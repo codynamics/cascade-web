@@ -403,6 +403,15 @@
   /* CAS-883: the Invite sheet opens from the film page (.filmpage, z-index:85) as well as the plain
      listing, so it needs the same over-the-film-page treatment as #contact.open above. */
   #filmInvite.open{z-index:91}
+  /* CAS-1077: Delete account opens from renderAccount()'s #accountScreen — a .uscreen, z-index:84 — same
+     over-the-launching-surface treatment as #contact.open/#feedback.open above. Audited every other .modal
+     (builder, filters, prefs, saveAs, recommend, logModal, videoModal): none of them can currently open
+     while a full z-index:84 .uscreen is on screen — they only open from another modal, from the plain
+     listing, from the nav menu (which the header carries, and the header sits under every full .uscreen),
+     or from #movingScreen/#agentsScreen, which are the one pair of .uscreen deliberately kept below the
+     header (z-index:29, see .uscreen comment below) and so already sit under the shared z-index:50 every
+     other .modal uses without needing this override. */
+  #deleteAcct.open{z-index:91}
   /* CAS-437: the public film page. Same phone-width-capped full page as .modal, but its own z-index so it
      sits over the splash (80) too — a share link has to show the film regardless of what boot put up. */
   /* CAS-554 device-parity-ignore: R2 — same reasoning as .modal above: top:0 carries no padding of its own

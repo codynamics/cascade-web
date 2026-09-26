@@ -1221,6 +1221,47 @@ test("Account and the keepfinding onboarding step carry no paid-membership copy,
   expectNoCas1076MembershipCopy(await page.locator("#onbStep").innerText());
 });
 
+// CAS-1077: #deleteAcct is a .modal (z-index:50) and #accountScreen is a .uscreen (z-index:84), so the
+// confirmation was in the DOM (class "open", display block) but painted underneath the Account screen —
+// elementFromPoint at its centre hit the screen behind it, not the modal, so the account could never
+// actually be deleted from the app. Fixed by giving #deleteAcct.open the same z-index:91 already used for
+// #contact/#feedback, the other sheets that open from an open .uscreen.
+// Needs accountWho().in true for renderAccount() to render the row as the clickable acctRow rather than
+// acctSoon's disabled "Not built yet" placeholder — set directly on window.CascadeAuth (guest mode still
+// creates the object, just with status:"guest") rather than a real (fake) Supabase sign-in, since nothing
+// here needs a session that survives a reload: only the flag renderAccount() itself reads.
+test("Delete account opens above the Account screen, not behind it (CAS-1077)", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  await page.evaluate(() => {
+    window.CascadeAuth.status = "signed-in";
+    window.CascadeAuth.user = { email: "cas1077@example.com" };
+  });
+
+  await page.locator("#navMenuBtn").click();
+  await page.locator("#navMenu .navitem", { hasText: "Account" }).click();
+  await expect(page.locator("#accountScreen")).toHaveClass(/open/);
+
+  await page.locator("#accountScreen .urow", { hasText: "Delete account" }).click();
+  await expect(page.locator("#deleteAcct")).toHaveClass(/open/);
+
+  // The real hit-test a tap goes through, not just DOM presence — the bug left the modal open in the DOM
+  // the whole time, so a class/visibility check alone would never have caught it.
+  const modalIsOnTop = await page.evaluate(() => {
+    const box = document.getElementById("deleteAcct").getBoundingClientRect();
+    const el = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return !!(el && el.closest("#deleteAcct"));
+  });
+  expect(modalIsOnTop, "the confirmation modal must be the top element at its own centre, not the Account screen underneath it").toBe(true);
+
+  await expect(page.locator("#deleteAcctGo")).toBeVisible();
+  await expect(page.locator("#deleteAcctGo")).toHaveText("Delete my account");
+  // AC4: the gating stays — the button is disabled until the confirm word is typed. Never clicked here.
+  await expect(page.locator("#deleteAcctGo")).toBeDisabled();
+});
+
 // CAS-1035 AC3: a Watch On tick made just before the tab closes must survive a reload even though it never
 // reached the account — the observed bug (Lee, iPhone: two Stream ticks reverted after a swipe-close and
 // reopen). Same session-persists-across-a-real-reload technique as CAS913_FAKE_SUPABASE_GLOBAL above (a
