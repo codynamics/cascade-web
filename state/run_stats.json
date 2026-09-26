@@ -1,18 +1,18 @@
 {
   "date": "2026-09-26",
   "tmdb": {
-    "calls": 5867,
+    "calls": 11733,
     "errors": 0,
     "not_found": 0,
     "status_counts": {}
   },
   "watchmode": {
     "remaining_monthly_credits": 40000,
-    "calls": 123,
+    "calls": 238,
     "errors": 0
   },
   "oscarbase": {
-    "calls": 750,
+    "calls": 1500,
     "errors": 0
   },
   "email": {

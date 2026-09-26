@@ -1251,6 +1251,80 @@
     "tmdb_not_found_streak": 0
   },
   {
+    "tmdb_id": 1492640,
+    "cache_stamped_at": "2026-09-26",
+    "imdb_id": "tt6933238",
+    "title": "UNABOMBER",
+    "year": "2026",
+    "genres": [
+      "Thriller",
+      "Drama",
+      "Crime"
+    ],
+    "cinema_date": null,
+    "cinema_release": false,
+    "release_dates": [
+      {
+        "region": "AU",
+        "type": 4,
+        "date": "2026-09-25"
+      }
+    ],
+    "age_rating": "M",
+    "worldwide_gross": null,
+    "budget": null,
+    "popularity": 104.4732,
+    "synopsis": "Follow Ted Kaczynski's transformation from Harvard prodigy into the infamous Unabomber. Subjected to controversial psychological experiments by Professor Henry Murray, Kaczynski's troubled past resurfaces decades later when his manhunt, led by FBI agent Joanne Miller, brings to light the chilling consequences of ambition and isolation.",
+    "language": "en",
+    "culture": "Western",
+    "poster": "/39aMkR8Y5vhCG9dTkjiqRl8AVqp.jpg",
+    "trailers": [
+      "B3tR6qQjbgI"
+    ],
+    "director": "Janus Metz",
+    "cast": [
+      "Russell Crowe",
+      "Shailene Woodley",
+      "Jacob Tremblay",
+      "Annabelle Wallis"
+    ],
+    "poll_tier": "slow",
+    "jw_link": "https://www.themoviedb.org/movie/1492640-unabomber/watch?locale=AU",
+    "status": [
+      "included_streaming"
+    ],
+    "availability_confidence": "confirmed",
+    "offers": [
+      {
+        "service": "Netflix",
+        "type": "sub",
+        "price": null,
+        "format": null
+      },
+      {
+        "service": "Netflix Standard with Ads",
+        "type": "sub",
+        "price": null,
+        "format": null
+      }
+    ],
+    "last_polled": "2026-09-26",
+    "availability_source": "tmdb_providers",
+    "tmdb_not_found_streak": 0,
+    "settled_since": "2026-09-26",
+    "wm_user_rating": 7.2,
+    "wm_critic_score": 51,
+    "wm_popularity_percentile": 100.0,
+    "wm_fields_fetched_at": "2026-09-26",
+    "first_seen": "2026-09-26",
+    "last_probed": "2026-09-26",
+    "probe_count": 1,
+    "outcome": "scored",
+    "window_dates": {
+      "included_streaming": "2026-09-26"
+    }
+  },
+  {
     "tmdb_id": 1284465,
     "imdb_id": "tt32273171",
     "title": "The Death of Robin Hood",
@@ -64010,13 +64084,13 @@
     "jw_link": "https://www.themoviedb.org/movie/513310-boss-level/watch?locale=AU",
     "offers": [
       {
-        "service": "Netflix",
+        "service": "Amazon Prime Video",
         "type": "sub",
         "price": null,
         "format": null
       },
       {
-        "service": "Netflix Standard with Ads",
+        "service": "Amazon Prime Video with Ads",
         "type": "sub",
         "price": null,
         "format": null
@@ -86492,12 +86566,6 @@
         "format": null
       },
       {
-        "service": "Fetch TV",
-        "type": "rent",
-        "price": null,
-        "format": null
-      },
-      {
         "service": "Apple TV Store",
         "type": "buy",
         "price": null,
@@ -86517,12 +86585,6 @@
       },
       {
         "service": "YouTube",
-        "type": "buy",
-        "price": null,
-        "format": null
-      },
-      {
-        "service": "Fetch TV",
         "type": "buy",
         "price": null,
         "format": null
@@ -210861,6 +210923,12 @@
     "jw_link": "https://www.themoviedb.org/movie/820530-1/watch?locale=AU",
     "offers": [
       {
+        "service": "Crunchyroll",
+        "type": "sub",
+        "price": null,
+        "format": null
+      },
+      {
         "service": "Crunchyroll Amazon Channel",
         "type": "sub",
         "price": null,
@@ -289401,19 +289469,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 2.0297,
     "popularity_percentile": 86.866,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "Little Nicholas: Happy as Can Be",
     "tmdb_id": 893366,
     "wm_critic_score": 83,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 86.52,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 95.23,
     "wm_user_rating": 7.0,
     "year": "2022",
     "cache_stamped_at": "2026-09-17",
@@ -289575,6 +289643,12 @@
     "poll_tier": "slow",
     "jw_link": "https://www.themoviedb.org/movie/333623-the-school-idol-movie/watch?locale=AU",
     "offers": [
+      {
+        "service": "Crunchyroll",
+        "type": "sub",
+        "price": null,
+        "format": null
+      },
       {
         "service": "Crunchyroll Amazon Channel",
         "type": "sub",
@@ -289942,11 +290016,11 @@
     },
     "wm_user_rating": null,
     "wm_critic_score": null,
-    "wm_popularity_percentile": 96.8,
-    "wm_fields_fetched_at": "2026-09-17",
+    "wm_popularity_percentile": 96.81,
+    "wm_fields_fetched_at": "2026-09-26",
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
-    "probe_count": 1,
+    "last_probed": "2026-09-26",
+    "probe_count": 2,
     "outcome": "scored",
     "tmdb_not_found_streak": 0
   },
@@ -293639,19 +293713,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.9812,
     "popularity_percentile": 98.128,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "The Narrow Bridge",
     "tmdb_id": 959669,
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 98.11,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 97.99,
     "wm_user_rating": 6.8,
     "year": "2022",
     "cache_stamped_at": "2026-09-17",
@@ -293692,19 +293766,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.9805,
     "popularity_percentile": 93.316,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "kid 90",
     "tmdb_id": 795859,
     "wm_critic_score": 72,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 93.19,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 98.09,
     "wm_user_rating": 7.0,
     "year": "2021",
     "cache_stamped_at": "2026-09-17",
@@ -293732,12 +293806,12 @@
       "Stephen Dorff",
       "Balthazar Getty"
     ],
-    "poll_tier": "slow",
+    "poll_tier": "none",
     "jw_link": null,
     "offers": [],
-    "availability_confidence": "estimated",
+    "availability_confidence": "confirmed",
     "last_polled": "2026-09-26",
-    "availability_source": "tmdb_providers",
+    "availability_source": "tmdb_date",
     "window_dates": {
       "upcoming": "2026-09-26"
     },
@@ -294483,19 +294557,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.9688,
     "popularity_percentile": 92.504,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "As Needed",
     "tmdb_id": 508206,
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 92.35,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 91.52,
     "wm_user_rating": 6.7,
     "year": "2018",
     "cache_stamped_at": "2026-09-17",
@@ -305418,19 +305492,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.883,
     "popularity_percentile": 95.114,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "Adam",
     "tmdb_id": 595875,
     "wm_critic_score": 74,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 95.03,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 94.61,
     "wm_user_rating": 7.0,
     "year": "2019",
     "cache_stamped_at": "2026-09-17",
@@ -317921,19 +317995,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.7736,
     "popularity_percentile": 90.354,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "The Living Dead",
     "tmdb_id": 643786,
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 90.13,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 89.01,
     "wm_user_rating": 6.5,
     "year": "2019",
     "cache_stamped_at": "2026-09-17",
@@ -322416,19 +322490,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.7435,
     "popularity_percentile": 92.854,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "The Father",
     "tmdb_id": 605503,
     "wm_critic_score": 95,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 92.71,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 91.94,
     "wm_user_rating": 6.6,
     "year": "2019",
     "cache_stamped_at": "2026-09-17",
@@ -322820,20 +322894,20 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.7416,
     "popularity_percentile": 94.137,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "Loop",
     "tmdb_id": 610203,
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 94.03,
-    "wm_user_rating": 6.5,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 93.46,
+    "wm_user_rating": 6.6,
     "year": "2019",
     "cache_stamped_at": "2026-09-17",
     "imdb_id": "tt8241138",
@@ -325773,19 +325847,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.7156,
     "popularity_percentile": 96.996,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "Jinne Jamme Saare Nikamme",
     "tmdb_id": 883862,
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 96.97,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 92.64,
     "wm_user_rating": 6.6,
     "year": "2021",
     "cache_stamped_at": "2026-09-17",
@@ -327250,19 +327324,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.7034,
     "popularity_percentile": 95.101,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "America",
     "tmdb_id": 501145,
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 95.02,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 94.59,
     "wm_user_rating": 6.6,
     "year": "2018",
     "cache_stamped_at": "2026-09-17",
@@ -328903,19 +328977,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.693,
     "popularity_percentile": 85.474,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "Hawa",
     "tmdb_id": 925715,
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 85.08,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 83.37,
     "wm_user_rating": 7.4,
     "year": "2022",
     "cache_stamped_at": "2026-09-17",
@@ -329538,19 +329612,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.6871,
     "popularity_percentile": 94.838,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "White Water",
     "tmdb_id": 324114,
     "wm_critic_score": 65,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 94.75,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 94.29,
     "wm_user_rating": 7.0,
     "year": "2015",
     "cache_stamped_at": "2026-09-17",
@@ -331377,19 +331451,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.6761,
     "popularity_percentile": 80.488,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "Lord of the Ants",
     "tmdb_id": 840098,
     "wm_critic_score": 72,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 79.96,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 98.19,
     "wm_user_rating": 6.9,
     "year": "2022",
     "cache_stamped_at": "2026-09-17",
@@ -335687,19 +335761,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.652,
     "popularity_percentile": 98.372,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "Django & Django: Sergio Corbucci Unchained",
     "tmdb_id": 854521,
     "wm_critic_score": 65,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 98.36,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 98.25,
     "wm_user_rating": 7.0,
     "year": "2021",
     "cache_stamped_at": "2026-09-17",
@@ -340447,20 +340521,20 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.6206,
     "popularity_percentile": 93.559,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "American Girl",
     "tmdb_id": 1336225,
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 93.44,
-    "wm_user_rating": 7.6,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 92.77,
+    "wm_user_rating": 6.9,
     "year": "2022",
     "cache_stamped_at": "2026-09-17",
     "imdb_id": "tt14276934",
@@ -351959,19 +352033,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.5398,
     "popularity_percentile": 90.022,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "Loro 2",
     "tmdb_id": 520736,
     "wm_critic_score": 74,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 89.79,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 88.62,
     "wm_user_rating": 6.8,
     "year": "2018",
     "cache_stamped_at": "2026-09-17",
@@ -362826,19 +362900,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.4653,
     "popularity_percentile": 91.112,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "Vikram Vedha",
     "tmdb_id": 851783,
     "wm_critic_score": 74,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 90.91,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 89.89,
     "wm_user_rating": 7.3,
     "year": "2022",
     "cache_stamped_at": "2026-09-17",
@@ -369194,19 +369268,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.4197,
     "popularity_percentile": 96.994,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "Blue",
     "tmdb_id": 451735,
     "wm_critic_score": 78,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 96.96,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 96.76,
     "wm_user_rating": 7.3,
     "year": "2017",
     "cache_stamped_at": "2026-09-17",
@@ -369734,19 +369808,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.4167,
     "popularity_percentile": 86.6,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "The Surgeon of the Rusty Knife",
     "tmdb_id": 649985,
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 86.25,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 84.67,
     "wm_user_rating": 7.3,
     "year": "2022",
     "cache_stamped_at": "2026-09-17",
@@ -372951,13 +373025,13 @@
       "upcoming": "2026-09-09",
       "in_cinema": "2026-09-24"
     },
-    "wm_user_rating": null,
-    "wm_critic_score": 53,
-    "wm_popularity_percentile": 97.41,
-    "wm_fields_fetched_at": "2026-09-17",
+    "wm_user_rating": 6.8,
+    "wm_critic_score": 63,
+    "wm_popularity_percentile": 99.03,
+    "wm_fields_fetched_at": "2026-09-26",
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
-    "probe_count": 1,
+    "last_probed": "2026-09-26",
+    "probe_count": 2,
     "outcome": "scored",
     "jw_link": null,
     "last_polled": "2026-09-26",
@@ -376753,19 +376827,19 @@
   },
   {
     "first_seen": "2026-09-16",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "outcome": "scored",
     "popularity": 1.3691,
     "popularity_percentile": 89.896,
-    "probe_count": 1,
+    "probe_count": 2,
     "status": [
       "upcoming"
     ],
     "title": "Skin",
     "tmdb_id": 719889,
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 89.66,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 88.23,
     "wm_user_rating": 6.6,
     "year": "2019",
     "cache_stamped_at": "2026-09-17",
@@ -379575,14 +379649,14 @@
     "jw_link": null,
     "language": "ky",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "none",
     "popularity": 1.3526,
     "popularity_percentile": 86.234,
     "poster": "/jHVTIHyKpXtsaJqhqZSB7PlyTG9.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -379595,8 +379669,8 @@
       "upcoming": "2026-09-17"
     },
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 85.86,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 84.24,
     "wm_user_rating": 6.8,
     "worldwide_gross": null,
     "year": "2018"
@@ -381910,14 +381984,14 @@
     "jw_link": null,
     "language": "en",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "none",
     "popularity": 1.3379,
     "popularity_percentile": 90.446,
     "poster": "/vxQTkOg2OYS0SqYasvF7inMWgdH.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -381930,8 +382004,8 @@
       "upcoming": "2026-09-17"
     },
     "wm_critic_score": 80,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 90.23,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 89.12,
     "wm_user_rating": 7.0,
     "worldwide_gross": null,
     "year": "2015"
@@ -383263,28 +383337,28 @@
     "last_probed": "2026-09-17",
     "offers": [
       {
+        "format": null,
+        "price": null,
         "service": "HBO Max",
-        "type": "sub",
-        "price": null,
-        "format": null
+        "type": "sub"
       },
       {
+        "format": null,
+        "price": null,
         "service": "HBO Max Amazon Channel",
-        "type": "sub",
-        "price": null,
-        "format": null
+        "type": "sub"
       },
       {
-        "service": "YouTube",
-        "type": "rent",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "YouTube",
+        "type": "rent"
       },
       {
-        "service": "YouTube",
-        "type": "buy",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "YouTube",
+        "type": "buy"
       }
     ],
     "outcome": "scored",
@@ -383343,28 +383417,28 @@
     "last_probed": "2026-09-17",
     "offers": [
       {
+        "format": null,
+        "price": null,
         "service": "Apple TV Store",
-        "type": "rent",
-        "price": null,
-        "format": null
+        "type": "rent"
       },
       {
+        "format": null,
+        "price": null,
         "service": "Amazon Video",
-        "type": "rent",
-        "price": null,
-        "format": null
+        "type": "rent"
       },
       {
+        "format": null,
+        "price": null,
         "service": "Apple TV Store",
-        "type": "buy",
-        "price": null,
-        "format": null
+        "type": "buy"
       },
       {
-        "service": "Amazon Video",
-        "type": "buy",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "Amazon Video",
+        "type": "buy"
       }
     ],
     "outcome": "scored",
@@ -383422,16 +383496,16 @@
     "last_probed": "2026-09-17",
     "offers": [
       {
-        "service": "Apple TV Store",
-        "type": "rent",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "Apple TV Store",
+        "type": "rent"
       },
       {
-        "service": "Apple TV Store",
-        "type": "buy",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "Apple TV Store",
+        "type": "buy"
       }
     ],
     "outcome": "scored",
@@ -383491,16 +383565,16 @@
     "last_probed": "2026-09-17",
     "offers": [
       {
-        "service": "Amazon Prime Video",
-        "type": "sub",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "Amazon Prime Video",
+        "type": "sub"
       },
       {
-        "service": "Amazon Prime Video with Ads",
-        "type": "sub",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "Amazon Prime Video with Ads",
+        "type": "sub"
       }
     ],
     "outcome": "scored",
@@ -383557,16 +383631,16 @@
     "last_probed": "2026-09-17",
     "offers": [
       {
-        "service": "Amazon Prime Video",
-        "type": "sub",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "Amazon Prime Video",
+        "type": "sub"
       },
       {
-        "service": "Amazon Prime Video with Ads",
-        "type": "sub",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "Amazon Prime Video with Ads",
+        "type": "sub"
       }
     ],
     "outcome": "scored",
@@ -383623,40 +383697,40 @@
     "last_probed": "2026-09-17",
     "offers": [
       {
+        "format": null,
+        "price": null,
         "service": "Apple TV Store",
-        "type": "rent",
-        "price": null,
-        "format": null
+        "type": "rent"
       },
       {
+        "format": null,
+        "price": null,
         "service": "Google Play Movies",
-        "type": "rent",
-        "price": null,
-        "format": null
+        "type": "rent"
       },
       {
+        "format": null,
+        "price": null,
         "service": "YouTube",
-        "type": "rent",
-        "price": null,
-        "format": null
+        "type": "rent"
       },
       {
+        "format": null,
+        "price": null,
         "service": "Apple TV Store",
-        "type": "buy",
-        "price": null,
-        "format": null
+        "type": "buy"
       },
       {
+        "format": null,
+        "price": null,
         "service": "Google Play Movies",
-        "type": "buy",
-        "price": null,
-        "format": null
+        "type": "buy"
       },
       {
-        "service": "YouTube",
-        "type": "buy",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "YouTube",
+        "type": "buy"
       }
     ],
     "outcome": "scored",
@@ -383711,22 +383785,22 @@
     "last_probed": "2026-09-17",
     "offers": [
       {
+        "format": null,
+        "price": null,
         "service": "Hoopla",
-        "type": "free",
-        "price": null,
-        "format": null
+        "type": "free"
       },
       {
+        "format": null,
+        "price": null,
         "service": "Tubi TV",
-        "type": "free",
-        "price": null,
-        "format": null
+        "type": "free"
       },
       {
-        "service": "Plex",
-        "type": "free",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "Plex",
+        "type": "free"
       }
     ],
     "outcome": "scored",
@@ -383785,16 +383859,16 @@
     "last_probed": "2026-09-17",
     "offers": [
       {
-        "service": "Amazon Prime Video",
-        "type": "sub",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "Amazon Prime Video",
+        "type": "sub"
       },
       {
-        "service": "Amazon Prime Video with Ads",
-        "type": "sub",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "Amazon Prime Video with Ads",
+        "type": "sub"
       }
     ],
     "outcome": "scored",
@@ -383850,16 +383924,16 @@
     "last_probed": "2026-09-17",
     "offers": [
       {
-        "service": "Hoopla",
-        "type": "free",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "Hoopla",
+        "type": "free"
       },
       {
-        "service": "Tubi TV",
-        "type": "free",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "Tubi TV",
+        "type": "free"
       }
     ],
     "outcome": "scored",
@@ -383916,40 +383990,40 @@
     "last_probed": "2026-09-17",
     "offers": [
       {
+        "format": null,
+        "price": null,
         "service": "Apple TV Store",
-        "type": "rent",
-        "price": null,
-        "format": null
+        "type": "rent"
       },
       {
+        "format": null,
+        "price": null,
         "service": "Google Play Movies",
-        "type": "rent",
-        "price": null,
-        "format": null
+        "type": "rent"
       },
       {
+        "format": null,
+        "price": null,
         "service": "YouTube",
-        "type": "rent",
-        "price": null,
-        "format": null
+        "type": "rent"
       },
       {
+        "format": null,
+        "price": null,
         "service": "Apple TV Store",
-        "type": "buy",
-        "price": null,
-        "format": null
+        "type": "buy"
       },
       {
+        "format": null,
+        "price": null,
         "service": "Google Play Movies",
-        "type": "buy",
-        "price": null,
-        "format": null
+        "type": "buy"
       },
       {
-        "service": "YouTube",
-        "type": "buy",
+        "format": null,
         "price": null,
-        "format": null
+        "service": "YouTube",
+        "type": "buy"
       }
     ],
     "outcome": "scored",
@@ -386682,14 +386756,14 @@
     "jw_link": null,
     "language": "nl",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "none",
     "popularity": 1.3148,
     "popularity_percentile": 90.466,
     "poster": "/s0t78EAmEgbnvwszXphAa6nbd9k.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -386702,8 +386776,8 @@
       "upcoming": "2026-09-17"
     },
     "wm_critic_score": 65,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 90.25,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 89.14,
     "wm_user_rating": 6.5,
     "worldwide_gross": null,
     "year": "2017"
@@ -389345,14 +389419,14 @@
     "jw_link": null,
     "language": "pl",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "none",
     "popularity": 1.2978,
     "popularity_percentile": 93.382,
     "poster": "/xYv28JRaDzm1p7Zz2fGpA519tfl.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -389368,8 +389442,8 @@
       "upcoming": "2026-09-17"
     },
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 93.25,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 92.56,
     "wm_user_rating": 7.7,
     "worldwide_gross": null,
     "year": "2020"
@@ -390230,14 +390304,14 @@
     "jw_link": null,
     "language": "en",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "none",
     "popularity": 1.2936,
     "popularity_percentile": 80.24,
     "poster": "/rkR9BsoecpBAWknViMRnO42f43n.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -390253,8 +390327,8 @@
       "upcoming": "2026-09-17"
     },
     "wm_critic_score": 69,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 79.7,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 77.61,
     "wm_user_rating": 7.3,
     "worldwide_gross": null,
     "year": "2017"
@@ -390351,14 +390425,14 @@
     "jw_link": null,
     "language": "zh",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "none",
     "popularity": 1.2932,
     "popularity_percentile": 79,
     "poster": "/c3pvLauEGSw0FWMfCAARvHLgNsn.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -390374,8 +390448,8 @@
       "upcoming": "2026-09-17"
     },
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 78.44,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 76.31,
     "wm_user_rating": 6.5,
     "worldwide_gross": null,
     "year": "2019"
@@ -395208,14 +395282,14 @@
     "jw_link": null,
     "language": "fr",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "none",
     "popularity": 1.2736,
     "popularity_percentile": 82.454,
     "poster": "/gdPQam9v6SXH7YfVTNMeKWGESQE.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -395228,8 +395302,8 @@
       "upcoming": "2026-09-17"
     },
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 81.97,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 80.0,
     "wm_user_rating": 7.0,
     "worldwide_gross": null,
     "year": "2022"
@@ -398203,14 +398277,14 @@
     "jw_link": null,
     "language": "en",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "slow",
     "popularity": 1.2555,
     "popularity_percentile": 83.136,
     "poster": "/n25nJyESAdjDWfxaAKe6UW6Ntms.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -398222,8 +398296,8 @@
       "gJIYL0PdFJI"
     ],
     "wm_critic_score": 89,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 82.67,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 80.75,
     "wm_user_rating": 7.9,
     "worldwide_gross": null,
     "year": "2022",
@@ -399333,14 +399407,14 @@
     "jw_link": null,
     "language": "en",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "slow",
     "popularity": 1.2507,
     "popularity_percentile": 85.019,
     "poster": "/4L8eHIxGCVUjxBOvmHzHPghbQGg.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -399352,8 +399426,8 @@
       "7oTecp7Q7nE"
     ],
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 84.61,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 82.85,
     "wm_user_rating": 7.7,
     "worldwide_gross": 13639,
     "year": "2015",
@@ -400707,14 +400781,14 @@
     "jw_link": null,
     "language": "fr",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "slow",
     "popularity": 1.2459,
     "popularity_percentile": 89.178,
     "poster": "/77jCwaADS141DVKmlmGILumHXeY.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -400726,8 +400800,8 @@
       "vB2YNPhW4a4"
     ],
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 88.92,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 87.65,
     "wm_user_rating": 6.5,
     "worldwide_gross": null,
     "year": "2022",
@@ -407415,14 +407489,14 @@
     "jw_link": null,
     "language": "en",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "slow",
     "popularity": 1.2198,
     "popularity_percentile": 80.692,
     "poster": "/r1y2dwUVRcNDmGbYoBGTycIY0Zp.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -407434,8 +407508,8 @@
       "J7ZN_FxKnSc"
     ],
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 80.17,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 92.03,
     "wm_user_rating": 7.8,
     "worldwide_gross": null,
     "year": "2018",
@@ -408720,14 +408794,14 @@
     "jw_link": null,
     "language": "zh",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "slow",
     "popularity": 1.2161,
     "popularity_percentile": 82.457,
     "poster": "/aO4d3o21ZR3hIlh8dupbFRJ7nF8.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -408737,8 +408811,8 @@
     "tmdb_id": 623760,
     "trailers": [],
     "wm_critic_score": 78,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 81.97,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 80.0,
     "wm_user_rating": 6.6,
     "worldwide_gross": null,
     "year": "2019",
@@ -412742,14 +412816,14 @@
     "jw_link": null,
     "language": "el",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "slow",
     "popularity": 1.1951,
     "popularity_percentile": 81.078,
     "poster": "/oXK69ImFmvBUpop1UVn7KCuHW2a.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -412762,8 +412836,8 @@
       "986_9-ki12w"
     ],
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 80.56,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 78.5,
     "wm_user_rating": 8.2,
     "worldwide_gross": null,
     "year": "2019",
@@ -412932,13 +413006,13 @@
     "jw_link": null,
     "language": "en",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "active",
     "popularity": 1.1945,
     "poster": "/uqUGgcuHF2bSzLtMUQM0ICJXabo.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [
       {
         "date": "2026-08-27",
@@ -412959,8 +413033,8 @@
       "in_cinema": "2026-09-20"
     },
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 89.1,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 92.22,
     "wm_user_rating": null,
     "worldwide_gross": null,
     "year": "2026"
@@ -421341,14 +421415,14 @@
     "jw_link": null,
     "language": "en",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "slow",
     "popularity": 1.1562,
     "popularity_percentile": 85.249,
     "poster": "/vclAGPhOATtFECQfe1aE1ZDQdG.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [],
     "status": [
       "upcoming"
@@ -421358,8 +421432,8 @@
     "tmdb_id": 923700,
     "trailers": [],
     "wm_critic_score": 87,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 84.84,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 83.11,
     "wm_user_rating": 7.5,
     "worldwide_gross": null,
     "year": "2021",
@@ -430256,13 +430330,13 @@
     "jw_link": null,
     "language": "en",
     "last_polled": "2026-09-17",
-    "last_probed": "2026-09-17",
+    "last_probed": "2026-09-26",
     "offers": [],
     "outcome": "scored",
     "poll_tier": "active",
     "popularity": 1.1173,
     "poster": "/a0nGI5FZCAkaVvxxtz21a1waSlW.jpg",
-    "probe_count": 1,
+    "probe_count": 2,
     "release_dates": [
       {
         "date": "2025-11-07",
@@ -430290,9 +430364,9 @@
       "in_cinema": "2026-09-04"
     },
     "wm_critic_score": null,
-    "wm_fields_fetched_at": "2026-09-17",
-    "wm_popularity_percentile": 97.48,
-    "wm_user_rating": 6.1,
+    "wm_fields_fetched_at": "2026-09-26",
+    "wm_popularity_percentile": 98.64,
+    "wm_user_rating": 6.2,
     "worldwide_gross": null,
     "year": "2026"
   },
@@ -520887,7 +520961,7 @@
     "poll_tier": "none",
     "popularity": 0.097,
     "poster": null,
-    "probe_count": 7,
+    "probe_count": 8,
     "release_dates": [
       {
         "date": "2027-04-01",
