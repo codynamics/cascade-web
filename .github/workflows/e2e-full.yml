@@ -4,6 +4,10 @@
 # CAS-385's reasoning still holds: per-ticket specs pinned to one commit's exact copy/DOM would
 # turn the gate red for approved UI changes that are not regressions. This workflow exists so
 # that suite is still runnable, and its result inspectable, without running it by hand.
+# CAS-1025: even with CAS-1016's 60-minute ceiling and --retries=1, a single runner could not
+# finish the full suite (run 36225028455 timed out with no report). Shard across 4 parallel jobs
+# so each carries roughly a quarter of the specs, well inside the timeout, then merge the shards'
+# blob reports into one HTML report.
 name: e2e-full
 
 on:
@@ -16,6 +20,10 @@ jobs:
   e2e-full:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,9 +37,39 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps webkit
       - run: npm run build
-      - run: npm run test:e2e:full -- --retries=1
+      - run: npm run test:e2e:full -- --retries=1 --reporter=blob --shard=${{ matrix.shard }}/4
 
-      - name: Keep the HTML report
+      - name: Keep the shard's blob report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 7
+
+  merge-reports:
+    needs: e2e-full
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Download all shard blob reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      - name: Merge into one HTML report
+        run: npx playwright merge-reports --reporter=html ./all-blob-reports
+
+      - name: Keep the merged HTML report
         if: always()
         uses: actions/upload-artifact@v4
         with:
