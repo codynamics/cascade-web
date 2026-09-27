@@ -1555,7 +1555,8 @@ def provider_offers(prov: dict) -> list[dict]:
     return [{"service": s, "type": t, "price": None, "format": None} for s, t in rows]
 
 
-def _offerless_window(cinema_date: str | None, today: datetime.date) -> str:
+def _offerless_window(cinema_date: str | None, today: datetime.date,
+                       year: int | None = None, release_dates: list | None = None) -> str:
     """CAS-608: the date-only classification for a title with no usable offer to read a window
     from — judged by the release date, never by whether an offer exists, so a film Cascade can't
     place an AU offer against is never confused with one that genuinely hasn't come out yet.
@@ -1565,12 +1566,35 @@ def _offerless_window(cinema_date: str | None, today: datetime.date) -> str:
                                        still held in the catalogue, judged by qScore like any other
                                        released title. This is the split that used to fall to
                                        "upcoming" and never left it.)
-    Mirrored exactly by app_template.html's own offerlessWindow — CAS-608 AC5 asserts they agree."""
-    opened = bool(cinema_date and cinema_date <= today.isoformat())
+    Mirrored exactly by app_template.html's own offerlessWindow — CAS-608 AC5 asserts they agree
+    (that mirror never passes `year`/`release_dates`: see the CAS-1078 note below).
+
+    CAS-1078: `cinema_date` alone used to mean "not yet opened" even for a title with NO AU
+    cinema_date at all and a release year already behind us — 82 old back-catalogue titles with
+    no AU theatrical release on record stayed `upcoming` forever, because nothing here could tell
+    "genuinely still to come" apart from "old title Cascade never got an AU date for". `year`/
+    `release_dates` are optional so every existing caller (and the fixture-equality test against
+    app_template.html's copy, which only ever exercises the cinema_date-only cases) is unaffected;
+    when `cinema_date` is None and the caller supplies a `year` already behind `today` with no AU
+    release_dates entry (any type) still ahead of `today`, that title is `released`, not `upcoming`."""
+    if not cinema_date:
+        if (year is not None and year < today.year
+                and not any((rd.get("date") or "") > today.isoformat() for rd in (release_dates or []))):
+            return "released"
+        return "upcoming"
+    opened = cinema_date <= today.isoformat()
     if not opened:
         return "upcoming"
     still_running = cinema_date >= (today - datetime.timedelta(days=CINEMA_RUN_DAYS)).isoformat()
     return "in_cinema" if still_running else "released"
+
+
+def _record_year(movie: dict) -> int | None:
+    y = movie.get("year")
+    try:
+        return int(y)
+    except (TypeError, ValueError):
+        return None
 
 
 def derive_from_providers(movie: dict, prov: dict, today: datetime.date) -> list[str]:
@@ -1594,7 +1618,8 @@ def derive_from_providers(movie: dict, prov: dict, today: datetime.date) -> list
     # buy offer is never filed under the big screen (engine invariant #55). So the offer-less fallback
     # only ever runs when NO home window resolved.
     if not windows:
-        windows.append(_offerless_window(movie.get("cinema_date"), today))
+        windows.append(_offerless_window(movie.get("cinema_date"), today,
+                                          _record_year(movie), movie.get("release_dates")))
     return windows
 
 
@@ -1675,7 +1700,7 @@ def derive_status(movie: dict, offers: list[dict], today: datetime.date) -> list
     # CAS-608: date-only, same as derive_from_providers' offer-less fallback — a title past its
     # cinema run with no priced offer is released-and-unavailable, not upcoming.
     if not status:
-        status.add(_offerless_window(cd, today))
+        status.add(_offerless_window(cd, today, _record_year(movie), movie.get("release_dates")))
     return sorted(status)
 
 

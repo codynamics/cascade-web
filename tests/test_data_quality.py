@@ -52,6 +52,10 @@ BLOCKING_TESTS = {
     # one the default selection or an agent's saved criteria didn't happen to name. Blocking so a future
     # ingestion path can't reintroduce the un-canonical spelling the way the back-catalogue merge above did.
     "CatalogueShape.test_age_rating_is_canonical_spelling",
+    # CAS-1078: an old back-catalogue title latched at Upcoming forever with no AU release date at
+    # all is the same class of app-breaker as the checks above — a listing claiming a cinema future
+    # the film doesn't have. Blocking so the classify_tier/_offerless_window gap can't reopen.
+    "StatusAgreesWithTheCalendar.test_upcoming_never_holds_an_old_title_with_no_future_au_date",
 }
 
 # The windows a film can hold, in journey order — the same list the front end calls CASCADE.
@@ -280,6 +284,29 @@ class StatusAgreesWithTheCalendar(unittest.TestCase):
             len(late), 40,
             f"{len(late)} films are still labelled Upcoming after their opening date — the poll scheduler's "
             f"upcoming latch (see CAS-227) has got worse: {late[:5]}")
+
+    def test_upcoming_never_holds_an_old_title_with_no_future_au_date(self):
+        # CAS-1078: 84 old back-catalogue titles (release year already behind us) with no AU
+        # cinema_date at all stayed Upcoming forever — classify_tier's "none" tier (poll_scheduler.py)
+        # never re-checked them, and _offerless_window's cinema_date-only read had no way to tell
+        # "genuinely still to come" apart from "an old title Cascade never got an AU date for". Unlike
+        # test_upcoming_films_are_not_already_out above (cinema_date required, tolerant, a known gap),
+        # this is a hard zero: a film whose own release year has passed, with no AU release_dates entry
+        # of any type still ahead of us, must never be Upcoming, cinema_date or not.
+        bad = []
+        for m in self.movies:
+            if "upcoming" not in (m.get("status") or []):
+                continue
+            year = m.get("year")
+            year = int(year) if isinstance(year, str) and year.isdigit() else None
+            if year is None or year >= self.today.year:
+                continue
+            if any((rd.get("date") or "") > self.today.isoformat()
+                   for rd in (m.get("release_dates") or [])):
+                continue
+            bad.append((m["title"], m.get("year"), m.get("cinema_date")))
+        self.assertEqual(bad, [],
+                          f"old titles with no future AU date still marked Upcoming: {bad[:5]}")
 
     def test_dates_parse_and_are_sane(self):
         horizon = self.today + datetime.timedelta(days=365 * 6)

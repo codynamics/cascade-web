@@ -414,6 +414,27 @@ class UpcomingLatchNeverTrapsAReleasedTitle(unittest.TestCase):
         m = {"status": ["upcoming"], "cinema_date": None}
         self.assertEqual(pp.ps.classify_tier(m, datetime.date(2026, 8, 12)), "none")
 
+    def test_classify_tier_is_never_none_once_the_titles_own_year_has_passed(self):
+        # CAS-1078: a back-catalogue title with no AU cinema_date AT ALL used to read the same as a
+        # genuinely-unannounced one — "none" forever — even when its own release year had already
+        # passed and no AU release_dates entry (any type) was still ahead of us.
+        m = {"status": ["upcoming"], "cinema_date": None, "year": "2018", "release_dates": []}
+        self.assertNotEqual(pp.ps.classify_tier(m, datetime.date(2026, 9, 27)), "none")
+
+    def test_classify_tier_still_skips_a_title_with_no_year_known_at_all(self):
+        m = {"status": ["upcoming"], "cinema_date": None, "release_dates": []}
+        self.assertEqual(pp.ps.classify_tier(m, datetime.date(2026, 9, 27)), "none")
+
+    def test_classify_tier_still_skips_a_title_whose_year_has_not_arrived_yet(self):
+        m = {"status": ["upcoming"], "cinema_date": None, "year": "2027", "release_dates": []}
+        self.assertEqual(pp.ps.classify_tier(m, datetime.date(2026, 9, 27)), "none")
+
+    def test_classify_tier_still_skips_an_old_year_title_with_a_future_au_release_date(self):
+        # A digital-only AU date can be announced with no theatrical cinema_date behind it at all.
+        m = {"status": ["upcoming"], "cinema_date": None, "year": "2018",
+             "release_dates": [{"region": "AU", "type": 4, "date": "2026-12-01"}]}
+        self.assertEqual(pp.ps.classify_tier(m, datetime.date(2026, 9, 27)), "none")
+
 
 class ALatchedUpcomingTitleSelfCorrectsOnTheNextRun(unittest.TestCase):
     """The end-to-end version of the fix above, exercised through the real write path
