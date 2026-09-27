@@ -17883,11 +17883,17 @@ function endTutorial(markSeen){
   if(markSeen) markTutorialSeen();
   tutCards=[]; tutIdx=-1;
 }
-// Replay (from Account's Help & feedback row): Account is a .uscreen sitting over the listing that was
-// already there, so closing it is enough to land back on it — no need to force the watch tab or rebuild.
+// Replay (from Account's Help & feedback row): Account is a .uscreen sitting over whatever was already
+// there, but that "whatever" isn't always the Watch listing — Account can be reached from Menu while
+// Moving or Agents is open underneath it, and closing Account alone would just uncover that screen instead
+// (CAS-1079: two of the tour's cards anchor to #groups .card controls that are covered, not gone, so they
+// resolved to real-but-invisible rects instead of being skipped). showAgentsHome() is the same "uncover the
+// Watch listing" call applyDeepLink() already uses for the same reason — closes Moving/Agents if either is
+// open, then Account's own close reveals the listing underneath both.
 // Bypasses tutorialSeen() on purpose, same as any other explicit "show me that again" control.
 function replayTutorial(){
   closeAccount();
+  showAgentsHome();
   requestAnimationFrame(()=>requestAnimationFrame(startTutorial));
 }
 function membStartWork(){
