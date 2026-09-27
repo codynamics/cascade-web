@@ -98,7 +98,7 @@ function makeContext(){
 const EXPORTS = `
 ;globalThis.__ONB_V2__ = { onbAnswersV2Default, ONB_AGENTS_V2, buildOnbAgentsV2, onbNotifySum,
   MOVIES, watchesFilm, watchCount, normCascade, laneCrit, onbAgentCapSolveV2, ONB_AGENT_CAP_V2,
-  onbMassiveCritV2, onbFavsCritV2, onbDateCritV2, onbFamilyCritV2,
+  onbMassiveCritV2, onbFavsCritV2, onbDateCritV2, onbFamilyCritV2, YEARS_STOPS,
   listingOrder, DEFAULT_SORT, escA, paintSplashWall, SHARP_STEPS, onbAgentRevealHTML,
   onbMembershipFilms, REVEAL_POSTERS, MEMB_POSTERS };
 `;
@@ -188,7 +188,9 @@ check("AC10", () => {
     const nonNull = Object.values(favs.watchMarkers).filter(v => v != null);
     const s = Math.max(...nonNull);
     // CAS-952: the range widened from onbFavsSolve's old 60-90 to the shared solve's 60-95.
-    assert.ok(Number.isInteger(s) && s >= 60 && s <= 95, `Personal Favs solved score(${JSON.stringify(ans)}) = ${s}`);
+    // CAS-1080: widened again to 60-100 — 95 was an arbitrary margin below the score scale's own
+    // top, not a real ceiling, and BASE_A/B's empty styles (all genres) is broad enough to need it.
+    assert.ok(Number.isInteger(s) && s >= 60 && s <= 100, `Personal Favs solved score(${JSON.stringify(ans)}) = ${s}`);
   }
 });
 
@@ -297,12 +299,15 @@ check("CAS952-AC2", () => {
   for(const ans of CAS952_ANSWERS){
     for(const a of E.buildOnbAgentsV2(ans)){
       // The ticket's own rule has a second branch: "if no score up to 95 gets the count to 45 or
-      // below, use 95 and accept the result." A solve pinned at the 95 ceiling is that accepted
+      // below, use 95 and accept the result." A solve pinned at the ceiling is that accepted
       // outcome, not a failure — Personal Favs under a cinema-yes answer (its widest ladder, four
       // active windows) lands here against today's catalogue.
+      // CAS-1080: the ceiling itself moved to 100 (and Personal Favs gets a yearsBack lever to try
+      // first) — an empty styles answer (every genre) is broad enough that even the tightened lever
+      // still pins at the new ceiling, so the accepted-outcome branch survives, just at 100 not 95.
       const n = E.watchCount(a);
-      assert.ok(n <= 45 || cas952ScoreOf(a) === 95,
-        `${a.name} watchCount ${n} > 45 for ${JSON.stringify(ans)}, and its solve did not reach the 95 ceiling`);
+      assert.ok(n <= 45 || cas952ScoreOf(a) === 100,
+        `${a.name} watchCount ${n} > 45 for ${JSON.stringify(ans)}, and its solve did not reach the 100 ceiling`);
     }
   }
 });
@@ -329,9 +334,13 @@ check("CAS952-AC5", () => {
     for(const a of E.buildOnbAgentsV2(ans)){
       const floor = CAS952_FLOORS[a.name], s = cas952ScoreOf(a);
       assert.ok(Number.isInteger(s), `${a.name} solved score not an integer: ${s}`);
-      assert.ok(s >= floor && s <= 95, `${a.name} solved score ${s} outside [${floor},95]`);
+      // CAS-1080: ceiling widened 95 -> 100.
+      assert.ok(s >= floor && s <= 100, `${a.name} solved score ${s} outside [${floor},100]`);
       if(s > floor){
-        const prev = CAS952_CRIT[a.name](ans, s - 1);
+        // CAS-1080: Personal Favs may have solved under a tightened yearsBack (its own second
+        // lever) — re-deriving score-1 has to hold that same lever steady, or it isn't the same
+        // sweep the solve actually ran. The other three recipes ignore the extra argument.
+        const prev = CAS952_CRIT[a.name](ans, s - 1, a.yearsBack);
         E.normCascade(prev); E.laneCrit(prev, prev.kind);
         assert.ok(E.watchCount(prev) > 45, `${a.name} score-1 (${s - 1}) did not exceed the cap`);
       }
@@ -352,7 +361,10 @@ check("CAS952-AC6", () => {
     if(favs){
       same(favs.genre, ans.styles || []);
       same(favs.age, ans.ages);
-      assert.equal(favs.yearsBack, 0);
+      // CAS-1080: yearsBack is 0 ("any year") unless the score sweep alone couldn't seat watchCount()
+      // at or under the cap, in which case it's one of FAVS_YEARSBACK_LEVER's stops instead.
+      assert.ok(favs.yearsBack === 0 || E.YEARS_STOPS.slice(1).includes(favs.yearsBack),
+        `Personal Favs yearsBack ${favs.yearsBack} is neither 0 nor a lever stop`);
       assert.equal(favs.selScale, ans.selScale || 0);
       same(favs.myServices, {pvod:false, rental:true, included_streaming:true});
     }

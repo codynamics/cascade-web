@@ -12766,8 +12766,9 @@ function onbFavsMarkersV2(big, s){
 }
 // Personal Favs' full criteria at a given trial score — used both by the recipe (at the solved
 // score) and by onbAgentCapSolveV2 (at each candidate score), so the two can never disagree about
-// what counts as "the onb_favs agent at score s".
-function onbFavsCritV2(ans, s){
+// what counts as "the onb_favs agent at score s". `yearsBack` is onbAgentCapSolveV2's second lever
+// (CAS-1080) — omitted, it keeps the original "any year" breadth.
+function onbFavsCritV2(ans, s, yearsBack){
   const big = onbBigWindowV2(ans);
   const marks = onbFavsMarkersV2(big, s);
   // CAS-912: only the BIG window rings. The trailing windows still admit and list films — they exist
@@ -12778,9 +12779,11 @@ function onbFavsCritV2(ans, s){
     kind: ans.cinema==="yes" ? "cinema" : "stream",
     watchMarkers: marks, status: watchToStatuses(ww),
     genre: ans.styles||[], exclude: [], age: ans.ages||[],
-    // yearsBack:0 is a decision, not an omission — "how far back" left onboarding, and the score
-    // solve below absorbs the extra breadth.
-    yearsBack: 0, selScale: ans.selScale||0,
+    // yearsBack:0 ("any year") is the starting decision, not an omission — "how far back" left
+    // onboarding, and the score solve above absorbed the extra breadth. CAS-1080: the catalogue has
+    // grown past the point where score alone always gets there by 95, so onbAgentCapSolveV2 may hand
+    // back a tighter value here as its second lever.
+    yearsBack: typeof yearsBack==="number" ? yearsBack : 0, selScale: ans.selScale||0,
     selCrowd: 0, selCritScore: 0, selAwards: 0, selBuzz: 0,
     myServices: {pvod:false, rental:true, included_streaming:true},
     watchWindows: ww,
@@ -12789,17 +12792,34 @@ function onbFavsCritV2(ans, s){
 // Every onboarding agent's reveal-time list is capped the same way (CAS-952): walk the score UP from
 // the recipe's own floor and return the lowest that seats watchCount() at or under the pre-services
 // cap. A recipe already under the cap at its floor comes back unchanged (Massive Movies, floor 90).
-// Never widens criteria to reach it — only the score moves; if nothing up to 95 gets there, 95 is
-// accepted as-is.
+// CAS-1080: the catalogue has grown past the point where score alone (even up to 100, the top of the
+// score's own 0-100 scale — CAS-952 stopped one short of it at 95, an arbitrary margin, not a real
+// ceiling) always reaches the cap — Personal Favs on broad style picks, at ~5,750 films. When the
+// plain sweep fails, a recipe can hand in `leverValues` — its own second lever (e.g. yearsBack), tried
+// in the order given, each with a fresh score sweep — before score 100 is accepted as a last resort. A
+// recipe that never overflows never touches its lever, so nothing changes for Massive/Date/Family today.
 const ONB_AGENT_CAP_V2 = 45;
-function onbAgentCapSolveV2(critFn, ans, floor){
-  for(let s=floor; s<=95; s++){
-    const c = critFn(ans, s);
-    normCascade(c); laneCrit(c, c.kind);
-    if(watchCount(c) <= ONB_AGENT_CAP_V2) return s;
+function onbAgentCapSolveV2(critFn, ans, floor, leverValues){
+  const sweep = lever => {
+    for(let s=floor; s<=100; s++){
+      const c = critFn(ans, s, lever);
+      normCascade(c); laneCrit(c, c.kind);
+      if(watchCount(c) <= ONB_AGENT_CAP_V2) return {score:s, lever};
+    }
+    return null;
+  };
+  const plain = sweep(undefined);
+  if(plain) return plain;
+  for(const lever of (leverValues||[])){
+    const hit = sweep(lever);
+    if(hit) return hit;
   }
-  return 95;
+  return {score:100, lever: (leverValues||[]).at(-1)};
 }
+// CAS-1080: Personal Favs' own yearsBack ladder for onbAgentCapSolveV2's second lever — the same
+// YEARS_STOPS ladder the how-far-back dial offers a person, loosest to tightest, minus its leading 0
+// ("any year"), which is the plain sweep's own starting value and so is tried first regardless.
+const FAVS_YEARSBACK_LEVER = YEARS_STOPS.slice(1);
 // Massive Movies' criteria at a trial score `s` for its one active window (the BIG window) — used
 // both by the recipe (at the solved score) and onbAgentCapSolveV2 (at each candidate).
 function onbMassiveCritV2(ans, s){
@@ -12856,19 +12876,19 @@ function onbFamilyCritV2(ans, s){
 // contested film — deliberate, not incidental.
 const ONB_AGENTS_V2 = [
   {key:"onb_massive", icon:"🎬", name:"Massive Movies", who:"me", when:a=>true,
-   build(ans){ return onbMassiveCritV2(ans, onbAgentCapSolveV2(onbMassiveCritV2, ans, 90)); }},
+   build(ans){ const r = onbAgentCapSolveV2(onbMassiveCritV2, ans, 90); return onbMassiveCritV2(ans, r.score); }},
 
   {key:"onb_favs", icon:"⭐", name:"Personal Favs", who:"me", when:a=>true,
-   build(ans){ return onbFavsCritV2(ans, onbAgentCapSolveV2(onbFavsCritV2, ans, 60)); }},
+   build(ans){ const r = onbAgentCapSolveV2(onbFavsCritV2, ans, 60, FAVS_YEARSBACK_LEVER); return onbFavsCritV2(ans, r.score, r.lever); }},
 
   {key:"onb_date", icon:"❤️", name:"Date Night", who:"partner", when:a=>a.partner==="yes",
    // Lifted from Lee's live Partner Date Night, score dropped to 70.
-   build(ans){ return onbDateCritV2(ans, onbAgentCapSolveV2(onbDateCritV2, ans, 70)); }},
+   build(ans){ const r = onbAgentCapSolveV2(onbDateCritV2, ans, 70); return onbDateCritV2(ans, r.score); }},
 
   {key:"onb_family", icon:"👨‍👩‍👧", name:"Family Movies", who:"everyone", when:a=>a.kids==="yes",
    // Lifted from Lee's live Boys, with one correction: the source agent's genre:null means
    // "nothing qualifies" (CAS-182), not "no filter" — copied verbatim it would match nothing.
-   build(ans){ return onbFamilyCritV2(ans, onbAgentCapSolveV2(onbFamilyCritV2, ans, 73)); }},
+   build(ans){ const r = onbAgentCapSolveV2(onbFamilyCritV2, ans, 73); return onbFamilyCritV2(ans, r.score); }},
 ];
 // Build the v2 agents from a set of answers. Same contract as buildOnbAgents above: normalised
 // cascade objects, in recipe order, ready for the caller to assign ids and push onto `cascades` —

@@ -233,6 +233,10 @@ if(typeof window.CascadeAuth === "undefined"){
   MISSION_DIALS, MISSION_DIALS_USED, missionRest, missionKind, laneCrit,
   axisCountsNow, genreCountsNow,
   onbApply, onbCount, pickStarter, flowStart, flowStop, FLOWS,
+  // CAS-1080: the v2 onboarding answers default and its four-agent generator, plus the shared
+  // reveal-time cap they solve against — exported so a test can build a real onboarding roster
+  // from a fixed answer set and assert watchCount() against the cap directly.
+  onbAnswersV2Default, buildOnbAgentsV2, ONB_AGENT_CAP_V2,
   // CAS-959: the v2 onboarding commit marker (set at v2_done, cleared by flowStart or a completed/dropped
   // load) — exported so a test can seed "this device just built an unconfirmed onboarding draft" the same
   // way v2_done itself does, without driving the whole wired flow through the DOM stub.
