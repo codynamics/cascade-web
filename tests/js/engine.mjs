@@ -334,6 +334,11 @@ if(typeof window.CascadeAuth === "undefined"){
   // value it now counts by) — exported so a test can assert the parts sum to the headline directly, rather
   // than scraping the rendered string.
   placementSplitHTML, filmNotifyState, windowUsable,
+  // CAS-1081: windowArmed (a marker above 100 reads as Never, display-only — windowUsable itself, and
+  // therefore admission, is untouched) and agentCascadeSumHTML (the SCORE row it feeds — shared by the
+  // onboarding reveal/done step, the agent editor and the Agents list) — exported so a test can assert
+  // the rendered row directly rather than re-deriving the >100 case by hand.
+  windowArmed, agentCascadeSumHTML,
   // CAS-728: cascSigOf/agentFloor are what recomputeFound's own sticky-admission re-evaluation reads to
   // decide whether an agent has changed and what its current floor is — exported so a test can compute the
   // exact signature/floor a seeded agent_films row should carry, rather than guessing at internal state.

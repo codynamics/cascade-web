@@ -7872,6 +7872,14 @@ function windowEnabled(key){
 function windowUsable(c, key){
   return windowEnabled(key) && c.watchMarkers && c.watchMarkers[key]!=null;
 }
+// CAS-1081: display-only — a marker set above 100 (e.g. Family Movies' cinema = stream score + 17, which can
+// clear 100 on a high solve) can never be met by a 0-100 admission score, so it already behaves as Never for
+// admission (windowUsable/agentFloor are left alone, so that behaviour is untouched). This is only for
+// wherever a window's OWN marker is read back out to a person, so it renders the same as Never there too
+// instead of an impossible "101+".
+function windowArmed(c, key){
+  return windowUsable(c, key) && c.watchMarkers[key]<=100;
+}
 // CAS-917: the start-window model. An agent's start window is its earliest (lowest-rung) usable window — the
 // one carrying its entry bar. Every enabled window AFTER the start window is always followed, marker or not:
 // an admitted, unwatched film's auto Watch On moves forward into it when the film arrives there. A window
@@ -14197,7 +14205,8 @@ const WATCH_LEVEL_PHRASE = {in_cinema:"watch it at the Cinema", premium:"watch i
 // reads "stream it", per the ticket's own copy).
 const WATCH_LEVEL_FOLLOW_PHRASE = {premium:"watch it on Premium", rent:"rent it", stream:"stream it"};
 function msnValueLine(c){
-  const marks=WATCH_LEVEL_KEYS.filter(k=>windowUsable(c,k));
+  // CAS-1081: windowArmed, not windowUsable — a marker above 100 can never be met, so it reads as Never here.
+  const marks=WATCH_LEVEL_KEYS.filter(k=>windowArmed(c,k));
   if(!marks.length) return "No window is armed — nothing will ever qualify.";
   const byScore=[...marks].sort((a,b)=>c.watchMarkers[b]-c.watchMarkers[a]);
   const phrase = k => WATCH_LEVEL_PHRASE[k] || `watch it on ${WATCH_LEVEL_SHORT_LABEL[k]}`;
@@ -14228,11 +14237,12 @@ function msnChipsHTML(c){
   if(!keys.length) return "";
   // CAS-917: the start window — the earliest enabled+marked one. A window after it with no marker of its own
   // now follows rather than reading Never (the start-window model), so its chip names what it follows instead.
-  const startKey=WATCH_LEVEL_KEYS.find(k=>windowUsable(c,k));
+  // CAS-1081: windowArmed, not windowUsable — a marker above 100 reads as Never here too.
+  const startKey=WATCH_LEVEL_KEYS.find(k=>windowArmed(c,k));
   const chips=keys.map(k=>{
     const dot=`<span class="agdot" style="background:${WINDOW_COLOR[k]}"></span>`;
     const onVal = c.watchMarkers[k]===0 ? "Off" : `${c.watchMarkers[k]}+`;   // CAS-762: never a literal "0+"
-    if(windowUsable(c,k)){
+    if(windowArmed(c,k)){
       return `<span class="msnchip on">${dot}<span class="msnchiplbl" data-key="${k}">${esc(WATCH_LEVEL_SHORT_LABEL[k])} ${onVal}</span>
           <button type="button" class="msnchipx" data-act="never" data-key="${k}"
             aria-label="Set ${escA(WATCH_LEVEL_SHORT_LABEL[k])} to Never">✕</button></span>`;
@@ -14264,7 +14274,8 @@ function msnMarkStyle(c, key, offKeys){
   return {left:`${pct}%`, transform:edge};
 }
 function msnTrackAreaHTML(c){
-  const usable=WATCH_LEVEL_KEYS.filter(k=>windowUsable(c,k));
+  // CAS-1081: windowArmed, not windowUsable — a marker above 100 gets no handle on the track, same as Never.
+  const usable=WATCH_LEVEL_KEYS.filter(k=>windowArmed(c,k));
   const offKeys=usable.filter(k=>c.watchMarkers[k]===0);
   const segs=msnSegments(c, usable).map(s=>
     `<div class="msnseg${s.color?"":" grey"}" style="left:${s.left||0}%;width:${s.width}%${s.color?`;background:${s.color}`:""}"></div>`);
@@ -14313,7 +14324,8 @@ function restoreWatchMarker(c, key){
 // msnRebuild() instead, which re-renders #msnTrackArea and re-wires it.
 function paintMsnTrack(){
   const c=onbFlow.draft, track=$("msnTrack"); if(!c || !track) return;
-  const usable=WATCH_LEVEL_KEYS.filter(k=>windowUsable(c,k));
+  // CAS-1081: windowArmed, not windowUsable — keep in step with msnTrackAreaHTML's own filter above.
+  const usable=WATCH_LEVEL_KEYS.filter(k=>windowArmed(c,k));
   const offKeys=usable.filter(k=>c.watchMarkers[k]===0);
   // CAS-762: msnSegments always yields usable.length+1 slots (an Off window's own slot just paints 0-width),
   // so the DOM node count here never has to change mid-drag as a value crosses in or out of Off.
@@ -16180,9 +16192,11 @@ function agentStylesSum(c){
 }
 // CAS-814: the agent's watch markers, ladder order (WATCH_LEVEL_KEYS) — a coloured dot (WINDOW_COLOR) +
 // score + window name per usable window; a window set to Never (windowUsable false) is simply absent.
+// CAS-1081: windowArmed, not windowUsable — a marker above 100 (e.g. Family Movies' cinema) reads the same
+// as Never here, since the 0-100 scale can never actually reach it.
 const AGROW_WINDOW_WORD = {in_cinema:"in cinema", premium:"premium", rent:"rent", stream:"streaming"};
 function agentCascadeSumHTML(c){
-  const marks=WATCH_LEVEL_KEYS.filter(k=>windowUsable(c,k));
+  const marks=WATCH_LEVEL_KEYS.filter(k=>windowArmed(c,k));
   if(!marks.length) return "No windows set";
   return marks.map(k=>
     `<span class="agdot" style="background:${WINDOW_COLOR[k]}"></span>${c.watchMarkers[k]}+ ${AGROW_WINDOW_WORD[k]}`
