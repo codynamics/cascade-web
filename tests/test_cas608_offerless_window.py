@@ -55,6 +55,29 @@ class OfferlessWindowClassifiesByDateAlone(unittest.TestCase):
         status = pp.derive_status({"cinema_date": long_ago}, [], self.today)
         self.assertEqual(status, ["released"])
 
+    def test_no_cinema_date_but_an_old_year_is_released_not_upcoming(self):
+        # CAS-1078: a back-catalogue title with no AU cinema_date at all and a release year already
+        # behind us is an old title Cascade never got an AU date for, not a genuinely future one.
+        self.assertEqual(pp._offerless_window(None, self.today, year=2018), "released")
+
+    def test_no_cinema_date_and_no_year_is_still_upcoming(self):
+        # `year` is optional and defaults to unknown — an unannounced title stays upcoming.
+        self.assertEqual(pp._offerless_window(None, self.today, year=None), "upcoming")
+
+    def test_no_cinema_date_and_a_year_not_yet_arrived_is_still_upcoming(self):
+        self.assertEqual(pp._offerless_window(None, self.today, year=2027), "upcoming")
+
+    def test_no_cinema_date_and_an_old_year_but_a_future_au_release_date_is_still_upcoming(self):
+        future = (self.today + datetime.timedelta(days=30)).isoformat()
+        self.assertEqual(
+            pp._offerless_window(None, self.today, year=2018,
+                                  release_dates=[{"region": "AU", "type": 4, "date": future}]),
+            "upcoming")
+
+    def test_derive_from_providers_reclassifies_an_old_undated_title(self):
+        movie = {"cinema_date": None, "year": "2016", "release_dates": []}
+        self.assertEqual(pp.derive_from_providers(movie, {}, self.today), ["released"])
+
 
 class LadderCohortExcludesReleasedTitles(unittest.TestCase):
     """AC4: a fixture of 100 past-dated, offer-less films must put none of them on the 7-day ladder."""

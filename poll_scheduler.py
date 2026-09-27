@@ -56,6 +56,22 @@ def _date(s):
 def cinema_date(m): return _date(m.get("cinema_date"))
 
 
+def _release_year(m):
+    y = m.get("year")
+    try:
+        return int(y)
+    except (TypeError, ValueError):
+        return None
+
+
+def has_future_au_release(m, today):
+    """True if any AU release_dates entry (any type — CAS-360 keeps them all) is still ahead of
+    `today`, even with no cinema_date at all: a title can carry an announced digital/physical AU
+    date with no theatrical one."""
+    today_iso = today.isoformat()
+    return any((rd.get("date") or "") > today_iso for rd in (m.get("release_dates") or []))
+
+
 def classify_tier(m, today):
     """CAS-472: `st == {"upcoming"}` alone used to also mean "none", so a title that fell all the
     way back to upcoming (a real AU-delisting, offer-less catalogue drift, or the CAS-472 bug
@@ -63,12 +79,22 @@ def classify_tier(m, today):
     the ONLY thing gated on this tier, so nothing ever polled it again to find out it had moved
     on. Only a cinema_date genuinely unknown-or-still-ahead may skip polling; once it is known
     and has passed, the title is always active/slow, never none, regardless of what `status`
-    currently holds."""
+    currently holds.
+
+    CAS-1078: a cinema_date of None is not, on its own, evidence a title is still ahead of us —
+    82 back-catalogue titles with a release year already behind us and no AU release_dates entry
+    (any type) still in the future latched at "none"/upcoming forever, because nothing ever
+    polled them again to learn they had no real AU availability either. Only genuinely open
+    questions (no year yet, a year that hasn't arrived, or a still-future AU date of any kind)
+    may skip polling now; a title whose own year is already behind us gets treated the same way
+    a known-and-passed cinema_date already is — active/slow, never none."""
     st = set(m.get("status", []))
     c = cinema_date(m)
     if c and c > today:
         return "none"
-    if c is None and st == {"upcoming"}:
+    year = _release_year(m)
+    still_open = year is None or year >= today.year or has_future_au_release(m, today)
+    if c is None and st == {"upcoming"} and still_open:
         return "none"
     recent = bool(c and 0 <= (today - c).days <= SIX_MONTHS)
     if (st & ACTIVE_WINDOW) or recent:

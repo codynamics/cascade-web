@@ -134748,7 +134748,7 @@
       "popularity_percentile": 98.593,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Hope Frozen: A Quest To Live Twice",
       "tmdb_id": 594676,
@@ -134780,14 +134780,15 @@
         "Matrix Naovaratpong",
         "Max More"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -137296,7 +137297,7 @@
       "popularity_percentile": 99.334,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Sherlock: The Abominable Bride",
       "tmdb_id": 379170,
@@ -137334,14 +137335,15 @@
         "Una Stubbs",
         "Rupert Graves"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -193081,7 +193083,7 @@
       "popularity_percentile": 98.311,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Team Thor",
       "tmdb_id": 413279,
@@ -193115,14 +193117,15 @@
         "Mark Ruffalo",
         "Daley Pearson"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -198576,7 +198579,7 @@
       "popularity_percentile": 98.132,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Love, Chunibyo & Other Delusions! Take On Me",
       "tmdb_id": 460399,
@@ -198614,14 +198617,15 @@
         "Chinatsu Akasaki",
         "Azumi Asakura"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-23",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-23"
+        "upcoming": "2026-09-23",
+        "released": "2026-09-27"
       },
       "tmdb_not_found_streak": 0
     },
@@ -209233,7 +209237,7 @@
       "popularity_percentile": 97.669,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Team Thor: Part 2",
       "tmdb_id": 441829,
@@ -209267,14 +209271,15 @@
         "Chris Hemsworth",
         "Daley Pearson"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -229398,7 +229403,7 @@
       "popularity_percentile": 93.557,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Pistorius",
       "tmdb_id": 552096,
@@ -229431,14 +229436,15 @@
         "Arnold Pistorius",
         "Carl Pistorius"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -231836,7 +231842,7 @@
       "popularity_percentile": 99.047,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "High & Low The Worst",
       "tmdb_id": 727502,
@@ -231870,14 +231876,15 @@
         "Yuki Yamada",
         "Goki Maeda"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -233415,7 +233422,7 @@
       "popularity_percentile": 95.128,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Burial",
       "tmdb_id": 951189,
@@ -233445,14 +233452,15 @@
       ],
       "director": "Emilija \u0160karnulyt\u0117",
       "cast": [],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -251896,7 +251904,7 @@
       "popularity_percentile": 93.978,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Selfie",
       "tmdb_id": 574236,
@@ -251926,14 +251934,15 @@
         "Pietro Orlando",
         "Alessandro Antonelli"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -272474,7 +272483,7 @@
       "popularity_percentile": 96.958,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Confession",
       "tmdb_id": 634595,
@@ -272511,14 +272520,15 @@
         "Nana",
         "Choi Gwang-il"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -276120,7 +276130,7 @@
       "popularity_percentile": 95.624,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "O.J.: Made in America",
       "tmdb_id": 377462,
@@ -276156,14 +276166,15 @@
         "Marcia Clark",
         "Danny Bakewell Sr."
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       },
       "award": "won",
       "award_text": "Won 1 Oscar.",
@@ -278018,7 +278029,7 @@
       "popularity_percentile": 96.947,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Limbo",
       "tmdb_id": 591222,
@@ -278056,14 +278067,15 @@
         "Mason Lee",
         "Hiroyuki Ikeuchi"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -278468,55 +278480,6 @@
         "rental": "2026-09-17"
       },
       "tmdb_not_found_streak": 0
-    },
-    {
-      "tmdb_id": 1455301,
-      "imdb_id": "tt19387192",
-      "title": "Darwin",
-      "year": "2025",
-      "genres": [],
-      "cinema_date": null,
-      "cinema_release": false,
-      "release_dates": [],
-      "age_rating": null,
-      "worldwide_gross": null,
-      "budget": null,
-      "popularity": 2.1297,
-      "synopsis": "A group of thieves, that prey on the affluent millennial society, gets more than they bargained for, when they encounter an adversary more formidable than they could've imagined.",
-      "language": "en",
-      "culture": "Western",
-      "poster": "/6diqNT394sqGRRy3y7heIOFfioO.jpg",
-      "trailers": [
-        "syQHGywP4bU"
-      ],
-      "director": "Aaron Abdin, Ali Abdin",
-      "cast": [
-        "Keraun Harris",
-        "Danielle LaRoach",
-        "Martin Bats Bradford",
-        "Mason Douglas"
-      ],
-      "poll_tier": "none",
-      "jw_link": null,
-      "offers": [],
-      "status": [
-        "upcoming"
-      ],
-      "availability_confidence": "confirmed",
-      "last_polled": "2026-08-21",
-      "availability_source": "tmdb_date",
-      "window_dates": {
-        "upcoming": "2026-08-21"
-      },
-      "wm_user_rating": null,
-      "wm_critic_score": null,
-      "wm_popularity_percentile": 52.92,
-      "wm_fields_fetched_at": "2026-09-22",
-      "cache_stamped_at": "2026-09-16",
-      "first_seen": "2026-09-16",
-      "last_probed": "2026-09-22",
-      "probe_count": 1,
-      "outcome": "scored"
     },
     {
       "first_seen": "2026-09-16",
@@ -289480,7 +289443,7 @@
       "popularity_percentile": 86.866,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Little Nicholas: Happy as Can Be",
       "tmdb_id": 893366,
@@ -289515,14 +289478,15 @@
         "Simon Faliu",
         "Alban Aumard"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -293724,7 +293688,7 @@
       "popularity_percentile": 98.128,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "The Narrow Bridge",
       "tmdb_id": 959669,
@@ -293759,14 +293723,15 @@
         "Borys Heorhiyevskyi",
         "Kostiantyn Kostyshyn"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -293777,7 +293742,7 @@
       "popularity_percentile": 93.316,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "kid 90",
       "tmdb_id": 795859,
@@ -293811,14 +293776,15 @@
         "Stephen Dorff",
         "Balthazar Getty"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-26",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-26"
+        "upcoming": "2026-09-26",
+        "released": "2026-09-27"
       },
       "tmdb_not_found_streak": 0
     },
@@ -294568,7 +294534,7 @@
       "popularity_percentile": 92.504,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "As Needed",
       "tmdb_id": 508206,
@@ -294600,14 +294566,15 @@
         "Luigi Fedele",
         "Nicola Siri"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -305503,7 +305470,7 @@
       "popularity_percentile": 95.114,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Adam",
       "tmdb_id": 595875,
@@ -305537,14 +305504,15 @@
         "Douae Belkhaouda",
         "Aziz Hattab"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -305574,19 +305542,20 @@
         "REI AMI",
         "Audrey Nuna"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
       "status": [
-        "upcoming"
+        "released"
       ],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-08-09",
       "availability_source": "tmdb_date",
       "award": null,
       "award_text": "",
       "window_dates": {
-        "upcoming": "2026-08-09"
+        "upcoming": "2026-08-09",
+        "released": "2026-09-27"
       },
       "wm_user_rating": null,
       "wm_critic_score": null,
@@ -318006,7 +317975,7 @@
       "popularity_percentile": 90.354,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "The Living Dead",
       "tmdb_id": 643786,
@@ -318040,14 +318009,15 @@
         "Wang Yifei",
         "He Longlong"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -322501,7 +322471,7 @@
       "popularity_percentile": 92.854,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "The Father",
       "tmdb_id": 605503,
@@ -322535,14 +322505,15 @@
         "Tanya Shahova",
         "Hristofor Nedkov"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -322905,7 +322876,7 @@
       "popularity_percentile": 94.137,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Loop",
       "tmdb_id": 610203,
@@ -322938,14 +322909,15 @@
         "Branca Messina",
         "Z\u00e9 Carlos Machado"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -325858,7 +325830,7 @@
       "popularity_percentile": 96.996,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Jinne Jamme Saare Nikamme",
       "tmdb_id": 883862,
@@ -325890,14 +325862,15 @@
         "Seema Kaushal",
         "Pukhraj Bhalla"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -327335,7 +327308,7 @@
       "popularity_percentile": 95.101,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "America",
       "tmdb_id": 501145,
@@ -327368,14 +327341,15 @@
         "Corinne Kurzmann",
         "Mike Burch"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -328988,7 +328962,7 @@
       "popularity_percentile": 85.474,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Hawa",
       "tmdb_id": 925715,
@@ -329025,14 +328999,15 @@
         "Sariful Razz",
         "Nasir Uddin Khan"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -329623,7 +329598,7 @@
       "popularity_percentile": 94.838,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "White Water",
       "tmdb_id": 324114,
@@ -329656,14 +329631,15 @@
         "Larenz Tate",
         "Storm Reid"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-23",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-23"
+        "upcoming": "2026-09-23",
+        "released": "2026-09-27"
       },
       "tmdb_not_found_streak": 0
     },
@@ -331462,7 +331438,7 @@
       "popularity_percentile": 80.488,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Lord of the Ants",
       "tmdb_id": 840098,
@@ -331508,14 +331484,15 @@
         "Leonardo Maltese",
         "Sara Serraiocco"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-20",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-20"
+        "upcoming": "2026-09-20",
+        "released": "2026-09-27"
       },
       "tmdb_not_found_streak": 0
     },
@@ -333837,17 +333814,18 @@
         "Bassem Samra",
         "Tara Emad"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
       "status": [
-        "upcoming"
+        "released"
       ],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-16",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-16"
+        "upcoming": "2026-09-16",
+        "released": "2026-09-27"
       },
       "wm_user_rating": 7.5,
       "wm_critic_score": null,
@@ -335772,7 +335750,7 @@
       "popularity_percentile": 98.372,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Django & Django: Sergio Corbucci Unchained",
       "tmdb_id": 854521,
@@ -335807,14 +335785,15 @@
         "Ruggero Deodato",
         "Adolf Hitler"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -340532,7 +340511,7 @@
       "popularity_percentile": 93.559,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "American Girl",
       "tmdb_id": 1336225,
@@ -340566,14 +340545,15 @@
         "Pamela Ricardo",
         "Shay Mack"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -343399,17 +343379,18 @@
         "Roger B. Chaffee",
         "Martha Chaffee"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
       "status": [
-        "upcoming"
+        "released"
       ],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-23",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-23"
+        "upcoming": "2026-09-23",
+        "released": "2026-09-27"
       },
       "wm_user_rating": 6.5,
       "wm_critic_score": null,
@@ -352044,7 +352025,7 @@
       "popularity_percentile": 90.022,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Loro 2",
       "tmdb_id": 520736,
@@ -352078,14 +352059,15 @@
         "Riccardo Scamarcio",
         "Kasia Smutniak"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -359215,17 +359197,18 @@
         "Jen Lilley",
         "Laura Osnes"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
       "status": [
-        "upcoming"
+        "released"
       ],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-04",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-04"
+        "upcoming": "2026-09-04",
+        "released": "2026-09-27"
       },
       "wm_user_rating": 5.9,
       "wm_critic_score": null,
@@ -362911,7 +362894,7 @@
       "popularity_percentile": 91.112,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Vikram Vedha",
       "tmdb_id": 851783,
@@ -362945,14 +362928,15 @@
         "Radhika Apte",
         "Rohit Saraf"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -369279,7 +369263,7 @@
       "popularity_percentile": 96.994,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Blue",
       "tmdb_id": 451735,
@@ -369314,14 +369298,15 @@
         "Nejat \u0130\u015fler",
         "Teoman"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -369819,7 +369804,7 @@
       "popularity_percentile": 86.6,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "The Surgeon of the Rusty Knife",
       "tmdb_id": 649985,
@@ -369853,14 +369838,15 @@
         "Marcos Caruso",
         "C\u00e1ssio Gabus Mendes"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -376838,7 +376824,7 @@
       "popularity_percentile": 89.896,
       "probe_count": 2,
       "status": [
-        "upcoming"
+        "released"
       ],
       "title": "Skin",
       "tmdb_id": 719889,
@@ -376870,14 +376856,15 @@
         "Hilda Dokubo",
         "Eryca Freemantle"
       ],
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "jw_link": null,
       "offers": [],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "last_polled": "2026-09-17",
       "availability_source": "tmdb_date",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -379632,7 +379619,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -379657,21 +379644,22 @@
       "last_probed": "2026-09-26",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 1.3526,
       "popularity_percentile": 86.234,
       "poster": "/jHVTIHyKpXtsaJqhqZSB7PlyTG9.jpg",
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Central Asia. A sanatorium called Aurora, is located at the shores of the high mountainous lake Issyk-Kul and the action of the film is taking place in this sanatorium. All happens in one day. The sanatorium serves as a mirror of the whole country, which is a kind of health resort for its population, with its beautiful nature. Sudden break of the balance between time and space leads to the start of the mechanism of fatal processes.",
       "title": "Aurora",
       "tmdb_id": 551381,
       "trailers": [],
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       },
       "wm_critic_score": null,
       "wm_fields_fetched_at": "2026-09-26",
@@ -381968,7 +381956,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -381992,21 +381980,22 @@
       "last_probed": "2026-09-26",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 1.3379,
       "popularity_percentile": 90.446,
       "poster": "/vxQTkOg2OYS0SqYasvF7inMWgdH.jpg",
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Songbirds are disappearing at an alarming rate. The Messenger is a visually thrilling ode to the beauty and importance of the imperiled songbird, and what it means to all of us on both a global and human level if we lose them.",
       "title": "The Messenger",
       "tmdb_id": 362383,
       "trailers": [],
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       },
       "wm_critic_score": 80,
       "wm_fields_fetched_at": "2026-09-26",
@@ -386739,7 +386728,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -386764,21 +386753,22 @@
       "last_probed": "2026-09-26",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 1.3148,
       "popularity_percentile": 90.466,
       "poster": "/s0t78EAmEgbnvwszXphAa6nbd9k.jpg",
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "'Cargo' brings the raw story of three brothers who own a family business in the fishery and are trying to save it from destruction. The passion for their profession but also for their loved ones, however, drives them to desperate actions.",
       "title": "Cargo",
       "tmdb_id": 473311,
       "trailers": [],
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       },
       "wm_critic_score": 65,
       "wm_fields_fetched_at": "2026-09-26",
@@ -389401,7 +389391,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -389427,14 +389417,14 @@
       "last_probed": "2026-09-26",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 1.2978,
       "popularity_percentile": 93.382,
       "poster": "/xYv28JRaDzm1p7Zz2fGpA519tfl.jpg",
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Tomasz Komenda was 23 years old when his normal life was brutally interrupted. Overnight he was arrested, thrown into prison and charged with murder. Subsequent expert opinions confirmed his participation in the crime, and any evidence was against him. For nearly two decades in prison, he was beaten, intimidated, humiliated and on his own. Finally, after 18 years of imprisonment, prosecutors and a policeman appeared on his way, who decided to discover the truth behind the mysterious case of the detainee.",
       "title": "25 Years of Innocence",
@@ -389444,7 +389434,8 @@
         "8ugos2Kef7o"
       ],
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       },
       "wm_critic_score": null,
       "wm_fields_fetched_at": "2026-09-26",
@@ -390287,7 +390278,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -390312,14 +390303,14 @@
       "last_probed": "2026-09-26",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 1.2936,
       "popularity_percentile": 80.24,
       "poster": "/rkR9BsoecpBAWknViMRnO42f43n.jpg",
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Imagine Dragons\u2019 Mormon frontman Dan Reynolds is taking on a new mission to explore how the church treats its LGBTQ members. With the rising suicide rate amongst teens in the state of Utah, his concern with the church\u2019s policies sends him on an unexpected path for acceptance and change.",
       "title": "Believer",
@@ -390329,7 +390320,8 @@
         "6extsp-lCLU"
       ],
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       },
       "wm_critic_score": 69,
       "wm_fields_fetched_at": "2026-09-26",
@@ -390405,7 +390397,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -390433,14 +390425,14 @@
       "last_probed": "2026-09-26",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 1.2932,
       "popularity_percentile": 79,
       "poster": "/c3pvLauEGSw0FWMfCAARvHLgNsn.jpg",
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Unfolding the life of a taxi driver that uses his services as a front for extortion rackets and other criminal activities. When his hot-headed younger brother's impulsive behaviour lead the cops and triad to their doorstep. As the eldest, he stops at nothing to protect them all.",
       "title": "Fly By Night",
@@ -390450,7 +390442,8 @@
         "yctnNVM89X8"
       ],
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       },
       "wm_critic_score": null,
       "wm_fields_fetched_at": "2026-09-26",
@@ -395265,7 +395258,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -395290,21 +395283,22 @@
       "last_probed": "2026-09-26",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 1.2736,
       "popularity_percentile": 82.454,
       "poster": "/gdPQam9v6SXH7YfVTNMeKWGESQE.jpg",
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "A road-movie narrated by Michael Cimino (recorded by the documentary's director during their journey together across the United States), and with the exceptional participation of Quentin Tarantino and Oliver Stone. From Thunderbolt and Lightfoot to Year of the Dragon, not to mention The Deer Hunter and Heaven's Gate, discover a unique portrait of an uncompromising director.",
       "title": "Michael Cimino, God Bless America",
       "tmdb_id": 833916,
       "trailers": [],
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       },
       "wm_critic_score": null,
       "wm_fields_fetched_at": "2026-09-26",
@@ -398292,7 +398286,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Through never before-seen archive material, interviews with celebrities, industry insiders, rabid fans and the Kids In The Hall themselves \u2013 this documentary tells the wild story of this cult-famous comedy troupe from the 1980s to the present day.",
       "title": "The Kids in the Hall: Comedy Punks",
@@ -398307,7 +398301,8 @@
       "worldwide_gross": null,
       "year": "2022",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -399422,7 +399417,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "After a bleak childhood, Jane Eyre goes out into the world to become a governess. As she lives happily in her new position at Thornfield Hall, she meets the dark, cold, and abrupt master of the house, Edward Rochester. Jane and her employer grow close in friendship and she soon finds herself falling in love with him. Happiness seems to have found Jane at last, but could Rochester's terrible secret be about to destroy it forever?",
       "title": "National Theatre Live: Jane Eyre",
@@ -399437,7 +399432,8 @@
       "worldwide_gross": 13639,
       "year": "2015",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -400796,7 +400792,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Ce\u0301dric is a worker in a precision mechanics factory in the French Alps. When he finds out that the factory is about to be sold to an investment fund, he joins forces with two of his childhood friends to pull off an epic heist.",
       "title": "The Takeover",
@@ -400811,7 +400807,8 @@
       "worldwide_gross": null,
       "year": "2022",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -407504,7 +407501,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Astrophysicists show how black holes might hold answers to how the universe evolved, leading to life on Earth and, ultimately, the human race.",
       "title": "Black Hole Apocalypse",
@@ -407519,7 +407516,8 @@
       "worldwide_gross": null,
       "year": "2018",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -408809,7 +408807,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Journalist Guo lives together with her mother and daughter in the same residence. The relation of three generations looks placid but there is actually a fierce undercurrent of rebellion and resistance.",
       "title": "Spring Tide",
@@ -408822,7 +408820,8 @@
       "worldwide_gross": null,
       "year": "2019",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -412831,7 +412830,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "A young girl, recently married, is traveling from Aidini to Greece with her mother and her two daughters. On board the ship she decides not to let life pass her by, but to live her own way. And she goes ahead! She writes endlessly wherever she can, on napkins and cigarette boxes, to bills. She smokes, she passionately falls in love, casually gambles in luxurious salons, but also in illegal basements. A teacher who becomes an actress and plays in streets and in theaters, a poet who becomes the greatest Greek folk songwriter. She collaborates with all the famous music personalities of the country, from Vassilis Tsitsanis and Apostolos Kaldaras to Manolis \u0397iotis, Antonis Repanis and Manos Hadjidakis, bravely asserting herself to a cruel and typically male-dominated world.",
       "title": "My Name Is Eftihia",
@@ -412847,7 +412846,8 @@
       "worldwide_gross": null,
       "year": "2019",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -421430,7 +421430,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "This Story is about the unpredictable journey of Goutham, who takes on to experience the best weed in the world not knowing that his life is going to end soon due to drug addiction.",
       "title": "The Trip",
@@ -421443,7 +421443,8 @@
       "worldwide_gross": null,
       "year": "2021",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -430713,7 +430714,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Kumari is married off to Dhruvan of Kanjirangattu Tharavadu, a cursed land beyond Illmayi, in the west.  As Kumari finds her comfort zone in her new family which is heavy with mystery, myths and superstitions, she also realizes that the people over there are blinded by faith and sorcery,  ready to sacrifice their lives to preserve tradition, prosperity and peace.",
       "title": "Kumari",
@@ -430726,7 +430727,8 @@
       "worldwide_gross": null,
       "year": "2022",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -437452,7 +437454,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -437477,20 +437479,21 @@
       "last_probed": "2026-09-23",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 1.0891,
       "poster": "/njq3p81KoTVd0lWqGeudId7WwUn.jpg",
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "A middle-class family battles financial hurdles and personal setbacks while pursuing their dream of owning a home in the bustling city.",
       "title": "3BHK",
       "tmdb_id": 1293849,
       "trailers": [],
       "window_dates": {
-        "upcoming": "2026-08-21"
+        "upcoming": "2026-08-21",
+        "released": "2026-09-27"
       },
       "wm_critic_score": null,
       "wm_fields_fetched_at": "2026-09-23",
@@ -439848,7 +439851,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Ben wakes up from an artificial coma after a failed mission. The personal protector has to deal with the fact that he could not prevent the death of a little girl. In order to recover, the BKA officer takes a break from the police service and drives to the Baltic Sea with his girlfriend Marion. He spent happy days there as a child. The first visit to his parents in years is at the same time the return to the place of painful memories, because back then his best friend Timmi was killed in a mysterious accident. To his astonishment, he now learns that Timmi, now an adult, is alive and lying in a hospital as a coma patient. Together with Marion, a doctor who specializes in this diseases, Ben wants to reach Timmi with the help of MRI technology. Perhaps the trauma can be resolved if the cause can be brought to light. Unlike Ben, however, neither Timmi's father nor the village cop Nolting seem interested in it. A web of guilt, lies and deception has to be unraveled to clue to the puzzle.",
       "title": "Die Heimsuchung",
@@ -439861,7 +439864,8 @@
       "worldwide_gross": null,
       "year": "2021",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -444106,7 +444110,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -444130,13 +444134,13 @@
       "last_probed": "2026-09-23",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 1.0598,
       "poster": "/2KRoeHPmtrhb113FqGnDgWPVgn8.jpg",
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "When BA Flight 149 unwittingly landed in a warzone, its passengers and crew were taken hostage. Did the UK government allow it? And who were the mercenaries on board?",
       "title": "Flight 149: Hostage of War",
@@ -444145,7 +444149,8 @@
         "-5CRn-3Tcfo"
       ],
       "window_dates": {
-        "upcoming": "2026-08-12"
+        "upcoming": "2026-08-12",
+        "released": "2026-09-27"
       },
       "wm_critic_score": null,
       "wm_fields_fetched_at": "2026-09-23",
@@ -456251,7 +456256,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Lok is a recovering schizophrenic who yearns for love. One day, he encounters the young and beautiful Yan and quickly falls in love with her. The pair develops a relationship that is beyond their wildest dreams.",
       "title": "Beyond the Dream",
@@ -456266,7 +456271,8 @@
       "worldwide_gross": null,
       "year": "2020",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -465513,7 +465519,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -465539,7 +465545,7 @@
       "last_probed": "2026-09-23",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 0.967,
       "poster": "/7XPZOfZcuaBawXON9kHDwrrCeJR.jpg",
       "probe_count": 2,
@@ -465551,7 +465557,7 @@
         }
       ],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "The story follows Hassan and his dog, Rambo, as they embark on a quest to save Rambo from Hassan's vengeful landlord, whom the dog attacked. Through his challenging journey across Cairo to find a safe haven for Rambo, Hassan confronts his deepest fears and rediscovers himself.",
       "title": "Seeking Haven for Mr. Rambo",
@@ -465560,7 +465566,8 @@
         "XjAYJkuYH4Y"
       ],
       "window_dates": {
-        "upcoming": "2026-09-11"
+        "upcoming": "2026-09-11",
+        "released": "2026-09-27"
       },
       "wm_critic_score": null,
       "wm_fields_fetched_at": "2026-09-23",
@@ -470440,7 +470447,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Seven friends who attend a dinner and decide to play a game with their cell phones. Unfortunately, the game ends in disaster when their dark secret is revealed.",
       "title": "Perfect Strangers",
@@ -470456,7 +470463,8 @@
       "worldwide_gross": null,
       "year": "2022",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -470495,7 +470503,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "The films story takes place over the course of one day. Bapak senses that he does not have much time left and so he invites his offspring to have dinner with him the next evening. He want to discuss some family matters concerning their inheritance, a large part of which is his home, a large sprawling house set in an acre of prime real estate located in the centre of Kuala Lumpur. An unexpected visit by two strangers leads Bapak to change his plans and bring the dinner forward to that evening instead.",
       "title": "Spilt Gravy on Rice",
@@ -470510,7 +470518,8 @@
       "worldwide_gross": null,
       "year": "2022",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -474563,7 +474572,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "New Year\u2019s Eve. Sarah is working - again. Nick is her only customer - again. Same old same old. Except this year, their countdown to midnight will be the strangest and deadliest they have ever known. Why is an executioner Dalek targeting these two people, in this place, on this night? Why are they having to live through the same moments again? Can the Doctor, Yaz and Dan save them and survive into the New Year?",
       "title": "Doctor Who: Eve of the Daleks",
@@ -474578,7 +474587,8 @@
       "worldwide_gross": null,
       "year": "2022",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -475318,7 +475328,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Ullaas is a cunning guy who can go to any extent for money. One fine day, he cheats a priest and redirects an NRI match which is supposed to go to a known person in his village. He manages everything and finally ties the knot with Laya. The twist in the tale arises when Ullaas comes to know that the NRI girl he married is a complete alcoholic. Rest of the story is as to how Sunil manages to get his problematic wife back on track.",
       "title": "2 Countries",
@@ -475333,7 +475343,8 @@
       "worldwide_gross": 8200000,
       "year": "2015",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -475663,7 +475674,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Silent version of the Twain tale, filmed in Pleasanton, California. A Missouri boy (Jack Pickford) encounters his first love (Clara Horton) and bucks responsibilities to find adventure with his friend, Huck Finn (Robert Gordon).",
       "title": "Tom Sawyer",
@@ -475676,7 +475687,8 @@
       "worldwide_gross": null,
       "year": "1917",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -478709,7 +478721,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Set during the Edo Period, a young man from a noble family meets a young woman under a special tree called \"Raiou\" (the tree was struck by lightning at one time with the broken part eventually sprouting out cherry blossoms). The young woman lived freely in the mountains after she was abducted as a young child. The couple soon fall in love under the Raiou tree, but become acutely aware of their different social positions &amp; the ramifications it has on their relationship.",
       "title": "The Lightning Tree",
@@ -478722,7 +478734,8 @@
       "worldwide_gross": null,
       "year": "2010",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -479312,7 +479325,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "The wolf was almost completely eradicated in Europe over the past few centuries. The species also disappeared from the Netherlands 150 years ago and it was believed that this was forever. Only small populations survived in the large forests of Eastern Europe. In recent decades, not only did the wolf get legal protection, it also started a remarkable comeback. With time this magnificent animal found its way back from Poland through Germany to the Netherlands and Belgium. The carnivore, around which there are many myths and which is very often portrayed as bloodthirsty, welcomed back by many and despised by others. Are wolves really that dangerous to people? This exceptional documentary follows the journey of a young, lone wolf which grows up in eastern Germany and then head westwards on its search for its own territory and a consort to finally settle down in the Netherlands to found there the first permanent wolf pack since the extermination of the species long time ago.",
       "title": "Wolf: Wanderer Without Borders",
@@ -479328,7 +479341,8 @@
       "worldwide_gross": null,
       "year": "2022",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -479856,7 +479870,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "If Sidik manages to spot a leopard in his beloved mountains of Kurdistan, the area can be declared a protected nature reserve. Will that finally bring peace?",
       "title": "Sidik and the Panther",
@@ -479871,7 +479885,8 @@
       "worldwide_gross": null,
       "year": "2019",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -484279,7 +484294,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "The film follows the story of Hadzi Trifun, a prominent Serbian merchant, who tries to keep the peace with the Turkish authorities, but also maintains his reputation and influence in Vranje, an important Turkish town near the border with liberated Serbia. While Trifun is preparing his two sons to succeed him as the leaders of the Serbian people, he is suffering not only from powerful Turkish beys, but also from his family. Trifun makes difficult decisions that will later affect his descendants, the heroes of the novel Impure Blood by Serbian writer Bora Stankovic.",
       "title": "Necista krv Greh predaka",
@@ -484294,7 +484309,8 @@
       "worldwide_gross": null,
       "year": "2021",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -484575,7 +484591,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": 4000000,
       "cast": [
@@ -484600,13 +484616,13 @@
       "last_probed": "2026-09-23",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 0.879,
       "poster": "/z0YPcVdWvxG5dmBL0QRQeB2B6Th.jpg",
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "The Saudi family is following strict instructions from their grandfather to remain confined in the desert during the early 1990s. A series of events shakes the family's foundation and they find them in a struggle between life and death.",
       "title": "Hobal",
@@ -484615,7 +484631,8 @@
         "8DbWL7YCF5s"
       ],
       "window_dates": {
-        "upcoming": "2026-09-11"
+        "upcoming": "2026-09-11",
+        "released": "2026-09-27"
       },
       "wm_critic_score": null,
       "wm_fields_fetched_at": "2026-09-23",
@@ -485519,7 +485536,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Follows the crime and scandal that took down President Richard Nixon the day of the break-in at the Watergate Hotel.",
       "title": "Watergate: High Crimes in the White House",
@@ -485534,7 +485551,8 @@
       "worldwide_gross": null,
       "year": "2022",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -487178,7 +487196,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "This charming documentary showcases the career of musical-comedy sensation Kaye Ballard, whose ability to sing and tell jokes was ubiquitous in the late 20th century. Delightful moments are captured in rare archival footage and interviews with Ann-Margret, Michael Feinstein and Ballard herself.",
       "title": "Kaye Ballard - The Show Goes On!",
@@ -487191,7 +487209,8 @@
       "worldwide_gross": null,
       "year": "2019",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -491909,55 +491928,6 @@
       "window_dates": {
         "included_streaming": "2026-09-17"
       }
-    },
-    {
-      "age_rating": null,
-      "availability_confidence": "confirmed",
-      "availability_source": "tmdb_date",
-      "award": null,
-      "award_text": "1 win & 1 nomination",
-      "budget": null,
-      "cast": [
-        "Shelia Stahl",
-        "Christina Stahl",
-        "Mike Stahl"
-      ],
-      "cinema_date": null,
-      "cinema_release": false,
-      "culture": "Western",
-      "director": "Matt Smukler",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Documentary"
-      ],
-      "imdb_id": "tt6149648",
-      "jw_link": null,
-      "language": "en",
-      "last_polled": "2026-08-14",
-      "last_probed": "2026-09-23",
-      "offers": [],
-      "outcome": "scored",
-      "poll_tier": "none",
-      "popularity": 0.8345,
-      "poster": "/vmu4r8BEeahkC638hP4d76og3ex.jpg",
-      "probe_count": 1,
-      "release_dates": [],
-      "status": [
-        "upcoming"
-      ],
-      "synopsis": "Honors student Christina balances school, track, and teen life while caring for her mom with a 59 IQ and supporting her dad. A powerful true story about sacrifice, disability, and the unspoken weight of growing up as a young caregiver.",
-      "title": "Wildflower: The Documentary",
-      "tmdb_id": 750611,
-      "trailers": [],
-      "window_dates": {
-        "upcoming": "2026-08-14"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-23",
-      "wm_popularity_percentile": 47.1,
-      "wm_user_rating": null,
-      "worldwide_gross": null,
-      "year": "2025"
     },
     {
       "age_rating": null,
@@ -501635,7 +501605,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Through a unique architectural and engineering lens, \u201cRise & Fall: The World Trade Center\u201d recounts the inspiring, true story behind an American icon, and the remarkable group of people who dreamed it and made it real. No ordinary pair of buildings, the Twin Towers featured a unique structural design\u2014and dozens of other technical breakthroughs\u2014that made the then-tallest buildings in the world possible. But did these innovations contribute to their collapse on 9/11? With the help of harrowing first-hand testimonies, expert interviews, and never-before-seen graphics, and with the benefit of two decades of engineering hindsight, viewers will understand how the Towers rose\u2026and why they fell.",
       "title": "Rise & Fall: The World Trade Center",
@@ -501648,7 +501618,8 @@
       "worldwide_gross": null,
       "year": "2021",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -502427,52 +502398,6 @@
       "window_dates": {
         "included_streaming": "2026-09-17"
       }
-    },
-    {
-      "age_rating": null,
-      "availability_confidence": "confirmed",
-      "availability_source": "tmdb_date",
-      "budget": null,
-      "cast": [
-        "James Blake"
-      ],
-      "cinema_date": null,
-      "cinema_release": false,
-      "culture": "Western",
-      "director": "Peter Grant",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Documentary",
-        "TV Movie"
-      ],
-      "imdb_id": "tt38356446",
-      "jw_link": null,
-      "language": "en",
-      "last_polled": "2026-08-11",
-      "last_probed": "2026-09-23",
-      "offers": [],
-      "outcome": "scored",
-      "poll_tier": "none",
-      "popularity": 0.7596,
-      "poster": "/db0qxu31EDPCq27nP9RwQJ1oP7P.jpg",
-      "probe_count": 1,
-      "release_dates": [],
-      "status": [
-        "upcoming"
-      ],
-      "synopsis": "James Blake joins three young men to explore why they're turned to the so-called manosphere to achieve success, and how it influences their real lives.",
-      "title": "Men of the Manosphere",
-      "tmdb_id": 1604723,
-      "trailers": [],
-      "window_dates": {
-        "upcoming": "2026-08-11"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-23",
-      "wm_popularity_percentile": 45.05,
-      "wm_user_rating": null,
-      "worldwide_gross": null,
-      "year": "2025"
     },
     {
       "age_rating": null,
@@ -506996,7 +506921,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Bhaskar's wife thinks he is a stationery store worker, his girlfriend thinks he is a software engineer but no one knows he is also a burglar. His royal pains start when his tangled web of lies involving a hopeful girlfriend, a blackmailing wife, and a cheating cop all collide. Bhaskar's one last heist might just land him in a gilded cage of his own making.",
       "title": "Raja Raja Chora",
@@ -507009,7 +506934,8 @@
       "worldwide_gross": null,
       "year": "2021",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -507686,7 +507612,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "3 young strangers who have been wronged in a bid to find justice form an alliance to bring a ruthless and vicious politician down. They subject themselves to physical and psychological training in order to execute the justice society has failed to grant them. Will they succeed and will this revenge bring them the peace they so desperately seek?",
       "title": "Devil in Agbada",
@@ -507699,7 +507625,8 @@
       "worldwide_gross": null,
       "year": "2021",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -508100,7 +508027,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Seven friends meet up for dinner on a full moon Friday night and deep secrets will come to the surface, shaking their lives and threatening their relationships.",
       "title": "Perfect Strangers",
@@ -508113,7 +508040,8 @@
       "worldwide_gross": null,
       "year": "2016",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -508681,7 +508609,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -508705,7 +508633,7 @@
       "last_probed": "2026-09-23",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 0.6911,
       "poster": "/8QuZbheWpOyt6Uj3PZXKvf3EKkF.jpg",
       "probe_count": 1,
@@ -508717,7 +508645,7 @@
         }
       ],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "A conservatively raised capitalist travels the world on an evolutionary journey exploring alternative economic and political models in a pursuit for greater global peace, unity and wealth equality.",
       "title": "Common Wealth",
@@ -508726,7 +508654,8 @@
         "9OTID0c6Xlw"
       ],
       "window_dates": {
-        "upcoming": "2026-08-16"
+        "upcoming": "2026-08-16",
+        "released": "2026-09-27"
       },
       "wm_critic_score": null,
       "wm_fields_fetched_at": "2026-09-23",
@@ -512945,54 +512874,6 @@
     {
       "age_rating": null,
       "availability_confidence": "confirmed",
-      "availability_source": "tmdb_date",
-      "budget": null,
-      "cast": [
-        "Marcus Mumford",
-        "Ted Dwane",
-        "Ben Lovett"
-      ],
-      "cinema_date": null,
-      "cinema_release": false,
-      "culture": "Western",
-      "director": "Jack Lowe",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Music",
-        "Documentary"
-      ],
-      "imdb_id": null,
-      "jw_link": null,
-      "language": "en",
-      "last_polled": "2026-08-16",
-      "last_probed": "2026-09-23",
-      "offers": [],
-      "outcome": "scored",
-      "poll_tier": "none",
-      "popularity": 0.6024,
-      "poster": "/yowPdv4OChxKJsJG1gxgr0uXimB.jpg",
-      "probe_count": 1,
-      "release_dates": [],
-      "status": [
-        "upcoming"
-      ],
-      "synopsis": "Watch Mumford & Sons, live from Manchester\u2019s Aviva Studios, home of Factory International, where they will be performing tracks from the brand new album \u201cRUSHMERE\u201d, due for release on 28th March.",
-      "title": "City Sessions: Mumford & Sons",
-      "tmdb_id": 1453890,
-      "trailers": [],
-      "window_dates": {
-        "upcoming": "2026-08-16"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-23",
-      "wm_popularity_percentile": 23.02,
-      "wm_user_rating": null,
-      "worldwide_gross": null,
-      "year": "2025"
-    },
-    {
-      "age_rating": null,
-      "availability_confidence": "confirmed",
       "availability_source": "tmdb_providers",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -514957,58 +514838,6 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
-      "availability_source": "tmdb_date",
-      "budget": null,
-      "cast": [
-        "Tisha Campbell",
-        "Melissa De Sousa",
-        "Amiyah Scott",
-        "Kaye Singleton"
-      ],
-      "cinema_date": null,
-      "cinema_release": false,
-      "culture": "Western",
-      "director": "Wendy Raquel Robinson",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Comedy",
-        "Action",
-        "Drama"
-      ],
-      "imdb_id": "tt33381924",
-      "jw_link": null,
-      "language": "en",
-      "last_polled": "2026-08-21",
-      "last_probed": "2026-09-23",
-      "offers": [],
-      "outcome": "scored",
-      "poll_tier": "none",
-      "popularity": 0.5549,
-      "poster": "/mHesze8r2wmLZzjWJW7XCuRMJJG.jpg",
-      "probe_count": 1,
-      "release_dates": [],
-      "status": [
-        "upcoming"
-      ],
-      "synopsis": "When a dark web trafficking attempt impacts her family, blockchain expert Dr. Carol Cleavers joins forces with her best friend to take down a dangerous cyber operation exploiting women.",
-      "title": "Operation: Aunties",
-      "tmdb_id": 1510187,
-      "trailers": [
-        "ocnWROncRjU"
-      ],
-      "window_dates": {
-        "upcoming": "2026-08-21"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-23",
-      "wm_popularity_percentile": 55.16,
-      "wm_user_rating": null,
-      "worldwide_gross": null,
-      "year": "2025"
-    },
-    {
-      "age_rating": null,
       "availability_confidence": "estimated",
       "availability_source": "tmdb_providers",
       "award": null,
@@ -516806,7 +516635,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "award": null,
       "award_text": "",
@@ -516834,20 +516663,21 @@
       "last_probed": "2026-09-23",
       "offers": [],
       "outcome": "scored",
-      "poll_tier": "none",
+      "poll_tier": "slow",
       "popularity": 0.5018,
       "poster": "/7sBQwuyel1EaJCVcexh5xWEOiWv.jpg",
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Jija is on a unique mission-to send a letter addressed to \"Mukkam Post Devach Ghar\" (God`s Home). Her journey, filled with humorous twists, emotional moments, and heartfelt connections, brings her family and the community together in unexpected ways.",
       "title": "Mukkam Post Devach Ghar",
       "tmdb_id": 1428470,
       "trailers": [],
       "window_dates": {
-        "upcoming": "2026-09-10"
+        "upcoming": "2026-09-10",
+        "released": "2026-09-27"
       },
       "wm_critic_score": null,
       "wm_fields_fetched_at": "2026-09-23",
@@ -518512,7 +518342,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "The odds were against her. Learn how singer Tina Turner reached super-stardom with her high-energy style and gravelly voice and prevailed as the 'Queen of Rock n Roll'.",
       "title": "Tina Turner: Simply the Best",
@@ -518525,7 +518355,8 @@
       "worldwide_gross": null,
       "year": "2021",
       "window_dates": {
-        "upcoming": "2026-09-17"
+        "upcoming": "2026-09-17",
+        "released": "2026-09-27"
       }
     },
     {
@@ -519425,113 +519256,6 @@
       "wm_user_rating": 6.3,
       "worldwide_gross": null,
       "year": "2024"
-    },
-    {
-      "age_rating": null,
-      "availability_confidence": "confirmed",
-      "availability_source": "tmdb_date",
-      "budget": null,
-      "cast": [
-        "Nathalie Morris",
-        "Carlos Sanson Jr.",
-        "Alan Dukes",
-        "Lily Stewart"
-      ],
-      "cinema_date": null,
-      "cinema_release": false,
-      "culture": "Western",
-      "director": "Seth Gabrielsson",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Drama"
-      ],
-      "imdb_id": null,
-      "jw_link": null,
-      "language": "en",
-      "last_polled": "2026-08-21",
-      "last_probed": null,
-      "offers": [],
-      "outcome": "unprobed",
-      "poll_tier": "none",
-      "popularity": 0.3499,
-      "poster": "/yY7zkWR6SGmjt8jfBzHWu8wT8vW.jpg",
-      "probe_count": 0,
-      "release_dates": [
-        {
-          "date": "2025-08-14",
-          "region": "AU",
-          "type": 1
-        }
-      ],
-      "status": [
-        "upcoming"
-      ],
-      "synopsis": "Set in the sleepy town of Bawley Point on the NSW South Coast and brimming with laconic humour, this unforgettable tale of misguided obsession and rampant insecurity tangles with the absurdity of wanting to alter the body in defiance of things beyond our control.",
-      "title": "5'12\"",
-      "tmdb_id": 1513631,
-      "trailers": [],
-      "window_dates": {
-        "upcoming": "2026-08-21"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-11",
-      "wm_popularity_percentile": 61.34,
-      "wm_user_rating": null,
-      "worldwide_gross": null,
-      "year": "2025"
-    },
-    {
-      "age_rating": null,
-      "availability_confidence": "confirmed",
-      "availability_source": "tmdb_date",
-      "award": null,
-      "award_text": "",
-      "budget": 500000,
-      "cast": [
-        "Lara Deam",
-        "Cara Matthews",
-        "Jarid Kennedy",
-        "Tom Marchant"
-      ],
-      "cinema_date": null,
-      "cinema_release": false,
-      "culture": "Western",
-      "director": "Herman Perera",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Horror",
-        "Thriller"
-      ],
-      "imdb_id": "tt31796970",
-      "jw_link": null,
-      "language": "en",
-      "last_polled": "2026-08-21",
-      "last_probed": null,
-      "offers": [],
-      "outcome": "unprobed",
-      "poll_tier": "none",
-      "popularity": 0.3487,
-      "poster": "/bIRfv3MfAfbnIs1VjiCAK0193T1.jpg",
-      "probe_count": 0,
-      "release_dates": [],
-      "status": [
-        "upcoming"
-      ],
-      "synopsis": "After Lucky's world crumbles, her college friend Hadiya, Hadiya's husband Brad, and their children arrive to help Lucky, only to find the old mansion occupied by a dangerous presence that will stop at nothing to make them leave.",
-      "title": "Sunny's Mansion",
-      "tmdb_id": 1523424,
-      "trailers": [
-        "HC2PROUIEks"
-      ],
-      "window_dates": {
-        "upcoming": "2026-08-21"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-11",
-      "wm_popularity_percentile": 76.3,
-      "wm_user_rating": null,
-      "worldwide_gross": null,
-      "year": "2025"
     },
     {
       "age_rating": "E",
