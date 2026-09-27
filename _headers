@@ -6,5 +6,5 @@
   Cross-Origin-Opener-Policy: same-origin
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   # BEGIN GENERATED CSP — poc_pipeline.py --build-html; do not hand-edit
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-m+juXt/vzGsG/imyh2mUYn8XB8n6uXsjWctSh5sbLDE=' 'sha256-mx5HrfmxOEUdBHqpg0rOc5h7fk1ml38W36dT8zO4cjE='; style-src 'self' 'sha256-Wm+TBlNEJIGTttfT8oKixChzp1oo9KfSWMaMwoZbiZk=' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://image.tmdb.org https://img.youtube.com; connect-src 'self' https://ypccfyatejejslzlfrbf.supabase.co https://cascademovies.com; frame-src https://www.youtube-nocookie.com; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://image.tmdb.org https://img.youtube.com; connect-src 'self' https://ypccfyatejejslzlfrbf.supabase.co https://cascademovies.com; frame-src https://www.youtube-nocookie.com; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'none'
   # END GENERATED CSP

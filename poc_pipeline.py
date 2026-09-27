@@ -33,7 +33,7 @@ to compare against. Output for the app front-end is written to movies.json.
 """
 
 from __future__ import annotations
-import os, sys, csv, io, re, json, time, shutil, hashlib, base64, calendar, datetime, subprocess, urllib.parse, urllib.request, urllib.error
+import os, sys, csv, io, re, json, time, shutil, calendar, datetime, subprocess, urllib.parse, urllib.request, urllib.error
 from collections import Counter
 
 import runstats
@@ -3051,48 +3051,36 @@ def build_html(records: list[dict] | None = None, provider_status: dict | None =
     # Machine-readable stamp served at /version.json (same origin as the app).
     with open(VERSION_JSON, "w", encoding="utf-8") as f:
         json.dump(info, f, separators=(",", ":")); f.write("\n")
-    # CAS-947: window.BUILD_INFO's own generated file — kept OUT of the main inline <script> (which the
-    # CSP below hashes) precisely because `builtAt` changes on every build; see the comment on the
-    # <script src="build-info.js"> tag in app_template.html.
+    # CAS-947: window.BUILD_INFO's own generated file — kept OUT of the main inline <script> precisely
+    # because `builtAt` changes on every build; see the comment on the <script src="build-info.js">
+    # tag in app_template.html.
     with open(BUILD_INFO_JS, "w", encoding="utf-8") as f:
         f.write("window.BUILD_INFO = " + json.dumps(info) + ";\n")
     print(f"stamped v{info['version']} · build {info['build']} · {info['commit']}")
-    write_csp_headers(html)
+    write_csp_headers()
     _sync_ios_www()
 
 
-def _sha256_b64(text: str) -> str:
-    return base64.b64encode(hashlib.sha256(text.encode("utf-8")).digest()).decode("ascii")
+def build_csp() -> str:
+    """CAS-947 hashed every inline <script>/<style> block instead of allowing 'unsafe-inline'. CAS-1057
+    (Decision 27 Sep 2026, option b) reverted script-src/style-src to 'unsafe-inline' and dropped the
+    hashes: app_template.html drives most of its UI through onclick/style attributes generated per
+    record at runtime (movie/video-specific values from movies.json), which a build-time hash list can
+    never cover, and a stale hash on the pinned inline <script> was blocking the whole app on the
+    Cloudflare preview host — browsers ignore 'unsafe-inline' outright whenever any hash is present.
+    Strict, hash-only CSP is deferred to post-launch hardening. Do not add 'unsafe-eval'.
 
-
-def build_csp(html: str) -> str:
-    """CAS-947: a hash-based Content-Security-Policy for the built index.html.
-
-    'unsafe-inline' is worthless against the app's many HTML-injection sinks once any inline script
-    exists at all, so every inline <script>/<style> block is individually hashed instead. Only truly
-    inline blocks are hashed — a <script src=...> tag is already same-origin and covered by 'self'.
     Origins below were verified against what app_template.html actually loads/fetches/embeds, not
     guessed: fonts.googleapis.com (stylesheet + preconnect), fonts.gstatic.com (the fonts it serves),
     image.tmdb.org (posters) and img.youtube.com (trailer thumbnails) for img-src, the Supabase project
     and cascademovies.com (the native-app catalogue fetch, CATALOGUE_URL) for connect-src, and
     youtube-nocookie.com (the trailer <iframe>) for frame-src. Plain <a target="_blank"> links (TMDB,
     Watchmode, JustWatch, wa.me, YouTube watch pages) are navigations, not fetches, so they need no
-    directive. No 'unsafe-inline'/'unsafe-hashes' anywhere — see the ticket comment for the onclick-
-    handler count this policy does not, and cannot, cover."""
-    script_hashes, style_hashes = [], []
-    for m in re.finditer(r"<script(\s[^>]*)?>(.*?)</script>", html, re.DOTALL | re.IGNORECASE):
-        attrs, body = m.group(1) or "", m.group(2)
-        if re.search(r"\bsrc\s*=", attrs, re.IGNORECASE):
-            continue  # external file, same-origin, already covered by script-src 'self'
-        script_hashes.append(_sha256_b64(body))
-    for m in re.finditer(r"<style(\s[^>]*)?>(.*?)</style>", html, re.DOTALL | re.IGNORECASE):
-        style_hashes.append(_sha256_b64(m.group(2)))
-    script_src = " ".join(["'self'"] + [f"'sha256-{h}'" for h in script_hashes])
-    style_src  = " ".join(["'self'"] + [f"'sha256-{h}'" for h in style_hashes] + ["https://fonts.googleapis.com"])
+    directive."""
     directives = [
         "default-src 'self'",
-        f"script-src {script_src}",
-        f"style-src {style_src}",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: https://image.tmdb.org https://img.youtube.com",
         "connect-src 'self' https://ypccfyatejejslzlfrbf.supabase.co https://cascademovies.com",
@@ -3109,10 +3097,10 @@ _CSP_BEGIN = "  # BEGIN GENERATED CSP — poc_pipeline.py --build-html; do not h
 _CSP_END   = "  # END GENERATED CSP"
 
 
-def write_csp_headers(html: str) -> None:
+def write_csp_headers() -> None:
     """Write the CSP into _headers under its existing /* rule, replacing any previously generated
     block between the marker comments so the hand-written headers above it are never touched."""
-    csp = build_csp(html)
+    csp = build_csp()
     generated = f"{_CSP_BEGIN}\n  Content-Security-Policy: {csp}\n{_CSP_END}"
     current = open(HEADERS_FILE, encoding="utf-8").read() if os.path.exists(HEADERS_FILE) else "/*\n"
     if _CSP_BEGIN in current and _CSP_END in current:
