@@ -931,6 +931,13 @@ alter table public.analytics_admins enable row level security;
 insert into public.analytics_admins (user_id) values ('c7e9b361-368f-4488-84b5-baf0ac7a0751')
   on conflict (user_id) do nothing;
 
+-- CAS-1074: repo drift — this policy was applied live but never recorded here. Lets an admin
+-- confirm their own admin-ness (e.g. to decide whether to show admin UI) without needing
+-- service_role; it grants no visibility into any OTHER row of this table.
+drop policy if exists analytics_admins_select_self on public.analytics_admins;
+create policy analytics_admins_select_self on public.analytics_admins
+  for select to authenticated using (user_id = auth.uid());
+
 drop policy if exists usage_events_select_admin on public.usage_events;
 create policy usage_events_select_admin on public.usage_events
   for select to authenticated
@@ -1126,6 +1133,102 @@ grant select on public.analytics_onboarding_funnel to authenticated;
 grant select on public.analytics_activation        to authenticated;
 grant select on public.analytics_retention         to authenticated;
 grant select on public.analytics_feature_usage     to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- admin_members / admin_member_activity / admin_member_onboarding / admin_member_emails /
+-- admin_cascades — the Cascade Admin site's member-list reads (CAS-1074)
+-- ---------------------------------------------------------------------------
+-- These four existed only live, with NO record in this file, until CAS-1074 (repo drift). All but
+-- admin_member_emails ran `security_invoker = true` — the view runs with the CALLING user's own
+-- row-security, so the `ag`/cascades read inside admin_members was silently narrowed to the signed-
+-- in admin's OWN cascades by cascades_owner's RLS, undercounting every admin's Members/With-an-agent
+-- totals. `security_invoker = false` (the default) makes each view run as its OWNER instead, which
+-- bypasses RLS on the tables it reads — safe here ONLY because every view ends with its own
+-- `exists (select 1 from analytics_admins ...)` guard, so a non-admin caller still gets zero rows,
+-- same as admin_member_emails already did live. Do not drop that guard when editing these.
+-- admin_cascades is new: the Admin site's all-members cascades count used to read public.cascades
+-- directly, which the same cascades_owner RLS also limits to the caller's own rows — an admin view
+-- is added here rather than loosening cascades' RLS (out of scope, and would expose ordinary users'
+-- own cascades to each other via the app itself, not just the Admin site).
+create or replace view public.admin_members
+with (security_invoker = false) as
+with ev as (
+  select
+    usage_events.user_id,
+    min(usage_events.created_at) as first_seen_at,
+    max(usage_events.created_at) as last_seen_at,
+    count(*) as events,
+    count(distinct usage_events.session) as sessions,
+    count(distinct usage_events.client_key) as devices,
+    count(distinct date_trunc('day', usage_events.created_at)) as active_days
+  from public.usage_events
+  where usage_events.user_id is not null
+  group by usage_events.user_id
+),
+ag as (
+  select
+    cascades.user_id,
+    count(*) as agents,
+    max(cascades.updated_at) as last_agent_edit
+  from public.cascades
+  group by cascades.user_id
+)
+select
+  coalesce(ev.user_id, ag.user_id) as user_id,
+  left(coalesce(ev.user_id, ag.user_id)::text, 8) as short_id,
+  ev.first_seen_at, ev.last_seen_at, ev.events, ev.sessions, ev.devices, ev.active_days,
+  coalesce(ag.agents, 0) as agents,
+  ag.last_agent_edit
+from ev
+full join ag on ag.user_id = ev.user_id
+where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid());
+
+create or replace view public.admin_member_activity
+with (security_invoker = false) as
+select user_id, type as feature, count(*) as events, min(created_at) as first_at, max(created_at) as last_at
+from public.usage_events
+where user_id is not null
+  and exists (select 1 from public.analytics_admins a where a.user_id = auth.uid())
+group by user_id, type;
+
+create or replace view public.admin_member_onboarding
+with (security_invoker = false) as
+select
+  user_id,
+  coalesce(data ->> 'step', data ->> 'key', '(unknown)') as step,
+  count(*) filter (where type = 'onbstep_shown')    as shown,
+  count(*) filter (where type = 'onbstep_continue') as continued,
+  count(*) filter (where type = 'onbstep_skipped')  as skipped,
+  max(created_at) as last_at
+from public.usage_events
+where user_id is not null
+  and type like 'onbstep_%'
+  and exists (select 1 from public.analytics_admins a where a.user_id = auth.uid())
+group by user_id, (coalesce(data ->> 'step', data ->> 'key', '(unknown)'));
+
+create or replace view public.admin_member_emails
+with (security_invoker = false) as
+select id as user_id, email::text as email
+from auth.users u
+where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid());
+
+create or replace view public.admin_cascades
+with (security_invoker = false) as
+select id, user_id, name, criteria, alert_moments, active, created_at, updated_at
+from public.cascades
+where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid());
+
+revoke all on public.admin_members          from anon, public;
+revoke all on public.admin_member_activity  from anon, public;
+revoke all on public.admin_member_onboarding from anon, public;
+revoke all on public.admin_member_emails    from anon, public;
+revoke all on public.admin_cascades         from anon, public;
+
+grant select on public.admin_members          to authenticated;
+grant select on public.admin_member_activity  to authenticated;
+grant select on public.admin_member_onboarding to authenticated;
+grant select on public.admin_member_emails    to authenticated;
+grant select on public.admin_cascades         to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- delete_my_account — self-service account deletion (CAS-980)
