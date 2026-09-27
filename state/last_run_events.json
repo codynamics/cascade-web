@@ -1,1 +1,21 @@
-[]
+[
+  {
+    "tmdb_id": 1291659,
+    "title": "The Wizard of the Kremlin",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Foxtel Now"
+    ],
+    "detected": "2026-09-27"
+  },
+  {
+    "tmdb_id": 1291659,
+    "title": "The Wizard of the Kremlin",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-09-27"
+  }
+]
