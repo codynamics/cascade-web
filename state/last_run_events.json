@@ -1,21 +1,306 @@
 [
   {
-    "tmdb_id": 1291659,
-    "title": "The Wizard of the Kremlin",
-    "kind": "arrived",
-    "new_window": "included_streaming",
-    "label": "Included Streaming",
-    "services": [
-      "Foxtel Now"
-    ],
-    "detected": "2026-09-27"
+    "tmdb_id": 594676,
+    "title": "Hope Frozen: A Quest To Live Twice",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
   },
   {
-    "tmdb_id": 1291659,
-    "title": "The Wizard of the Kremlin",
+    "tmdb_id": 379170,
+    "title": "Sherlock: The Abominable Bride",
     "kind": "left",
-    "lost_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "detected": "2026-09-27"
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 413279,
+    "title": "Team Thor",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 460399,
+    "title": "Love, Chunibyo & Other Delusions! Take On Me",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 441829,
+    "title": "Team Thor: Part 2",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 552096,
+    "title": "Pistorius",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 727502,
+    "title": "High & Low The Worst",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 951189,
+    "title": "Burial",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 574236,
+    "title": "Selfie",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 634595,
+    "title": "Confession",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 377462,
+    "title": "O.J.: Made in America",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 591222,
+    "title": "Limbo",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 893366,
+    "title": "Little Nicholas: Happy as Can Be",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 959669,
+    "title": "The Narrow Bridge",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 795859,
+    "title": "kid 90",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 508206,
+    "title": "As Needed",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 595875,
+    "title": "Adam",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 1605290,
+    "title": "Snoop's Holiday Halftime Party",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 643786,
+    "title": "The Living Dead",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 605503,
+    "title": "The Father",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 610203,
+    "title": "Loop",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 883862,
+    "title": "Jinne Jamme Saare Nikamme",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 501145,
+    "title": "America",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 925715,
+    "title": "Hawa",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 324114,
+    "title": "White Water",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 840098,
+    "title": "Lord of the Ants",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 1316416,
+    "title": "Siko Siko",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 854521,
+    "title": "Django & Django: Sergio Corbucci Unchained",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 1336225,
+    "title": "American Girl",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 1446706,
+    "title": "Apollo 1: Destination Moon",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 520736,
+    "title": "Loro 2",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 1340828,
+    "title": "A Little Women's Christmas",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 851783,
+    "title": "Vikram Vedha",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 451735,
+    "title": "Blue",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 649985,
+    "title": "The Surgeon of the Rusty Knife",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 719889,
+    "title": "Skin",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 551381,
+    "title": "Aurora",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
+  },
+  {
+    "tmdb_id": 362383,
+    "title": "The Messenger",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-09-28"
   }
 ]
