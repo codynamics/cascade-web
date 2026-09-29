@@ -1,24 +1,6 @@
 {
-  "checked_at": "2026-09-28T20:34:01.432354+00:00",
+  "checked_at": "2026-09-29T07:01:51.546426+00:00",
   "checks": [
-    {
-      "name": "email_send",
-      "ok": null,
-      "value": 0,
-      "threshold": 0,
-      "detail": "no email attempted this run \u2014 unavailable.",
-      "status": "unknown",
-      "checked_at": "2026-09-28T07:01:44.028761+00:00"
-    },
-    {
-      "name": "push_send",
-      "ok": null,
-      "value": 0,
-      "threshold": 0,
-      "detail": "APNs configured but no push attempted this run \u2014 unavailable.",
-      "status": "unknown",
-      "checked_at": "2026-09-28T07:01:44.028761+00:00"
-    },
     {
       "name": "catalogue_size",
       "ok": true,
@@ -126,6 +108,24 @@
       "detail": "only 0 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
       "status": "unknown",
       "checked_at": "2026-09-28T20:34:01.432354+00:00"
+    },
+    {
+      "name": "email_send",
+      "ok": null,
+      "value": 0,
+      "threshold": 0,
+      "detail": "no email attempted this run \u2014 unavailable.",
+      "status": "unknown",
+      "checked_at": "2026-09-29T07:01:51.546426+00:00"
+    },
+    {
+      "name": "push_send",
+      "ok": null,
+      "value": 0,
+      "threshold": 0,
+      "detail": "APNs configured but no push attempted this run \u2014 unavailable.",
+      "status": "unknown",
+      "checked_at": "2026-09-29T07:01:51.546426+00:00"
     }
   ],
   "ok": true
