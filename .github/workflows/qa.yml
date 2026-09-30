@@ -362,10 +362,78 @@ jobs:
           path: qa-failures/e2e.txt
           retention-days: 7
 
+  # CAS-1093: proves the server-first account-store rework against a REAL local Supabase (Supabase CLI +
+  # Docker), not the no-Supabase environment every other job above runs in — that gap is how a sync pass
+  # that deleted every agent on sign-in reached production undetected (2026-09-30). See
+  # scripts/test-integrity.mjs and tests/e2e-integrity/account-integrity.spec.mjs's own headers for the
+  # scenarios and why some are still `test.fixme()`. Because promote.yml fires on this whole workflow
+  # succeeding, a red integrity job blocks the promote exactly like any other job here.
+  integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: npm ci
+
+      # Same Playwright browser/apt caching as the e2e job above, keyed the same way — both jobs install
+      # the same pinned webkit build, so they share the cache.
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: Allow caching the apt archive
+        run: sudo chown "$(whoami)" /var/cache/apt/archives
+
+      - name: Cache apt archives (webkit OS dependencies)
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-webkit-${{ hashFiles('package-lock.json') }}
+
+      - name: Install the matching browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps webkit
+
+      - name: Install browser OS dependencies (binary already cached)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps webkit
+
+      - name: Account integrity (local Supabase)
+        timeout-minutes: 25
+        run: |
+          set -o pipefail
+          npm run test:integrity 2>&1 | tee integrity.log
+
+      - name: Capture failure detail
+        if: failure()
+        run: |
+          mkdir -p qa-failures
+          (grep -m1 -E '✘|[0-9]+\) .+ › |Error:' integrity.log || tail -5 integrity.log) \
+            > qa-failures/integrity.txt
+
+      - name: Upload failure detail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-failure-integrity
+          path: qa-failures/integrity.txt
+          retention-days: 7
+
   # CAS-462: Jira checkpoint only — no build artefact depends on this, so it runs after the
-  # other 5 jobs (not in parallel with them) and only on green, via `needs:`.
+  # other jobs (not in parallel with them) and only on green, via `needs:`.
   mark-on-staging:
-    needs: [build-check, engine, data, monitor, e2e, lint, scheduler]
+    needs: [build-check, engine, data, monitor, e2e, lint, scheduler, integrity]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -394,7 +462,7 @@ jobs:
   # promote.yml's own `workflow_run` trigger as before — without the guard every push would
   # dispatch promote twice.
   dispatch-promote:
-    needs: [build-check, engine, data, monitor, e2e, lint, scheduler]
+    needs: [build-check, engine, data, monitor, e2e, lint, scheduler, integrity]
     if: success() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/staging'
     # Creating a workflow_dispatch event via the API needs actions:write, which the top-level
     # `permissions:` block above does not grant — this job (only) needs its own grant.
@@ -412,11 +480,11 @@ jobs:
         run: gh workflow run promote.yml --ref main
 
   # CAS-482: the failure-path mirror of mark-on-staging above. `if: failure()` on a job whose
-  # `needs` list is the same 5 QA jobs runs exactly when at least one of them went red — GitHub's
+  # `needs` list is the same QA jobs runs exactly when at least one of them went red — GitHub's
   # default failure propagation. Each QA job already uploaded a qa-failure-<job> artifact with its
   # first failing line (see the "Capture failure detail" steps above) if it failed.
   on-failure:
-    needs: [build-check, engine, data, monitor, e2e, lint, scheduler]
+    needs: [build-check, engine, data, monitor, e2e, lint, scheduler, integrity]
     if: failure()
     # download-artifact's `pattern` option lists this run's artifacts via the Actions API, which
     # needs actions:read — the top-level `permissions:` block above restricts every other scope to
@@ -451,10 +519,11 @@ jobs:
           E2E:         ${{ needs.e2e.result }}
           LINT:        ${{ needs.lint.result }}
           SCHEDULER:   ${{ needs.scheduler.result }}
+          INTEGRITY:   ${{ needs.integrity.result }}
         run: |
           FAILED=""
           DETAIL=""
-          for pair in "build-check:$BUILD_CHECK" "engine:$ENGINE" "data:$DATA" "monitor:$MONITOR" "e2e:$E2E" "lint:$LINT" "scheduler:$SCHEDULER"; do
+          for pair in "build-check:$BUILD_CHECK" "engine:$ENGINE" "data:$DATA" "monitor:$MONITOR" "e2e:$E2E" "lint:$LINT" "scheduler:$SCHEDULER" "integrity:$INTEGRITY"; do
             name="${pair%%:*}"; result="${pair##*:}"
             if [ "$result" = "failure" ]; then
               FAILED="${FAILED:+$FAILED, }$name"
@@ -482,7 +551,7 @@ jobs:
   # noticed by whoever next opens the Actions tab. Separate concern from on-failure above
   # (which requeues the Jira ticket) — needs every other job so it fires whichever one broke.
   alert:
-    needs: [build-check, engine, data, monitor, lint, e2e, scheduler, mark-on-staging, dispatch-promote, on-failure]
+    needs: [build-check, engine, data, monitor, lint, e2e, scheduler, integrity, mark-on-staging, dispatch-promote, on-failure]
     if: failure()
     permissions:
       contents: read

@@ -16,15 +16,17 @@
     "test:agents": "node tests/js/run-agent-suite.mjs",
     "test:a11y": "playwright test tests/e2e/CAS-960.spec.mjs",
     "test:rls": "node tests/rls/matrix.mjs",
+    "test:integrity": "node scripts/test-integrity.mjs",
     "manifest:wm-scoreable": "node scripts/wm_scoreable_manifest.mjs",
     "screenshots": "node scripts/appstore-screenshots.mjs",
-    "qa": "npm run test:lint && npm run build && npm run test:engine && npm run test:scheduler && npm run test:data && npm run test:monitor && npm run test:e2e"
+    "qa": "npm run test:lint && npm run build && npm run test:engine && npm run test:scheduler && npm run test:data && npm run test:monitor && npm run test:e2e && npm run test:integrity"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@capacitor/cli": "^8.5.0",
     "@electric-sql/pglite": "^0.5.8",
-    "@playwright/test": "1.60.0"
+    "@playwright/test": "1.60.0",
+    "supabase": "2.118.0"
   },
   "dependencies": {
     "@capacitor-community/in-app-review": "^8.0.0",
