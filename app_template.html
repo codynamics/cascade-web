@@ -6922,12 +6922,11 @@ function friendFormHTML(existing, ctx){
     <input type="text" class="namein" id="ffName" maxlength="40" autocomplete="off" value="${escA(name)}" placeholder="e.g. Sam">
     <div class="flabel">Email</div>
     <input type="email" class="namein" id="ffEmail" autocomplete="off" value="${escA(email)}" placeholder="e.g. sam@example.com">
-    <div class="flabel">Mobile (optional)</div>
+    <div class="flabel">Mobile</div>
     <input type="tel" class="namein" id="ffMobile" autocomplete="off" value="${escA(mobile)}" placeholder="e.g. 0412 000 000">
-    <div class="pnote">One of email or mobile is enough. Saved to your friends when you send.</div>
     <div class="pnote" id="ffErr" style="color:#ffb9a6" hidden></div>
     <button type="button" class="filminvcta" onclick="submitFriendForm('${ctx}','${idAttr}')">${existing?"Save changes":"Add and select"}</button>
-    ${existing?`<button type="button" class="listact danger" style="width:auto;height:auto;padding:9px 18px;margin-top:10px" onclick="confirmDeleteFriend('${idAttr}')">Delete friend</button>`:""}`;
+    ${existing?`<button type="button" class="osdel" onclick="confirmDeleteFriend('${idAttr}')">Remove</button>`:""}`;
 }
 // CAS-932: fills the (still-open) add form from a system-picked contact — never saves straight from the
 // picker, so a mis-tap on the wrong contact is still caught by the existing confirm-and-Save step below.

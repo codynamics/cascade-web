@@ -135,7 +135,7 @@ test("CAS-928 AC3g: deleting a friend asks for confirmation first, then removes 
   page.on("dialog", dialog => dialog.accept());
 
   await page.locator('#friendsRows .frow[data-fid="5"]').click();
-  await page.locator('#friendsBody button:has-text("Delete friend")').click();
+  await page.locator('#friendsBody button:has-text("Remove")').click();
 
   await expect(page.locator("#friendsScreen")).not.toContainText("Tom");
   const deletes = await page.evaluate(() => window.__friendDeletes);
