@@ -2047,6 +2047,12 @@
   .mbd{font-size:12.5px;color:var(--dim);line-height:1.35}
   /* The haul, under the button — four across, so it reads as a wall rather than a shelf. */
   .membgrid{grid-template-columns:repeat(4,1fr);gap:7px;margin:18px 0 4px}
+  /* No page scroll (Lee, 2026-09-30): the body fills the screen and the poster wall takes only the height left
+     under the button, fading out, instead of pushing the page into a scroll. On a screen too short for the form
+     itself the page still scrolls, and the wall is then zero rows. */
+  .memb .membinner{flex:1 0 auto;margin:0 auto}
+  .membgrid{flex:1 1 0;min-height:0;overflow:hidden;align-content:start;
+    -webkit-mask-image:linear-gradient(to bottom,#000 65%,transparent);mask-image:linear-gradient(to bottom,#000 65%,transparent)}
 
   /* CAS-205: the membership setup bar and its sheet are gone — see the note where their code was.
      Their whole stylesheet went with them; nothing else in the app used .ms*. */
