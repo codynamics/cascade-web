@@ -7521,7 +7521,7 @@ function renderInvitesScreen(){
     {label:"Waiting", key:"waiting", rows:groups.Waiting},
   ].filter(s=>s.rows.length);
   const body = !invites.length
-    ? `<div class="invempty">No invites yet — invite someone to a film from its page and their reply will show up here.</div>`
+    ? `<div class="invempty">No invites yet — expand a film card to see the invite button. Their reply will show up here.</div>`
     : sections.map(s=>`<div class="flabel">${s.label}</div>${s.rows.map(inv=>inviteRowHTML(inv, s.key)).join("")}`).join("");
   el.innerHTML=`
     <div class="ostop"><h2 class="osh">Invites</h2>
