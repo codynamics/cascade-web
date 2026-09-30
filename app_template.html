@@ -480,7 +480,7 @@
   .flabel:first-child{margin-top:0}
   /* One visible focus ring for every interactive thing the new UI added. A control you can Tab to but
      can't SEE that you've Tabbed to is not keyboard-operable in any way that matters. */
-  .chip:focus-visible,.qpill:focus-visible,.hatch:focus-visible,.ebtn:focus-visible,.cschip:focus-visible,
+  .chip:focus-visible,.qpill:focus-visible,.hatch:focus-visible,.ebtn:focus-visible,
   .mlbtn:focus-visible,.ca-btn:focus-visible,.tpl:focus-visible,.actbtn:focus-visible,
   .iconbtn:focus-visible,.modechip:focus-visible,.donebtn:focus-visible,.applybtn:focus-visible,
   .dangerbtn:focus-visible,.secbtn:focus-visible{
@@ -1233,15 +1233,6 @@
   .ebtn:hover{border-color:var(--accent)}
   .ebtn b{color:#a7eccb;white-space:nowrap}
   .ebtn.ghost{justify-content:center;color:var(--faint);border-style:dashed}
-  .cascstart{margin:2px 12px 0;background:linear-gradient(135deg,rgba(124,92,255,.12),rgba(72,199,142,.07));
-    border:1px solid #3b3560;border-radius:13px;padding:12px}
-  .csh{font-size:13.5px;font-weight:800;color:var(--ink)}
-  .csp{font-size:12px;color:var(--dim);line-height:1.55;margin:4px 0 9px}
-  .cschips{display:flex;flex-wrap:wrap;gap:6px}
-  .cschip{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:20px;
-    padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
-  .cschip:hover{border-color:var(--accent)}
-  .cschip b{color:#a7eccb;font-weight:800}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;display:none}
   .overlay.open{display:block}
   /* CAS-553: diagnostics panel — a centered box inside the shared .overlay backdrop, not a full-bleed
@@ -1361,10 +1352,6 @@
      inconsistency CAS-64 is here to kill. */
 
   .mlempty{color:var(--faint);font-size:12.5px;line-height:1.6;text-align:center;padding:34px 12px}
-  /* CAS-102: the starter block now lives HERE, in the empty Found view. The empty state centres its text;
-     the block is a read-and-choose panel, so it keeps its own left alignment and drops the side margin it
-     needed when it sat loose in the Cascades bar. */
-  .mlempty .cascstart{margin:16px 0 0;text-align:left}
 
   /* ---- the provenance sheet (CAS-67) ---- */
   /* Tap the megaphone anywhere and this is what opens: who put the film on your Found list, which Cascade is
@@ -5298,6 +5285,18 @@ function loadCascades(){
   }catch(e){ return []; }
 }
 function saveCascades(){ try{ localStorage.setItem(acctKey("cascade_cascades"), JSON.stringify(cascades)); }catch(e){} }
+// CAS-1090: a placeholder here, in the same outer scope as saveCascades above — a guest device has no
+// account to tombstone a delete against. The account-sync IIFE further down reassigns this (exactly the way
+// it reassigns saveCascades itself, "wrap the one save chokepoint") to the real implementation, which is
+// where cascadeKnown/cascadePendingDeletes actually live. deleteAgentAsk calls this directly, by name, the
+// same way it already calls saveCascades — the one and only place a cascades row is ever marked for a
+// server delete.
+function tombstoneCascadeDelete(id){}
+// CAS-1090: same placeholder/reassignment shape as tombstoneCascadeDelete above — a guest device has never
+// had an account confirm anything, so the real answer (cascadeKnown.size>0, only known inside the
+// account-sync IIFE) is always "no" until that IIFE swaps this in. FLOWS' onboarding commit step (well
+// outside the IIFE) calls this rather than reading cascadeKnown directly, which it cannot reach.
+function accountHasConfirmedCascades(){ return false; }
 // CAS-863: WATCH_STEPS is the watched-verdict ramp the Watch On panel (openWatchPanel) renders as its five
 // segments — it used to sit here because the (now retired) watch-list model's watchlistDefaults() was this
 // array's earliest caller; nothing left up here needs it hoisted, but there's no reason to move it either.
@@ -7872,6 +7871,14 @@ function windowEnabled(key){
 function windowUsable(c, key){
   return windowEnabled(key) && c.watchMarkers && c.watchMarkers[key]!=null;
 }
+// CAS-1081: display-only — a marker set above 100 (e.g. Family Movies' cinema = stream score + 17, which can
+// clear 100 on a high solve) can never be met by a 0-100 admission score, so it already behaves as Never for
+// admission (windowUsable/agentFloor are left alone, so that behaviour is untouched). This is only for
+// wherever a window's OWN marker is read back out to a person, so it renders the same as Never there too
+// instead of an impossible "101+".
+function windowArmed(c, key){
+  return windowUsable(c, key) && c.watchMarkers[key]<=100;
+}
 // CAS-917: the start-window model. An agent's start window is its earliest (lowest-rung) usable window — the
 // one carrying its entry bar. Every enabled window AFTER the start window is always followed, marker or not:
 // an admitted, unwatched film's auto Watch On moves forward into it when the film arrives there. A window
@@ -9431,25 +9438,6 @@ function watchAlsoShowPool(){
   const wsearch=watchSearch[watchTab];
   return wsearch ? pool.filter(m=>m.title.toLowerCase().includes(wsearch)) : pool;
 }
-// First run: the deck is just the "+ New" card, which asks for a decision without offering a reason. Give them
-// three real starting points instead — each with the number of films it catches TODAY, so the payoff is visible
-// before they commit to anything (goal-gradient, and nothing to sign up for).
-function cascadeStartHTML(){
-  if(cascades.length) return "";
-  // CAS-517: a returning signed-in device that hasn't heard back from the account fetch yet reads
-  // `cascades` as empty too, same as a genuinely new account — cascadesReady is what tells them apart,
-  // so this stays silent (rather than nagging a returning member to start over) until it's true.
-  if(!cascadesReady) return "";
-  return `<div class="cascstart">
-    <div class="csh">Put your first Cascade to work</div>
-    <div class="csp">Cascade does the watching for you — set one going and it finds the films while you get on
-      with your life. Start from one of these (you can change every part of it):</div>
-    <div class="cschips">${QUICK_STARTS.map(t=>{
-      const n=countCriteria(t.crit);
-      return `<button class="cschip" onclick="quickStart('${t.key}')">${t.icon} ${t.name} <b>${n}</b></button>`;
-    }).join("")}</div>
-  </div>`;
-}
 // ---- "Finish your agent" (CAS-71) — removed by CAS-273 --------------------------
 // The services question used to be asked a second time here, on top of the listing, once the agent had found
 // you something. The ask is already made where it belongs — in the flow that builds the agent, and any time
@@ -9465,17 +9453,9 @@ function cascadeStartHTML(){
 // A held film keeps the answer it had when you tapped it, so the chip on a stub doesn't flicker.
 const isFresh = m => heldOpen.has(m.tmdb_id) ? heldOpen.get(m.tmdb_id).fresh
                                             : (foundSource(m.tmdb_id)==="auto" && isNewFound(m.tmdb_id));
-// CAS-134: the chrome above the list and the receipts below it are drawn the SAME way in both scopes. That is
-// the whole point of the ticket — the listing must not look like a different product depending on how you got
-// to it, and the surest way to guarantee that is to have one function draw it.
 function renderListChrome(){
   const el=$("listChrome"); if(!el) return;
-  // CAS-150: the starter block used to live in the empty "New" list, which is where a first-time user landed.
-  // CAS-566: it sits above the listing rather than inside its empty state because the listing's own empty
-  // state (scopeRows()/emptyResultsHTML(), R3) is reserved for "this agent matched nothing" — a genuinely
-  // different message from "you have no agent yet". It shows while there are no Cascades at all, and goes
-  // the moment there is one.
-  el.innerHTML = cascadeStartHTML();   // CAS-273: "Finish your agent" no longer rides above the listing
+  el.innerHTML = "";
 }
 // CAS-136: the membership-setup banner is no longer part of the listing — it sits at the very top of the
 // content, above the cascade scroll, so it cannot be scrolled past without being read. Still gated by
@@ -10880,7 +10860,7 @@ function scopeEmptyHTML(){
 }
 function emptyResultsHTML(){
   // CAS-566: zero agents is not "this agent's filters matched nothing" — there is no agent, and nothing to
-  // relax or reset. cascadeStartHTML() (rendered above the listing) already carries the call to action.
+  // relax or reset.
   if(!cascades.length) return "";
   // CAS-718: every agent is always in scope now — the deck's per-list picker that used to justify naming a
   // multi-agent watch list is gone, so only the single-agent case still names anyone; two or more falls
@@ -10987,13 +10967,6 @@ window.newCascade=newCascade;
 const draftFromTemplate = t => ({id:null, template:t.key, icon:t.icon, name:t.name,
   ...JSON.parse(JSON.stringify(t.crit))});
 function startFromTemplate(t){ logEvent("template_opened",{key:t.key}); draft=draftFromTemplate(t); openEditor("New Cascade"); }
-// First-run shortcuts on the empty deck. Straight into the editor, pre-filled — never a straight-to-save.
-const QUICK_STARTS = ["watch_tonight","bargain","my_taste"].map(k=>CASCADE_TEMPLATES.find(t=>t.key===k));
-window.quickStart=key=>{
-  const t=CASCADE_TEMPLATES.find(x=>x.key===key); if(!t) return;
-  logEvent("quickstart",{key});
-  startFromTemplate(t); openModal($("builder"));
-};
 // Save the current draft as a Cascade and open it. Shared by the builder's apply and onboarding's starter.
 function commitDraft(){
   const name=(draft.name||"").trim() || CASCADE_TEMPLATES.find(t=>t.key===draft.template)?.name || "My Cascade";
@@ -11412,7 +11385,13 @@ function deleteAgentAsk(c){
               + `${mine===1?"it":"them"}. `
             : "")
     + `Anything you added by hand stays, and your watched / not-interested marks aren't touched.`)) return false;
-  cascades.splice(cascades.indexOf(c),1); saveCascades();
+  cascades.splice(cascades.indexOf(c),1);
+  // CAS-1090: the ONE place a cascades row is ever tombstoned for a server delete — every other path that
+  // removes an id from `cascades` (an onboarding re-run rebuilding the array, a merge/reconcile pass, a
+  // refused-upsert drop) must NOT delete it from the account, only stop showing it on THIS device.
+  // Tombstone before saveCascades() schedules the sync.
+  tombstoneCascadeDelete(c.id);
+  saveCascades();
   // CAS-782: a film pinned to (or moved out of) ONLY this agent must not go on pointing at an agent that no
   // longer exists — scrub this agent's id out of every notify[*].pinnedTo/notIn, then let recomputeFound()
   // re-derive ordinary membership and prune anything left holding no state at all (the `overridden` guard at
@@ -12766,8 +12745,9 @@ function onbFavsMarkersV2(big, s){
 }
 // Personal Favs' full criteria at a given trial score — used both by the recipe (at the solved
 // score) and by onbAgentCapSolveV2 (at each candidate score), so the two can never disagree about
-// what counts as "the onb_favs agent at score s".
-function onbFavsCritV2(ans, s){
+// what counts as "the onb_favs agent at score s". `yearsBack` is onbAgentCapSolveV2's second lever
+// (CAS-1080) — omitted, it keeps the original "any year" breadth.
+function onbFavsCritV2(ans, s, yearsBack){
   const big = onbBigWindowV2(ans);
   const marks = onbFavsMarkersV2(big, s);
   // CAS-912: only the BIG window rings. The trailing windows still admit and list films — they exist
@@ -12778,9 +12758,11 @@ function onbFavsCritV2(ans, s){
     kind: ans.cinema==="yes" ? "cinema" : "stream",
     watchMarkers: marks, status: watchToStatuses(ww),
     genre: ans.styles||[], exclude: [], age: ans.ages||[],
-    // yearsBack:0 is a decision, not an omission — "how far back" left onboarding, and the score
-    // solve below absorbs the extra breadth.
-    yearsBack: 0, selScale: ans.selScale||0,
+    // yearsBack:0 ("any year") is the starting decision, not an omission — "how far back" left
+    // onboarding, and the score solve above absorbed the extra breadth. CAS-1080: the catalogue has
+    // grown past the point where score alone always gets there by 95, so onbAgentCapSolveV2 may hand
+    // back a tighter value here as its second lever.
+    yearsBack: typeof yearsBack==="number" ? yearsBack : 0, selScale: ans.selScale||0,
     selCrowd: 0, selCritScore: 0, selAwards: 0, selBuzz: 0,
     myServices: {pvod:false, rental:true, included_streaming:true},
     watchWindows: ww,
@@ -12789,17 +12771,34 @@ function onbFavsCritV2(ans, s){
 // Every onboarding agent's reveal-time list is capped the same way (CAS-952): walk the score UP from
 // the recipe's own floor and return the lowest that seats watchCount() at or under the pre-services
 // cap. A recipe already under the cap at its floor comes back unchanged (Massive Movies, floor 90).
-// Never widens criteria to reach it — only the score moves; if nothing up to 95 gets there, 95 is
-// accepted as-is.
+// CAS-1080: the catalogue has grown past the point where score alone (even up to 100, the top of the
+// score's own 0-100 scale — CAS-952 stopped one short of it at 95, an arbitrary margin, not a real
+// ceiling) always reaches the cap — Personal Favs on broad style picks, at ~5,750 films. When the
+// plain sweep fails, a recipe can hand in `leverValues` — its own second lever (e.g. yearsBack), tried
+// in the order given, each with a fresh score sweep — before score 100 is accepted as a last resort. A
+// recipe that never overflows never touches its lever, so nothing changes for Massive/Date/Family today.
 const ONB_AGENT_CAP_V2 = 45;
-function onbAgentCapSolveV2(critFn, ans, floor){
-  for(let s=floor; s<=95; s++){
-    const c = critFn(ans, s);
-    normCascade(c); laneCrit(c, c.kind);
-    if(watchCount(c) <= ONB_AGENT_CAP_V2) return s;
+function onbAgentCapSolveV2(critFn, ans, floor, leverValues){
+  const sweep = lever => {
+    for(let s=floor; s<=100; s++){
+      const c = critFn(ans, s, lever);
+      normCascade(c); laneCrit(c, c.kind);
+      if(watchCount(c) <= ONB_AGENT_CAP_V2) return {score:s, lever};
+    }
+    return null;
+  };
+  const plain = sweep(undefined);
+  if(plain) return plain;
+  for(const lever of (leverValues||[])){
+    const hit = sweep(lever);
+    if(hit) return hit;
   }
-  return 95;
+  return {score:100, lever: (leverValues||[]).at(-1)};
 }
+// CAS-1080: Personal Favs' own yearsBack ladder for onbAgentCapSolveV2's second lever — the same
+// YEARS_STOPS ladder the how-far-back dial offers a person, loosest to tightest, minus its leading 0
+// ("any year"), which is the plain sweep's own starting value and so is tried first regardless.
+const FAVS_YEARSBACK_LEVER = YEARS_STOPS.slice(1);
 // Massive Movies' criteria at a trial score `s` for its one active window (the BIG window) — used
 // both by the recipe (at the solved score) and onbAgentCapSolveV2 (at each candidate).
 function onbMassiveCritV2(ans, s){
@@ -12856,19 +12855,19 @@ function onbFamilyCritV2(ans, s){
 // contested film — deliberate, not incidental.
 const ONB_AGENTS_V2 = [
   {key:"onb_massive", icon:"🎬", name:"Massive Movies", who:"me", when:a=>true,
-   build(ans){ return onbMassiveCritV2(ans, onbAgentCapSolveV2(onbMassiveCritV2, ans, 90)); }},
+   build(ans){ const r = onbAgentCapSolveV2(onbMassiveCritV2, ans, 90); return onbMassiveCritV2(ans, r.score); }},
 
   {key:"onb_favs", icon:"⭐", name:"Personal Favs", who:"me", when:a=>true,
-   build(ans){ return onbFavsCritV2(ans, onbAgentCapSolveV2(onbFavsCritV2, ans, 60)); }},
+   build(ans){ const r = onbAgentCapSolveV2(onbFavsCritV2, ans, 60, FAVS_YEARSBACK_LEVER); return onbFavsCritV2(ans, r.score, r.lever); }},
 
   {key:"onb_date", icon:"❤️", name:"Date Night", who:"partner", when:a=>a.partner==="yes",
    // Lifted from Lee's live Partner Date Night, score dropped to 70.
-   build(ans){ return onbDateCritV2(ans, onbAgentCapSolveV2(onbDateCritV2, ans, 70)); }},
+   build(ans){ const r = onbAgentCapSolveV2(onbDateCritV2, ans, 70); return onbDateCritV2(ans, r.score); }},
 
   {key:"onb_family", icon:"👨‍👩‍👧", name:"Family Movies", who:"everyone", when:a=>a.kids==="yes",
    // Lifted from Lee's live Boys, with one correction: the source agent's genre:null means
    // "nothing qualifies" (CAS-182), not "no filter" — copied verbatim it would match nothing.
-   build(ans){ return onbFamilyCritV2(ans, onbAgentCapSolveV2(onbFamilyCritV2, ans, 73)); }},
+   build(ans){ const r = onbAgentCapSolveV2(onbFamilyCritV2, ans, 73); return onbFamilyCritV2(ans, r.score); }},
 ];
 // Build the v2 agents from a set of answers. Same contract as buildOnbAgents above: normalised
 // cascade objects, in recipe order, ready for the caller to assign ids and push onto `cascades` —
@@ -14177,7 +14176,8 @@ const WATCH_LEVEL_PHRASE = {in_cinema:"watch it at the Cinema", premium:"watch i
 // reads "stream it", per the ticket's own copy).
 const WATCH_LEVEL_FOLLOW_PHRASE = {premium:"watch it on Premium", rent:"rent it", stream:"stream it"};
 function msnValueLine(c){
-  const marks=WATCH_LEVEL_KEYS.filter(k=>windowUsable(c,k));
+  // CAS-1081: windowArmed, not windowUsable — a marker above 100 can never be met, so it reads as Never here.
+  const marks=WATCH_LEVEL_KEYS.filter(k=>windowArmed(c,k));
   if(!marks.length) return "No window is armed — nothing will ever qualify.";
   const byScore=[...marks].sort((a,b)=>c.watchMarkers[b]-c.watchMarkers[a]);
   const phrase = k => WATCH_LEVEL_PHRASE[k] || `watch it on ${WATCH_LEVEL_SHORT_LABEL[k]}`;
@@ -14208,11 +14208,12 @@ function msnChipsHTML(c){
   if(!keys.length) return "";
   // CAS-917: the start window — the earliest enabled+marked one. A window after it with no marker of its own
   // now follows rather than reading Never (the start-window model), so its chip names what it follows instead.
-  const startKey=WATCH_LEVEL_KEYS.find(k=>windowUsable(c,k));
+  // CAS-1081: windowArmed, not windowUsable — a marker above 100 reads as Never here too.
+  const startKey=WATCH_LEVEL_KEYS.find(k=>windowArmed(c,k));
   const chips=keys.map(k=>{
     const dot=`<span class="agdot" style="background:${WINDOW_COLOR[k]}"></span>`;
     const onVal = c.watchMarkers[k]===0 ? "Off" : `${c.watchMarkers[k]}+`;   // CAS-762: never a literal "0+"
-    if(windowUsable(c,k)){
+    if(windowArmed(c,k)){
       return `<span class="msnchip on">${dot}<span class="msnchiplbl" data-key="${k}">${esc(WATCH_LEVEL_SHORT_LABEL[k])} ${onVal}</span>
           <button type="button" class="msnchipx" data-act="never" data-key="${k}"
             aria-label="Set ${escA(WATCH_LEVEL_SHORT_LABEL[k])} to Never">✕</button></span>`;
@@ -14244,7 +14245,8 @@ function msnMarkStyle(c, key, offKeys){
   return {left:`${pct}%`, transform:edge};
 }
 function msnTrackAreaHTML(c){
-  const usable=WATCH_LEVEL_KEYS.filter(k=>windowUsable(c,k));
+  // CAS-1081: windowArmed, not windowUsable — a marker above 100 gets no handle on the track, same as Never.
+  const usable=WATCH_LEVEL_KEYS.filter(k=>windowArmed(c,k));
   const offKeys=usable.filter(k=>c.watchMarkers[k]===0);
   const segs=msnSegments(c, usable).map(s=>
     `<div class="msnseg${s.color?"":" grey"}" style="left:${s.left||0}%;width:${s.width}%${s.color?`;background:${s.color}`:""}"></div>`);
@@ -14293,7 +14295,8 @@ function restoreWatchMarker(c, key){
 // msnRebuild() instead, which re-renders #msnTrackArea and re-wires it.
 function paintMsnTrack(){
   const c=onbFlow.draft, track=$("msnTrack"); if(!c || !track) return;
-  const usable=WATCH_LEVEL_KEYS.filter(k=>windowUsable(c,k));
+  // CAS-1081: windowArmed, not windowUsable — keep in step with msnTrackAreaHTML's own filter above.
+  const usable=WATCH_LEVEL_KEYS.filter(k=>windowArmed(c,k));
   const offKeys=usable.filter(k=>c.watchMarkers[k]===0);
   // CAS-762: msnSegments always yields usable.length+1 slots (an Off window's own slot just paints 0-width),
   // so the DOM node count here never has to change mid-drag as a value crosses in or out of Off.
@@ -15786,8 +15789,17 @@ const SHARP_STEPS = {
           // CAS-951: first-run onboarding ESTABLISHES the device's roster — it replaces whatever
           // cascades already holds (a stale account's set, or an earlier commit this same run),
           // it never appends to it.
-          cascades.length=0;
-          cascades.push(...agents);
+          // CAS-1090: UNLESS cascadeKnown already has entries — that only happens once a real account load
+          // or reconcile has actually confirmed the account holds agents of its own, which means this was
+          // never a genuine empty first run to begin with. The production incident this guards against was
+          // exactly this: the boot-time splash (showSplash(), gated on the device-local onboardingSeen()
+          // flag, not on account state) can open onboarding for an already-signed-in device before that
+          // flag catches up, and completing it here used to wipe the 43 real agents the account load had
+          // already landed by the time the user reached this screen. Append instead of replacing, so
+          // whatever the account already had survives — same "always lands on its agents" guarantee
+          // cascadePendingDeleteIds' tombstone gives the sync side, applied here at the source.
+          if(accountHasConfirmedCascades()) cascades.push(...agents);
+          else { cascades.length=0; cascades.push(...agents); }
           saveCascades();
           setActive(agents[0].id);
           onbFlow.workingAgents=agents;
@@ -16160,9 +16172,11 @@ function agentStylesSum(c){
 }
 // CAS-814: the agent's watch markers, ladder order (WATCH_LEVEL_KEYS) — a coloured dot (WINDOW_COLOR) +
 // score + window name per usable window; a window set to Never (windowUsable false) is simply absent.
+// CAS-1081: windowArmed, not windowUsable — a marker above 100 (e.g. Family Movies' cinema) reads the same
+// as Never here, since the 0-100 scale can never actually reach it.
 const AGROW_WINDOW_WORD = {in_cinema:"in cinema", premium:"premium", rent:"rent", stream:"streaming"};
 function agentCascadeSumHTML(c){
-  const marks=WATCH_LEVEL_KEYS.filter(k=>windowUsable(c,k));
+  const marks=WATCH_LEVEL_KEYS.filter(k=>windowArmed(c,k));
   if(!marks.length) return "No windows set";
   return marks.map(k=>
     `<span class="agdot" style="background:${WINDOW_COLOR[k]}"></span>${c.watchMarkers[k]}+ ${AGROW_WINDOW_WORD[k]}`
@@ -17883,11 +17897,17 @@ function endTutorial(markSeen){
   if(markSeen) markTutorialSeen();
   tutCards=[]; tutIdx=-1;
 }
-// Replay (from Account's Help & feedback row): Account is a .uscreen sitting over the listing that was
-// already there, so closing it is enough to land back on it — no need to force the watch tab or rebuild.
+// Replay (from Account's Help & feedback row): Account is a .uscreen sitting over whatever was already
+// there, but that "whatever" isn't always the Watch listing — Account can be reached from Menu while
+// Moving or Agents is open underneath it, and closing Account alone would just uncover that screen instead
+// (CAS-1079: two of the tour's cards anchor to #groups .card controls that are covered, not gone, so they
+// resolved to real-but-invisible rects instead of being skipped). showAgentsHome() is the same "uncover the
+// Watch listing" call applyDeepLink() already uses for the same reason — closes Moving/Agents if either is
+// open, then Account's own close reveals the listing underneath both.
 // Bypasses tutorialSeen() on purpose, same as any other explicit "show me that again" control.
 function replayTutorial(){
   closeAccount();
+  showAgentsHome();
   requestAnimationFrame(()=>requestAnimationFrame(startTutorial));
 }
 function membStartWork(){
@@ -18838,11 +18858,13 @@ function afterSignIn(){
     return;
   }
   showFoundList(); render();
-  // CAS-403: an empty account still lands on the app (the empty-deck quick-starts), never the
-  // onboarding wizard — signing in is arrival, not a first run. The wizard stays reachable from the
-  // splash's own entry point for a genuine new user who chooses it.
+  // CAS-1082: reverses CAS-403. An account whose agent list has actually finished loading (this function
+  // only runs once it has) and still holds none has never really been onboarded, whatever a stale device
+  // flag claims — the account itself is the authority here (CAS-186, above). Straight into the flow that
+  // builds its first agents; membStartWork() commits the roster, lands on Watch, and applies any pending
+  // deep link once onboarding genuinely finishes.
   logEvent("signin_empty_account");
-  applyDeepLink();   // CAS-962: same reasoning — this is arrival, not a first run
+  flowStart();
 }
 
 // ---- Re-engagement: what Cascade found while you weren't looking (CAS-69) ------------------------------
@@ -19350,10 +19372,33 @@ else if(dedupedN)
   // swept up rows this device had simply never LOADED (created on another device, or not yet pulled),
   // not only rows the user actually removed. CAS-734 replaces the bare-id `cascadeBaseline` Set this
   // guarded with `cascadeKnown`, a Map<id,{sig,version}> — this device's own record of what the ACCOUNT
-  // last confirmed for each agent it has seen, the same shape CAS-692 gave `watchlistKnown`. A delete is
-  // still computed against THAT private record, never against the live account, so this device can only
-  // ever delete an id it itself watched drop out of its own list — exactly what the Delete button (and
-  // nothing else) does.
+  // last confirmed for each agent it has seen, the same shape CAS-692 gave `watchlistKnown`.
+  // CAS-1090: CAS-734's own claim above — "this device can only ever delete an id it itself watched drop
+  // out of its own list, exactly what the Delete button does" — was never actually true: the id merely had
+  // to be ABSENT from the live `cascades` array at sync time, for any reason (an onboarding re-run wiping
+  // the array being the observed one — see flowStart's commit step below), not because the Delete button
+  // was pressed. `cascadePendingDeletes` is the real version of that claim: a tombstone set written ONLY by
+  // deleteAgentAsk, so a delete request is now impossible without it, regardless of what `cascades` holds.
+  const CASCADE_PENDING_DELETES_KEY = "cascade_pending_deletes";
+  function loadCascadePendingDeletes(){
+    try{
+      const raw=localStorage.getItem(acctKey(CASCADE_PENDING_DELETES_KEY));
+      if(!raw) return new Set();
+      const parsed=JSON.parse(raw);
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    }catch(e){ return new Set(); }
+  }
+  function saveCascadePendingDeletes(){
+    try{ localStorage.setItem(acctKey(CASCADE_PENDING_DELETES_KEY), JSON.stringify([...cascadePendingDeletes])); }catch(e){}
+  }
+  let cascadePendingDeletes = loadCascadePendingDeletes();
+  // CAS-1090: the real implementation, swapped in over the outer no-op placeholder declared alongside
+  // saveCascades — cascadeKnown only exists in here, so this is the one place that can decide whether an id
+  // is worth tombstoning at all (a locally-only id the account never confirmed needs no server delete).
+  tombstoneCascadeDelete = function(id){
+    if(cascadeKnown.has(id)){ cascadePendingDeletes.add(id); saveCascadePendingDeletes(); }
+  };
+  accountHasConfirmedCascades = function(){ return cascadeKnown.size>0; };
   let syncTimer=null, syncing=false, syncAgain=false;
   const CASCADE_KNOWN_KEY = "cascade_cascade_known";
   function loadCascadeKnown(){
@@ -19409,6 +19454,7 @@ else if(dedupedN)
     // preserve for them across a switch either way — every one reloads fresh off the account now current.
     cascadeKnown = loadCascadeKnown();
     cascadeEditedAt = loadCascadeEditedAt();
+    cascadePendingDeletes = loadCascadePendingDeletes();
     watchKnown = loadWatchKnown();
     const p = loadPrefs();
     prefs.on = p.on; prefs.touched = p.touched; setTo(prefs.sub, p.sub); setTo(prefs.store, p.store);
@@ -19466,10 +19512,13 @@ else if(dedupedN)
     if(known && DEFAULTABLE_CASCADE_FIELDS.some(({flag})=>c[flag])) return false;
     return !known || known.sig!==cascadeFullSigOf(c);
   });
-  const cascadePendingDeleteIds = () => {
-    const ids=new Set(cascades.map(c=>c.id).filter(isUuid));
-    return [...cascadeKnown.keys()].filter(id=>!ids.has(id));
-  };
+  // CAS-1090: explicit only, never inferred. The live `cascades` array plays no part in this any more — an
+  // id is a candidate for a server delete purely because deleteAgentAsk tombstoned it, and only for as long
+  // as the account still confirms it exists (cascadeKnown). Absence from `cascades`, on its own, proves
+  // nothing: it could be a genuine delete not yet tombstoned by a caller (a bug elsewhere), an agent this
+  // device hasn't loaded yet, or — the incident this ticket fixes — the array simply having been reset out
+  // from under the sync (flowStart's commit step, or any future bug shaped like it).
+  const cascadePendingDeleteIds = () => [...cascadePendingDeletes].filter(id=>cascadeKnown.has(id));
   function scheduleSync(){
     outboxMark("cascades", cascadeDirtyRows().map(cascadeToRow), r=>r.id);
     clearTimeout(syncTimer); syncTimer=setTimeout(runSync, 400);
@@ -19539,8 +19588,11 @@ else if(dedupedN)
     if(deletes.length){
       const { error } = await c.from("cascades").delete().eq("user_id", owner).in("id", deletes);
       if(error){ console.warn("Cascade delete", error); recordSyncOutcome("cascades", false, error); return; }
-      deletes.forEach(id=>{ cascadeKnown.delete(id); cascadeEditedAt.delete(id); });
+      // CAS-1090: the tombstone is cleared only once the delete actually lands — an error above leaves it in
+      // cascadePendingDeletes so the next sync pass retries the same id, same as cascadeKnown's own retry shape.
+      deletes.forEach(id=>{ cascadeKnown.delete(id); cascadeEditedAt.delete(id); cascadePendingDeletes.delete(id); });
       saveCascadeEditedAt();
+      saveCascadePendingDeletes();
       outboxClearKeys("cascades", deletes);   // CAS-1035
     }
     saveCascadeKnown();
@@ -19608,7 +19660,11 @@ else if(dedupedN)
       const moments = momentsOf(rowToCascade(r)), stored = r.alert_moments||[];
       return moments.length!==stored.length || moments.some(k=>!stored.includes(k));
     });
-    let remote = rawRows.map(rowToCascade);
+    // CAS-1090: an id this device has tombstoned but not yet had confirmed deleted (the server round trip
+    // is still in flight, or the last attempt failed) must not reappear just because a full reload re-read
+    // the account before that delete landed — cascadeKnown below is still built from the untouched rawRows,
+    // so the retry on the next sync pass is unaffected.
+    let remote = rawRows.map(rowToCascade).filter(x=>!cascadePendingDeletes.has(x.id));
     const localOnes = cascades.slice();
     // CAS-393/CAS-733/CAS-734: an agent that exists only on this device, which the account has never
     // confirmed (absent from rawById) AND this device has never confirmed either (absent from oldKnown, so
@@ -19672,6 +19728,12 @@ else if(dedupedN)
   // the account (cascadeKnown) but has now gone is dropped locally (another device deleted it); anything
   // this device has created but not yet pushed (its id isn't in cascadeKnown yet) is left alone, so a
   // refresh landing mid-edit never undoes work still in flight.
+  // CAS-1090: an account row this device has ALREADY confirmed (oldKnown) but doesn't currently hold locally
+  // used to be treated as "this device must have deleted it" and skipped rather than pulled back down — that
+  // guess is exactly backwards once cascades can go transiently empty for a reason that ISN'T a delete (see
+  // flowStart's commit step). The only reliable "this device is mid-delete on it" signal is the explicit
+  // tombstone (cascadePendingDeletes), so that's what gates the skip now — anything else the account still
+  // holds is adopted, never silently dropped.
   async function reconcileCascades(){
     const c=client(); if(!c||!accountActive()) return;
     const { data, error } = await acctRead("cascades", () => c.from("cascades").select("*").order("created_at"));
@@ -19684,10 +19746,11 @@ else if(dedupedN)
     rawRows.forEach(r=>{
       const i=cascades.findIndex(x=>x.id===r.id);
       if(i<0){
-        // CAS-734 (mirrors CAS-692's watch-list fix): absent locally but this device previously confirmed
-        // the account held it — either this device deleted it and the push just hasn't landed, or another
-        // device did. A stale reconcile must not resurrect it. A truly unseen-before id is simply adopted.
-        if(!oldKnown.has(r.id)) cascades.push(rowToCascade(r));
+        // CAS-1090: absent locally is pulled down UNLESS this device has an explicit tombstone out on it —
+        // that's the only case where the absence really is "this device deleted it, the push just hasn't
+        // landed". Anything else the account still reports (including an id oldKnown already had) is
+        // "not yet loaded here", never "deleted", and is adopted — see the file-level note above.
+        if(!cascadePendingDeletes.has(r.id)) cascades.push(rowToCascade(r));
         return;
       }
       if(cascSigOf(cascades[i])===cascSigOf(rowToCascade(r))){ cascades[i]=rowToCascade(r); return; }
@@ -19902,6 +19965,15 @@ else if(dedupedN)
   // send what actually changed.
   let filmKnown=null;
   const filmDirtyRows = () => filmRows().filter(r => !filmKnown || filmKnown.get(r.movie_id)!==r.status);
+  // CAS-1090 Change 4: checked, not changed. This still infers a delete from absence, but not unsafely —
+  // unlike cascadeKnown/cascades, filmKnown is never a separate persisted model that can drift out of step
+  // with the local Sets: every place that resets it (loadAccountFilms, reconcileFilms) recomputes filmKnown
+  // from the exact SAME fetch that repopulates watched/disliked/blocked/etc via applyFilmRows, in the same
+  // synchronous pass — so a transient "wholesale reset" can never leave filmKnown claiming a row the Sets
+  // don't also account for, the drift that let cascades silently delete real agents. And the one place a row
+  // truly drops out of these Sets (window.setOpinion, the un-mark tap) already IS the explicit user action a
+  // tombstone would exist to gate on. See the "same thing said twice" comment above filmRows() — this table
+  // was already built to need only one model, deliberately, which a bolt-on tombstone would undo for no gain.
   const filmPendingDeleteIds = () => {
     if(!filmKnown) return [];
     const ids=new Set(filmRows().map(r=>r.movie_id));
@@ -20217,6 +20289,16 @@ else if(dedupedN)
   let watchPushKnown=null;
   const watchRowSig = r => JSON.stringify([r.windows, r.sources]);
   const watchDirtyRows = () => watchRows().filter(r => !watchPushKnown || watchPushKnown.get(r.movie_id)!==watchRowSig(r));
+  // CAS-1090 Change 4: checked, not changed. This is the one table where absence genuinely has to mean
+  // delete for CORRECT behaviour, not just accidentally-safe behaviour: an agent's "auto" Watch On rung
+  // clearing itself because the film no longer matches (recomputeFound's ordinary re-arm/un-arm) is meant to
+  // reach the account as a real delete, same as a manual toggleFilmOpt/pickNever un-tick — an explicit-only
+  // tombstone would silently stop the automatic case from ever syncing, leaving a stale row the account
+  // would go on alerting from forever. The risk this ticket is actually about — `notify` (and therefore
+  // watchRows()) transiently empty while watchPushKnown/watchKnown still hold the account's real state — is
+  // the exact race CAS-1035 already closed below: scheduleWatchSync refuses to even mark the outbox, let
+  // alone schedule runWatchSync/watchPendingDeleteIds, until filmWatchReady is true again after a
+  // clearAccountNotify() pass. That guard is what cascades never had.
   const watchPendingDeleteIds = () => {
     if(!watchPushKnown) return [];
     const ids=new Set(watchRows().map(r=>r.movie_id));
@@ -20372,6 +20454,13 @@ else if(dedupedN)
     const known=agentFilmsKnown && agentFilmsKnown.get(agentFilmKey(r.cascade_id,r.movie_id));
     return !known || known!==agentFilmSig(r);
   });
+  // CAS-1090 Change 4: checked, not changed. agentFilms isn't user-authored data to protect — it's a
+  // recomputed admission cache (which films an agent's OWN criteria currently admit), and a film leaving
+  // that set through ordinary recomputation is the intended, correct source of a delete here, not something
+  // a tombstone should gate on. An explicit-only rule would leave a stale admitted_at/score row on the
+  // account for a film the agent no longer actually admits. Nothing here shares cascades' failure shape
+  // either: agentFilmsKnown only ever gets reset in lockstep with agentFilms itself (loadAgentFilms), never
+  // by a separate, driftable path the way cascadeKnown/cascades were two models of the same thing.
   const agentFilmPendingDeleteKeys = () => {
     if(!agentFilmsKnown) return [];
     const keys=new Set(agentFilmRows().map(r=>agentFilmKey(r.cascade_id,r.movie_id)));
@@ -20919,6 +21008,10 @@ else if(dedupedN)
                                 cascadeDirtyRows, cascadePendingDeleteIds,
                                 get cascadeKnown(){ return cascadeKnown; },
                                 get cascadeEditedAt(){ return cascadeEditedAt; },
+                                // CAS-1090: the tombstone set itself, by reference like cascadeKnown above —
+                                // so a test can seed/inspect exactly what this device has marked for deletion
+                                // without waiting on a real deleteAgentAsk() confirm() dialog.
+                                get cascadePendingDeletes(){ return cascadePendingDeletes; },
                                 // CAS-691: the guest-cache reload seam (what a cold boot re-reads localStorage
                                 // into before the account fan-out ever runs), the wrapped save chokepoints
                                 // themselves (so a test exercises the real write path an Edit-screen tap

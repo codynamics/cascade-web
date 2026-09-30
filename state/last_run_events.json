@@ -1,1 +1,38 @@
-[]
+[
+  {
+    "tmdb_id": 1288059,
+    "title": "I Want Your Sex",
+    "kind": "arrived",
+    "new_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "services": [
+      "JustWatch TV",
+      "Amazon Video"
+    ],
+    "detected": "2026-09-29"
+  },
+  {
+    "tmdb_id": 1288059,
+    "title": "I Want Your Sex",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-09-29"
+  },
+  {
+    "tmdb_id": 504172,
+    "title": "The Mule",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-09-29"
+  },
+  {
+    "tmdb_id": 1172265,
+    "title": "The Blue Trail",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-09-29"
+  }
+]

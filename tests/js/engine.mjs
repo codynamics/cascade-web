@@ -233,6 +233,10 @@ if(typeof window.CascadeAuth === "undefined"){
   MISSION_DIALS, MISSION_DIALS_USED, missionRest, missionKind, laneCrit,
   axisCountsNow, genreCountsNow,
   onbApply, onbCount, pickStarter, flowStart, flowStop, FLOWS,
+  // CAS-1080: the v2 onboarding answers default and its four-agent generator, plus the shared
+  // reveal-time cap they solve against — exported so a test can build a real onboarding roster
+  // from a fixed answer set and assert watchCount() against the cap directly.
+  onbAnswersV2Default, buildOnbAgentsV2, ONB_AGENT_CAP_V2,
   // CAS-959: the v2 onboarding commit marker (set at v2_done, cleared by flowStart or a completed/dropped
   // load) — exported so a test can seed "this device just built an unconfirmed onboarding draft" the same
   // way v2_done itself does, without driving the whole wired flow through the DOM stub.
@@ -330,6 +334,11 @@ if(typeof window.CascadeAuth === "undefined"){
   // value it now counts by) — exported so a test can assert the parts sum to the headline directly, rather
   // than scraping the rendered string.
   placementSplitHTML, filmNotifyState, windowUsable,
+  // CAS-1081: windowArmed (a marker above 100 reads as Never, display-only — windowUsable itself, and
+  // therefore admission, is untouched) and agentCascadeSumHTML (the SCORE row it feeds — shared by the
+  // onboarding reveal/done step, the agent editor and the Agents list) — exported so a test can assert
+  // the rendered row directly rather than re-deriving the >100 case by hand.
+  windowArmed, agentCascadeSumHTML,
   // CAS-728: cascSigOf/agentFloor are what recomputeFound's own sticky-admission re-evaluation reads to
   // decide whether an agent has changed and what its current floor is — exported so a test can compute the
   // exact signature/floor a seeded agent_films row should carry, rather than guessing at internal state.

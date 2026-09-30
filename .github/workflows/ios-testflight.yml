@@ -20,6 +20,10 @@ name: ios-testflight
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: "Marketing version x.y.z, next after the newest v* git tag"
+        required: true
+        type: string
       web_url:
         description: "Run the app live against this https URL instead of the bundled www/. Leave blank for a normal bundled build."
         required: false
@@ -32,8 +36,18 @@ jobs:
   testflight:
     runs-on: macos-26
     timeout-minutes: 30
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate version input
+        run: |
+          set -euo pipefail
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must be x.y.z (digits only), e.g. 1.2.3. Got: '${{ inputs.version }}'"
+            exit 1
+          fi
 
       - uses: actions/setup-node@v4
         with:
@@ -121,11 +135,24 @@ jobs:
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
           IOS_PROVISIONING_PROFILE_SPECIFIER: ${{ secrets.IOS_PROVISIONING_PROFILE_SPECIFIER }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_VERSION: ${{ inputs.version }}
         run: bundle exec fastlane ios beta
 
       - name: Remove the temporary keychain
         if: always()
         run: security delete-keychain "$RUNNER_TEMP/ios-signing.keychain-db" || true
+
+      - name: Tag v${{ inputs.version }}
+        if: success()
+        run: |
+          set -euo pipefail
+          TAG="v${{ inputs.version }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
+            echo "::error::Tag $TAG already exists on origin — refusing to overwrite it."
+            exit 1
+          fi
+          git tag "$TAG" "${{ github.sha }}"
+          git push origin "$TAG"
 
   # CAS-973: email someone the moment this workflow breaks, instead of leaving it to be
   # noticed by whoever next opens the Actions tab.

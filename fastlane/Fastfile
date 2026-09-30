@@ -19,6 +19,13 @@ platform :ios do
       build_number: (latest_build + 1).to_s
     )
 
+    app_version = ENV["APP_VERSION"]
+    UI.user_error!("APP_VERSION is blank — the ios-testflight workflow must pass the dispatched version input") if app_version.nil? || app_version.empty?
+    increment_version_number(
+      xcodeproj: "ios/App/App.xcodeproj",
+      version_number: app_version
+    )
+
     # CAS-456: xcodebuild archive tries automatic signing management first, which needs an
     # interactive Apple ID session that doesn't exist on a GitHub-hosted runner. Force manual
     # signing with the cert/profile the workflow already imported into the CI keychain.

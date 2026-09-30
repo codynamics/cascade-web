@@ -100,6 +100,42 @@ class LadderCohortExcludesReleasedTitles(unittest.TestCase):
         self.assertTrue(pp._is_ladder_cohort(in_cinema))
 
 
+class RevalidateStaleUpcomingCorrectsAlreadyPublishedCandidates(unittest.TestCase):
+    """CAS-1083: a candidate already past its one-shot enrichment never gets its status re-derived
+    by anything else in the pipeline, so a title once wrongly stamped upcoming stays that way
+    forever with nothing to correct it. revalidate_stale_upcoming is a pure, no-API-call pass over
+    every candidate currently stamped upcoming."""
+
+    today = datetime.date(2026, 9, 30)
+
+    def test_an_old_undated_title_stuck_upcoming_is_corrected(self):
+        candidates = {"1": {"tmdb_id": 1, "title": "Old Stuck Title", "year": "2017",
+                            "cinema_date": None, "release_dates": [],
+                            "status": ["upcoming"], "poll_tier": "none",
+                            "availability_confidence": "confirmed",
+                            "availability_source": "tmdb_date"}}
+        fixed = pp.revalidate_stale_upcoming(candidates, self.today)
+        self.assertEqual(fixed, 1)
+        self.assertEqual(candidates["1"]["status"], ["released"])
+
+    def test_a_genuinely_upcoming_title_is_left_alone(self):
+        future = (self.today + datetime.timedelta(days=30)).isoformat()
+        candidates = {"2": {"tmdb_id": 2, "title": "Real Upcoming Title", "year": "2026",
+                            "cinema_date": None,
+                            "release_dates": [{"region": "AU", "type": 4, "date": future}],
+                            "status": ["upcoming"]}}
+        fixed = pp.revalidate_stale_upcoming(candidates, self.today)
+        self.assertEqual(fixed, 0)
+        self.assertEqual(candidates["2"]["status"], ["upcoming"])
+
+    def test_a_non_upcoming_candidate_is_never_touched(self):
+        candidates = {"3": {"tmdb_id": 3, "title": "Already Released", "year": "2017",
+                            "status": ["released"]}}
+        fixed = pp.revalidate_stale_upcoming(candidates, self.today)
+        self.assertEqual(fixed, 0)
+        self.assertEqual(candidates["3"]["status"], ["released"])
+
+
 class PythonAndAppTemplateAgree(unittest.TestCase):
     """CAS-608 AC5: poc_pipeline.py's _offerless_window and app_template.html's offerlessWindow
     must classify the same fixture identically."""

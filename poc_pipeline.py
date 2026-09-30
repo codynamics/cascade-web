@@ -33,7 +33,7 @@ to compare against. Output for the app front-end is written to movies.json.
 """
 
 from __future__ import annotations
-import os, sys, csv, io, re, json, time, shutil, hashlib, base64, calendar, datetime, subprocess, urllib.parse, urllib.request, urllib.error
+import os, sys, csv, io, re, json, time, shutil, calendar, datetime, subprocess, urllib.parse, urllib.request, urllib.error
 from collections import Counter
 
 import runstats
@@ -1326,6 +1326,11 @@ def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery
     refresh_enriched_candidates(candidates, enriched_records, today_iso)
     merge_backcatalogue_candidates(candidates, today_iso)
 
+    stale_upcoming_fixed = revalidate_stale_upcoming(candidates, today)
+    if stale_upcoming_fixed:
+        print(f"[info] CAS-1083: corrected {stale_upcoming_fixed} candidate(s) stuck Upcoming "
+              f"with no future AU date.")
+
     held_ids = load_user_held_ids()
     if held_ids is None:
         print("[warn] CAS-986: state/user_held_ids.json absent or unreadable — demoting nothing "
@@ -1358,6 +1363,15 @@ def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery
 
     published_records, stats = select_publishable(candidates, engine_ids, previously_published_ids,
                                                    held_ids, CATALOGUE_TARGET)
+    # CAS-1105: a final safety net, independent of how each record's status got here — catches a
+    # title left published by any path (including a one-off correction script) that never called
+    # select_publishable itself to re-decide membership.
+    published_records, floor_dropped = revalidate_published_floor(published_records, engine_ids, held_ids)
+    if floor_dropped:
+        stats["demoted"] += floor_dropped
+        stats["published"] -= floor_dropped
+        print(f"[info] CAS-1105: revalidate_published_floor dropped {floor_dropped} published "
+              f"title(s) that no longer clear WM_PUBLISH_FLOOR and are not user-held.")
     print(publish_enrich_log_line(enrich_stats, stats["promoted"]))
     unprobed = sum(1 for c in candidates.values() if c.get("outcome") == "unprobed")
     report = {
@@ -1595,6 +1609,69 @@ def _record_year(movie: dict) -> int | None:
         return int(y)
     except (TypeError, ValueError):
         return None
+
+
+def revalidate_stale_upcoming(candidates: dict, today: datetime.date) -> int:
+    """CAS-1083: a candidate that already satisfies is_publishable_record never gets its status
+    re-derived by anything else in this pipeline — enrich_candidates_for_publication only visits a
+    candidate that ISN'T yet publishable (one-shot), and build_live_catalogue's own daily re-poll
+    loop only ever sees titles the day's TMDB discovery pool actually surfaces, which an old
+    back-catalogue title with no active cinema run never is again once first published. So a title
+    whose one-shot classification landed on "upcoming" — whether from CAS-1078's own gap or any
+    future variant of it — stays "upcoming" forever, with no further chance to reconsider it.
+
+    This is a pure, no-API-call correction: every field _offerless_window needs (cinema_date/year/
+    release_dates) is already sitting on the record, so re-checking every candidate currently
+    stamped upcoming costs nothing and is safe to run on every publication pass. Bypasses
+    apply_monotonic_status's downgrade guard on purpose — that guard exists to make a real AU
+    de-listing wait out a transient provider-feed gap, not to hold back a correction to a
+    classification that was never backed by an offer in the first place (CAS-608/CAS-1078 offer-
+    less "released" already earns immediate commit via the guard's own prev_confidence == "estimated"
+    bypass whenever a candidate reaches it; this just guarantees every stuck candidate reaches it).
+
+    Returns the number of candidates corrected."""
+    fixed = 0
+    for c in candidates.values():
+        if c.get("status") != ["upcoming"]:
+            continue
+        window = _offerless_window(c.get("cinema_date"), today, _record_year(c), c.get("release_dates"))
+        if window == "upcoming":
+            continue
+        c["status"] = [window]
+        c["availability_confidence"] = "estimated"
+        c["availability_source"] = "tmdb_date"
+        c.pop("pending_downgrade", None)
+        fixed += 1
+    return fixed
+
+
+def revalidate_published_floor(movies: list[dict], engine_scoreable_ids: set, held_ids) -> tuple[list[dict], int]:
+    """CAS-1105: select_publishable's own demotion-protection ("exempt" branch) only ever runs
+    when select_publishable itself is called — it re-checks WM_PUBLISH_FLOOR for every title that
+    drops out of ranked_in, held or not. But nothing stops a title from losing its floor exemption
+    through a path that never calls select_publishable at all: CAS-1083's own revalidate_stale_
+    upcoming() correctly flips a stuck-upcoming candidate to "released" the moment its buzz
+    exemption lapses, and that ran once as a standalone correction directly against the committed
+    catalogue (outside apply_two_tier_publication) to clear a backlog of 44 stale titles. The
+    status flip was right; nothing after it re-asked whether the now-released, unscored title
+    still belonged in movies.json, so 6 non-held titles stayed published indefinitely with no
+    score behind them at all — the exact shape test_every_published_film_clears_the_publish_floor
+    exists to catch.
+
+    Run this on every publication pass, after select_publishable, as the same safety net
+    regardless of how a published record's status got there. Pure and free — `engine_scoreable_ids`
+    is already computed for this run; reuses CAS-1067's own held-ids fail-safe (drop nothing this
+    run when `held_ids` is None, since the state tables were unreadable). Returns (surviving
+    records, dropped count)."""
+    survivors = []
+    dropped = 0
+    for m in movies:
+        tid = m["tmdb_id"]
+        if tid in engine_scoreable_ids or held_ids is None or str(tid) in held_ids:
+            survivors.append(m)
+        else:
+            dropped += 1
+    return survivors, dropped
 
 
 def derive_from_providers(movie: dict, prov: dict, today: datetime.date) -> list[str]:
@@ -3051,48 +3128,36 @@ def build_html(records: list[dict] | None = None, provider_status: dict | None =
     # Machine-readable stamp served at /version.json (same origin as the app).
     with open(VERSION_JSON, "w", encoding="utf-8") as f:
         json.dump(info, f, separators=(",", ":")); f.write("\n")
-    # CAS-947: window.BUILD_INFO's own generated file — kept OUT of the main inline <script> (which the
-    # CSP below hashes) precisely because `builtAt` changes on every build; see the comment on the
-    # <script src="build-info.js"> tag in app_template.html.
+    # CAS-947: window.BUILD_INFO's own generated file — kept OUT of the main inline <script> precisely
+    # because `builtAt` changes on every build; see the comment on the <script src="build-info.js">
+    # tag in app_template.html.
     with open(BUILD_INFO_JS, "w", encoding="utf-8") as f:
         f.write("window.BUILD_INFO = " + json.dumps(info) + ";\n")
     print(f"stamped v{info['version']} · build {info['build']} · {info['commit']}")
-    write_csp_headers(html)
+    write_csp_headers()
     _sync_ios_www()
 
 
-def _sha256_b64(text: str) -> str:
-    return base64.b64encode(hashlib.sha256(text.encode("utf-8")).digest()).decode("ascii")
+def build_csp() -> str:
+    """CAS-947 hashed every inline <script>/<style> block instead of allowing 'unsafe-inline'. CAS-1057
+    (Decision 27 Sep 2026, option b) reverted script-src/style-src to 'unsafe-inline' and dropped the
+    hashes: app_template.html drives most of its UI through onclick/style attributes generated per
+    record at runtime (movie/video-specific values from movies.json), which a build-time hash list can
+    never cover, and a stale hash on the pinned inline <script> was blocking the whole app on the
+    Cloudflare preview host — browsers ignore 'unsafe-inline' outright whenever any hash is present.
+    Strict, hash-only CSP is deferred to post-launch hardening. Do not add 'unsafe-eval'.
 
-
-def build_csp(html: str) -> str:
-    """CAS-947: a hash-based Content-Security-Policy for the built index.html.
-
-    'unsafe-inline' is worthless against the app's many HTML-injection sinks once any inline script
-    exists at all, so every inline <script>/<style> block is individually hashed instead. Only truly
-    inline blocks are hashed — a <script src=...> tag is already same-origin and covered by 'self'.
     Origins below were verified against what app_template.html actually loads/fetches/embeds, not
     guessed: fonts.googleapis.com (stylesheet + preconnect), fonts.gstatic.com (the fonts it serves),
     image.tmdb.org (posters) and img.youtube.com (trailer thumbnails) for img-src, the Supabase project
     and cascademovies.com (the native-app catalogue fetch, CATALOGUE_URL) for connect-src, and
     youtube-nocookie.com (the trailer <iframe>) for frame-src. Plain <a target="_blank"> links (TMDB,
     Watchmode, JustWatch, wa.me, YouTube watch pages) are navigations, not fetches, so they need no
-    directive. No 'unsafe-inline'/'unsafe-hashes' anywhere — see the ticket comment for the onclick-
-    handler count this policy does not, and cannot, cover."""
-    script_hashes, style_hashes = [], []
-    for m in re.finditer(r"<script(\s[^>]*)?>(.*?)</script>", html, re.DOTALL | re.IGNORECASE):
-        attrs, body = m.group(1) or "", m.group(2)
-        if re.search(r"\bsrc\s*=", attrs, re.IGNORECASE):
-            continue  # external file, same-origin, already covered by script-src 'self'
-        script_hashes.append(_sha256_b64(body))
-    for m in re.finditer(r"<style(\s[^>]*)?>(.*?)</style>", html, re.DOTALL | re.IGNORECASE):
-        style_hashes.append(_sha256_b64(m.group(2)))
-    script_src = " ".join(["'self'"] + [f"'sha256-{h}'" for h in script_hashes])
-    style_src  = " ".join(["'self'"] + [f"'sha256-{h}'" for h in style_hashes] + ["https://fonts.googleapis.com"])
+    directive."""
     directives = [
         "default-src 'self'",
-        f"script-src {script_src}",
-        f"style-src {style_src}",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: https://image.tmdb.org https://img.youtube.com",
         "connect-src 'self' https://ypccfyatejejslzlfrbf.supabase.co https://cascademovies.com",
@@ -3109,10 +3174,10 @@ _CSP_BEGIN = "  # BEGIN GENERATED CSP — poc_pipeline.py --build-html; do not h
 _CSP_END   = "  # END GENERATED CSP"
 
 
-def write_csp_headers(html: str) -> None:
+def write_csp_headers() -> None:
     """Write the CSP into _headers under its existing /* rule, replacing any previously generated
     block between the marker comments so the hand-written headers above it are never touched."""
-    csp = build_csp(html)
+    csp = build_csp()
     generated = f"{_CSP_BEGIN}\n  Content-Security-Policy: {csp}\n{_CSP_END}"
     current = open(HEADERS_FILE, encoding="utf-8").read() if os.path.exists(HEADERS_FILE) else "/*\n"
     if _CSP_BEGIN in current and _CSP_END in current:
