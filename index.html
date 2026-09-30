@@ -15941,6 +15941,9 @@ const flowCounted = () => flowList().slice(2).filter(k => k!=="keepfinding" && !
 // window's own sub-moments the first time its Notify switch is turned ON, same as it always has — this only
 // changes when that first arming happens: on the user's own tap, not silently at agent creation.)
 let flowOn=false;              // inside the wired flow (vs a standalone ?step= preview)
+// CAS-1106: fires at most once per page load — see flowStart() below. A second flow start this same
+// session (e.g. "+ New Cascade") is this person's own just-made picks, not a leftover from before.
+let onbGuestPrefsResetDone=false;
 // CAS-246: this run of the flow is making a SECOND agent from the deck, so it stops after the agent is
 // picked and hands over to the Briefing rather than walking the linear sharpening screens and finishing on
 // the membership page. Cleared by flowStart/flowStop, so it can never leak into a first run.
@@ -15970,6 +15973,15 @@ function flowStart(startKey){
   onbFlow.draft=null;          // no agent yet — nothing on the first two screens quotes a count
   onbFlow.workingAgents=null; onbFlow.reportStats=null;   // CAS-629: a fresh roster commits fresh every run
   onbV2CommittedClear();       // CAS-951: a genuinely new run may commit again
+  // CAS-1106: onboarding runs signed out (acctSuffix "guest"), so without this the services step reads
+  // prefs.sub/prefs.store straight off whatever an earlier session on this device left in the @guest key —
+  // never this new person's own choice. Only the first flow start of THIS page load clears it: once
+  // cleared, any further flow start this session (e.g. "+ New Cascade") is this same person continuing,
+  // and must not wipe the services they only just picked.
+  if(acctSuffix==="guest" && !onbGuestPrefsResetDone){
+    prefs.sub=new Set(); prefs.store=new Set(); prefs.touched=false; savePrefs();
+    onbGuestPrefsResetDone=true;
+  }
   // CAS-1047: a genuinely new first run (splash/film-page signup) must not inherit a previous person's
   // saved answers on a shared device — every v2_* step reloads onbFlow.answersV2 straight from this key.
   // "+ New Cascade" (startKey "pickagent") is an already-onboarded user adding another agent, not a new
