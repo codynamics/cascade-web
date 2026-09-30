@@ -492012,55 +492012,6 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "estimated",
-      "availability_source": "tmdb_date",
-      "award": null,
-      "award_text": "1 win & 1 nomination",
-      "budget": null,
-      "cast": [
-        "Shelia Stahl",
-        "Christina Stahl",
-        "Mike Stahl"
-      ],
-      "cinema_date": null,
-      "cinema_release": false,
-      "culture": "Western",
-      "director": "Matt Smukler",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Documentary"
-      ],
-      "imdb_id": "tt6149648",
-      "jw_link": null,
-      "language": "en",
-      "last_polled": "2026-08-14",
-      "last_probed": "2026-09-23",
-      "offers": [],
-      "outcome": "scored",
-      "poll_tier": "none",
-      "popularity": 0.8345,
-      "poster": "/vmu4r8BEeahkC638hP4d76og3ex.jpg",
-      "probe_count": 1,
-      "release_dates": [],
-      "status": [
-        "released"
-      ],
-      "synopsis": "Honors student Christina balances school, track, and teen life while caring for her mom with a 59 IQ and supporting her dad. A powerful true story about sacrifice, disability, and the unspoken weight of growing up as a young caregiver.",
-      "title": "Wildflower: The Documentary",
-      "tmdb_id": 750611,
-      "trailers": [],
-      "window_dates": {
-        "upcoming": "2026-08-14"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-23",
-      "wm_popularity_percentile": 47.1,
-      "wm_user_rating": null,
-      "worldwide_gross": null,
-      "year": "2025"
-    },
-    {
-      "age_rating": null,
       "availability_confidence": "confirmed",
       "availability_source": "tmdb_providers",
       "budget": null,
@@ -502528,52 +502479,6 @@
       "window_dates": {
         "included_streaming": "2026-09-17"
       }
-    },
-    {
-      "age_rating": null,
-      "availability_confidence": "estimated",
-      "availability_source": "tmdb_date",
-      "budget": null,
-      "cast": [
-        "James Blake"
-      ],
-      "cinema_date": null,
-      "cinema_release": false,
-      "culture": "Western",
-      "director": "Peter Grant",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Documentary",
-        "TV Movie"
-      ],
-      "imdb_id": "tt38356446",
-      "jw_link": null,
-      "language": "en",
-      "last_polled": "2026-08-11",
-      "last_probed": "2026-09-23",
-      "offers": [],
-      "outcome": "scored",
-      "poll_tier": "none",
-      "popularity": 0.7596,
-      "poster": "/db0qxu31EDPCq27nP9RwQJ1oP7P.jpg",
-      "probe_count": 1,
-      "release_dates": [],
-      "status": [
-        "released"
-      ],
-      "synopsis": "James Blake joins three young men to explore why they're turned to the so-called manosphere to achieve success, and how it influences their real lives.",
-      "title": "Men of the Manosphere",
-      "tmdb_id": 1604723,
-      "trailers": [],
-      "window_dates": {
-        "upcoming": "2026-08-11"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-23",
-      "wm_popularity_percentile": 45.05,
-      "wm_user_rating": null,
-      "worldwide_gross": null,
-      "year": "2025"
     },
     {
       "age_rating": null,
@@ -513049,54 +512954,6 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "estimated",
-      "availability_source": "tmdb_date",
-      "budget": null,
-      "cast": [
-        "Marcus Mumford",
-        "Ted Dwane",
-        "Ben Lovett"
-      ],
-      "cinema_date": null,
-      "cinema_release": false,
-      "culture": "Western",
-      "director": "Jack Lowe",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Music",
-        "Documentary"
-      ],
-      "imdb_id": null,
-      "jw_link": null,
-      "language": "en",
-      "last_polled": "2026-08-16",
-      "last_probed": "2026-09-23",
-      "offers": [],
-      "outcome": "scored",
-      "poll_tier": "none",
-      "popularity": 0.6024,
-      "poster": "/yowPdv4OChxKJsJG1gxgr0uXimB.jpg",
-      "probe_count": 1,
-      "release_dates": [],
-      "status": [
-        "released"
-      ],
-      "synopsis": "Watch Mumford & Sons, live from Manchester\u2019s Aviva Studios, home of Factory International, where they will be performing tracks from the brand new album \u201cRUSHMERE\u201d, due for release on 28th March.",
-      "title": "City Sessions: Mumford & Sons",
-      "tmdb_id": 1453890,
-      "trailers": [],
-      "window_dates": {
-        "upcoming": "2026-08-16"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-23",
-      "wm_popularity_percentile": 23.02,
-      "wm_user_rating": null,
-      "worldwide_gross": null,
-      "year": "2025"
-    },
-    {
-      "age_rating": null,
       "availability_confidence": "confirmed",
       "availability_source": "tmdb_providers",
       "budget": null,
@@ -515059,58 +514916,6 @@
       "window_dates": {
         "included_streaming": "2026-09-17"
       }
-    },
-    {
-      "age_rating": null,
-      "availability_confidence": "estimated",
-      "availability_source": "tmdb_date",
-      "budget": null,
-      "cast": [
-        "Tisha Campbell",
-        "Melissa De Sousa",
-        "Amiyah Scott",
-        "Kaye Singleton"
-      ],
-      "cinema_date": null,
-      "cinema_release": false,
-      "culture": "Western",
-      "director": "Wendy Raquel Robinson",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Comedy",
-        "Action",
-        "Drama"
-      ],
-      "imdb_id": "tt33381924",
-      "jw_link": null,
-      "language": "en",
-      "last_polled": "2026-08-21",
-      "last_probed": "2026-09-23",
-      "offers": [],
-      "outcome": "scored",
-      "poll_tier": "none",
-      "popularity": 0.5549,
-      "poster": "/mHesze8r2wmLZzjWJW7XCuRMJJG.jpg",
-      "probe_count": 1,
-      "release_dates": [],
-      "status": [
-        "released"
-      ],
-      "synopsis": "When a dark web trafficking attempt impacts her family, blockchain expert Dr. Carol Cleavers joins forces with her best friend to take down a dangerous cyber operation exploiting women.",
-      "title": "Operation: Aunties",
-      "tmdb_id": 1510187,
-      "trailers": [
-        "ocnWROncRjU"
-      ],
-      "window_dates": {
-        "upcoming": "2026-08-21"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-23",
-      "wm_popularity_percentile": 55.16,
-      "wm_user_rating": null,
-      "worldwide_gross": null,
-      "year": "2025"
     },
     {
       "age_rating": null,
@@ -519532,113 +519337,6 @@
       "wm_user_rating": 6.3,
       "worldwide_gross": null,
       "year": "2024"
-    },
-    {
-      "age_rating": null,
-      "availability_confidence": "estimated",
-      "availability_source": "tmdb_date",
-      "budget": null,
-      "cast": [
-        "Nathalie Morris",
-        "Carlos Sanson Jr.",
-        "Alan Dukes",
-        "Lily Stewart"
-      ],
-      "cinema_date": null,
-      "cinema_release": false,
-      "culture": "Western",
-      "director": "Seth Gabrielsson",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Drama"
-      ],
-      "imdb_id": null,
-      "jw_link": null,
-      "language": "en",
-      "last_polled": "2026-08-21",
-      "last_probed": "2026-09-29",
-      "offers": [],
-      "outcome": "scored",
-      "poll_tier": "none",
-      "popularity": 0.3499,
-      "poster": "/yY7zkWR6SGmjt8jfBzHWu8wT8vW.jpg",
-      "probe_count": 1,
-      "release_dates": [
-        {
-          "date": "2025-08-14",
-          "region": "AU",
-          "type": 1
-        }
-      ],
-      "status": [
-        "released"
-      ],
-      "synopsis": "Set in the sleepy town of Bawley Point on the NSW South Coast and brimming with laconic humour, this unforgettable tale of misguided obsession and rampant insecurity tangles with the absurdity of wanting to alter the body in defiance of things beyond our control.",
-      "title": "5'12\"",
-      "tmdb_id": 1513631,
-      "trailers": [],
-      "window_dates": {
-        "upcoming": "2026-08-21"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-29",
-      "wm_popularity_percentile": 59.36,
-      "wm_user_rating": null,
-      "worldwide_gross": null,
-      "year": "2025"
-    },
-    {
-      "age_rating": null,
-      "availability_confidence": "estimated",
-      "availability_source": "tmdb_date",
-      "award": null,
-      "award_text": "",
-      "budget": 500000,
-      "cast": [
-        "Lara Deam",
-        "Cara Matthews",
-        "Jarid Kennedy",
-        "Tom Marchant"
-      ],
-      "cinema_date": null,
-      "cinema_release": false,
-      "culture": "Western",
-      "director": "Herman Perera",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Horror",
-        "Thriller"
-      ],
-      "imdb_id": "tt31796970",
-      "jw_link": null,
-      "language": "en",
-      "last_polled": "2026-08-21",
-      "last_probed": "2026-09-29",
-      "offers": [],
-      "outcome": "scored",
-      "poll_tier": "none",
-      "popularity": 0.3487,
-      "poster": "/bIRfv3MfAfbnIs1VjiCAK0193T1.jpg",
-      "probe_count": 1,
-      "release_dates": [],
-      "status": [
-        "released"
-      ],
-      "synopsis": "After Lucky's world crumbles, her college friend Hadiya, Hadiya's husband Brad, and their children arrive to help Lucky, only to find the old mansion occupied by a dangerous presence that will stop at nothing to make them leave.",
-      "title": "Sunny's Mansion",
-      "tmdb_id": 1523424,
-      "trailers": [
-        "HC2PROUIEks"
-      ],
-      "window_dates": {
-        "upcoming": "2026-08-21"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-29",
-      "wm_popularity_percentile": 72.09,
-      "wm_user_rating": null,
-      "worldwide_gross": null,
-      "year": "2025"
     },
     {
       "age_rating": "E",

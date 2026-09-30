@@ -1363,6 +1363,15 @@ def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery
 
     published_records, stats = select_publishable(candidates, engine_ids, previously_published_ids,
                                                    held_ids, CATALOGUE_TARGET)
+    # CAS-1105: a final safety net, independent of how each record's status got here — catches a
+    # title left published by any path (including a one-off correction script) that never called
+    # select_publishable itself to re-decide membership.
+    published_records, floor_dropped = revalidate_published_floor(published_records, engine_ids, held_ids)
+    if floor_dropped:
+        stats["demoted"] += floor_dropped
+        stats["published"] -= floor_dropped
+        print(f"[info] CAS-1105: revalidate_published_floor dropped {floor_dropped} published "
+              f"title(s) that no longer clear WM_PUBLISH_FLOOR and are not user-held.")
     print(publish_enrich_log_line(enrich_stats, stats["promoted"]))
     unprobed = sum(1 for c in candidates.values() if c.get("outcome") == "unprobed")
     report = {
@@ -1634,6 +1643,35 @@ def revalidate_stale_upcoming(candidates: dict, today: datetime.date) -> int:
         c.pop("pending_downgrade", None)
         fixed += 1
     return fixed
+
+
+def revalidate_published_floor(movies: list[dict], engine_scoreable_ids: set, held_ids) -> tuple[list[dict], int]:
+    """CAS-1105: select_publishable's own demotion-protection ("exempt" branch) only ever runs
+    when select_publishable itself is called — it re-checks WM_PUBLISH_FLOOR for every title that
+    drops out of ranked_in, held or not. But nothing stops a title from losing its floor exemption
+    through a path that never calls select_publishable at all: CAS-1083's own revalidate_stale_
+    upcoming() correctly flips a stuck-upcoming candidate to "released" the moment its buzz
+    exemption lapses, and that ran once as a standalone correction directly against the committed
+    catalogue (outside apply_two_tier_publication) to clear a backlog of 44 stale titles. The
+    status flip was right; nothing after it re-asked whether the now-released, unscored title
+    still belonged in movies.json, so 6 non-held titles stayed published indefinitely with no
+    score behind them at all — the exact shape test_every_published_film_clears_the_publish_floor
+    exists to catch.
+
+    Run this on every publication pass, after select_publishable, as the same safety net
+    regardless of how a published record's status got there. Pure and free — `engine_scoreable_ids`
+    is already computed for this run; reuses CAS-1067's own held-ids fail-safe (drop nothing this
+    run when `held_ids` is None, since the state tables were unreadable). Returns (surviving
+    records, dropped count)."""
+    survivors = []
+    dropped = 0
+    for m in movies:
+        tid = m["tmdb_id"]
+        if tid in engine_scoreable_ids or held_ids is None or str(tid) in held_ids:
+            survivors.append(m)
+        else:
+            dropped += 1
+    return survivors, dropped
 
 
 def derive_from_providers(movie: dict, prov: dict, today: datetime.date) -> list[str]:
