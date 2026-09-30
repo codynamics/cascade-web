@@ -53,10 +53,14 @@ test("CAS-1081: msnValueLine/msnChipsHTML (the agent editor) also treat the >100
     const line = E.msnValueLine(c);
     assert.ok(!line.includes("101"), `value line must never show "101+": ${line}`);
     assert.ok(!/cinema/i.test(line), `cinema must be left out of the value line: ${line}`);
-    assert.ok(line.startsWith("91+, rent it"), `rent must lead the sentence: ${line}`);
+    assert.ok(line.startsWith("Lists films scoring 91+"), `rent's real marker must lead the sentence: ${line}`);
+    assert.ok(line.includes("to rent or streaming"), `rent and stream must both be named as listed windows: ${line}`);
 
     const chips = E.msnChipsHTML(c);
     assert.ok(!chips.includes("101"), `chips must never show "101+": ${chips}`);
-    assert.ok(chips.includes("Cinema — never"), `cinema's chip must read Never, like any other Never window: ${chips}`);
+    // CAS-1113: chips carry window names only now — cinema (not armed, since its marker is >100) must show
+    // as a window before the start (a ＋ chip), never as the start or a follower.
+    assert.match(chips, /data-act="msn-start-add" data-key="in_cinema"/,
+      `cinema must read as a window before the start, offering to move the start back to it: ${chips}`);
   });
 });

@@ -2689,8 +2689,11 @@ test("CAS-734 AC3(d): an agent present only on this device, with an id the accou
 
 test("CAS-743 AC2: a local agent with no watchMarkers key never overwrites an account row that has one, even when the local edit timestamp is the newer of the two", () => withCas734State(async () => {
   const id = uuidFor(8);
+  // CAS-1113: uniform across all four windows — normCascade's own single-score collapse is a no-op on
+  // this shape, so this test's deepEqual below still pins the VALUES surviving the sync untouched, not
+  // that collapse's separate (already-covered) behaviour.
   const remoteRow = { id, user_id: "cas681-test-user", name: "Account version",
-    criteria: { order: 0, watchMarkers: { in_cinema: 90, premium: 75, rent: 60, stream: 50 } },
+    criteria: { order: 0, watchMarkers: { in_cinema: 90, premium: 90, rent: 90, stream: 90 } },
     alert_moments: [], active: true,
     created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-05T00:00:00.000Z" };
   const { client } = fakeCascadesSupabase([remoteRow]);
@@ -2710,7 +2713,7 @@ test("CAS-743 AC2: a local agent with no watchMarkers key never overwrites an ac
   assert.ok(kept, "the agent must still be present");
   assert.equal(kept.name, "Account version",
     "the account's real watchMarkers must win over a defaulted local guess, whatever the timestamps say");
-  assert.deepEqual(kept.watchMarkers, { in_cinema: 90, premium: 75, rent: 60, stream: 50 });
+  assert.deepEqual(kept.watchMarkers, { in_cinema: 90, premium: 90, rent: 90, stream: 90 });
 }));
 
 test("CAS-743 AC3: an agent whose watchMarkers is still normCascade's default guess is excluded from the rows handed to the upsert; an agent with a real, user-set marker is included", () => withCas734State(async () => {
@@ -2731,8 +2734,8 @@ test("CAS-743 AC3: an agent whose watchMarkers is still normCascade's default gu
   E.CascadePersistence.cascadeKnown.set(idA, { ...knownA, sig: "pre-v0.9.3-stale-sig" });
 
   // B gets a real, user-driven edit through the actual mutator — genuinely dirty for a real reason.
-  E.setWatchMarker(b, "in_cinema", 88);
-  assert.ok(!b._watchMarkersDefaulted, "harness check: setWatchMarker must clear B's defaulted flag");
+  E.setAgentScore(b, "in_cinema", 88);
+  assert.ok(!b._watchMarkersDefaulted, "harness check: setAgentScore must clear B's defaulted flag");
 
   const dirty = E.CascadePersistence.cascadeDirtyRows();
   assert.ok(!dirty.some(c => c.id === idA),

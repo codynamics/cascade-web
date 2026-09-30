@@ -347,10 +347,11 @@ if(typeof window.CascadeAuth === "undefined"){
   // decide whether an agent has changed and what its current floor is — exported so a test can compute the
   // exact signature/floor a seeded agent_films row should carry, rather than guessing at internal state.
   cascSigOf, agentFloor,
-  // CAS-743: setWatchMarker is the one real mutator a user-driven marker edit goes through (it also clears
-  // the *Defaulted provenance flag normCascade's own guess sets) — exported so a test can drive a genuine
-  // edit through the real function rather than poking c.watchMarkers by hand.
-  setWatchMarker,
+  // CAS-1113: setAgentScore is the one real mutator a user-driven score edit goes through now (it also
+  // clears the *Defaulted provenance flag normCascade's own guess sets) — exported so a test can drive a
+  // genuine edit through the real function rather than poking c.watchMarkers by hand. Replaces the retired
+  // per-window setWatchMarker.
+  setAgentScore,
   // CAS-726: filmWatchSource is the provenance read the round-trip test asserts against directly;
   // toggleFilmOpt is wire code (window-assigned, like ymCascToggle above) — a test drives a manual
   // tick through the real function rather than poking notify[id].wins by hand.
@@ -424,18 +425,21 @@ if(typeof window.CascadeAuth === "undefined"){
   // test can assert the panel/copy-button text without a real DOM or the 5-tap gesture.
   diagReport, diagReportText, diagSyncStatusText,
   // CAS-789: rounding out the agent-behaviour suite's export surface — windowEnabled (the watchPrefs
-  // Where-and-when gate), restoreWatchMarker/msnTrackAreaHTML/msnValueLine (the Mission marker track's own
-  // mutator and render helpers) and notifyChipHTML (the Watch On chip's own render, alongside agentChipHTML
-  // above) — plain top-level functions, exported directly like the rest of this file.
-  windowEnabled, restoreWatchMarker, msnTrackAreaHTML, msnValueLine, notifyChipHTML,
+  // Where-and-when gate), msnTrackAreaHTML/msnValueLine (the Cascade score track's own render helpers)
+  // and notifyChipHTML (the Watch On chip's own render, alongside agentChipHTML above) — plain top-level
+  // functions, exported directly like the rest of this file.
+  windowEnabled, msnTrackAreaHTML, msnValueLine, notifyChipHTML,
   // CAS-917: windowFollowed (the start-window model's own predicate) and msnChipsHTML (the "On this
   // track" chip row, alongside msnValueLine/msnTrackAreaHTML above) — exported so a test can assert both
   // the placement decision and its two render surfaces directly.
   windowFollowed, msnChipsHTML,
-  // CAS-762: msnLastValue — the module-level "value a window carried before Never" map — exported by
-  // reference (like watched/blocked/found above) so a test can seed the exact Off-round-trip restoreWatchMarker
-  // now has to handle without driving the real click handlers.
-  msnLastValue,
+  // CAS-1113: msnListedWindows is the shared "start window + everything it lists" decision msnValueLine/
+  // msnChipsHTML/msnTrackAreaHTML all read — exported so a test can assert it directly. msnLastScore
+  // (a single remembered value, replacing the retired per-window msnLastValue map) is reassigned by
+  // setAgentScore, so it's exposed through a getter/setter like flowKind/watchTab elsewhere in this file.
+  msnListedWindows,
+  get msnLastScore(){ return msnLastScore; },
+  setMsnLastScore(v){ msnLastScore=v; },
   // CAS-790/791: found — the live membership Set recomputeFound rebuilds every pass, by reference like
   // watched/blocked above — needed for the A-F and G/I checks' direct membership assertions.
   // (watchRows/applyWatchRows already reach a test through CascadePersistence, same as the rest of the

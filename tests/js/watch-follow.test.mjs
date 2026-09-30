@@ -173,19 +173,25 @@ test("CAS-917 AC3: stream switched off account-wide — an account-off window is
   });
 }));
 
-test("CAS-917 AC4: msnValueLine appends every followed, unmarked window after the start window's own clause", () => withWatchPrefs(WATCH_PREFS, () => {
+test("CAS-917 AC4: msnValueLine names every enabled window at or after the start, followed windows included", () => withWatchPrefs(WATCH_PREFS, () => {
   const c1 = broadCascade("cas917-ac4-1", 0, { in_cinema: null, premium: null, rent: 70, stream: null });
-  assert.equal(E.msnValueLine(c1), "70+, rent it, then stream it · under 70, don't list");
+  assert.equal(E.msnValueLine(c1),
+    "Lists films scoring 70+ wherever they are now — to rent or streaming — and follows each one to the next. Under 70, not listed.");
 
   const c2 = broadCascade("cas917-ac4-2", 1, { in_cinema: 90, premium: null, rent: null, stream: null });
-  assert.equal(E.msnValueLine(c2), "90+, watch it at the Cinema, then rent it, then stream it · under 90, don't list");
+  assert.equal(E.msnValueLine(c2),
+    "Lists films scoring 90+ wherever they are now — at the cinema, to rent or streaming — and follows each one to the next. Under 90, not listed.");
 }));
 
-test("CAS-917 AC5: msnChipsHTML — a followed window reads 'follows <Start>', not 'never'", () => withWatchPrefs(WATCH_PREFS, () => {
+test("CAS-917 AC5: msnChipsHTML — a followed window shows a plain ✓, a window before the start offers ＋", () => withWatchPrefs(WATCH_PREFS, () => {
   const c = broadCascade("cas917-ac5", 0, { in_cinema: null, premium: null, rent: 70, stream: null });
   const html = E.msnChipsHTML(c);
-  assert.ok(html.includes("Cinema — never"), "a window before the start window must still read never");
-  assert.ok(html.includes("Rent 70+"), "the start window's own marker chip must read its score");
-  assert.ok(html.includes("Stream — follows Rent"), "a followed window with no marker must name what it follows");
-  assert.ok(!html.includes("Stream — never"), "a followed window must never read never");
+  assert.match(html, /data-act="msn-start-add" data-key="in_cinema"/,
+    "a window before the start window must offer to move the start back to it");
+  assert.match(html, /data-act="msn-start-remove" data-key="rent"/,
+    "the start window's own chip must offer to remove it");
+  assert.match(html, /Stream<\/span><span class="msnchipck"/,
+    "a followed window (after the start, no marker of its own) must show a plain ✓ right after its label");
+  assert.doesNotMatch(html, /data-key="stream"/,
+    "a followed window's chip must carry no button/control at all — data-key only ever lives on one");
 }));

@@ -448,17 +448,14 @@ async function openFirstAgentMission(page){
   await expect(page.locator(".msntrackwrap")).toBeVisible();
 }
 
-test("Mission screen: one score track, one marker per enabled window, Premium adds a fourth (CAS-729 AC2)", async ({ page }) => {
+test("Mission screen: one score track, exactly one handle; Premium becomes a followed window, not a second one (CAS-1113)", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
 
   await openFirstAgentMission(page);
   await expect(page.locator(".msntrackwrap")).toHaveCount(1);
-  // CAS-911: the v2 roster's rank-0 agent (Massive Movies, onbMassiveCritV2) marks only its ONE active/big
-  // window (Cinema, from this test's toShortlist(page,"cinema")) — Rent and Stream are enabled but seeded
-  // with no marker of their own, so the baseline is one real marker, not three. (Premium also starts off,
-  // CAS-243/watchPrefsDefaults.)
+  // CAS-1113: one score for the whole agent now — exactly one handle, whatever windows it lists.
   await expect(page.locator(".msnmark")).toHaveCount(1);
 
   // Back out (nothing was actually changed on this visit), then switch Premium on for real through the
@@ -479,46 +476,40 @@ test("Mission screen: one score track, one marker per enabled window, Premium ad
   await expect(page.locator("#wwScreen")).not.toHaveClass(/open/);
 
   await openFirstAgentMission(page);
-  // CAS-917: Premium now ranks after Cinema (this agent's start window) with no marker of its own, so
-  // enabling it makes it a FOLLOWED window — msnChipsHTML's own "follows" chip, not a fourth track marker —
-  // exactly the case this ticket's start-window model added. The marker count is unchanged until the chip's
-  // own + (restoreWatchMarker) actually gives it a value, which is when it becomes the track's real fourth
-  // marker (a real one here, since Cinema is already marked).
+  // CAS-1113: Premium now ranks after Cinema (this agent's start window), so switching it on makes it a
+  // FOLLOWED window at the start's own score — msnChipsHTML's own plain ✓ chip, never a second handle.
   await expect(page.locator(".msnmark")).toHaveCount(1);
   const premiumChip = page.locator(".msnchip", { hasText: "Premium" });
-  await expect(premiumChip).toContainText("follows Cinema");
-  await premiumChip.locator('[data-act="restore"]').click();
-  await expect(page.locator(".msnmark")).toHaveCount(2);
+  await expect(premiumChip.locator(".msnchipck")).toBeVisible();
+  await expect(page.locator(".msnmark")).toHaveCount(1);
 });
 
-test("Mission screen: dragging Cinema below Rental pushes Rental down, never crossing or stacking (CAS-729 AC3)", async ({ page }) => {
+test("Mission screen: dragging the single handle moves every listed window's score together, never independently (CAS-1113)", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openFirstAgentMission(page);
 
-  // Arrange a known, staggered starting point. CAS-911: Massive Movies (this roster's rank-0 agent) seeds
-  // only its one active/big window with a real marker — Rent and Stream start null (CAS-917's start-window
-  // model follows them off Cinema instead), so only one .msnmark exists in the DOM at this point. Give all
-  // three a real value here and rebuild through msnRebuild() — paintMsnTrack() is an in-place repaint that
-  // only updates marks that already exist in the DOM, so it can move Cinema's own handle but can never
-  // conjure the Rent/Stream handles this test then drags into being; msnRebuild() re-renders #msnTrackArea
-  // (and rewires it) the same way the real Never/restore chips do whenever the marker set itself changes.
+  // Arrange a known starting point — Cinema, Rent and Stream all listed at the same real score, through the
+  // real mutator (setAgentScore) rather than poking watchMarkers by hand. msnRebuild() re-renders
+  // #msnTrackArea and rewires it, the same way the real chip actions do whenever the listed-window set or
+  // its score changes.
   await page.evaluate(() => {
     const c = onbFlow.draft;
-    c.watchMarkers.in_cinema = 90; c.watchMarkers.rent = 75; c.watchMarkers.stream = 60;
+    setAgentScore(c, "in_cinema", 90);
     msnRebuild();
   });
   const before = await page.evaluate(() => ({ ...onbFlow.draft.watchMarkers }));
+  expect(before.in_cinema).toBe(before.rent);
+  expect(before.rent).toBe(before.stream);
 
   // CAS-897: CAS-816 put this track partway down the single-page "Edit Agent" screen, behind the occasions
-  // and styles cards above it — the dedicated Mission screen this test was written against put it first
-  // thing on screen, needing no scroll. Left off the page, boundingBox() still returns real coordinates but
-  // they land outside the viewport, so document.elementFromPoint (what a real mouse click hit-tests against)
+  // and styles cards above it. Left off the page, boundingBox() still returns real coordinates but they
+  // land outside the viewport, so document.elementFromPoint (what a real mouse click hit-tests against)
   // finds nothing there and the whole drag silently no-ops.
   await page.locator(".msntrackwrap").scrollIntoViewIfNeeded();
   const trackBox = await page.locator(".msntrackwrap").boundingBox();
-  const handle = page.locator('.msnhandle[data-key="in_cinema"]');
+  const handle = page.locator(".msnhandle");
   const handleBox = await handle.boundingBox();
   await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
   await page.mouse.down();
@@ -527,12 +518,11 @@ test("Mission screen: dragging Cinema below Rental pushes Rental down, never cro
 
   const after = await page.evaluate(() => ({ ...onbFlow.draft.watchMarkers }));
   expect(after.in_cinema, JSON.stringify({ before, after })).toBeLessThan(before.in_cinema);
-  expect(after.rent, JSON.stringify({ before, after })).toBeLessThan(before.rent);        // Rental pushed down
-  expect(after.in_cinema).toBeGreaterThan(after.rent);                                    // never crossed
-  expect(after.rent).toBeGreaterThan(after.stream);                                       // never crossed
-  expect(after.in_cinema).not.toBe(after.rent);                                           // never stacked
-  expect(after.rent).not.toBe(after.stream);                                              // never stacked
-  await expect(page.locator(".msnmark")).toHaveCount(3);   // still three distinct markers, none merged away
+  // CAS-1113: one score for the whole agent — every listed window must move together, never independently
+  // (the old MARKER_MIN_GAP push/never-cross/never-stack guarantees this ticket retired).
+  expect(after.rent).toBe(after.in_cinema);
+  expect(after.stream).toBe(after.in_cinema);
+  await expect(page.locator(".msnmark")).toHaveCount(1);
 });
 
 test("Mission/hub: no Watch On door, marker values in the Mission card, requirement scope chips, no overflow (CAS-729 AC4/AC5/AC6)", async ({ page }) => {
@@ -584,77 +574,13 @@ test("Mission/hub: no Watch On door, marker values in the Mission card, requirem
   await expect(page.locator("#onbStep", { hasText: "Watch On" })).toHaveCount(0);
 });
 
-// CAS-732: paintMsnTrack() (the in-place drag repaint) updated each segment's left/width from the sorted
-// marker order but never its background, so a segment kept whatever colour msnTrackAreaHTML() gave it at
-// build time even once dragging re-sorted it to a different window. The trigger is a tie with no
-// deterministic tie-break — exactly how CAS-727 migrated every pre-existing agent (watchMarkers[k] all
-// equal) — which built the segments in WATCH_LEVEL_KEYS order rather than ascending-score order.
-test("Mission screen: dragging repaints segment colours to match their windows; ties break stream-first (CAS-732 AC2/AC3)", async ({ page }) => {
-  await toShortlist(page, "cinema");
-  await finishFlow(page);
-  await toListing(page);
-  await openFirstAgentMission(page);
-
-  // Flatten every window to the exact tie CAS-732 traces the bug to. Premium is switched on too so all
-  // four windows sit on the track (it's off by default, CAS-243).
-  await page.evaluate(() => {
-    watchPrefs.premium = { list: true, notify: false };
-    const c = onbFlow.draft;
-    WATCH_LEVEL_KEYS.forEach(k => { c.watchMarkers[k] = 75; });
-    msnRebuild();
-  });
-  await expect(page.locator(".msnmark")).toHaveCount(4);
-
-  // AC3: with all four markers tied, the leftmost coloured segment carries Stream's colour — the tie-break
-  // orders low-window-first, matching the direction the track is drawn in.
-  const leftmostBg = await page.locator(".msnseg").nth(1).evaluate(el => getComputedStyle(el).backgroundColor);
-  const streamBg = await page.evaluate(() => {
-    const d = document.createElement("div");
-    d.style.background = WINDOW_COLOR.stream;
-    document.body.appendChild(d);
-    const rgb = getComputedStyle(d).backgroundColor;
-    d.remove();
-    return rgb;
-  });
-  expect(leftmostBg).toBe(streamBg);
-
-  // AC2: drag Stream's own marker away from the still-tied trio above it via the real handle path (last in
-  // DOM among the overlapping tied handles, so it's the one that actually receives the pointer), then every
-  // .msnseg's computed background-color must match WINDOW_COLOR for the window whose marker begins that
-  // segment. Fails on the current code, which only repaints position/width on drag, never colour.
-  const trackBox = await page.locator(".msntrackwrap").boundingBox();
-  const handle = page.locator('.msnhandle[data-key="stream"]');
-  const handleBox = await handle.boundingBox();
-  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(trackBox.x + 2, handleBox.y + handleBox.height / 2, { steps: 8 });
-  await page.mouse.up();
-
-  const mismatches = await page.evaluate(() => {
-    const c = onbFlow.draft;
-    const usable = WATCH_LEVEL_KEYS.filter(k => windowUsable(c, k));
-    const byScore = [...usable].sort((a, b) => (c.watchMarkers[a] - c.watchMarkers[b])
-      || (WATCH_LEVEL_KEYS.indexOf(b) - WATCH_LEVEL_KEYS.indexOf(a)));
-    const segEls = document.querySelectorAll(".msnseg");
-    const resolve = v => {
-      const d = document.createElement("div");
-      d.style.background = v;
-      document.body.appendChild(d);
-      const rgb = getComputedStyle(d).backgroundColor;
-      d.remove();
-      return rgb;
-    };
-    const bad = [];
-    byScore.forEach((k, i) => {
-      const el = segEls[i + 1]; if(!el) return;
-      const got = getComputedStyle(el).backgroundColor;
-      const want = resolve(WINDOW_COLOR[k]);
-      if(got !== want) bad.push({ i, k, got, want });
-    });
-    return bad;
-  });
-  expect(mismatches, JSON.stringify(mismatches)).toEqual([]);
-});
+// "Mission screen: dragging repaints segment colours to match their windows; ties break stream-first
+// (CAS-732 AC2/AC3)" deleted, CAS-1113: the bug class this pinned (a segment keeping a stale PER-WINDOW
+// colour after a drag re-sorted which window it belonged to) cannot recur — there is only ever one handle
+// and one neutral fill colour (#c9ced8) now, never multiple simultaneously-coloured segments to mis-sort.
+// A window's own colour survives only on its 7px dot in the label stack under the handle, which is keyed
+// off the listed-windows array directly on every repaint (paintMsnTrack does not touch it at all — the
+// dots are static per render, not part of the in-place drag repaint this bug was in).
 
 test("'Only show films on my services' changes what a new agent finds", async ({ page }) => {
   // Every window a streaming agent lists (Premium/Rent/Streaming) is service-scoped, so switching the
