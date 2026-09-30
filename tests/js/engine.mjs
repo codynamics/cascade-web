@@ -369,6 +369,11 @@ if(typeof window.CascadeAuth === "undefined"){
   // at the bottom of the account-sync IIFE — a live reference, so a test can stub CascadeAuth.client with
   // a fake Supabase and call e.g. CascadePersistence.loadWatchlistAccount() directly.
   get CascadePersistence(){ return window.CascadePersistence; },
+  // CAS-1094: the server-first account store core (acctLoad/acctOp and the persisted op queue) lives on
+  // window.CascadeAccountStore, assigned once at the bottom of its own IIFE — the same live-reference
+  // reasoning as CascadePersistence above, so a test can stub CascadeAuth.client with a fake Supabase and
+  // call acctOp/acctLoad directly.
+  get CascadeAccountStore(){ return window.CascadeAccountStore; },
   // CAS-843: momentsOf (alert_moments derivation, now off the account's own Where & when Notify switches
   // rather than a per-agent field) lives on window.CascadeShape, the same live-reference reasoning as
   // CascadePersistence above.
