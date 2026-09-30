@@ -7131,12 +7131,12 @@ function inviteSentLineFor(sent){
   const names=joinNames(sent.map(s=>s.friend.name));
   const plural=sent.length!==1, verb=plural?"have":"has", noun=plural?"answers":"answer";
   const allEmail=sent.every(s=>s.channel==="email");
-  if(allEmail) return `${names} ${verb} been emailed. You will see their ${noun} under Invites.`;
+  if(allEmail) return `${names} ${verb} been emailed. You will be notified when they respond, and you can see all invites and responses from the Invites menu option.`;
   const anyEmail=sent.some(s=>s.channel==="email");
   if(anyEmail) return `${names} ${verb} been invited — some by email, some in your messaging app. `+
-    `You will see their ${noun} under Invites.`;
+    `You will be notified when they respond, and you can see all invites and responses from the Invites menu option.`;
   return `${names} ${verb} been invited — finish sending in your messaging app. `+
-    `You will see their ${noun} under Invites.`;
+    `You will be notified when they respond, and you can see all invites and responses from the Invites menu option.`;
 }
 function filmInviteSentHTML(info){
   return `<div class="filminvsent">
