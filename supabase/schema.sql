@@ -1,9 +1,14 @@
 -- Cascade Web — database schema + row-level security
 -- Source of truth: Confluence "Cascade Web — Architecture & CC Build Spec" §3.
 -- Apply this in the Supabase SQL editor (see supabase/README.md). Safe to re-run.
+-- This file is the full current state, kept in sync with supabase/migrations/ (CAS-1092): a
+-- schema change lands as a new numbered migration AND the matching edit here, in the same commit.
 --
--- Eleven tables:
+-- Twenty-three tables:
+--   schema_migrations — the migration ledger (CAS-1092): one row per applied migration file.
 --   cascades      — one row per saved agent, per user (the user owns their rows via RLS).
+--                   Soft-deletable since CAS-1092 (deleted_at) via the delete_agent() RPC; a hard
+--                   DELETE is archived into account_deleted_rows (below) rather than lost for good.
 --   user_prefs    — the account-level defaults a NEW agent starts from, plus the services the
 --                   user actually pays for. CAS-211.
 --   user_films    — one row per (user, film) the user has said something about: liked, so-so,
@@ -56,10 +61,33 @@
 --                   (CAS-887) is stamped by the daily monitor once a reply has led an email digest —
 --                   a separate column from `seen_at`, which stays the app's alone (opening the
 --                   Invites screen), so a digest run can never clear a badge nobody has actually seen.
+--   recommendations — Recommend Cascade sends (CAS-884/M11), read by the hourly recommend.yml
+--                   workflow and sent with the service_role key.
+--   invite_emails — the outgoing queue for a multi-recipient Invite's email leg (CAS-930/M12).
+--   friends       — the shared recipient picker's own saved people (CAS-928/M12); readable only
+--                   by their owner.
+--   analytics_admins — the allowlist gating the admin_* views and the usage_events read policy
+--                   below (CAS-942).
+--   account_deleted_rows — the CAS-1092 archive: every row hard-deleted from the 12 tables the
+--                   archive_deleted_row() trigger is attached to lands here first, so a client
+--                   sync bug or a fat-fingered delete is recoverable. Not written for agent_films
+--                   (derived, high volume), notifications, or any analytics table.
+--   app_config    — small server-read/no-client-write config, e.g. min_client_build (CAS-1108).
 
 -- gen_random_uuid() lives in pgcrypto. It is pre-installed on Supabase, but declaring the
 -- dependency keeps this file self-contained and portable to a plain Postgres.
 create extension if not exists pgcrypto;
+
+-- ---------------------------------------------------------------------------
+-- schema_migrations — the migration ledger (CAS-1092)
+-- ---------------------------------------------------------------------------
+create table if not exists public.schema_migrations (
+  version    text primary key,
+  applied_at timestamptz not null default now()
+);
+alter table public.schema_migrations enable row level security;
+-- No client policies — nobody but service_role/the SQL editor's own postgres role ever reads
+-- or writes this table.
 
 -- ---------------------------------------------------------------------------
 -- cascades — one row per saved agent, per user
@@ -97,6 +125,35 @@ create policy cascades_owner on public.cascades
 -- The monitoring job pulls active cascades grouped by user; index the hot columns.
 create index if not exists cascades_user_id_idx on public.cascades (user_id);
 create index if not exists cascades_active_idx  on public.cascades (active) where active;
+
+-- CAS-1092: soft delete for agents, independent of the archive-on-hard-delete safety net below.
+-- Hard deletes remain permitted for now (a later ticket removes them) — delete_agent() is an
+-- additional, softer path, not a replacement for cascades_owner's own DELETE grant.
+alter table public.cascades add column if not exists deleted_at timestamptz;
+create index if not exists cascades_not_deleted_idx on public.cascades (user_id) where deleted_at is null;
+
+-- security invoker (the default — stated explicitly): runs as the calling user, so
+-- cascades_owner's own RLS already confines the UPDATE to the caller's rows; the explicit
+-- user_id = auth.uid() below is redundant with that policy but kept for clarity.
+create or replace function public.delete_agent(p_id uuid)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  update public.cascades
+  set deleted_at = now()
+  where id = p_id and user_id = auth.uid() and deleted_at is null;
+
+  if not found then
+    raise exception 'delete_agent: no matching active agent %', p_id;
+  end if;
+end;
+$$;
+
+revoke all on function public.delete_agent(uuid) from public;
+grant execute on function public.delete_agent(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- user_films — what the user has said about a film (CAS-183)
@@ -316,9 +373,15 @@ create table if not exists public.agent_films (
 
 alter table public.agent_films enable row level security;
 
+-- CAS-1092: with-check also verifies the parent cascade is the caller's, not just user_id (which
+-- a client could otherwise pair with someone else's cascade_id). `using` is unchanged.
 drop policy if exists agent_films_owner on public.agent_films;
 create policy agent_films_owner on public.agent_films
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using (auth.uid() = user_id)
+  with check (
+    auth.uid() = user_id
+    and exists (select 1 from public.cascades c where c.id = cascade_id and c.user_id = auth.uid())
+  );
 
 create index if not exists agent_films_cascade_id_idx on public.agent_films (cascade_id);
 
@@ -362,9 +425,15 @@ create table if not exists public.list_films (
 
 alter table public.list_films enable row level security;
 
+-- CAS-1092: with-check also verifies the parent list is the caller's, not just user_id (which a
+-- client could otherwise pair with someone else's list_id). `using` is unchanged.
 drop policy if exists list_films_owner on public.list_films;
 create policy list_films_owner on public.list_films
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using (auth.uid() = user_id)
+  with check (
+    auth.uid() = user_id
+    and exists (select 1 from public.lists l where l.id = list_id and l.user_id = auth.uid())
+  );
 
 create index if not exists list_films_list_id_idx on public.list_films (list_id);
 
@@ -402,6 +471,24 @@ create index if not exists watchlists_user_id_idx on public.watchlists (user_id)
 alter table public.watchlists add column if not exists deleted_at timestamptz;
 create index if not exists watchlists_deleted_at_idx on public.watchlists (deleted_at);
 
+-- CAS-1092: the app keeps one row per user; enforce it. Raises a clear exception naming the
+-- offending user_ids instead of failing the index build with an opaque duplicate-key error, and
+-- never deletes a row itself.
+do $$
+declare
+  dupes text;
+begin
+  select string_agg(user_id::text, ', ' order by user_id) into dupes
+  from (
+    select user_id from public.watchlists group by user_id having count(*) > 1
+  ) d;
+  if dupes is not null then
+    raise exception 'watchlists: unique(user_id) violated by existing rows for user_id(s): %', dupes;
+  end if;
+end $$;
+
+create unique index if not exists watchlists_user_id_key on public.watchlists (user_id);
+
 -- ---------------------------------------------------------------------------
 -- notifications — the alert ledger (de-dupe: never email the same
 -- movie+moment twice per cascade)
@@ -436,6 +523,11 @@ create policy notifications_read_own on public.notifications
 drop policy if exists notifications_mark_read on public.notifications;
 create policy notifications_mark_read on public.notifications
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- CAS-1092: the client's only write is markRealAlertsRead's .update({read_at:now}) — confirmed
+-- against app_template.html. Lock the column grant to match; the row policy above is unchanged.
+revoke update on public.notifications from authenticated;
+grant update (read_at) on public.notifications to authenticated;
 
 -- The de-dupe check filters by user; the unique() above already indexes
 -- (cascade_id, movie_id, moment).
@@ -487,6 +579,8 @@ create table if not exists public.usage_events (
 );
 create index if not exists usage_events_created_idx on public.usage_events (created_at desc);
 create index if not exists usage_events_type_idx    on public.usage_events (type);
+-- CAS-1092: usage_events_rate_limit() below queries (client_key, created_at) on every insert.
+create index if not exists usage_events_client_created_idx on public.usage_events (client_key, created_at);
 
 alter table public.usage_events enable row level security;
 
@@ -549,6 +643,8 @@ create table if not exists public.contact_messages (
 );
 create index if not exists contact_messages_unsent_idx
   on public.contact_messages (created_at) where sent_at is null;
+-- CAS-1092: contact_messages_rate_limit() below queries (client_key, created_at) on every insert.
+create index if not exists contact_messages_client_created_idx on public.contact_messages (client_key, created_at);
 
 alter table public.contact_messages enable row level security;
 
@@ -762,6 +858,8 @@ create table if not exists public.recommendations (
 );
 create index if not exists recommendations_unsent_idx
   on public.recommendations (created_at) where sent_at is null;
+-- CAS-1092: recommendations_rate_limit() below queries (sender_id, created_at) on every insert.
+create index if not exists recommendations_sender_created_idx on public.recommendations (sender_id, created_at);
 
 alter table public.recommendations enable row level security;
 
@@ -859,6 +957,131 @@ create policy friends_owner on public.friends
   for all to authenticated using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
 
 -- ---------------------------------------------------------------------------
+-- account_deleted_rows — a hard-delete archive on the account tables (CAS-1092)
+-- ---------------------------------------------------------------------------
+-- On 2026-09-30 a client sync bug deleted every agent on an account with no way back. This is
+-- the safety net: every hard DELETE on the 12 tables below is archived here first, before it is
+-- gone. Deliberately NOT on agent_films (derived, high volume), notifications, or any analytics
+-- table.
+create table if not exists public.account_deleted_rows (
+  id           bigserial primary key,
+  table_name   text not null,
+  row_data     jsonb not null,
+  deleted_by   uuid default auth.uid(),
+  deleted_role text default current_user,
+  deleted_at   timestamptz not null default now()
+);
+alter table public.account_deleted_rows enable row level security;
+-- No client policies — this is a write-only-by-trigger, read-only-by-Lee ledger.
+
+-- security definer: runs as the function's owner so it can insert into account_deleted_rows no
+-- matter which table's own RLS-less trigger context invoked it. deleted_role records the CALLING
+-- role (via auth.role()), not the definer's own elevated role — inside a security definer
+-- trigger `current_user` is always the function's owner. Skips the archive entirely mid a
+-- self-service account deletion (CAS-980): delete_my_account() below sets the
+-- cascade.account_delete flag before it deletes anything, so a deleted account is not retained.
+create or replace function public.archive_deleted_row()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if current_setting('cascade.account_delete', true) = 'on' then
+    return old;
+  end if;
+  insert into public.account_deleted_rows (table_name, row_data, deleted_role)
+  values (TG_TABLE_NAME, to_jsonb(old), coalesce(auth.role(), current_user));
+  return old;
+end;
+$$;
+
+drop trigger if exists archive_deleted_row on public.cascades;
+create trigger archive_deleted_row after delete on public.cascades
+  for each row execute function public.archive_deleted_row();
+
+drop trigger if exists archive_deleted_row on public.user_films;
+create trigger archive_deleted_row after delete on public.user_films
+  for each row execute function public.archive_deleted_row();
+
+drop trigger if exists archive_deleted_row on public.user_prefs;
+create trigger archive_deleted_row after delete on public.user_prefs
+  for each row execute function public.archive_deleted_row();
+
+drop trigger if exists archive_deleted_row on public.notify_prefs;
+create trigger archive_deleted_row after delete on public.notify_prefs
+  for each row execute function public.archive_deleted_row();
+
+drop trigger if exists archive_deleted_row on public.film_picks;
+create trigger archive_deleted_row after delete on public.film_picks
+  for each row execute function public.archive_deleted_row();
+
+drop trigger if exists archive_deleted_row on public.film_watch;
+create trigger archive_deleted_row after delete on public.film_watch
+  for each row execute function public.archive_deleted_row();
+
+drop trigger if exists archive_deleted_row on public.lists;
+create trigger archive_deleted_row after delete on public.lists
+  for each row execute function public.archive_deleted_row();
+
+drop trigger if exists archive_deleted_row on public.list_films;
+create trigger archive_deleted_row after delete on public.list_films
+  for each row execute function public.archive_deleted_row();
+
+drop trigger if exists archive_deleted_row on public.watchlists;
+create trigger archive_deleted_row after delete on public.watchlists
+  for each row execute function public.archive_deleted_row();
+
+drop trigger if exists archive_deleted_row on public.friends;
+create trigger archive_deleted_row after delete on public.friends
+  for each row execute function public.archive_deleted_row();
+
+drop trigger if exists archive_deleted_row on public.invites;
+create trigger archive_deleted_row after delete on public.invites
+  for each row execute function public.archive_deleted_row();
+
+drop trigger if exists archive_deleted_row on public.push_tokens;
+create trigger archive_deleted_row after delete on public.push_tokens
+  for each row execute function public.archive_deleted_row();
+
+-- security definer, service_role only: the archive is designed to grow forever until swept.
+create or replace function public.purge_deleted_rows(p_days int)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  deleted_count int;
+begin
+  delete from public.account_deleted_rows
+  where deleted_at < now() - (p_days || ' days')::interval;
+  get diagnostics deleted_count = row_count;
+  return deleted_count;
+end;
+$$;
+
+revoke all on function public.purge_deleted_rows(int) from public, anon, authenticated;
+grant execute on function public.purge_deleted_rows(int) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- app_config — server-read, no client write (CAS-1092); seeds min_client_build (CAS-1108)
+-- ---------------------------------------------------------------------------
+create table if not exists public.app_config (
+  key        text primary key,
+  value      jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.app_config enable row level security;
+
+drop policy if exists app_config_read on public.app_config;
+create policy app_config_read on public.app_config
+  for select to anon, authenticated using (true);
+
+insert into public.app_config (key, value) values ('min_client_build', '0'::jsonb)
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
 -- keep cascades.updated_at honest on every write
 -- ---------------------------------------------------------------------------
 create or replace function public.set_updated_at()
@@ -873,47 +1096,47 @@ $$;
 
 drop trigger if exists cascades_set_updated_at on public.cascades;
 create trigger cascades_set_updated_at
-  before update on public.cascades
+  before insert or update on public.cascades
   for each row execute function public.set_updated_at();
 
 drop trigger if exists user_films_set_updated_at on public.user_films;
 create trigger user_films_set_updated_at
-  before update on public.user_films
+  before insert or update on public.user_films
   for each row execute function public.set_updated_at();
 
 drop trigger if exists notify_prefs_set_updated_at on public.notify_prefs;
 create trigger notify_prefs_set_updated_at
-  before update on public.notify_prefs
+  before insert or update on public.notify_prefs
   for each row execute function public.set_updated_at();
 
 drop trigger if exists film_picks_set_updated_at on public.film_picks;
 create trigger film_picks_set_updated_at
-  before update on public.film_picks
+  before insert or update on public.film_picks
   for each row execute function public.set_updated_at();
 
 drop trigger if exists film_watch_set_updated_at on public.film_watch;
 create trigger film_watch_set_updated_at
-  before update on public.film_watch
+  before insert or update on public.film_watch
   for each row execute function public.set_updated_at();
 
 drop trigger if exists user_prefs_set_updated_at on public.user_prefs;
 create trigger user_prefs_set_updated_at
-  before update on public.user_prefs
+  before insert or update on public.user_prefs
   for each row execute function public.set_updated_at();
 
 drop trigger if exists lists_set_updated_at on public.lists;
 create trigger lists_set_updated_at
-  before update on public.lists
+  before insert or update on public.lists
   for each row execute function public.set_updated_at();
 
 drop trigger if exists list_films_set_updated_at on public.list_films;
 create trigger list_films_set_updated_at
-  before update on public.list_films
+  before insert or update on public.list_films
   for each row execute function public.set_updated_at();
 
 drop trigger if exists watchlists_set_updated_at on public.watchlists;
 create trigger watchlists_set_updated_at
-  before update on public.watchlists
+  before insert or update on public.watchlists
   for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
@@ -1171,6 +1394,7 @@ ag as (
     count(*) as agents,
     max(cascades.updated_at) as last_agent_edit
   from public.cascades
+  where cascades.deleted_at is null
   group by cascades.user_id
 )
 select
@@ -1212,11 +1436,13 @@ select id as user_id, email::text as email
 from auth.users u
 where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid());
 
+-- CAS-1092: cascades can now carry a soft delete (deleted_at); exclude those rows here too.
 create or replace view public.admin_cascades
 with (security_invoker = false) as
 select id, user_id, name, criteria, alert_moments, active, created_at, updated_at
 from public.cascades
-where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid());
+where deleted_at is null
+  and exists (select 1 from public.analytics_admins a where a.user_id = auth.uid());
 
 revoke all on public.admin_members          from anon, public;
 revoke all on public.admin_member_activity  from anon, public;
@@ -1256,6 +1482,10 @@ begin
   if uid is null then
     raise exception 'delete_my_account: not signed in';
   end if;
+
+  -- CAS-1092: a deleted account is not retained in account_deleted_rows — set the flag
+  -- archive_deleted_row() checks before any of the deletes below run.
+  perform set_config('cascade.account_delete', 'on', true);
 
   delete from public.agent_films      where user_id = uid;
   delete from public.cascades         where user_id = uid;

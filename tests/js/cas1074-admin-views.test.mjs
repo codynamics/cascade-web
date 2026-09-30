@@ -2,9 +2,9 @@
 // admin_member_onboarding/admin_member_emails/admin_cascades must return EVERY member's rows to
 // an admin (not just the signed-in admin's own, the security_invoker=true bug) and ZERO rows to a
 // non-admin, with anon denied outright. Runs the real migration file (supabase/migrations/
-// 20260927_cas1074_admin_views_guard.sql) against an in-process real Postgres engine (pglite),
-// on top of a minimal fixture mirroring the relevant slice of supabase/schema.sql — not a
-// text-grep of the SQL (AC1).
+// 0000_cas1074_admin_views_guard.sql — brought into the numbered migration sequence unchanged by
+// CAS-1092) against an in-process real Postgres engine (pglite), on top of a minimal fixture
+// mirroring the relevant slice of supabase/schema.sql — not a text-grep of the SQL (AC1).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -15,7 +15,7 @@ import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MIGRATION_SQL = fs.readFileSync(
-  path.join(ROOT, 'supabase', 'migrations', '20260927_cas1074_admin_views_guard.sql'),
+  path.join(ROOT, 'supabase', 'migrations', '0000_cas1074_admin_views_guard.sql'),
   'utf8'
 );
 

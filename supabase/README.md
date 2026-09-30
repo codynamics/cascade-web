@@ -1,52 +1,52 @@
 # Supabase backend — Cascade Web
 
-This folder holds the database schema for the live, account-based Cascade service.
-It is the backend surface the browser talks to (Auth + two tables), plus the ledger
-the daily monitoring job writes.
+This folder holds the database schema for the live, account-based Cascade service — the
+backend surface the browser talks to, plus the ledger the daily monitoring job writes.
 
-- **`schema.sql`** — the `cascades` and `notifications` tables, with **row-level
-  security (RLS)** so each user can only read/write their own rows.
+- **`schema.sql`** — the full current state of the schema (every table, RLS policy, trigger,
+  index, function and view). Updated in the **same commit** as every migration below, so it is
+  always the single, up-to-date source of truth — never apply it partially or read it as a diff.
+- **`migrations/NNNN_<name>.sql`** — the numbered, ordered history of how the live database got
+  to that state. Each migration is a standalone file, safe to re-run (`create ... if not exists`,
+  `drop ... if exists` before every `create`, etc.), and records itself in
+  `public.schema_migrations` on success.
 
-> The full one-time account setup (create the Supabase project, enable magic-link
-> auth, create Resend, add the GitHub Actions secrets, fill `config.js`) lives in
-> **`SETUP-cascade-web.md`**. This file covers just the database step.
+> The full one-time account setup (create the Supabase project, enable magic-link auth, create
+> Resend, add the GitHub Actions secrets, fill `config.js`) lives in **`SETUP-cascade-web.md`**.
+> This file covers just the database step.
 
-## What the schema creates
+## How to apply a change (Lee — one time per migration)
 
-| Object | Purpose |
-| --- | --- |
-| `public.cascades` | One row per saved agent, per user. `criteria` (jsonb) holds the filter (genres, minRating, services, maxPrice, ageMax…); `alert_moments` (text[]) is the subset of `hits_cinema \| past_opening_weekend \| hits_pvod \| hits_rent \| hits_stream` the agent should fire on. |
-| `public.notifications` | The sent-email ledger. The daily job writes it and de-dupes against it so the same `(cascade, movie, moment)` is never emailed twice. |
+1. Open the Supabase project → **SQL Editor** → **New query**.
+2. Apply every file under `migrations/` **in number order** that is not yet recorded in
+   `public.schema_migrations` (`select version from public.schema_migrations order by version;`).
+   Paste one file's contents and click **Run**, then move to the next number.
+3. `schema.sql` needs nothing further applied — it is kept in sync with the migrations in the
+   same commit, so once every migration up to the latest number has run, the live project already
+   matches it. It exists as the single readable end-state, and as the script to run against a
+   brand-new project instead of replaying every migration from scratch.
 
-**Row-level security**
+> CC (the build agent) never runs SQL against a live project — it validates every file offline
+> against the PostgreSQL grammar (`pglast`) and never applies anything itself. Applying a
+> migration to the live project is always a Lee step.
 
-- `cascades` — RLS on; policy `cascades_owner` gives a user full access to *only*
-  their own rows (`auth.uid() = user_id`). No user can see another account's agents.
-- `notifications` — RLS on; policy `notifications_read_own` lets a user read *only*
-  their own history. There is **no** end-user insert policy on purpose: the daily
-  monitoring job is the only writer, using the **`service_role`** key (which bypasses
-  RLS). The browser never writes this table.
+## Adding a new schema change
 
-## How to apply it (Lee — one time, ~1 minute)
-
-1. Open your Supabase project → **SQL Editor** → **New query**.
-2. Paste the entire contents of [`schema.sql`](./schema.sql) and click **Run**.
-3. Confirm under **Table Editor** that `cascades` and `notifications` exist, and under
-   **Authentication → Policies** that each table shows RLS **enabled** with its policy.
-
-The script is **idempotent** — safe to run again after a later schema change; it uses
-`create … if not exists` and re-creates policies/trigger cleanly, so re-running won't
-error or duplicate anything.
-
-> ⚠️ Run this in **your own Supabase project's** SQL editor only. CC (the build agent)
-> never runs SQL against a live project — it validates the file offline against the
-> PostgreSQL grammar (`pglast`).
+1. Write `migrations/NNNN_<name>.sql` (next number after the highest one present), ending with
+   `insert into public.schema_migrations(version) values ('NNNN') on conflict do nothing;`.
+   Idempotent, so it is safe to re-run.
+2. Make the same change in `schema.sql`, in the same commit, so the two never drift (CAS-1074 was
+   exactly this kind of drift — a change applied live with no record in either file).
+3. `git diff --stat` for the commit should show only `supabase/` (and, when a migration is
+   asserted by a test, `tests/`) — a migration never touches runtime code.
 
 ## Notes
 
-- `gen_random_uuid()` comes from the `pgcrypto` extension (pre-installed on Supabase;
-  the script enables it defensively so the file also works on a plain Postgres).
-- `updated_at` on `cascades` is kept current automatically by the `cascades_set_updated_at`
-  trigger, so the app never has to set it by hand.
-- Deleting a user (`auth.users`) cascades to their `cascades` and `notifications`
-  (`on delete cascade`); deleting a cascade cascades to its notifications.
+- `gen_random_uuid()` comes from the `pgcrypto` extension (pre-installed on Supabase; the script
+  enables it defensively so the file also works on a plain Postgres).
+- `updated_at` on the tables that carry it is kept current automatically by each table's own
+  `set_updated_at` trigger (fires on both insert and update since CAS-1092), so the app never has
+  to set it by hand.
+- Deleting a user (`auth.users`) cascades to their owned rows (`on delete cascade`); most hard
+  deletes on the account tables are archived first into `account_deleted_rows` (CAS-1092) — see
+  `schema.sql`'s header for exactly which tables and which are deliberately excluded.
