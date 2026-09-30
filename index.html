@@ -3300,7 +3300,10 @@
   /* availability band: one compact line */
   .card:not(.expanded) .bandw{padding:5px 10px}
   .card:not(.expanded) .avail2{min-height:20px}
-  .card:not(.expanded) .reldate{display:none}
+  /* Lee, 2026-10-01: the collapsed card shows the Releasing/Released date too (reverses CAS-604's hide). To make
+     room it drops the dot trail, and a cinema-slot capsule drops its own date — the release label already says it. */
+  .card:not(.expanded) .wdot,.card:not(.expanded) .wline{display:none}
+  .card:not(.expanded) .cap[class*="w-cin-"] .capdate{display:none}
   .card:not(.expanded) .cap{padding:1px 8px;gap:4px;border-radius:8px}
   .card:not(.expanded) .capwin{gap:4px}
   .card:not(.expanded) .capicon{display:none}
