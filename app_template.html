@@ -19444,6 +19444,22 @@ else if(dedupedN)
     if(nextSuffix === acctSuffix) return;
     const fromGuest = acctSuffix === "guest";
     migrateLegacyAcctKeysOnce();
+    // CAS-1114: onboarding runs signed out, so everything it set (services, occasions, watch windows,
+    // notification choices) lives only under the guest namespace. A guest -> new-uid switch immediately
+    // after onboarding just committed its roster (the marker below) carries those guest values into the
+    // new account's own namespace here, rather than leaving the (empty, brand-new) account keys to be read
+    // as "nothing was ever chosen". They then reach the server through the existing load path — loadUserPrefs/
+    // loadNotifyPrefs push them when the account has no row of its own yet, or discard them in favour of the
+    // account's own row when it already has one, exactly as any other local edit would. Any other guest -> uid
+    // switch (no onboarding just completed) is untouched — carryOnboarding is false and nothing here fires.
+    const carryOnboarding = fromGuest && nextSuffix!=="guest" && !!onbV2CommittedLoad();
+    if(carryOnboarding){
+      ["cascade_prefs", BASE_KEY, WATCH_PREFS_KEY, NOTIFY_PREFS_KEY, OCCASIONS_KEY].forEach(base=>{
+        const raw = localStorage.getItem(base+"@guest");
+        if(raw!=null){ try{ localStorage.setItem(base+"@"+nextSuffix, raw); }catch(e){} }
+        try{ localStorage.removeItem(base+"@guest"); }catch(e){}
+      });
+    }
     acctSuffix = nextSuffix;
     try{ localStorage.setItem(ACCT_SUFFIX_KEY, acctSuffix); }catch(e){}
     // CAS-393/733/734's "offer up what's genuinely new" only ever makes sense for a Cascade built on THIS
