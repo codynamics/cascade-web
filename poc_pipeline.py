@@ -1326,6 +1326,11 @@ def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery
     refresh_enriched_candidates(candidates, enriched_records, today_iso)
     merge_backcatalogue_candidates(candidates, today_iso)
 
+    stale_upcoming_fixed = revalidate_stale_upcoming(candidates, today)
+    if stale_upcoming_fixed:
+        print(f"[info] CAS-1083: corrected {stale_upcoming_fixed} candidate(s) stuck Upcoming "
+              f"with no future AU date.")
+
     held_ids = load_user_held_ids()
     if held_ids is None:
         print("[warn] CAS-986: state/user_held_ids.json absent or unreadable — demoting nothing "
@@ -1595,6 +1600,40 @@ def _record_year(movie: dict) -> int | None:
         return int(y)
     except (TypeError, ValueError):
         return None
+
+
+def revalidate_stale_upcoming(candidates: dict, today: datetime.date) -> int:
+    """CAS-1083: a candidate that already satisfies is_publishable_record never gets its status
+    re-derived by anything else in this pipeline — enrich_candidates_for_publication only visits a
+    candidate that ISN'T yet publishable (one-shot), and build_live_catalogue's own daily re-poll
+    loop only ever sees titles the day's TMDB discovery pool actually surfaces, which an old
+    back-catalogue title with no active cinema run never is again once first published. So a title
+    whose one-shot classification landed on "upcoming" — whether from CAS-1078's own gap or any
+    future variant of it — stays "upcoming" forever, with no further chance to reconsider it.
+
+    This is a pure, no-API-call correction: every field _offerless_window needs (cinema_date/year/
+    release_dates) is already sitting on the record, so re-checking every candidate currently
+    stamped upcoming costs nothing and is safe to run on every publication pass. Bypasses
+    apply_monotonic_status's downgrade guard on purpose — that guard exists to make a real AU
+    de-listing wait out a transient provider-feed gap, not to hold back a correction to a
+    classification that was never backed by an offer in the first place (CAS-608/CAS-1078 offer-
+    less "released" already earns immediate commit via the guard's own prev_confidence == "estimated"
+    bypass whenever a candidate reaches it; this just guarantees every stuck candidate reaches it).
+
+    Returns the number of candidates corrected."""
+    fixed = 0
+    for c in candidates.values():
+        if c.get("status") != ["upcoming"]:
+            continue
+        window = _offerless_window(c.get("cinema_date"), today, _record_year(c), c.get("release_dates"))
+        if window == "upcoming":
+            continue
+        c["status"] = [window]
+        c["availability_confidence"] = "estimated"
+        c["availability_source"] = "tmdb_date"
+        c.pop("pending_downgrade", None)
+        fixed += 1
+    return fixed
 
 
 def derive_from_providers(movie: dict, prov: dict, today: datetime.date) -> list[str]:

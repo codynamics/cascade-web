@@ -242548,9 +242548,9 @@
       "poll_tier": "none",
       "offers": [],
       "status": [
-        "upcoming"
+        "in_cinema"
       ],
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "window_dates": {
         "upcoming": "2026-08-11"
@@ -386809,7 +386809,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -386841,7 +386841,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "'Cargo' brings the raw story of three brothers who own a family business in the fishery and are trying to save it from destruction. The passion for their profession but also for their loved ones, however, drives them to desperate actions.",
       "title": "Cargo",
@@ -389472,7 +389472,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -389505,7 +389505,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Tomasz Komenda was 23 years old when his normal life was brutally interrupted. Overnight he was arrested, thrown into prison and charged with murder. Subsequent expert opinions confirmed his participation in the crime, and any evidence was against him. For nearly two decades in prison, he was beaten, intimidated, humiliated and on his own. Finally, after 18 years of imprisonment, prosecutors and a policeman appeared on his way, who decided to discover the truth behind the mysterious case of the detainee.",
       "title": "25 Years of Innocence",
@@ -390359,7 +390359,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -390391,7 +390391,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Imagine Dragons\u2019 Mormon frontman Dan Reynolds is taking on a new mission to explore how the church treats its LGBTQ members. With the rising suicide rate amongst teens in the state of Utah, his concern with the church\u2019s policies sends him on an unexpected path for acceptance and change.",
       "title": "Believer",
@@ -390478,7 +390478,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -390513,7 +390513,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Unfolding the life of a taxi driver that uses his services as a front for extortion rackets and other criminal activities. When his hot-headed younger brother's impulsive behaviour lead the cops and triad to their doorstep. As the eldest, he stops at nothing to protect them all.",
       "title": "Fly By Night",
@@ -395339,7 +395339,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
@@ -395371,7 +395371,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "A road-movie narrated by Michael Cimino (recorded by the documentary's director during their journey together across the United States), and with the exceptional participation of Quentin Tarantino and Oliver Stone. From Thunderbolt and Lightfoot to Year of the Dragon, not to mention The Deer Hunter and Heaven's Gate, discover a unique portrait of an uncompromising director.",
       "title": "Michael Cimino, God Bless America",
@@ -398334,7 +398334,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -398367,7 +398367,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Through never before-seen archive material, interviews with celebrities, industry insiders, rabid fans and the Kids In The Hall themselves \u2013 this documentary tells the wild story of this cult-famous comedy troupe from the 1980s to the present day.",
       "title": "The Kids in the Hall: Comedy Punks",
@@ -399466,7 +399466,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -399498,7 +399498,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "After a bleak childhood, Jane Eyre goes out into the world to become a governess. As she lives happily in her new position at Thornfield Hall, she meets the dark, cold, and abrupt master of the house, Edward Rochester. Jane and her employer grow close in friendship and she soon finds herself falling in love with him. Happiness seems to have found Jane at last, but could Rochester's terrible secret be about to destroy it forever?",
       "title": "National Theatre Live: Jane Eyre",
@@ -400841,7 +400841,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": 2300000,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -400873,7 +400873,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Ce\u0301dric is a worker in a precision mechanics factory in the French Alps. When he finds out that the factory is about to be sold to an investment fund, he joins forces with two of his childhood friends to pull off an epic heist.",
       "title": "The Takeover",
@@ -407551,7 +407551,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -407582,7 +407582,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Astrophysicists show how black holes might hold answers to how the universe evolved, leading to life on Earth and, ultimately, the human race.",
       "title": "Black Hole Apocalypse",
@@ -408857,7 +408857,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -408888,7 +408888,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Journalist Guo lives together with her mother and daughter in the same residence. The relation of three generations looks placid but there is actually a fierce undercurrent of rebellion and resistance.",
       "title": "Spring Tide",
@@ -412879,7 +412879,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -412911,7 +412911,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "A young girl, recently married, is traveling from Aidini to Greece with her mother and her two daughters. On board the ship she decides not to let life pass her by, but to live her own way. And she goes ahead! She writes endlessly wherever she can, on napkins and cigarette boxes, to bills. She smokes, she passionately falls in love, casually gambles in luxurious salons, but also in illegal basements. A teacher who becomes an actress and plays in streets and in theaters, a poet who becomes the greatest Greek folk songwriter. She collaborates with all the famous music personalities of the country, from Vassilis Tsitsanis and Apostolos Kaldaras to Manolis \u0397iotis, Antonis Repanis and Manos Hadjidakis, bravely asserting herself to a cruel and typically male-dominated world.",
       "title": "My Name Is Eftihia",
@@ -421485,7 +421485,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [],
@@ -421511,7 +421511,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "This Story is about the unpredictable journey of Goutham, who takes on to experience the best weed in the world not knowing that his life is going to end soon due to drug addiction.",
       "title": "The Trip",
@@ -422287,7 +422287,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -422321,7 +422321,7 @@
         }
       ],
       "status": [
-        "upcoming"
+        "in_cinema"
       ],
       "synopsis": "Indie-rock group the Yeah Yeah Yeahs channel the spirit of David Lynch with this exquisitely ethereal, sublimely surreal record of a Los Angeles concert performance.",
       "title": "Yeah Yeah Yeahs: Hidden in Pieces",
@@ -430761,7 +430761,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -430795,7 +430795,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Kumari is married off to Dhruvan of Kanjirangattu Tharavadu, a cursed land beyond Illmayi, in the west.  As Kumari finds her comfort zone in her new family which is heavy with mystery, myths and superstitions, she also realizes that the people over there are blinded by faith and sorcery,  ready to sacrifice their lives to preserve tradition, prosperity and peace.",
       "title": "Kumari",
@@ -437535,7 +437535,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -437566,7 +437566,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "A middle-class family battles financial hurdles and personal setbacks while pursuing their dream of owning a home in the bustling city.",
       "title": "3BHK",
@@ -439897,7 +439897,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -439932,7 +439932,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Ben wakes up from an artificial coma after a failed mission. The personal protector has to deal with the fact that he could not prevent the death of a little girl. In order to recover, the BKA officer takes a break from the police service and drives to the Baltic Sea with his girlfriend Marion. He spent happy days there as a child. The first visit to his parents in years is at the same time the return to the place of painful memories, because back then his best friend Timmi was killed in a mysterious accident. To his astonishment, he now learns that Timmi, now an adult, is alive and lying in a hospital as a coma patient. Together with Marion, a doctor who specializes in this diseases, Ben wants to reach Timmi with the help of MRI technology. Perhaps the trauma can be resolved if the cause can be brought to light. Unlike Ben, however, neither Timmi's father nor the village cop Nolting seem interested in it. A web of guilt, lies and deception has to be unraveled to clue to the puzzle.",
       "title": "Die Heimsuchung",
@@ -444191,7 +444191,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -444221,7 +444221,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "When BA Flight 149 unwittingly landed in a warzone, its passengers and crew were taken hostage. Did the UK government allow it? And who were the mercenaries on board?",
       "title": "Flight 149: Hostage of War",
@@ -448687,7 +448687,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -448722,7 +448722,7 @@
         }
       ],
       "status": [
-        "upcoming"
+        "in_cinema"
       ],
       "synopsis": "A fusion of the brilliantly choreographed stage spectacle of Pulp\u2019s biggest ever arena show \u2014 part of the global tour for More, the band\u2019s first album in 24 years \u2014 with four decades of colorful, never-seen-before archival material.",
       "title": "Pulp: What Do You Do for an Encore?",
@@ -456305,7 +456305,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -456337,7 +456337,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Lok is a recovering schizophrenic who yearns for love. One day, he encounters the young and beautiful Yan and quickly falls in love with her. The pair develops a relationship that is beyond their wildest dreams.",
       "title": "Beyond the Dream",
@@ -465600,7 +465600,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -465638,7 +465638,7 @@
         }
       ],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "The story follows Hassan and his dog, Rambo, as they embark on a quest to save Rambo from Hassan's vengeful landlord, whom the dog attacked. Through his challenging journey across Cairo to find a safe haven for Rambo, Hassan confronts his deepest fears and rediscovers himself.",
       "title": "Seeking Haven for Mr. Rambo",
@@ -470496,7 +470496,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -470528,7 +470528,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Seven friends who attend a dinner and decide to play a game with their cell phones. Unfortunately, the game ends in disaster when their dark secret is revealed.",
       "title": "Perfect Strangers",
@@ -470551,7 +470551,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -470584,7 +470584,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "The films story takes place over the course of one day. Bapak senses that he does not have much time left and so he invites his offspring to have dinner with him the next evening. He want to discuss some family matters concerning their inheritance, a large part of which is his home, a large sprawling house set in an acre of prime real estate located in the centre of Kuala Lumpur. An unexpected visit by two strangers leads Bapak to change his plans and bring the dinner forward to that evening instead.",
       "title": "Spilt Gravy on Rice",
@@ -474620,7 +474620,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -474653,7 +474653,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "New Year\u2019s Eve. Sarah is working - again. Nick is her only customer - again. Same old same old. Except this year, their countdown to midnight will be the strangest and deadliest they have ever known. Why is an executioner Dalek targeting these two people, in this place, on this night? Why are they having to live through the same moments again? Can the Doctor, Yaz and Dan save them and survive into the New Year?",
       "title": "Doctor Who: Eve of the Daleks",
@@ -475377,7 +475377,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -475409,7 +475409,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Ullaas is a cunning guy who can go to any extent for money. One fine day, he cheats a priest and redirects an NRI match which is supposed to go to a known person in his village. He manages everything and finally ties the knot with Laya. The twist in the tale arises when Ullaas comes to know that the NRI girl he married is a complete alcoholic. Rest of the story is as to how Sunil manages to get his problematic wife back on track.",
       "title": "2 Countries",
@@ -475722,7 +475722,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -475755,7 +475755,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Silent version of the Twain tale, filmed in Pleasanton, California. A Missouri boy (Jack Pickford) encounters his first love (Clara Horton) and bucks responsibilities to find adventure with his friend, Huck Finn (Robert Gordon).",
       "title": "Tom Sawyer",
@@ -478769,7 +478769,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -478802,7 +478802,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Set during the Edo Period, a young man from a noble family meets a young woman under a special tree called \"Raiou\" (the tree was struck by lightning at one time with the broken part eventually sprouting out cherry blossoms). The young woman lived freely in the mountains after she was abducted as a young child. The couple soon fall in love under the Raiou tree, but become acutely aware of their different social positions &amp; the ramifications it has on their relationship.",
       "title": "The Lightning Tree",
@@ -479375,7 +479375,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -479406,7 +479406,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "The wolf was almost completely eradicated in Europe over the past few centuries. The species also disappeared from the Netherlands 150 years ago and it was believed that this was forever. Only small populations survived in the large forests of Eastern Europe. In recent decades, not only did the wolf get legal protection, it also started a remarkable comeback. With time this magnificent animal found its way back from Poland through Germany to the Netherlands and Belgium. The carnivore, around which there are many myths and which is very often portrayed as bloodthirsty, welcomed back by many and despised by others. Are wolves really that dangerous to people? This exceptional documentary follows the journey of a young, lone wolf which grows up in eastern Germany and then head westwards on its search for its own territory and a consort to finally settle down in the Netherlands to found there the first permanent wolf pack since the extermination of the species long time ago.",
       "title": "Wolf: Wanderer Without Borders",
@@ -479922,7 +479922,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -479951,7 +479951,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "If Sidik manages to spot a leopard in his beloved mountains of Kurdistan, the area can be declared a protected nature reserve. Will that finally bring peace?",
       "title": "Sidik and the Panther",
@@ -484344,7 +484344,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -484375,7 +484375,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "The film follows the story of Hadzi Trifun, a prominent Serbian merchant, who tries to keep the peace with the Turkish authorities, but also maintains his reputation and influence in Vranje, an important Turkish town near the border with liberated Serbia. While Trifun is preparing his two sons to succeed him as the leaders of the Serbian people, he is suffering not only from powerful Turkish beys, but also from his family. Trifun makes difficult decisions that will later affect his descendants, the heroes of the novel Impure Blood by Serbian writer Bora Stankovic.",
       "title": "Necista krv Greh predaka",
@@ -484672,7 +484672,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": 4000000,
       "cast": [
@@ -484703,7 +484703,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "The Saudi family is following strict instructions from their grandfather to remain confined in the desert during the early 1990s. A series of events shakes the family's foundation and they find them in a struggle between life and death.",
       "title": "Hobal",
@@ -485586,7 +485586,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -485617,7 +485617,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Follows the crime and scandal that took down President Richard Nixon the day of the break-in at the Watergate Hotel.",
       "title": "Watergate: High Crimes in the White House",
@@ -487246,7 +487246,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -487277,7 +487277,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "This charming documentary showcases the career of musical-comedy sensation Kaye Ballard, whose ability to sing and tell jokes was ubiquitous in the late 20th century. Delightful moments are captured in rare archival footage and interviews with Ann-Margret, Michael Feinstein and Ballard herself.",
       "title": "Kaye Ballard - The Show Goes On!",
@@ -492012,7 +492012,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "award": null,
       "award_text": "1 win & 1 nomination",
@@ -492043,7 +492043,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Honors student Christina balances school, track, and teen life while caring for her mom with a 59 IQ and supporting her dad. A powerful true story about sacrifice, disability, and the unspoken weight of growing up as a young caregiver.",
       "title": "Wildflower: The Documentary",
@@ -501706,7 +501706,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -501735,7 +501735,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Through a unique architectural and engineering lens, \u201cRise & Fall: The World Trade Center\u201d recounts the inspiring, true story behind an American icon, and the remarkable group of people who dreamed it and made it real. No ordinary pair of buildings, the Twin Towers featured a unique structural design\u2014and dozens of other technical breakthroughs\u2014that made the then-tallest buildings in the world possible. But did these innovations contribute to their collapse on 9/11? With the help of harrowing first-hand testimonies, expert interviews, and never-before-seen graphics, and with the benefit of two decades of engineering hindsight, viewers will understand how the Towers rose\u2026and why they fell.",
       "title": "Rise & Fall: The World Trade Center",
@@ -502531,7 +502531,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -502559,7 +502559,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "James Blake joins three young men to explore why they're turned to the so-called manosphere to achieve success, and how it influences their real lives.",
       "title": "Men of the Manosphere",
@@ -507064,7 +507064,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -507097,7 +507097,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Bhaskar's wife thinks he is a stationery store worker, his girlfriend thinks he is a software engineer but no one knows he is also a burglar. His royal pains start when his tangled web of lies involving a hopeful girlfriend, a blackmailing wife, and a cheating cop all collide. Bhaskar's one last heist might just land him in a gilded cage of his own making.",
       "title": "Raja Raja Chora",
@@ -507757,7 +507757,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -507788,7 +507788,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "3 young strangers who have been wronged in a bid to find justice form an alliance to bring a ruthless and vicious politician down. They subject themselves to physical and psychological training in order to execute the justice society has failed to grant them. Will they succeed and will this revenge bring them the peace they so desperately seek?",
       "title": "Devil in Agbada",
@@ -508171,7 +508171,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [
@@ -508203,7 +508203,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Seven friends meet up for dinner on a full moon Friday night and deep secrets will come to the surface, shaking their lives and threatening their relationships.",
       "title": "Perfect Strangers",
@@ -508785,7 +508785,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -508821,7 +508821,7 @@
         }
       ],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "A conservatively raised capitalist travels the world on an evolutionary journey exploring alternative economic and political models in a pursuit for greater global peace, unity and wealth equality.",
       "title": "Common Wealth",
@@ -513049,7 +513049,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -513079,7 +513079,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Watch Mumford & Sons, live from Manchester\u2019s Aviva Studios, home of Factory International, where they will be performing tracks from the brand new album \u201cRUSHMERE\u201d, due for release on 28th March.",
       "title": "City Sessions: Mumford & Sons",
@@ -515062,7 +515062,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -515094,7 +515094,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "When a dark web trafficking attempt impacts her family, blockchain expert Dr. Carol Cleavers joins forces with her best friend to take down a dangerous cyber operation exploiting women.",
       "title": "Operation: Aunties",
@@ -516911,7 +516911,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "award": null,
       "award_text": "",
@@ -516945,7 +516945,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Jija is on a unique mission-to send a letter addressed to \"Mukkam Post Devach Ghar\" (God`s Home). Her journey, filled with humorous twists, emotional moments, and heartfelt connections, brings her family and the community together in unexpected ways.",
       "title": "Mukkam Post Devach Ghar",
@@ -518594,7 +518594,7 @@
     {
       "age_rating": null,
       "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
+      "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-17",
       "cast": [],
@@ -518618,7 +518618,7 @@
       "probe_count": 2,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "The odds were against her. Learn how singer Tina Turner reached super-stardom with her high-energy style and gravelly voice and prevailed as the 'Queen of Rock n Roll'.",
       "title": "Tina Turner: Simply the Best",
@@ -518780,7 +518780,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cache_stamped_at": "2026-09-10",
@@ -518810,7 +518810,7 @@
         }
       ],
       "status": [
-        "upcoming"
+        "in_cinema"
       ],
       "synopsis": "Poetic documentary and comedy. A painter and a photographer wander aimlessly through the Victorian bush, looking at trees and for people to paint with.",
       "title": "Elsewhere Starts Here and It's All Happening",
@@ -519535,7 +519535,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "budget": null,
       "cast": [
@@ -519571,7 +519571,7 @@
         }
       ],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "Set in the sleepy town of Bawley Point on the NSW South Coast and brimming with laconic humour, this unforgettable tale of misguided obsession and rampant insecurity tangles with the absurdity of wanting to alter the body in defiance of things beyond our control.",
       "title": "5'12\"",
@@ -519589,7 +519589,7 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "confirmed",
+      "availability_confidence": "estimated",
       "availability_source": "tmdb_date",
       "award": null,
       "award_text": "",
@@ -519622,7 +519622,7 @@
       "probe_count": 1,
       "release_dates": [],
       "status": [
-        "upcoming"
+        "released"
       ],
       "synopsis": "After Lucky's world crumbles, her college friend Hadiya, Hadiya's husband Brad, and their children arrive to help Lucky, only to find the old mansion occupied by a dangerous presence that will stop at nothing to make them leave.",
       "title": "Sunny's Mansion",
