@@ -17821,7 +17821,7 @@ window.membStart=()=>{
     // CAS-1056: continueWithEmail only requests a code now — it never signs in on its own. The code is
     // entered in the account modal's own verify step (this screen carries no code-entry UI of its own),
     // which runs proceed() itself once that code confirms; idle() just hands this button back meanwhile.
-    window.CascadeAuth.continueWithEmail(email).then(result=>{
+    window.CascadeAuth.continueWithEmail(email, { createUser: true }).then(result=>{
       if(result.ok){ window.CascadeAuth.openVerify(email, proceed); idle(); }
       else{ membEmailError(result.error||"Could not send a sign-in code — try again."); idle(); }
     });
@@ -21435,7 +21435,10 @@ else if(dedupedN)
     // (shouldCreateUser, its own default) or reaches the existing one, either way with no password of
     // any kind computed, stored or sent. Signing in only actually completes in verifyEmailCode below,
     // once the emailed code comes back confirmed.
-    api.continueWithEmail = async email => {
+    // CAS-1088: createUser lets the caller choose whether an unknown email may be signed up —
+    // the Sign in panel passes false so a typo'd/unregistered email is told so instead of silently
+    // creating an account; onboarding's membership email gate passes true, its existing behaviour.
+    api.continueWithEmail = async (email, { createUser = true } = {}) => {
       // CAS-1073: the review address skips the OTP round trip entirely — Apple's reviewer would
       // never receive that email — going straight to the same code screen as everyone else.
       if(isReviewEmail(email)) return { ok: true };
@@ -21443,13 +21446,19 @@ else if(dedupedN)
       const _t460signIn = performance.now();
       console.log('[CAS-460] code request start', _t460signIn);
       try {
-        const { error } = await supa.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+        const { error } = await supa.auth.signInWithOtp({ email, options: { shouldCreateUser: createUser } });
         if(!error){
           // CAS-837: this is the "account creation" moment an invite's arrival converts on — one event,
           // never a table row (CAS-808 owns any reward/record; this stays stateless apart from the ref
           // itself and the events). A code being sent can't yet distinguish sign-in from sign-up, so
           // this still only fires once the code is actually confirmed, from verifyEmailCode below.
           return { ok: true };
+        }
+        // CAS-1088: createUser:false against an email with no account — the documented GoTrue error
+        // code (auth-js v2.115.0's ErrorCode union) for this exact case, matched on error.code rather
+        // than error.message per the ticket's own instruction.
+        if(error.code === 'otp_disabled'){
+          return { ok: false, noAccount: true, error: error.message };
         }
         logClientHealthEvent("auth_failed", authFailedPayload(error));
         return { ok: false, error: error.message };
@@ -21547,9 +21556,11 @@ else if(dedupedN)
     gid('authContinue').addEventListener('click', async () => {
       const email = readEmail(); if(!email) return;
       msg.textContent = 'Sending a code…';
-      const result = await api.continueWithEmail(email);
+      const result = await api.continueWithEmail(email, { createUser: false });
       if(!result.ok){
-        msg.textContent = 'Could not send a code: ' + result.error;
+        msg.textContent = result.noAccount
+          ? "There's no Cascade account for that email."
+          : 'Could not send a code: ' + result.error;
         return;
       }
       msg.textContent = '';
