@@ -115,6 +115,7 @@ jobs:
         with:
           python-version: "3.12"
 
+      - run: npm ci
       - run: python poc_pipeline.py --build-html
 
       - name: Engine invariants + data integrity
