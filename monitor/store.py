@@ -296,13 +296,17 @@ class SupabaseStore:
         return h
 
     # Deliberately far above any plausible PostgREST max-rows setting, so a server-side cap is
-    # always what actually bounds a page, never this number — _get discovers the real per-page
-    # size from the first response and pages on that (CAS-1091: do not assume the cap is 1,000).
+    # always what actually bounds a page, never this number.
     _PAGE_REQUEST_LIMIT = 10_000
 
     def _get(self, path: str) -> list:
-        """Pages through every row with limit+offset until a short page confirms the end, so a
-        server-side row cap (PostgREST's max-rows — CAS-1091) can never silently truncate a read.
+        """Pages through every row with limit+offset until the response's own row count says
+        there's nothing left, so a server-side row cap (PostgREST's max-rows — CAS-1091) can
+        never silently truncate a read. A page coming back shorter than requested does NOT by
+        itself prove the end — that's exactly what an unlucky max-rows cap looks like too — so
+        `_get` asks PostgREST for the true total (`Prefer: count=exact`, read back off the
+        `Content-Range` response header) and stops once it has fetched that many rows, rather
+        than guessing from page shape.
         `path` must already carry a stable `order` (the table's primary key, or the primary key
         appended as a tie-breaker) — PostgREST does not guarantee row order across paged requests
         otherwise, so paging on an unordered result could skip or repeat rows."""
@@ -312,18 +316,24 @@ class SupabaseStore:
         table = path.lstrip("/").split("?", 1)[0]
         out: list = []
         offset = 0
-        page_size = None
+        total = None
         while True:
             page_path = f"{path}{sep}limit={self._PAGE_REQUEST_LIMIT}&offset={offset}"
-            req = urllib.request.Request(self._base + page_path, headers=self._headers(), method="GET")
+            req = urllib.request.Request(
+                self._base + page_path,
+                headers=self._headers({"Prefer": "count=exact"}),
+                method="GET",
+            )
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
                 page = json.loads(resp.read().decode("utf-8"))
+                content_range = resp.headers.get("Content-Range")
             out.extend(page)
-            n = len(page)
-            offset += n
-            if page_size is None:
-                page_size = n
-            if n == 0 or n < page_size:
+            offset += len(page)
+            if content_range:
+                total_part = content_range.rsplit("/", 1)[-1]
+                if total_part.isdigit():
+                    total = int(total_part)
+            if len(page) == 0 or (total is not None and offset >= total):
                 break
         print(f"[store] {table}: {len(out)} rows")
         return out

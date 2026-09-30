@@ -49,8 +49,9 @@ class FetchUserHeldIds(unittest.TestCase):
 class _FakeResponse:
     """Minimal stand-in for the object urllib.request.urlopen() hands back as a context manager."""
 
-    def __init__(self, rows):
+    def __init__(self, rows, content_range=None):
         self._body = json.dumps(rows).encode("utf-8")
+        self.headers = {"Content-Range": content_range} if content_range else {}
 
     def read(self):
         return self._body
@@ -76,7 +77,9 @@ class SupabaseStoreGetPagesEveryResult(unittest.TestCase):
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(req.full_url).query)
             offset = int(qs.get("offset", ["0"])[0])
             page = rows[offset: offset + server_page_size]
-            return _FakeResponse(page)
+            end = offset + len(page) - 1 if page else offset - 1
+            content_range = f"{offset}-{end}/{total_rows}"
+            return _FakeResponse(page, content_range=content_range)
 
         store = SupabaseStore("https://example.test.invalid", "fake-key")
         patcher = unittest.mock.patch("monitor.store.urllib.request.urlopen", side_effect=fake_urlopen)
