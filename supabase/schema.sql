@@ -7,8 +7,10 @@
 -- Twenty-three tables:
 --   schema_migrations — the migration ledger (CAS-1092): one row per applied migration file.
 --   cascades      — one row per saved agent, per user (the user owns their rows via RLS).
---                   Soft-deletable since CAS-1092 (deleted_at) via the delete_agent() RPC; a hard
---                   DELETE is archived into account_deleted_rows (below) rather than lost for good.
+--                   Soft-deletable since CAS-1092 (deleted_at) via the delete_agent() RPC; a client
+--                   hard DELETE is no longer permitted at all (CAS-1102) — only service_role/a
+--                   security-definer function can, and that is still archived into
+--                   account_deleted_rows (below) rather than lost for good.
 --   user_prefs    — the account-level defaults a NEW agent starts from, plus the services the
 --                   user actually pays for. CAS-211.
 --   user_films    — one row per (user, film) the user has said something about: liked, so-so,
@@ -127,8 +129,6 @@ create index if not exists cascades_user_id_idx on public.cascades (user_id);
 create index if not exists cascades_active_idx  on public.cascades (active) where active;
 
 -- CAS-1092: soft delete for agents, independent of the archive-on-hard-delete safety net below.
--- Hard deletes remain permitted for now (a later ticket removes them) — delete_agent() is an
--- additional, softer path, not a replacement for cascades_owner's own DELETE grant.
 alter table public.cascades add column if not exists deleted_at timestamptz;
 create index if not exists cascades_not_deleted_idx on public.cascades (user_id) where deleted_at is null;
 
@@ -154,6 +154,10 @@ $$;
 
 revoke all on function public.delete_agent(uuid) from public;
 grant execute on function public.delete_agent(uuid) to authenticated;
+
+-- CAS-1102: agents are removed only via delete_agent() above, which soft-deletes — a client hard
+-- delete is no longer permitted at all.
+revoke delete on public.cascades from authenticated, anon;
 
 -- ---------------------------------------------------------------------------
 -- user_films — what the user has said about a film (CAS-183)
@@ -1043,6 +1047,69 @@ create trigger archive_deleted_row after delete on public.invites
 drop trigger if exists archive_deleted_row on public.push_tokens;
 create trigger archive_deleted_row after delete on public.push_tokens
   for each row execute function public.archive_deleted_row();
+
+-- ---------------------------------------------------------------------------
+-- block_bulk_delete — clients may delete at most one account row per statement (CAS-1102)
+-- ---------------------------------------------------------------------------
+-- A statement-level AFTER DELETE trigger with a transition table, so it sees every row a single
+-- statement removed at once rather than once per row. current_user (not auth.role()) is the guard:
+-- for a plain client call it is 'authenticated'/'anon', but inside a SECURITY DEFINER function it
+-- is the function's OWNER (archive_deleted_row() above notes the same thing), so this never fires
+-- for the service role or for the security-definer delete_my_account() below — confirmed:
+-- delete_my_account() is declared `security definer` with no explicit owner change, so it runs as
+-- whichever role owns the function (the migration-applying role, e.g. postgres/supabase_admin),
+-- which is neither 'authenticated' nor 'anon'.
+create or replace function public.block_bulk_delete()
+returns trigger
+language plpgsql
+as $$
+begin
+  if current_user in ('authenticated', 'anon') and (select count(*) from old_rows) > 1 then
+    raise exception 'bulk_delete_blocked';
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists block_bulk_delete on public.user_films;
+create trigger block_bulk_delete after delete on public.user_films
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.film_watch;
+create trigger block_bulk_delete after delete on public.film_watch
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.film_picks;
+create trigger block_bulk_delete after delete on public.film_picks
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.list_films;
+create trigger block_bulk_delete after delete on public.list_films
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.lists;
+create trigger block_bulk_delete after delete on public.lists
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.friends;
+create trigger block_bulk_delete after delete on public.friends
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.push_tokens;
+create trigger block_bulk_delete after delete on public.push_tokens
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.agent_films;
+create trigger block_bulk_delete after delete on public.agent_films
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
 
 -- security definer, service_role only: the archive is designed to grow forever until swept.
 create or replace function public.purge_deleted_rows(p_days int)

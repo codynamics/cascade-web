@@ -59,7 +59,7 @@ export async function liveCascades(userId){
 
 /** The one-time code a real sign-in would have emailed — fetched via the admin API instead of standing up
  * a mail-capture dependency this suite has no other use for. */
-async function fetchOtp(email){
+export async function fetchOtp(email){
   const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email });
   if(error) throw new Error(`generateLink(${email}) failed: ${error.message}`);
   const code = data && data.properties && data.properties.email_otp;
@@ -110,4 +110,16 @@ export async function signOutFromAccount(page){
   await expect(page.locator("#authSignedIn")).toBeVisible();
   await page.locator("#authSignOut").click();
   await expect.poll(() => page.evaluate(() => window.CascadeAuth.status), { timeout: 15_000 }).toBe("signed-out");
+}
+
+/** An authenticated supabase-js client for one real test user, with no browser involved — S13 (CAS-1102)
+ * asserts on a database TRIGGER, not app behaviour, so it drives the same anon-key REST path the app's own
+ * client uses (verifyOtp with type:'email', matching app_template.html's own call) directly rather than
+ * through a page. Never routed into a browser context. */
+export async function signInDirect(email){
+  const client = createClient(SUPABASE_URL, ANON_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const code = await fetchOtp(email);
+  const { error } = await client.auth.verifyOtp({ email, token: code, type: "email" });
+  if(error) throw new Error(`signInDirect(${email}) failed: ${error.message}`);
+  return client;
 }

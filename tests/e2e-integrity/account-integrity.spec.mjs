@@ -11,10 +11,12 @@
 // un-fixme them as the features they depend on land, and add scenarios of their own for their own tables.
 //   - S1, S6: once onboarding commits through complete_membership (CAS-1098/CAS-1099).
 //   - S4's conflict half, S5: once agents move onto the account store (CAS-1094+).
+// S13 (CAS-1102, migration 0003_delete_guard.sql) asserts on that migration's own trigger directly via a
+// signed-in supabase-js client, not the browser — see its own comment below.
 import { test, expect } from "@playwright/test";
 import {
   admin, createTestUser, seedCascades, liveCascades, testEmail,
-  gotoIntegrityFresh, signInFromSplash, signOutFromAccount,
+  gotoIntegrityFresh, signInFromSplash, signOutFromAccount, signInDirect,
 } from "./helpers.mjs";
 import { settleListing } from "../e2e/helpers.mjs";
 
@@ -313,4 +315,49 @@ test("S9: a service change on A, a language change on B, and a notify switch on 
     await ctxA.close();
     await ctxB.close();
   }
+});
+
+// CAS-1102: migration 0003 enforces at the DATABASE level that a client deletes at most one account row
+// per statement, and that cascades can never be client-hard-deleted at all. This asserts on the trigger
+// itself, not app behaviour, so it drives a real signed-in supabase-js client directly (signInDirect) —
+// no browser, no page — the same way tests/rls/matrix.mjs probes RLS from the anon side.
+test("S13: a client may delete at most one account row per statement; cascades cannot be hard-deleted; delete_my_account still removes everything", async () => {
+  const email = testEmail("s13");
+  const user = await createTestUser(email);
+  const userClient = await signInDirect(email);
+
+  const seedRows = [
+    { user_id: user.id, movie_id: "9900001", status: "liked" },
+    { user_id: user.id, movie_id: "9900002", status: "disliked" },
+  ];
+  const { error: seedErr } = await admin.from("user_films").insert(seedRows);
+  if(seedErr) throw new Error(`S13 seeding failed: ${seedErr.message}`);
+
+  // Deleting both of the caller's own user_films rows in one statement is refused; both remain.
+  const bulkDelete = await userClient.from("user_films").delete().eq("user_id", user.id);
+  expect(bulkDelete.error, "a two-row delete in one statement must be refused").toBeTruthy();
+  const afterBulk = await admin.from("user_films").select("movie_id").eq("user_id", user.id);
+  expect(afterBulk.data.map(r => r.movie_id).sort()).toEqual(["9900001", "9900002"]);
+
+  // Deleting exactly one succeeds.
+  const oneDelete = await userClient.from("user_films").delete()
+    .eq("user_id", user.id).eq("movie_id", "9900001");
+  expect(oneDelete.error, "a single-row delete must succeed").toBeFalsy();
+  const afterOne = await admin.from("user_films").select("movie_id").eq("user_id", user.id);
+  expect(afterOne.data.map(r => r.movie_id)).toEqual(["9900002"]);
+
+  // A client delete on cascades is refused outright, even for exactly one row.
+  const [agent] = await seedCascades(user.id, [{ name: "S13 agent" }]);
+  const cascadeDelete = await userClient.from("cascades").delete().eq("id", agent.id);
+  expect(cascadeDelete.error, "a client cascades delete must be refused").toBeTruthy();
+  const liveAgent = await admin.from("cascades").select("id").eq("id", agent.id);
+  expect(liveAgent.data.length).toBe(1);
+
+  // delete_my_account (security definer) still removes everything, unaffected by the guard above.
+  const rpcResult = await userClient.rpc("delete_my_account");
+  expect(rpcResult.error, "delete_my_account must still succeed").toBeFalsy();
+  const afterAccountCascades = await admin.from("cascades").select("id").eq("user_id", user.id);
+  expect(afterAccountCascades.data.length).toBe(0);
+  const afterAccountFilms = await admin.from("user_films").select("movie_id").eq("user_id", user.id);
+  expect(afterAccountFilms.data.length).toBe(0);
 });
