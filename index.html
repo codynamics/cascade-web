@@ -5285,6 +5285,18 @@ function loadCascades(){
   }catch(e){ return []; }
 }
 function saveCascades(){ try{ localStorage.setItem(acctKey("cascade_cascades"), JSON.stringify(cascades)); }catch(e){} }
+// CAS-1090: a placeholder here, in the same outer scope as saveCascades above — a guest device has no
+// account to tombstone a delete against. The account-sync IIFE further down reassigns this (exactly the way
+// it reassigns saveCascades itself, "wrap the one save chokepoint") to the real implementation, which is
+// where cascadeKnown/cascadePendingDeletes actually live. deleteAgentAsk calls this directly, by name, the
+// same way it already calls saveCascades — the one and only place a cascades row is ever marked for a
+// server delete.
+function tombstoneCascadeDelete(id){}
+// CAS-1090: same placeholder/reassignment shape as tombstoneCascadeDelete above — a guest device has never
+// had an account confirm anything, so the real answer (cascadeKnown.size>0, only known inside the
+// account-sync IIFE) is always "no" until that IIFE swaps this in. FLOWS' onboarding commit step (well
+// outside the IIFE) calls this rather than reading cascadeKnown directly, which it cannot reach.
+function accountHasConfirmedCascades(){ return false; }
 // CAS-863: WATCH_STEPS is the watched-verdict ramp the Watch On panel (openWatchPanel) renders as its five
 // segments — it used to sit here because the (now retired) watch-list model's watchlistDefaults() was this
 // array's earliest caller; nothing left up here needs it hoisted, but there's no reason to move it either.
@@ -11373,7 +11385,13 @@ function deleteAgentAsk(c){
               + `${mine===1?"it":"them"}. `
             : "")
     + `Anything you added by hand stays, and your watched / not-interested marks aren't touched.`)) return false;
-  cascades.splice(cascades.indexOf(c),1); saveCascades();
+  cascades.splice(cascades.indexOf(c),1);
+  // CAS-1090: the ONE place a cascades row is ever tombstoned for a server delete — every other path that
+  // removes an id from `cascades` (an onboarding re-run rebuilding the array, a merge/reconcile pass, a
+  // refused-upsert drop) must NOT delete it from the account, only stop showing it on THIS device.
+  // Tombstone before saveCascades() schedules the sync.
+  tombstoneCascadeDelete(c.id);
+  saveCascades();
   // CAS-782: a film pinned to (or moved out of) ONLY this agent must not go on pointing at an agent that no
   // longer exists — scrub this agent's id out of every notify[*].pinnedTo/notIn, then let recomputeFound()
   // re-derive ordinary membership and prune anything left holding no state at all (the `overridden` guard at
@@ -15771,8 +15789,17 @@ const SHARP_STEPS = {
           // CAS-951: first-run onboarding ESTABLISHES the device's roster — it replaces whatever
           // cascades already holds (a stale account's set, or an earlier commit this same run),
           // it never appends to it.
-          cascades.length=0;
-          cascades.push(...agents);
+          // CAS-1090: UNLESS cascadeKnown already has entries — that only happens once a real account load
+          // or reconcile has actually confirmed the account holds agents of its own, which means this was
+          // never a genuine empty first run to begin with. The production incident this guards against was
+          // exactly this: the boot-time splash (showSplash(), gated on the device-local onboardingSeen()
+          // flag, not on account state) can open onboarding for an already-signed-in device before that
+          // flag catches up, and completing it here used to wipe the 43 real agents the account load had
+          // already landed by the time the user reached this screen. Append instead of replacing, so
+          // whatever the account already had survives — same "always lands on its agents" guarantee
+          // cascadePendingDeleteIds' tombstone gives the sync side, applied here at the source.
+          if(accountHasConfirmedCascades()) cascades.push(...agents);
+          else { cascades.length=0; cascades.push(...agents); }
           saveCascades();
           setActive(agents[0].id);
           onbFlow.workingAgents=agents;
@@ -19345,10 +19372,33 @@ else if(dedupedN)
   // swept up rows this device had simply never LOADED (created on another device, or not yet pulled),
   // not only rows the user actually removed. CAS-734 replaces the bare-id `cascadeBaseline` Set this
   // guarded with `cascadeKnown`, a Map<id,{sig,version}> — this device's own record of what the ACCOUNT
-  // last confirmed for each agent it has seen, the same shape CAS-692 gave `watchlistKnown`. A delete is
-  // still computed against THAT private record, never against the live account, so this device can only
-  // ever delete an id it itself watched drop out of its own list — exactly what the Delete button (and
-  // nothing else) does.
+  // last confirmed for each agent it has seen, the same shape CAS-692 gave `watchlistKnown`.
+  // CAS-1090: CAS-734's own claim above — "this device can only ever delete an id it itself watched drop
+  // out of its own list, exactly what the Delete button does" — was never actually true: the id merely had
+  // to be ABSENT from the live `cascades` array at sync time, for any reason (an onboarding re-run wiping
+  // the array being the observed one — see flowStart's commit step below), not because the Delete button
+  // was pressed. `cascadePendingDeletes` is the real version of that claim: a tombstone set written ONLY by
+  // deleteAgentAsk, so a delete request is now impossible without it, regardless of what `cascades` holds.
+  const CASCADE_PENDING_DELETES_KEY = "cascade_pending_deletes";
+  function loadCascadePendingDeletes(){
+    try{
+      const raw=localStorage.getItem(acctKey(CASCADE_PENDING_DELETES_KEY));
+      if(!raw) return new Set();
+      const parsed=JSON.parse(raw);
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    }catch(e){ return new Set(); }
+  }
+  function saveCascadePendingDeletes(){
+    try{ localStorage.setItem(acctKey(CASCADE_PENDING_DELETES_KEY), JSON.stringify([...cascadePendingDeletes])); }catch(e){}
+  }
+  let cascadePendingDeletes = loadCascadePendingDeletes();
+  // CAS-1090: the real implementation, swapped in over the outer no-op placeholder declared alongside
+  // saveCascades — cascadeKnown only exists in here, so this is the one place that can decide whether an id
+  // is worth tombstoning at all (a locally-only id the account never confirmed needs no server delete).
+  tombstoneCascadeDelete = function(id){
+    if(cascadeKnown.has(id)){ cascadePendingDeletes.add(id); saveCascadePendingDeletes(); }
+  };
+  accountHasConfirmedCascades = function(){ return cascadeKnown.size>0; };
   let syncTimer=null, syncing=false, syncAgain=false;
   const CASCADE_KNOWN_KEY = "cascade_cascade_known";
   function loadCascadeKnown(){
@@ -19404,6 +19454,7 @@ else if(dedupedN)
     // preserve for them across a switch either way — every one reloads fresh off the account now current.
     cascadeKnown = loadCascadeKnown();
     cascadeEditedAt = loadCascadeEditedAt();
+    cascadePendingDeletes = loadCascadePendingDeletes();
     watchKnown = loadWatchKnown();
     const p = loadPrefs();
     prefs.on = p.on; prefs.touched = p.touched; setTo(prefs.sub, p.sub); setTo(prefs.store, p.store);
@@ -19461,10 +19512,13 @@ else if(dedupedN)
     if(known && DEFAULTABLE_CASCADE_FIELDS.some(({flag})=>c[flag])) return false;
     return !known || known.sig!==cascadeFullSigOf(c);
   });
-  const cascadePendingDeleteIds = () => {
-    const ids=new Set(cascades.map(c=>c.id).filter(isUuid));
-    return [...cascadeKnown.keys()].filter(id=>!ids.has(id));
-  };
+  // CAS-1090: explicit only, never inferred. The live `cascades` array plays no part in this any more — an
+  // id is a candidate for a server delete purely because deleteAgentAsk tombstoned it, and only for as long
+  // as the account still confirms it exists (cascadeKnown). Absence from `cascades`, on its own, proves
+  // nothing: it could be a genuine delete not yet tombstoned by a caller (a bug elsewhere), an agent this
+  // device hasn't loaded yet, or — the incident this ticket fixes — the array simply having been reset out
+  // from under the sync (flowStart's commit step, or any future bug shaped like it).
+  const cascadePendingDeleteIds = () => [...cascadePendingDeletes].filter(id=>cascadeKnown.has(id));
   function scheduleSync(){
     outboxMark("cascades", cascadeDirtyRows().map(cascadeToRow), r=>r.id);
     clearTimeout(syncTimer); syncTimer=setTimeout(runSync, 400);
@@ -19534,8 +19588,11 @@ else if(dedupedN)
     if(deletes.length){
       const { error } = await c.from("cascades").delete().eq("user_id", owner).in("id", deletes);
       if(error){ console.warn("Cascade delete", error); recordSyncOutcome("cascades", false, error); return; }
-      deletes.forEach(id=>{ cascadeKnown.delete(id); cascadeEditedAt.delete(id); });
+      // CAS-1090: the tombstone is cleared only once the delete actually lands — an error above leaves it in
+      // cascadePendingDeletes so the next sync pass retries the same id, same as cascadeKnown's own retry shape.
+      deletes.forEach(id=>{ cascadeKnown.delete(id); cascadeEditedAt.delete(id); cascadePendingDeletes.delete(id); });
       saveCascadeEditedAt();
+      saveCascadePendingDeletes();
       outboxClearKeys("cascades", deletes);   // CAS-1035
     }
     saveCascadeKnown();
@@ -19603,7 +19660,11 @@ else if(dedupedN)
       const moments = momentsOf(rowToCascade(r)), stored = r.alert_moments||[];
       return moments.length!==stored.length || moments.some(k=>!stored.includes(k));
     });
-    let remote = rawRows.map(rowToCascade);
+    // CAS-1090: an id this device has tombstoned but not yet had confirmed deleted (the server round trip
+    // is still in flight, or the last attempt failed) must not reappear just because a full reload re-read
+    // the account before that delete landed — cascadeKnown below is still built from the untouched rawRows,
+    // so the retry on the next sync pass is unaffected.
+    let remote = rawRows.map(rowToCascade).filter(x=>!cascadePendingDeletes.has(x.id));
     const localOnes = cascades.slice();
     // CAS-393/CAS-733/CAS-734: an agent that exists only on this device, which the account has never
     // confirmed (absent from rawById) AND this device has never confirmed either (absent from oldKnown, so
@@ -19667,6 +19728,12 @@ else if(dedupedN)
   // the account (cascadeKnown) but has now gone is dropped locally (another device deleted it); anything
   // this device has created but not yet pushed (its id isn't in cascadeKnown yet) is left alone, so a
   // refresh landing mid-edit never undoes work still in flight.
+  // CAS-1090: an account row this device has ALREADY confirmed (oldKnown) but doesn't currently hold locally
+  // used to be treated as "this device must have deleted it" and skipped rather than pulled back down — that
+  // guess is exactly backwards once cascades can go transiently empty for a reason that ISN'T a delete (see
+  // flowStart's commit step). The only reliable "this device is mid-delete on it" signal is the explicit
+  // tombstone (cascadePendingDeletes), so that's what gates the skip now — anything else the account still
+  // holds is adopted, never silently dropped.
   async function reconcileCascades(){
     const c=client(); if(!c||!accountActive()) return;
     const { data, error } = await acctRead("cascades", () => c.from("cascades").select("*").order("created_at"));
@@ -19679,10 +19746,11 @@ else if(dedupedN)
     rawRows.forEach(r=>{
       const i=cascades.findIndex(x=>x.id===r.id);
       if(i<0){
-        // CAS-734 (mirrors CAS-692's watch-list fix): absent locally but this device previously confirmed
-        // the account held it — either this device deleted it and the push just hasn't landed, or another
-        // device did. A stale reconcile must not resurrect it. A truly unseen-before id is simply adopted.
-        if(!oldKnown.has(r.id)) cascades.push(rowToCascade(r));
+        // CAS-1090: absent locally is pulled down UNLESS this device has an explicit tombstone out on it —
+        // that's the only case where the absence really is "this device deleted it, the push just hasn't
+        // landed". Anything else the account still reports (including an id oldKnown already had) is
+        // "not yet loaded here", never "deleted", and is adopted — see the file-level note above.
+        if(!cascadePendingDeletes.has(r.id)) cascades.push(rowToCascade(r));
         return;
       }
       if(cascSigOf(cascades[i])===cascSigOf(rowToCascade(r))){ cascades[i]=rowToCascade(r); return; }
@@ -19897,6 +19965,15 @@ else if(dedupedN)
   // send what actually changed.
   let filmKnown=null;
   const filmDirtyRows = () => filmRows().filter(r => !filmKnown || filmKnown.get(r.movie_id)!==r.status);
+  // CAS-1090 Change 4: checked, not changed. This still infers a delete from absence, but not unsafely —
+  // unlike cascadeKnown/cascades, filmKnown is never a separate persisted model that can drift out of step
+  // with the local Sets: every place that resets it (loadAccountFilms, reconcileFilms) recomputes filmKnown
+  // from the exact SAME fetch that repopulates watched/disliked/blocked/etc via applyFilmRows, in the same
+  // synchronous pass — so a transient "wholesale reset" can never leave filmKnown claiming a row the Sets
+  // don't also account for, the drift that let cascades silently delete real agents. And the one place a row
+  // truly drops out of these Sets (window.setOpinion, the un-mark tap) already IS the explicit user action a
+  // tombstone would exist to gate on. See the "same thing said twice" comment above filmRows() — this table
+  // was already built to need only one model, deliberately, which a bolt-on tombstone would undo for no gain.
   const filmPendingDeleteIds = () => {
     if(!filmKnown) return [];
     const ids=new Set(filmRows().map(r=>r.movie_id));
@@ -20212,6 +20289,16 @@ else if(dedupedN)
   let watchPushKnown=null;
   const watchRowSig = r => JSON.stringify([r.windows, r.sources]);
   const watchDirtyRows = () => watchRows().filter(r => !watchPushKnown || watchPushKnown.get(r.movie_id)!==watchRowSig(r));
+  // CAS-1090 Change 4: checked, not changed. This is the one table where absence genuinely has to mean
+  // delete for CORRECT behaviour, not just accidentally-safe behaviour: an agent's "auto" Watch On rung
+  // clearing itself because the film no longer matches (recomputeFound's ordinary re-arm/un-arm) is meant to
+  // reach the account as a real delete, same as a manual toggleFilmOpt/pickNever un-tick — an explicit-only
+  // tombstone would silently stop the automatic case from ever syncing, leaving a stale row the account
+  // would go on alerting from forever. The risk this ticket is actually about — `notify` (and therefore
+  // watchRows()) transiently empty while watchPushKnown/watchKnown still hold the account's real state — is
+  // the exact race CAS-1035 already closed below: scheduleWatchSync refuses to even mark the outbox, let
+  // alone schedule runWatchSync/watchPendingDeleteIds, until filmWatchReady is true again after a
+  // clearAccountNotify() pass. That guard is what cascades never had.
   const watchPendingDeleteIds = () => {
     if(!watchPushKnown) return [];
     const ids=new Set(watchRows().map(r=>r.movie_id));
@@ -20367,6 +20454,13 @@ else if(dedupedN)
     const known=agentFilmsKnown && agentFilmsKnown.get(agentFilmKey(r.cascade_id,r.movie_id));
     return !known || known!==agentFilmSig(r);
   });
+  // CAS-1090 Change 4: checked, not changed. agentFilms isn't user-authored data to protect — it's a
+  // recomputed admission cache (which films an agent's OWN criteria currently admit), and a film leaving
+  // that set through ordinary recomputation is the intended, correct source of a delete here, not something
+  // a tombstone should gate on. An explicit-only rule would leave a stale admitted_at/score row on the
+  // account for a film the agent no longer actually admits. Nothing here shares cascades' failure shape
+  // either: agentFilmsKnown only ever gets reset in lockstep with agentFilms itself (loadAgentFilms), never
+  // by a separate, driftable path the way cascadeKnown/cascades were two models of the same thing.
   const agentFilmPendingDeleteKeys = () => {
     if(!agentFilmsKnown) return [];
     const keys=new Set(agentFilmRows().map(r=>agentFilmKey(r.cascade_id,r.movie_id)));
@@ -20914,6 +21008,10 @@ else if(dedupedN)
                                 cascadeDirtyRows, cascadePendingDeleteIds,
                                 get cascadeKnown(){ return cascadeKnown; },
                                 get cascadeEditedAt(){ return cascadeEditedAt; },
+                                // CAS-1090: the tombstone set itself, by reference like cascadeKnown above —
+                                // so a test can seed/inspect exactly what this device has marked for deletion
+                                // without waiting on a real deleteAgentAsk() confirm() dialog.
+                                get cascadePendingDeletes(){ return cascadePendingDeletes; },
                                 // CAS-691: the guest-cache reload seam (what a cold boot re-reads localStorage
                                 // into before the account fan-out ever runs), the wrapped save chokepoints
                                 // themselves (so a test exercises the real write path an Edit-screen tap
