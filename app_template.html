@@ -3787,8 +3787,7 @@
        only as a last-resort fallback inside continueWithEmail() for an account whose derived password no
        longer signs it in — not as the primary flow, so made-up test emails are unaffected in the common case. -->
   <div id="authSignedOut" style="display:none">
-    <div class="pnote">Enter your email to sign in, or create your account. Your Cascades then sync
-      across your devices.</div>
+    <div class="pnote">Enter your email to sign in.</div>
     <div class="flabel">Email</div>
     <input id="authEmail" class="namein" type="email" inputmode="email" autocomplete="email"
            placeholder="you@example.com">
@@ -3959,7 +3958,7 @@
     <!-- CAS-259: just "Sign up". The bullets above and the tagline already say what you get; the button
          only has to name the door. It also puts the two doors in the same grammar — Sign up / Log in. -->
     <button class="splashcta" id="splashCta" type="button">Sign up</button>
-    <button class="splashlogin" id="splashLogin" type="button">Log in</button>
+    <button class="splashlogin" id="splashLogin" type="button">Sign in</button>
     <button class="splashabout" id="splashAbout" type="button">What is Cascade?</button>
   </div>
 </div>
@@ -21542,6 +21541,8 @@ else if(dedupedN)
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ msg.textContent = 'Please enter a valid email address.'; return null; }
       return email;
     };
+
+    gid('authEmail').addEventListener('input', () => { msg.textContent = ''; });
 
     gid('authContinue').addEventListener('click', async () => {
       const email = readEmail(); if(!email) return;
