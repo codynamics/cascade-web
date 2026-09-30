@@ -2087,6 +2087,9 @@ function fakeCas726Supabase(seed){
     const builder = { then(resolve, reject){
       return Promise.resolve({ data: rows.map(r => ({ ...r })), error: null }).then(resolve, reject);
     } };
+    // CAS-1096: acctLoad chains .select("*").order(pk,...).range(from,to) before its own .then() — both
+    // are no-ops here, one page already covers every fixture this file seeds.
+    builder.order = () => builder;
     builder.range = () => builder;   // CAS-1049: loadAgentFilms pages with .range(); one page covers this fixture
     return builder;
   }
@@ -2094,6 +2097,8 @@ function fakeCas726Supabase(seed){
     const conds = [];
     const builder = {
       eq(col, val){ conds.push([col, val]); return builder; },
+      // CAS-1096: acctOp's "delete" kind calls .match(op.match) — one call, every column at once.
+      match(obj){ Object.entries(obj).forEach(([col, val]) => conds.push([col, val])); return builder; },
       then(resolve, reject){
         state[table] = state[table].filter(r => !conds.every(([c, v]) => r[c] === v));
         return Promise.resolve({ error: null }).then(resolve, reject);
@@ -2106,7 +2111,10 @@ function fakeCas726Supabase(seed){
       return {
         select(){ return selectBuilder(state[table]); },
         upsert(rows){
-          rows.forEach(row => {
+          // CAS-1096: film_watch now pushes through acctOp's "upsert" kind — a single row object, not an
+          // array — alongside agent_films' own array-based chunked upsert, which still calls this the old way.
+          const list = Array.isArray(rows) ? rows : [rows];
+          list.forEach(row => {
             const i = state[table].findIndex(x => keyOf[table](x) === keyOf[table](row));
             if(i >= 0) state[table][i] = { ...state[table][i], ...row }; else state[table].push({ ...row });
           });
@@ -2138,7 +2146,7 @@ test("CAS-726 AC2: a manual Watch On tick round-trips through film_watch.sources
   signInWithClient(client);
 
   E.toggleFilmOpt(m.tmdb_id, level.key);          // the real manual-tick wire code, not a direct field poke
-  await E.CascadePersistence.syncWatchesNow();
+  await new Promise(r => setTimeout(r, 0));       // CAS-1096: let pushFilmWatch's own acctOp call resolve
   await E.CascadePersistence.loadFilmWatches();    // simulate a reload: refetch the account from scratch
 
   assert.equal(E.filmWatchSource(m.tmdb_id), "manual",
@@ -2950,15 +2958,22 @@ function fakeCas739Supabase(seed){
                   notify_prefs: (seed.notify_prefs || []).map(r => ({ ...r })) };
   const keyOf = { film_picks: r => `${r.user_id}:${r.movie_id}`, notify_prefs: r => r.user_id };
   function selectBuilder(rows){
-    return { then(resolve, reject){
+    const builder = { then(resolve, reject){
       return Promise.resolve({ data: rows.map(r => ({ ...r })), error: null }).then(resolve, reject);
     } };
+    // CAS-1096: acctLoad chains .select("*").order(pk,...).range(from,to) before its own .then() — both
+    // are no-ops here, one page already covers every fixture this file seeds.
+    builder.order = () => builder;
+    builder.range = () => builder;
+    return builder;
   }
   function deleteBuilder(table){
     const conds = [];
     const builder = {
       eq(col, val){ conds.push([col, v => v === val]); return builder; },
       in(col, vals){ const set = new Set(vals); conds.push([col, v => set.has(v)]); return builder; },
+      // CAS-1096: acctOp's "delete" kind calls .match(op.match) — one call, every column at once.
+      match(obj){ Object.entries(obj).forEach(([col, val]) => conds.push([col, v => v === val])); return builder; },
       then(resolve, reject){
         state[table] = state[table].filter(r => !conds.every(([c, test]) => test(r[c])));
         return Promise.resolve({ error: null }).then(resolve, reject);
@@ -2971,7 +2986,10 @@ function fakeCas739Supabase(seed){
       return {
         select(){ return selectBuilder(state[table]); },
         upsert(rows){
-          rows.forEach(row => {
+          // CAS-1096: film_picks now pushes through acctOp's "upsert" kind — a single row object, not an
+          // array.
+          const list = Array.isArray(rows) ? rows : [rows];
+          list.forEach(row => {
             const i = state[table].findIndex(x => keyOf[table](x) === keyOf[table](row));
             if(i >= 0) state[table][i] = { ...state[table][i], ...row }; else state[table].push({ ...row });
           });
@@ -3012,7 +3030,11 @@ test("CAS-739 AC3: pinnedTo and notIn survive a save/load round-trip through the
   const { client } = fakeCas739Supabase({});
   signInWithClient(client);
 
-  await E.CascadePersistence.syncNotifyNow();     // push, through pickRows()
+  // CAS-1096: pushFilmPick is the real per-row acctOp write seam pinFilmToCascadeAndRepaint/deleteAgentAsk
+  // call — drive it directly for both ids, the same way syncNotifyNow used to push everything at once.
+  E.CascadePersistence.pushFilmPick(pinnedId);
+  E.CascadePersistence.pushFilmPick(movedId);
+  await new Promise(r => setTimeout(r, 0));   // let both acctOp calls resolve against the fake client
   delete E.notify[pinnedId]; delete E.notify[movedId];   // simulate a fresh device: nothing local yet
   await E.CascadePersistence.loadFilmPicks();      // load, back into notify
 

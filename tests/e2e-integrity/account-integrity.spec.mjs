@@ -148,6 +148,112 @@ test("S6: onboarding into a previously-held account by email keeps that account'
   test.fixme(true, "until onboarding commits through complete_membership");
 });
 
+// CAS-1096: verdicts (user_films) moved onto acctOp — S7 proves a verdict set by hand on one device reaches
+// another on reload, and clearing it back out is a delete of exactly that one row, every other row untouched.
+test("S7: mark a film watched on A -> B shows it after reload; clear it on A leaves every other user_films row intact", async ({ browser }) => {
+  const email = testEmail("s7");
+  const user = await createTestUser(email);
+  const otherRows = [
+    { user_id: user.id, movie_id: "9700001", status: "liked" },
+    { user_id: user.id, movie_id: "9700002", status: "disliked" },
+  ];
+  const { error: seedErr } = await admin.from("user_films").insert(otherRows);
+  if(seedErr) throw new Error(`seeding user_films failed: ${seedErr.message}`);
+
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  try{
+    const pageA = await ctxA.newPage();
+    const pageB = await ctxB.newPage();
+
+    await gotoIntegrityFresh(pageA);
+    await signInFromSplash(pageA, email);
+    await settleListing(pageA);
+
+    await gotoIntegrityFresh(pageB);
+    await signInFromSplash(pageB, email);
+    await settleListing(pageB);
+
+    const filmId = await pageA.evaluate(() => MOVIES[0].tmdb_id);
+
+    await pageA.evaluate((id) => window.setOpinion(id, "liked"), filmId);
+
+    await expect.poll(async () => {
+      const { data } = await admin.from("user_films").select("status")
+        .eq("user_id", user.id).eq("movie_id", String(filmId)).maybeSingle();
+      return data && data.status;
+    }, { timeout: 15_000 }).toBe("liked");
+
+    await pageB.reload();
+    await pageB.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
+    await settleListing(pageB);
+    await expect.poll(
+      (id) => pageB.evaluate((mid) => opinionOf(mid), id),
+      { timeout: 15_000 },
+    ).toBe("liked");
+
+    // Tapping the same lit answer again clears it (CAS-100) — an explicit delete of that one row.
+    await pageA.evaluate((id) => window.setOpinion(id, "liked"), filmId);
+
+    await expect.poll(async () => {
+      const { data } = await admin.from("user_films").select("movie_id,status").eq("user_id", user.id);
+      return (data || []).map(r => `${r.movie_id}:${r.status}`).sort();
+    }, { timeout: 15_000 }).toEqual(["9700001:liked", "9700002:disliked"]);
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
+});
+
+// CAS-1096: Watch On (film_watch) and picks/pins (film_picks) also moved onto acctOp — S8 proves every one
+// of them (plus a verdict, user_films) survives the exact 2026-09-30-incident shape (a sign-out/sign-in
+// cycle on the same context), on screen and server-side, unlike anything that would come back from a whole-
+// table diff resync.
+test("S8: sign out then sign back in leaves every verdict, Watch On and pin intact", async ({ page }) => {
+  const email = testEmail("s8");
+  const user = await createTestUser(email);
+  const verdictId = "9800001", watchId = "9800002", pickId = "9800003", pinId = "9800004";
+  const seeds = [
+    admin.from("user_films").insert({ user_id: user.id, movie_id: verdictId, status: "wow" }),
+    admin.from("film_watch").insert({ user_id: user.id, movie_id: watchId,
+      windows: ["stream", "rent"], sources: { stream: "manual", rent: "manual" } }),
+    admin.from("film_picks").insert({ user_id: user.id, movie_id: pickId, state: "mine", pinned_to: [], not_in: [] }),
+    admin.from("film_picks").insert({ user_id: user.id, movie_id: pinId, state: null, pinned_to: ["s8-fake-agent"], not_in: [] }),
+  ];
+  for(const seed of await Promise.all(seeds)){
+    if(seed.error) throw new Error(`S8 seeding failed: ${seed.error.message}`);
+  }
+
+  await gotoIntegrityFresh(page);
+  await signInFromSplash(page, email);
+  await settleListing(page);
+
+  const readState = ([a, b, c, d]) => ({
+    verdict: opinionOf(Number(a)),
+    watch: (notify[b] && notify[b].wins) ? Object.keys(notify[b].wins).filter(k => notify[b].wins[k]).sort() : [],
+    pick: notify[c] && notify[c].source,
+    pin: (notify[d] && notify[d].pinnedTo) || [],
+  });
+  const before = await page.evaluate(readState, [verdictId, watchId, pickId, pinId]);
+  expect(before.verdict).toBe("wow");
+  expect(before.watch).toEqual(["rent", "stream"]);
+  expect(before.pick).toBe("manual");
+  expect(before.pin).toEqual(["s8-fake-agent"]);
+
+  await signOutFromAccount(page);
+  await signInFromSplash(page, email);
+  await settleListing(page);
+
+  const after = await page.evaluate(readState, [verdictId, watchId, pickId, pinId]);
+  expect(after).toEqual(before);
+
+  const liveFilms = await admin.from("user_films").select("movie_id,status").eq("user_id", user.id);
+  expect(liveFilms.data).toEqual([{ movie_id: verdictId, status: "wow" }]);
+  const liveWatch = await admin.from("film_watch").select("movie_id,windows").eq("user_id", user.id);
+  expect(liveWatch.data.map(r => r.movie_id)).toEqual([watchId]);
+  expect([...liveWatch.data[0].windows].sort()).toEqual(["rent", "stream"]);
+});
+
 // CAS-1095: user_prefs moved onto per-column acctOp updates — S9 proves two devices can each change a
 // different column of the SAME row concurrently (one a user_prefs column, the other a different user_prefs
 // column plus a notify_prefs column) with no updated_at conflict check, and both changes still survive on

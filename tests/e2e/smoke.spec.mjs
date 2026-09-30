@@ -1267,8 +1267,10 @@ test("Delete account opens above the Account screen, not behind it (CAS-1077)", 
 // reopen). Same session-persists-across-a-real-reload technique as CAS913_FAKE_SUPABASE_GLOBAL above (a
 // fresh window.supabase per navigation, backed by one real localStorage session key), but film_watch's own
 // upsert ALWAYS fails here — the push this device makes never reaches the account, on this reload or the
-// next, so the only thing that can be keeping the tick alive across the reload below is the durable outbox
-// (CascadePersistence's outboxOverlay, applied inside loadFilmWatches ahead of clearAccountNotify's wipe).
+// next, so the only thing that can be keeping the tick alive across the reload below is acctOp's own
+// persisted queue (CAS-1096: film_watch moved onto acctOp — persistQueue() writes it to localStorage
+// synchronously, before this reload; CascadePersistence's acctOpPendingOverlay is what loadFilmWatches
+// applies it back through, ahead of clearAccountNotify's wipe).
 const CAS1035_FAKE_SUPABASE_GLOBAL = `
   const SESSION_KEY = "cas1035-fake-session";
   const readSession = () => {
@@ -1286,7 +1288,7 @@ const CAS1035_FAKE_SUPABASE_GLOBAL = `
   }
   function filmWatchTable(){
     return {
-      select: () => ({ then: (resolve) => resolve({ data: [], error: null }) }),
+      select: () => chain(),   // CAS-1096: acctLoad chains .select().order().range() before its own .then()
       upsert: () => ({ then: (resolve) => resolve({ data: null, error: { message: "network down" } }) }),
       delete: () => chain(),
     };

@@ -1,10 +1,16 @@
-// CAS-1039 AC2/AC3 — a real account can carry thousands of user_films/film_watch/agent_films rows (the
-// back-catalogue growth that made a single-request bulk upsert fail network-side, "TypeError: Load failed").
-// The fix: push only rows this device has actually changed (diffed against filmKnown/watchPushKnown/
-// agentFilmsKnown, the same known-value-diff shape cascadeKnown already gave cascades), in requests of at
-// most SYNC_CHUNK_SIZE rows, with one chunk's failure never blocking another chunk's success. These tests
-// drive the real seam (CascadePersistence.syncWatchesNow/syncAgentFilmsNow/syncFilmsNow) with a stubbed
-// Supabase client, the same convention outbox-durability.test.mjs and sync-outcomes.test.mjs use.
+// CAS-1039 AC2/AC3 — a real account can carry thousands of agent_films rows (the back-catalogue growth
+// that made a single-request bulk upsert fail network-side, "TypeError: Load failed"). The fix: push only
+// rows this device has actually changed (diffed against agentFilmsKnown, the same known-value-diff shape
+// cascadeKnown already gave cascades), in requests of at most SYNC_CHUNK_SIZE rows, with one chunk's
+// failure never blocking another chunk's success. These tests drive the real seam
+// (CascadePersistence.syncAgentFilmsNow) with a stubbed Supabase client, the same convention
+// outbox-durability.test.mjs and sync-outcomes.test.mjs use.
+//
+// CAS-1096 moved user_films and film_watch off this whole chunked-diff mechanism onto acctOp (one
+// operation per row, per user action) — their own chunking tests below are retired, not replaced in kind,
+// since a single-row op has nothing left to chunk; see tests/js/cas1096-account-store.test.mjs for their
+// own acctOp-shaped coverage instead. agent_films is untouched here; CAS-1097 is the ticket that moves it
+// (and automatic Watch On placement) onto acctOp too.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
@@ -63,26 +69,6 @@ function signOut(E){
   auth.enabled = false; auth.client = null; auth.session = null;
 }
 
-test("CAS-1039 AC2: 1500 film_watch rows push as a chunked full resync, none over 200 rows", async () => {
-  const E = loadEngine();
-  const client = makeFakeClient();
-  signIn(E, client);
-  try{
-    for(let i=0;i<1500;i++){
-      const e = E.entryFor(9000000+i);
-      e.wins = { stream: true };
-      e.winsSource = { stream: "auto" };
-    }
-    await E.CascadePersistence.syncWatchesNow();
-    const calls = client.upsertCalls.filter(c => c.table==="film_watch");
-    assert.ok(calls.length > 1, "sanity: 1500 rows must have taken more than one request");
-    calls.forEach(c => assert.ok(c.rows.length <= 200, `a request carried ${c.rows.length} rows, over the 200 cap`));
-    assert.equal(calls.reduce((n,c)=>n+c.rows.length, 0), 1500,
-      "every dirty row must reach the account exactly once across all chunks");
-    assert.equal(E.CascadePersistence.syncOutcome.film_watch.ok, true);
-  } finally{ signOut(E); }
-});
-
 test("CAS-1039 AC2: 3000 agent_films rows push as a chunked full resync, none over 200 rows", async () => {
   const E = loadEngine();
   const client = makeFakeClient();
@@ -100,70 +86,6 @@ test("CAS-1039 AC2: 3000 agent_films rows push as a chunked full resync, none ov
     assert.equal(calls.reduce((n,c)=>n+c.rows.length, 0), 3000,
       "every dirty row must reach the account exactly once across all chunks");
     assert.equal(E.CascadePersistence.syncOutcome.agent_films.ok, true);
-  } finally{ signOut(E); }
-});
-
-test("CAS-1039 AC2: once film_watch is fully synced, a single changed pick pushes one request of one row", async () => {
-  const E = loadEngine();
-  const client = makeFakeClient();
-  signIn(E, client);
-  try{
-    for(let i=0;i<50;i++){
-      const e = E.entryFor(9100000+i);
-      e.wins = { stream: true };
-      e.winsSource = { stream: "auto" };
-    }
-    await E.CascadePersistence.syncWatchesNow();   // full resync — seeds watchPushKnown for all 50
-    client.upsertCalls.length = 0;
-
-    const changedId = 9100000+5;
-    const e = E.entryFor(changedId);
-    e.wins = { stream: true, rent: true };
-    e.winsSource = { stream: "auto", rent: "manual" };
-
-    await E.CascadePersistence.syncWatchesNow();
-    const calls = client.upsertCalls.filter(c => c.table==="film_watch");
-    assert.equal(calls.length, 1, "a single changed row must take exactly one request");
-    assert.equal(calls[0].rows.length, 1, "that request must carry exactly the one changed row");
-    assert.equal(calls[0].rows[0].movie_id, String(changedId));
-  } finally{ signOut(E); }
-});
-
-test("CAS-1039 AC3: a forced failure in one film_watch chunk leaves the other chunks' keys cleared and the failed chunk's keys still pending", async () => {
-  const E = loadEngine();
-  const FAIL_ID = String(9200000+250);
-  const client = makeFakeClient({
-    shouldFailUpsert: { film_watch: rows => rows.some(r => r.movie_id===FAIL_ID) },
-  });
-  signIn(E, client);
-  try{
-    for(let i=0;i<450;i++){
-      const e = E.entryFor(9200000+i);
-      e.wins = { stream: true };
-      e.winsSource = { stream: "auto" };
-    }
-    // Replicate scheduleWatchSync's own outboxMark (not itself exposed) with the exposed primitives, so
-    // the outbox reflects this run's dirty set the same way the real debounced path would before a push.
-    const dirty = E.CascadePersistence.watchDirtyRows();
-    const bucket = {}; dirty.forEach(r => { bucket[r.movie_id]=r; });
-    Object.assign(E.CascadePersistence.outbox, { film_watch: bucket });
-
-    await E.CascadePersistence.syncWatchesNow();
-
-    const calls = client.upsertCalls.filter(c => c.table==="film_watch");
-    const failedCall = calls.find(c => c.rows.some(r => r.movie_id===FAIL_ID));
-    assert.ok(failedCall, "sanity: some chunk actually carried the forced-failure id");
-    const okCalls = calls.filter(c => c!==failedCall);
-    assert.ok(okCalls.length > 0, "sanity: more than one chunk ran, or the isolation this test checks is moot");
-
-    const pending = E.CascadePersistence.outboxPending("film_watch");
-    failedCall.rows.forEach(r => assert.ok(r.movie_id in pending,
-      `the failed chunk's own row ${r.movie_id} must remain pending`));
-    okCalls.forEach(c => c.rows.forEach(r => assert.ok(!(r.movie_id in pending),
-      `${r.movie_id} was in a chunk that succeeded and must have been cleared`)));
-
-    assert.equal(E.CascadePersistence.syncOutcome.film_watch.ok, false,
-      "a run with any failed chunk must record the target as failed, not silently succeeded");
   } finally{ signOut(E); }
 });
 
@@ -202,30 +124,4 @@ test("CAS-1039/CAS-1049 AC3: a forced failure deleting one agent_films chunk lea
       "the other chunk's deletes must have succeeded and left agentFilmsKnown");
     assert.equal(E.CascadePersistence.syncOutcome.agent_films.ok, false);
   } finally{ signOut(E); }
-});
-
-test("CAS-1039: user_films only re-pushes a row once its status actually changes, not on every sync", async () => {
-  const E = loadEngine();
-  const client = makeFakeClient();
-  signIn(E, client);
-  try{
-    E.watched.add(424242); E.disliked.add(424242);   // filmRows() reports this as status "disliked"
-    await E.CascadePersistence.syncFilmsNow();
-    assert.equal(client.upsertCalls.filter(c=>c.table==="user_films").length, 1, "sanity: the first sync pushes it");
-
-    client.upsertCalls.length = 0;
-    await E.CascadePersistence.syncFilmsNow();   // nothing changed since the last confirmed push
-    assert.equal(client.upsertCalls.filter(c=>c.table==="user_films").length, 0,
-      "an unchanged verdict must not be re-pushed on the next sync");
-
-    E.disliked.delete(424242); E.indifferent.add(424242);   // a real change: disliked -> soso
-    await E.CascadePersistence.syncFilmsNow();
-    const calls = client.upsertCalls.filter(c=>c.table==="user_films");
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].rows.length, 1);
-    assert.equal(calls[0].rows[0].status, "soso");
-  } finally{
-    E.watched.delete(424242); E.disliked.delete(424242); E.indifferent.delete(424242);
-    signOut(E);
-  }
 });
