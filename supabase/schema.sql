@@ -1151,8 +1151,13 @@ create table if not exists public.analytics_admins (
 alter table public.analytics_admins enable row level security;
 
 -- Lee's auth.users id on project ypccfyatejejslzlfrbf, read from the live database 2026-09-12.
-insert into public.analytics_admins (user_id) values ('c7e9b361-368f-4488-84b5-baf0ac7a0751')
-  on conflict (user_id) do nothing;
+-- Guarded by an existence check: on a brand-new database (e.g. npm run test:integrity's local
+-- Supabase stack, CAS-1093) that user doesn't exist yet, and an unconditional insert violates
+-- analytics_admins_user_id_fkey.
+insert into public.analytics_admins (user_id)
+select 'c7e9b361-368f-4488-84b5-baf0ac7a0751'
+where exists (select 1 from auth.users where id = 'c7e9b361-368f-4488-84b5-baf0ac7a0751')
+on conflict (user_id) do nothing;
 
 -- CAS-1074: repo drift — this policy was applied live but never recorded here. Lets an admin
 -- confirm their own admin-ness (e.g. to decide whether to show admin UI) without needing
