@@ -12776,7 +12776,7 @@ function onbBigWindowV2(ans){
 // at each candidate score to count it.
 function onbFavsMarkersV2(big, s){
   const marks={}, i=WATCH_LEVEL_KEYS.indexOf(big);
-  WATCH_LEVEL_KEYS.forEach((k,j)=>{ marks[k] = j<i ? null : (j===i ? s : Math.max(60, s-6*(j-i))); });
+  WATCH_LEVEL_KEYS.forEach((k,j)=>{ marks[k] = j<i ? null : (j===i ? s : Math.max(55, s-6*(j-i))); });
   return marks;
 }
 // Personal Favs' full criteria at a given trial score — used both by the recipe (at the solved
@@ -12813,7 +12813,7 @@ function onbFavsCritV2(ans, s, yearsBack){
 // plain sweep fails, a recipe can hand in `leverValues` — its own second lever (e.g. yearsBack), tried
 // in the order given, each with a fresh score sweep — before score 100 is accepted as a last resort. A
 // recipe that never overflows never touches its lever, so nothing changes for Massive/Date/Family today.
-const ONB_AGENT_CAP_V2 = 45;
+const ONB_AGENT_CAP_V2 = 55;
 function onbAgentCapSolveV2(critFn, ans, floor, leverValues){
   const sweep = lever => {
     for(let s=floor; s<=100; s++){
@@ -12891,19 +12891,19 @@ function onbFamilyCritV2(ans, s){
 // contested film — deliberate, not incidental.
 const ONB_AGENTS_V2 = [
   {key:"onb_massive", icon:"🎬", name:"Massive Movies", who:"me", when:a=>true,
-   build(ans){ const r = onbAgentCapSolveV2(onbMassiveCritV2, ans, 90); return onbMassiveCritV2(ans, r.score); }},
+   build(ans){ const r = onbAgentCapSolveV2(onbMassiveCritV2, ans, 85); return onbMassiveCritV2(ans, r.score); }},
 
   {key:"onb_favs", icon:"⭐", name:"Personal Favs", who:"me", when:a=>true,
-   build(ans){ const r = onbAgentCapSolveV2(onbFavsCritV2, ans, 60, FAVS_YEARSBACK_LEVER); return onbFavsCritV2(ans, r.score, r.lever); }},
+   build(ans){ const r = onbAgentCapSolveV2(onbFavsCritV2, ans, 55, FAVS_YEARSBACK_LEVER); return onbFavsCritV2(ans, r.score, r.lever); }},
 
   {key:"onb_date", icon:"❤️", name:"Date Night", who:"partner", when:a=>a.partner==="yes",
    // Lifted from Lee's live Partner Date Night, score dropped to 70.
-   build(ans){ const r = onbAgentCapSolveV2(onbDateCritV2, ans, 70); return onbDateCritV2(ans, r.score); }},
+   build(ans){ const r = onbAgentCapSolveV2(onbDateCritV2, ans, 65); return onbDateCritV2(ans, r.score); }},
 
   {key:"onb_family", icon:"👨‍👩‍👧", name:"Family Movies", who:"everyone", when:a=>a.kids==="yes",
    // Lifted from Lee's live Boys, with one correction: the source agent's genre:null means
    // "nothing qualifies" (CAS-182), not "no filter" — copied verbatim it would match nothing.
-   build(ans){ const r = onbAgentCapSolveV2(onbFamilyCritV2, ans, 73); return onbFamilyCritV2(ans, r.score); }},
+   build(ans){ const r = onbAgentCapSolveV2(onbFamilyCritV2, ans, 68); return onbFamilyCritV2(ans, r.score); }},
 ];
 // Build the v2 agents from a set of answers. Same contract as buildOnbAgents above: normalised
 // cascade objects, in recipe order, ready for the caller to assign ids and push onto `cascades` —
@@ -15814,12 +15814,14 @@ const SHARP_STEPS = {
           // CAS-915: the occasions these answers imply, created only now — at commit — via createOccasion()
           // (idempotent by name, writes the register immediately) so backing out of the flow before this
           // screen never leaves an orphan register entry.
-          const justMe=createOccasion("Just me");
-          const dateNight = onbFlow.answersV2.partner==="yes" ? createOccasion("Date night") : null;
+          const me=createOccasion("Me");
+          const partner = onbFlow.answersV2.partner==="yes" ? createOccasion("Partner") : null;
           const family = onbFlow.answersV2.kids==="yes" ? createOccasion("Family") : null;
+          const allOcc=[me, partner, family].filter(Boolean).map(o=>o.id);
           agents.forEach(c=>{
-            if(c.template==="onb_massive" || c.template==="onb_favs") c.occasions=[justMe.id];
-            else if(c.template==="onb_date" && dateNight) c.occasions=[dateNight.id];
+            if(c.template==="onb_massive") c.occasions=allOcc.slice();
+            else if(c.template==="onb_favs") c.occasions=[me.id];
+            else if(c.template==="onb_date" && partner) c.occasions=[partner.id];
             else if(c.template==="onb_family" && family) c.occasions=[family.id];
           });
           // CAS-951: first-run onboarding ESTABLISHES the device's roster — it replaces whatever
