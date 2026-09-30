@@ -13,7 +13,7 @@
 //   - S4's conflict half, S5: once agents move onto the account store (CAS-1094+).
 import { test, expect } from "@playwright/test";
 import {
-  createTestUser, seedCascades, liveCascades, testEmail,
+  admin, createTestUser, seedCascades, liveCascades, testEmail,
   gotoIntegrityFresh, signInFromSplash, signOutFromAccount,
 } from "./helpers.mjs";
 import { settleListing } from "../e2e/helpers.mjs";
@@ -146,4 +146,65 @@ test("S6: onboarding into a previously-held account by email keeps that account'
   // completes membership with X's email — X's existing server-side agents must survive un-touched, not be
   // overwritten by the fresh onboarding roster. Fixme'd alongside S1: both need complete_membership.
   test.fixme(true, "until onboarding commits through complete_membership");
+});
+
+// CAS-1095: user_prefs moved onto per-column acctOp updates — S9 proves two devices can each change a
+// different column of the SAME row concurrently (one a user_prefs column, the other a different user_prefs
+// column plus a notify_prefs column) with no updated_at conflict check, and both changes still survive on
+// both devices after a reload — the "last write of EACH column wins independently" rule this ticket adds.
+test("S9: a service change on A, a language change on B, and a notify switch on B all land on both after reload", async ({ browser }) => {
+  const email = testEmail("s9");
+  const user = await createTestUser(email);
+  await admin.from("user_prefs").insert({ user_id: user.id });
+  await admin.from("notify_prefs").insert({ user_id: user.id });
+
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  try{
+    const pageA = await ctxA.newPage();
+    const pageB = await ctxB.newPage();
+
+    await gotoIntegrityFresh(pageA);
+    await signInFromSplash(pageA, email);
+    await settleListing(pageA);
+
+    await gotoIntegrityFresh(pageB);
+    await signInFromSplash(pageB, email);
+    await settleListing(pageB);
+
+    // A changes a service (user_prefs.sub_services).
+    await pageA.evaluate(() => { prefs.sub.add("Stan"); savePrefs(); pushPrefsCols(["sub_services", "store_services"]); });
+
+    // B changes a language (user_prefs.taste.langs) and a notification switch (notify_prefs.in_app) —
+    // two different settings, two different acctOp updates, from the same device.
+    await pageB.evaluate(() => { tasteBase.langs = ["en", "fr"]; saveTasteBase(); });
+    await pageB.evaluate(() => { notifyPrefs.inApp = false; saveNotifyPrefs(); });
+
+    await expect.poll(async () => {
+      const { data } = await admin.from("user_prefs").select("sub_services,taste").eq("user_id", user.id).single();
+      return data && data.sub_services && data.sub_services.includes("Stan") && data.taste && JSON.stringify(data.taste.langs);
+    }, { timeout: 15_000 }).toBe(JSON.stringify(["en", "fr"]));
+
+    await expect.poll(async () => {
+      const { data } = await admin.from("notify_prefs").select("in_app").eq("user_id", user.id).single();
+      return data && data.in_app;
+    }, { timeout: 15_000 }).toBe(false);
+
+    await pageA.reload();
+    await pageA.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
+    await settleListing(pageA);
+    await pageB.reload();
+    await pageB.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
+    await settleListing(pageB);
+
+    for(const page of [pageA, pageB]){
+      const state = await page.evaluate(() => ({ sub: [...prefs.sub], langs: tasteBase.langs, inApp: notifyPrefs.inApp }));
+      expect(state.sub).toContain("Stan");
+      expect(state.langs).toEqual(["en", "fr"]);
+      expect(state.inApp).toBe(false);
+    }
+  } finally {
+    await ctxA.close();
+    await ctxB.close();
+  }
 });

@@ -5211,6 +5211,10 @@ function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem(acctKey("casc
   catch(e){ return {on:false,touched:false,sub:new Set(),store:new Set()}; } }
 function savePrefs(){ try{ localStorage.setItem(acctKey("cascade_prefs"),
   JSON.stringify({on:prefs.on,touched:prefs.touched,sub:[...prefs.sub],store:[...prefs.store]})); }catch(e){} }
+// CAS-1095: savePrefs() backs more than one distinct user_prefs settings change (services picked, and
+// services-only/touched) — each call site names exactly which column(s) its own edit touched. A no-op
+// (guarded internally) until window.CascadePersistence exists and the device is signed in.
+function pushPrefsCols(cols){ if(window.CascadePersistence) window.CascadePersistence.pushUserPrefsCols(cols); }
 const prefs = loadPrefs();
 // How many times this browser has opened the app. CAS-273 removed its ONE reader — "Finish your agent" had
 // to arrive after the agent proved itself, so it needed to know this wasn't the first visit — so the counter
@@ -5389,8 +5393,8 @@ const occasionRegSorted = () => [...occasionReg].sort((a,b)=>a.name.localeCompar
 // (and any other future save path) filters an agent's occasions through, so "ignored on read" (occasionName/
 // occasionsSummary above already skip an unresolvable id) and "gone after the next save" share one rule.
 // CAS-779 defect 2: that rule is only safe once this device has actually SEEN the account's register — with
-// it still in flight (window.CascadePersistence.userPrefsReady false, same signal runUserPrefsSync itself
-// defers on), an empty local occasionReg is not evidence an id is stale, so nothing gets pruned yet.
+// it still in flight (window.CascadePersistence.userPrefsReady false), an empty local occasionReg is not
+// evidence an id is stale, so nothing gets pruned yet.
 const pruneOccasionIds = ids => {
   const cp = window.CascadePersistence;
   if(cp && cp.userPrefsReady===false) return (ids||[]).slice();
@@ -5863,8 +5867,13 @@ function onChipToggle(cls){
   if(cls!=="svc") return;
   // Smart default: picking services IS the request to see only what you can watch — so turn the scope on
   // for them the first time (most people never flip a default). If they've used the switch by hand, respect that.
-  if(!prefs.touched && !prefs.on && servicesPicked()) prefs.on=true;
+  const autoOn = !prefs.touched && !prefs.on && servicesPicked();
+  if(autoOn) prefs.on=true;
   savePrefs(); syncServiceChips();
+  // CAS-1095: a service pick always touches sub_services/store_services; the smart default above also
+  // touches services_only in the same user action, so both travel in the one update when it fires.
+  const cols=["sub_services","store_services"]; if(autoOn) cols.push("services_only");
+  pushPrefsCols(cols);
 }
 CASCADE.forEach(s=>{
   const c=document.createElement("div"); c.className="chip st-"+s; c.textContent=STATUS_LABEL[s]; c.dataset.val=s;
@@ -5993,7 +6002,7 @@ function updatePrefSwitch(){
   $("prefCascadeNote").innerHTML = notes.join("");
 }
 function updatePrefBtn(){ const b=$("prefBtn"); if(b) b.classList.toggle("on", prefsActive()); }
-$("prefSwitch").onclick=()=>{ prefs.on=!prefs.on; prefs.touched=true; savePrefs(); updatePrefSwitch(); updatePrefBtn(); render(); };
+$("prefSwitch").onclick=()=>{ prefs.on=!prefs.on; prefs.touched=true; savePrefs(); pushPrefsCols(["services_only","touched"]); updatePrefSwitch(); updatePrefBtn(); render(); };
 // One CTA for every "scoped to my services, but none picked" dead end.
 window.openServices=()=>{ closeModal($("builder")); openModal($("prefs")); };
 const pickServicesCTA = (fn="openServices()") => `<button class="ctabtn" onclick="${fn}">📺 Pick your services</button>`;
@@ -15243,7 +15252,7 @@ const SHARP_STEPS = {
       draw("onbStepSvcs",   SUB_SERVICES,   prefs.sub, PRIMARY_SUB_SERVICES);
       const tog=$("onbSvcOnly");
       if(tog) tog.onclick=()=>{
-        prefs.on=!prefs.on; savePrefs();
+        prefs.on=!prefs.on; savePrefs(); pushPrefsCols(["services_only"]);
         tog.classList.toggle("on", prefs.on);
         updatePrefSwitch(); updatePrefBtn();
         onbRefresh();
@@ -15629,7 +15638,7 @@ const SHARP_STEPS = {
       onbFlow.answersV2=onbAnswersV2Load();
       // CAS-915: reuse onChipToggle('svc')'s own auto-arm condition (minus its servicesPicked() gate —
       // this screen arms on entry, not only once a service is picked) rather than a second copy of the rule.
-      if(!prefs.touched && !prefs.on){ prefs.on=true; savePrefs(); }
+      if(!prefs.touched && !prefs.on){ prefs.on=true; savePrefs(); pushPrefsCols(["services_only"]); }
       const draw=(boxId, list, set, primary)=>{
         const box=$(boxId); if(!box) return;
         const open = !!svcMore[boxId];
@@ -15672,7 +15681,7 @@ const SHARP_STEPS = {
       if(tog){
         tog.classList.toggle("on", prefs.on);
         tog.onclick=()=>{
-          prefs.on=!prefs.on; prefs.touched=true; savePrefs();
+          prefs.on=!prefs.on; prefs.touched=true; savePrefs(); pushPrefsCols(["services_only","touched"]);
           tog.classList.toggle("on", prefs.on);
           updatePrefSwitch(); updatePrefBtn();
           render();
@@ -19010,20 +19019,14 @@ else if(dedupedN)
   // its own admission_score) before its own load of the account's ledger had resolved, racing whatever
   // score another device already recorded for the same film.
   let agentFilmsReady = true;
-  // CAS-740: same reasoning again, for user_prefs — a save chokepoint firing (savePrefs, saveTasteBase, an
-  // onboarding answer) while this device's own loadUserPrefs() is still in flight would push whatever
-  // default this device booted with (prefs.touched, an empty onb answer) over a real value another device
-  // already wrote. runUserPrefsSync defers itself while this is false rather than skipping the write outright,
-  // so an edit made during the race still reaches the account once the load resolves.
+  // CAS-740/CAS-1053: whether this device's own loadUserPrefs() has resolved yet this session — CAS-1095
+  // removed the whole-row-push race this flag originally guarded against (a per-column acctOp push can no
+  // longer overwrite an unrelated field, load in flight or not), but it still gates the CAS-1053 loading
+  // state (watchMineOnlyEmptyKind) so a fresh device doesn't flash a false "no services" dead end before its
+  // own load has had a chance to answer.
   let userPrefsReady = true;
-  // CAS-741: notify_prefs is a single whole-row-per-user table exactly like user_prefs above, and had NO
-  // gate at all — a save chokepoint firing before this device's own loadNotifyPrefs() resolved (or after
-  // it outright failed) pushed whatever this device booted with over a real account row, silently muting
-  // email alerts or erasing a real address. Deliberately NOT the same shape as userPrefsReady: that flag
-  // flips true in a blanket `.finally()` regardless of outcome, so a failed load still unblocks the write
-  // a moment later. notifyPrefsReady only ever flips true on loadNotifyPrefs' own SUCCESS path (see below)
-  // — a failed load leaves it false for the rest of the session, suppressing the push rather than falling
-  // through to defaults once the promise merely settles.
+  // CAS-741/CAS-1053: same reasoning as userPrefsReady above, for notify_prefs — only ever flips true on
+  // loadNotifyPrefs' own SUCCESS path, so a failed load leaves it false for the rest of the session.
   let notifyPrefsReady = true;
 
   // ---- CAS-656: per-table load-failure tracking + the persistent "not connected" banner ---------------
@@ -19920,9 +19923,11 @@ else if(dedupedN)
     if(!watchSyncing && !watchTimer) reconcileFilmWatches();
     // CAS-561: taste/watch_windows only pulled the account's answer on sign-in/boot before this —
     // a tab left open across a change on another device stayed on its stale baseline until reloaded.
-    // Guarded on !upTimer the same way the other reconciles are, so a pull can't land on top of an
-    // edit this device made that hasn't reached the account yet.
-    if(!upTimer) loadUserPrefs();
+    // CAS-1095: guarded on the acctOp queue holding no still-unsent user_prefs write, the same reasoning
+    // as !upTimer used to cover — a pull can't land on top of an edit this device made that hasn't
+    // reached the account yet.
+    const acctStore = window.CascadeAccountStore;
+    if(!acctStore || !acctStore.queue.some(op => op.table==="user_prefs")) loadUserPrefs();
     // CAS-487: there is no push channel on web, so nothing else ever refreshes the ledger —
     // without this, an open tab's Moving badge is frozen at whatever it was on load.
     loadRealAlerts();
@@ -20112,6 +20117,18 @@ else if(dedupedN)
              email_on:!!notifyPrefs.emailOn,
              email_address:(notifyPrefs.email||"").trim() || null };
   }
+  // CAS-1095: notify_prefs' own per-column push, replacing the whole-row upsert scheduleNotifySync/
+  // runNotifySync used to do for it below. All three fields travel together — unlike user_prefs'
+  // eleven independent columns, "how you're told" is one setting with three parts, never edited one
+  // field at a time — as one acctOp update, with no updated_at conflict check (CAS-1095's own rule:
+  // each setting's last write wins independently).
+  function pushNotifyPrefs(){
+    if(!accountActive()) return;
+    const owner=uid(); if(!owner) return;
+    const { user_id, ...fields } = prefsRow();
+    return window.CascadeAccountStore.acctOp({ table:"notify_prefs", kind:"update", match:{ user_id:owner },
+      fields, onDone:(ok, err) => recordSyncOutcome("notify_prefs", ok, err) });
+  }
   // Only the answers the USER gave travel. An auto entry is derivable from the Cascade that made
   // it, so uploading it would be storing a conclusion next to its own premise — and the two would
   // disagree the moment the Cascade changed.
@@ -20141,24 +20158,12 @@ else if(dedupedN)
   // to diff against, rather than guessing from the live table.
   let pickBaseline=null;
   function scheduleNotifySync(){
-    outboxMark("notify_prefs", [prefsRow()], ()=>"_");   // CAS-1035: a singleton row, one fixed key
     outboxMark("film_picks", pickRows(), r=>r.movie_id);
     clearTimeout(notifyTimer); notifyTimer=setTimeout(runNotifySync, 500);
   }
   async function runNotifySync(){
     const c=client(), owner=uid(); if(!c||!owner) return;
     try{
-      // CAS-741: this device's own load of the row (loadNotifyPrefs, below) may still be in flight, or may
-      // already have failed — pushing now would risk overwriting a real account value (or erasing a real
-      // email address) with whatever this device booted with. notifyPrefsReady only ever flips true on that
-      // load's own SUCCESS path, so a failed load leaves the push suppressed rather than falling through to
-      // defaults; film_picks (below) carries no such default to protect and is unaffected.
-      if(notifyPrefsReady){
-        const { error:pe } = await c.from("notify_prefs").upsert([prefsRow()], { onConflict:"user_id" });
-        if(pe) console.warn("notify_prefs upsert", pe);
-        recordSyncOutcome("notify_prefs", !pe, pe);
-        if(!pe) outboxClearKeys("notify_prefs", ["_"]);   // CAS-1035
-      }
       const rows=pickRows();
       let picksOk=true, picksErr=null;
       if(rows.length){
@@ -20179,24 +20184,27 @@ else if(dedupedN)
       recordSyncOutcome("film_picks", picksOk, picksErr);
     }catch(err){ console.warn("Cascade: notify sync failed", err); }
   }
+  // CAS-1095: loads through acctLoad — the account's own answer always wins, adopted wholesale, never
+  // merged with (or carried up from) whatever this device had before. A genuinely missing row (no device
+  // has ever saved notify_prefs for this account) is created once with fixed defaults, never this
+  // device's own in-memory values — CAS-1095's "never seed the server from a device" rule.
   async function loadNotifyPrefs(){
     const c=client(); if(!c||!accountActive()) return;
-    const { data, error } = await c.from("notify_prefs").select("*").limit(1);   // RLS: only mine
-    // CAS-741: leave notifyPrefsReady false on a failed load — never fall through to letting a later push
-    // treat this device's local defaults as safe to send.
-    if(error){ console.warn("notify_prefs load", error); return; }
-    const row=(data||[])[0];
-    // CAS-1035: a still-unsent local edit is a stronger claim than whatever the account currently holds —
-    // treat it exactly like "no row yet" (below): keep this device's own value and push it, rather than
-    // adopting a remote row that predates the edit still sitting in the outbox.
-    if(!row || outboxPending("notify_prefs")["_"]){ notifyPrefsReady=true; scheduleNotifySync(); return; }
+    const ok = await window.CascadeAccountStore.acctLoad([{ table:"notify_prefs", pk:"user_id" }]);
+    if(!ok){ recordSyncOutcome("notify_prefs", false, { message:"load failed" }); return; }
+    recordSyncOutcome("notify_prefs", true);
+    const owner=uid();
+    const row=(window.CascadeAccountStore.acctStore.notify_prefs||[])[0];
+    if(!row){
+      c.from("notify_prefs").upsert([{ user_id:owner }], { onConflict:"user_id" }).then(({error})=>{
+        if(error) console.warn("notify_prefs bootstrap insert", error);
+      });
+      notifyPrefsReady=true;
+      return;
+    }
     notifyPrefs.inApp   = row.in_app!==false;
     notifyPrefs.emailOn = !!row.email_on;
     notifyPrefs.email   = row.email_address || "";
-    // CAS-1035: the LOCAL-only persist, same convention loadUserPrefs already follows for every field it
-    // adopts — the wrapped saveNotifyPrefs() also arms scheduleNotifySync's outbox mark, which would make
-    // every future load distrust this just-adopted (already-current) row until a wholly redundant
-    // re-push happens to land, permanently blocking a real remote update from a different device.
     saveNotifyPrefsLocal();
     notifyPrefsReady=true;
   }
@@ -20334,8 +20342,8 @@ else if(dedupedN)
   // would otherwise mark from that transiently-empty `notify`, wholesale-wiping the very outbox row
   // loadFilmWatches' own outboxOverlay is about to need — the real mechanism behind the WebKit-only AC3
   // failure a Node-only repro (no concurrent fan-out) could never reproduce. Defer rather than drop, the
-  // same "not ready yet" convention runUserPrefsSync already uses — the watch itself is untouched, only the
-  // outbox mark and its debounce wait for `notify` to be a trustworthy snapshot again.
+  // same "not ready yet" convention the account-sync seam uses elsewhere — the watch itself is untouched,
+  // only the outbox mark and its debounce wait for `notify` to be a trustworthy snapshot again.
   function scheduleWatchSync(){
     if(!filmWatchReady){ clearTimeout(watchTimer); watchTimer=setTimeout(scheduleWatchSync, 50); return; }
     outboxMark("film_watch", watchDirtyRows(), r=>r.movie_id);
@@ -20762,50 +20770,43 @@ else if(dedupedN)
              // no occasions") rather than "unanswered" — see loadUserPrefs' own carry-up check below.
              occasions:JSON.parse(JSON.stringify(occasionReg)) };
   }
-  let upTimer=null;
-  function scheduleUserPrefsSync(){
-    outboxMark("user_prefs", [userPrefsRow()], ()=>"_");   // CAS-1035: a singleton row, one fixed key
-    clearTimeout(upTimer); upTimer=setTimeout(runUserPrefsSync, 500);
-  }
-  // CAS-1035: loadUserPrefs' own carry-up self-heal (below) re-derives a row from what it just read PLUS
-  // whatever this device kept because the account's copy lacked it — not an unconfirmed edit the user is
-  // waiting to have protected. Arming the same outbox key it does would make every future load distrust
-  // the account until that backfill push happens to land, which can permanently block a real remote
-  // update (a different device's answer) from ever being adopted again. Push it, but don't gate on it.
-  function armUserPrefsPush(){ clearTimeout(upTimer); upTimer=setTimeout(runUserPrefsSync, 500); }
-  async function runUserPrefsSync(){
-    const c=client(), owner=uid(); if(!c||!owner) return;
-    // CAS-740: this device's own load of the row (below) may still be in flight — pushing now would risk
-    // overwriting a real account value with whatever this device booted with. Defer rather than drop the
-    // write outright, so an edit made during the race still lands once the load resolves.
-    if(!userPrefsReady){ scheduleUserPrefsSync(); return; }
-    const { error } = await c.from("user_prefs").upsert([userPrefsRow()], { onConflict:"user_id" });
-    if(error) console.warn("user_prefs upsert", error);
-    else outboxClearKeys("user_prefs", ["_"]);   // CAS-1035
-    recordSyncOutcome("user_prefs", !error, error);
+  // CAS-1095: user_prefs' own per-column push — the only path any of its eleven columns is written.
+  // Each caller names exactly the column(s) its own settings change actually touched; no other field of
+  // userPrefsRow() ever travels. No updated_at conflict check: each setting is independent, so the last
+  // write of that column wins, the same rule notify_prefs' pushNotifyPrefs above follows.
+  function pushUserPrefsCols(cols){
+    if(!accountActive()) return;
+    const owner=uid(); if(!owner) return;
+    const row = userPrefsRow();
+    const fields = {};
+    cols.forEach(c => { fields[c] = row[c]; });
+    return window.CascadeAccountStore.acctOp({ table:"user_prefs", kind:"update", match:{ user_id:owner },
+      fields, onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
   }
   // CAS-561 merge rule: user_prefs is one row per user holding whole-object fields (taste,
   // watch_windows) rather than an array of rows like cascades — there is nothing to diff or prune per
-  // item, so "last write wins" IS the upsert itself: whichever device's debounced write reaches the
-  // account last is what the row holds, and the next device to load (below) or reconcile (see
-  // reconcileOnReturn) simply adopts it whole. No separate timestamp field is needed for that — a
-  // union would risk silently re-widening a language/window a user deliberately narrowed on another
-  // device, which CAS-561 explicitly rules out.
+  // item, so "last write wins" IS the update itself: whichever device's push reaches the account last is
+  // what that column holds, and the next device to load (below) or reconcile (see reconcileOnReturn)
+  // simply adopts it. No separate timestamp field is needed for that — a union would risk silently
+  // re-widening a language/window a user deliberately narrowed on another device, which CAS-561 explicitly
+  // rules out.
+  // CAS-1095: loads through acctLoad — the account's own answer always wins, adopted wholesale, never
+  // merged with (or carried up from) whatever this device had before. A field the account genuinely has
+  // no answer for is simply left at whatever this device already showed — never overwritten, and never
+  // pushed back up either (the carry-up self-heal this ticket removes). A genuinely missing row (no
+  // device has ever saved user_prefs for this account) is created once with fixed defaults, never this
+  // device's own in-memory values — CAS-1095's "never seed the server from a device" rule.
   async function loadUserPrefs(){
     const c=client(); if(!c||!accountActive()) return;
-    const { data, error } = await c.from("user_prefs").select("*").limit(1);   // RLS: only mine
-    // CAS-1053 AC3: syncOutcome (CAS-787) used to be a write-only ledger, so a device that only ever reads a
-    // clean, fully-populated row (the common case) left user_prefs reading "not yet attempted" in diagnostics
-    // forever — indistinguishable from a load that never ran at all. Record the read outcome here too.
-    if(error){ console.warn("user_prefs load", error); recordSyncOutcome("user_prefs", false, error); return; }
+    const ok = await window.CascadeAccountStore.acctLoad([{ table:"user_prefs", pk:"user_id" }]);
+    if(!ok){ recordSyncOutcome("user_prefs", false, { message:"load failed" }); return; }
     recordSyncOutcome("user_prefs", true);
-    const row=(data||[])[0];
-    // CAS-837: ref_code is an account fact with no local-device counterpart to carry up, and — unlike
-    // every field below — has to resolve even before the account's first user_prefs row exists (a
-    // brand-new signup). Adopt what the account already has, or (nobody has minted one yet, row or no
-    // row) generate one now and write it with its own targeted upsert, never through userPrefsRow()'s
-    // whole-row upsert, so a debounced push of an unrelated setting from another device can never carry
-    // a stale/absent ref_code over this one.
+    const row=(window.CascadeAccountStore.acctStore.user_prefs||[])[0];
+    // CAS-837: ref_code is an account fact with no local-device counterpart, and — unlike every field
+    // below — has to resolve even before the account's first user_prefs row exists (a brand-new signup).
+    // Adopt what the account already has, or (nobody has minted one yet, row or no row) generate one now
+    // and write it with its own targeted upsert, never through a userPrefsRow()-shaped push, so a push of
+    // an unrelated setting from another device can never carry a stale/absent ref_code over this one.
     if(row && typeof row.ref_code==="string" && row.ref_code){
       refCodeCache = row.ref_code;
     } else if(!refCodeCache){
@@ -20815,83 +20816,73 @@ else if(dedupedN)
         if(error) console.warn("ref_code write", error);
       });
     }
-    // CAS-1035: a still-unsent local edit outranks whatever the account currently holds — treat it exactly
-    // like "no row yet": keep this device's own values (every field below) and push again, rather than
-    // adopting a remote row that predates the edit still sitting in the outbox.
-    if(!row || outboxPending("user_prefs")["_"]){ scheduleUserPrefsSync(); return; }   // no row yet — seed it from this device
+    if(!row){
+      c.from("user_prefs").upsert([{ user_id: uid() }], { onConflict:"user_id" }).then(({error})=>{
+        if(error) console.warn("user_prefs bootstrap insert", error);
+      });
+      return;
+    }
     setTo(prefs.sub, row.sub_services||[]);
     setTo(prefs.store, row.store_services||[]);
     prefs.on = !!row.services_only;
-    // CAS-561: a row that exists but has never carried taste/watch_windows (created before this
-    // ticket, or before CAS-211 for taste) must not be read as "the account has decided []" — that
-    // would silently drop this device's local baseline. Carry the local value up instead, same as the
-    // no-row branch above, rather than overwriting it with an empty default.
-    let carryUp=false;
     if(row.taste && typeof row.taste==="object" && Object.keys(row.taste).length){
       tasteBase = {...baseDefaults(), ...row.taste};
       saveTasteBaseLocal();
-    } else carryUp=true;
+    }
     if(row.watch_windows && typeof row.watch_windows==="object" && Object.keys(row.watch_windows).length){
       watchPrefs = {...watchPrefsDefaults(), ...migrateWatch(row.watch_windows)};
       saveWatchPrefsLocal();
       syncWatchPrefsToCascades();
-    } else carryUp=true;
-    // CAS-740: `touched` has no legitimate value that means "unanswered" other than SQL null itself — false
-    // is a real answer ("hasn't touched the switch yet"), so a migrated row nobody has re-saved since this
-    // column existed must read back as null, not false, or every existing account would silently look
-    // freshly-unanswered on its next load. Same carry-up as taste/watch_windows above: adopt the account's
-    // explicit answer, or keep this device's own value and push it up.
+    }
+    // CAS-740: `touched` has no legitimate value that means "unanswered" other than SQL null itself —
+    // false is a real answer ("hasn't touched the switch yet"), so a row nobody has ever saved this
+    // column for reads back as null, left alone here rather than adopted as a false "answer".
     if(row.touched===true || row.touched===false) prefs.touched = row.touched;
-    else carryUp=true;
     const onb=onbAnswersLoad();
     let onbChanged=false;
-    if(Array.isArray(row.never_show)){ onb.never=row.never_show; onbChanged=true; } else carryUp=true;
-    if(typeof row.onb_depth==="string" && row.onb_depth){ onb.depth=row.onb_depth; onbChanged=true; } else carryUp=true;
+    if(Array.isArray(row.never_show)){ onb.never=row.never_show; onbChanged=true; }
+    if(typeof row.onb_depth==="string" && row.onb_depth){ onb.depth=row.onb_depth; onbChanged=true; }
     if(onbChanged) onbAnswersSaveLocal(onb);
     if(row.framing===true || row.framing===false){ if(ux.on!==row.framing){ ux.on=row.framing; saveUxLocal(); } }
-    else carryUp=true;
-    // CAS-742: same carry-up as taste/watch_windows above — an empty/absent object reads as "no device has
-    // saved this under the new column yet", not "the account has decided nothing is seen".
     if(row.moving_seen && typeof row.moving_seen==="object" && Object.keys(row.moving_seen).length){
       Object.keys(movingSeen).forEach(k=>delete movingSeen[k]);
       Object.assign(movingSeen, row.moving_seen);
       saveMovingSeenLocal();
-    } else carryUp=true;
-    // CAS-775: unlike taste/watch_windows/moving_seen above, an empty array IS a real answer here (AC2/AC10)
-    // — only a genuinely absent/non-array column (no device has saved under this column yet, or it doesn't
-    // exist yet — AC9) reads as unanswered and carries this device's own register up instead.
+    }
+    // CAS-775: unlike taste/watch_windows/moving_seen above, an empty array IS a real answer here — only a
+    // genuinely absent/non-array column (no device has saved under this column yet) is left alone.
     if(Array.isArray(row.occasions)){
       occasionReg.length=0;
       row.occasions.filter(o=>o && typeof o.id==="string" && typeof o.name==="string").forEach(o=>occasionReg.push(o));
       saveOccasionRegLocal();
-    } else carryUp=true;
+    }
     savePrefsLocal();
     syncServiceChips(); updatePrefSwitch(); updatePrefBtn();
     if(typeof render==="function") render();
-    if(carryUp) armUserPrefsPush();
   }
   const saveTasteBaseLocal = saveTasteBase;
-  saveTasteBase = function(){ saveTasteBaseLocal(); if(accountActive()) scheduleUserPrefsSync(); };
+  saveTasteBase = function(){ saveTasteBaseLocal(); pushUserPrefsCols(["taste"]); };
   const saveWatchPrefsLocal = saveWatchPrefs;
   // CAS-561: same chokepoint shape as saveTasteBase above — Where & when you'll watch is the other
   // CAS-532 "system-wide, no per-agent override" setting, so it gets the same account round-trip.
-  saveWatchPrefs = function(){ saveWatchPrefsLocal(); if(accountActive()) scheduleUserPrefsSync(); };
+  saveWatchPrefs = function(){ saveWatchPrefsLocal(); pushUserPrefsCols(["watch_windows"]); };
   const onbAnswersSaveLocal = onbAnswersSave;
   // CAS-740: the never-show genres and depth answer are persisted per account regardless, so — same
-  // chokepoint shape as saveTasteBase/saveWatchPrefs above — they get the same account round-trip.
-  onbAnswersSave = function(a){ onbAnswersSaveLocal(a); if(accountActive()) scheduleUserPrefsSync(); };
+  // chokepoint shape as saveTasteBase/saveWatchPrefs above — they get the same account round-trip. Both
+  // columns always travel together: this is the one chokepoint either ever changes through.
+  onbAnswersSave = function(a){ onbAnswersSaveLocal(a); pushUserPrefsCols(["never_show","onb_depth"]); };
   const saveMovingSeenLocal = saveMovingSeen;
   // CAS-742: same chokepoint shape as saveTasteBase/saveWatchPrefs/onbAnswersSave above — the Moving badge's
   // seen-state was the last front-end-owned object of this shape that still lived device-only.
-  saveMovingSeen = function(){ saveMovingSeenLocal(); if(accountActive()) scheduleUserPrefsSync(); };
+  saveMovingSeen = function(){ saveMovingSeenLocal(); pushUserPrefsCols(["moving_seen"]); };
   const saveUxLocal = saveUx;
   // CAS-740: the framing toggle, same reasoning.
-  saveUx = function(){ saveUxLocal(); if(accountActive()) scheduleUserPrefsSync(); };
+  saveUx = function(){ saveUxLocal(); pushUserPrefsCols(["framing"]); };
   const saveOccasionRegLocal = saveOccasionReg;
   // CAS-775: same chokepoint shape as saveTasteBase/saveWatchPrefs/saveMovingSeen above — createOccasion/
   // renameOccasion/deleteOccasion all funnel through saveOccasionReg, so wrapping it here is the one place
   // needed to give the whole register the same account round-trip.
-  saveOccasionReg = function(){ saveOccasionRegLocal(); if(accountActive()) scheduleUserPrefsSync(); };
+  saveOccasionReg = function(){ saveOccasionRegLocal(); pushUserPrefsCols(["occasions"]); };
 
   const saveNotifyLocal = saveNotify;
   // CAS-484: `wins` lives on the same notify entries film_picks does, so the one save chokepoint
@@ -20899,14 +20890,16 @@ else if(dedupedN)
   // arming (film_watch).
   saveNotify = function(){ saveNotifyLocal(); if(accountActive()){ scheduleNotifySync(); scheduleWatchSync(); } };
   const saveNotifyPrefsLocal = saveNotifyPrefs;
-  saveNotifyPrefs = function(){ saveNotifyPrefsLocal(); if(accountActive()) scheduleNotifySync(); };
+  // CAS-1095: "how you're told" is one setting with three parts (in_app/email_on/email_address) — they
+  // always travel together, as one acctOp update, never a whole-row push.
+  saveNotifyPrefs = function(){ saveNotifyPrefsLocal(); pushNotifyPrefs(); };
   const savePrefsLocal = savePrefs;
   // CAS-843: prefs is the services answer (user_prefs) only now — the global alert mute it used to
   // also carry (notify_prefs.excluded_moments) is gone, so this chokepoint no longer touches notify_prefs.
-  savePrefs = function(){
-    savePrefsLocal();
-    if(accountActive()) scheduleUserPrefsSync();
-  };
+  // CAS-1095: unlike the chokepoints above, this one backs more than one distinct settings change
+  // (services picked, and services-only/touched) — each call site below names exactly which column(s)
+  // its own edit touched via pushUserPrefsCols, rather than this wrapper guessing a fixed set every time.
+  savePrefs = function(){ savePrefsLocal(); };
 
   // ---- CAS-1035: flush every pending account write the instant the tab is about to disappear ----------
   // flushUsageEvents (analytics, wired the same way near the top of this file) was the only flush that
@@ -20925,7 +20918,6 @@ else if(dedupedN)
     clearTimeout(notifyTimer); runNotifySync();
     clearTimeout(watchTimer); runWatchSync();
     clearTimeout(agentFilmsTimer); runAgentFilmsSync();
-    clearTimeout(upTimer); runUserPrefsSync();
   }
   if(typeof document!=="undefined" && document.addEventListener){
     document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushAccountSync(); });
@@ -20956,17 +20948,13 @@ else if(dedupedN)
     // below now avoids entirely (agentFilmRowReady, above, still applies as a second line of defence for
     // any row scheduleAgentFilmsSync's own 500ms timer sends outside of a replay).
     await runSync();
-    await Promise.allSettled([
-      runFilmSync(), runNotifySync(), runWatchSync(), runAgentFilmsSync(),
-      // CAS-1045: unlike the four syncs above (each diffs against its own known-confirmed baseline, so
-      // replaying with nothing genuinely dirty is a no-op), runUserPrefsSync is a whole-row "last write
-      // wins" upsert with no diff at all — replaying it unconditionally pushed this device's current
-      // user_prefs answer over the account's every single sign-in, stale local copy or not. Only replay it
-      // when this device actually still owes the account an edit (outboxMark armed "_" before this boot);
-      // otherwise loadUserPrefs (called right after this resolves) is the sole authority on what this
-      // account's user_prefs holds.
-      outboxPending("user_prefs")["_"] ? runUserPrefsSync() : Promise.resolve()
-    ]);
+    await Promise.allSettled([ runFilmSync(), runNotifySync(), runWatchSync(), runAgentFilmsSync() ]);
+    // CAS-1095: user_prefs/notify_prefs no longer have an outbox of their own to replay — acctOp's own
+    // persisted queue (cascade_ops@<uid>) is what a genuinely unsent edit from before this boot lives in
+    // now, the same "this device still owes the account a write" case replayOutbox exists to cover for
+    // every other table above. One best-effort attempt this boot, same as the rest of this function —
+    // sendQueue's own "online" listener (CascadeAccountStore) covers a later reconnect.
+    if(window.CascadeAccountStore) await window.CascadeAccountStore.sendQueue();
   }
 
   window.CascadePersistence = { loadAccount, syncNow: runSync, accountActive, isUuid,
@@ -21007,8 +20995,12 @@ else if(dedupedN)
                                 filmDirtyRows, filmPendingDeleteIds,
                                 get filmKnown(){ return filmKnown; },
                                 loadNotifyPrefs, loadRealAlerts, syncNotifyNow: runNotifySync,
-                                prefsRow, pickRows, loadFilmPicks,
-                                loadUserPrefs, syncUserPrefsNow: runUserPrefsSync, userPrefsRow,
+                                // CAS-1095: pushNotifyPrefs/pushUserPrefsCols are the real per-column write
+                                // seams, replacing the old whole-row syncUserPrefsNow/syncNotifyNow — exposed
+                                // the same way every other real write chokepoint here is, so a test can drive
+                                // an actual settings-change push without going through a UI control.
+                                pushNotifyPrefs, prefsRow, pickRows, loadFilmPicks,
+                                loadUserPrefs, pushUserPrefsCols, userPrefsRow,
                                 // CAS-740: read/write, same shape as filmWatchReady/agentFilmsReady above —
                                 // so a test can drive user_prefs' own "the account hasn't answered yet" gate
                                 // directly, the same way fireAccountFanout drives it for real.
@@ -21132,15 +21124,17 @@ else if(dedupedN)
   // acctLoad(tables): tables is [{ table, pk }, ...]. After a verified session, reads each table paged at
   // 1,000 rows, replacing whatever this device held for it. The caller renders after it resolves — that is
   // wire code, deliberately not this function's job.
+  // CAS-1095: returns whether every table loaded cleanly, so a caller (loadUserPrefs/loadNotifyPrefs) can
+  // record its own outcome for the CAS-787 diagnostics ledger without acctLoad needing to know about it.
   async function acctLoad(tables){
     const c = client();
-    if(!c || !uid()) return;
+    if(!c || !uid()) return false;
     for(const { table, pk } of tables){
       let rows = [], from = 0;
       for(;;){
         const { data, error } = await c.from(table).select("*")
           .order(pk, { ascending:true }).range(from, from+ACCT_STORE_PAGE-1);
-        if(error){ console.warn("acctLoad", table, error); return; }
+        if(error){ console.warn("acctLoad", table, error); return false; }
         const page = data || [];
         rows = rows.concat(page);
         if(page.length < ACCT_STORE_PAGE) break;
@@ -21148,6 +21142,7 @@ else if(dedupedN)
       }
       acctStore[table] = rows;
     }
+    return true;
   }
 
   // The op queue is per account and survives a reload — persisted at cascade_ops@<uid>, reloaded whenever
@@ -21258,6 +21253,7 @@ else if(dedupedN)
           }
           toast("Updated on another device");
         }
+        if(op.onDone) op.onDone(true, null);
         return "done";
       }
       if(isTransient(status)){
@@ -21267,6 +21263,7 @@ else if(dedupedN)
       console.warn("acctOp", op.table, op.kind, error);
       revertOptimistic(op);
       toast("Couldn't save that change — try again.");
+      if(op.onDone) op.onDone(false, error);
       return "done";
     }
     return "retry-later";

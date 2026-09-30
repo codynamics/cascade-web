@@ -4,9 +4,12 @@
 // own (empty) keys — the onboarding answers were silently dropped, and a brand-new member landed on My
 // services showing zero services. maybeSwitchAcctSuffix now carries the guest copies into the new account's
 // own namespace first, whenever the switch is guest -> uid and onboarding has just committed its roster
-// (onbV2CommittedSave/onbV2CommittedLoad) — the existing loadUserPrefs()/runUserPrefsSync() path then either
-// pushes them (no server row yet) or discards them in favour of the account's real row (an existing member
-// who walked onboarding again on this device), exactly like any other local edit.
+// (onbV2CommittedSave/onbV2CommittedLoad) — the carried values render locally either way.
+// CAS-1095: the server side of this changed underneath it. loadUserPrefs() used to push a brand-new,
+// no-row-yet account's row from whatever this device currently held (which, thanks to the carry above,
+// already included the onboarding picks) — CAS-1095 removed that: a missing row is now bootstrapped once
+// with fixed defaults only, never this device's own values, so the carried picks stay local-only until a
+// later settings change (or the CAS-1099 onboarding-commit rework, once that lands) actually pushes them.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
@@ -35,6 +38,7 @@ function fakeClient({ upserts = {}, selects = {} } = {}){
           thenable.order = () => thenable;
           thenable.limit = () => thenable;
           thenable.eq = () => thenable;
+          thenable.range = () => thenable;   // CAS-1095: acctLoad's own paging call
           return thenable;
         },
         delete(){
@@ -87,14 +91,16 @@ test("CAS-1114 AC1: a brand-new member's onboarding services/occasions survive s
   assert.deepEqual([...E.occasionReg].map(o => o.id).sort(), ["me", "partner"], "the guest's occasions must survive the switch");
 
   await E.CascadePersistence.loadUserPrefs();
-  await E.CascadePersistence.syncUserPrefsNow();
 
-  // loadUserPrefs() also mints and writes a ref_code via its own targeted upsert (no sub_services on that
-  // row at all) ahead of the whole-row push under test — find the whole-row one specifically.
-  const push = client.upsertCalls.find(c => c.table === "user_prefs" && "sub_services" in c.rows[0]);
-  assert.ok(push, "a brand-new account with no user_prefs row yet must have the carried values pushed");
-  assert.deepEqual([...push.rows[0].sub_services].sort(), ["Netflix"], "the push must carry the onboarding service pick");
-  assert.deepEqual([...push.rows[0].occasions].map(o => o.id).sort(), ["me", "partner"], "the push must carry the onboarding occasions");
+  // CAS-1095: a genuinely missing row is bootstrapped once with fixed defaults, never this device's own
+  // values — none of the upserts loadUserPrefs issues for a no-row account (the ref_code mint, the blank
+  // bootstrap) may carry sub_services/occasions.
+  const bootstraps = client.upsertCalls.filter(c => c.table === "user_prefs");
+  assert.ok(bootstraps.length > 0, "a brand-new account with no user_prefs row yet must be bootstrapped");
+  bootstraps.forEach(c => {
+    assert.ok(!("sub_services" in c.rows[0]), "the bootstrap must never carry this device's own services");
+    assert.ok(!("occasions" in c.rows[0]), "the bootstrap must never carry this device's own occasions");
+  });
 
   assert.equal(E.localStorage.getItem("cascade_prefs@guest"), null, "the guest copy must be cleared once carried");
 });

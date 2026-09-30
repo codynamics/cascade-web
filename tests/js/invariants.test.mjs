@@ -3059,23 +3059,35 @@ test("CAS-844 AC3: a loaded film_picks row with state \"off\" does not remove th
 // device loaded without it, read the scope as unanswered, silently re-enabled services-only, and pushed that
 // back over the account — so a setting the user had turned off returned and stuck. touched now rides the
 // same row/merge rule taste and watch_windows already do.
-function fakeCas740Supabase(row){
-  const state = { row: row ? { ...row } : null, upsertCalls: [] };
-  const client = {
-    from(table){
-      assert.equal(table, "user_prefs", "this fake only serves user_prefs");
-      return {
-        select(){ return { limit: async () => ({ data: state.row ? [{ ...state.row }] : [], error: null }) }; },
-        upsert(rows){
-          state.upsertCalls.push(rows.map(r => ({ ...r })));
-          rows.forEach(r => { state.row = { ...r }; });
-          return Promise.resolve({ data: rows, error: null });
-        },
-      };
+// CAS-1095: user_prefs moved off the whole-row upsert onto acctLoad (a pure read) / acctOp's per-column
+// update — this single-row fake serves both chains (acctLoad's select().order().range(), acctOp's
+// update().match(), and the one-time-missing-row upsert()) for whichever table it's built for. Reused by
+// every user_prefs/notify_prefs test below (CAS-740/741/742/775).
+function fakeSingleRowTable(table, row){
+  const state = { row: row ? { ...row } : null, pushCalls: [] };
+  const b = {
+    select(){ return b; },
+    order(){ return b; },
+    range(){ return b; },
+    update(fields){ b._fields = fields; return b; },
+    match(){ return b; },
+    upsert(rows){ b._fields = rows[0]; return b; },
+    then(resolve, reject){
+      let result;
+      if(b._fields){
+        state.pushCalls.push({ ...b._fields });
+        state.row = { ...(state.row || {}), ...b._fields };
+        result = { data: [{ ...b._fields }], error: null, status: 200 };
+        b._fields = null;   // one-shot per chain — the next from(table) call starts a fresh write, if any
+      } else {
+        result = { data: state.row ? [{ ...state.row }] : [], error: null, status: 200 };
+      }
+      return Promise.resolve(result).then(resolve, reject);
     },
   };
-  return { client, state };
+  return { client: { from(t){ assert.equal(t, table, `this fake only serves ${table}`); return b; } }, state };
 }
+function fakeCas740Supabase(row){ return fakeSingleRowTable("user_prefs", row); }
 function withCas740State(fn){
   // CAS-957: both keys are namespaced by account now (acctKey) — signInWithClient never changes acctSuffix
   // (it pokes CascadeAuth directly, bypassing the real sign-in chokepoint), so every test in this file reads
@@ -3096,14 +3108,14 @@ function withCas740State(fn){
   })();
 }
 
-test("CAS-740 AC2: userPrefsRow() carries touched, and a save/load round trip preserves false", () => withCas740State(async () => {
+test("CAS-740 AC2: userPrefsRow() carries touched, and a push/load round trip preserves false", () => withCas740State(async () => {
   E.prefs.touched = false;
   assert.equal(E.CascadePersistence.userPrefsRow().touched, false, "userPrefsRow() must include touched");
 
-  const { client, state } = fakeCas740Supabase(null);
+  const { client, state } = fakeCas740Supabase({ user_id: "cas740-test-user", touched: false });
   signInWithClient(client);
-  await E.CascadePersistence.syncUserPrefsNow();
-  assert.equal(state.row.touched, false, "a freshly-seeded row must carry touched:false, not drop it");
+  await E.CascadePersistence.pushUserPrefsCols(["touched"]);
+  assert.equal(state.row.touched, false, "the pushed row must carry touched:false, not drop it");
 
   E.prefs.touched = true;   // corrupt local memory so the next assertion proves the LOAD, not a no-op
   await E.CascadePersistence.loadUserPrefs();
@@ -3115,45 +3127,23 @@ test("CAS-740 AC3: an account that already answered touched=true is adopted on l
   const remoteRow = {
     user_id: "cas740-test-user", sub_services: [], store_services: [], services_only: false,
     taste: JSON.parse(JSON.stringify(E.tasteBase)), watch_windows: JSON.parse(JSON.stringify(E.watchPrefs)),
-    touched: true, never_show: [], onb_depth: "best", framing: true,
+    touched: true, never_show: [], onb_depth: "best", framing: true, ref_code: "cas740ac3",
   };
   const { client, state } = fakeCas740Supabase(remoteRow);
   signInWithClient(client);
 
   await E.CascadePersistence.loadUserPrefs();
   assert.equal(E.prefs.touched, true, "the account's real touched:true must win over this device's stale local false");
-  assert.equal(state.upsertCalls.length, 0, "a row that already answers everything must not trigger any write");
+  assert.equal(state.pushCalls.length, 0, "a row that already answers everything must not trigger any write");
 }));
 
-// ---- WHOLE-ROW UPSERTS DON'T OVERWRITE ANOTHER DEVICE (CAS-741) --------------------------------------------
-// notify_prefs pushed unconditionally, with no gate on whether this device's own load had resolved or even
-// succeeded — a failed load still let the next edit push this device's local defaults over a real account
-// row (muting email alerts, erasing a real address).
-function fakeCas741NotifySupabase({ row = null, loadError = null } = {}){
-  const state = { row: row ? { ...row } : null, upsertCalls: [] };
-  const client = {
-    from(table){
-      if(table === "notify_prefs"){
-        return {
-          select(){ return { limit: async () => (loadError ? { data: null, error: loadError }
-            : { data: state.row ? [{ ...state.row }] : [], error: null }) }; },
-          upsert(rows){
-            state.upsertCalls.push(rows.map(r => ({ ...r })));
-            rows.forEach(r => { state.row = { ...r }; });
-            return Promise.resolve({ data: rows, error: null });
-          },
-        };
-      }
-      // film_picks — runNotifySync always touches it too; accepted and discarded, not what these tests are about.
-      return {
-        select(){ return { limit: async () => ({ data: [], error: null }) }; },
-        upsert: async () => ({ data: [], error: null }),
-        delete(){ return { eq(){ return this; }, in: async () => ({ error: null }) }; },
-      };
-    },
-  };
-  return { client, state };
-}
+// ---- LOADS NEVER WRITE (CAS-741, restated under CAS-1095) --------------------------------------------------
+// Originally: notify_prefs pushed unconditionally, with no gate on whether this device's own load had
+// resolved or even succeeded, so the next edit could push this device's local defaults over a real account
+// row (muting email alerts, erasing a real address). CAS-1095 removed the whole-row push (and therefore the
+// race) entirely: notify_prefs now only loads through acctLoad (a pure read) and only writes through
+// pushNotifyPrefs, which a load path never calls — there is no longer a "load in flight/failed" gate to
+// test, because a load can no longer trigger a write of any kind, clean or stale.
 function withCas741NotifyState(fn){
   const savedReady = E.CascadePersistence.notifyPrefsReady;
   const savedPrefs = { ...E.notifyPrefs };
@@ -3167,32 +3157,24 @@ function withCas741NotifyState(fn){
   })();
 }
 
-test("CAS-741 AC2(a): notify_prefs is never pushed while this device's own load has not resolved", () => withCas741NotifyState(async () => {
-  E.CascadePersistence.notifyPrefsReady = false;   // simulates loadNotifyPrefs still being in flight
-  const { client, state } = fakeCas741NotifySupabase({});
-  signInWithClient(client);
-
-  E.notifyPrefs.emailOn = true; E.notifyPrefs.email = "test@example.com";
-  await E.CascadePersistence.syncNotifyNow();
-
-  assert.equal(state.upsertCalls.length, 0,
-    "no notify_prefs write may be issued before this device's own load has resolved — fails on current code");
-}));
-
-test("CAS-741 AC2(b): a failed notify_prefs load suppresses the write rather than pushing this device's defaults", () => withCas741NotifyState(async () => {
-  const remoteRow = { user_id: "cas681-test-user", in_app: true, email_on: true,
-    email_address: "real@account.com", excluded_moments: [] };
-  const { client, state } = fakeCas741NotifySupabase({ row: remoteRow, loadError: { message: "network down" } });
+test("CAS-741 (CAS-1095): loadNotifyPrefs never writes notify_prefs, whether the load succeeds or fails", () => withCas741NotifyState(async () => {
+  const remoteRow = { user_id: "cas681-test-user", in_app: true, email_on: true, email_address: "real@account.com" };
+  const { client, state } = fakeSingleRowTable("notify_prefs", remoteRow);
   signInWithClient(client);
 
   E.CascadePersistence.notifyPrefsReady = false;   // fireAccountFanout's own step, before kicking off the load
-  await E.CascadePersistence.loadNotifyPrefs();   // simulated load failure
-  E.notifyPrefs.emailOn = false; E.notifyPrefs.email = "";   // this device's own (unrelated) local default
-  await E.CascadePersistence.syncNotifyNow();
+  await E.CascadePersistence.loadNotifyPrefs();
+  assert.equal(state.pushCalls.length, 0, "a clean load must never write notify_prefs back");
+  assert.equal(E.notifyPrefs.email, "real@account.com", "the account's real row is adopted");
 
-  assert.equal(state.upsertCalls.length, 0,
-    "a failed load must suppress the notify_prefs write, not fall through to pushing this device's defaults over the real row — fails on current code");
-  assert.equal(state.row.email_address, "real@account.com", "the account's real row must be untouched");
+  // A failed load (client throws/returns an error) must also never fall through to a write.
+  const throwingClient = { from(t){ assert.equal(t, "notify_prefs"); return { select(){ return this; },
+    order(){ return this; }, range(){ return this; },
+    then(resolve){ return Promise.resolve({ data: null, error: { message: "network down" } }).then(resolve); } }; } };
+  signInWithClient(throwingClient);
+  E.CascadePersistence.notifyPrefsReady = false;
+  await E.CascadePersistence.loadNotifyPrefs();
+  assert.equal(E.CascadePersistence.notifyPrefsReady, false, "a failed load must not flip notifyPrefsReady true");
 }));
 
 // ---- PER-DEVICE CACHES AND STAMPS MADE TWO DEVICES DISAGREE (CAS-742) --------------------------------------
@@ -3370,7 +3352,7 @@ test("CAS-715 AC7: the New filter is registered in the filt registry and clearin
 // device left it lit on every other. It now rides the same user_prefs row/merge rule as taste and
 // watch_windows (CAS-561), reusing the CAS-740 fake (that double serves "user_prefs" generically, not just
 // the touched/never_show/onb_depth/framing fields it was written for).
-test("CAS-742: movingSeen persists through user_prefs — save/load round trip, same carry-up rule as taste", () => withCas740State(async () => {
+test("CAS-742: movingSeen persists through user_prefs — push/load round trip", () => withCas740State(async () => {
   const fid = String(E.MOVIES[0].tmdb_id);
   const saved = E.movingSeen[fid];
   try {
@@ -3378,10 +3360,10 @@ test("CAS-742: movingSeen persists through user_prefs — save/load round trip, 
     assert.deepEqual(E.CascadePersistence.userPrefsRow().moving_seen, E.movingSeen,
       "userPrefsRow() must include the live movingSeen object");
 
-    const { client, state } = fakeCas740Supabase(null);
+    const { client, state } = fakeCas740Supabase({ user_id: "cas740-test-user" });
     signInWithClient(client);
-    await E.CascadePersistence.syncUserPrefsNow();
-    assert.deepEqual(state.row.moving_seen, E.movingSeen, "a freshly-seeded row must carry moving_seen");
+    await E.CascadePersistence.pushUserPrefsCols(["moving_seen"]);
+    assert.deepEqual(state.row.moving_seen, E.movingSeen, "the pushed row must carry moving_seen");
 
     delete E.movingSeen[fid];   // corrupt local memory so the next assertion proves the LOAD, not a no-op
     await E.CascadePersistence.loadUserPrefs();
@@ -3610,15 +3592,15 @@ function withCas775RegState(fn){
 // userPrefsRow()'s return both live inside the vm sandbox; the plain `[o]`/`[]` literal on the other side is
 // constructed in THIS file's realm. Comparing the two arrays directly fails on that prototype check alone,
 // independent of their contents (the same gotcha this suite has hit for chained .map()/.flatMap() results).
-test("CAS-775: userPrefsRow() carries the register, and a save/load round trip preserves it, including an empty array", () => withCas775RegState(async () => {
+test("CAS-775: userPrefsRow() carries the register, and a push/load round trip preserves it, including an empty array", () => withCas775RegState(async () => {
   E.occasionReg.length = 0;
   const o = E.createOccasion("CAS775-roundtrip");
   assert.deepEqual([...E.CascadePersistence.userPrefsRow().occasions], [o], "userPrefsRow() must include the live register");
 
-  const { client, state } = fakeCas740Supabase(null);
+  const { client, state } = fakeCas740Supabase({ user_id: "cas740-test-user" });
   signInWithClient(client);
-  await E.CascadePersistence.syncUserPrefsNow();
-  assert.deepEqual([...state.row.occasions], [o], "a freshly-seeded row must carry the register, not drop it");
+  await E.CascadePersistence.pushUserPrefsCols(["occasions"]);
+  assert.deepEqual([...state.row.occasions], [o], "the pushed row must carry the register, not drop it");
 
   E.occasionReg.length = 0;   // corrupt local memory so the next assertion proves the LOAD, not a no-op
   await E.CascadePersistence.loadUserPrefs();
@@ -3631,35 +3613,37 @@ test("CAS-775: userPrefsRow() carries the register, and a save/load round trip p
   assert.deepEqual([...E.occasionReg], [], "an account row with occasions:[] must overwrite this device's local register — an empty array is a real answer");
 }));
 
-test("CAS-775 AC9: a user_prefs row with no occasions column at all must not throw, and carries this device's register up", () => withCas775RegState(async () => {
+// CAS-1095: carry-up (self-heal a missing/NULL column by pushing this device's own value back up) is
+// removed entirely — a field the account has no answer for is now simply left alone: not overwritten, and
+// never pushed either. AC9/AC10 restated under that rule.
+test("CAS-775 AC9 (CAS-1095): a user_prefs row with no occasions column at all leaves this device's register untouched, and pushes nothing", () => withCas775RegState(async () => {
   const o = E.createOccasion("CAS775-ac9-local-only");
   const remoteRow = {   // no `occasions` key — simulates the column not existing on the live project yet
     user_id: "cas740-test-user", sub_services: [], store_services: [], services_only: false,
     taste: JSON.parse(JSON.stringify(E.tasteBase)), watch_windows: JSON.parse(JSON.stringify(E.watchPrefs)),
-    touched: true, never_show: [], onb_depth: "best", framing: true, moving_seen: {},
+    touched: true, never_show: [], onb_depth: "best", framing: true, moving_seen: {}, ref_code: "cas775ac9",
   };
   const { client, state } = fakeCas740Supabase(remoteRow);
   signInWithClient(client);
   await assert.doesNotReject(() => E.CascadePersistence.loadUserPrefs(),
     "a missing occasions column must read exactly like NULL, never throw");
   assert.deepEqual([...E.occasionReg], [o], "this device's local register must survive untouched when the column doesn't exist yet");
+  assert.equal(state.pushCalls.length, 0, "a load must never push this device's register back, missing column or not");
 }));
 
-test("CAS-775 AC10: a user_prefs row with occasions:NULL carries this device's local register up, not an empty one", () => withCas775RegState(async () => {
+test("CAS-775 AC10 (CAS-1095): a user_prefs row with occasions:NULL leaves this device's local register untouched, and pushes nothing", () => withCas775RegState(async () => {
   const o = E.createOccasion("CAS775-ac10-local-only");
   const remoteRow = {
     user_id: "cas740-test-user", sub_services: [], store_services: [], services_only: false,
     taste: JSON.parse(JSON.stringify(E.tasteBase)), watch_windows: JSON.parse(JSON.stringify(E.watchPrefs)),
     touched: true, never_show: [], onb_depth: "best", framing: true, moving_seen: {}, occasions: null,
+    ref_code: "cas775ac10",
   };
   const { client, state } = fakeCas740Supabase(remoteRow);
   signInWithClient(client);
   await E.CascadePersistence.loadUserPrefs();
-  assert.deepEqual([...E.occasionReg], [o], "a NULL occasions column must carry this device's local register up, not overwrite it with an empty one");
-  // loadUserPrefs schedules the carry-up push on a debounce timer rather than firing it inline — force it
-  // via the same real sync function the timer would eventually call, and check what it actually pushes.
-  await E.CascadePersistence.syncUserPrefsNow();
-  assert.deepEqual([...state.row.occasions], [o], "the carried-up local register, not an empty one, must be what gets pushed back to the account");
+  assert.deepEqual([...E.occasionReg], [o], "a NULL occasions column must leave this device's local register exactly as it was");
+  assert.equal(state.pushCalls.length, 0, "a load must never push this device's register back, NULL column or not");
 }));
 
 test("CAS-775 AC11: an occasion id matching no register entry is ignored on read and gone after the agent's next save", () => {

@@ -165,6 +165,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // CAS-255: the my-services scope and the stage dates are both places the app makes a claim about what you
   // can watch and when, so the QA gate needs to reach them the same way the listing does.
   prefs, servicesPicked, matchesServices, scopeOf, anyScope, HOME_KEYS,
+  // CAS-1095: onChipToggle is the real wire chokepoint a ⚙️ service-chip tap goes through — exported so a
+  // test can drive an actual service toggle through the real function and assert the acctOp update it
+  // issues, rather than poking prefs.sub by hand.
+  onChipToggle,
   // CAS-1053 AC4: watchMineOnlyOn (the "Show only available on my services" per-tab switch) and
   // watchMineOnlyEmptyKind (the pure loading-vs-dead-end decision behind the Watch list's mineOnly empty
   // state) — exported so a test can assert the loading state wins while user_prefs hasn't loaded, without
