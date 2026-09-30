@@ -4811,7 +4811,7 @@ function acctKey(base){ return base + "@" + acctSuffix; }
 // this device genuinely still owns comes back from the account's own table on the very next load/merge
 // anyway. "Come out clean" (the ticket's own words) wins over "guess whose it was."
 const ACCT_MIGRATED_KEY = "cascade_957_migrated";
-const MANAGED_ACCT_KEYS = ["cascade_cascades", "cascade_cascade_known", "cascade_cascade_edited_at",
+const MANAGED_ACCT_KEYS = ["cascade_cascades", "cascade_cascade_edited_at",
   "cascade_watched", "cascade_disliked", "cascade_blocked", "cascade_indifferent", "cascade_wow", "cascade_enjoyed",
   "cascade_notify", "cascade_watch_known", "cascade_notifyprefs", "cascade_prefs", "cascade_ux",
   "cascade_taste_base", "cascade_watch_prefs", "cascade_moving_seen", "cascade_occasions", "cascade_onb_answers"];
@@ -19400,19 +19400,22 @@ else if(dedupedN)
   };
   accountHasConfirmedCascades = function(){ return cascadeKnown.size>0; };
   let syncTimer=null, syncing=false, syncAgain=false;
-  const CASCADE_KNOWN_KEY = "cascade_cascade_known";
-  function loadCascadeKnown(){
-    try{
-      const raw=localStorage.getItem(acctKey(CASCADE_KNOWN_KEY));
-      if(!raw) return new Map();
-      const parsed=JSON.parse(raw);
-      return new Map(Array.isArray(parsed) ? parsed : []);
-    }catch(e){ return new Map(); }
-  }
-  function saveCascadeKnown(){
-    try{ localStorage.setItem(acctKey(CASCADE_KNOWN_KEY), JSON.stringify([...cascadeKnown])); }catch(e){}
-  }
-  let cascadeKnown = loadCascadeKnown();
+  // CAS-1107: cascadeKnown used to persist to localStorage as cascade_cascade_known@<uid> and reload from
+  // there on the very next boot or account switch — a stale copy surviving a sign-out/sign-in could then
+  // stand in for this session's real "what does the account currently confirm" baseline before any load
+  // had actually asked the account anything, exactly the shape of the incident fireAccountFanout's own
+  // CAS-1107 comment traces. It now lives in memory only, populated purely by a successful loadAccount()/
+  // reconcileCascades() call THIS session — saveCascadeKnown is gone outright, not a no-op, so nothing can
+  // accidentally reintroduce the write. One-shot cleanup for any device still carrying the old key.
+  try{
+    const staleKnownKeys=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k && k.indexOf("cascade_cascade_known@")===0) staleKnownKeys.push(k);
+    }
+    staleKnownKeys.forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
+  }catch(e){}
+  let cascadeKnown = new Map();
   // CAS-734: this device's own record of when it last actually CHANGED an agent's content — as opposed to
   // cascadeKnown's version, which is merely when it last SAW the account's copy. Only an id this device has
   // genuinely edited is ever in here, so an agent it only ever received can never win a conflict it was
@@ -19452,7 +19455,9 @@ else if(dedupedN)
     // None of the other namespaced subsystems fold local-only content into an incoming account the way
     // cascades' fold-in does (their own load-from-account paths replace wholesale), so there is nothing to
     // preserve for them across a switch either way — every one reloads fresh off the account now current.
-    cascadeKnown = loadCascadeKnown();
+    // CAS-1107: cascadeKnown is memory-only now — reset to empty, never reloaded from a namespaced key, so a
+    // switch never hands this session a baseline it hasn't itself confirmed.
+    cascadeKnown = new Map();
     cascadeEditedAt = loadCascadeEditedAt();
     cascadePendingDeletes = loadCascadePendingDeletes();
     watchKnown = loadWatchKnown();
@@ -19595,7 +19600,6 @@ else if(dedupedN)
       saveCascadePendingDeletes();
       outboxClearKeys("cascades", deletes);   // CAS-1035
     }
-    saveCascadeKnown();
     recordSyncOutcome("cascades", true);
   }
 
@@ -19716,7 +19720,6 @@ else if(dedupedN)
     // edit would.
     cascadeKnown = new Map(rawRows.filter(r=>isUuid(r.id))
       .map(r=>[r.id, { sig: cascadeFullSigOf(rowToCascade(r)), version: r.updated_at||null }]));
-    saveCascadeKnown();
     if(localOnly.length || langDirty || alertDirty || driftDirty) scheduleSync();
     if(typeof afterSignIn==="function") afterSignIn();
   }
@@ -19763,7 +19766,6 @@ else if(dedupedN)
     reconcileActiveIds();
     cascadeKnown = new Map(rawRows.filter(r=>isUuid(r.id))
       .map(r=>[r.id, { sig: cascadeFullSigOf(rowToCascade(r)), version: r.updated_at||null }]));
-    saveCascadeKnown();
     saveCascadeEditedAt();
     // CAS-424: converge on whichever device last reordered — only once anyone actually has, so a background
     // reconcile never reshuffles an account nobody has touched the Agents screen on.
@@ -19807,46 +19809,48 @@ else if(dedupedN)
     const _t460fanout = performance.now();
     console.log('[CAS-460] account fan-out start (' + label + ')', _t460fanout);
     // CAS-1045: this device's own namespaced caches (prefs, outbox, cascades, cascadeKnown, ...) must
-    // already belong to the account actually signing in before replayOutbox looks at any of them — a live
+    // already belong to the account actually signing in before anything below looks at any of them — a live
     // account switch (sign out of A, sign in to B in the same tab) otherwise leaves them pointed at A (or
-    // guest) for the whole span of the replay below, and user_prefs' own whole-row replay (see the
+    // guest) for the whole span of the loads below, and user_prefs' own whole-row replay (see the
     // outboxPending guard in replayOutbox) would echo A's/guest's in-memory answer back under B's uid.
     // loadAccount() below calls this again for the same uid — a harmless no-op (maybeSwitchAcctSuffix
     // returns immediately once nextSuffix===acctSuffix) that keeps the CAS-957 direct-call test seam intact.
     maybeSwitchAcctSuffix(uid());
-    // CAS-1035 AC2: replay every outbox entry — a row this device owed the account before this boot —
-    // BEFORE any load below gets a chance to apply remote rows over it. Neither caller of
-    // fireAccountFanout awaits its return, so this delays nothing anyone was relying on finishing
-    // synchronously; it only reorders what already happens inside this one async function.
-    await replayOutbox();
     // CAS-741: set before loadNotifyPrefs() is invoked (inside the array below) — loadNotifyPrefs itself
     // flips this true on its own success path only, never on a failed load.
     notifyPrefsReady=false;
     invitesReady=false;
     friendsReady=false;
-    Promise.allSettled([
+    // CAS-735/740/736: blocked for exactly the span of this device's own first fetch this session — win or
+    // lose, each load's own resolution (not a fixed delay) is what lifts it.
+    filmWatchReady=false;
+    userPrefsReady=false;
+    agentFilmsReady=false;
+    const allLoads = Promise.allSettled([
       loadAccount(), loadAccountFilms(), loadNotifyPrefs(), loadRealAlerts(),
-      loadFilmPicks(), loadInvites(), loadFriends()
-    ]).then(()=>{
+      loadFilmPicks(), loadInvites(), loadFriends(),
+      loadFilmWatches().finally(()=>{ filmWatchReady=true; }),
+      // CAS-1053: loadUserPrefs already re-renders on its own successful-apply path, but a branch that
+      // returns early (no row yet, or a genuinely pending local edit) never does — without this, a device
+      // that took one of those branches would be stuck on watchPrefsLoadingHTML() until some unrelated
+      // render() happened to fire.
+      loadUserPrefs().finally(()=>{ userPrefsReady=true; if(typeof render==="function") render(); }),
+      loadAgentFilms().finally(()=>{ agentFilmsReady=true; }),
+    ]);
+    allLoads.then(()=>{
       const t1 = performance.now();
       console.log('[CAS-460] account fan-out end (' + label + ')', t1, 'elapsed_ms', (t1-_t460fanout).toFixed(1));
     });
-    // CAS-735: blocked for exactly the span of this device's own first film_watch fetch this session — win
-    // or lose, loadFilmWatches' own resolution (not a fixed delay) is what lifts it.
-    filmWatchReady=false;
-    loadFilmWatches().finally(()=>{ filmWatchReady=true; });
-    // CAS-740: blocked the same way, for user_prefs — a save chokepoint firing before this device's own
-    // load resolves must not push a stale local default over whatever the account actually holds.
-    userPrefsReady=false;
-    // CAS-1053: loadUserPrefs already re-renders on its own successful-apply path, but a branch that
-    // returns early (no row yet, or a genuinely pending local edit) never does — without this, a device
-    // that took one of those branches would be stuck on watchPrefsLoadingHTML() until some unrelated
-    // render() happened to fire.
-    loadUserPrefs().finally(()=>{ userPrefsReady=true; if(typeof render==="function") render(); });
-    // CAS-736: blocked the same way, for the same reason — this device's own agent_films fetch must land
-    // before recomputeFound trusts any admission it derives placement from.
-    agentFilmsReady=false;
-    loadAgentFilms().finally(()=>{ agentFilmsReady=true; });
+    // CAS-1107: every load above must settle — success or failure — BEFORE replayOutbox (and therefore
+    // runSync/any sync*ToAccount) ever runs. The old order let replayOutbox fire on whatever baseline this
+    // device booted with (an empty local `cascades` against a stale persisted cascadeKnown, in the traced
+    // incident) — a real account load hadn't confirmed anything yet, but a sync could already act as if it
+    // had. A table whose own load fails still leaves acctTableFail latched for it (see acctRead), which the
+    // sync side already gates on, so a failed load here still means zero writes to that table below.
+    await allLoads;
+    // CAS-1035 AC2: replay every outbox entry — a row this device owed the account before this boot — now
+    // that every load above has had its chance to establish this session's real baseline first.
+    await replayOutbox();
   }
   let currentUser = null;
   window.addEventListener("cascade-auth-change", () => {
@@ -19864,7 +19868,7 @@ else if(dedupedN)
       // on-device set that no longer exists; the bell stops showing another account's news.
       currentUser = null; loadGuest(); loadGuestFilms(); loadGuestNotify(); realAlerts=[]; updateMovingBadge();
       invites=[]; invitesReady=true; updateInvitesBadge();   // CAS-886: same reasoning — a guest has no invites
-      cascadeKnown=new Map(); saveCascadeKnown(); cascadeEditedAt=new Map(); saveCascadeEditedAt();
+      cascadeKnown=new Map(); cascadeEditedAt=new Map(); saveCascadeEditedAt();
       filmKnown=null; pickBaseline=null; watchPushKnown=null;
       agentFilms={}; agentFilmsKnown=null; agentFilmsReady=true;   // CAS-736: a guest has nothing to wait on
       watchKnown=new Map(); saveWatchKnown(); filmWatchReady=true;   // CAS-735: a guest has nothing to wait on
@@ -20950,6 +20954,11 @@ else if(dedupedN)
   }
 
   window.CascadePersistence = { loadAccount, syncNow: runSync, accountActive, isUuid,
+                                // CAS-1107: the real sign-in/account-switch chokepoint itself (the
+                                // auth-change listener and the boot-restore check below both call it
+                                // directly) — exposed so a test can drive the whole load-before-replay
+                                // ordering fix for real, rather than only its individual pieces.
+                                fireAccountFanout,
                                 // CAS-957: loadGuest is the real sign-out chokepoint (the auth-change
                                 // listener below calls it directly) — exposed so a test can drive an actual
                                 // sign-out the same way it already drives a sign-in through loadAccount.
