@@ -21299,7 +21299,17 @@ else if(dedupedN)
   // CAS-916: lockBodyScroll lives in the classic <script> above — this module shares window but not
   // that script's own let/const bindings (same reason onboardingSeen is exposed the same way).
   const openAuth  = () => { modal.classList.add('open'); if(typeof window.lockBodyScroll==='function') window.lockBodyScroll(true); };
+  // CAS-1089: closing while on the code step — Cancel, Escape or backdrop, whichever this panel ends up
+  // wired to — abandons that attempt rather than leaving it resumable: next time Sign in opens, it's the
+  // email step again, not wherever this close caught it.
   const closeAuth = () => {
+    stopResendTimer();
+    if(gid('authVerify').style.display !== 'none'){
+      verifyEmail = null;
+      gid('authCode').value = '';
+      gid('authVerifyErr').textContent = '';
+      showPanel('authSignedOut');
+    }
     modal.classList.remove('open');
     if(!document.querySelector('.modal.open') && typeof window.lockBodyScroll==='function') window.lockBodyScroll(false); };
   const showPanel = which => ['authGuest','authSignedOut','authVerify','authSignedIn']
@@ -21340,12 +21350,34 @@ else if(dedupedN)
   // CAS-1073 AC3: the review address must never render as UI text — the review code screen shows
   // the same generic copy as every other state on this panel.
   const verifyMsgFor = email => isReviewEmail(email) ? 'Enter your code.' : 'Enter the code we sent to ' + email + '.';
+
+  // CAS-1089: Resend is locked for 60s after every code send (Continue, openVerify or Resend itself),
+  // matching Supabase's own per-address OTP rate limit so a user never presses an enabled Resend into a
+  // server-side rate-limit error. Driven off a deadline timestamp rather than a tick count so it stays
+  // correct under a test clock jump, not just real elapsed seconds.
+  let resendTimer = null, resendDeadline = 0;
+  const stopResendTimer = () => { if(resendTimer){ clearInterval(resendTimer); resendTimer = null; } };
+  const renderResendTimer = () => {
+    const btn = gid('authResend');
+    const remaining = Math.min(59, Math.ceil((resendDeadline - Date.now()) / 1000));
+    if(remaining <= 0){ stopResendTimer(); btn.disabled = false; btn.textContent = 'Resend code'; return; }
+    btn.disabled = true;
+    btn.textContent = 'Resend code in 0:' + String(remaining).padStart(2, '0');
+  };
+  const startResendTimer = () => {
+    stopResendTimer();
+    resendDeadline = Date.now() + 60000;
+    renderResendTimer();
+    resendTimer = setInterval(renderResendTimer, 1000);
+  };
+
   const enterVerify = (email, onVerified) => {
     verifyEmail = email; verifyResolve = onVerified || null;
     gid('authVerifyMsg').textContent = verifyMsgFor(email);
     gid('authVerifyErr').textContent = '';
     gid('authCode').value = '';
     showPanel('authVerify');
+    startResendTimer();
   };
   // The membership step's email gate has no code-entry UI of its own (CAS-1056: that lives only in this
   // panel) — it hands off here instead: open this modal straight onto the verify step for the code it
@@ -21593,6 +21625,7 @@ else if(dedupedN)
 
     gid('authResend').addEventListener('click', async () => {
       if(!verifyEmail) return;
+      startResendTimer();
       gid('authVerifyErr').textContent = '';
       gid('authVerifyMsg').textContent = 'Sending a new code…';
       const result = await api.continueWithEmail(verifyEmail);
