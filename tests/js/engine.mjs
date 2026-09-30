@@ -181,6 +181,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // rendered order against an independently-run comparator rather than re-deriving sortForKey's branches.
   DEFAULT_SORT, sortForKey,
   fmtDay, fmtDate, bandHTML, windowsLineHTML, savingsHTML,
+  // CAS-1119: cardTopHTML is the expanded card's whole "about this film" block (poster..director/cast),
+  // shared verbatim with filmPageHTML (the invite/share-link page) — exported together so a test can assert
+  // the invite page's rendered top literally contains the same cardTopHTML(m) output, not a re-derived copy.
+  cardTopHTML, filmPageHTML,
   inferredScale, inferScaleWhy, budgetCell, moneyRowHTML, SCALE_INFER_MIN_PEERS, popOf, scaleTier,
   // CAS-742: the two catalogue-derived compute-once caches, exposed by reference (Map, never reassigned) so
   // a test can assert their .size directly, plus the one function that clears both — the real invalidation
@@ -282,6 +286,13 @@ if(typeof window.CascadeAuth === "undefined"){
   // not accountActive() — exposing the stub localStorage (already the engine's own global) lets a test drive
   // that key directly instead of only being able to flip the (now branch-irrelevant) CascadeAuth fields.
   localStorage,
+  // CAS-1119: the stub global itself (window === globalThis in this sandbox, same object as ctx in
+  // makeContext) — exposed the same way localStorage is above, so a test can stub window.open and assert a
+  // CTA like filmPageCta actually called it, rather than only checking it didn't throw.
+  window,
+  // CAS-1119: filmPageCta is the invite/film page's one action — exported directly (it's window.filmPageCta,
+  // a plain global function) so a test can call it and assert the window.open it makes.
+  filmPageCta: (...args) => window.filmPageCta(...args),
   // CAS-668: the badge/list agreement — movingWindowRows is the one recipe both renderMovingScreen and
   // movingUnseenCount filter through, movingBadgeWindow is which window applies right now (live if Moving
   // is open, predicted — always "2weeks", CAS-848 — if it's not), and openMovingScreen/closeMovingScreen/

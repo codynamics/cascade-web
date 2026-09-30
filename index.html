@@ -424,28 +424,26 @@
      viewport's true top:0, so its close control needs the same notch allowance. */
   .fpclose{position:sticky;top:0;background:var(--bg);display:flex;justify-content:flex-end;
     padding:calc(14px + env(safe-area-inset-top,0px)) 0 6px;z-index:2}
-  .fpposter{width:100%;max-width:220px;margin:0 auto 14px;display:block;border-radius:10px;
-    background:var(--panel2)}
+  /* CAS-1119: .fptitle/.fpmeta are the "Film not found" fallback's own markup now (openFilmPage) — the
+     ordinary film page's title/meta come from cardTopHTML's .titletext/.metaline instead (see the .filmpage
+     .titletext/.filmpage .qscore/.filmpage .credits.incard/.filmpage .oscmark/.filmpage .attrib/.filmpage
+     .condbadge rules above, which give that reused markup the same "always expanded" treatment the card
+     itself gets from .card.expanded). .fpposter and .filmpage .wtw went with it — the poster is cardTopHTML's
+     own .poster/.ptomb now, and this page no longer shows a where-to-watch list at all (CAS-1119: the release
+     band is the top's last item, not the per-service offers list). */
   .fptitle{font-size:21px;font-weight:800;text-align:center;margin:0 0 4px}
   .fpmeta{font-size:13px;color:var(--dim);text-align:center;margin:0 0 14px}
   .fpcta{display:block;width:100%;background:var(--accentdeep);color:#fff;border:none;border-radius:11px;
     padding:14px;font-weight:800;font-size:15.5px;cursor:pointer;margin:20px 0 10px}
   .fpfoot{font-size:12px;color:var(--faint);text-align:center;margin:0 0 20px}
-  /* .synopsis clamps to 3 lines and .wtw hides by default — both card-list space-savers this standalone
-     page doesn't need; it's the one place the full synopsis and the where-to-watch list are always open. */
-  .filmpage .synopsis{-webkit-line-clamp:unset;display:block;margin-bottom:14px}
-  /* .windows packs its dates as adjacent no-space inline spans, so a run that doesn't fit on one line has
-     nowhere to wrap — the card gets away with it on a narrower row; this page's wider one still can't fit
-     every date, so it scrolls sideways instead of the card's overflow:hidden silently cutting it off. */
-  .filmpage .wtw{display:block;margin-bottom:14px;overflow-x:auto}
+  .filmpage .synopsis{margin-bottom:14px}
   .filmpage .mrow{margin-bottom:8px}
   /* CAS-885: the invite landing — added onto the ordinary film page once its token resolves (see
-     resolveFilmInvite), never present without ?inv=. Sized to fit 390x844 with nothing below the fold: a
-     narrower poster and a 2-line synopsis clamp buy back the room the ask panel needs. Both scoped under
-     .invmode so the everyday film page (no invite) is untouched — same reasoning as CAS-437's own page. */
+     resolveFilmInvite), never present without ?inv=. A 2-line synopsis clamp buys back the room the ask
+     panel needs. Scoped under .invmode so the everyday film page (no invite) is untouched — same reasoning
+     as CAS-437's own page. */
   .fpword{font-family:var(--font-body);font-weight:500;letter-spacing:.4em;font-size:13px;color:var(--accenttext);
     text-align:center;padding-left:.4em;margin:0 0 10px}
-  .filmpage.invmode .fpposter{max-width:186px}
   .filmpage.invmode .synopsis{-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;
     overflow:hidden;margin-bottom:14px}
   .fpinvite{border:1px solid var(--line);border-radius:14px;padding:18px;margin:14px 0;text-align:center}
@@ -683,7 +681,11 @@
   /* CAS-W3: the labels return to the card's own left edge and the values line up with the
      synopsis, which starts where the poster ends. One column boundary, not two arbitrary ones. */
   .credits.incard{grid-area:credits;display:none;padding-left:0;margin:4px 0 0}
-  .card.expanded .credits.incard{display:block}
+  /* CAS-1119: the invite/film page reuses cardTopHTML's .ctop verbatim (see filmPageHTML) but never carries
+     the .card.expanded ancestor class that normally unlocks these rows — .filmpage gets the same "always
+     expanded" treatment here and in every other .card.expanded rule below that touches something cardTopHTML
+     renders, so the reused markup looks the same wherever it lands. */
+  .card.expanded .credits.incard,.filmpage .credits.incard{display:block}
   .credits.incard .credit{font-size:12px}
   .credits.incard .credit .clbl{flex:0 0 124px}
   .credits.incard .credit.awardsrow+.credit{margin-top:10px}
@@ -703,7 +705,7 @@
   .title{grid-area:title;display:flex;align-items:baseline;gap:6px;min-width:0;
     font-size:16.5px;font-weight:750;line-height:1.25;cursor:pointer}
   .titletext{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .card.expanded .titletext{overflow:visible;white-space:normal;text-overflow:clip}
+  .card.expanded .titletext,.filmpage .titletext{overflow:visible;white-space:normal;text-overflow:clip}
   .cert{flex:none;display:inline-block;font-size:10.5px;font-weight:800;padding:1px 6px;border-radius:5px;
     border:1px solid #5b6472;color:#d6dce6;background:#232a35;vertical-align:middle;letter-spacing:.3px;white-space:nowrap}
   .cert.mature{border-color:#c0563f;color:#ffb9a6;background:rgba(192,86,63,.16)}
@@ -731,7 +733,7 @@
      168px (2:3) height. */
   .synopsis{grid-area:syn;font-size:13px;color:#c8d0da;line-height:1.38;margin:0;
     display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-  .card.expanded .synopsis{-webkit-line-clamp:unset;display:block}
+  .card.expanded .synopsis,.filmpage .synopsis{-webkit-line-clamp:unset;display:block}
   /* CAS-436: .expand now renders as its own band below .cfoot (a sibling of .cbody/.cfoot, not nested in
      .cbody), so it carries its own horizontal inset matching theirs instead of inheriting .cbody's padding. */
   .expand{max-height:0;opacity:0;overflow:hidden;padding:0 13px 13px;transition:max-height .4s ease,opacity .3s ease}
@@ -3216,7 +3218,7 @@
   .qscore.mid{color:#bcdcff;border-color:rgba(90,169,240,.4);background:rgba(90,169,240,.12)}
   .qscore.lo{color:#9aa3b2;border-color:rgba(255,255,255,.14)}
   .qscore.none{color:#5c6472;border-color:rgba(255,255,255,.10)}
-  .card.expanded .qscore{font-size:14px}
+  .card.expanded .qscore,.filmpage .qscore{font-size:14px}
   /* ---- Minimal card layout (collapsed card reads as a row) --------------------
      Collapsed only. The expanded card, the film page and every stub are untouched. */
   /* Back to 108px (Lee, 2026-09-11) — the .r-wmscores row is gone. CAS-897's history, kept: it was 137px while
@@ -3371,13 +3373,15 @@
   .oscmark.won{color:#ffd98a;border:1px solid rgba(255,196,74,.5);background:rgba(255,196,74,.12)}
   .oscmark.nom{color:#cfd7e6;border:1px solid rgba(255,255,255,.18)}
   .card:not(.expanded) .mrow.r-scores .oscmark{margin-left:2px}
-  .card.expanded .oscmark{display:none}
+  .card.expanded .oscmark,.filmpage .oscmark{display:none}
   /* CAS-634: agent attribution, right-aligned after the Oscar mark in the same scores-row slot the
      collapsed card already gives that line — so it costs no extra height. Hidden expanded: the award
-     chips already say enough there, and this would just be one more thing stacked under the title. */
+     chips already say enough there, and this would just be one more thing stacked under the title.
+     CAS-1119: hidden on .filmpage for a sharper reason too — attributionHTML reads the VISITOR's own
+     cascades, which have nothing to do with whoever sent the invite. */
   .attrib{flex:0 1 auto;min-width:0;margin-left:auto;padding-left:6px;font-size:10.5px;
     color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .card.expanded .attrib{display:none}
+  .card.expanded .attrib,.filmpage .attrib{display:none}
   /* CAS-701: the condensed card's own copy of the scale badge (see condensedBadgeHTML) — the same full
      .tentbadge lozenge the expanded card's .r-badge row and the film page use, riding whichever stats row
      the card is showing (r-scores or r-cinfo — see the .card.cinfo rules below; only one is ever visible
@@ -3385,7 +3389,7 @@
      ahead of .attrib, which is the item that gives way when the row is tight. Hidden expanded: the
      full-size .r-badge row already carries the same badge there. */
   .condbadge{flex:none;display:inline-flex}
-  .card.expanded .condbadge{display:none}
+  .card.expanded .condbadge,.filmpage .condbadge{display:none}
   /* (6) "Can Watch" is wider than "Notify"; equal thirds truncated it to "Can W..." */
   .card:not(.expanded) .actions .ctl{flex:0 0 auto;min-width:0}
   .card:not(.expanded) .actions .ctl.casc{flex:1 1 0;min-width:0}
@@ -7273,40 +7277,19 @@ window.sendFilmInvite = async()=>{
 };
 // ---- CAS-437: the public film page a share link opens ---------------------------------------------------
 // What a person who has never opened Cascade is entitled to see: the film, honestly — the same facts the
-// card shows (synopsis, where to watch, scores, awards), read from the same MOVIES the app already loaded.
-// No card controls (Notify/Lists/Watched) — those act on an account this visitor may not have yet; the one
-// action here is the door into getting one.
-function filmPageWhereHTML(m){
-  if(isEstimated(m)) return estimateHTML(m);
-  const offers=dedupOffers(m.offers||[]);
-  if(!offers.length) return "";
-  return `<div class="wtw">${windowsLineHTML(m)}${offers.map(o=>`<div class="wtwrow">
-      <span class="svc"><span class="tt ${o.type}">${TYPE_LABEL[o.type]||o.type}</span>${svcName(o.service)}</span>
-      <span class="off">${o.price!=null?"$"+o.price.toFixed(2):""}${o.fmt?" · "+o.fmt:""}</span></div>`).join("")}</div>`;
-}
+// card shows, read from the same MOVIES the app already loaded.
+// CAS-1119: the top is cardTopHTML(m) + bandHTML(m) — the exact same code the expanded card's own top and
+// release band render from, so this page can never show the film differently than the card does. No account
+// controls (Notify/Agent/Watched, or the signed-in-only "Invite someone" button) — those act on an account
+// this visitor may not have yet; the one action here is the door into getting one.
 function filmPageHTML(m){
-  const yr=yearOf(m);
-  const cert = m.age_rating ? `<span class="cert ${MATURE.has(m.age_rating)?'mature':''}">${m.age_rating}</span>` : "";
-  // CAS-486: a fixture film from the notify-test harness's ?fixtures=1 merge stays visually marked
-  // wherever it renders — this badge, plus the "TEST FIXTURE" director credit below.
-  const fixtureBadge = m._fixture ? `<span class="fixturebadge" title="${escA(FIXTURE_MARKER)}">TEST FIXTURE</span>` : "";
-  const cult = m.language ? langName(m.language) : "";
-  const genres = (m.genres||[]).join(", ");
-  const poster = m.poster ? `<img class="fpposter" src="https://image.tmdb.org/t/p/w342${escA(m.poster)}" alt="">` : "";
-  const syn = m.synopsis ? `<p class="synopsis">${esc(m.synopsis)}</p>` : "";
   return `
     <div class="fpclose"><button type="button" class="ebtn" onclick="closeFilmPage()"
         title="Close" aria-label="Close">✕</button></div>
-    ${poster}
-    <div class="fptitle">${esc(m.title)} ${cert}${fixtureBadge}</div>
-    <div class="fpmeta">${[yr,genres,cult].filter(Boolean).join(" · ")}</div>
-    ${syn}
-    ${filmPageWhereHTML(m)}
-    <div class="mrow r-scores">${scoresRowHTML(m)}</div>
-    <div class="mrow r-awards">${cinemaReleaseChip(m)}${awardChips(m)}</div>
-    ${inviteFilmHTML(m, true)}
-    <button type="button" class="fpcta" onclick="filmPageCta()">Get Cascade — find more like this</button>
-    <div class="fpfoot">Cascade tracks cinema, rental and streaming for you — sign up to build your own.</div>`;
+    ${cardTopHTML(m)}
+    ${bandHTML(m)}
+    <button type="button" class="fpcta" onclick="filmPageCta()">Become a Cascade Member</button>
+    <div class="fpfoot">Cascade finds and tracks your favorite cinema, rental and streaming for you.</div>`;
 }
 // Hash-routed so the same static index.html (there is no per-film build output, GitHub Pages serves the
 // one file) is a real, permanent, bookmarkable page for the film — see inviteUrlFor.
@@ -7323,6 +7306,11 @@ function openFilmPage(id){
        <div class="fptitle">Film not found</div>
        <div class="fpmeta">This title isn't in Cascade's catalogue right now.</div>`;
   el.classList.add("open"); lockBodyScroll(true);
+  // CAS-1119: the coach-mark tour must never sit underneath the film page — a film page that opens WHILE
+  // the tour is showing (a late-resolving invite route, or another #/film/ hashchange) closes it at once
+  // rather than leaving it stacked below .filmpage's own z-index. Not marked seen: the tour was interrupted,
+  // not dismissed, so it gets a real chance later.
+  if($("tutScrim").classList.contains("open")) endTutorial(false);
   if(m) document.title = `${m.title} — Cascade`;
   logEvent("film_page_shown",{id, found:!!m});
   if(m && INVITE_TOKEN) tryResolveFilmInvite(id);
@@ -7333,13 +7321,14 @@ window.closeFilmPage=()=>{
   if(!document.querySelector(".modal.open,.filmpage.open")) lockBodyScroll(false);
   document.title = DEFAULT_TITLE;
 };
-// The page's one action: straight into signup, same as the splash's own CTA (CAS-188's flowStart), not a
-// second door that still has to be found and tapped.
+// CAS-1119 (Lee, 2026-10-01): the page's one action opens cascademovies.com itself — a fresh tab, not the
+// in-app signup flow this used to jump into — and leaves the invite page open behind it, so a recipient who
+// backs out of signing up still has the film and the ask panel to come back to. Capacitor's WKWebView/Android
+// WebView routes a target="_blank" window.open to the system browser by default (no Browser plugin vendored
+// here, and none needed) — this is not a web-only path.
 window.filmPageCta=()=>{
   logEvent("film_page_cta");
-  closeFilmPage();
-  $("splash").classList.remove("open");   // mirrors splashGo — don't leave it stacked open underneath
-  flowStart();
+  window.open("https://cascademovies.com/", "_blank", "noopener");
 };
 // A hash-only navigation (another film link tapped from an already-open tab, or Back/Forward between two
 // share links) never reloads the page, so the boot-time check below only ever catches the FIRST one. This
@@ -7392,15 +7381,6 @@ async function resolveFilmInvite(token, id, c){
   el.classList.add("invmode");
   const close=el.querySelector(".fpclose");
   if(close && !el.querySelector(".fpword")) close.insertAdjacentHTML("afterend", `<div class="fpword">CASCADE</div>`);
-  // A recipient who happens to already have their own Cascade account still gets the ask panel, not this
-  // sender-side control too — inviteFilmHTML(m,true) was rendered on the assumption this was an ordinary
-  // visit before the invite resolved.
-  const bigInvite=el.querySelector(".filminvcta");
-  if(bigInvite){
-    const note=bigInvite.nextElementSibling;
-    bigInvite.remove();
-    if(note && note.classList.contains("pnote")) note.remove();
-  }
   const sender=esc(rows[0].sender_name || "Someone");
   recvInviteSender=sender;
   cta.insertAdjacentHTML("beforebegin", `<div class="fpinvite" id="fpInvite">
@@ -7624,6 +7604,55 @@ window.closeVideoModal=()=>{
   $("vidFrame").src="";   // stop playback — an emptied src beats a paused iframe still holding the stream open
 };
 $("videoModalClose").onclick=closeVideoModal;
+// CAS-1119: the expanded card's whole "about this film" block — poster (with trailer play button), title,
+// age rating and Cascade score, genres/language and the full synopsis, Budget/Gross, People/Critics, badges,
+// Director/Cast. Shared verbatim between cardHTML (below) and the invite/film page (filmPageHTML) so the
+// invite page can never drift from what the card itself shows — one source, not two copies to keep in sync.
+function cardTopHTML(m){
+  const syn = m.synopsis ? `<p class="synopsis">${esc(m.synopsis)}</p>` : "";
+  const cert = m.age_rating ? `<span class="cert ${MATURE.has(m.age_rating)?'mature':''}">${m.age_rating}</span>` : "";
+  // CAS-486: a fixture film from the notify-test harness's ?fixtures=1 merge stays visually marked
+  // wherever it renders — this badge, plus the "TEST FIXTURE" director credit in About & credits.
+  const fixtureBadge = m._fixture ? `<span class="fixturebadge" title="${escA(FIXTURE_MARKER)}">TEST</span>` : "";
+  // CAS-135: the chip reads the film's LANGUAGE (e.g. "English"), now that selection is language-based —
+  // not the old genre-ish "Western" culture bucket.
+  const cult = m.language ? ` · <span class="culttag">${langName(m.language)}</span>` : "";
+  const poster = m.poster ? `background-image:url(https://image.tmdb.org/t/p/w185${m.poster})` : "";
+  // The ▶ on the poster goes straight to the film's first trailer. No trailer, no button.
+  const firstTrailer=(m.trailers||[])[0];
+  const play = firstTrailer
+    ? `<a class="pplay" href="https://www.youtube.com/watch?v=${safeUrl(firstTrailer)}" target="_blank" rel="noopener"
+         onclick="event.stopPropagation()" title="Play the trailer" aria-label="${escA("Play the trailer for "+m.title)}">▶</a>`
+    : "";
+  const badge = scaleBadge(m);
+  // CAS-179: one grid, one order — title · genres·language · synopsis · money · scores · awards, with
+  // the poster spanning down to the scores row and the scale badge tucked under it beside the awards.
+  return `<div class="ctop">
+      <!-- CAS-276: the tombstone is the POSTER, and nothing else. -->
+      <div class="ptomb">
+        <div class="poster" style="${poster}">${play}</div>
+      </div>
+      <!-- CAS-373: the title text gets its own span so it (not the badge) is what truncates — the rating
+           badge is flex:none and always shows, collapsed or expanded. -->
+      <div class="title"><span class="titletext">${m.title}</span>${cert}${fixtureBadge}${qScoreHTML(m)}</div>
+      <div class="metaline">${(m.genres||[]).length ? esc((m.genres||[]).join(", "))+cult : cult.replace(/^ · /,"")}</div>
+      ${syn}
+      <div class="mrow r-money">${moneyRowHTML(m)}</div>
+      <div class="mrow r-scores">${scoresRowHTML(m)}${oscMarkHTML(m)}${condensedBadgeHTML(m)}${attributionHTML(m)}</div>
+      <!-- CAS-686: condensed-card-only — shown instead of r-scores when this film gets the "cinfo" class
+           on .card. Hidden everywhere else, including the expanded card and the invite/film page, by the
+           base .r-cinfo{display:none}. -->
+      <div class="mrow r-cinfo">${cinemaInfoRowHTML(m)}</div>
+      <!-- CAS-373: the badge (Landmark/Anticipated/…) moves under the poster, left column; the awards
+           chips keep the text column, same row — row-aligned with the badge, column-aligned with IMDb. -->
+      <div class="mrow r-badge">${badge}</div>
+      <div class="mrow r-awards">${cinemaReleaseChip(m)}${awardChips(m)}</div>
+      <!-- CAS-612 (v0.9.5): Awards/Director/Cast sit here, above the RELEASED band. The .incard class is
+           what gates them on .card.expanded — .expand's own max-height animation does not reach them here.
+           The invite/film page has no .expand to gate them out of, so they always show there. -->
+      ${creditsHTML(m, true)}
+    </div>`;
+}
 // One card, the same in both views. The provenance block that used to sit between the synopsis and the badges
 // came out in CAS-100.
 function cardHTML(m, markNew=false, {hideDismiss=false}={}){
@@ -7645,21 +7674,6 @@ function cardHTML(m, markNew=false, {hideDismiss=false}={}){
   const wtw = offers.length ? `<div class="wtw">${windowsLineHTML(m)}${offers.map(o=>`<div class="wtwrow">
       <span class="svc"><span class="tt ${o.type}">${TYPE_LABEL[o.type]||o.type}</span>${svcName(o.service)}</span>
       <span class="off">${o.price!=null?"$"+o.price.toFixed(2):""}${o.fmt?" · "+o.fmt:""}</span></div>`).join("")}${jwLink?`<div class="wtwrow jwrow">${jwLink}</div>`:""}</div>` : "";
-  const syn = m.synopsis ? `<p class="synopsis">${esc(m.synopsis)}</p>` : "";
-  const cert = m.age_rating ? `<span class="cert ${MATURE.has(m.age_rating)?'mature':''}">${m.age_rating}</span>` : "";
-  // CAS-486: a fixture film from the notify-test harness's ?fixtures=1 merge stays visually marked
-  // wherever it renders — this badge, plus the "TEST FIXTURE" director credit in About & credits.
-  const fixtureBadge = m._fixture ? `<span class="fixturebadge" title="${escA(FIXTURE_MARKER)}">TEST</span>` : "";
-  // CAS-135: the chip reads the film's LANGUAGE (e.g. "English"), now that selection is language-based —
-  // not the old genre-ish "Western" culture bucket.
-  const cult = m.language ? ` · <span class="culttag">${langName(m.language)}</span>` : "";
-  const poster = m.poster ? `background-image:url(https://image.tmdb.org/t/p/w185${m.poster})` : "";
-  // The ▶ on the poster goes straight to the film's first trailer. No trailer, no button.
-  const firstTrailer=(m.trailers||[])[0];
-  const play = firstTrailer
-    ? `<a class="pplay" href="https://www.youtube.com/watch?v=${safeUrl(firstTrailer)}" target="_blank" rel="noopener"
-         onclick="event.stopPropagation()" title="Play the trailer" aria-label="${escA("Play the trailer for "+m.title)}">▶</a>`
-    : "";
   const badge = scaleBadge(m);
   // CAS-686: the condensed card shows the money row instead of the scores row when this film holds none
   // of IMDb/RT/Metacritic — see condensedShowsScores.
@@ -7682,37 +7696,9 @@ function cardHTML(m, markNew=false, {hideDismiss=false}={}){
   // CAS-135: the "New this week" and "Past opening weekend" chips are removed — too many tags. What's new
   // is still tracked (freshness) but no longer chipped on the card title. (markNew is kept in the signature
   // for callers but no longer rendered.)
-  // CAS-179: one grid, one order — title · genres·language · synopsis · money · scores · awards, with
-  // the poster spanning down to the scores row and the scale badge tucked under it beside the awards.
   return `<div class="card ${expandedSet.has(id)?'expanded':''} ${cinfoCard?'cinfo':''} ${denseScores?'densescores':''}" id="card-${id}">
     <div class="cbody" onclick="cardTap(event,${id})">
-      <div class="ctop">
-        <!-- CAS-276: the tombstone is the POSTER, and nothing else. The scale badge used to hang below it,
-             which pushed the column's bottom up to 59px past the IMDb lozenge it is supposed to finish
-             level with — measured across 355 cards, and every one of the worst offenders had a badge. -->
-        <div class="ptomb">
-          <div class="poster" style="${poster}">${play}</div>
-        </div>
-        <!-- CAS-373: the title text gets its own span so it (not the badge) is what truncates — the rating
-             badge is flex:none and always shows, collapsed or expanded. -->
-        <div class="title"><span class="titletext">${m.title}</span>${cert}${fixtureBadge}${qScoreHTML(m)}</div>
-        <div class="metaline">${(m.genres||[]).length ? esc((m.genres||[]).join(", "))+cult : cult.replace(/^ · /,"")}</div>
-        ${syn}
-        <div class="mrow r-money">${moneyRowHTML(m)}</div>
-        <div class="mrow r-scores">${scoresRowHTML(m)}${oscMarkHTML(m)}${condensedBadgeHTML(m)}${attributionHTML(m)}</div>
-        <!-- CAS-686: condensed-card-only — shown instead of r-scores when this film gets the "cinfo" class
-             on .card (condensedShowsScores(m) is false). Hidden everywhere else, including the expanded
-             card, by the base .r-cinfo{display:none}. -->
-        <div class="mrow r-cinfo">${cinemaInfoRowHTML(m)}</div>
-        <!-- CAS-373: the badge (Landmark/Anticipated/…) moves under the poster, left column; the awards
-             chips keep the text column, same row — row-aligned with the badge, column-aligned with IMDb. -->
-        <div class="mrow r-badge">${badge}</div>
-        <div class="mrow r-awards">${cinemaReleaseChip(m)}${awardChips(m)}</div>
-        <!-- CAS-612 (v0.9.5): Awards/Director/Cast now sit here, above the RELEASED band, rather than in
-             .expand below the control row. The .incard class is what gates them on .card.expanded — .expand's own
-             max-height animation does not reach them here. -->
-        ${creditsHTML(m, true)}
-      </div>
+      ${cardTopHTML(m)}
     </div>
     ${bandHTML(m, svcLine)}
     <div class="cfoot">
@@ -17827,14 +17813,22 @@ let tutCards=[], tutIdx=-1;
 // The one gate for the automatic (non-replay) trigger: onboarding done, at least one agent, not already
 // seen or skipped, and nothing else already on screen (a deep link opening straight into another screen
 // right after onboarding, per CAS-962, must win over the tour starting underneath it).
+// CAS-1119: a #/film/ route counts as "the film page" even in the instant before openFilmPage() has run
+// and actually added .filmpage.open — the invite page is a share-link recipient's whole reason for being
+// here, and the tour must never show on top of it.
 function maybeStartTutorial(){
   if(!onboardingSeen() || !cascades.length || tutorialSeen()) return;
-  if(document.querySelector(".uscreen.open,.modal.open,.wsheetscrim.open,.filmpage.open")) return;
+  if(filmRouteId()!=null || document.querySelector(".uscreen.open,.modal.open,.wsheetscrim.open,.filmpage.open")) return;
   requestAnimationFrame(()=>requestAnimationFrame(startTutorial));
 }
 // Resolution happens here, not at the gate above, so it always runs one full layout past whatever just
 // painted the listing — same double-rAF reasoning as membStart's own proceed() a few lines up.
 function startTutorial(){
+  // CAS-1119: maybeStartTutorial's gate only reflects the instant it ran — a film page that opens in the
+  // two rAFs between then and now (the boot path's own #/film/<id> handling runs after maybeStartTutorial,
+  // see CAS-437) must still win, so the one check that matters here runs again right before the tour
+  // actually shows.
+  if(filmRouteId()!=null || document.querySelector(".filmpage.open")) return;
   const anchored=tutorialCardDefs().map(c=>({text:c.text, el:tutorialResolveAnchor(c.sel)})).filter(c=>c.el);
   // Resilience: skip a card whose anchor isn't there rather than point at nothing; if fewer than two of
   // the four resolve, don't start at all — and don't mark it seen, so a later, better-populated listing
