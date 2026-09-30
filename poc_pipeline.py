@@ -33,7 +33,7 @@ to compare against. Output for the app front-end is written to movies.json.
 """
 
 from __future__ import annotations
-import os, sys, csv, io, re, json, time, shutil, calendar, datetime, subprocess, urllib.parse, urllib.request, urllib.error
+import os, sys, csv, io, re, json, time, shutil, hashlib, calendar, datetime, subprocess, urllib.parse, urllib.request, urllib.error
 from collections import Counter
 
 import runstats
@@ -120,6 +120,8 @@ VERSION_FILE  = os.path.join(os.path.dirname(__file__), "VERSION")        # hand
 VERSION_JSON  = os.path.join(os.path.dirname(__file__), "version.json")   # machine-readable build stamp
 BUILD_INFO_JS = os.path.join(os.path.dirname(__file__), "build-info.js")  # CAS-947: runtime-loadable twin of VERSION_JSON
 HEADERS_FILE  = os.path.join(os.path.dirname(__file__), "_headers")       # Cloudflare Pages response headers (CAS-946)
+CATALOGUE_DIR     = os.path.join(os.path.dirname(__file__), "catalogue")       # CAS-1101: hashed catalogue files
+CATALOGUE_POINTER = os.path.join(os.path.dirname(__file__), "catalogue.json")  # CAS-1101: points at the current one
 IOS_WWW_DIR   = os.path.join(os.path.dirname(__file__), "www")            # Capacitor webDir mirror (CAS-453)
 IOS_WWW_ASSETS = ("index.html", "config.js", "favicon.svg", "favicon.png",
                    "apple-touch-icon.png", "splash-logo.svg",
@@ -3104,6 +3106,51 @@ def build_version_info(provider_status: dict | None = None) -> dict:
     return info
 
 
+# CAS-1101: fields index.html's inline MOVIES payload carries that app_template.html never reads
+# via `m.<field>` — pipeline/monitor-only bookkeeping. Dropped from the compact catalogue file
+# below; movies.json itself is untouched and stays the pipeline's and monitor's source of truth.
+CATALOGUE_DROPPED_FIELDS = (
+    "availability_source", "wm_fields_fetched_at", "cache_stamped_at", "last_polled",
+    "first_seen", "last_probed", "imdb_id", "popularity_percentile",
+    "tmdb_not_found_streak", "poll_tier", "settled_since", "probe_count",
+    "oscar_detail_checked",
+)
+
+
+def write_catalogue(records: list[dict], catalogue_date: str) -> None:
+    """CAS-1101: alongside the inlined MOVIES payload, publish a compact content-hashed catalogue
+    file (client-read fields only, no indentation) plus a small pointer file at the site root, so
+    a data-only refresh doesn't have to re-ship all of index.html. Old hashed files are pruned,
+    keeping only the one just written and whatever the pointer named before this call."""
+    os.makedirs(CATALOGUE_DIR, exist_ok=True)
+    prev_name = None
+    if os.path.exists(CATALOGUE_POINTER):
+        try:
+            prev_file = json.load(open(CATALOGUE_POINTER, encoding="utf-8")).get("file")
+            prev_name = os.path.basename(prev_file) if prev_file else None
+        except (json.JSONDecodeError, OSError):
+            prev_name = None
+
+    trimmed = [{k: v for k, v in m.items() if k not in CATALOGUE_DROPPED_FIELDS} for m in records]
+    payload = json.dumps(trimmed, separators=(",", ":")).encode("utf-8")
+    file_hash = hashlib.sha256(payload).hexdigest()[:12]
+    file_name = f"catalogue.{file_hash}.json"
+    with open(os.path.join(CATALOGUE_DIR, file_name), "wb") as f:
+        f.write(payload)
+
+    with open(CATALOGUE_POINTER, "w", encoding="utf-8") as f:
+        json.dump({"file": f"catalogue/{file_name}", "hash": file_hash,
+                    "generated": catalogue_date, "count": len(records)}, f, separators=(",", ":"))
+        f.write("\n")
+
+    keep = {file_name}
+    if prev_name:
+        keep.add(prev_name)
+    for name in os.listdir(CATALOGUE_DIR):
+        if name not in keep:
+            os.remove(os.path.join(CATALOGUE_DIR, name))
+
+
 def build_html(records: list[dict] | None = None, provider_status: dict | None = None):
     """Inject the latest movies + date into app_template.html -> index.html.
     Keeps the app a single double-clickable file (no server, no CORS).
@@ -3134,6 +3181,7 @@ def build_html(records: list[dict] | None = None, provider_status: dict | None =
     with open(BUILD_INFO_JS, "w", encoding="utf-8") as f:
         f.write("window.BUILD_INFO = " + json.dumps(info) + ";\n")
     print(f"stamped v{info['version']} · build {info['build']} · {info['commit']}")
+    write_catalogue(records, catalogue_date)
     write_csp_headers()
     _sync_ios_www()
 
