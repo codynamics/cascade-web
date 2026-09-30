@@ -242548,9 +242548,9 @@
       "poll_tier": "none",
       "offers": [],
       "status": [
-        "in_cinema"
+        "upcoming"
       ],
-      "availability_confidence": "estimated",
+      "availability_confidence": "confirmed",
       "availability_source": "tmdb_date",
       "window_dates": {
         "upcoming": "2026-08-11"
