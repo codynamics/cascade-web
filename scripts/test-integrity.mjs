@@ -1,15 +1,25 @@
 #!/usr/bin/env node
 // CAS-1093: `npm run test:integrity` — the one command the ticket asks for. Starts a local Supabase stack
-// (Supabase CLI, Docker; supabase/config.toml), resets it so every file in supabase/migrations/ is applied
-// in number order, builds the app, and runs tests/e2e-integrity/*.spec.mjs against it with test-only config
-// injection (tests/e2e-integrity/helpers.mjs routes config.js at the local stack's own URL/anon key — never
-// the real project's, which live only in the git-tracked config.js this script never touches).
+// (Supabase CLI, Docker; supabase/config.toml), loads supabase/schema.sql into it, builds the app, and runs
+// tests/e2e-integrity/*.spec.mjs against it with test-only config injection (tests/e2e-integrity/helpers.mjs
+// routes config.js at the local stack's own URL/anon key — never the real project's, which live only in the
+// git-tracked config.js this script never touches).
+//
+// Why schema.sql, not a migrations/ replay: supabase/README.md is explicit that migrations/ is the
+// incremental history applied BY HAND onto an already-live project, while schema.sql is "the script to run
+// against a brand-new project instead of replaying every migration from scratch" — its earliest migration
+// (0000, CAS-1074) assumes objects like analytics_admins already exist live, so replaying migrations/ from
+// an empty database (what `supabase start`/`db reset` do on a fresh stack) fails on that very first file.
+// A brand-new local stack is exactly the "brand-new project" case the README already calls out, so this
+// hides migrations/ from the CLI's automatic first-boot replay and loads schema.sql directly instead,
+// matching the documented bootstrap path rather than the by-hand incremental one.
 //
 // Why the local URL/anon/service_role keys are read back from `supabase status` rather than hardcoded: the
 // CLI generates them per-stack from supabase/config.toml + its own JWT secret, and reading them keeps this
 // script correct across CLI versions instead of quietly drifting from whatever the installed CLI actually
 // started.
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 
 function run(cmd, args, extraEnv){
   const res = spawnSync(cmd, args, { stdio: "inherit", env: { ...process.env, ...extraEnv } });
@@ -28,12 +38,22 @@ function readField(text, label){
   return m[1];
 }
 
+const MIGRATIONS_DIR = "supabase/migrations";
+const MIGRATIONS_BAK = "supabase/migrations.test-integrity-bak";
+
 console.log("[test:integrity] starting local Supabase stack (npx supabase start)...");
-run("npx", ["supabase", "start"]);
+fs.renameSync(MIGRATIONS_DIR, MIGRATIONS_BAK);
+fs.mkdirSync(MIGRATIONS_DIR);
+try{
+  run("npx", ["supabase", "start"]);
+}finally{
+  fs.rmSync(MIGRATIONS_DIR, { recursive: true, force: true });
+  fs.renameSync(MIGRATIONS_BAK, MIGRATIONS_DIR);
+}
 
 try{
-  console.log("[test:integrity] resetting the local database and applying supabase/migrations/ in order...");
-  run("npx", ["supabase", "db", "reset"]);
+  console.log("[test:integrity] loading supabase/schema.sql into the fresh local database...");
+  run("npx", ["supabase", "db", "query", "--local", "--file", "supabase/schema.sql"]);
 
   const status = supabaseStatusText();
   const apiUrl = readField(status, "API URL");

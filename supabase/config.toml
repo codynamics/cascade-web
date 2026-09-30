@@ -1,7 +1,7 @@
 # CAS-1093: local Supabase CLI project config for `npm run test:integrity`
 # (scripts/test-integrity.mjs) — a throwaway, Docker-backed stack started fresh for every run, never the
-# live project. supabase/README.md's manual-apply-by-hand workflow for the live project is unaffected;
-# this stack applies the same supabase/migrations/ files automatically via `supabase db reset`, for tests
+# live project. supabase/README.md's manual-apply-by-hand workflow for the live project is unaffected; this
+# stack loads supabase/schema.sql directly (the README's own "brand-new project" bootstrap path), for tests
 # only. Never real project keys — the CLI's own local demo keys are read at test time (via `supabase
 # status`) rather than copied in here. Deliberately minimal: every key below is one that's been stable
 # across Supabase CLI versions for a long time; anything not listed here keeps the CLI's own default.
