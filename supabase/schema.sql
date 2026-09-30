@@ -263,6 +263,14 @@ alter table public.user_prefs add column if not exists ref_code text;
 create unique index if not exists user_prefs_ref_code_idx
   on public.user_prefs (ref_code) where ref_code is not null;
 
+-- CAS-1120: an account-level name a member can set, so the invite email can say who invited you
+-- by name rather than the sender's email local part (accounts have no name otherwise).
+alter table public.user_prefs add column if not exists display_name text;
+
+alter table public.user_prefs drop constraint if exists user_prefs_display_name_check;
+alter table public.user_prefs add constraint user_prefs_display_name_check
+  check (display_name is null or char_length(display_name) between 1 and 60);
+
 alter table public.user_prefs enable row level security;
 
 drop policy if exists user_prefs_owner on public.user_prefs;
@@ -739,6 +747,15 @@ create table if not exists public.invites (
 );
 create index if not exists invites_sender_idx on public.invites (sender_id, created_at desc);
 
+-- CAS-1120: an invite carries an optional suggested date and an optional note, shown in the invite
+-- email and on the invite page.
+alter table public.invites add column if not exists suggested_date date;
+alter table public.invites add column if not exists note text;
+
+alter table public.invites drop constraint if exists invites_note_check;
+alter table public.invites add constraint invites_note_check
+  check (note is null or char_length(note) <= 500);
+
 alter table public.invites enable row level security;
 
 drop policy if exists invites_owner on public.invites;
@@ -770,6 +787,8 @@ as $$
     'tmdb_id', tmdb_id,
     'film_title', film_title,
     'to_name', to_name,
+    'suggested_date', suggested_date,
+    'note', note,
     'created_at', created_at
   )
   from public.invites
