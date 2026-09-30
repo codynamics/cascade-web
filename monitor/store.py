@@ -295,22 +295,63 @@ class SupabaseStore:
             h.update(extra)
         return h
 
+    # Deliberately far above any plausible PostgREST max-rows setting, so a server-side cap is
+    # always what actually bounds a page, never this number.
+    _PAGE_REQUEST_LIMIT = 10_000
+
     def _get(self, path: str) -> list:
-        req = urllib.request.Request(self._base + path, headers=self._headers(), method="GET")
-        with urllib.request.urlopen(req, timeout=self._timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+        """Pages through every row with limit+offset until the response's own row count says
+        there's nothing left, so a server-side row cap (PostgREST's max-rows — CAS-1091) can
+        never silently truncate a read. A page coming back shorter than requested does NOT by
+        itself prove the end — that's exactly what an unlucky max-rows cap looks like too — so
+        `_get` asks PostgREST for the true total (`Prefer: count=exact`, read back off the
+        `Content-Range` response header) and stops once it has fetched that many rows, rather
+        than guessing from page shape.
+        `path` must already carry a stable `order` (the table's primary key, or the primary key
+        appended as a tie-breaker) — PostgREST does not guarantee row order across paged requests
+        otherwise, so paging on an unordered result could skip or repeat rows."""
+        if "order=" not in path:
+            raise ValueError(f"_get requires an explicit order for stable paging: {path}")
+        sep = "&" if "?" in path else "?"
+        table = path.lstrip("/").split("?", 1)[0]
+        out: list = []
+        offset = 0
+        total = None
+        while True:
+            page_path = f"{path}{sep}limit={self._PAGE_REQUEST_LIMIT}&offset={offset}"
+            req = urllib.request.Request(
+                self._base + page_path,
+                headers=self._headers({"Prefer": "count=exact"}),
+                method="GET",
+            )
+            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+                page = json.loads(resp.read().decode("utf-8"))
+                content_range = resp.headers.get("Content-Range")
+            out.extend(page)
+            offset += len(page)
+            if content_range:
+                total_part = content_range.rsplit("/", 1)[-1]
+                if total_part.isdigit():
+                    total = int(total_part)
+            if len(page) == 0 or (total is not None and offset >= total):
+                break
+        print(f"[store] {table}: {len(out)} rows")
+        return out
 
     def fetch_active_cascades(self) -> list:
-        return self._get("/cascades?active=eq.true&select=*")
+        return self._get("/cascades?active=eq.true&select=*&order=id.asc")
 
     def fetch_notification_keys(self) -> set:
-        rows = self._get("/notifications?select=cascade_id,movie_id,moment")
+        rows = self._get("/notifications?select=cascade_id,movie_id,moment&order=id.asc")
         return {(r.get("cascade_id"), str(r.get("movie_id")), r.get("moment")) for r in rows}
 
     def fetch_notify_prefs(self) -> dict:
         """user_id -> the user's delivery preferences (CAS-185). A user with no row is not an
         error and not a default-off: they simply have not answered, and PREFS_DEFAULT applies."""
-        rows = self._get("/notify_prefs?select=user_id,in_app,email_on,email_address,excluded_moments")
+        rows = self._get(
+            "/notify_prefs?select=user_id,in_app,email_on,email_address,excluded_moments"
+            "&order=user_id.asc"
+        )
         return {str(r.get("user_id")): r for r in rows if r.get("user_id")}
 
     def fetch_picks(self) -> list:
@@ -320,12 +361,15 @@ class SupabaseStore:
         decide which cascade owns a film for cross-surface attribution — see matching.pick_overrides
         and matching._resolve_owner. No schema change — both columns already exist and the app
         already writes them (app_template.html's pinFilmToCascadeAndRepaint / film_picks.not_in)."""
-        return self._get("/film_picks?select=user_id,movie_id,state,pinned_to,not_in")
+        return self._get(
+            "/film_picks?select=user_id,movie_id,state,pinned_to,not_in"
+            "&order=user_id.asc,movie_id.asc"
+        )
 
     def fetch_push_tokens(self) -> dict:
         """user_id -> the user's live device tokens (CAS-465), read with service_role (bypasses
         RLS, same convention as fetch_active_cascades)."""
-        rows = self._get("/push_tokens?select=user_id,device_token")
+        rows = self._get("/push_tokens?select=user_id,device_token&order=id.asc")
         out: dict = {}
         for r in rows:
             out.setdefault(str(r.get("user_id")), []).append(r.get("device_token"))
@@ -334,7 +378,7 @@ class SupabaseStore:
     def fetch_unread_counts(self) -> dict:
         """user_id -> count of unread notifications rows — the same number the in-app bell
         badge shows, so a push's badge field can never disagree with it (CAS-465)."""
-        rows = self._get("/notifications?read_at=is.null&select=user_id")
+        rows = self._get("/notifications?read_at=is.null&select=user_id&order=id.asc")
         out: dict = {}
         for r in rows:
             uid = str(r.get("user_id"))
@@ -346,14 +390,18 @@ class SupabaseStore:
         sources}. `sources` (CAS-918) is read alongside `windows` so matching.match() can tell
         an auto placement from a manual one when deciding whether a window-arrival moment
         forward-matches a film that has moved on but hasn't been re-placed yet."""
-        return self._get("/film_watch?select=user_id,movie_id,windows,sources")
+        return self._get(
+            "/film_watch?select=user_id,movie_id,windows,sources&order=user_id.asc,movie_id.asc"
+        )
 
     def fetch_watch_notification_keys(self) -> set:
         """(user_id, movie_id, moment) already delivered via the per-film-watch path — the rows in
         `notifications` with no owning cascade. Kept apart from fetch_notification_keys() because
         a null cascade_id does not, by itself, de-dupe across users the way a real one does (see
         matching.match_film_watches)."""
-        rows = self._get("/notifications?cascade_id=is.null&select=user_id,movie_id,moment")
+        rows = self._get(
+            "/notifications?cascade_id=is.null&select=user_id,movie_id,moment&order=id.asc"
+        )
         return {(str(r.get("user_id")), str(r.get("movie_id")), r.get("moment")) for r in rows}
 
     def fetch_user_prefs(self) -> dict:
@@ -365,7 +413,10 @@ class SupabaseStore:
         agent's own myServices). A user with no row here has never opened those screens, and
         compute_admission() reads that as the engine's own permissive default, not as "answered
         empty"."""
-        rows = self._get("/user_prefs?select=user_id,sub_services,store_services,taste,services_only")
+        rows = self._get(
+            "/user_prefs?select=user_id,sub_services,store_services,taste,services_only"
+            "&order=user_id.asc"
+        )
         return {str(r.get("user_id")): r for r in rows if r.get("user_id")}
 
     def fetch_user_films(self) -> list:
@@ -373,7 +424,7 @@ class SupabaseStore:
         into the engine's own applyFilmRows() by admit_shim.mjs (CAS-825) — the same rebuild the app
         runs on sign-in — so a blocked/disliked film is excluded from admission the same way the app
         excludes it, not by a second exclusion rule guessed at in Python."""
-        return self._get("/user_films?select=user_id,movie_id,status")
+        return self._get("/user_films?select=user_id,movie_id,status&order=user_id.asc,movie_id.asc")
 
     def fetch_user_held_ids(self) -> set:
         """CAS-986: every tmdb_id a user holds state on — a watched opinion (user_films), a
@@ -382,8 +433,12 @@ class SupabaseStore:
         state/user_held_ids.json at the end of every monitor run so the nightly pipeline can never
         orphan a film a user marked watched or pinned."""
         out: set = set()
-        for path in ("/user_films?select=movie_id", "/film_watch?select=movie_id",
-                    "/agent_films?select=movie_id", "/notifications?select=movie_id"):
+        for path in (
+            "/user_films?select=movie_id&order=user_id.asc,movie_id.asc",
+            "/film_watch?select=movie_id&order=user_id.asc,movie_id.asc",
+            "/agent_films?select=movie_id&order=user_id.asc,cascade_id.asc,movie_id.asc",
+            "/notifications?select=movie_id&order=id.asc",
+        ):
             out |= {str(r.get("movie_id")) for r in self._get(path) if r.get("movie_id") is not None}
         return out
 
@@ -391,7 +446,7 @@ class SupabaseStore:
         """Every contact_messages row not yet emailed (CAS-836), oldest first — read with
         service_role, since the anon key that wrote these rows has no select grant on them."""
         return self._get(
-            "/contact_messages?sent_at=is.null&order=created_at.asc"
+            "/contact_messages?sent_at=is.null&order=created_at.asc,id.asc"
             "&select=id,user_id,client_key,category,email,message,diagnostics,build,created_at,attachment_path"
         )
 
@@ -421,7 +476,7 @@ class SupabaseStore:
         service_role, since the authenticated-only RLS policy scopes a normal client to its own
         sender_id, never every user's."""
         return self._get(
-            "/recommendations?sent_at=is.null&order=created_at.asc"
+            "/recommendations?sent_at=is.null&order=created_at.asc,id.asc"
             "&select=id,sender_id,sender_name,to_name,to_email,message,created_at"
         )
 
@@ -452,7 +507,7 @@ class SupabaseStore:
         token -> invites.token) — read with service_role, the same bypass-RLS convention as every
         other digest source here. Never reads or writes `seen_at`; that column belongs to the app."""
         rows = self._get(
-            "/invite_replies?digested_at=is.null&select="
+            "/invite_replies?digested_at=is.null&order=created_at.asc,id.asc&select="
             "id,token,answer,created_at,invites(sender_id,to_name,film_title,tmdb_id)"
         )
         out = []
@@ -495,7 +550,7 @@ class SupabaseStore:
         service_role, since the authenticated-only RLS policy scopes a normal client to invites it
         owns, never every user's."""
         rows = self._get(
-            "/invite_emails?sent_at=is.null&order=created_at.asc&select="
+            "/invite_emails?sent_at=is.null&order=created_at.asc,id.asc&select="
             "id,token,to_email,to_name,created_at,invites(sender_name,film_title,tmdb_id)"
         )
         out = []
@@ -539,7 +594,7 @@ class SupabaseStore:
         writes `seen_at`/`digested_at`; those columns belong to the app and the next-morning digest
         respectively."""
         rows = self._get(
-            "/invite_replies?notified_at=is.null&order=created_at.asc&select="
+            "/invite_replies?notified_at=is.null&order=created_at.asc,id.asc&select="
             "id,token,answer,created_at,invites(sender_id,to_name,film_title,tmdb_id)"
         )
         out = []
@@ -689,10 +744,27 @@ class SupabaseStore:
         except (json.JSONDecodeError, TypeError):
             return 0
 
+    # CAS-1091: none of these views carries a declared primary key (they're plain `group by`
+    # aggregates — supabase/schema.sql), so the paging order is each view's own group-by columns,
+    # the set that is already guaranteed unique per output row by the grouping itself.
+    _VIEW_ORDER = {
+        "analytics_sessions": "client_key.asc,session.asc",
+        "analytics_acquisition": "day.asc,source.asc,medium.asc,campaign.asc",
+        "analytics_onboarding_funnel": "step.asc",
+        "analytics_activation": "day.asc",
+        "analytics_retention": "cohort_week.asc,plat.asc",
+        "analytics_feature_usage": "feature.asc",
+    }
+
     def fetch_view(self, view_name: str) -> list:
         """CAS-1021: every row of a public view or table, select=* — used by metrics_report.py to
-        read the CAS-942 analytics_* views without a bespoke method per view."""
-        return self._get(f"/{view_name}?select=*")
+        read the CAS-942 analytics_* views without a bespoke method per view. CAS-1091: a view with
+        no known unique key to page on is refused rather than fetched unpaged — add it to
+        _VIEW_ORDER (or flag needs-lee if it truly has none) before wiring a new view in here."""
+        order = self._VIEW_ORDER.get(view_name)
+        if not order:
+            raise ValueError(f"fetch_view({view_name!r}): no known unique key to page on (CAS-1091)")
+        return self._get(f"/{view_name}?select=*&order={order}")
 
     def delete_old_usage_events(self, days: int = 180) -> int:
         """CAS-942: purge usage_events rows older than `days`, with the same service_role
