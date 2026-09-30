@@ -6,7 +6,7 @@
 // keeps the account "already set up" so sign-in skips the onboarding wizard straight to the main app,
 // exactly as CAS-886's own spec proves.
 import { test, expect } from "@playwright/test";
-import { gotoFresh } from "./helpers.mjs";
+import { bootAlreadySignedIn } from "./helpers.mjs";
 
 const SEEDED_CASCADE = { id: "928aaaa1-0000-4000-8000-000000000001", user_id: "cas928-user",
   name: "Existing agent", criteria: {}, created_at: "2020-01-01T00:00:00.000Z" };
@@ -69,24 +69,14 @@ function fakeSupabaseScript(friendsFixture){
 }
 
 /** A real (faked) sign-in with the friends fixture loaded off the genuine 'cascade-auth-change' event —
- * same route as CAS-886's own bootSignedIn. */
+ * same route as CAS-886's own bootSignedIn. CAS-1084: thin adapter over helpers.mjs's shared
+ * bootAlreadySignedIn. */
 async function bootSignedIn(page, friendsFixture){
-  await page.route("**/config.js", route => route.fulfill({
-    contentType: "application/javascript",
-    body: `window.CASCADE_CONFIG = { SUPABASE_URL: "https://fake-project.supabase.test", SUPABASE_ANON_KEY: "fake-anon-key-not-a-real-secret" };`,
-  }));
-  await page.route("**/supabase-js.js", route => route.fulfill({
-    contentType: "application/javascript",
-    body: fakeSupabaseScript(friendsFixture),
-  }));
-  await gotoFresh(page);
-  await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
-  await page.locator("#splashCta").click();
-  await expect(page.locator("#obWho")).toBeVisible();
-  await page.evaluate(() => window.__cas928ResolveSession());
-  await page.waitForFunction(() => window.CascadeAuth.status === "signed-in", null, { timeout: 5000 });
-  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
-  await page.waitForFunction(() => typeof friendsReady !== "undefined" && friendsReady === true, null, { timeout: 5000 });
+  await bootAlreadySignedIn(page, {
+    supabaseScript: fakeSupabaseScript(friendsFixture),
+    resolveFnName: "__cas928ResolveSession",
+    readyFlagExpr: "typeof friendsReady !== 'undefined' && friendsReady === true",
+  });
 }
 
 async function openInviteSheet(page){

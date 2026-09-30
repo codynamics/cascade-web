@@ -5,7 +5,7 @@
 // technique CAS-969's spec uses for Capacitor.Plugins.InAppReview. The friends fixture / fake Supabase
 // client is CAS-928.spec.mjs's own bootSignedIn recipe, trimmed to what this ticket needs.
 import { test, expect } from "@playwright/test";
-import { gotoFresh } from "./helpers.mjs";
+import { bootAlreadySignedIn } from "./helpers.mjs";
 
 const SEEDED_CASCADE = { id: "932aaaa1-0000-4000-8000-000000000001", user_id: "cas932-user",
   name: "Existing agent", criteria: {}, created_at: "2020-01-01T00:00:00.000Z" };
@@ -59,23 +59,14 @@ async function primeCapacitor(page, native, pickResult){
   }, { native, pickResult });
 }
 
+/** CAS-1084: thin adapter over helpers.mjs's shared bootAlreadySignedIn — same recipe as CAS-928's own
+ * bootSignedIn, trimmed to this spec's single (empty) friends fixture. */
 async function bootSignedIn(page){
-  await page.route("**/config.js", route => route.fulfill({
-    contentType: "application/javascript",
-    body: `window.CASCADE_CONFIG = { SUPABASE_URL: "https://fake-project.supabase.test", SUPABASE_ANON_KEY: "fake-anon-key-not-a-real-secret" };`,
-  }));
-  await page.route("**/supabase-js.js", route => route.fulfill({
-    contentType: "application/javascript",
-    body: fakeSupabaseScript(),
-  }));
-  await gotoFresh(page);
-  await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
-  await page.locator("#splashCta").click();
-  await expect(page.locator("#obWho")).toBeVisible();
-  await page.evaluate(() => window.__cas932ResolveSession());
-  await page.waitForFunction(() => window.CascadeAuth.status === "signed-in", null, { timeout: 5000 });
-  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
-  await page.waitForFunction(() => typeof friendsReady !== "undefined" && friendsReady === true, null, { timeout: 5000 });
+  await bootAlreadySignedIn(page, {
+    supabaseScript: fakeSupabaseScript(),
+    resolveFnName: "__cas932ResolveSession",
+    readyFlagExpr: "typeof friendsReady !== 'undefined' && friendsReady === true",
+  });
 }
 
 async function openAddForm(page){

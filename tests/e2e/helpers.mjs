@@ -198,6 +198,46 @@ export async function settleListing(page){
   return last;
 }
 
+/** CAS-1084: shared boot for specs that fake a sign-in to an account which already holds an agent, so the
+ * fixture (invites/friends/whatever) loads via the app's own real 'cascade-auth-change' event instead of a
+ * hand-set CascadeAuth object (which never fires it). This is the exact route CAS-740's own AC4 test
+ * (smoke.spec.mjs) proves works: splashGo() always calls flowStart() with no idea yet whether the device is
+ * signed in, so a fake getSession() that doesn't resolve until the test calls it explicitly reproduces that
+ * ordering deterministically — landing on v2_about ("Cascade finds your movies for you.", #onbStepInner
+ * .obhd) first, then afterSignIn() exits the wizard once the (fake, resolved) session says the account
+ * already has agents. Replaces three specs' former local bootSignedIn copies, each of which instead waited
+ * on `#obWho` — a v1 "who's watching" onboarding screen the v2 rework deleted outright (zero hits left in
+ * app_template.html), which is why they'd hang until timeout.
+ *
+ * `resolveFnName` is the window-global each spec's own fake supabase-js script parks its getSession
+ * resolver on (e.g. "__cas886ResolveSession") — a real `window.X = ...` assignment, so plain property
+ * lookup reaches it. `readyFlagExpr`, given when a caller also needs to wait on the fixture actually
+ * landing, is a page-context boolean expression string (e.g. "typeof invitesReady !== 'undefined' &&
+ * invitesReady === true") rather than a bare flag name: like MOVIES (see gotoFresh above), invitesReady/
+ * friendsReady are top-level `let`s in app_template.html's classic script, not window properties, so
+ * `window[name]` can't reach them — only a real expression evaluated in page scope can. */
+export async function bootAlreadySignedIn(page, { supabaseScript, resolveFnName, readyFlagExpr }){
+  await page.route("**/config.js", route => route.fulfill({
+    contentType: "application/javascript",
+    body: `window.CASCADE_CONFIG = { SUPABASE_URL: "https://fake-project.supabase.test", SUPABASE_ANON_KEY: "fake-anon-key-not-a-real-secret" };`,
+  }));
+  await page.route("**/supabase-js.js", route => route.fulfill({
+    contentType: "application/javascript",
+    body: supabaseScript,
+  }));
+  await gotoFresh(page);
+  await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
+  await page.locator("#splashCta").click();
+  // splashGo() always starts the wizard (flowStart()) before the (deferred, async) auth module has had any
+  // chance to answer whether this device is signed in — mirrors CAS-740 AC4's own first assertion after
+  // this same click (smoke.spec.mjs).
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about (CAS-953)
+  await page.evaluate(name => window[name](), resolveFnName);
+  await page.waitForFunction(() => window.CascadeAuth.status === "signed-in", null, { timeout: 5000 });
+  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+  if(readyFlagExpr) await page.waitForFunction(readyFlagExpr, null, { timeout: 5000 });
+}
+
 /** The listing's section headers, as {window, count}. */
 export function sectionCounts(page){
   return page.locator("#groups .group").evaluateAll(gs => gs.map(g => ({

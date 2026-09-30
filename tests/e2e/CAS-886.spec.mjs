@@ -6,7 +6,7 @@
 // the account "already set up" so sign-in skips the onboarding wizard straight to the main app, exactly as
 // CAS-740's own AC4 test proves.
 import { test, expect } from "@playwright/test";
-import { gotoFresh } from "./helpers.mjs";
+import { bootAlreadySignedIn } from "./helpers.mjs";
 
 const SEEDED_CASCADE = { id: "886aaaa1-0000-4000-8000-000000000001", user_id: "cas886-user",
   name: "Existing agent", criteria: {}, created_at: "2020-01-01T00:00:00.000Z" };
@@ -64,24 +64,14 @@ function fakeSupabaseScript(invitesFixture){
 }
 
 /** A real (faked) sign-in to an account that already holds an agent — CAS-740 AC4's own proven route past
- * the onboarding wizard — with loadInvites() run off the genuine 'cascade-auth-change' event this produces. */
+ * the onboarding wizard — with loadInvites() run off the genuine 'cascade-auth-change' event this produces.
+ * CAS-1084: thin adapter over helpers.mjs's shared bootAlreadySignedIn. */
 async function bootSignedIn(page, invitesFixture){
-  await page.route("**/config.js", route => route.fulfill({
-    contentType: "application/javascript",
-    body: `window.CASCADE_CONFIG = { SUPABASE_URL: "https://fake-project.supabase.test", SUPABASE_ANON_KEY: "fake-anon-key-not-a-real-secret" };`,
-  }));
-  await page.route("**/supabase-js.js", route => route.fulfill({
-    contentType: "application/javascript",
-    body: fakeSupabaseScript(invitesFixture),
-  }));
-  await gotoFresh(page);
-  await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
-  await page.locator("#splashCta").click();
-  await expect(page.locator("#obWho")).toBeVisible();
-  await page.evaluate(() => window.__cas886ResolveSession());
-  await page.waitForFunction(() => window.CascadeAuth.status === "signed-in", null, { timeout: 5000 });
-  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
-  await page.waitForFunction(() => typeof invitesReady !== "undefined" && invitesReady === true, null, { timeout: 5000 });
+  await bootAlreadySignedIn(page, {
+    supabaseScript: fakeSupabaseScript(invitesFixture),
+    resolveFnName: "__cas886ResolveSession",
+    readyFlagExpr: "typeof invitesReady !== 'undefined' && invitesReady === true",
+  });
 }
 
 // AC2a
