@@ -480,7 +480,7 @@
   .flabel:first-child{margin-top:0}
   /* One visible focus ring for every interactive thing the new UI added. A control you can Tab to but
      can't SEE that you've Tabbed to is not keyboard-operable in any way that matters. */
-  .chip:focus-visible,.qpill:focus-visible,.hatch:focus-visible,.ebtn:focus-visible,.cschip:focus-visible,
+  .chip:focus-visible,.qpill:focus-visible,.hatch:focus-visible,.ebtn:focus-visible,
   .mlbtn:focus-visible,.ca-btn:focus-visible,.tpl:focus-visible,.actbtn:focus-visible,
   .iconbtn:focus-visible,.modechip:focus-visible,.donebtn:focus-visible,.applybtn:focus-visible,
   .dangerbtn:focus-visible,.secbtn:focus-visible{
@@ -1233,15 +1233,6 @@
   .ebtn:hover{border-color:var(--accent)}
   .ebtn b{color:#a7eccb;white-space:nowrap}
   .ebtn.ghost{justify-content:center;color:var(--faint);border-style:dashed}
-  .cascstart{margin:2px 12px 0;background:linear-gradient(135deg,rgba(124,92,255,.12),rgba(72,199,142,.07));
-    border:1px solid #3b3560;border-radius:13px;padding:12px}
-  .csh{font-size:13.5px;font-weight:800;color:var(--ink)}
-  .csp{font-size:12px;color:var(--dim);line-height:1.55;margin:4px 0 9px}
-  .cschips{display:flex;flex-wrap:wrap;gap:6px}
-  .cschip{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:20px;
-    padding:7px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
-  .cschip:hover{border-color:var(--accent)}
-  .cschip b{color:#a7eccb;font-weight:800}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;display:none}
   .overlay.open{display:block}
   /* CAS-553: diagnostics panel — a centered box inside the shared .overlay backdrop, not a full-bleed
@@ -1361,10 +1352,6 @@
      inconsistency CAS-64 is here to kill. */
 
   .mlempty{color:var(--faint);font-size:12.5px;line-height:1.6;text-align:center;padding:34px 12px}
-  /* CAS-102: the starter block now lives HERE, in the empty Found view. The empty state centres its text;
-     the block is a read-and-choose panel, so it keeps its own left alignment and drops the side margin it
-     needed when it sat loose in the Cascades bar. */
-  .mlempty .cascstart{margin:16px 0 0;text-align:left}
 
   /* ---- the provenance sheet (CAS-67) ---- */
   /* Tap the megaphone anywhere and this is what opens: who put the film on your Found list, which Cascade is
@@ -9439,25 +9426,6 @@ function watchAlsoShowPool(){
   const wsearch=watchSearch[watchTab];
   return wsearch ? pool.filter(m=>m.title.toLowerCase().includes(wsearch)) : pool;
 }
-// First run: the deck is just the "+ New" card, which asks for a decision without offering a reason. Give them
-// three real starting points instead — each with the number of films it catches TODAY, so the payoff is visible
-// before they commit to anything (goal-gradient, and nothing to sign up for).
-function cascadeStartHTML(){
-  if(cascades.length) return "";
-  // CAS-517: a returning signed-in device that hasn't heard back from the account fetch yet reads
-  // `cascades` as empty too, same as a genuinely new account — cascadesReady is what tells them apart,
-  // so this stays silent (rather than nagging a returning member to start over) until it's true.
-  if(!cascadesReady) return "";
-  return `<div class="cascstart">
-    <div class="csh">Put your first Cascade to work</div>
-    <div class="csp">Cascade does the watching for you — set one going and it finds the films while you get on
-      with your life. Start from one of these (you can change every part of it):</div>
-    <div class="cschips">${QUICK_STARTS.map(t=>{
-      const n=countCriteria(t.crit);
-      return `<button class="cschip" onclick="quickStart('${t.key}')">${t.icon} ${t.name} <b>${n}</b></button>`;
-    }).join("")}</div>
-  </div>`;
-}
 // ---- "Finish your agent" (CAS-71) — removed by CAS-273 --------------------------
 // The services question used to be asked a second time here, on top of the listing, once the agent had found
 // you something. The ask is already made where it belongs — in the flow that builds the agent, and any time
@@ -9473,17 +9441,9 @@ function cascadeStartHTML(){
 // A held film keeps the answer it had when you tapped it, so the chip on a stub doesn't flicker.
 const isFresh = m => heldOpen.has(m.tmdb_id) ? heldOpen.get(m.tmdb_id).fresh
                                             : (foundSource(m.tmdb_id)==="auto" && isNewFound(m.tmdb_id));
-// CAS-134: the chrome above the list and the receipts below it are drawn the SAME way in both scopes. That is
-// the whole point of the ticket — the listing must not look like a different product depending on how you got
-// to it, and the surest way to guarantee that is to have one function draw it.
 function renderListChrome(){
   const el=$("listChrome"); if(!el) return;
-  // CAS-150: the starter block used to live in the empty "New" list, which is where a first-time user landed.
-  // CAS-566: it sits above the listing rather than inside its empty state because the listing's own empty
-  // state (scopeRows()/emptyResultsHTML(), R3) is reserved for "this agent matched nothing" — a genuinely
-  // different message from "you have no agent yet". It shows while there are no Cascades at all, and goes
-  // the moment there is one.
-  el.innerHTML = cascadeStartHTML();   // CAS-273: "Finish your agent" no longer rides above the listing
+  el.innerHTML = "";
 }
 // CAS-136: the membership-setup banner is no longer part of the listing — it sits at the very top of the
 // content, above the cascade scroll, so it cannot be scrolled past without being read. Still gated by
@@ -10888,7 +10848,7 @@ function scopeEmptyHTML(){
 }
 function emptyResultsHTML(){
   // CAS-566: zero agents is not "this agent's filters matched nothing" — there is no agent, and nothing to
-  // relax or reset. cascadeStartHTML() (rendered above the listing) already carries the call to action.
+  // relax or reset.
   if(!cascades.length) return "";
   // CAS-718: every agent is always in scope now — the deck's per-list picker that used to justify naming a
   // multi-agent watch list is gone, so only the single-agent case still names anyone; two or more falls
@@ -10995,13 +10955,6 @@ window.newCascade=newCascade;
 const draftFromTemplate = t => ({id:null, template:t.key, icon:t.icon, name:t.name,
   ...JSON.parse(JSON.stringify(t.crit))});
 function startFromTemplate(t){ logEvent("template_opened",{key:t.key}); draft=draftFromTemplate(t); openEditor("New Cascade"); }
-// First-run shortcuts on the empty deck. Straight into the editor, pre-filled — never a straight-to-save.
-const QUICK_STARTS = ["watch_tonight","bargain","my_taste"].map(k=>CASCADE_TEMPLATES.find(t=>t.key===k));
-window.quickStart=key=>{
-  const t=CASCADE_TEMPLATES.find(x=>x.key===key); if(!t) return;
-  logEvent("quickstart",{key});
-  startFromTemplate(t); openModal($("builder"));
-};
 // Save the current draft as a Cascade and open it. Shared by the builder's apply and onboarding's starter.
 function commitDraft(){
   const name=(draft.name||"").trim() || CASCADE_TEMPLATES.find(t=>t.key===draft.template)?.name || "My Cascade";
@@ -18878,11 +18831,13 @@ function afterSignIn(){
     return;
   }
   showFoundList(); render();
-  // CAS-403: an empty account still lands on the app (the empty-deck quick-starts), never the
-  // onboarding wizard — signing in is arrival, not a first run. The wizard stays reachable from the
-  // splash's own entry point for a genuine new user who chooses it.
+  // CAS-1082: reverses CAS-403. An account whose agent list has actually finished loading (this function
+  // only runs once it has) and still holds none has never really been onboarded, whatever a stale device
+  // flag claims — the account itself is the authority here (CAS-186, above). Straight into the flow that
+  // builds its first agents; membStartWork() commits the roster, lands on Watch, and applies any pending
+  // deep link once onboarding genuinely finishes.
   logEvent("signin_empty_account");
-  applyDeepLink();   // CAS-962: same reasoning — this is arrival, not a first run
+  flowStart();
 }
 
 // ---- Re-engagement: what Cascade found while you weren't looking (CAS-69) ------------------------------
