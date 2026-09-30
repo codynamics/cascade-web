@@ -27,6 +27,7 @@ import json
 import os
 import sys
 
+from .catalogue import load_today
 from .emailer import DEFAULT_SITE_URL, SITE_URL_ENV, send_via_resend
 from .store import InMemoryStore, store_from_env
 
@@ -42,19 +43,26 @@ def email_subject(row) -> str:
     return f"{sender} invited you to watch {film}"
 
 
-def render_email(row) -> dict:
-    """Return {'subject', 'html', 'text'} for one invite_emails row."""
+def render_email(row, movie=None) -> dict:
+    """Return {'subject', 'html', 'text'} for one invite_emails row. `movie` is the invited
+    film's today-catalogue record (for its poster), or None if it has since dropped out of the
+    catalogue — the same resolve-by-caller shape format_invite_reply (emailer.py) already uses."""
     esc = _html.escape
     subject = email_subject(row)
     to_name = row.get("to_name") or "there"
     sender = row.get("sender_name") or "A friend"
     film = row.get("film_title") or "a film"
     url = invite_url(row)
+    poster = (movie or {}).get("poster")
 
     text = (
-        f"{sender} wants to know if you're in for {film}.\n\n"
-        f"Say yes or no: {url}"
+        f"{sender} has invited you to watch {film}.\n\n"
+        f"View invite: {url}"
     )
+    poster_img = (
+        f'<img src="https://image.tmdb.org/t/p/w342{esc(poster)}" width="160" '
+        f'style="border-radius:10px;display:block;margin-top:14px;" alt="{esc(film)}">'
+    ) if poster else ''
     html_doc = (
         '<!doctype html><html><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1"></head>'
@@ -68,16 +76,17 @@ def render_email(row) -> dict:
         '<tr><td>'
         '<div style="font-size:18px;font-weight:700;letter-spacing:1px;color:#7C5CFF;'
         'text-transform:uppercase;">Cascade</div>'
+        f'{poster_img}'
         f'<div style="font-size:15px;color:#141A2A;margin-top:14px;">'
-        f'{esc(sender)} wants to know if you\'re in for <b>{esc(film)}</b>.</div>'
+        f'{esc(sender)} has invited you to watch <b>{esc(film)}</b>.</div>'
         '</td></tr>'
         '<tr><td style="padding-top:20px;">'
         f'<a href="{esc(url)}" style="display:inline-block;background:#6b48f2;color:#ffffff;'
         'text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:11px;">'
-        'Say yes or no</a>'
+        'View invite</a>'
         '</td></tr>'
         '<tr><td style="padding-top:18px;font-size:12px;color:#8b95a5;">'
-        f'{esc(to_name)}, you got this because someone who uses Cascade invited you to watch with them.'
+        f'{esc(to_name)}, you got this because {esc(sender)} invited you to watch with them.'
         '</td></tr>'
         '</table></td></tr></table></body></html>'
     )
@@ -116,6 +125,8 @@ def main(argv=None) -> int:
 
     print(f"[monitor.invitemail] {len(rows)} unsent invite email(s).")
 
+    movies_by_id = {str(m.get("tmdb_id")): m for m in load_today()}
+
     sent, skipped, failed = 0, 0, 0
     for row in rows:
         if row.get("tmdb_id") is None:
@@ -123,7 +134,8 @@ def main(argv=None) -> int:
                   "invite — skipping.")
             skipped += 1
             continue
-        email = render_email(row)
+        movie = movies_by_id.get(str(row.get("tmdb_id")))
+        email = render_email(row, movie)
         if args.dry_run:
             print(f"[monitor.invitemail] would send to {row.get('to_email')!r}: {email['subject']!r}")
             print(email["text"])
