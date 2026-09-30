@@ -409,6 +409,12 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps webkit
 
+      # CAS-1093: scripts/test-integrity.mjs loads schema.sql via psql (a multi-statement script, which
+      # `supabase db query --file` can't run). Most ubuntu-latest runners already carry it; this is a no-op
+      # when they do.
+      - name: Ensure psql is available
+        run: command -v psql || (sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client)
+
       - name: Account integrity (local Supabase)
         timeout-minutes: 25
         run: |

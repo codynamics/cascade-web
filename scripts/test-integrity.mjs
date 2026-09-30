@@ -14,10 +14,17 @@
 // hides migrations/ from the CLI's automatic first-boot replay and loads schema.sql directly instead,
 // matching the documented bootstrap path rather than the by-hand incremental one.
 //
-// Why the local URL/anon/service_role keys are read back from `supabase status` rather than hardcoded: the
-// CLI generates them per-stack from supabase/config.toml + its own JWT secret, and reading them keeps this
-// script correct across CLI versions instead of quietly drifting from whatever the installed CLI actually
-// started.
+// Why psql, not `supabase db query --file`: that command sends the whole file as one prepared statement,
+// which Postgres rejects for a multi-statement script ("cannot insert multiple commands into a prepared
+// statement") — schema.sql is exactly that. psql runs it the same way the README's own SQL-Editor step
+// runs it live: as a plain multi-statement script.
+//
+// Why the local URL/anon/service_role keys (and the db connection string) are read back from
+// `supabase status -o env` rather than hardcoded: the CLI generates them per-stack from
+// supabase/config.toml + its own JWT secret, and reading them keeps this script correct across CLI
+// versions instead of quietly drifting from whatever the installed CLI actually started. The lookup below
+// matches by field-name pattern rather than one exact name because the CLI has already renamed these once
+// (anon/service_role key -> Publishable/Secret key) between versions.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 
@@ -26,16 +33,29 @@ function run(cmd, args, extraEnv){
   if(res.status !== 0) throw new Error(`${cmd} ${args.join(" ")} exited ${res.status}`);
 }
 
-function supabaseStatusText(){
-  const res = spawnSync("npx", ["supabase", "status"], { encoding: "utf8" });
-  if(res.status !== 0) throw new Error(`supabase status exited ${res.status}:\n${res.stderr}`);
-  return res.stdout;
+function supabaseStatusEnv(){
+  const res = spawnSync("npx", ["supabase", "status", "-o", "env"], { encoding: "utf8" });
+  if(res.status !== 0) throw new Error(`supabase status -o env exited ${res.status}:\n${res.stderr}`);
+  const map = {};
+  for(const line of res.stdout.split(/\r?\n/)){
+    const m = line.match(/^([A-Za-z0-9_]+)=(.*)$/);
+    if(!m) continue;
+    let value = m[2].trim();
+    if(value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+    map[m[1]] = value;
+  }
+  return map;
 }
 
-function readField(text, label){
-  const m = text.match(new RegExp(`^\\s*${label}:\\s*(\\S+)`, "im"));
-  if(!m) throw new Error(`supabase status output had no "${label}:" line — CLI output shape may have changed:\n${text}`);
-  return m[1];
+function readEnvField(map, candidateNames, label){
+  const hit = Object.entries(map).find(([k]) => candidateNames.some(n => n.toLowerCase() === k.toLowerCase()));
+  if(!hit){
+    throw new Error(`supabase status -o env had no ${label} key (looked for ${candidateNames.join(" / ")}) — got keys: ${Object.keys(map).join(", ")}`);
+  }
+  if(hit[1].includes("***")){
+    throw new Error(`${label} value from supabase status -o env looks masked (${hit[1]}) — expected the unmasked machine-readable form`);
+  }
+  return hit[1];
 }
 
 const MIGRATIONS_DIR = "supabase/migrations";
@@ -52,13 +72,14 @@ try{
 }
 
 try{
-  console.log("[test:integrity] loading supabase/schema.sql into the fresh local database...");
-  run("npx", ["supabase", "db", "query", "--local", "--file", "supabase/schema.sql"]);
+  const statusEnv = supabaseStatusEnv();
+  const dbUrl = readEnvField(statusEnv, ["DB_URL", "DATABASE_URL"], "database connection");
+  const apiUrl = readEnvField(statusEnv, ["API_URL", "PROJECT_URL"], "API URL");
+  const anonKey = readEnvField(statusEnv, ["ANON_KEY", "PUBLISHABLE_KEY"], "anon/publishable key");
+  const serviceRoleKey = readEnvField(statusEnv, ["SERVICE_ROLE_KEY", "SECRET_KEY"], "service_role/secret key");
 
-  const status = supabaseStatusText();
-  const apiUrl = readField(status, "API URL");
-  const anonKey = readField(status, "anon key");
-  const serviceRoleKey = readField(status, "service_role key");
+  console.log("[test:integrity] loading supabase/schema.sql into the fresh local database...");
+  run("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-f", "supabase/schema.sql"]);
 
   console.log("[test:integrity] building the app...");
   run("python", ["poc_pipeline.py", "--build-html"]);
