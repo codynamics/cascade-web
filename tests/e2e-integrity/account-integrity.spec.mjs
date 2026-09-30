@@ -91,8 +91,8 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
     await pageA.locator(`.agrow[data-id="${seededAgent.id}"] .ag-edit`).click();
     await pageA.locator(".eapenc").click();
     await pageA.locator("#onbStepName").fill(newName);
-    await pageA.locator(".osback").click();
-    await pageA.locator(".osback").click();
+    await pageA.locator("#onbStepInner .osback").click();
+    await pageA.locator("#onbStepInner .osback").click();
     // saveCascades() debounces the actual push 400ms out (scheduleSync); force it rather than waiting on
     // the timer — window.CascadePersistence.syncNow is runSync itself, idempotent to call directly.
     await pageA.evaluate(() => window.CascadePersistence.syncNow());
