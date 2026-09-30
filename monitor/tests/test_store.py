@@ -2,11 +2,17 @@
 user holds state on, across four tables, as a set of strings ready to be sorted straight into
 state/user_held_ids.json.
 
+CAS-1091: SupabaseStore._get() pages through every result rather than trusting PostgREST's
+unpaged default, which silently truncates at the project's max-rows setting.
+
 Run:  python -m unittest monitor.tests.test_store   (from the repo root)
 """
+import json
 import unittest
+import unittest.mock
+import urllib.parse
 
-from monitor.store import InMemoryStore
+from monitor.store import InMemoryStore, SupabaseStore
 
 
 class FetchUserHeldIds(unittest.TestCase):
@@ -38,6 +44,66 @@ class FetchUserHeldIds(unittest.TestCase):
     def test_nothing_held_anywhere_is_an_empty_set_not_an_error(self):
         store = InMemoryStore()
         self.assertEqual(store.fetch_user_held_ids(), set())
+
+
+class _FakeResponse:
+    """Minimal stand-in for the object urllib.request.urlopen() hands back as a context manager."""
+
+    def __init__(self, rows):
+        self._body = json.dumps(rows).encode("utf-8")
+
+    def read(self):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+
+class SupabaseStoreGetPagesEveryResult(unittest.TestCase):
+    """CAS-1091: a fake HTTP layer serving rows in server-capped pages of 1,000 — smaller than
+    _get's own requested limit, so a page only ever comes up short because the server capped it,
+    the same shape a real max-rows setting produces."""
+
+    def _fake_store(self, total_rows: int, server_page_size: int):
+        rows = [{"id": i} for i in range(total_rows)]
+        requests = []
+
+        def fake_urlopen(req, timeout=None):
+            requests.append(req.full_url)
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(req.full_url).query)
+            offset = int(qs.get("offset", ["0"])[0])
+            page = rows[offset: offset + server_page_size]
+            return _FakeResponse(page)
+
+        store = SupabaseStore("https://example.test.invalid", "fake-key")
+        patcher = unittest.mock.patch("monitor.store.urllib.request.urlopen", side_effect=fake_urlopen)
+        return store, requests, patcher
+
+    def test_2037_rows_in_pages_of_1000_come_back_whole_in_3_requests(self):
+        store, requests, patcher = self._fake_store(total_rows=2037, server_page_size=1000)
+        with patcher:
+            result = store._get("/widgets?select=*&order=id.asc")
+        self.assertEqual(len(result), 2037)
+        self.assertEqual([r["id"] for r in result], list(range(2037)))
+        self.assertEqual(len(requests), 3)
+        for url in requests:
+            self.assertIn("order=", url)
+
+    def test_a_row_count_under_one_page_needs_one_request(self):
+        store, requests, patcher = self._fake_store(total_rows=37, server_page_size=1000)
+        with patcher:
+            result = store._get("/widgets?select=*&order=id.asc")
+        self.assertEqual(len(result), 37)
+        self.assertEqual(len(requests), 1)
+
+    def test_missing_order_is_refused_rather_than_fetched_unpaged(self):
+        store, _requests, patcher = self._fake_store(total_rows=1, server_page_size=1000)
+        with patcher:
+            with self.assertRaises(ValueError):
+                store._get("/widgets?select=*")
 
 
 if __name__ == "__main__":
