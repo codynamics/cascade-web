@@ -117,9 +117,11 @@ test("CAS-955: every onboarding step fires onbstep_shown once per entry, ahead o
   const continues = log.filter(e => e.type === "onbstep_continue");
 
   // AC(b): the flow's first step shows before any continue exists in the log at all.
+  // CAS-953 inserted v2_about ahead of v2_intro as the first-run entry step (see gotoStep's own
+  // comment), so that — not v2_intro — is the first step this log should ever show.
   const firstRelevant = log.find(e => e.type === "onbstep_shown" || e.type === "onbstep_continue");
   expect(firstRelevant.type).toBe("onbstep_shown");
-  expect(firstRelevant.step).toBe("v2_intro");
+  expect(firstRelevant.step).toBe("v2_about");
 
   // AC(a): every step that produced a continue also produced a shown with the identical step value.
   const shownSteps = new Set(shown.map(e => e.step));
