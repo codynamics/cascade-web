@@ -44,10 +44,11 @@ test("CAS-789: every required export resolves from tests/js/engine.mjs", () => {
 
 // Cinema/Rental/Streaming usable, Premium off — watchPrefsDefaults()'s own shape, made explicit
 // so this file never depends on whatever an earlier test (in this file or another) left the
-// global watchPrefs pointing at.
+// global watchPrefs pointing at. CAS-1123 dropped the separate Notify flag — a window carries
+// just `list` now — so this fixture no longer carries one either.
 const WATCH_PREFS = {
-  in_cinema: { list: true, notify: false }, premium: { list: false, notify: false },
-  rent: { list: true, notify: false }, stream: { list: true, notify: false },
+  in_cinema: { list: true }, premium: { list: false },
+  rent: { list: true }, stream: { list: true },
 };
 function withWatchPrefs(overrides, fn){
   const saved = E.watchPrefs;
@@ -557,7 +558,7 @@ test("C1: switching a window off clears windowEnabled, drops it from msnTrackAre
   E.recomputeFound();
   assert.equal(E.notify[id].wins.in_cinema, true, "setup: the film must earn Cinema, the first usable rung");
 
-  withWatchPrefs({ in_cinema: { list: false, notify: false } }, () => {
+  withWatchPrefs({ in_cinema: { list: false } }, () => {
     assert.equal(E.windowEnabled("in_cinema"), false, "C1: windowEnabled must read false once switched off");
     const html = E.msnTrackAreaHTML(c);
     assert.doesNotMatch(html, /data-key="in_cinema"/, "C1: a switched-off window must render no marker");
@@ -589,7 +590,7 @@ test("C3: disabling a film's own current window (and anything later) resolves st
   // WATCH_LEVEL_KEYS' standing scan starts AT the film's own current rung, not strictly after it —
   // for a film already at Stream (the ladder's last rung), "every window later than its own" has
   // no members, so its own window has to go too for the scan to actually run dry.
-  withWatchPrefs({ stream: { list: false, notify: false } }, () => {
+  withWatchPrefs({ stream: { list: false } }, () => {
     E.recomputeFound();
     assert.equal(E.notify[id].wins.stream, false, "C3: standing must no longer be able to claim Stream");
     assert.equal(E.notify[id].wins.in_cinema, true, "C3: placement must fall back to earned (Cinema) — the film keeps a Watch On");
