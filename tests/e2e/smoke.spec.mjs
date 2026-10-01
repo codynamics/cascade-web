@@ -444,14 +444,14 @@ async function openFirstAgentMission(page){
   await expect(page.locator(".msntrackwrap")).toBeVisible();
 }
 
-test("Mission screen: one score track, exactly one handle; Premium becomes a followed window, not a second one (CAS-1113)", async ({ page }) => {
+test("Mission screen: one score track, exactly one handle; a newly account-enabled window starts as an OFF pill, not auto-armed (CAS-1128)", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
 
   await openFirstAgentMission(page);
   await expect(page.locator(".msntrackwrap")).toHaveCount(1);
-  // CAS-1113: one score for the whole agent now — exactly one handle, whatever windows it lists.
+  // CAS-1128: one score for the whole agent — exactly one handle, whatever windows it lists.
   await expect(page.locator(".msnmark")).toHaveCount(1);
 
   // Back out (nothing was actually changed on this visit), then switch Premium on for real through the
@@ -470,12 +470,13 @@ test("Mission screen: one score track, exactly one handle; Premium becomes a fol
   await closeWhereWhenScreen(page);
 
   await openFirstAgentMission(page);
-  // CAS-1113: Premium now ranks after Cinema (this agent's start window), so switching it on makes it a
-  // FOLLOWED window at the start's own score — msnChipsHTML's own plain ✓ chip, never a second handle.
+  // CAS-1128: windows are independent per-agent toggles now (the CAS-917 start-window-forward model this
+  // retires would have auto-armed Premium at the agent's existing score) — enabling Premium for the account
+  // adds its pill, but it starts OFF/unticked, never a second handle.
   await expect(page.locator(".msnmark")).toHaveCount(1);
-  const premiumChip = page.locator(".msnchip", { hasText: "Premium" });
-  await expect(premiumChip.locator(".msnchipck")).toBeVisible();
-  await expect(page.locator(".msnmark")).toHaveCount(1);
+  const premiumPill = page.locator(".msnpill", { hasText: "Premium" });
+  await expect(premiumPill).toBeVisible();
+  await expect(premiumPill).toHaveClass(/off/);
 });
 
 test("Mission screen: dragging the single handle moves every listed window's score together, never independently (CAS-1113)", async ({ page }) => {
@@ -486,11 +487,10 @@ test("Mission screen: dragging the single handle moves every listed window's sco
 
   // Arrange a known starting point — Cinema, Rent and Stream all listed at the same real score, through the
   // real mutator (setAgentScore) rather than poking watchMarkers by hand. msnRebuild() re-renders
-  // #msnTrackArea and rewires it, the same way the real chip actions do whenever the listed-window set or
-  // its score changes.
+  // #msnTrackArea and rewires it, the same way a real pill tap does whenever the ON set or its score changes.
   await page.evaluate(() => {
     const c = onbFlow.draft;
-    setAgentScore(c, "in_cinema", 90);
+    setAgentScore(c, 90);
     msnRebuild();
   });
   const before = await page.evaluate(() => ({ ...onbFlow.draft.watchMarkers }));
@@ -512,8 +512,8 @@ test("Mission screen: dragging the single handle moves every listed window's sco
 
   const after = await page.evaluate(() => ({ ...onbFlow.draft.watchMarkers }));
   expect(after.in_cinema, JSON.stringify({ before, after })).toBeLessThan(before.in_cinema);
-  // CAS-1113: one score for the whole agent — every listed window must move together, never independently
-  // (the old MARKER_MIN_GAP push/never-cross/never-stack guarantees this ticket retired).
+  // CAS-1113/CAS-1128: one score for the whole agent — every ON window must move together, never
+  // independently (the old MARKER_MIN_GAP push/never-cross/never-stack guarantees retired by CAS-1113).
   expect(after.rent).toBe(after.in_cinema);
   expect(after.stream).toBe(after.in_cinema);
   await expect(page.locator(".msnmark")).toHaveCount(1);

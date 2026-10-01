@@ -444,15 +444,17 @@ if(typeof window.CascadeAuth === "undefined"){
   // and notifyChipHTML (the Watch On chip's own render, alongside agentChipHTML above) — plain top-level
   // functions, exported directly like the rest of this file.
   windowEnabled, msnTrackAreaHTML, msnValueLine, notifyChipHTML,
-  // CAS-917: windowFollowed (the start-window model's own predicate) and msnChipsHTML (the "On this
-  // track" chip row, alongside msnValueLine/msnTrackAreaHTML above) — exported so a test can assert both
-  // the placement decision and its two render surfaces directly.
-  windowFollowed, msnChipsHTML,
-  // CAS-1113: msnListedWindows is the shared "start window + everything it lists" decision msnValueLine/
-  // msnChipsHTML/msnTrackAreaHTML all read — exported so a test can assert it directly. msnLastScore
-  // (a single remembered value, replacing the retired per-window msnLastValue map) is reassigned by
-  // setAgentScore, so it's exposed through a getter/setter like flowKind/watchTab elsewhere in this file.
-  msnListedWindows,
+  // CAS-1128: windowFollowed (now a plain "enabled AND ON" predicate, the CAS-917 start-window-forward
+  // model retired) and msnPillsHTML (the independent per-window "Track in" pill row that replaces the
+  // retired start/follow chip row, msnChipsHTML) — exported so a test can assert both the placement
+  // decision and its render surfaces directly.
+  windowFollowed, msnPillsHTML,
+  // CAS-1128: msnOnWindows is the shared "which windows is this agent actually tracking" decision
+  // msnValueLine/msnPillsHTML/msnTrackAreaHTML all read — exported so a test can assert it directly.
+  // toggleAgentWindow is the pill-tap mutator, alongside setAgentScore (the drag mutator) above. msnLastScore
+  // (a single remembered value) is reassigned by both, so it's exposed through a getter/setter like
+  // flowKind/watchTab elsewhere in this file.
+  msnOnWindows, toggleAgentWindow,
   get msnLastScore(){ return msnLastScore; },
   setMsnLastScore(v){ msnLastScore=v; },
   // CAS-790/791: found — the live membership Set recomputeFound rebuilds every pass, by reference like

@@ -674,13 +674,14 @@ test("CAS-854 AC3: a released film is unaffected by the Cinema-Never gate, on bo
 // AC2: for every agent and film, listedBy(m,c) implies cascadeScore(m) >= c.scoreFloor. No exceptions —
 // checked both across the real preset/lane matrix (CASES) and directly against matchesCriteria with a custom
 // floor, since listedBy narrows further (window/pin state) and must not be the only place this holds.
-test("CAS-724 AC2: no listed film's Cascade score is below its own agent's scoreFloor — no exceptions but Off (CAS-762)", () => {
+test("CAS-724 AC2: no listed film's Cascade score is below its own agent's scoreFloor", () => {
   for(const { kind, s, label } of CASES){
     pickInLane(E, kind, s.key);
     const d = E.onbApply();
     const listed = E.MOVIES.filter(m => E.listedBy(m, d));
-    // CAS-762: a floor of 0 is Off — no score requirement, so an unscored film (-1) legitimately lists there.
-    for(const m of listed) assert.ok(d.scoreFloor === 0 || E.cascadeScore(m) >= d.scoreFloor,
+    // CAS-1128: a literal scoreFloor of 0 no longer survives normCascade (it migrates to TRACK_MIN), so the
+    // >= check below holds unconditionally now — the old "0 is Off" escape (CAS-762, retired) is dead here.
+    for(const m of listed) assert.ok(E.cascadeScore(m) >= d.scoreFloor,
       `${label}: ${m.title} lists at Cascade score ${E.cascadeScore(m)}, below its own agent's floor ${d.scoreFloor}`);
   }
   const floored = missionCase({ scoreFloor: 70 });
@@ -688,13 +689,13 @@ test("CAS-724 AC2: no listed film's Cascade score is below its own agent's score
   assert.ok(scoredBelow.length > 0, "no film scored below 70 in the fixture catalogue — this test would prove nothing");
   for(const m of scoredBelow) assert.equal(E.matchesCriteria(m, floored), false,
     `${m.title} scores ${E.cascadeScore(m)}, below the agent's floor of 70, but still matched`);
-  // CAS-762 supersedes rule 4 at a floor of 0 (Off): that floor is now no score requirement at all, so an
-  // unscored film DOES clear it — a floor of 0 is exactly the case AC2's own >= check above can never see,
-  // since cascadeScore(m) >= d.scoreFloor is -1 >= 0 (false) for a film this rule now legitimately admits.
+  // CAS-1128 retires CAS-762's "a floor of 0 is Off, no score requirement" reading: normCascade now migrates
+  // any literal 0 marker (however it arrives — a legacy watchMarkers value or, as here, the legacy scoreFloor
+  // seed) up to TRACK_MIN (50) and keeps it ON, so missionCase({scoreFloor:0}) is an ordinary 50-floor agent
+  // now, not an Off one — rule 4 holds there exactly as it does at any other real floor.
   const unscored = E.MOVIES.find(m => E.cascadeScore(m) === -1 && E.matchesCriteria(m, missionCase(), undefined, true));
-  if(unscored) assert.equal(E.matchesCriteria(unscored, missionCase({ scoreFloor: 0 })), true,
-    `${unscored.title} has no Cascade score and its agent's floor is Off (0) — CAS-762 says that admits it`);
-  // and rule 4 still holds wherever there IS a real floor: any positive floor keeps denying a scoreless film.
+  if(unscored) assert.equal(E.matchesCriteria(unscored, missionCase({ scoreFloor: 0 })), false,
+    `${unscored.title} has no Cascade score but was admitted at scoreFloor:0 — CAS-1128 migrates that to a real floor (TRACK_MIN), not Off`);
   if(unscored) assert.equal(E.matchesCriteria(unscored, missionCase({ scoreFloor: 50 })), false,
     `${unscored.title} has no Cascade score but was admitted at a real floor of 50`);
 });
@@ -751,10 +752,15 @@ test("CAS-724: scoreHeldBackCount agrees with its own set, at a real floor", () 
     E.invalidateComputeCaches();
   }
 });
-// CAS-762: at a floor of 0 (Off) scoreHeldBackCount must read 0 — nothing is excluded by score any more.
-test("CAS-762: scoreHeldBackCount is 0 for an agent whose floor is Off", () => {
+// CAS-1128 retires CAS-762's "scoreFloor 0 means Off" reading — a literal 0 now migrates to TRACK_MIN (50)
+// through normCascade, so this is an ordinary 50-floor agent, and scoreHeldBackCount must count exactly the
+// unscored films that floor excludes, the same as any other real floor.
+test("CAS-1128: scoreHeldBackCount at scoreFloor:0 counts against the migrated TRACK_MIN floor, not zero", () => {
   const d = missionCase({ status: ["included_streaming", "pvod", "rental"], scoreFloor: 0 });
-  assert.equal(E.scoreHeldBackCount(d), 0, "an Off-floor agent must hold nothing back for having no score");
+  assert.equal(E.agentFloor(d), 50, "setup: scoreFloor:0 must migrate to TRACK_MIN, never stay Off");
+  const held = E.scoreHeldBackCount(d);
+  const heldFilms = E.MOVIES.filter(m => E.cascadeScore(m) === -1 && !E.taggedOut(m) && !E.listedBy(m, d) && E.listedBy(m, d, true));
+  assert.equal(held, heldFilms.length, "scoreHeldBackCount must agree with its own unscored-and-would-list set");
 });
 
 // ---- 10b. THE CHOSEN SORT'S OWN COMPARATOR DECIDES THE ORDER (CAS-702) ------------------------------------
@@ -1280,7 +1286,7 @@ test("CAS-727 AC2(b): in cinemas, a score between the Rental and Cinema markers 
   }
 });
 
-test("CAS-727 AC2(c)/(d)/AC3-in-miniature: earned is fixed at admission — a film travels forward with its status, and a marker-less window after the start still follows", () => {
+test("CAS-727 AC2(c)/(d)/AC3-in-miniature: earned is fixed at admission — a film travels forward with its status, and a window dropped to Off (CAS-1128) is skipped, not followed", () => {
   const film = scoredUnwatchedFilm(["upcoming"]);
   const id = film.tmdb_id;
   const savedStatus = film.status;
@@ -1300,17 +1306,16 @@ test("CAS-727 AC2(c)/(d)/AC3-in-miniature: earned is fixed at admission — a fi
       assert.equal(E.notify[id].wins.rent, true, "AC2(c): standing overtakes earned once the film reaches rental");
       assert.equal(E.notify[id].wins.in_cinema, false);
 
-      // (d), CAS-917 start-window model: this agent's start window is Cinema (its earliest marker-carrying
-      // window), so Rental — later than the start — is a FOLLOWED window regardless of whether it carries
-      // its own marker. Setting it to Never (no marker) no longer skips it forward to the next real marker
-      // (Streaming) the way it did before CAS-917 — a null marker on a window after the start now means
-      // "follows", not "excluded". Removing Rental's marker must still land the film at Rental.
+      // (d), CAS-1128: windows are independent on/off now (CAS-917's start-window-forward model retired) —
+      // dropping Rental's own marker to Never switches that window OFF for this agent, so placement must
+      // skip it, not land on it. Streaming still carries its own marker (never nulled by this test), so the
+      // film moves on to it, the next window it reaches that this agent still has ON.
       const c = E.cascades.find(x => x.id === cId);
       c.watchMarkers.rent = null;
       E.recomputeFound();
-      assert.equal(E.notify[id].wins.rent, true, "AC2(d): a marker-less Rental after the start window still follows");
+      assert.equal(E.notify[id].wins.rent, false, "AC2(d), CAS-1128: an OFF Rental must never be placed in");
       assert.equal(E.notify[id].wins.in_cinema, false);
-      assert.equal(E.notify[id].wins.stream, false);
+      assert.equal(E.notify[id].wins.stream, true, "AC2(d), CAS-1128: placement must move on to the next ON window (Streaming)");
     });
   } finally {
     delete E.notify[id];
