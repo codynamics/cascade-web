@@ -297,7 +297,11 @@ jobs:
   # with a final step failing the job if either did.
   integrity:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # CAS-1110: the two steps below carry their own 20m/25m budgets (45m) with nothing left over for
+    # checkout/npm ci/playwright+apt install/psql setup ahead of them — this job's own timeout used to be
+    # exactly that sum, so a cold cache on either setup phase could starve the step that runs last. 55m
+    # leaves real headroom instead of relying on every setup step hitting a warm cache.
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -387,6 +391,15 @@ jobs:
           name: qa-failure-e2e
           path: qa-failures/e2e.txt
           retention-days: 7
+
+      # CAS-1110: a step killed by its own timeout-minutes (the e2e step above, when the suite overruns
+      # 20m) can leave webkit/playwright child processes behind that the shell's own exit doesn't reap —
+      # harmless on their own, but the integrity step right after launches its own webkit instance against
+      # the same runner, so clear the slate first rather than risk the two contending for the same
+      # resources. A no-op on a clean exit.
+      - name: Clean up any leftover e2e browser processes
+        if: always()
+        run: pkill -9 -f 'ms-playwright' || true
 
       - name: Account integrity (local Supabase)
         id: integrity_run

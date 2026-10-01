@@ -5,6 +5,7 @@
 // pickStarter() directly would still pass with every button on the page unwired, which is most of what an
 // end-to-end suite is for.
 import { expect } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
 
 export const PRESET_NAMES = {
   // CAS-261: Nominees & Awards left the cinema lane — the cinema control set is Scale + Buzz, so there was
@@ -37,29 +38,56 @@ export async function freshApp(page){
   return gotoFresh(page);
 }
 
-/** CAS-1110: CASCADE_E2E_SUPABASE_URL/ANON_KEY/SESSION are set by scripts/test-e2e.mjs, which starts a
- * local Supabase stack and creates the one shared signed-in test user the whole suite runs as — never the
- * live project, which this never touches. Thrown lazily (not at import time) so specs that don't call
- * freshAppSignedIn()/toShortlist() can still import this module without the wrapper script running. */
+/** CAS-1110: CASCADE_E2E_SUPABASE_URL/ANON_KEY/SERVICE_ROLE_KEY are set by scripts/test-e2e.mjs, which
+ * starts a local Supabase stack — never the live project, which this never touches. Read lazily (not at
+ * import time) so specs that don't call freshAppSignedIn()/toShortlist() can still import this module
+ * without the wrapper script running. */
 function signedInEnv(){
   const url = process.env.CASCADE_E2E_SUPABASE_URL;
   const anonKey = process.env.CASCADE_E2E_SUPABASE_ANON_KEY;
-  const sessionJson = process.env.CASCADE_E2E_SESSION;
-  if(!url || !anonKey || !sessionJson){
-    throw new Error('freshAppSignedIn()/toShortlist() need CASCADE_E2E_SUPABASE_URL, CASCADE_E2E_SUPABASE_ANON_KEY and CASCADE_E2E_SESSION — run this suite via "npm run test:e2e", not Playwright directly');
+  const serviceRoleKey = process.env.CASCADE_E2E_SUPABASE_SERVICE_ROLE_KEY;
+  if(!url || !anonKey || !serviceRoleKey){
+    throw new Error('freshAppSignedIn()/toShortlist() need CASCADE_E2E_SUPABASE_URL, CASCADE_E2E_SUPABASE_ANON_KEY and CASCADE_E2E_SUPABASE_SERVICE_ROLE_KEY — run this suite via "npm run test:e2e", not Playwright directly');
   }
-  return { url, anonKey, session: JSON.parse(sessionJson) };
+  return { url, anonKey, serviceRoleKey };
+}
+
+let e2eUserSeq = 0;
+/** A fresh, never-reused test email per call to freshAppSignedIn — see the function's own comment for why
+ * a shared account across the whole run isn't safe here. */
+function e2eTestEmail(){
+  e2eUserSeq += 1;
+  return `cas1110-e2e-${Date.now()}-${e2eUserSeq}@e2e.test`;
 }
 
 /** CAS-1110: the signed-in equivalent of freshApp — routes config.js at the local Supabase stack and
- * injects the shared test user's real session into localStorage before the app's first script runs, so
+ * injects a brand-new test user's real session into localStorage before the app's first script runs, so
  * CascadeAuth resolves signed-in on boot instead of guest. The storage key matches supabase-js's own
  * default derivation from the project URL (see supabase-js.js / app_template.html's own createClient
  * call: `sb-${new URL(url).hostname.split(".")[0]}-auth-token`) — a real confirmed session against the
  * real local stack, not a fake client. gotoFresh's own clear-storage-then-reload is unaffected: addInitScript
- * re-runs on every navigation in this page, so the session is back in place by the second `goto`. */
+ * re-runs on every navigation in this page, so the session is back in place by the second `goto`.
+ *
+ * A fresh user per call, not one user shared by the whole suite (tests/e2e-integrity/helpers.mjs's
+ * createTestUser/testEmail pattern, mirrored here): server-side account data (agents, cascades, ...) now
+ * lives on the account, not localStorage, so a shared account would carry every earlier test's onboarding
+ * into the next one — gotoFresh's localStorage.clear() only wipes the client cache, not the server rows a
+ * signed-in boot immediately reloads. A fresh account per call keeps each test exactly as isolated as the
+ * guest-mode suite always was. */
 export async function freshAppSignedIn(page){
-  const { url, anonKey, session } = signedInEnv();
+  const { url, anonKey, serviceRoleKey } = signedInEnv();
+  const admin = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const email = e2eTestEmail();
+  const { error: createErr } = await admin.auth.admin.createUser({ email, email_confirm: true });
+  if(createErr) throw new Error(`createUser(${email}) failed: ${createErr.message}`);
+  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({ type: "magiclink", email });
+  if(linkErr) throw new Error(`generateLink(${email}) failed: ${linkErr.message}`);
+  const code = linkData && linkData.properties && linkData.properties.email_otp;
+  if(!code) throw new Error(`generateLink(${email}) returned no email_otp`);
+  const anon = createClient(url, anonKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data: verifyData, error: verifyErr } = await anon.auth.verifyOtp({ email, token: code, type: "email" });
+  if(verifyErr) throw new Error(`verifyOtp(${email}) failed: ${verifyErr.message}`);
+
   const storageKey = `sb-${new URL(url).hostname.split(".")[0]}-auth-token`;
   await page.route("**/config.js", route => route.fulfill({
     status: 200,
@@ -68,7 +96,7 @@ export async function freshAppSignedIn(page){
   }));
   await page.addInitScript(([key, value]) => {
     try{ localStorage.setItem(key, value); }catch(e){}
-  }, [storageKey, JSON.stringify(session)]);
+  }, [storageKey, JSON.stringify(verifyData.session)]);
   return gotoFresh(page);
 }
 
@@ -85,10 +113,11 @@ export const numberIn = s => {
  * first counted step. Kept the name from the old flow's shortlist-of-agents screen this replaces;
  * `kind` only nudges the cinema question now, since every roster this builds is a MIX of agents —
  * there is no lane left to choose.
- * CAS-1110: boots signed in (freshAppSignedIn), not guest — the shared test user starts with no agents,
- * so the wizard runs exactly as it did signed out; only membScreen's email gate (toListing, below) differs,
- * and it already no-ops when the device is already signed in. Specs testing the splash/onboarding entry
- * itself, or sign-in/out mechanics directly, boot signed out on purpose and don't call this. */
+ * CAS-1110: boots signed in (freshAppSignedIn), not guest — the fresh test account it creates starts with
+ * no agents, so the wizard runs exactly as it did signed out; only membScreen's email gate (toListing,
+ * below) differs, and it already no-ops when the device is already signed in. Specs testing the
+ * splash/onboarding entry itself, or sign-in/out mechanics directly, boot signed out on purpose and don't
+ * call this. */
 export async function toShortlist(page, kind){
   await freshAppSignedIn(page);
   await page.locator("#splashCta").click();
