@@ -20369,6 +20369,49 @@ else if(dedupedN)
   // device never learns about, or one abandoned mid-flight) must not retry forever; past this many rounds
   // it is sent anyway, same as a cascade_id this device doesn't hold at all.
   const AGENT_FILM_DEFER_MAX_ATTEMPTS = 10;
+  // CAS-1136: recomputeFound's first pass on a newly-signed-in device can admit a large share of the real
+  // catalogue in one synchronous sweep (a wide-open agent — no restrictive criteria — has nothing to narrow
+  // it). Pushing one acctOp per admission, each a separate round trip sendQueue sends strictly one at a
+  // time, turned that into hundreds of serialized requests — slow/flaky enough under real network latency
+  // to starve an unrelated sign-out on the same tab of its own turn (the account-integrity S3 regression).
+  // Every admission queued within one synchronous pass is collected here instead and sent as a handful of
+  // batched upserts — still one row per admission, still never a delete, just far fewer requests.
+  const AGENT_FILM_PUSH_BYTE_CAP = 48000;   // CAS-1054's own browser keepalive-quota reasoning, carried over
+  const AGENT_FILM_PUSH_CHUNK_SIZE = 200;   // CAS-1039's own row-count cap, carried over
+  let pendingAgentFilmPushes = new Map();   // key -> {owner, cascadeId, movieId, row}
+  let agentFilmPushFlushTimer = null;
+  function chunkAgentFilmPushes(pending){
+    const out=[]; let cur=[], curBytes=0;
+    for(const p of pending){
+      const bytes = new TextEncoder().encode(JSON.stringify(p.row)).length;
+      if(cur.length && (curBytes+bytes>AGENT_FILM_PUSH_BYTE_CAP || cur.length>=AGENT_FILM_PUSH_CHUNK_SIZE)){
+        out.push(cur); cur=[]; curBytes=0;
+      }
+      cur.push(p); curBytes+=bytes;
+    }
+    if(cur.length) out.push(cur);
+    return out;
+  }
+  function flushAgentFilmPushes(){
+    agentFilmPushFlushTimer = null;
+    const pending = [...pendingAgentFilmPushes.values()];
+    pendingAgentFilmPushes.clear();
+    if(!window.CascadeAccountStore || !pending.length) return;
+    // A sign-out (or account switch) between queuing and this flush leaves a stale entry pointed at an
+    // account no longer signed in — same guard as pushAgentFilmAdmission's own deferCtx.owner check below.
+    const owner = uid();
+    const ready = pending.filter(p=>p.owner===owner);
+    if(!ready.length) return;
+    chunkAgentFilmPushes(ready).forEach(batch=>{
+      const op={ table:"agent_films", kind:"upsert_many",
+                 items: batch.map(p=>({ match:{ user_id:p.owner, cascade_id:p.cascadeId, movie_id:p.movieId },
+                                         fields:{ admitted_at:p.row.admitted_at, admission_score:p.row.admission_score,
+                                                  admission_status:p.row.admission_status, agent_sig:p.row.agent_sig } })),
+                 onConflict:"user_id,cascade_id,movie_id" };
+      op.onDone=(ok,err)=>recordSyncOutcome("agent_films", ok, err);
+      window.CascadeAccountStore.acctOp(op);
+    });
+  }
   function pushAgentFilmAdmission(cascadeId, movieId, row, deferCtx){
     if(!accountActive()) return;
     const owner=uid(); if(!owner) return;
@@ -20386,13 +20429,8 @@ else if(dedupedN)
       setTimeout(()=>pushAgentFilmAdmission(cascadeId, movieId, row, { owner, attempt:attempt+1 }), AGENT_FILM_DEFER_MS);
       return;
     }
-    const op={ table:"agent_films", kind:"upsert",
-               match:{ user_id:owner, cascade_id:cascadeId, movie_id:String(movieId) },
-               fields:{ admitted_at:row.admitted_at, admission_score:row.admission_score,
-                        admission_status:row.admission_status, agent_sig:row.agent_sig },
-               onConflict:"user_id,cascade_id,movie_id" };
-    op.onDone=(ok,err)=>recordSyncOutcome("agent_films", ok, err);
-    return window.CascadeAccountStore.acctOp(op);
+    pendingAgentFilmPushes.set(agentFilmKey(cascadeId,String(movieId)), { owner, cascadeId, movieId:String(movieId), row });
+    if(!agentFilmPushFlushTimer) agentFilmPushFlushTimer = setTimeout(flushAgentFilmPushes, 0);
   }
   function setAgentFilm(cascadeId, movieId, {admission_score, admission_status, agent_sig, admitted_at}={}){
     const key=agentFilmKey(cascadeId,String(movieId));
@@ -20947,10 +20985,11 @@ else if(dedupedN)
     try{
       // CAS-1096: onConflict travels too — an "upsert" kind op (the composite-key tables this ticket
       // moves onto acctOp) needs its real conflict target on every retry, including one that only starts
-      // after a reload has reconstructed this op from the plain JSON below.
+      // after a reload has reconstructed this op from the plain JSON below. CAS-1136: items travels the
+      // same way for "upsert_many" — the batched admission seam's own op shape.
       const plain = queue.map(op => ({ id: op.id, table: op.table, kind: op.kind, match: op.match,
                                         fields: op.fields, expectUpdatedAt: op.expectUpdatedAt,
-                                        onConflict: op.onConflict }));
+                                        onConflict: op.onConflict, items: op.items }));
       localStorage.setItem(opQueueKey(), JSON.stringify(plain));
     }catch(e){}
   }
@@ -20988,6 +21027,21 @@ else if(dedupedN)
         op._wasNew = true;
         rows.push(Object.assign({}, op.match, op.fields));
       }
+    } else if(op.kind === "upsert_many"){
+      // CAS-1136: agent_films' own batched-admission seam (pushAgentFilmAdmission/flushAgentFilmPushes) —
+      // the same insert-or-update-in-place reasoning as "upsert" above, just several rows in one op so a
+      // burst of admissions from one recomputeFound pass costs one request instead of one per row.
+      op._results = op.items.map(item=>{
+        const row = rows.find(r => rowMatches(r, item.match));
+        if(row){
+          const prev = {};
+          Object.keys(item.fields).forEach(k => { prev[k] = row[k]; });
+          Object.assign(row, item.fields);
+          return { wasNew:false, prev };
+        }
+        rows.push(Object.assign({}, item.match, item.fields));
+        return { wasNew:true };
+      });
     } else if(op.kind === "delete"){
       const idx = rows.findIndex(r => rowMatches(r, op.match));
       if(idx >= 0){ op._prevRow = rows[idx]; rows.splice(idx, 1); }
@@ -21010,6 +21064,17 @@ else if(dedupedN)
         const row = rows.find(r => rowMatches(r, op.match));
         if(row) Object.assign(row, op._prev);
       }
+    } else if(op.kind === "upsert_many" && op._results){
+      op.items.forEach((item,i)=>{
+        const res = op._results[i];
+        if(res.wasNew){
+          const idx = rows.findIndex(r => rowMatches(r, item.match));
+          if(idx >= 0) rows.splice(idx, 1);
+        } else if(res.prev){
+          const row = rows.find(r => rowMatches(r, item.match));
+          if(row) Object.assign(row, res.prev);
+        }
+      });
     } else if(op.kind === "delete" && op._prevRow){
       rows.push(op._prevRow);
     }
@@ -21029,6 +21094,17 @@ else if(dedupedN)
       // CAS-1096: op.onConflict names the real composite key (e.g. "user_id,movie_id") — a retry of the
       // same op can never duplicate the row, same reasoning as the "insert" kind above.
       return await c.from(op.table).upsert(Object.assign({}, op.match, op.fields), { onConflict:op.onConflict });
+    }
+    if(op.kind === "upsert_many"){
+      // CAS-1136: the same composite-key reasoning as "upsert" above, one request for every row in op.items.
+      // A real FK/RLS rejection fails the whole multi-row statement, not just the offending row — unlike
+      // "upsert"'s own single-row retry-and-isolate fallback (cascades' syncToAccount does the same for its
+      // own 42501s), a poisoned item here drops its whole batch. Acceptable here: pushAgentFilmAdmission's
+      // own CAS-1064 defer already keeps an unconfirmed cascade's rows out of a batch in the first place, so
+      // this is a narrower, already-rare edge case, and a dropped batch still surfaces via recordSyncOutcome
+      // (the degraded banner) rather than silently vanishing.
+      const rows = op.items.map(item => Object.assign({}, item.match, item.fields));
+      return await c.from(op.table).upsert(rows, { onConflict:op.onConflict });
     }
     if(op.kind === "update"){
       let q = c.from(op.table).update(op.fields).match(op.match);

@@ -5,6 +5,13 @@
 // real seam (CascadePersistence.setAgentFilm/clearAgentFilm -> pushAgentFilmAdmission ->
 // CascadeAccountStore.acctOp) against a stubbed Supabase client, the same convention
 // cas1096-account-store.test.mjs uses for the other acctOp-backed tables.
+//
+// CAS-1136: pushAgentFilmAdmission no longer sends one upsert per admission straight away — every admission
+// queued within one synchronous pass (recomputeFound's own first-sign-in sweep, chiefly) now batches into
+// one "upsert_many" acctOp op, sent as a single multi-row request (see flushAgentFilmPushes/the acctOp
+// "upsert_many" kind in app_template.html). The fake client's upsert() therefore always receives an ARRAY
+// of rows, even a batch of one — every assertion below indexes into that array rather than reading a bare
+// row off the call.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
@@ -16,9 +23,9 @@ function makeFakeClient(){
     upsertCalls, deleteCalls,
     from(table){
       return {
-        upsert(row){
-          upsertCalls.push({ table, row });
-          return { then(resolve){ return Promise.resolve({ data: [row], error: null, status: 201 }).then(resolve); } };
+        upsert(rows){
+          upsertCalls.push({ table, rows });
+          return { then(resolve){ return Promise.resolve({ data: rows, error: null, status: 201 }).then(resolve); } };
         },
         delete(){
           const chain = {
@@ -52,10 +59,39 @@ test("CAS-1097: a film's first admission on an agent issues exactly one agent_fi
       { admission_score: 72, admission_status: "stream", agent_sig: "sig-1" });
     await settle();
     const calls = client.upsertCalls.filter(c => c.table === "agent_films");
-    assert.equal(calls.length, 1, "exactly one upsert for the film's first admission");
-    assert.equal(calls[0].row.cascade_id, cascadeId);
-    assert.equal(calls[0].row.movie_id, "9700001");
-    assert.equal(calls[0].row.admission_score, 72);
+    assert.equal(calls.length, 1, "exactly one upsert request for the film's first admission");
+    assert.equal(calls[0].rows.length, 1, "that request carries exactly one row");
+    assert.equal(calls[0].rows[0].cascade_id, cascadeId);
+    assert.equal(calls[0].rows[0].movie_id, "9700001");
+    assert.equal(calls[0].rows[0].admission_score, 72);
+  } finally {
+    E.CascadePersistence.cascadeKnown.delete(cascadeId);
+    signOut(E);
+  }
+});
+
+test("CAS-1136: several admissions queued within one synchronous pass batch into a single upsert request", async () => {
+  const E = loadEngine();
+  const client = makeFakeClient();
+  const cascadeId = "cas1136-agent-batch";
+  signIn(E, client);
+  E.CascadePersistence.cascadeKnown.set(cascadeId, { sig: "known" });
+  try {
+    // recomputeFound's own first-sign-in sweep calls setAgentFilm once per newly-matched film, all within
+    // one synchronous pass — this is the shape that used to cost one serialized request per film.
+    for(let i=0; i<5; i++){
+      E.CascadePersistence.setAgentFilm(cascadeId, 9701000+i,
+        { admission_score: 70+i, admission_status: "stream", agent_sig: "sig-1" });
+    }
+    await settle();
+    const calls = client.upsertCalls.filter(c => c.table === "agent_films");
+    assert.equal(calls.length, 1, "five admissions queued in one pass must cost exactly one request");
+    assert.equal(calls[0].rows.length, 5, "the one request carries every queued admission");
+    // JSON.stringify, not assert.deepEqual: calls[0].rows was built inside the vm-loaded engine (a
+    // different realm), so comparing it against a literal array here trips assert/strict's prototype
+    // check even when every element already matches — the same dodge client-health-events.test.mjs uses.
+    const movieIds = calls[0].rows.map(r => r.movie_id).sort();
+    assert.equal(JSON.stringify(movieIds), JSON.stringify(["9701000","9701001","9701002","9701003","9701004"]));
   } finally {
     E.CascadePersistence.cascadeKnown.delete(cascadeId);
     signOut(E);
