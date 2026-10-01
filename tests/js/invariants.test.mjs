@@ -19,6 +19,15 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 // CAS-764: acctRead's real backoff (~400ms/~1.2s) is a UX choice for a live device, not something this
 // suite should sit through on every retry-to-failure test below — zero it once, for every test in this file.
 E.CascadePersistence.ACCT_READ_DELAYS = [0, 0];
+// CAS-1097: acctOp's own backoff (~400ms/~1.2s/~3.6s) is the same kind of live-device UX delay, not
+// something to sit through either — zero it once, same reasoning as ACCT_READ_DELAYS above. agent_films
+// joining acctOp means an admission churned by one test's own recomputeFound() pass can land a retry here.
+E.CascadeAccountStore.ACCT_OP_RETRY_DELAYS = [0, 0, 0];
+// CAS-1097: pushAgentFilmAdmission's own cascade-confirmation defer (~500ms, up to 10 rounds) is the same
+// class of delay — zero it so a deferred retry armed by one test's recomputeFound() pass resolves on the
+// very next tick rather than landing mid-way through a LATER, unrelated test (every test in this file
+// shares one fake uid, so the defer's own owner check can't tell two different tests' sessions apart).
+E.CascadePersistence.AGENT_FILM_DEFER_MS = 0;
 
 // Every preset in every lane it is offered in — the real matrix a person can walk into.
 const LANES = ["cinema", "stream"];
@@ -2220,7 +2229,7 @@ test("CAS-726: a locally-written agent_films row (setAgentFilm) survives a push-
 
   E.CascadePersistence.setAgentFilm(cascadeId, m.tmdb_id,
     { admission_score: 91, admission_status: "upcoming", agent_sig: "sig-c" });
-  await E.CascadePersistence.syncAgentFilmsNow();
+  await new Promise(r => setTimeout(r, 0));   // CAS-1097: let pushAgentFilmAdmission's own acctOp call resolve
   await E.CascadePersistence.loadAgentFilms();   // simulate a reload
 
   const rows = E.CascadePersistence.agentFilmsFor(cascadeId);
@@ -2529,14 +2538,34 @@ function withCas734State(fn){
   const savedEdited = new Map(E.CascadePersistence.cascadeEditedAt);
   E.CascadePersistence.cascadeKnown.clear();
   E.CascadePersistence.cascadeEditedAt.clear();
+  // CAS-1097: these tests are about cascade conflict resolution, not admission — but loadAccount/
+  // reconcileCascades both call render(), which calls the real recomputeFound(), which now pushes one
+  // real agent_films acctOp row per film the (deliberately wide-open, `{order:0}`) fixture cascades here
+  // admit off the real built catalogue. That is hundreds of synchronous acctOp calls sharing the one
+  // queue this suite's cascades-only fake client was never built to answer, which was turning every test
+  // after this block into a multi-second (and once, 300-second) wait on backoff this suite should never
+  // sit through. Stubbed out for exactly the span these tests run, same convention as
+  // ACCT_READ_DELAYS/ACCT_OP_RETRY_DELAYS being zeroed elsewhere for a UX delay this suite isn't about.
+  const realAcctOp = E.CascadeAccountStore.acctOp;
+  E.CascadeAccountStore.acctOp = op => (op.table === "agent_films" ? Promise.resolve() : realAcctOp(op));
   return (async () => {
     try { await fn(); }
     finally {
+      // AC3(d) below seeds a cascade deliberately never confirmed into cascadeKnown — the real case
+      // pushAgentFilmAdmission's own defer chain (up to AGENT_FILM_DEFER_MAX_ATTEMPTS=10 rounds) exists
+      // for, and with no confirmation ever arriving it runs every round before giving up and sending
+      // anyway. loadAccount() above doesn't await that chain (it's fire-and-forget), so it can still be
+      // mid-flight here — drain it (AGENT_FILM_DEFER_MS is zeroed file-wide, so 10 rounds is a handful of
+      // ticks) while the agent_films stub above is still in place, or a late round lands after acctOp is
+      // restored below, against whatever client a LATER test has since signed in with (every test here
+      // shares one fake uid, so pushAgentFilmAdmission's own owner check can't catch the mismatch).
+      await new Promise(r => setTimeout(r, 50));
       E.cascades.length = 0; savedCascades.forEach(c => E.cascades.push(c));
       E.CascadePersistence.cascadeKnown.clear();
       savedKnown.forEach((v, k) => E.CascadePersistence.cascadeKnown.set(k, v));
       E.CascadePersistence.cascadeEditedAt.clear();
       savedEdited.forEach((v, k) => E.CascadePersistence.cascadeEditedAt.set(k, v));
+      E.CascadeAccountStore.acctOp = realAcctOp;
       signOut();
     }
   })();

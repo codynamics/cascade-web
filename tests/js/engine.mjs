@@ -362,6 +362,12 @@ if(typeof window.CascadeAuth === "undefined"){
   // decide whether an agent has changed and what its current floor is — exported so a test can compute the
   // exact signature/floor a seeded agent_films row should carry, rather than guessing at internal state.
   cascSigOf, agentFloor,
+  // CAS-1097: earnedWindowForScore/autoPlacementFor/autoPlacementForAdmission are recomputeFound's own
+  // Watch-On placement arithmetic, extracted into standalone pure functions so the monitor's
+  // placement_shim.mjs can ask the exact same question (a frozen admission_score -> the window it earns,
+  // carried forward to the film's current standing) through this same harness, rather than a second,
+  // hand-ported copy — the CAS-825 lesson applied to placement, not just admission.
+  earnedWindowForScore, autoPlacementFor, autoPlacementForAdmission,
   // CAS-1113: setAgentScore is the one real mutator a user-driven score edit goes through now (it also
   // clears the *Defaulted provenance flag normCascade's own guess sets) — exported so a test can drive a
   // genuine edit through the real function rather than poking c.watchMarkers by hand. Replaces the retired

@@ -21,7 +21,8 @@ import json
 import os
 import unittest
 
-from monitor import (compute_transitions, match, matches_criteria, compute_admission, service_ok,
+from monitor import (compute_transitions, match, matches_criteria, compute_admission,
+                     compute_auto_placements, synthesize_auto_watch_rows, service_ok,
                      notification_rows, suppressed_pairs, excluded_moments, match_film_watches,
                      match_newly_qualified, match_new_to_agent)
 from monitor.matching import Hit, agent_channels, MOMENT_TO_WINDOW
@@ -352,6 +353,80 @@ class WindowPlacementTests(unittest.TestCase):
         counts = {}
         match(cascades, [no_row_t], admission=admission, film_watches=[], placement_counts=counts)
         self.assertEqual(counts, {"no_placement": 1})
+
+
+class AutoPlacementTests(unittest.TestCase):
+    """CAS-1097: agent_films stops being client-pushed CURRENT membership — but an admitted film
+    with no film_watch row of its own (automatic placement stopped being client-pushed per CAS-1096)
+    still needs a placement for WindowPlacementTests' own CAS-841 gate to see it.
+    compute_auto_placements()/synthesize_auto_watch_rows() derive one from agent_films' frozen
+    admission_score, via placement_shim.mjs — the same earned/standing arithmetic
+    recomputeFound's own placement block runs on the device (app_template.html's
+    earnedWindowForScore/autoPlacementFor/autoPlacementForAdmission). A real film_watch row —
+    manual, or a legacy pre-CAS-1096 auto one — always wins outright."""
+
+    def _movie(self, tmdb_id=9001, status=("included_streaming",)):
+        return {"tmdb_id": tmdb_id, "title": "Auto Placed Film", "genres": ["Drama"],
+                "status": list(status), "cinema_date": "2026-01-01", "language": "en",
+                "wm_critic_score": 70, "popularity": 50, "wm_popularity_percentile": 70,
+                "wm_user_rating": 7.5}
+
+    def _cascade(self, moments, stream_marker=50):
+        # Only `stream` is a usable window — in_cinema/premium/rent are off (Never), so the score-earn
+        # ladder can only ever land on Stream, never short-circuit on an earlier always-open rung.
+        # Built directly, not via _criteria() above — that helper always overwrites watchMarkers with
+        # _OPEN_MARKERS, which this test's whole point (an earn that lands specifically on Stream)
+        # needs full control over.
+        markers = {"in_cinema": None, "premium": None, "rent": None, "stream": stream_marker}
+        return [{"id": "c1", "user_id": "u1", "name": "Everything", "active": True,
+                 "alert_moments": list(moments),
+                 "criteria": {"genre": ["Drama"], "imdb": 7.0, "watchMarkers": markers}}]
+
+    def test_an_admitted_film_with_no_film_watch_row_is_auto_placed_in_stream(self):
+        movie = self._movie()
+        cascades = self._cascade(["hits_stream"])
+        agent_films = [{"user_id": "u1", "cascade_id": "c1", "movie_id": "9001", "admission_score": 80}]
+
+        auto_placements = compute_auto_placements(agent_films, cascades, [movie], account_prefs={})
+        self.assertEqual(auto_placements, {("u1", "9001"): "stream"},
+            "an admission at a score above the Stream marker, with every earlier window off, must earn Stream")
+
+        auto_rows = synthesize_auto_watch_rows(auto_placements, placed_keys=set())
+        admission = _admit(cascades, today=[movie])
+        t = Transition("9001", movie["title"], "hits_stream", movie=movie)
+        hits = match(cascades, [t], admission=admission, film_watches=auto_rows)
+        self.assertEqual(len(hits.get("u1", [])), 1,
+            "a film admitted by an agent and auto-placed in Stream, with no film_watch row, must be "
+            "treated as Stream")
+
+    def test_a_manual_film_watch_row_overrides_the_synthesized_auto_placement(self):
+        movie = self._movie()
+        cascades = self._cascade(["hits_stream", "hits_rent"])
+        agent_films = [{"user_id": "u1", "cascade_id": "c1", "movie_id": "9001", "admission_score": 80}]
+        # The real film_watch row says Rent, by hand — the same admission_score that would otherwise
+        # earn Stream via compute_auto_placements must never be allowed to overrule it.
+        manual_watch = [{"user_id": "u1", "movie_id": "9001", "windows": ["rent"],
+                         "sources": {"rent": "manual"}}]
+        placed_keys = {("u1", "9001")}
+
+        auto_placements = compute_auto_placements(agent_films, cascades, [movie], account_prefs={})
+        auto_rows = synthesize_auto_watch_rows(auto_placements, placed_keys)
+        self.assertEqual(auto_rows, [],
+            "a (user, movie) already covered by a real film_watch row gets no synthesized row at all")
+
+        admission = _admit(cascades, today=[movie])
+        film_watches = manual_watch + auto_rows
+        stream_t = Transition("9001", movie["title"], "hits_stream", movie=movie)
+        self.assertEqual(match(cascades, [stream_t], admission=admission, film_watches=film_watches), {},
+            "the manual Rent placement must win outright — Stream must not also fire")
+        rent_t = Transition("9001", movie["title"], "hits_rent", movie=movie)
+        hits = match(cascades, [rent_t], admission=admission, film_watches=film_watches)
+        self.assertEqual(len(hits.get("u1", [])), 1, "the manual row's own Rent placement must still fire")
+
+    def test_an_agent_films_row_naming_no_cascade_in_the_batch_is_skipped(self):
+        movie = self._movie()
+        agent_films = [{"user_id": "u1", "cascade_id": "gone", "movie_id": "9001", "admission_score": 80}]
+        self.assertEqual(compute_auto_placements(agent_films, [], [movie], account_prefs={}), {})
 
 
 class ForwardWindowMatchTests(unittest.TestCase):

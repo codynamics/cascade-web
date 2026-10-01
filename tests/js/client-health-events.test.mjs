@@ -25,7 +25,10 @@ function fakeUpsertClient(table, errQueue){
         upsert(rows){
           const err = errQueue[Math.min(i, errQueue.length - 1)];
           i++;
-          const result = err ? { data: null, error: err } : { data: rows, error: null };
+          // CAS-1097: acctOp's own isTransient(status) reads a top-level `status`, not anything nested in
+          // `error` — a forced failure here must carry one, or acctOp treats it as a network blip (status
+          // undefined is falsy, i.e. transient) and retries instead of ever calling onDone(false, ...).
+          const result = err ? { data: null, error: err, status: err.status || 400 } : { data: rows, error: null, status: 200 };
           return { then(resolve, reject){ return Promise.resolve(result).then(resolve, reject); } };
         },
       };
@@ -141,7 +144,7 @@ test("CAS-985: a failed agent_films push (the real recordSyncOutcome choke point
     signIn(fakeUpsertClient("agent_films", [{ code: "PGRST301", message: "down" }]));
     E.CascadePersistence.setAgentFilm(cascadeId, m.tmdb_id,
       { admission_score: 50, admission_status: "in_cinema", agent_sig: "sig" });
-    await E.CascadePersistence.syncAgentFilmsNow();
+    await new Promise(r => setTimeout(r, 0));   // CAS-1097: let pushAgentFilmAdmission's own acctOp call resolve
     const row = eventsOfType("sync_failed")[0];
     assert.equal(JSON.stringify(row.data), JSON.stringify({ table: "agent_films", code: "PGRST301" }));
   } finally {

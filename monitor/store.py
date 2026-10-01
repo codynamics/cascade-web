@@ -25,6 +25,7 @@ Interface:
   fetch_user_prefs() -> {user_id: {sub_services, store_services, taste, services_only}}    # CAS-825/CAS-853
   fetch_user_films() -> [{user_id, movie_id, status}]                                      # CAS-825
   fetch_user_held_ids() -> set[str]  # every tmdb_id a user holds state on                  # CAS-986
+  fetch_agent_films() -> [{user_id, cascade_id, movie_id, admission_score, admission_status}]  # CAS-1097
   fetch_unsent_contact_messages() -> [contact_messages row, sent_at is null]                # CAS-836
   mark_contact_messages_sent(ids, sent_at) -> int                                           # CAS-836
   sign_attachment_url(path) -> signed URL string | None                                     # CAS-864
@@ -187,15 +188,23 @@ class InMemoryStore:
         return list(self._user_films)
 
     def fetch_user_held_ids(self) -> set:
-        """CAS-986: every tmdb_id a user holds state on — a watched opinion (user_films), a
-        per-film Watch-it tick (film_watch), an agent's own admitted film (agent_films), or a
-        notification ever sent about it. The two-tier catalogue's demotion-safety net: the monitor
-        writes this union to state/user_held_ids.json at the end of every run so the nightly
-        pipeline can never orphan a film a user marked watched or pinned."""
+        """CAS-986/CAS-1097: every tmdb_id a user holds state on — a watched opinion (user_films), a
+        per-film Watch-it tick (film_watch), an agent's own admitted film (agent_films), a hand
+        pin/move/pick (film_picks), or a notification ever sent about it. The two-tier catalogue's
+        demotion-safety net: the monitor writes this union to state/user_held_ids.json at the end of
+        every run so the nightly pipeline can never orphan a film a user marked watched or pinned."""
         out: set = set()
-        for rows in (self._user_films, self._watches, self._agent_films, self._notifications):
+        for rows in (self._user_films, self._watches, self._agent_films, self._picks, self._notifications):
             out |= {str(r.get("movie_id")) for r in rows if r.get("movie_id") is not None}
         return out
+
+    def fetch_agent_films(self) -> list:
+        """CAS-726/CAS-1097: every agent's admitted-film history — [{user_id, cascade_id, movie_id,
+        admission_score, admission_status}], the frozen-at-admission record the client keeps
+        appending to (CAS-1097: never a whole-table diff any more). Fed to
+        matching.compute_auto_placements() for an admitted film's automatic Watch-On placement when
+        it carries no film_watch row of its own."""
+        return list(self._agent_films)
 
     def fetch_unsent_contact_messages(self) -> list:
         return [dict(r) for r in self._contact_messages if not r.get("sent_at")]
@@ -412,16 +421,17 @@ class SupabaseStore:
         return {(str(r.get("user_id")), str(r.get("movie_id")), r.get("moment")) for r in rows}
 
     def fetch_user_prefs(self) -> dict:
-        """user_id -> {sub_services, store_services, taste, services_only} (CAS-825/CAS-853): the
-        account facts the real engine's matchesCriteria reads beyond an agent's own criteria —
-        CAS-211's services (the my-services scope's own comparison set), CAS-146's taste baseline
-        (only `.langs` survives there today, see app_template.html's passesTasteBase), and CAS-853's
-        `services_only` (the "only show films on my services" switch, now authoritative over every
-        agent's own myServices). A user with no row here has never opened those screens, and
-        compute_admission() reads that as the engine's own permissive default, not as "answered
-        empty"."""
+        """user_id -> {sub_services, store_services, taste, services_only, watch_windows}
+        (CAS-825/CAS-853/CAS-1097): the account facts the real engine reads beyond an agent's own
+        criteria — CAS-211's services (the my-services scope's own comparison set), CAS-146's taste
+        baseline (only `.langs` survives there today, see app_template.html's passesTasteBase),
+        CAS-853's `services_only` (the "only show films on my services" switch, now authoritative
+        over every agent's own myServices), and CAS-1097's `watch_windows` (Where & when you'll
+        watch — compute_auto_placements()'s own windowUsable/windowFollowed gate). A user with no
+        row here has never opened those screens, and compute_admission()/compute_auto_placements()
+        both read that as the engine's own permissive default, not as "answered empty"."""
         rows = self._get(
-            "/user_prefs?select=user_id,sub_services,store_services,taste,services_only"
+            "/user_prefs?select=user_id,sub_services,store_services,taste,services_only,watch_windows"
             "&order=user_id.asc"
         )
         return {str(r.get("user_id")): r for r in rows if r.get("user_id")}
@@ -434,20 +444,32 @@ class SupabaseStore:
         return self._get("/user_films?select=user_id,movie_id,status&order=user_id.asc,movie_id.asc")
 
     def fetch_user_held_ids(self) -> set:
-        """CAS-986: every tmdb_id a user holds state on — a watched opinion (user_films), a
-        per-film Watch-it tick (film_watch), an agent's own admitted film (agent_films), or a
-        notification ever sent about it. The two-tier catalogue's demotion-safety net: written to
-        state/user_held_ids.json at the end of every monitor run so the nightly pipeline can never
-        orphan a film a user marked watched or pinned."""
+        """CAS-986/CAS-1097: every tmdb_id a user holds state on — a watched opinion (user_films), a
+        per-film Watch-it tick (film_watch), an agent's own admitted film (agent_films), a hand
+        pin/move/pick (film_picks), or a notification ever sent about it. The two-tier catalogue's
+        demotion-safety net: written to state/user_held_ids.json at the end of every monitor run so
+        the nightly pipeline can never orphan a film a user marked watched or pinned."""
         out: set = set()
         for path in (
             "/user_films?select=movie_id&order=user_id.asc,movie_id.asc",
             "/film_watch?select=movie_id&order=user_id.asc,movie_id.asc",
             "/agent_films?select=movie_id&order=user_id.asc,cascade_id.asc,movie_id.asc",
+            "/film_picks?select=movie_id&order=user_id.asc,movie_id.asc",
             "/notifications?select=movie_id&order=id.asc",
         ):
             out |= {str(r.get("movie_id")) for r in self._get(path) if r.get("movie_id") is not None}
         return out
+
+    def fetch_agent_films(self) -> list:
+        """CAS-726/CAS-1097: every agent's admitted-film history — [{user_id, cascade_id, movie_id,
+        admission_score, admission_status}], the frozen-at-admission record the client keeps
+        appending to (CAS-1097: never a whole-table diff any more). Fed to
+        matching.compute_auto_placements() for an admitted film's automatic Watch-On placement when
+        it carries no film_watch row of its own."""
+        return self._get(
+            "/agent_films?select=user_id,cascade_id,movie_id,admission_score,admission_status"
+            "&order=user_id.asc,cascade_id.asc,movie_id.asc"
+        )
 
     def fetch_unsent_contact_messages(self) -> list:
         """Every contact_messages row not yet emailed (CAS-836), oldest first — read with

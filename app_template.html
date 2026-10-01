@@ -5149,41 +5149,23 @@ function recomputeFound(){
     // keeps the pre-CAS-736 local-cache-once fallback; it was never part of the cross-device divergence
     // this ticket fixes, since a pin is already a per-device manual override.
     const admissionRow = CP && CP.getAgentFilm(owner.id, m.tmdb_id);
-    let earned=null;
+    let earned;
     if(admissionRow){
-      for(const k of WATCH_LEVEL_KEYS){
-        if(!windowUsable(owner,k)) continue;
-        // CAS-762: a window at Off (0) carries no score requirement, so it earns regardless of admission_score
-        // — including an unscored film's -1, which must still arm a Watch On rather than landing in no tab.
-        if(owner.watchMarkers[k]===0 || admissionRow.admission_score>=owner.watchMarkers[k]){ earned=k; break; }
-      }
+      // CAS-762: a window at Off (0) carries no score requirement, so it earns regardless of admission_score
+      // — including an unscored film's -1, which must still arm a Watch On rather than landing in no tab.
+      earned = earnedWindowForScore(owner, admissionRow.admission_score);
     } else {
-      if(e.watchEarned===undefined){
-        e.watchEarned=null;
-        const score=cascadeScore(m);
-        for(const k of WATCH_LEVEL_KEYS){
-          if(!windowUsable(owner,k)) continue;
-          if(owner.watchMarkers[k]===0 || score>=owner.watchMarkers[k]){ e.watchEarned=k; break; }
-        }
-      }
-      earned=e.watchEarned;
+      if(e.watchEarned===undefined) e.watchEarned = earnedWindowForScore(owner, cascadeScore(m));
+      earned = e.watchEarned;
     }
     if(earned==null) return;                    // below every marker at admission — no value written
     // STATUS_RUNG numbers a film's current window on the exact same ladder WINDOW_RUNG numbers the four
     // watch levels (CAS-280), so the film's rung IS its natural standing key — snapped forward past
-    // whichever windows are off or set to Never.
-    const rung=STATUS_RUNG[primaryStatus(m)];
-    let standing=null;
-    if(rung>0){
-      const si=WATCH_LEVEL_KEYS.findIndex(k=>WINDOW_RUNG[k]===rung);
-      // CAS-1128: the earliest window at or after the film's current rung that this agent has actually
-      // switched ON (windowFollowed) — an admitted, unwatched film's Watch On moves forward only as far as
-      // a window the agent itself tracks, never into one it has left OFF.
-      for(let j=si; j>=0 && j<WATCH_LEVEL_KEYS.length; j++){
-        if(windowFollowed(owner,WATCH_LEVEL_KEYS[j])){ standing=WATCH_LEVEL_KEYS[j]; break; }
-      }
-    }
-    const finalKey=(standing && WINDOW_RUNG[standing]>WINDOW_RUNG[earned]) ? standing : earned;
+    // whichever windows are off or set to Never. CAS-1128: the earliest window at or after the film's
+    // current rung that this agent has actually switched ON (windowFollowed) — an admitted, unwatched
+    // film's Watch On moves forward only as far as a window the agent itself tracks, never into one it has
+    // left OFF. (autoPlacementFor, CAS-1097.)
+    const finalKey=autoPlacementFor(owner, m, earned);
     // CAS-1096 AC5: automatic Watch On placement is explicitly NOT moved onto acctOp by this ticket —
     // only a hand-set/cleared Watch On (toggleFilmOpt/pickNever/setOpinion) pushes.
     WATCH_LEVEL_KEYS.forEach(k=>{ e.wins[k]=false; });
@@ -7891,6 +7873,40 @@ function windowFollowed(c, key){
 function agentFloor(c){
   const marks=WATCH_LEVEL_KEYS.filter(k=>windowUsable(c,k)).map(k=>c.watchMarkers[k]);
   return marks.length ? Math.min(...marks) : Infinity;
+}
+// CAS-736: which window a SCORE earns on `owner` — the lowest usable marker the score clears, ladder order.
+// Extracted out of recomputeFound's own placement block (CAS-1097) so both the live device (an admission's
+// frozen admission_score) and recomputeFound's own pinned-film fallback (a live cascadeScore) can share one
+// definition, and so the monitor can ask the exact same question through tests/js/engine.mjs without a
+// second, hand-ported copy (CAS-825's own lesson).
+function earnedWindowForScore(owner, score){
+  for(const k of WATCH_LEVEL_KEYS){
+    if(!windowUsable(owner,k)) continue;
+    if(owner.watchMarkers[k]===0 || score>=owner.watchMarkers[k]) return k;
+  }
+  return null;
+}
+// CAS-736/CAS-1128: the later of `earned` (fixed at admission) and `standing` (the film's CURRENT window,
+// snapped forward to the nearest window this agent actually follows) — what stops the cinema/streaming
+// score-basis flip at release from demoting or dropping an already-found film. Returns null when `earned`
+// itself is null (below every marker at admission — no placement at all).
+function autoPlacementFor(owner, m, earned){
+  if(earned==null) return null;
+  const rung=STATUS_RUNG[primaryStatus(m)];
+  let standing=null;
+  if(rung>0){
+    const si=WATCH_LEVEL_KEYS.findIndex(k=>WINDOW_RUNG[k]===rung);
+    for(let j=si; j>=0 && j<WATCH_LEVEL_KEYS.length; j++){
+      if(windowFollowed(owner,WATCH_LEVEL_KEYS[j])){ standing=WATCH_LEVEL_KEYS[j]; break; }
+    }
+  }
+  return (standing && WINDOW_RUNG[standing]>WINDOW_RUNG[earned]) ? standing : earned;
+}
+// CAS-736: the single question a frozen admission_score answers — the window an admission at `admissionScore`
+// earns on `owner`, carried forward to the film's current standing. The one entry point the monitor's own
+// placement_shim.mjs calls (CAS-1097) so its automatic-placement answer can never drift from the device's.
+function autoPlacementForAdmission(owner, m, admissionScore){
+  return autoPlacementFor(owner, m, earnedWindowForScore(owner, admissionScore));
 }
 // CAS-1113: markers no longer move independently — an agent carries ONE score, applied to its start
 // window and every enabled window after it, so there is nothing left to push apart or keep in ladder
@@ -19230,56 +19246,9 @@ else if(dedupedN)
     const el = $("savingDot"); if(!el) return;
     el.classList.toggle("show", savingIndicatorArmed);
   }
-  // CAS-1039: agent_films can carry thousands of rows on a real account (the back-catalogue growth that
-  // broke bulk upserts network-side) — every push/delete against it goes out in requests of at most this
-  // many rows/ids, never the whole set in one call. CAS-1096 moved user_films/film_watch off this chunked
-  // shape entirely (one acctOp per row, per user action).
-  const SYNC_CHUNK_SIZE = 200;
-  function chunkByN(list, size){
-    const out=[];
-    for(let i=0;i<(list||[]).length;i+=size) out.push(list.slice(i,i+size));
-    return out;
-  }
-  // CAS-1049: agent_films deletes are keyed by (cascade_id, movie_id) — grouped by cascade_id and sent as
-  // one .in("movie_id",...) request per group, capped smaller than SYNC_CHUNK_SIZE per the ticket's own
-  // number, since a fresh sign-in's pending-delete set can span many cascades at once.
-  const AGENT_DELETE_CHUNK_SIZE = 100;
-  // CAS-1054: agent_films rows are not the same size as user_films/film_watch's — every row carries
-  // agent_sig, the WHOLE cascade signature (cascSigOf) stringified, ~400-500 bytes on a real agent — so a
-  // row-count-only cap (SYNC_CHUNK_SIZE) let a chunk's JSON body run past the browser's 64KiB
-  // keepalive-fetch quota (CAS-1035 wraps every fetch this client makes with keepalive:true) and get
-  // rejected client-side before it ever reached the network. Chunk by cumulative JSON byte size, still
-  // never over SYNC_CHUNK_SIZE rows either (CAS-1039's own contract), capped well under the browser's
-  // quota so it stays safe even with several other tables' keepalive syncs in flight at once (replayOutbox
-  // runs all of them concurrently on boot).
-  const AGENT_FILMS_UPSERT_BYTE_CAP = 48000;
-  const jsonByteLen = v => new TextEncoder().encode(JSON.stringify(v)).length;
-  function chunkAgentFilmRows(rows){
-    const out=[];
-    let cur=[], curBytes=0;
-    for(const r of (rows||[])){
-      const bytes=jsonByteLen(r);
-      if(cur.length && (curBytes+bytes>AGENT_FILMS_UPSERT_BYTE_CAP || cur.length>=SYNC_CHUNK_SIZE)){
-        out.push(cur); cur=[]; curBytes=0;
-      }
-      cur.push(r); curBytes+=bytes;
-    }
-    if(cur.length) out.push(cur);
-    return out;
-  }
-  // Every row this device still owes the account, minus whatever the remote read just returned for the
-  // same keys (the pending copy is the newer, still-unconfirmed one) — the shape every load/apply site
-  // below applies instead of the raw remote rows.
-  // CAS-1096: user_films/film_watch/film_picks no longer use the CAS-1035 outbox at all (acctOp's own
-  // persisted queue is their durability story now); agent_films is the only table still on this path
-  // until CAS-1097 moves it too — this helper was renamed off its old name so a plain text search for
-  // that old name (this ticket's own AC) doesn't also flag agent_films' unrelated, still-correct use.
-  function pendingOverlay(target, remoteRows, keyOf){
-    const pending=outboxPending(target);
-    const kept=(remoteRows||[]).filter(r=>!(keyOf(r) in pending));
-    return [...kept, ...Object.values(pending)];
-  }
-  // CAS-1096/CAS-1035: the acctOp equivalent of pendingOverlay above, for the tables that moved onto
+  // CAS-1097: cascades is the only table still on the CAS-1035 outbox (agent_films moved onto acctOp,
+  // joining user_films/film_watch/film_picks — see acctOpPendingOverlay below, its own equivalent).
+  // CAS-1096/CAS-1035: the acctOp equivalent of the old pendingOverlay helper, for the tables that moved onto
   // acctOp's own persisted queue instead of the CAS-1035 outbox — a write this device queued but hasn't
   // had confirmed yet must survive a reload's fresh remote read the same way an outbox row always did (the
   // exact guarantee CAS-1035 AC3 tests for film_watch), not be silently reverted to the account's older
@@ -19506,7 +19475,7 @@ else if(dedupedN)
     // CAS-1035: outbox is namespaced the same as everything else above — loaded once at parse time
     // (before any account is known, so always under "guest"), and never re-read since. Without this, a
     // row this device recorded as still-owed under the real account's key is invisible to the in-memory
-    // `outbox` a reload rebuilds under "guest" first, so pendingOverlay has nothing to restore.
+    // `outbox` a reload rebuilds under "guest" first, so cascades' own load has nothing to restore.
     outbox = loadOutbox();
   }
   // CAS-734: every cascade whose content no longer matches what this device last confirmed the account
@@ -19903,7 +19872,7 @@ else if(dedupedN)
       currentUser = null; loadGuest(); loadGuestFilms(); loadGuestNotify(); realAlerts=[]; updateMovingBadge();
       invites=[]; invitesReady=true; updateInvitesBadge();   // CAS-886: same reasoning — a guest has no invites
       cascadeKnown=new Map(); cascadeEditedAt=new Map(); saveCascadeEditedAt();
-      agentFilms={}; agentFilmsKnown=null; agentFilmsReady=true;   // CAS-736: a guest has nothing to wait on
+      agentFilms={}; agentFilmsReady=true;   // CAS-736: a guest has nothing to wait on
       watchKnown=new Map(); saveWatchKnown(); filmWatchReady=true;   // CAS-735: a guest has nothing to wait on
       userPrefsReady=true;   // CAS-740: a guest has nothing to wait on
       notifyPrefsReady=true;   // CAS-741: a guest has nothing to wait on
@@ -20317,28 +20286,58 @@ else if(dedupedN)
   function getAgentFilm(cascadeId, movieId){
     return agentFilms[agentFilmKey(cascadeId, String(movieId))];
   }
+  // CAS-1097: agent_films stops being client-pushed truth of CURRENT membership — admission_score is real
+  // account history (frozen the moment a film is first admitted, CAS-736's whole reason to exist), not
+  // something a stateless recompute could ever regenerate. The LOCAL ledger above is still rewritten every
+  // recomputeFound pass exactly as before (that's what makes sticky admission and Watch-On placement work
+  // on THIS device) — only the SERVER push changes: one upsert, the first time a given (cascade,movie) is
+  // ever admitted on this device, never again and never a delete (see setAgentFilm/clearAgentFilm below).
+  let AGENT_FILM_DEFER_MS = 500;   // exposed (like ACCT_READ_DELAYS) so a test can shrink this
+  // Bounds the CAS-1064 defer below — a cascade whose own upsert never confirms (a permanent failure this
+  // device never learns about, or one abandoned mid-flight) must not retry forever; past this many rounds
+  // it is sent anyway, same as a cascade_id this device doesn't hold at all.
+  const AGENT_FILM_DEFER_MAX_ATTEMPTS = 10;
+  function pushAgentFilmAdmission(cascadeId, movieId, row, deferCtx){
+    if(!accountActive()) return;
+    const owner=uid(); if(!owner) return;
+    // A deferred retry (below) whose signed-in account changed underneath it — sign-out, then a
+    // DIFFERENT account signing in, while this was still waiting on the original cascade's own upsert —
+    // is stale and must not write the old row under the new account's uid.
+    if(deferCtx && deferCtx.owner!==owner) return;
+    const attempt = deferCtx ? deferCtx.attempt : 0;
+    // CAS-1064's ordering concern still applies even on acctOp: a cascade this device still holds but the
+    // account hasn't confirmed yet (cascadeKnown has no entry) would be rejected outright by the FK if
+    // raced ahead of that cascade's own upsert — wait for the confirmation. A cascade_id this device does
+    // NOT hold at all is a different case (deleted locally before ever syncing) — nothing will ever confirm
+    // it, so it is sent anyway and left to acctOp's own permanent-failure handling.
+    if(cascades.some(cc=>cc.id===cascadeId) && !cascadeKnown.has(cascadeId) && attempt<AGENT_FILM_DEFER_MAX_ATTEMPTS){
+      setTimeout(()=>pushAgentFilmAdmission(cascadeId, movieId, row, { owner, attempt:attempt+1 }), AGENT_FILM_DEFER_MS);
+      return;
+    }
+    const op={ table:"agent_films", kind:"upsert",
+               match:{ user_id:owner, cascade_id:cascadeId, movie_id:String(movieId) },
+               fields:{ admitted_at:row.admitted_at, admission_score:row.admission_score,
+                        admission_status:row.admission_status, agent_sig:row.agent_sig },
+               onConflict:"user_id,cascade_id,movie_id" };
+    op.onDone=(ok,err)=>recordSyncOutcome("agent_films", ok, err);
+    return window.CascadeAccountStore.acctOp(op);
+  }
   function setAgentFilm(cascadeId, movieId, {admission_score, admission_status, agent_sig, admitted_at}={}){
-    agentFilms[agentFilmKey(cascadeId,String(movieId))]={
-      admitted_at: admitted_at || new Date().toISOString(), admission_score, admission_status, agent_sig,
-    };
-    if(accountActive()) scheduleAgentFilmsSync();
+    const key=agentFilmKey(cascadeId,String(movieId));
+    const isNew=!(key in agentFilms);
+    const row={ admitted_at: admitted_at || new Date().toISOString(), admission_score, admission_status, agent_sig };
+    agentFilms[key]=row;
+    // A re-confirm of an already-known admission (criteria drift re-test passing again, CAS-728) only
+    // ever refreshes agent_sig/local bookkeeping — admission_score/admitted_at are frozen history and the
+    // account already has them, so nothing is pushed a second time.
+    if(isNew) pushAgentFilmAdmission(cascadeId, movieId, row);
   }
   // "Nothing to say" (the film left the agent) is the absence of a row, not a row saying so — same
-  // convention as film_picks/user_films/film_watch.
+  // convention as film_picks/user_films/film_watch. CAS-1097: local-only now — the account's own copy is
+  // history (see pushAgentFilmAdmission above) and is never deleted by ordinary recomputation leaving a
+  // film out of an agent's current set.
   function clearAgentFilm(cascadeId, movieId){
-    const key=agentFilmKey(cascadeId,String(movieId));
-    if(!(key in agentFilms)) return;
-    delete agentFilms[key];
-    if(accountActive()) scheduleAgentFilmsSync();
-  }
-  function agentFilmRows(){
-    const owner=uid();
-    return Object.keys(agentFilms).map(k=>{
-      const sep=k.indexOf("::"), r=agentFilms[k];
-      return {user_id:owner, cascade_id:k.slice(0,sep), movie_id:k.slice(sep+2),
-              admitted_at:r.admitted_at, admission_score:r.admission_score,
-              admission_status:r.admission_status, agent_sig:r.agent_sig};
-    });
+    delete agentFilms[agentFilmKey(cascadeId,String(movieId))];
   }
   function applyAgentFilmRows(rows){
     const next={};
@@ -20350,163 +20349,17 @@ else if(dedupedN)
     });
     agentFilms=next;
   }
-  let agentFilmsTimer=null, agentFilmsSyncing=false, agentFilmsAgain=false;
-  // CAS-1039: key ("cascadeId::movieId") -> sig of the four written columns this device last had
-  // CONFIRMED by the account (null before any load/push) — replacing the old bare-key
-  // agentFilmsBaseline Set so a score/status/sig change on an already-known admission still counts as
-  // dirty. CAS-1096 removed the equivalent baseline maps user_films/film_watch used to keep; this one
-  // still applies here until CAS-1097 moves agent_films onto acctOp too.
-  let agentFilmsKnown=null;
-  const agentFilmSig = r => JSON.stringify([r.admitted_at, r.admission_score, r.admission_status, r.agent_sig]);
-  const agentFilmDirtyRows = () => agentFilmRows().filter(r=>{
-    const known=agentFilmsKnown && agentFilmsKnown.get(agentFilmKey(r.cascade_id,r.movie_id));
-    return !known || known!==agentFilmSig(r);
-  });
-  // CAS-1090 Change 4: checked, not changed. agentFilms isn't user-authored data to protect — it's a
-  // recomputed admission cache (which films an agent's OWN criteria currently admit), and a film leaving
-  // that set through ordinary recomputation is the intended, correct source of a delete here, not something
-  // a tombstone should gate on. An explicit-only rule would leave a stale admitted_at/score row on the
-  // account for a film the agent no longer actually admits. Nothing here shares cascades' failure shape
-  // either: agentFilmsKnown only ever gets reset in lockstep with agentFilms itself (loadAgentFilms), never
-  // by a separate, driftable path the way cascadeKnown/cascades were two models of the same thing.
-  const agentFilmPendingDeleteKeys = () => {
-    if(!agentFilmsKnown) return [];
-    const keys=new Set(agentFilmRows().map(r=>agentFilmKey(r.cascade_id,r.movie_id)));
-    return [...agentFilmsKnown.keys()].filter(k=>!keys.has(k));
-  };
-  function scheduleAgentFilmsSync(){
-    outboxMark("agent_films", agentFilmDirtyRows(), r=>agentFilmKey(r.cascade_id,r.movie_id));
-    clearTimeout(agentFilmsTimer); agentFilmsTimer=setTimeout(runAgentFilmsSync, 500);
-  }
-  async function runAgentFilmsSync(){
-    if(!accountActive()) return;
-    if(agentFilmsSyncing){ agentFilmsAgain=true; return; }
-    agentFilmsSyncing=true;
-    try{ await syncAgentFilmsToAccount(); }
-    catch(err){ console.warn("Cascade: agent_films sync failed", err); }
-    finally{ agentFilmsSyncing=false; if(agentFilmsAgain){ agentFilmsAgain=false; scheduleAgentFilmsSync(); } }
-  }
-  // CAS-1039: same dirty-only, chunked, per-chunk-isolated shape user_films/film_watch's own pushes used
-  // before CAS-1096 moved them onto acctOp.
-  // CAS-1049: the old delete phase fired one DELETE per pending row, all in flight at once via
-  // Promise.all — on a first sign-in with a large pending-delete set that's up to SYNC_CHUNK_SIZE
-  // concurrent requests, and production showed exactly this surfacing as a network-level
-  // "TypeError: Failed to fetch" (see ticket evidence). Deletes are now grouped by cascade_id and sent
-  // one .in("movie_id",...) request per AGENT_DELETE_CHUNK_SIZE ids, awaited sequentially — never more
-  // than one delete request in flight at a time. A failed chunk still never blocks another chunk.
-  // CAS-1054: that concurrency fix did not stop production's "TypeError: Failed to fetch"/"Load failed"
-  // on agent_films upserts, because concurrency was never the real limit for THIS table. Every row
-  // carries agent_sig — cascSigOf(cascade) JSON.stringify'd whole, ~400-500 bytes on real agents — so a
-  // row-count chunk of SYNC_CHUNK_SIZE (200) routinely produces a 100-150KB request body (measured live
-  // against the real project: a realistic 200-row chunk was 144.5KB). Every fetch this client makes
-  // carries keepalive:true (CAS-1035), and browsers (Chrome and Safari both) reject a keepalive fetch
-  // outright — client-side, before it ever reaches the network, hence a bare network-level TypeError —
-  // once its body exceeds a 64KiB quota shared across in-flight keepalive requests. A live-reproduction
-  // POST of an identical chunk shape straight from Node (no keepalive) against the real project succeeded
-  // every time (201), which rules out every server-side candidate: gateway size limits, a bad row value,
-  // the on_conflict target (it matches agent_films' own primary key), a trigger (there is none), and a
-  // missing cascade_id FK. Upsert chunks are now bounded by cumulative JSON byte size, not row count.
-  //
-  // CAS-1064: a row whose cascade_id names an agent THIS DEVICE currently holds but has not yet had
-  // confirmed by the account (cascadeKnown has no entry for it) waits rather than being pushed and
-  // rejected by the FK the instant it races ahead of that agent's own cascades upsert — replayOutbox
-  // (below) sequences cascades first so this resolves within one replay pass. A cascade_id this device
-  // does NOT hold at all is a different case entirely (deleted locally, or genuinely orphaned) — nothing
-  // here will ever confirm it, so it is sent anyway and left to the permanent-failure classification below.
-  function agentFilmRowReady(row){
-    return !cascades.some(cc=>cc.id===row.cascade_id) || cascadeKnown.has(row.cascade_id);
-  }
-  // 23503 (foreign-key violation) and 42501 (RLS refusal) can never succeed by retrying — the row names an
-  // agent the account will never accept from this device. Anything else is presumed transient (network,
-  // 5xx, timeout) and stays queued.
-  function isPermanentAgentFilmError(err){
-    const code = err && err.code;
-    return code === "23503" || code === "42501";
-  }
-  // Backstop: whatever the error, a row that has failed this many consecutive rounds is dropped anyway —
-  // nothing may wedge the outbox permanently again, even a failure mode this ticket didn't anticipate.
-  const AGENT_FILM_MAX_ATTEMPTS = 5;
-  const agentFilmAttempts = new Map();   // key -> consecutive failed attempts, cleared on success/drop
-  // Returns true if the row was dropped from the outbox (permanent or over the retry ceiling); false if
-  // it was left queued for a future retry. Either way the failure is recorded via the usual sync_failed/
-  // degraded-banner path (CAS-985/CAS-787) — a genuinely failing write must still be visible.
-  function agentFilmRowFailed(row, err){
-    const key = agentFilmKey(row.cascade_id, row.movie_id);
-    const attempts = (agentFilmAttempts.get(key)||0) + 1;
-    const permanent = isPermanentAgentFilmError(err) || attempts >= AGENT_FILM_MAX_ATTEMPTS;
-    if(permanent){
-      agentFilmAttempts.delete(key);
-      outboxClearKeys("agent_films", [key]);
-    } else {
-      agentFilmAttempts.set(key, attempts);
-    }
-    recordSyncOutcome("agent_films", false, err);
-    return permanent;
-  }
-  function agentFilmRowSucceeded(row){
-    agentFilmAttempts.delete(agentFilmKey(row.cascade_id, row.movie_id));
-    if(!agentFilmsKnown) agentFilmsKnown=new Map();
-    agentFilmsKnown.set(agentFilmKey(row.cascade_id,row.movie_id), agentFilmSig(row));
-    outboxClearKeys("agent_films", [agentFilmKey(row.cascade_id,row.movie_id)]);   // CAS-1035
-  }
-  async function syncAgentFilmsToAccount(){
-    const c=client(), owner=uid(); if(!c||!owner) return;
-    const rows=agentFilmDirtyRows().filter(agentFilmRowReady);
-    let anyError=null;
-    for(const batch of chunkAgentFilmRows(rows)){
-      const { error } = await c.from("agent_films").upsert(batch, { onConflict:"user_id,cascade_id,movie_id" });
-      if(!error){ batch.forEach(agentFilmRowSucceeded); continue; }
-      // A real FK/RLS rejection fails the WHOLE multi-row statement, not just the offending row — retry
-      // singly (same shape as cascades' own 42501 handling above) so the specific bad row(s) can be told
-      // apart from the rest of a genuine batch. A batch of one already IS the single-row attempt.
-      console.warn("agent_films upsert", error);
-      for(const row of batch){
-        const r = (batch.length===1) ? { error } : await c.from("agent_films").upsert([row], { onConflict:"user_id,cascade_id,movie_id" });
-        if(r.error){ if(!agentFilmRowFailed(row, r.error)) anyError = r.error; }
-        else agentFilmRowSucceeded(row);
-      }
-    }
-    if(anyError){ recordSyncOutcome("agent_films", false, anyError); return; }
-    const pendingByCascade=new Map();
-    agentFilmPendingDeleteKeys().forEach(k=>{
-      const sep=k.indexOf("::"), cascadeId=k.slice(0,sep), movieId=k.slice(sep+2);
-      if(!pendingByCascade.has(cascadeId)) pendingByCascade.set(cascadeId, []);
-      pendingByCascade.get(cascadeId).push(movieId);
-    });
-    for(const [cascadeId, movieIds] of pendingByCascade){
-      for(const batch of chunkByN(movieIds, AGENT_DELETE_CHUNK_SIZE)){
-        const { error } = await c.from("agent_films").delete().eq("user_id",owner)
-          .eq("cascade_id",cascadeId).in("movie_id",batch);
-        if(error){ console.warn("agent_films delete", error); anyError=error; continue; }
-        const keys=batch.map(id=>agentFilmKey(cascadeId,id));
-        keys.forEach(k=>agentFilmsKnown.delete(k));
-        outboxClearKeys("agent_films", keys);   // CAS-1035
-      }
-    }
-    if(anyError){ recordSyncOutcome("agent_films", false, anyError); return; }
-    recordSyncOutcome("agent_films", true);
-  }
-  // CAS-1049: PostgREST caps an unranged select at 1,000 rows, so a real account's agent_films table
-  // (thousands of rows across several agents) could load incomplete and make the diff produce spurious
-  // upserts/deletes. Page with .range() until a page comes back short of the page size.
-  const AGENT_FILMS_LOAD_PAGE = 1000;
+  // CAS-1097: loads through acctLoad, the same shape as every other acctOp-backed table (loadAccountFilms/
+  // loadFilmPicks/loadFilmWatches) — acctLoad's own .range() paging (ACCT_STORE_PAGE=1000) already covers
+  // what the old bespoke paginated loop did. acctOpPendingOverlay keeps a still-unconfirmed local insert
+  // visible across a reload the same way it does for every other table.
   async function loadAgentFilms(){
-    const c=client(); if(!c||!accountActive()) return;
-    let remote=[], from=0;
-    for(;;){
-      const { data, error } = await c.from("agent_films")
-        .select("cascade_id,movie_id,admitted_at,admission_score,admission_status,agent_sig")
-        .range(from, from+AGENT_FILMS_LOAD_PAGE-1);
-      if(error){ console.warn("agent_films load", error); logSyncFailed("agent_films", error); return; }
-      const page=data||[];
-      remote=remote.concat(page);
-      if(page.length<AGENT_FILMS_LOAD_PAGE) break;
-      from+=AGENT_FILMS_LOAD_PAGE;
-    }
-    // CAS-1035: same reasoning as loadAccountFilms/loadFilmWatches — applyAgentFilmRows rebuilds the whole
-    // ledger from what it's handed, so overlay this device's own still-unsent rows back in.
-    applyAgentFilmRows(pendingOverlay("agent_films", remote, r=>agentFilmKey(r.cascade_id,r.movie_id)));
-    agentFilmsKnown=new Map(remote.map(r=>[agentFilmKey(r.cascade_id,r.movie_id), agentFilmSig(r)]));
+    if(!accountActive()) return;
+    const ok = await window.CascadeAccountStore.acctLoad([{ table:"agent_films", pk:"movie_id" }]);
+    if(!ok){ recordSyncOutcome("agent_films", false, { message:"load failed" }); return; }
+    recordSyncOutcome("agent_films", true);
+    applyAgentFilmRows(acctOpPendingOverlay("agent_films", window.CascadeAccountStore.acctStore.agent_films,
+      r=>agentFilmKey(r.cascade_id,r.movie_id)));
   }
 
   // The bell's real contents. Newest first, and capped: a list nobody can reach the bottom of is
@@ -20793,9 +20646,9 @@ else if(dedupedN)
     // yet the instant a real pagehide/hidden fires; a reload landing in that gap must not lose the mark.
     outboxPersistNow();
     clearTimeout(syncTimer); runSync();
-    // CAS-1096: user_films/film_watch/film_picks have nothing left to flush here — acctOp pushes (and
-    // durably persists its own queue) immediately, on every call, with no debounce to cancel.
-    clearTimeout(agentFilmsTimer); runAgentFilmsSync();
+    // CAS-1096/CAS-1097: user_films/film_watch/film_picks/agent_films have nothing left to flush here —
+    // acctOp pushes (and durably persists its own queue) immediately, on every call, with no debounce to
+    // cancel.
   }
   if(typeof document!=="undefined" && document.addEventListener){
     document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushAccountSync(); });
@@ -20803,36 +20656,20 @@ else if(dedupedN)
   if(typeof window!=="undefined" && window.addEventListener){
     window.addEventListener("pagehide", flushAccountSync);
   }
-  // CAS-1064: an agent_films outbox entry naming a cascade_id this device no longer has at all (the agent
-  // was deleted on this device after the row was queued) can never succeed — drop it before replay even
-  // attempts the always-doomed round trip. A cascade_id this device DOES still hold is a different case
-  // (see agentFilmRowReady above) and is left alone here.
-  function pruneOrphanAgentFilmOutbox(){
-    const orphanKeys = Object.keys(outboxPending("agent_films")).filter(k=>{
-      const cascadeId = k.slice(0, k.indexOf("::"));
-      return !cascades.some(cc=>cc.id===cascadeId);
-    });
-    if(orphanKeys.length) outboxClearKeys("agent_films", orphanKeys);
-  }
   // CAS-1035 AC2: the boot-time counterpart — every outbox entry, retried and AWAITED (unlike
   // flushAccountSync above) so fireAccountFanout can rely on "replayed" meaning "already attempted"
   // before it fires the loads that would otherwise apply older remote rows over an unsent one.
   async function replayOutbox(){
     if(!accountActive()) return;
-    pruneOrphanAgentFilmOutbox();
-    // CAS-1064: cascades must land (and be confirmed into cascadeKnown) before agent_films is even
-    // attempted — a new agent and one of its agent_films rows queued together used to race these two
-    // pushes concurrently, and the films side would lose that race and get rejected by the FK the ordering
-    // below now avoids entirely (agentFilmRowReady, above, still applies as a second line of defence for
-    // any row scheduleAgentFilmsSync's own 500ms timer sends outside of a replay).
     await runSync();
-    await runAgentFilmsSync();
-    // CAS-1095/CAS-1096: user_prefs/notify_prefs/user_films/film_watch/film_picks have no outbox of their
-    // own to replay — acctOp's own persisted queue (cascade_ops@<uid>) is what a genuinely unsent edit
-    // from before this boot lives in now, the same "this device still owes the account a write" case
-    // replayOutbox exists to cover for every other table above. One best-effort attempt this boot, same
-    // as the rest of this function — sendQueue's own "online" listener (CascadeAccountStore) covers a
-    // later reconnect.
+    // CAS-1095/CAS-1096/CAS-1097: user_prefs/notify_prefs/user_films/film_watch/film_picks/agent_films have
+    // no outbox of their own to replay — acctOp's own persisted queue (cascade_ops@<uid>) is what a
+    // genuinely unsent edit from before this boot lives in now, the same "this device still owes the
+    // account a write" case replayOutbox exists to cover for every other table above. One best-effort
+    // attempt this boot, same as the rest of this function — sendQueue's own "online" listener
+    // (CascadeAccountStore) covers a later reconnect, and pushAgentFilmAdmission's own cascadeKnown wait
+    // covers the CAS-1064 cascades-before-agent_films ordering this used to need runSync() sequenced ahead
+    // of explicitly.
     if(window.CascadeAccountStore) await window.CascadeAccountStore.sendQueue();
   }
 
@@ -20864,9 +20701,6 @@ else if(dedupedN)
                                 set SAVING_INDICATOR_DELAY_MS(v){ SAVING_INDICATOR_DELAY_MS=v; },
                                 get acctSuffix(){ return acctSuffix; },
                                 dropRefusedCascade,
-                                // CAS-1039: SYNC_CHUNK_SIZE is still the shared row-batching cap agent_films'
-                                // own sync goes through (CAS-1097 moves that table onto acctOp too, later).
-                                SYNC_CHUNK_SIZE,
                                 // CAS-1096: pushFilmVerdict/pushFilmWatch/pushFilmPick are the real per-row
                                 // acctOp write seams for user_films/film_watch/film_picks — exposed the same
                                 // way every other real write chokepoint here is (pushNotifyPrefs/
@@ -20951,22 +20785,14 @@ else if(dedupedN)
                                 get watchKnown(){ return watchKnown; },
                                 get filmWatchReady(){ return filmWatchReady; },
                                 set filmWatchReady(v){ filmWatchReady=!!v; },
-                                // CAS-726: the admitted-film ledger's own load/sync seam, plus the
+                                // CAS-726/CAS-1097: the admitted-film ledger's own load/push seam, plus the
                                 // read/write helpers CAS-728 writes through to make membership sticky.
-                                loadAgentFilms, syncAgentFilmsNow: runAgentFilmsSync, agentFilmRows,
-                                applyAgentFilmRows, agentFilmsFor, setAgentFilm, clearAgentFilm, getAgentFilm,
-                                agentFilmDirtyRows, agentFilmPendingDeleteKeys,
-                                // CAS-1064: the orphan-pruning/permanent-failure seam, so a test can drive
-                                // the boot-time prune and the FK/RLS drop-and-log classification directly.
-                                pruneOrphanAgentFilmOutbox, agentFilmRowReady, isPermanentAgentFilmError,
-                                // CAS-1049: the delete-chunking seam so a test can assert the ≤100-id,
-                                // one-in-flight-at-a-time contract directly.
-                                AGENT_DELETE_CHUNK_SIZE,
-                                // CAS-1054: the byte-size upsert-chunking seam, so a test can assert every
-                                // chunk this device would actually send stays under the browser's
-                                // keepalive-fetch quota, not just under a row count.
-                                AGENT_FILMS_UPSERT_BYTE_CAP, chunkAgentFilmRows,
-                                get agentFilmsKnown(){ return agentFilmsKnown; },
+                                // pushAgentFilmAdmission is the real acctOp write chokepoint (CAS-1097),
+                                // exposed the same way pushFilmVerdict/pushFilmWatch/pushFilmPick are above.
+                                loadAgentFilms, applyAgentFilmRows, agentFilmsFor, setAgentFilm, clearAgentFilm,
+                                getAgentFilm, pushAgentFilmAdmission,
+                                get AGENT_FILM_DEFER_MS(){ return AGENT_FILM_DEFER_MS; },
+                                set AGENT_FILM_DEFER_MS(v){ AGENT_FILM_DEFER_MS=v; },
                                 // CAS-736: same read/write-primitive shape as filmWatchReady above, so a
                                 // test can drive recomputeFound's "this device's own ledger hasn't loaded
                                 // yet" gate directly.
@@ -20997,9 +20823,9 @@ else if(dedupedN)
   const client = () => { const a=acct(); return (a && a.enabled && a.client) ? a.client : null; };
   const uid = () => { const a=acct(); return (a && a.session && a.session.user) ? a.session.user.id : null; };
 
-  // PostgREST caps an unranged select at 1,000 rows (same reasoning as AGENT_FILMS_LOAD_PAGE above) — page
-  // with .range() until a page comes back short, ordered by the caller's primary key so two requests can
-  // never see an inconsistent slice of a table being written to mid-page.
+  // PostgREST caps an unranged select at 1,000 rows — page with .range() until a page comes back short,
+  // ordered by the caller's primary key so two requests can never see an inconsistent slice of a table
+  // being written to mid-page.
   const ACCT_STORE_PAGE = 1000;
 
   // table -> the rows acctLoad most recently read for it. Replaced wholesale by acctLoad; mutated in place
