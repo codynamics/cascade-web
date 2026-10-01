@@ -791,7 +791,9 @@
      screen; only the presence of .fcheck and interactive .fchan buttons differs between the two. */
   .frow{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line)}
   .frow[onclick]{cursor:pointer}
-  .frow.fsel{background:rgba(76,125,255,.10);border-radius:10px}
+  /* CAS-1125: inset box-shadow rather than border — a real border would replace the row's own
+     border-bottom separator instead of sitting alongside it. */
+  .frow.fsel{background:rgba(76,125,255,.10);border-radius:10px;box-shadow:inset 0 0 0 1px var(--brand-blue)}
   .favatar{flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
     color:#fff;font-size:12.5px;font-weight:800}
   .fmeta{flex:1 1 auto;min-width:0}
@@ -804,8 +806,10 @@
   .fchan.on{background:rgba(76,125,255,.18);border-color:var(--brand-blue);color:var(--brand-blue)} /* a11y-contrast-ignore: ICON — .fchan wraps an <svg> icon (line ~751), not text */
   .fchanstatic{width:24px;height:24px;color:var(--brand-blue);display:grid;place-items:center;flex:0 0 auto} /* a11y-contrast-ignore: ICON — wraps an <svg> icon (line ~754), not text */
   .fchanstatic svg{width:14px;height:14px}
+  /* CAS-1125: no longer its own button — a plain indicator, since the whole row (.fchoice) now carries
+     the select/deselect tap. */
   .fcheck{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:1px solid var(--line);
-    background:transparent;color:#fff;font-size:13px;display:grid;place-items:center;cursor:pointer;padding:0}
+    background:transparent;color:#fff;font-size:13px;display:grid;place-items:center;padding:0}
   .fcheck.on{background:var(--brand-blue);border-color:var(--brand-blue)}
   .fempty{padding:18px 4px;color:var(--faint);font-size:13.5px}
   .fnewbtn{display:block;width:100%;text-align:left;background:transparent;border:none;color:#cddcff;
@@ -5930,9 +5934,10 @@ addChips("prefStoreChips", STORE_SERVICES, prefs.store, "svc", svcName);
 // ---- modals ----
 // Every .switch in the app is a div with role="switch" — which a mouse can use and a keyboard cannot.
 // One delegated pass makes them all reachable (Tab) and operable (Enter/Space), including the ones the
-// editor builds after this runs.
+// editor builds after this runs. CAS-1125: .fchoice (the selectable friend row) rides the same pass —
+// it replaced a real <button> circle, which was keyboard-operable for free.
 function armSwitches(root){
-  (root||document).querySelectorAll(".switch, .iconbtn, .modechip, .svctog").forEach(s=>{
+  (root||document).querySelectorAll(".switch, .iconbtn, .modechip, .svctog, .fchoice").forEach(s=>{
     if(s.dataset.kb) return;
     s.dataset.kb="1";
     if(!s.hasAttribute("tabindex")) s.tabIndex=0;
@@ -6869,35 +6874,41 @@ function filterFriendRows(containerId, q){
   });
 }
 // ---- the shared row + add/edit form --------------------------------------------------------------------
-// selectable=true is a picker row (checkbox + per-recipient channel buttons); selectable=false is the
-// Friends screen (a single static "has email" mark, tap the row to edit). One row renderer, one form
-// renderer, for both — "one implementation, not two" per the ticket. CAS-931: a selectable row now takes
-// its own ctx ("invite" or "recommend") and selMap, since Recommend hosts a second, independent picker
-// alongside the Invite sheet's — see toggleFriendSelect/setFriendChannel below, which route on ctx the
-// same way.
+// selectable=true is a picker row (whole row selects; channel buttons only show once selected);
+// selectable=false is the Friends screen (a single static "has email" mark, tap the row to edit). One row
+// renderer, one form renderer, for both — "one implementation, not two" per the ticket. CAS-931: a
+// selectable row takes its own ctx ("invite" or "recommend") and selMap, since Recommend hosts a second,
+// independent picker alongside the Invite sheet's — see toggleFriendSelect/setFriendChannel below, which
+// route on ctx the same way. CAS-1125: tapping anywhere on a selectable row (not just a dedicated circle)
+// toggles selection — the channel buttons keep their own tap via event.stopPropagation(), and the circle
+// is now a plain, non-interactive indicator. "fchoice" is armed for keyboard (Enter/Space) by armSwitches.
 function friendRowHTML(f, opts){
   const selectable=!!(opts && opts.selectable);
   const ctx=(opts && opts.ctx) || "invite";
   const selMap=(opts && opts.selMap) || inviteFriendSel;
   const sub=[f.email||"", f.mobile||""].filter(Boolean).join(" · ");
   const chans=friendChannels(f);
+  const sel = selectable && selMap.has(String(f.id));
   let chanHTML;
-  if(selectable){
+  if(selectable && sel){
     const chan=(selMap.get(String(f.id))||{}).channel || "email";
     chanHTML=`
       ${chans.email?`<button type="button" class="fchan${chan==="email"?" on":""}" onclick="event.stopPropagation();setFriendChannel('${ctx}','${f.id}','email')" aria-label="Email ${escA(f.name)}">${ICON.mail}</button>`:""}
       ${chans.whatsapp?`<button type="button" class="fchan${chan==="whatsapp"?" on":""}" onclick="event.stopPropagation();setFriendChannel('${ctx}','${f.id}','whatsapp')" aria-label="WhatsApp ${escA(f.name)}">${ICON.whatsapp}</button>`:""}
       ${chans.sms?`<button type="button" class="fchan${chan==="sms"?" on":""}" onclick="event.stopPropagation();setFriendChannel('${ctx}','${f.id}','sms')" aria-label="SMS ${escA(f.name)}">${ICON.sms}</button>`:""}`;
+  } else if(selectable){
+    chanHTML = "";
   } else {
     chanHTML = chans.email ? `<span class="fchanstatic" aria-hidden="true">${ICON.mail}</span>` : "";
   }
   const checkbox = selectable
-    ? (()=>{ const sel=selMap.has(String(f.id));
-        return `<button type="button" class="fcheck${sel?" on":""}" onclick="event.stopPropagation();toggleFriendSelect('${ctx}','${f.id}')" aria-pressed="${sel}" aria-label="${sel?"Selected":"Select"} ${escA(f.name)}">${sel?"✓":""}</button>`; })()
+    ? `<span class="fcheck${sel?" on":""}" aria-hidden="true">${sel?"✓":""}</span>`
     : "";
-  const sel = selectable && selMap.has(String(f.id));
-  const rowAttr = selectable ? "" : ` onclick="openFriendsEditForm('${f.id}')"`;
-  return `<div class="frow${sel?" fsel":""}" data-fid="${f.id}"${rowAttr}>
+  const rowCls = `frow${selectable?" fchoice":""}${sel?" fsel":""}`;
+  const rowAttr = selectable
+    ? ` onclick="toggleFriendSelect('${ctx}','${f.id}')" aria-pressed="${sel}" aria-label="${sel?"Selected":"Select"} ${escA(f.name)}"`
+    : ` onclick="openFriendsEditForm('${f.id}')"`;
+  return `<div class="${rowCls}" data-fid="${f.id}"${rowAttr}>
     <div class="favatar" style="background:${friendColorFor(f.name)}">${esc(friendInitials(f.name))}</div>
     <div class="fmeta"><div class="fname">${esc(f.name)}</div>${sub?`<div class="fsub">${esc(sub)}</div>`:""}</div>
     <div class="fchannels">${chanHTML}</div>
@@ -12358,18 +12369,15 @@ let recommendFriendSel = new Map();
 let recommendFriendAdding = false;
 let recommendCapMsg = null;
 let recommendSentInfo = null;   // {count} once a send has actually gone through; null otherwise
-// The message editor stays behind "Edit the message they get" rather than occupying the sheet by
-// default — the picker is the main event. null means "use the default text", which is computed per
-// recipient at render/send time (recommendMessageFor(recipientName, sender)); once the user types,
-// their raw edit is used verbatim for every recipient instead.
+// CAS-1125: the message textarea is always on the sheet now — the old show/hide toggle button is gone.
+// null means "use the default text" (recommendMessageFor's own fallback sender, computed at render/send
+// time); once the user types, their raw edit is used verbatim for every recipient instead. The message
+// is the same for every recipient — it no longer greets anyone by name.
 let recommendMsgText = null;
-let recommendMsgEditOpen = false;
 function recommendMessageFor(name, sender){
-  const who=(name||"").trim() || "there";
   const from=sender || "A friend";
-  return `Hi ${who} — I've been using Cascade to keep track of films I mean to see. It watches for `+
-    `when something lands in cinemas or on a service I already pay for, and tells me. Thought you'd `+
-    `like it. — ${from}`;
+  return `Hi there — I've been using Cascade to find and keep track of films I mean to see. Thought `+
+    `you'd like it. — ${from}`;
 }
 // Rebuilt fresh every open (mirrors renderContactForm()'s own convention) so a prior visit's picks,
 // message edits or error never bleed into the next one.
@@ -12409,15 +12417,11 @@ function renderRecommendForm(){
     <button type="button" class="fnewbtn" onclick="openRecommendAddForm()">+ Add someone new</button>
     <div id="recommendPicker">${rows}</div>
     <div class="pnote" id="recommendErr" style="color:#ffb9a6" ${recommendCapMsg?"":"hidden"}>${esc(recommendCapMsg||"")}</div>
-    <button type="button" class="filminvcta" id="recommendSend" onclick="sendRecommend()" ${n?"":"disabled"}>${esc(ctaLabel)}</button>
-    ${recommendMsgEditOpen ? `
-      <div class="flabel">What they'll get</div>
-      <textarea id="recommendMsg" class="cmsg" maxlength="2000" rows="6" oninput="onRecommendMsgInput(this.value)">${esc(recommendMsgText!==null?recommendMsgText:recommendMessageFor("",senderName))}</textarea>
-      <button type="button" class="osskip" onclick="toggleRecommendMsgEdit()">Hide the message</button>`
-    : `<button type="button" class="osskip" onclick="toggleRecommendMsgEdit()">Edit the message they get</button>`}`;
+    <div class="flabel">Recommendation message</div>
+    <textarea id="recommendMsg" class="cmsg" maxlength="2000" rows="6" oninput="onRecommendMsgInput(this.value)">${esc(recommendMsgText!==null?recommendMsgText:recommendMessageFor("",senderName))}</textarea>
+    <button type="button" class="filminvcta" id="recommendSend" onclick="sendRecommend()" ${n?"":"disabled"}>${esc(ctaLabel)}</button>`;
 }
 window.onRecommendMsgInput=(val)=>{ recommendMsgText=val; };
-window.toggleRecommendMsgEdit=()=>{ recommendMsgEditOpen=!recommendMsgEditOpen; renderRecommendForm(); };
 window.openRecommendAddForm=()=>{ recommendFriendAdding=true; renderRecommendForm(); };
 window.closeRecommendAddForm=()=>{ recommendFriendAdding=false; renderRecommendForm(); };
 window.openRecommend=()=>{
@@ -12426,7 +12430,6 @@ window.openRecommend=()=>{
   recommendCapMsg=null;
   recommendSentInfo=null;
   recommendMsgText=null;
-  recommendMsgEditOpen=false;
   renderRecommendForm();
   openModal($("recommend"));
   logEvent("recommend_opened");

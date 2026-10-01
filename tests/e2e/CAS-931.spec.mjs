@@ -75,9 +75,9 @@ async function addAndSelectMobileFriend(page, name, mobile){
   await page.waitForFunction(n => window.__friendInserts.length > n, before, { timeout: 5000 });
 }
 
-// AC(a)/AC(b): three email friends -> three recommendations rows, each with that friend's own email,
-// name, and a default message containing their own name.
-test("CAS-931 ACa/ACb: three email friends -> three recommendations, each with the recipient's own name", async ({ page }) => {
+// AC(a)/AC(b): three email friends -> three recommendations rows, each with that friend's own email
+// and name, and the same message (CAS-1125: the message no longer greets anyone by name).
+test("CAS-931 ACa/ACb: three email friends -> three recommendations, each with the same message", async ({ page }) => {
   await signedInListing(page);
   await openRecommendSheet(page);
 
@@ -94,8 +94,9 @@ test("CAS-931 ACa/ACb: three email friends -> three recommendations, each with t
   expect(rows.map(r => r.to_name).sort()).toEqual(["Mum", "Priya", "Sam"]);
   rows.forEach(r => {
     expect(r.to_email).toBe({ Sam: "sam@example.com", Priya: "priya@example.com", Mum: "mum@example.com" }[r.to_name]);
-    expect(r.message).toContain(r.to_name);
+    expect(r.message).toContain("Cascade");
   });
+  expect(new Set(rows.map(r => r.message)).size).toBe(1);
 });
 
 // AC(c): after sending, the header shows Done and not Cancel.
@@ -150,7 +151,7 @@ test("CAS-931: selecting a 21st recipient is refused and inserts nothing", async
   });
   await expect(page.locator("#recommendSend")).toContainText("Recommend to 20 people");
 
-  await page.locator('.frow[data-fid="21"] .fcheck').click();
+  await page.locator('.frow[data-fid="21"]').click();
 
   await expect(page.locator("#recommendErr")).toBeVisible();
   expect(await page.evaluate(() => recommendFriendSel.size)).toBe(20);

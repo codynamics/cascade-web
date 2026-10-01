@@ -165,7 +165,7 @@ test("CAS-928 AC3c: adding a friend with a name and an email inserts one row and
   expect(inserts[0].name).toBe("Jess");
   await expect(page.locator("#filmInviteSend")).toContainText("1");
   const jessId = inserts[0].id;
-  await expect(page.locator(`#filmInvitePicker .frow[data-fid="${jessId}"] .fcheck`)).toHaveClass(/on/);
+  await expect(page.locator(`#filmInvitePicker .frow[data-fid="${jessId}"]`)).toHaveClass(/fsel/);
 });
 
 // AC3e
@@ -174,11 +174,11 @@ test("CAS-928 AC3e: ticking three friends shows three selected, unticking one le
   await openInviteSheet(page);
 
   for(const id of [1, 2, 4]){
-    await page.locator(`#filmInvitePicker .frow[data-fid="${id}"] .fcheck`).click();
+    await page.locator(`#filmInvitePicker .frow[data-fid="${id}"]`).click();
   }
   await expect(page.locator("#filmInviteSend")).toContainText("3");
 
-  await page.locator('#filmInvitePicker .frow[data-fid="2"] .fcheck').click();
+  await page.locator('#filmInvitePicker .frow[data-fid="2"]').click();
   await expect(page.locator("#filmInviteSend")).toContainText("2");
 });
 
@@ -188,6 +188,7 @@ test("CAS-928 AC3f: tapping WhatsApp on a friend with a mobile marks that row's 
   await openInviteSheet(page);
 
   const row = page.locator('#filmInvitePicker .frow[data-fid="1"]');
+  await row.click();
   const mail = row.locator('.fchan[aria-label^="Email"]');
   const wa = row.locator('.fchan[aria-label^="WhatsApp"]');
   await expect(mail).toHaveClass(/on/);

@@ -466,6 +466,17 @@ if(typeof window.CascadeAuth === "undefined"){
   // exercises the clipboard-fallback branch) — exported so a test can assert the fallback's payload really
   // carries the link, the same guarantee CAS-929 asked for on the now-removed navigator.share path.
   inviteUrlFor, shareTextFor, openNextInviteChannel, openNextRecommendChannel,
+  // CAS-1125: friendRowHTML is the shared recipient-row renderer (now a single tap target, not a separate
+  // circle) and recommendMessageFor is the Recommend sheet's own default-message text — both plain
+  // top-level functions, exported directly. toggleFriendSelect is window-assigned wire code (wrapped like
+  // toggleFilmOpt above). friends/recommendFriendSel are reassigned wholesale elsewhere (loadFriends,
+  // openRecommend/sendRecommend), so both are exposed through a getter/setter, like watchPrefs above.
+  friendRowHTML, recommendMessageFor,
+  toggleFriendSelect: (ctx, id) => window.toggleFriendSelect(ctx, id),
+  get friends(){ return friends; },
+  setFriends(v){ friends = v; },
+  get recommendFriendSel(){ return recommendFriendSel; },
+  setRecommendFriendSel(v){ recommendFriendSel = v; },
   // CAS-968: the unread-reply badge/pill decision surface. invites is reassigned wholesale by loadInvites
   // (like watchPrefs/notifyPrefs above), so it's exposed through a getter/setter rather than by reference;
   // invitesUnseenCount/invitesBadgeText are the pure count -> display-text decision every badge reads, and
