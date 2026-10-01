@@ -2,6 +2,7 @@
 
 Run:  python -m unittest monitor.tests.test_recommend
 """
+import datetime as _dt
 import unittest
 from unittest import mock
 
@@ -67,7 +68,7 @@ class MainDryRunTests(unittest.TestCase):
 
 class MainLiveSendTests(unittest.TestCase):
     def test_successful_send_stamps_sent_at_on_every_row(self):
-        store = InMemoryStore(recommendations=[_row(1), _row(2)])
+        store = InMemoryStore(recommendations=[_row(1), _row(2, to_email="other@example.test")])
         with mock.patch("monitor.recommend.store_from_env", return_value=store), \
              mock.patch("monitor.recommend.send_via_resend") as send:
             exit_code = main([])
@@ -76,7 +77,7 @@ class MainLiveSendTests(unittest.TestCase):
         self.assertEqual(store.fetch_unsent_recommendations(), [])
 
     def test_send_failure_leaves_that_rows_sent_at_unstamped(self):
-        store = InMemoryStore(recommendations=[_row(1), _row(2)])
+        store = InMemoryStore(recommendations=[_row(1), _row(2, to_email="other@example.test")])
         with mock.patch("monitor.recommend.store_from_env", return_value=store), \
              mock.patch("monitor.recommend.send_via_resend", side_effect=RuntimeError("resend down")):
             exit_code = main([])
@@ -86,7 +87,7 @@ class MainLiveSendTests(unittest.TestCase):
         self.assertTrue(all(r["sent_at"] is None for r in unsent))
 
     def test_one_failure_does_not_block_the_other_row_from_sending(self):
-        store = InMemoryStore(recommendations=[_row(1), _row(2)])
+        store = InMemoryStore(recommendations=[_row(1), _row(2, to_email="other@example.test")])
         with mock.patch("monitor.recommend.store_from_env", return_value=store), \
              mock.patch("monitor.recommend.send_via_resend",
                          side_effect=[RuntimeError("resend down"), None]):
@@ -95,6 +96,35 @@ class MainLiveSendTests(unittest.TestCase):
         unsent = store.fetch_unsent_recommendations()
         self.assertEqual(len(unsent), 1)
         self.assertEqual(unsent[0]["id"], 1)
+
+
+class DuplicateAddressTests(unittest.TestCase):
+    """CAS-1131: never email the same (sender, address) pair twice."""
+
+    def test_two_unsent_rows_same_sender_and_address_different_case_fold_into_one_send(self):
+        store = InMemoryStore(recommendations=[
+            _row(1, to_email="Priya@Example.test"),
+            _row(2, to_email="priya@example.test"),
+        ])
+        with mock.patch("monitor.recommend.store_from_env", return_value=store), \
+             mock.patch("monitor.recommend.send_via_resend") as send:
+            exit_code = main([])
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(send.call_count, 1)
+        self.assertEqual(store.fetch_unsent_recommendations(), [])
+
+    def test_row_already_sent_within_7_days_is_stamped_without_a_second_send(self):
+        two_days_ago = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=2)).isoformat()
+        store = InMemoryStore(recommendations=[
+            _row(1, sent_at=two_days_ago),
+            _row(2),
+        ])
+        with mock.patch("monitor.recommend.store_from_env", return_value=store), \
+             mock.patch("monitor.recommend.send_via_resend") as send:
+            exit_code = main([])
+        self.assertEqual(exit_code, 0)
+        send.assert_not_called()
+        self.assertEqual(store.fetch_unsent_recommendations(), [])
 
 
 class RecommendationsFixtureFlagTests(unittest.TestCase):

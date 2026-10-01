@@ -473,6 +473,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // openRecommend/sendRecommend), so both are exposed through a getter/setter, like watchPrefs above.
   friendRowHTML, recommendMessageFor,
   toggleFriendSelect: (ctx, id) => window.toggleFriendSelect(ctx, id),
+  // CAS-1131: sendRecommend is window-assigned wire code (same reason as toggleFriendSelect above),
+  // exported so a test can drive the real de-dupe-by-email filter instead of re-deriving it.
+  sendRecommend: (...args) => window.sendRecommend(...args),
   get friends(){ return friends; },
   setFriends(v){ friends = v; },
   get recommendFriendSel(){ return recommendFriendSel; },

@@ -30,6 +30,7 @@ Interface:
   sign_attachment_url(path) -> signed URL string | None                                     # CAS-864
   fetch_unsent_recommendations() -> [recommendations row, sent_at is null]                  # CAS-884
   mark_recommendations_sent(ids, sent_at) -> int                                            # CAS-884
+  fetch_recent_sent_recommendations(since) -> [{sender_id, to_email, sent_at}, sent_at >= since]  # CAS-1131
   fetch_undigested_invite_replies() -> [{id, token, sender_id, to_name, film_title, tmdb_id,
                                           answer, created_at}, digested_at is null]          # CAS-887
   mark_invite_replies_digested(ids, digested_at) -> int                                      # CAS-887
@@ -225,6 +226,12 @@ class InMemoryStore:
                 r["sent_at"] = sent_at
                 n += 1
         return n
+
+    def fetch_recent_sent_recommendations(self, since) -> list:
+        """Every recommendations row already emailed on/after `since` (CAS-1131) — lets a caller
+        fold a newly-queued duplicate (same sender/address) into a no-op stamp instead of a second
+        email within the cooldown window."""
+        return [dict(r) for r in self._recommendations if r.get("sent_at") and r["sent_at"] >= since]
 
     def fetch_undigested_invite_replies(self) -> list:
         return [dict(r) for r in self._invite_replies if not r.get("digested_at")]
@@ -500,6 +507,13 @@ class SupabaseStore:
             return len(json.loads(body))
         except (json.JSONDecodeError, TypeError):
             return 0
+
+    def fetch_recent_sent_recommendations(self, since) -> list:
+        """Every recommendations row emailed on/after `since` (CAS-1131), read with service_role —
+        same cross-user reason as fetch_unsent_recommendations above."""
+        return self._get(
+            f"/recommendations?sent_at=gte.{urllib.parse.quote(since)}&select=sender_id,to_email,sent_at"
+        )
 
     def fetch_undigested_invite_replies(self) -> list:
         """Every invite_replies row not yet folded into a digest (CAS-887), each flattened with the

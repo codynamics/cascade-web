@@ -1,11 +1,16 @@
 """Recommend Cascade — the send half of Refer a friend (CAS-884/M11).
 
-Reads every unsent `recommendations` row and sends ONE email per row (not a digest — each
-recommendation is its own introduction, from its own sender, to its own recipient). Runs from a
-new hourly workflow (.github/workflows/recommend.yml) rather than the daily 6am one, so a
-recommendation lands within the hour. Same send-before-ledger discipline as monitor/contact.py:
-a row's email goes out first, and its own `sent_at` is stamped only once that send has actually
-succeeded, so a failed send is retried next run without touching any other row.
+Reads every unsent `recommendations` row and sends ONE email per (sender, lower-cased address)
+group (not a digest — each recommendation is its own introduction, from its own sender, to its
+own recipient). Runs from a new hourly workflow (.github/workflows/recommend.yml) rather than the
+daily 6am one, so a recommendation lands within the hour. Same send-before-ledger discipline as
+monitor/contact.py: a group's email goes out first, and `sent_at` is stamped on every row in that
+group only once the send has actually succeeded, so a failed send is retried next run without
+touching any other group.
+
+CAS-1131: a duplicate queued for the same (sender, address) is never emailed twice. Two unsent
+rows for the same pair fold into one send (the newest row's message), both stamped. A row whose
+pair was already sent within the last 7 days is stamped without sending at all.
 
     python -m monitor.recommend                              # live (needs SUPABASE_*, RESEND_API_KEY)
     python -m monitor.recommend --dry-run                     # render only; sends nothing, stamps nothing
@@ -103,27 +108,51 @@ def main(argv=None) -> int:
 
     print(f"[monitor.recommend] {len(rows)} unsent recommendation(s).")
 
-    sent, failed = 0, 0
+    # CAS-1131: fold same (sender, lower-cased address) rows in this batch into one send, and skip
+    # (but still stamp) any pair already sent in the last 7 days — a duplicate must never be emailed.
+    cooldown_since = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=7)).isoformat()
+    recently_sent = {
+        (r["sender_id"], (r.get("to_email") or "").lower())
+        for r in store.fetch_recent_sent_recommendations(cooldown_since)
+    }
+
+    groups = {}
     for row in rows:
-        email = render_email(row)
+        key = (row["sender_id"], (row.get("to_email") or "").lower())
+        groups.setdefault(key, []).append(row)
+    folded = len(rows) - len(groups)
+    if folded:
+        print(f"[monitor.recommend] folded {folded} duplicate unsent row(s) into "
+              f"{len(groups)} sender/address group(s).")
+
+    sent, failed = 0, 0
+    for key, group_rows in groups.items():
+        ids = [r["id"] for r in group_rows]
+        if key in recently_sent:
+            if not args.dry_run:
+                sent_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
+                store.mark_recommendations_sent(ids, sent_at)
+            continue
+        newest = max(group_rows, key=lambda r: r.get("created_at") or "")
+        email = render_email(newest)
         if args.dry_run:
-            print(f"[monitor.recommend] would send to {row.get('to_email')!r}: {email['subject']!r}")
+            print(f"[monitor.recommend] would send to {newest.get('to_email')!r}: {email['subject']!r}")
             print(email["text"])
             continue
         try:
-            send_via_resend(row["to_email"], email["subject"], email["html"], email["text"])
+            send_via_resend(newest["to_email"], email["subject"], email["html"], email["text"])
         except Exception as err:  # noqa: BLE001 — a failed send must not stamp sent_at
-            print(f"[monitor.recommend] send to {row.get('to_email')!r} failed: {err} — "
+            print(f"[monitor.recommend] send to {newest.get('to_email')!r} failed: {err} — "
                   "not marking sent, will retry next run.")
             failed += 1
             continue
         sent_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
-        store.mark_recommendations_sent([row["id"]], sent_at)
+        store.mark_recommendations_sent(ids, sent_at)
         sent += 1
 
     if args.dry_run:
         return 0
-    print(f"[monitor.recommend] sent {sent} of {len(rows)}; {failed} failed and will retry.")
+    print(f"[monitor.recommend] sent {sent} of {len(groups)} group(s); {failed} failed and will retry.")
     return 0
 
 

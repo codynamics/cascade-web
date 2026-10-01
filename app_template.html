@@ -12470,9 +12470,19 @@ function openNextRecommendChannel(queue){
 // regardless of channel, same as CAS-930's sendFilmInvite.
 window.sendRecommend=async()=>{
   const errEl=$("recommendErr"), btn=$("recommendSend");
+  // CAS-1131: two friend entries can share one email address — de-dupe by lower-cased address
+  // before anything is queued, so a send can never insert the same address twice.
+  const seenEmails=new Set();
   const recipients=[...recommendFriendSel.entries()]
     .map(([id,sel])=>({friend:friends.find(x=>String(x.id)===id), channel:(sel&&sel.channel)||"email"}))
-    .filter(r=>r.friend);
+    .filter(r=>r.friend)
+    .filter(r=>{
+      if(r.channel!=="email") return true;
+      const key=(r.friend.email||"").toLowerCase();
+      if(seenEmails.has(key)) return false;
+      seenEmails.add(key);
+      return true;
+    });
   errEl.hidden=true;
   if(!recipients.length) return;
   if(recipients.length>INVITE_MAX_RECIPIENTS){
