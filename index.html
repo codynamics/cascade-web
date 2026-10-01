@@ -19391,7 +19391,7 @@ else if(dedupedN)
     if(cascadeKnown.has(id)){ cascadePendingDeletes.add(id); saveCascadePendingDeletes(); }
   };
   accountHasConfirmedCascades = function(){ return cascadeKnown.size>0; };
-  let syncTimer=null, syncing=false, syncAgain=false;
+  let syncTimer=null, syncing=false, syncAgain=false, syncDone=null;
   // CAS-1107: cascadeKnown used to persist to localStorage as cascade_cascade_known@<uid> and reload from
   // there on the very next boot or account switch — a stale copy surviving a sign-out/sign-in could then
   // stand in for this session's real "what does the account currently confirm" baseline before any load
@@ -19536,13 +19536,23 @@ else if(dedupedN)
     outboxMark("cascades", cascadeDirtyRows().map(cascadeToRow), r=>r.id);
     clearTimeout(syncTimer); syncTimer=setTimeout(runSync, 400);
   }
-  async function runSync(){
-    if(!accountActive()) return;
-    if(syncing){ syncAgain=true; return; }
+  // CAS-1132: a caller awaiting runSync() must see the sync it actually asked for land, not just whichever
+  // one happened to be in flight already. The old short-circuit (`if(syncing){ syncAgain=true; return; }`)
+  // resolved immediately for the loser of that race, before syncAgain's own retry had even started — so an
+  // explicit flush (replayOutbox's `await runSync()`; a test's `CascadePersistence.syncNow()`) could believe
+  // a push had completed when only an older, already-stale sync had actually run. Returning the in-flight
+  // promise instead, and chaining the retry onto it when syncAgain fires, makes every caller's await resolve
+  // only once a pass that re-reads the current dirty rows has actually finished.
+  function runSync(){
+    if(!accountActive()) return Promise.resolve();
+    if(syncing){ syncAgain=true; return syncDone; }
     syncing=true;
-    try{ await syncToAccount(); }
-    catch(err){ console.warn("Cascade: account sync failed", err); }
-    finally{ syncing=false; if(syncAgain){ syncAgain=false; scheduleSync(); } }
+    syncDone = (async()=>{
+      try{ await syncToAccount(); }
+      catch(err){ console.warn("Cascade: account sync failed", err); }
+      finally{ syncing=false; if(syncAgain){ syncAgain=false; await runSync(); } }
+    })();
+    return syncDone;
   }
   // CAS-957: the account refused to ever let this device own this row (42501) — dropping it from the
   // local list (not just cascadeKnown) is deliberate: leaving it on screen with no way to ever save it
