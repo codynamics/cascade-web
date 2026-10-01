@@ -317,7 +317,7 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   await page.locator("#navMenu .navitem", { hasText: "Where & when you'll watch" }).click();
   await expect(page.locator(".osh", { hasText: "Where & when you'll watch" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
-  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).toHaveClass(/on/);
   await page.locator("#wwScreen .osback").click();
   await expect(page.locator("#wwScreen")).not.toHaveClass(/open/);
@@ -370,7 +370,7 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
 
   await page.locator("#navMenuBtn").click();
   await page.locator("#navMenu .navitem", { hasText: "Where & when you'll watch" }).click();
-  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).not.toHaveClass(/on/);
   await page.locator("#wwScreen .osback").click();
   await expect(page.locator(".wtabbtn", { hasText: "Premium" })).toHaveCount(0);
@@ -389,7 +389,7 @@ test("an agent created with every window enabled lists films at rental or stream
   await page.locator("#navMenu .navitem", { hasText: "Where & when you'll watch" }).click();
   await expect(page.locator(".osh", { hasText: "Where & when you'll watch" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
-  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).toHaveClass(/on/);
   await page.locator("#wwScreen .osback").click();
   await expect(page.locator("#wwScreen")).not.toHaveClass(/open/);
@@ -470,7 +470,7 @@ test("Mission screen: one score track, exactly one handle; Premium becomes a fol
   await page.locator("#navMenuBtn").click();
   await page.locator("#navMenu .navitem", { hasText: "Where & when you'll watch" }).click();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
-  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).toHaveClass(/on/);
   await page.locator("#wwScreen .osback").click();
   await expect(page.locator("#wwScreen")).not.toHaveClass(/open/);
