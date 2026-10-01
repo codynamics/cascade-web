@@ -1,7 +1,7 @@
 """Nightly health assertions (CAS-974, CAS-985).
 
 Every silent failure Cascade has actually had passed CI: a green `daily.yml` run is not
-evidence the night's work actually happened. This module asserts eighteen concrete things about
+evidence the night's work actually happened. This module asserts nineteen concrete things about
 the run that just finished and writes the answer to ``state/health.json`` as
 ``{checked_at, checks: [{name, ok, value, threshold, detail}], ok}`` — exiting non-zero on any
 real failure so `alert.yml` (CAS-973) fires.
@@ -93,6 +93,14 @@ USAGE_WINDOW_MIN_APP_OPEN = 50
 CLIENT_ERROR_RATE_MAX_PCT = 0.05
 CLIENT_ERROR_RATE_MAX_ABS = 20
 EMPTY_ACCOUNT_RATE_MAX_PCT = 0.10
+
+# CAS-1139: the two cohorts CAS-1139's nightly refresh re-orders for — weekly-TTL (pp._is_wm_
+# weekly_cohort) and within-a-year (pp.WM_RECENT_YEAR_DAYS) — must not go stale even on the free
+# plan's small credit pot. 5% tolerance; older films carry no threshold at all (see the ticket's
+# own Do-not-re-raise), so the check's detail reports their oldest stamp without failing on it.
+WM_FRESHNESS_MAX_PCT = 0.05
+WM_FRESHNESS_WEEKLY_MAX_AGE_DAYS = 14
+WM_FRESHNESS_YEAR_MAX_AGE_DAYS = 45
 
 # CAS-1135: a short, fixed list of films certain to be in Australian distribution and highly
 # rated — never an attempt to cover the whole catalogue, just a tripwire for the CAS-1134 class of
@@ -688,6 +696,54 @@ def check_released_scored_without_rating(candidates: list) -> dict:
                   "every 'scored' candidate outside the ladder cohort carries a real rating.")
 
 
+def _wm_fields_age_days(movie: dict, today: _dt.date) -> int | None:
+    stamp = movie.get("wm_fields_fetched_at")
+    if not stamp:
+        return None
+    try:
+        return (today - _dt.date.fromisoformat(stamp)).days
+    except ValueError:
+        return None
+
+
+def check_watchmode_freshness(movies: list, today: _dt.date) -> dict:
+    """CAS-1139: the nightly fields pass and the scoreability probe now spend the free plan's
+    small Watchmode pot on the titles whose ratings still move — this is the check that would
+    catch that ordering silently failing (e.g. the repair/never-fetched tiers starving tier 2/3
+    every night), never a volume check (catalogue_size/score_coverage) and never specific to one
+    title (landmark_films).
+
+    Fails once more than WM_FRESHNESS_MAX_PCT of the weekly-TTL cohort (pp._is_wm_weekly_cohort —
+    upcoming/in_cinema, or released within pp.WM_RECENT_RELEASE_DAYS) carries a
+    wm_fields_fetched_at older than WM_FRESHNESS_WEEKLY_MAX_AGE_DAYS, or more than
+    WM_FRESHNESS_MAX_PCT of films released within pp.WM_RECENT_YEAR_DAYS carry one older than
+    WM_FRESHNESS_YEAR_MAX_AGE_DAYS. A missing stamp counts as stale in both. Older films carry no
+    threshold — the detail only ever reports their oldest stamp."""
+    ages = [_wm_fields_age_days(m, today) for m in movies]
+    known_ages = [a for a in ages if a is not None]
+    oldest = max(known_ages) if known_ages else None
+
+    weekly = [m for m in movies if pp._is_wm_weekly_cohort(m, today)]
+    weekly_stale = sum(1 for m in weekly
+                       if (_wm_fields_age_days(m, today) or 0) > WM_FRESHNESS_WEEKLY_MAX_AGE_DAYS
+                       or m.get("wm_fields_fetched_at") is None)
+    weekly_pct = (weekly_stale / len(weekly)) if weekly else 0.0
+
+    within_year = [m for m in movies if pp._is_recent_release(m, today, pp.WM_RECENT_YEAR_DAYS)]
+    year_stale = sum(1 for m in within_year
+                     if (_wm_fields_age_days(m, today) or 0) > WM_FRESHNESS_YEAR_MAX_AGE_DAYS
+                     or m.get("wm_fields_fetched_at") is None)
+    year_pct = (year_stale / len(within_year)) if within_year else 0.0
+
+    detail = (f"{weekly_pct:.1%} of weekly-TTL film(s) stale past "
+             f"{WM_FRESHNESS_WEEKLY_MAX_AGE_DAYS}d, {year_pct:.1%} of film(s) released within "
+             f"{pp.WM_RECENT_YEAR_DAYS}d stale past {WM_FRESHNESS_YEAR_MAX_AGE_DAYS}d, oldest "
+             f"stamp in the catalogue is {oldest if oldest is not None else 'unknown'} day(s) old.")
+    ok = weekly_pct <= WM_FRESHNESS_MAX_PCT and year_pct <= WM_FRESHNESS_MAX_PCT
+    return _check("watchmode_freshness", ok, round(max(weekly_pct, year_pct) * 100, 1),
+                 round(WM_FRESHNESS_MAX_PCT * 100, 1), detail)
+
+
 def check_landmark_films(movies: list) -> dict:
     """Asks the shipped engine (poc_pipeline.scoreable_ids -> scripts/scoreable_shim.mjs ->
     isScoreable — the same route tests/test_data_quality.py's own publication-floor test uses,
@@ -714,7 +770,7 @@ CHECK_NAMES = ("catalogue_size", "catalogue_integrity", "tmdb_fetch", "watchmode
               "usage_events_insert", "auth_signin",
               "client_error_rate", "empty_account_rate", "activity_floor",
               "watchmode_identity", "watchmode_remap_backlog", "released_scored_without_rating",
-              "landmark_films")
+              "landmark_films", "watchmode_freshness")
 
 # CAS-993: the monitor only runs in alerts.yml now, so email_send/push_send — the two checks that
 # read THIS run's delivery stats — can only be asserted there. Every other check still runs in
@@ -755,6 +811,7 @@ def run_checks(*, today_movies=None, prev_movies=None, stats=None, usage_probe=N
             (today_movies or []) + (candidates or []), tv_tmdb_ids, remap_backlog_prev),
         "released_scored_without_rating": lambda: check_released_scored_without_rating(candidates or []),
         "landmark_films": lambda: check_landmark_films(today_movies or []),
+        "watchmode_freshness": lambda: check_watchmode_freshness(today_movies or [], today),
     }
     return [thunks[n]() for n in CHECK_NAMES if n in names]
 

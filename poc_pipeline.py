@@ -674,6 +674,14 @@ WM_NIGHTLY_MAX_CREDITS = int(os.getenv("WM_NIGHTLY_MAX_CREDITS", "400"))
 # DAYS: Watchmode popularity is the whole score for a title with no other window's data yet.
 WM_NIGHTLY_COHORT_TTL_DAYS = 7
 
+# CAS-1139: the free-plan refresh is ordered by how recently a title was released, not spent
+# blind in catalogue/popularity order. A released title within WM_RECENT_RELEASE_DAYS of its AU
+# release date gets the same weekly TTL as the ladder cohort (ratings still move early on); one
+# within WM_RECENT_YEAR_DAYS is spent before the long back-catalogue tail once the weekly cohort
+# and the never-fetched are already covered. See _is_wm_weekly_cohort/_release_date below.
+WM_RECENT_RELEASE_DAYS = 90
+WM_RECENT_YEAR_DAYS = 365
+
 # CAS-986: the two-tier catalogue. state/candidates.json is every title discovery has ever found —
 # never shipped, never read by the app, never pruned. movies.json is the strict subset that can
 # carry a Cascade score today, capped at CATALOGUE_TARGET (a ceiling now, not the mechanism — see
@@ -805,6 +813,39 @@ def _is_ladder_cohort(movie: dict) -> bool:
     return bool({"upcoming", "in_cinema"} & set(movie.get("status") or []))
 
 
+def _release_date(movie: dict) -> "datetime.date | None":
+    """CAS-1139: the earliest Australian release date on record — `cinema_date`, else the
+    earliest `release_dates[].date`. None (counts as old) when neither is usable."""
+    raw = movie.get("cinema_date")
+    if not raw:
+        dates = [rd.get("date") for rd in (movie.get("release_dates") or []) if rd.get("date")]
+        raw = min(dates) if dates else None
+    if not raw:
+        return None
+    try:
+        return datetime.date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def _is_recent_release(movie: dict, today: datetime.date, within_days: int) -> bool:
+    """True when `movie` has a usable _release_date that falls on or within `within_days` before
+    `today` — a future (not-yet-released) date, or no usable date at all, is never recent."""
+    release = _release_date(movie)
+    if release is None:
+        return False
+    age = (today - release).days
+    return 0 <= age <= within_days
+
+
+def _is_wm_weekly_cohort(movie: dict, today: datetime.date) -> bool:
+    """CAS-1139: the weekly-refresh set for the nightly fields pass and the scoreability probe —
+    the existing ladder cohort (_is_ladder_cohort, unchanged — it also decides what counts as
+    `scored`, CAS-1134, and must keep meaning upcoming/in_cinema only) plus a released title
+    whose release date is within WM_RECENT_RELEASE_DAYS, whose rating is still likely to move."""
+    return _is_ladder_cohort(movie) or _is_recent_release(movie, today, WM_RECENT_RELEASE_DAYS)
+
+
 # CAS-1135: nightly fields and the CAS-986 scoreability probe each tally enrich_watchmode_fields'
 # outcomes the same way — adding this here so both also capture up to 5 tmdb_ids behind a
 # 'mismatch' outcome, for monitor.health's watchmode_identity check to name in its detail line.
@@ -825,14 +866,18 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
     to the catalogue since the last manual run carried no Cascade score at all, and an upcoming
     title's popularity went stale until someone remembered to dispatch it.
 
-    Spends one shared budget, WM_NIGHTLY_MAX_CREDITS by default, across four priority tiers,
+    Spends one shared budget, WM_NIGHTLY_MAX_CREDITS by default, across five priority tiers,
     highest first:
       0. CAS-1134 repair — titles fetched under the pre-fix movie/TV id-map collision (a
          wm_fields_fetched_at stamp but no wm_id, whose tmdb_id also carries a TV row in the id
          map), forced stale regardless of how recently that bad fetch happened;
       1. titles with no wm_fields_fetched_at at all (never fetched);
-      2. upcoming/in_cinema titles stale past WM_NIGHTLY_COHORT_TTL_DAYS (7 days);
-      3. every other title stale past WATCHMODE_CACHE_TTL_DAYS (30 days).
+      2. CAS-1139: the weekly-refresh cohort (_is_wm_weekly_cohort — upcoming/in_cinema, or
+         released within WM_RECENT_RELEASE_DAYS) stale past WM_NIGHTLY_COHORT_TTL_DAYS (7 days);
+      3. CAS-1139: every other title stale past WATCHMODE_CACHE_TTL_DAYS (30 days), split and
+         ordered by recency so the small free-plan pot favours titles whose ratings still move:
+         3a. released within WM_RECENT_YEAR_DAYS, stalest wm_fields_fetched_at first;
+         3b. everything else, stalest wm_fields_fetched_at first.
     Each tier is spent in full before the next one starts, so an empty budget always favours the
     higher tier — the same discipline `enrich_watchmode_fields`'s own {"remaining", "skipped"}
     shape already gives every other bounded backfill in this module.
@@ -863,6 +908,7 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
         return outcomes
     wm_idmap = _invert_watchmode_idmap(idmap)
     tv_tmdb_ids = _watchmode_tv_tmdb_ids()
+    today = datetime.date.fromisoformat(_RUN_DATE)
 
     if budget is None:
         budget = {"remaining": WM_NIGHTLY_MAX_CREDITS, "skipped": 0}
@@ -886,11 +932,18 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
     for m in movies:
         if id(m) in seen:
             continue
-        if _is_ladder_cohort(m) and _watchmode_fields_stale(m, WM_NIGHTLY_COHORT_TTL_DAYS):
+        if _is_wm_weekly_cohort(m, today) and _watchmode_fields_stale(m, WM_NIGHTLY_COHORT_TTL_DAYS):
             cohort.append(m)
             seen.add(id(m))
 
-    rest = [m for m in movies if id(m) not in seen and _watchmode_fields_stale(m)]
+    # CAS-1139: tier 3, split by recency and spent stalest-fetched-first within each half.
+    recent_year, rest = [], []
+    for m in movies:
+        if id(m) in seen or not _watchmode_fields_stale(m):
+            continue
+        (recent_year if _is_recent_release(m, today, WM_RECENT_YEAR_DAYS) else rest).append(m)
+    recent_year.sort(key=lambda m: m.get("wm_fields_fetched_at") or "")
+    rest.sort(key=lambda m: m.get("wm_fields_fetched_at") or "")
 
     for m in repair:
         result = enrich_watchmode_fields(m, wm_idmap, budget, ttl_days=0)
@@ -900,6 +953,9 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
         _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
     for m in cohort:
         result = enrich_watchmode_fields(m, wm_idmap, budget, WM_NIGHTLY_COHORT_TTL_DAYS)
+        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
+    for m in recent_year:
+        result = enrich_watchmode_fields(m, wm_idmap, budget)
         _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
     for m in rest:
         result = enrich_watchmode_fields(m, wm_idmap, budget)
@@ -1079,8 +1135,12 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
          wm_fields_fetched_at stamp but no wm_id, whose tmdb_id also carries a TV row in
          `tv_tmdb_ids`), forced stale regardless of how recently that bad fetch happened.
       1. published titles (`published_ids` — yesterday's movies.json) whose Watchmode fields are
-         stale (30 days, or 7 for an upcoming/in_cinema ladder-cohort title) — first, because
-         letting a published title's fields expire silently removes it from the app.
+         stale (30 days, or 7 for the CAS-1139 weekly-refresh cohort — _is_wm_weekly_cohort) —
+         first, because letting a published title's fields expire silently removes it from the
+         app. CAS-1139: spent weekly-refresh titles first, then titles released within
+         WM_RECENT_YEAR_DAYS, then the rest — stalest wm_fields_fetched_at first within each
+         group, NOT by popularity (the ticket's own Change #3; tiers 0, 2 and 3 stay popularity-
+         ordered, unchanged).
       2. unprobed candidates, most popular first — this is what grows the catalogue.
       3. no_score candidates last probed more than SCOREABILITY_RECOVERY_DAYS ago — recovers the
          tail without re-asking every night.
@@ -1095,14 +1155,25 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
     def _by_popularity(items):
         return sorted(items, key=lambda m: m.get("popularity") or 0, reverse=True)
 
+    def _by_staleness(items):
+        return sorted(items, key=lambda m: m.get("wm_fields_fetched_at") or "")
+
     repair_tier = _by_popularity(
         c for c in candidates.values()
         if c.get("wm_fields_fetched_at") and not c.get("wm_id") and c.get("tmdb_id") in tv_tmdb_ids)
-    tier1 = _by_popularity(
+    tier1_pool = [
         c for c in candidates.values()
         if c["tmdb_id"] in published_ids
-        and _watchmode_fields_stale(c, SCOREABILITY_LADDER_STALE_DAYS if _is_ladder_cohort(c)
-                                    else SCOREABILITY_STALE_DAYS))
+        and _watchmode_fields_stale(c, SCOREABILITY_LADDER_STALE_DAYS if _is_wm_weekly_cohort(c, today)
+                                    else SCOREABILITY_STALE_DAYS)]
+    tier1_weekly = _by_staleness(c for c in tier1_pool if _is_wm_weekly_cohort(c, today))
+    tier1_year = _by_staleness(c for c in tier1_pool
+                               if not _is_wm_weekly_cohort(c, today)
+                               and _is_recent_release(c, today, WM_RECENT_YEAR_DAYS))
+    tier1_rest = _by_staleness(c for c in tier1_pool
+                               if not _is_wm_weekly_cohort(c, today)
+                               and not _is_recent_release(c, today, WM_RECENT_YEAR_DAYS))
+    tier1 = tier1_weekly + tier1_year + tier1_rest
     tier2 = _by_popularity(c for c in candidates.values() if c.get("outcome") == "unprobed")
     tier3 = _by_popularity(c for c in candidates.values() if c.get("outcome") == "no_score"
                            and _scoreability_recovery_due(c, today))
@@ -1112,7 +1183,7 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
         for c in tier:
             ttl = forced_ttl
             if ttl is None:
-                ttl = SCOREABILITY_LADDER_STALE_DAYS if _is_ladder_cohort(c) else SCOREABILITY_STALE_DAYS
+                ttl = SCOREABILITY_LADDER_STALE_DAYS if _is_wm_weekly_cohort(c, today) else SCOREABILITY_STALE_DAYS
             result = enrich_watchmode_fields(c, wm_idmap, bd, ttl)
             _bump_wm_outcome(outcomes, result, c.get("tmdb_id"))
             if result in ("ok", "no-id"):
