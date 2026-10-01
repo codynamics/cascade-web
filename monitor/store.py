@@ -42,6 +42,7 @@ Interface:
                                           answer, created_at}, notified_at is null]           # CAS-967
   mark_invite_replies_notified(ids, notified_at) -> int                                       # CAS-967
   delete_old_usage_events(days=180) -> int              # CAS-942: usage_events retention purge
+  purge_deleted_rows(days=30) -> int        # CAS-1109: account_deleted_rows archive retention purge
   fetch_view(view_name) -> list                # every row, select=* (CAS-1021: metrics_report.py)
 """
 from __future__ import annotations
@@ -104,7 +105,9 @@ class InMemoryStore:
         self._agent_films = list(agent_films or [])
 
     def fetch_active_cascades(self) -> list:
-        return [c for c in self._cascades if c.get("active", True)]
+        # CAS-1109: a soft-deleted agent (deleted_at set) is gone, same as the live SupabaseStore query below —
+        # a fixture predating CAS-1092 carries no deleted_at key at all, which must read as "not deleted".
+        return [c for c in self._cascades if c.get("active", True) and not c.get("deleted_at")]
 
     def fetch_notification_keys(self) -> set:
         return {(n.get("cascade_id"), str(n.get("movie_id")), n.get("moment"))
@@ -292,6 +295,10 @@ class InMemoryStore:
         """CAS-942: fixtures/tests carry no usage_events data — nothing to purge, always 0."""
         return 0
 
+    def purge_deleted_rows(self, days: int = 30) -> int:
+        """CAS-1109: fixtures/tests carry no account_deleted_rows archive — nothing to purge, always 0."""
+        return 0
+
 
 class SupabaseStore:
     """PostgREST access with the service_role key. Never constructed without a URL + key."""
@@ -355,7 +362,9 @@ class SupabaseStore:
         return out
 
     def fetch_active_cascades(self) -> list:
-        return self._get("/cascades?active=eq.true&select=*&order=id.asc")
+        # CAS-1109: agents move onto the account store — a soft-deleted agent (migration 0001/CAS-1092's
+        # deleted_at, set by delete_agent()) must never reach matching, same as the client's own loadAccount.
+        return self._get("/cascades?active=eq.true&deleted_at=is.null&select=*&order=id.asc")
 
     def fetch_notification_keys(self) -> set:
         rows = self._get("/notifications?select=cascade_id,movie_id,moment&order=id.asc")
@@ -817,6 +826,25 @@ class SupabaseStore:
         try:
             return len(json.loads(body))
         except (json.JSONDecodeError, TypeError):
+            return 0
+
+    def purge_deleted_rows(self, days: int = 30) -> int:
+        """CAS-1109: sweep the CAS-1092 account_deleted_rows archive (every hard-delete the
+        archive_deleted_row() trigger has caught, across all 12 archived tables) with the same
+        service_role-only RPC the schema grants only to this role. Returns the number of archive
+        rows purged."""
+        data = json.dumps({"p_days": days}).encode("utf-8")
+        req = urllib.request.Request(
+            self._base + "/rpc/purge_deleted_rows",
+            data=data,
+            headers=self._headers(),
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+            body = resp.read().decode("utf-8")
+        try:
+            return int(json.loads(body))
+        except (json.JSONDecodeError, TypeError, ValueError):
             return 0
 
 

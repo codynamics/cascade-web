@@ -217,7 +217,9 @@ export async function probeSupabaseCanary(fetchImpl = fetch) {
     return { signedIn: false, detail: `canary sign-in failed: ${session.detail}` };
   }
   const token = session.token;
-  const cascades = await supabaseFetch(fetchImpl, "/rest/v1/cascades?select=id", { token });
+  // CAS-1109: a soft-deleted agent (deleted_at set) is gone, same as the client's own loadAccount and the
+  // monitor's fetch_active_cascades — the canary's roster must never read green off rows nobody can see.
+  const cascades = await supabaseFetch(fetchImpl, "/rest/v1/cascades?select=id&deleted_at=is.null", { token });
   const agentFilms = await supabaseFetch(fetchImpl, "/rest/v1/agent_films?select=movie_id&limit=1", { token });
   const filmWatch = await supabaseFetch(fetchImpl, "/rest/v1/film_watch?select=movie_id&limit=1", { token });
   await supabaseFetch(fetchImpl, "/auth/v1/logout", { method: "POST", token }).catch(() => {});

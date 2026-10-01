@@ -12,6 +12,11 @@
 // "upsert_many" kind in app_template.html). The fake client's upsert() therefore always receives an ARRAY
 // of rows, even a batch of one — every assertion below indexes into that array rather than reading a bare
 // row off the call.
+//
+// CAS-1109: agents moved onto the account store — pushAgentFilmAdmission's own "has the account confirmed
+// this cascade yet" gate now reads CascadeAccountStore's own cascades mirror directly (acctStore.cascades),
+// replacing cascadeKnown. confirmCascade/unconfirmCascade below seed/clear that mirror directly, the same
+// role cascadeKnown.set/delete played before.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
@@ -46,6 +51,14 @@ function signOut(E){
   const auth = E.CascadeAuth;
   auth.enabled = false; auth.client = null; auth.session = null;
 }
+function confirmCascade(E, cascadeId){
+  const store = E.CascadeAccountStore.acctStore;
+  store.cascades = [...(store.cascades||[]), { id: cascadeId }];
+}
+function unconfirmCascade(E, cascadeId){
+  const store = E.CascadeAccountStore.acctStore;
+  store.cascades = (store.cascades||[]).filter(r => r.id !== cascadeId);
+}
 const settle = () => new Promise(r => setTimeout(r, 0));
 
 test("CAS-1097: a film's first admission on an agent issues exactly one agent_films upsert", async () => {
@@ -53,7 +66,7 @@ test("CAS-1097: a film's first admission on an agent issues exactly one agent_fi
   const client = makeFakeClient();
   const cascadeId = "cas1097-agent-a";
   signIn(E, client);
-  E.CascadePersistence.cascadeKnown.set(cascadeId, { sig: "known" });
+  confirmCascade(E, cascadeId);
   try {
     E.CascadePersistence.setAgentFilm(cascadeId, 9700001,
       { admission_score: 72, admission_status: "stream", agent_sig: "sig-1" });
@@ -65,7 +78,7 @@ test("CAS-1097: a film's first admission on an agent issues exactly one agent_fi
     assert.equal(calls[0].rows[0].movie_id, "9700001");
     assert.equal(calls[0].rows[0].admission_score, 72);
   } finally {
-    E.CascadePersistence.cascadeKnown.delete(cascadeId);
+    unconfirmCascade(E, cascadeId);
     signOut(E);
   }
 });
@@ -75,7 +88,7 @@ test("CAS-1136: several admissions queued within one synchronous pass batch into
   const client = makeFakeClient();
   const cascadeId = "cas1136-agent-batch";
   signIn(E, client);
-  E.CascadePersistence.cascadeKnown.set(cascadeId, { sig: "known" });
+  confirmCascade(E, cascadeId);
   try {
     // recomputeFound's own first-sign-in sweep calls setAgentFilm once per newly-matched film, all within
     // one synchronous pass — this is the shape that used to cost one serialized request per film.
@@ -93,7 +106,7 @@ test("CAS-1136: several admissions queued within one synchronous pass batch into
     const movieIds = calls[0].rows.map(r => r.movie_id).sort();
     assert.equal(JSON.stringify(movieIds), JSON.stringify(["9701000","9701001","9701002","9701003","9701004"]));
   } finally {
-    E.CascadePersistence.cascadeKnown.delete(cascadeId);
+    unconfirmCascade(E, cascadeId);
     signOut(E);
   }
 });
@@ -103,7 +116,7 @@ test("CAS-1097: re-confirming an already-known admission (criteria drift re-test
   const client = makeFakeClient();
   const cascadeId = "cas1097-agent-b";
   signIn(E, client);
-  E.CascadePersistence.cascadeKnown.set(cascadeId, { sig: "known" });
+  confirmCascade(E, cascadeId);
   try {
     E.CascadePersistence.setAgentFilm(cascadeId, 9700002,
       { admission_score: 55, admission_status: "stream", agent_sig: "sig-1" });
@@ -119,7 +132,7 @@ test("CAS-1097: re-confirming an already-known admission (criteria drift re-test
     assert.equal(E.CascadePersistence.getAgentFilm(cascadeId, 9700002).agent_sig, "sig-2",
       "the LOCAL ledger still refreshes agent_sig even though nothing was pushed to the account");
   } finally {
-    E.CascadePersistence.cascadeKnown.delete(cascadeId);
+    unconfirmCascade(E, cascadeId);
     signOut(E);
   }
 });
@@ -129,7 +142,7 @@ test("CAS-1097: clearAgentFilm (a film leaving an agent's current set) never iss
   const client = makeFakeClient();
   const cascadeId = "cas1097-agent-c";
   signIn(E, client);
-  E.CascadePersistence.cascadeKnown.set(cascadeId, { sig: "known" });
+  confirmCascade(E, cascadeId);
   try {
     E.CascadePersistence.setAgentFilm(cascadeId, 9700003,
       { admission_score: 60, admission_status: "stream", agent_sig: "sig-1" });
@@ -141,7 +154,7 @@ test("CAS-1097: clearAgentFilm (a film leaving an agent's current set) never iss
     assert.ok(!E.CascadePersistence.getAgentFilm(cascadeId, 9700003),
       "the LOCAL ledger still clears, so recomputeFound's own membership/sticky logic is unaffected");
   } finally {
-    E.CascadePersistence.cascadeKnown.delete(cascadeId);
+    unconfirmCascade(E, cascadeId);
     signOut(E);
   }
 });
@@ -159,14 +172,14 @@ test("CAS-1097/CAS-1064: a push for a cascade this device holds but the account 
       { admission_score: 80, admission_status: "stream", agent_sig: "sig-1" });
     await settle();
     assert.equal(client.upsertCalls.filter(c => c.table === "agent_films").length, 0,
-      "must not race the cascade's own still-unconfirmed upsert");
-    E.CascadePersistence.cascadeKnown.set(cascadeId, { sig: "known" });
+      "must not race the cascade's own still-unconfirmed insert");
+    confirmCascade(E, cascadeId);
     await new Promise(r => setTimeout(r, 50));   // past the (shrunk) re-check interval
     assert.equal(client.upsertCalls.filter(c => c.table === "agent_films").length, 1,
       "the deferred push must fire once the cascade is confirmed");
   } finally {
     E.cascades.length = 0;
-    E.CascadePersistence.cascadeKnown.delete(cascadeId);
+    unconfirmCascade(E, cascadeId);
     E.CascadePersistence.AGENT_FILM_DEFER_MS = savedDefer;
     signOut(E);
   }

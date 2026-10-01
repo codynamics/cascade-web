@@ -6,12 +6,12 @@
 // intact is not the class of bug this suite exists to catch.
 //
 // What must pass now (decision, 2026-10-01 build chat, scoping CAS-1093 AC2): S2, S3, plus S1/S6/S10 added
-// by CAS-1099 below. Every other scenario stays `test.fixme()`, not deleted — including S4 and S7-S9, which
-// have each passed in CI before that decision but are fixme'd anyway because their own features/tickets
-// aren't done yet. Later tickets in the server-first account-store rework
+// by CAS-1099, plus S4/S5 un-fixme'd by CAS-1109 below (agents now move onto the account store). Every
+// other scenario stays `test.fixme()`, not deleted — including S7-S9, which have each passed in CI before
+// but are fixme'd anyway because their own features/tickets aren't done yet. Later tickets in the
+// server-first account-store rework
 // (https://codynamics.atlassian.net/wiki/spaces/Cascade/pages/64815105) un-fixme them as the features they
 // depend on land, and add scenarios of their own for their own tables.
-//   - S4, S5: once agents move onto the account store (CAS-1094+).
 //   - S7, S8, S9: added by later tickets (CAS-1096, CAS-1095) — theirs to un-fixme.
 // S13 (CAS-1102, migration 0003_delete_guard.sql) asserts on that migration's own trigger directly via a
 // signed-in supabase-js client, not the browser — see its own comment below.
@@ -73,9 +73,6 @@ test("S3: sign out then sign back in on the same context deletes none (the 2026-
 });
 
 test("S4 (first half): an edit on context A reaches context B on reload", async ({ browser }) => {
-  // CAS-1093 (decision, 2026-10-01 build chat): scope of what must pass now is exactly S2 and S3 — fixme'd
-  // alongside S4's second half, same reason, even though this half has passed in CI before this decision.
-  test.fixme(true, "until agents move onto the account store");
   const email = testEmail("s4");
   const user = await createTestUser(email);
   const [seededAgent] = await seedCascades(user.id, [{ name: "Blockbusters" }]);
@@ -115,14 +112,14 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
     // CAS-1132: bisect "the UI never committed the rename locally" from "the commit landed but the push to
     // the server failed/never fired" — the two candidate causes the ticket itself names — before ever
     // asking the (real) network. If this reads newName, the bug is sync-side; if it still reads the old
-    // name, the bug is in the briefClose/briefCommit/commitDraft chain above, never reaching syncNow at all.
+    // name, the bug is in the briefClose/briefCommit/commitDraft chain above, never reaching the account at all.
     await expect.poll(
       () => pageA.evaluate((id) => { const c = cascades.find(x => x.id === id); return c && c.name; }, seededAgent.id),
       { timeout: 5_000 },
     ).toBe(newName);
 
-    // saveCascades() debounces the actual push 400ms out (scheduleSync); force it rather than waiting on
-    // the timer — window.CascadePersistence.syncNow is runSync itself, idempotent to call directly.
+    // CAS-1109: saveCascades() pushes through acctOp immediately now, no debounce to wait out — this just
+    // makes sure the queue is drained rather than racing the network.
     await pageA.evaluate(() => window.CascadePersistence.syncNow());
 
     await expect.poll(async () => {

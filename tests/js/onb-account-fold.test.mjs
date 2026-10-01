@@ -2,9 +2,14 @@
 // (membCompleteNewMembership), replacing CAS-959's own localOnly-fold carve-out in loadAccount() — removed
 // along with onbV2CommittedSave/Load/Clear, which no longer exist (the draft lives in memory only until
 // membership completes; see onbDraftModeOn). These tests drive the real seam with a stubbed Supabase
-// client, the same convention acct-namespacing.test.mjs uses. The THIRD test below (a hand-built local
-// agent folding in alongside an account's own) is CAS-734/733's original fold-in, unrelated to onboarding
-// and still exercised through loadAccount() directly, same as before this ticket.
+// client, the same convention acct-namespacing.test.mjs uses.
+// CAS-1109: CAS-734/733's own organic-local-work fold-in (a hand-built agent the account has never
+// confirmed surviving a loadAccount() call) is retired along with the rest of the old diff sync —
+// acctLoad replaces whatever this device held for cascades wholesale now, the same "no merge, no carry-up"
+// rule every other acctOp-backed table already follows. In practice this never arises for a real user: the
+// one path that creates a cascade (commitDraft -> saveCascades) always enqueues its own acctOp insert in
+// the same synchronous turn, so acctOpPendingOverlay (not a loadAccount-side merge) is what survives a
+// reload racing an unconfirmed create now.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
@@ -69,9 +74,8 @@ function signIn(E, userId, client){
 
 test("CAS-1099 AC1: completing membership issues exactly one complete_membership call and no direct insert/upsert to cascades, user_prefs or notify_prefs", async () => {
   const E = loadEngine();
-  // Real UUID shape (client-generated, exactly as cascadeNewId() would mint) — isUuid() is what loadAccount()
-  // filters cascadeKnown through, so a non-UUID test id would read as never-confirmed regardless of the
-  // cascadesRows round-trip below, and (wrongly, for this test) still look dirty.
+  // Real UUID shape (client-generated, exactly as cascadeNewId() would mint) — the shape complete_membership's
+  // real RPC payload always carries.
   const MASSIVE_ID = "a0000000-0000-4000-8000-00000000a001";
   const FAVS_ID = "a0000000-0000-4000-8000-00000000a002";
   const draftAgents = [
@@ -141,7 +145,7 @@ test("CAS-1099 change 3: an RPC error keeps the draft in memory for a retry", as
     "an error must not discard the draft");
 });
 
-test("CAS-734/733 (unrelated to onboarding): a hand-built local agent still folds in even when the account already has agents", async () => {
+test("CAS-1109: a hand-built local agent the account has never confirmed does not survive a loadAccount() call", async () => {
   const E = loadEngine();
   E.cascades.push(E.normCascade({ id: "hand-built", name: "My own agent", kind: "stream", status: [] }));
 
@@ -152,6 +156,6 @@ test("CAS-734/733 (unrelated to onboarding): a hand-built local agent still fold
   signIn(E, "cas1099-acct-2", fakeMembershipClient({ cascadesRows: existingRows }));
   await E.CascadePersistence.loadAccount();
 
-  assert.equal(JSON.stringify(E.cascades.map(c => c.id).sort()), JSON.stringify([A_ID, "hand-built"].sort()),
-    "CAS-393/733/734's own fold-in for organic local work must be untouched by this ticket");
+  assert.equal(JSON.stringify(E.cascades.map(c => c.id)), JSON.stringify([A_ID]),
+    "acctLoad replaces whatever this device held wholesale — a never-queued local-only row is not carried forward");
 });

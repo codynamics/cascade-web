@@ -173,6 +173,14 @@ def main(argv=None) -> int:
         if purged:
             print(f"[monitor] usage_events retention: purged {purged} row(s) older than 180 days.")
 
+    # CAS-1109: sweep the CAS-1092 account_deleted_rows archive once per day alongside the usage_events
+    # retention above — same service_role credential, same "skip on --dry-run" rule (a demo run must not
+    # delete real data).
+    if not args.dry_run:
+        archive_purged = _store_call(store, "purge_deleted_rows", 0)
+        if archive_purged:
+            print(f"[monitor] account_deleted_rows retention: purged {archive_purged} row(s) older than 30 days.")
+
     # CAS-986: the two-tier catalogue's demotion-safety net — every tmdb_id a user holds state on,
     # written once per real run so poc_pipeline.py can read it off disk without its own Supabase
     # credential. Skipped on --dry-run, same as every other write in this file (the docstring's own

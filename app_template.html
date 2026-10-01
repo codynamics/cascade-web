@@ -5337,17 +5337,18 @@ function loadCascades(){
 function saveCascades(){
   if(onbDraftModeOn) return;   // CAS-1099: a pre-membership draft's agents stay memory-only
   try{ localStorage.setItem(acctKey("cascade_cascades"), JSON.stringify(cascades)); }catch(e){} }
-// CAS-1090: a placeholder here, in the same outer scope as saveCascades above — a guest device has no
-// account to tombstone a delete against. The account-sync IIFE further down reassigns this (exactly the way
-// it reassigns saveCascades itself, "wrap the one save chokepoint") to the real implementation, which is
-// where cascadeKnown/cascadePendingDeletes actually live. deleteAgentAsk calls this directly, by name, the
-// same way it already calls saveCascades — the one and only place a cascades row is ever marked for a
-// server delete.
-function tombstoneCascadeDelete(id){}
-// CAS-1090: same placeholder/reassignment shape as tombstoneCascadeDelete above — a guest device has never
-// had an account confirm anything, so the real answer (cascadeKnown.size>0, only known inside the
-// account-sync IIFE) is always "no" until that IIFE swaps this in. FLOWS' onboarding commit step (well
-// outside the IIFE) calls this rather than reading cascadeKnown directly, which it cannot reach.
+// CAS-1109: a placeholder here, in the same outer scope as saveCascades above — a guest device has no
+// account to delete anything from. The account-sync IIFE further down reassigns this (exactly the way it
+// reassigns saveCascades itself, "wrap the one save chokepoint") to the real implementation: an immediate
+// acctOp rpc("delete_agent") call — agents move onto the account store, so a delete is one operation, not a
+// tombstone-then-batch-sync. deleteAgentAsk calls this directly, by name, the same way it already calls
+// saveCascades — the one and only place a cascades row is ever deleted from the account.
+function deleteCascadeFromAccount(id){}
+// CAS-1109: same placeholder/reassignment shape as deleteCascadeFromAccount above — a guest device has
+// never had an account confirm anything, so the real answer (whether CascadeAccountStore's own cascades
+// mirror currently holds any rows, only known inside the account-sync IIFE) is always "no" until that IIFE
+// swaps this in. FLOWS' onboarding commit step (well outside the IIFE) calls this rather than reaching into
+// CascadeAccountStore directly, which it cannot reach.
 function accountHasConfirmedCascades(){ return false; }
 // CAS-863: WATCH_STEPS is the watched-verdict ramp the Watch On panel (openWatchPanel) renders as its five
 // segments — it used to sit here because the (now retired) watch-list model's watchlistDefaults() was this
@@ -5579,8 +5580,8 @@ const buildCore = () => {
 // newer build has shipped a different (possibly incompatible) write shape. checkBuildGate (account-sync
 // IIFE, further down — it already has the client()/uid() helpers this needs) reads public.app_config's
 // min_client_build row and flips buildGateBlocked once this session's own BUILD_INFO.build is confirmed
-// below it. Declared at the top level, not inside either account IIFE, so both the legacy cascades sync
-// (runSync) and the acctOp queue (sendQueue) can read the one flag before sending anything.
+// below it. Declared at the top level, not inside the account IIFE, so the acctOp queue (sendQueue) can
+// read the one flag before sending anything.
 let buildGateBlocked = false;
 let buildGateUpdateUrl = null;
 function renderBuildGate(){
@@ -10069,8 +10070,8 @@ function legacyMissionFloorDefault(c){
 }
 // CAS-743: criteria fields normCascade fills with a GUESS when a saved agent predates the field, rather than
 // leaving it unset — {key: the criteria field, flag: the *Defaulted marker normCascade sets alongside it}.
-// The account sync seam (resolveCascadeConflict, cascadeDirtyRows) reads these flags so a guess never
-// outranks a real value on read, and never gets pushed to overwrite one on write. Add a field here, and set
+// The account sync seam (syncCascadesToAccount) reads these flags so a guess never gets pushed to overwrite
+// a real value on write. Add a field here, and set
 // its flag next to the fill (as watchMarkers does below), to cover the next field this hazard applies to —
 // see the ticket's Change item 3 for why this stays a short list rather than general schema versioning.
 const DEFAULTABLE_CASCADE_FIELDS = [ { key:"watchMarkers", flag:"_watchMarkersDefaulted" } ];
@@ -11538,11 +11539,11 @@ function deleteAgentAsk(c){
             : "")
     + `Anything you added by hand stays, and your watched / not-interested marks aren't touched.`)) return false;
   cascades.splice(cascades.indexOf(c),1);
-  // CAS-1090: the ONE place a cascades row is ever tombstoned for a server delete — every other path that
-  // removes an id from `cascades` (an onboarding re-run rebuilding the array, a merge/reconcile pass, a
-  // refused-upsert drop) must NOT delete it from the account, only stop showing it on THIS device.
-  // Tombstone before saveCascades() schedules the sync.
-  tombstoneCascadeDelete(c.id);
+  // CAS-1090/CAS-1109: the ONE place a cascades row is ever deleted from the account — an immediate
+  // rpc("delete_agent") call, soft-deleting it server-side. Every other path that removes an id from
+  // `cascades` (an onboarding re-run rebuilding the array, a refused-insert drop) must NOT delete it from
+  // the account, only stop showing it on THIS device.
+  deleteCascadeFromAccount(c.id);
   saveCascades();
   // CAS-782: a film pinned to (or moved out of) ONLY this agent must not go on pointing at an agent that no
   // longer exists — scrub this agent's id out of every notify[*].pinnedTo/notIn, then let recomputeFound()
@@ -15855,15 +15856,14 @@ const SHARP_STEPS = {
         // CAS-951: first-run onboarding ESTABLISHES the device's roster — it replaces whatever
         // cascades already holds (a stale account's set, or an earlier commit this same run),
         // it never appends to it.
-        // CAS-1090: UNLESS cascadeKnown already has entries — that only happens once a real account load
-        // or reconcile has actually confirmed the account holds agents of its own, which means this was
-        // never a genuine empty first run to begin with. The production incident this guards against was
-        // exactly this: the boot-time splash (showSplash(), gated on the device-local onboardingSeen()
-        // flag, not on account state) can open onboarding for an already-signed-in device before that
-        // flag catches up, and completing it here used to wipe the 43 real agents the account load had
-        // already landed by the time the user reached this screen. Append instead of replacing, so
-        // whatever the account already had survives — same "always lands on its agents" guarantee
-        // cascadePendingDeleteIds' tombstone gives the sync side, applied here at the source.
+        // CAS-1090/CAS-1109: UNLESS accountHasConfirmedCascades() says the account store already holds
+        // agents of its own — that only happens once a real account load has actually confirmed the account
+        // holds agents, which means this was never a genuine empty first run to begin with. The production
+        // incident this guards against was exactly this: the boot-time splash (showSplash(), gated on the
+        // device-local onboardingSeen() flag, not on account state) can open onboarding for an
+        // already-signed-in device before that flag catches up, and completing it here used to wipe the 43
+        // real agents the account load had already landed by the time the user reached this screen. Append
+        // instead of replacing, so whatever the account already had survives.
         if(accountHasConfirmedCascades()) cascades.push(...agents);
         else { cascades.length=0; cascades.push(...agents); }
         saveCascades();   // CAS-1099: a no-op while onbDraftModeOn — see that flag's own comment
@@ -19568,24 +19568,6 @@ else if(dedupedN)
       { id:row.id, name:row.name, paused:row.active===false, created_at:row.created_at||null });
     return normCascade(c);
   }
-  // CAS-734: the FULL row shape — name, every criteria field including `order`, alert_moments,
-  // active/paused — unlike cascSigOf's narrower "are these two functionally the same radar" question
-  // (which deliberately excludes `order`: CAS-72's dedupe test is about matches found, not shelf position).
-  // This is the signature the per-row conflict/dirty tracking below diffs against: it has to catch every
-  // field an upsert would actually write, or a real change (a reorder) would never look dirty and would
-  // never sync.
-  const cascadeFullSigOf = c => { const r=cascadeToRow(c); return JSON.stringify([r.name, r.criteria, r.alert_moments, r.active]); };
-  // CAS-1132: the same full signature, but with every still-guessed *Defaulted field stripped out first.
-  // cascadeDirtyRows diffs THIS against cascadeKnown's own sigNoDefault (recorded the same way everywhere
-  // cascadeKnown is populated) so a field that is nothing but normCascade's own guess can never, on its own,
-  // make a row look dirty — while a real edit to any OTHER field on that same row still shows up here exactly
-  // as it would in cascadeFullSigOf. See cascadeDirtyRows below for why a single combined signature couldn't
-  // tell those two cases apart.
-  const cascadeNonDefaultSigOf = c => {
-    const r=cascadeToRow(c);
-    DEFAULTABLE_CASCADE_FIELDS.forEach(({key,flag})=>{ if(c[flag]) delete r.criteria[key]; });
-    return JSON.stringify([r.name, r.criteria, r.alert_moments, r.active]);
-  };
   // expose the pure mappers for the monitor stories / tests to mirror
   window.CascadeShape = { cascadeToRow, rowToCascade, momentsOf };
 
@@ -19604,73 +19586,32 @@ else if(dedupedN)
   // signed-out transition below, so the account's agents simply stop being what's on screen.
   function loadGuest(){ maybeSwitchAcctSuffix(null); replaceCascades([]); }
 
-  // ---- write path: upsert only what THIS device changed, delete only what it watched disappear ---------
-  // CAS-408: the old prune deleted every account row "not on this device's screen" — which silently
-  // swept up rows this device had simply never LOADED (created on another device, or not yet pulled),
-  // not only rows the user actually removed. CAS-734 replaces the bare-id `cascadeBaseline` Set this
-  // guarded with `cascadeKnown`, a Map<id,{sig,version}> — this device's own record of what the ACCOUNT
-  // last confirmed for each agent it has seen, the same shape CAS-692 gave `watchlistKnown`.
-  // CAS-1090: CAS-734's own claim above — "this device can only ever delete an id it itself watched drop
-  // out of its own list, exactly what the Delete button does" — was never actually true: the id merely had
-  // to be ABSENT from the live `cascades` array at sync time, for any reason (an onboarding re-run wiping
-  // the array being the observed one — see flowStart's commit step below), not because the Delete button
-  // was pressed. `cascadePendingDeletes` is the real version of that claim: a tombstone set written ONLY by
-  // deleteAgentAsk, so a delete request is now impossible without it, regardless of what `cascades` holds.
-  const CASCADE_PENDING_DELETES_KEY = "cascade_pending_deletes";
-  function loadCascadePendingDeletes(){
-    try{
-      const raw=localStorage.getItem(acctKey(CASCADE_PENDING_DELETES_KEY));
-      if(!raw) return new Set();
-      const parsed=JSON.parse(raw);
-      return new Set(Array.isArray(parsed) ? parsed : []);
-    }catch(e){ return new Set(); }
-  }
-  function saveCascadePendingDeletes(){
-    try{ localStorage.setItem(acctKey(CASCADE_PENDING_DELETES_KEY), JSON.stringify([...cascadePendingDeletes])); }catch(e){}
-  }
-  let cascadePendingDeletes = loadCascadePendingDeletes();
-  // CAS-1090: the real implementation, swapped in over the outer no-op placeholder declared alongside
-  // saveCascades — cascadeKnown only exists in here, so this is the one place that can decide whether an id
-  // is worth tombstoning at all (a locally-only id the account never confirmed needs no server delete).
-  tombstoneCascadeDelete = function(id){
-    if(cascadeKnown.has(id)){ cascadePendingDeletes.add(id); saveCascadePendingDeletes(); }
+  // ---- write path: one acctOp per changed row, one rpc per delete -----------------------------------------
+  // CAS-1109: agents move onto the account store (CAS-1094+) — a create/edit is an acctOp insert/update of
+  // exactly the row (or columns) this device actually changed, diffed against CascadeAccountStore's own
+  // mirror (syncCascadesToAccount, below); a delete is deleteCascadeFromAccount's immediate
+  // rpc("delete_agent") call, never inferred from an id simply being absent from `cascades` (the CAS-1090
+  // incident this replaces — an onboarding re-run, or any other bug that resets the array, can no longer be
+  // mistaken for a user pressing Delete).
+  // CAS-1109: the real implementation, swapped in over the outer no-op placeholder declared alongside
+  // saveCascades — an immediate acctOp rpc("delete_agent") call, soft-deleting the row server-side
+  // (migration 0001/CAS-1092's deleted_at + delete_agent RPC, CAS-1102's revoked client hard-delete). No
+  // tombstone, no batched sync pass: acctOp's own persisted queue (cascade_ops@<uid>) is what survives a
+  // reload/offline gap between this call and the RPC actually landing, the same durability story as every
+  // other acctOp write in this file.
+  deleteCascadeFromAccount = function(id){
+    if(!accountActive()) return;
+    const op = { table:"delete_agent", kind:"rpc", fields:{ p_id:id },
+      onDone:(ok,err)=>recordSyncOutcome("cascades", ok, err) };
+    window.CascadeAccountStore.acctOp(op);
   };
-  accountHasConfirmedCascades = function(){ return cascadeKnown.size>0; };
-  let syncTimer=null, syncing=false, syncAgain=false, syncDone=null;
-  // CAS-1107: cascadeKnown used to persist to localStorage as cascade_cascade_known@<uid> and reload from
-  // there on the very next boot or account switch — a stale copy surviving a sign-out/sign-in could then
-  // stand in for this session's real "what does the account currently confirm" baseline before any load
-  // had actually asked the account anything, exactly the shape of the incident fireAccountFanout's own
-  // CAS-1107 comment traces. It now lives in memory only, populated purely by a successful loadAccount()/
-  // reconcileCascades() call THIS session — saveCascadeKnown is gone outright, not a no-op, so nothing can
-  // accidentally reintroduce the write. One-shot cleanup for any device still carrying the old key.
-  try{
-    const staleKnownKeys=[];
-    for(let i=0;i<localStorage.length;i++){
-      const k=localStorage.key(i);
-      if(k && k.indexOf("cascade_cascade_known@")===0) staleKnownKeys.push(k);
-    }
-    staleKnownKeys.forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
-  }catch(e){}
-  let cascadeKnown = new Map();
-  // CAS-734: this device's own record of when it last actually CHANGED an agent's content — as opposed to
-  // cascadeKnown's version, which is merely when it last SAW the account's copy. Only an id this device has
-  // genuinely edited is ever in here, so an agent it only ever received can never win a conflict it was
-  // never a party to. Persisted for the same reason cascadeKnown is: an edit made just before the tab
-  // closes must still outrank a stale remote row on the very next load, not only within the same session.
-  const CASCADE_EDITED_KEY = "cascade_cascade_edited_at";
-  function loadCascadeEditedAt(){
-    try{
-      const raw=localStorage.getItem(acctKey(CASCADE_EDITED_KEY));
-      if(!raw) return new Map();
-      const parsed=JSON.parse(raw);
-      return new Map(Array.isArray(parsed) ? parsed : []);
-    }catch(e){ return new Map(); }
-  }
-  function saveCascadeEditedAt(){
-    try{ localStorage.setItem(acctKey(CASCADE_EDITED_KEY), JSON.stringify([...cascadeEditedAt])); }catch(e){}
-  }
-  let cascadeEditedAt = loadCascadeEditedAt();
+  // CAS-1109: "confirmed" now means CascadeAccountStore's own cascades mirror (replaced wholesale by
+  // acctLoad, mutated in place by acctOp's optimistic apply) currently holds at least one row — the same
+  // "has a real account load actually landed something" question the old per-row baseline used to answer.
+  accountHasConfirmedCascades = function(){
+    const store = window.CascadeAccountStore;
+    return !!(store && (store.acctStore.cascades||[]).length>0);
+  };
   // ---- CAS-957: keep every namespaced local cache pointed at the account actually resolved -------------
   // Called from loadAccount() (signing in) and loadGuest() (signing out) — the two chokepoints every real
   // sign-in/out already runs through (via the cascade-auth-change listener below), and the same two a test
@@ -19694,14 +19635,9 @@ else if(dedupedN)
     // than carried forward. loadAccount()'s own network fetch (which always follows this) is what
     // repopulates it correctly either way.
     if(!fromGuest) cascades.length = 0;
-    // None of the other namespaced subsystems fold local-only content into an incoming account the way
-    // cascades' fold-in does (their own load-from-account paths replace wholesale), so there is nothing to
-    // preserve for them across a switch either way — every one reloads fresh off the account now current.
-    // CAS-1107: cascadeKnown is memory-only now — reset to empty, never reloaded from a namespaced key, so a
-    // switch never hands this session a baseline it hasn't itself confirmed.
-    cascadeKnown = new Map();
-    cascadeEditedAt = loadCascadeEditedAt();
-    cascadePendingDeletes = loadCascadePendingDeletes();
+    // CAS-1109: cascades now load through acctLoad wholesale, the same "no merge, no carry-up" rule every
+    // other acctOp-backed table already follows — there is no longer a local per-row baseline to reset
+    // across a switch.
     watchKnown = loadWatchKnown();
     const p = loadPrefs();
     prefs.on = p.on; prefs.touched = p.touched; setTo(prefs.sub, p.sub); setTo(prefs.store, p.store);
@@ -19732,305 +19668,105 @@ else if(dedupedN)
     // `outbox` a reload rebuilds under "guest" first, so cascades' own load has nothing to restore.
     outbox = loadOutbox();
   }
-  // CAS-734: every cascade whose content no longer matches what this device last confirmed the account
-  // holds is, by definition, something THIS device just changed — stamp it now so a later load/reconcile
-  // has real evidence to weigh against the account row's own updated_at, rather than the old "local always
-  // wins" guess. Runs from the one save chokepoint (below), so every edit path — rename, toggle, delete,
-  // reorder — is covered without instrumenting each call site individually.
-  function markCascadesEditedNow(){
-    const nowIso = new Date().toISOString();
+  // CAS-1109: cascades move onto the account store — the account's own mirror (CascadeAccountStore.acctStore
+  // .cascades, replaced wholesale by acctLoad and mutated in place by acctOp's optimistic apply) is this
+  // device's "what does the account currently confirm" baseline now. Looked up by id rather than held by
+  // reference, since acctLoad can swap the whole array out from under a stale reference.
+  function cascadeAccountRow(id){
+    const store = window.CascadeAccountStore;
+    return store ? (store.acctStore.cascades||[]).find(r=>r.id===id) : null;
+  }
+  // Create is an acctOp insert with this device's own client-generated uuid. Rename/pause/reorder/criteria/
+  // alert-moment edits push an acctOp update of only the columns that actually changed, with the account's
+  // own updated_at as the conflict check (expectUpdatedAt) — two concurrent edits to the same agent resolve
+  // through acctOp's own generic conflict handling (processOp's 0-rows-affected branch: reload, adopt the
+  // winner, toast "Updated on another device"), never a bespoke per-field resolver. Delete is
+  // deleteCascadeFromAccount's own immediate rpc("delete_agent") call, above.
+  // CAS-743/CAS-1132: a *Defaulted field (criteria.watchMarkers, still normCascade's own guess) is stripped
+  // from both sides before comparing criteria, so a guess that merely recomputes differently never makes
+  // criteria look changed on its own, while a real edit to any other part of criteria (or to
+  // name/alert_moments/active) still pushes.
+  function syncCascadesToAccount(){
+    if(!accountActive()) return;
     cascades.forEach(c=>{
-      const known = cascadeKnown.get(c.id);
-      if(!known || known.sig!==cascadeFullSigOf(c)) cascadeEditedAt.set(c.id, nowIso);
-    });
-    saveCascadeEditedAt();
-  }
-  // Dirty rows to push and rows to delete are DERIVED by diffing the live `cascades` array against
-  // cascadeKnown, rather than tracked by instrumenting every edit call site — the same reasoning CAS-692
-  // gives watchlistDirtyRows/watchlistPendingDeleteIds.
-  // CAS-743 found that a *Defaulted field is also exactly what makes an old row's cascadeFullSigOf disagree
-  // with a known.sig recorded before the field existed, which would otherwise mark a row dirty for a reason
-  // the user never caused. Its fix compared the FULL signature and suppressed the whole row whenever any
-  // *Defaulted flag was set — which also suppressed every OTHER genuine edit on that same row (a rename, say)
-  // for as long as the guess stood, since one combined signature can't tell "only the guess disagrees" apart
-  // from "something real changed too" (CAS-1132: this is why a renamed agent could go an unbounded number of
-  // syncs without ever reaching the account while its watchMarkers stayed an unconfirmed guess). Comparing the
-  // non-default signature instead keeps CAS-743's original protection — cascadeKnown's own sigNoDefault is
-  // recorded through the exact same stripping, so a guess that merely recomputes differently still matches —
-  // while still catching a real change to any other field. A row the account has never confirmed at all
-  // (known is unset) still always pushes, guess or not — there is nothing of the account's to protect on a
-  // genuinely new agent's first sync.
-  const cascadeDirtyRows = () => cascades.filter(c=>{
-    const known=cascadeKnown.get(c.id);
-    return !known || known.sigNoDefault!==cascadeNonDefaultSigOf(c);
-  });
-  // CAS-1090: explicit only, never inferred. The live `cascades` array plays no part in this any more — an
-  // id is a candidate for a server delete purely because deleteAgentAsk tombstoned it, and only for as long
-  // as the account still confirms it exists (cascadeKnown). Absence from `cascades`, on its own, proves
-  // nothing: it could be a genuine delete not yet tombstoned by a caller (a bug elsewhere), an agent this
-  // device hasn't loaded yet, or — the incident this ticket fixes — the array simply having been reset out
-  // from under the sync (flowStart's commit step, or any future bug shaped like it).
-  const cascadePendingDeleteIds = () => [...cascadePendingDeletes].filter(id=>cascadeKnown.has(id));
-  function scheduleSync(){
-    outboxMark("cascades", cascadeDirtyRows().map(cascadeToRow), r=>r.id);
-    clearTimeout(syncTimer); syncTimer=setTimeout(runSync, 400);
-  }
-  // CAS-1132: a caller awaiting runSync() must see the sync it actually asked for land, not just whichever
-  // one happened to be in flight already. The old short-circuit (`if(syncing){ syncAgain=true; return; }`)
-  // resolved immediately for the loser of that race, before syncAgain's own retry had even started — so an
-  // explicit flush (replayOutbox's `await runSync()`; a test's `CascadePersistence.syncNow()`) could believe
-  // a push had completed when only an older, already-stale sync had actually run. Returning the in-flight
-  // promise instead, and chaining the retry onto it when syncAgain fires, makes every caller's await resolve
-  // only once a pass that re-reads the current dirty rows has actually finished.
-  function runSync(){
-    if(!accountActive()) return Promise.resolve();
-    // CAS-1108: an out-of-date client sends no account writes of any kind — this is the legacy cascades
-    // sync pass, the one account write path this ticket's gate covers that isn't acctOp's queue (see
-    // sendQueue's own check, ACCOUNT STORE IIFE below).
-    if(buildGateBlocked) return Promise.resolve();
-    if(syncing){ syncAgain=true; return syncDone; }
-    syncing=true;
-    syncDone = (async()=>{
-      try{ await syncToAccount(); }
-      catch(err){ console.warn("Cascade: account sync failed", err); }
-      finally{ syncing=false; if(syncAgain){ syncAgain=false; await runSync(); } }
-    })();
-    return syncDone;
-  }
-  // CAS-957: the account refused to ever let this device own this row (42501) — dropping it from the
-  // local list (not just cascadeKnown) is deliberate: leaving it on screen with no way to ever save it
-  // again would be a worse experience than it simply not being there.
-  function dropRefusedCascade(id){
-    const i = cascades.findIndex(c=>c.id===id);
-    if(i>=0) cascades.splice(i,1);
-    cascadeKnown.delete(id);
-    cascadeEditedAt.delete(id);
-    saveCascadesLocal();
-    console.warn("Cascade upsert refused (42501) — dropped from this device", id);
-    if(typeof render==="function") render();
-  }
-  // CAS-734 Change 4: pushes only the agents this device has actually changed (cascadeDirtyRows, diffed
-  // against cascadeKnown) — a single-agent rename now upserts exactly one row, not the whole array. The old
-  // `cascades.map(cascadeToRow)` upserted every row on any single edit, which is why a rename used to leave
-  // every agent carrying an identical updated_at.
-  async function syncToAccount(){
-    const c=client(), owner=uid(); if(!c||!owner) return;
-    if(acctTableFail.cascades) return;   // CAS-656 AC2: a failed load must not push local state back over it
-    const dirty = cascadeDirtyRows();
-    const deletes = cascadePendingDeleteIds();
-    if(dirty.length){
-      const rows = dirty.map(cascadeToRow);
-      let { data, error } = await c.from("cascades").upsert(rows, { onConflict:"id" }).select("id,updated_at");
-      // CAS-957: 42501 is RLS's USING clause refusing the write — this device pushing a row it does not
-      // own, almost always a row this device cached under a different account before local storage was
-      // namespaced. Re-pushing it every sync would latch the degraded banner forever over a row that will
-      // NEVER succeed, so a lone dirty row is dropped outright rather than retried. Several dirty rows in
-      // one batch are retried one at a time so the specific poisoned row(s) can be identified and dropped
-      // without discarding the rest of a genuine batch.
-      if(error && error.code==="42501" && rows.length>1){
-        data = [];
-        let lastError = null;
-        for(const row of rows){
-          const r = await c.from("cascades").upsert([row], { onConflict:"id" }).select("id,updated_at");
-          if(r.error && r.error.code==="42501") dropRefusedCascade(row.id);
-          else if(r.error) lastError = r.error;
-          else data.push(...(r.data||[]));
-        }
-        error = lastError;
-      } else if(error && error.code==="42501"){
-        dropRefusedCascade(rows[0].id);
-        data = []; error = null;
+      const row = cascadeToRow(c);
+      const knownRaw = cascadeAccountRow(c.id);
+      if(!knownRaw){
+        const op = { table:"cascades", kind:"insert", fields:row,
+          onDone:(ok,err)=>{
+            recordSyncOutcome("cascades", ok, err);
+            // CAS-957: the account refused to ever let this device own this row (almost always 42501, a row
+            // cached under a different account before local storage was namespaced) — dropping it from the
+            // local list is deliberate: leaving it on screen with no way to ever save it again would be
+            // worse than it simply not being there. acctOp's own revertOptimistic already undid the
+            // optimistic insert into the account-store mirror; this is the UI's own separate `cascades`
+            // array, which only this save chokepoint can correct.
+            if(!ok){
+              const i=cascades.findIndex(x=>x.id===c.id);
+              if(i>=0){ cascades.splice(i,1); saveCascadesLocal(); if(typeof render==="function") render(); }
+            }
+          } };
+        window.CascadeAccountStore.acctOp(op);
+        return;
       }
-      if(error){ console.warn("Cascade upsert", error); recordSyncOutcome("cascades", false, error); return; }
-      const versionById = new Map((data||[]).map(r=>[r.id, r.updated_at]));
-      dirty.forEach(x=>{
-        if(!versionById.has(x.id)) return;   // refused (dropped above) or otherwise not written this pass
-        cascadeKnown.set(x.id, { sig: cascadeFullSigOf(x), sigNoDefault: cascadeNonDefaultSigOf(x), version: versionById.get(x.id)||null });
-        cascadeEditedAt.delete(x.id);   // pushed — the account now holds this device's edit
-      });
-      saveCascadeEditedAt();
-      outboxClearKeys("cascades", dirty.map(x=>x.id));   // CAS-1035
-    }
-    if(deletes.length){
-      const { error } = await c.from("cascades").delete().eq("user_id", owner).in("id", deletes);
-      if(error){ console.warn("Cascade delete", error); recordSyncOutcome("cascades", false, error); return; }
-      // CAS-1090: the tombstone is cleared only once the delete actually lands — an error above leaves it in
-      // cascadePendingDeletes so the next sync pass retries the same id, same as cascadeKnown's own retry shape.
-      deletes.forEach(id=>{ cascadeKnown.delete(id); cascadeEditedAt.delete(id); cascadePendingDeletes.delete(id); });
-      saveCascadeEditedAt();
-      saveCascadePendingDeletes();
-      outboxClearKeys("cascades", deletes);   // CAS-1035
-    }
-    recordSyncOutcome("cascades", true);
-  }
-
-  // ---- shared conflict resolver: loadAccount (full load) and reconcileCascades (background merge) BOTH
-  // call this, and only this. CAS-734 fault #2 was these two paths disagreeing about who wins — loadAccount
-  // was unconditionally local-wins, reconcileCascades unconditionally remote-wins — so which version a
-  // device showed depended only on whether the last event was a page load or a tab focus. Local wins only
-  // when this device's own recorded edit time for that agent (cascadeEditedAt) is genuinely newer than the
-  // account row's own updated_at; an id this device has never edited (no cascadeEditedAt entry) never
-  // wins — there is no local edit here to prefer over the account's copy.
-  // CAS-743: a local copy still carrying normCascade's own guess for a field (its *Defaulted flag) is
-  // structurally OLDER than an account row that already holds a real value for that field — the account row
-  // can only hold one because some device once actually wrote it, which this local copy has simply never
-  // seen. No cascadeEditedAt timestamp can outrank that: a stale pre-upgrade cache can carry a plausible, even
-  // newer, edit time while still missing fields the account has moved past. Checked before the timestamp
-  // comparison so it overrides localWins outright rather than merely tie-breaking it.
-  function localGuessedFieldRemoteHasReal(localCascade, rawRemoteRow){
-    const remoteCriteria = rawRemoteRow.criteria||{};
-    return DEFAULTABLE_CASCADE_FIELDS.some(({key,flag})=>{
-      if(!localCascade[flag]) return false;
-      const rv=remoteCriteria[key];
-      return rv && typeof rv==="object" && Object.keys(rv).length>0;
+      // CAS-743/CAS-1132: compare like for like — knownRaw is the account's raw stored row, which can predate
+      // a criteria field normCascade now fills with a default (watchMarkers' *Defaulted guess and any other
+      // field added since). Round-tripping it through the SAME rowToCascade/cascadeToRow pipeline `row` came
+      // from means a difference that exists ONLY because of that round trip (never a real edit) compares
+      // equal here, the same guarantee the pre-CAS-1109 diff sync's own re-normalized signature gave.
+      const known = cascadeToRow(rowToCascade(knownRaw));
+      const fields={};
+      if(known.name!==row.name) fields.name=row.name;
+      if(!!known.active!==!!row.active) fields.active=row.active;
+      if(JSON.stringify(known.alert_moments||[])!==JSON.stringify(row.alert_moments)) fields.alert_moments=row.alert_moments;
+      const knownCriteria=Object.assign({}, known.criteria||{}), rowCriteria=Object.assign({}, row.criteria);
+      DEFAULTABLE_CASCADE_FIELDS.forEach(({key,flag})=>{ if(c[flag]){ delete knownCriteria[key]; delete rowCriteria[key]; } });
+      if(JSON.stringify(knownCriteria)!==JSON.stringify(rowCriteria)) fields.criteria=row.criteria;
+      if(!Object.keys(fields).length) return;
+      const op = { table:"cascades", kind:"update", match:{ id:c.id }, fields, expectUpdatedAt: knownRaw.updated_at,
+        onDone:(ok,err)=>recordSyncOutcome("cascades", ok, err) };
+      window.CascadeAccountStore.acctOp(op);
     });
   }
-  function resolveCascadeConflict(localCascade, rawRemoteRow){
-    if(localGuessedFieldRemoteHasReal(localCascade, rawRemoteRow)) return rowToCascade(rawRemoteRow);
-    const editedIso = cascadeEditedAt.get(localCascade.id) || null;
-    const localWins = !!editedIso && editedIso > (rawRemoteRow.updated_at || "");
-    return localWins ? normCascade({...localCascade}) : rowToCascade(rawRemoteRow);
-  }
 
-  // ---- read path: adopt the account, and fold in what only this device has built ----
-  // CAS-212 replaces two stacked native confirm()s — one for Cascades, one for watch statuses, each
-  // firing ONLY when the account was empty — with one offer that covers everything and works when the
-  // account already has rows. That second case is the one that mattered: with a non-empty account the
-  // old code silently adopted the remote list and the agents on this device just vanished from view.
-  // MERGE, not replace. A Cascade already known to the account by id resolves through resolveCascadeConflict
-  // above; one genuinely new to this device (the account has never confirmed it) is folded straight in.
+  // ---- read path: acctLoad replaces whatever this device held, wholesale ----------------------------------
+  // CAS-1109: no merge, no carry-up, no known-set diffing — the architecture acctLoad was built for (CAS-1094).
+  // A write this device has queued but not yet had confirmed (an insert, or an update's changed columns) is
+  // overlaid back on top of the fresh remote rows the same way every other acctOp-backed table's load does
+  // (acctOpPendingOverlay), merge-aware for a partial update rather than the generic helper's whole-row
+  // replace, since an acctOp "update" op here only ever carries the columns that changed.
+  function cascadeOpOverlay(remoteRows){
+    const store = window.CascadeAccountStore;
+    if(!store) return remoteRows||[];
+    const byId = new Map((remoteRows||[]).map(r=>[r.id, Object.assign({}, r)]));
+    store.queue.filter(op=>op.table==="cascades").forEach(op=>{
+      const id = op.match && op.match.id;
+      if(!id) return;
+      if(op.kind==="insert") byId.set(id, Object.assign({}, op.fields));
+      else if(op.kind==="update") byId.set(id, Object.assign({}, byId.get(id)||{id}, op.fields));
+    });
+    return [...byId.values()];
+  }
   async function loadAccount(){
     const c=client(); if(!c||!accountActive()) return;
     maybeSwitchAcctSuffix(uid());
-    const { data, error } = await acctRead("cascades", () => c.from("cascades").select("*").order("created_at"));   // RLS: only mine
-    if(error){ console.warn("Cascade load", error); cascadesReady=true; return; }
+    const ok = await window.CascadeAccountStore.acctLoad([{ table:"cascades", pk:"id" }]);
+    if(!ok){ console.warn("Cascade load failed"); cascadesReady=true; recordSyncOutcome("cascades", false, { message:"load failed" }); return; }
     // CAS-733 Change 5: one-time legacy cleanup — a device carrying a pre-account guest agent set
     // (built back when signed-out was still a usable state) stops carrying it the moment its account
-    // load actually succeeds. Gated on the success branch above, never on a failed read (CAS-656): a
-    // load that never happened is not grounds to erase this device's only copy of anything. Harmless
-    // once there is nothing left to clean — the mirror write below (saveCascadesLocal) repopulates the
-    // same key with the authoritative account state a few lines down.
+    // load actually succeeds.
     try{ localStorage.removeItem("cascade_cascades"); }catch(e){}
-    const rawRows = data||[];
-    const oldKnown = cascadeKnown;   // this device's OWN last-confirmed state, from before this fetch
-    const rawById = new Map(rawRows.map(r=>[r.id, r]));
-    // CAS-560: a pre-CAS-560 row can still carry a real lang array — rowToCascade (via normCascade) clears
-    // it in memory either way, but flag it here so the corrected row gets pushed back rather than left
-    // stale in the account until this device happens to touch the agent for some other reason.
-    const langDirty = rawRows.some(r => ((r.criteria||{}).lang||[]).length);
-    // CAS-601: an agent saved while alertLive() was hardwired false carries a stale (empty)
-    // alert_moments — flag it the same way so the corrected value gets pushed back rather than
-    // left stale in the account until this device happens to touch the agent for some other reason.
-    const alertDirty = rawRows.some(r => {
-      const moments = momentsOf(rowToCascade(r)), stored = r.alert_moments||[];
-      return moments.length!==stored.length || moments.some(k=>!stored.includes(k));
-    });
-    // CAS-1090: an id this device has tombstoned but not yet had confirmed deleted (the server round trip
-    // is still in flight, or the last attempt failed) must not reappear just because a full reload re-read
-    // the account before that delete landed — cascadeKnown below is still built from the untouched rawRows,
-    // so the retry on the next sync pass is unaffected.
-    let remote = rawRows.map(rowToCascade).filter(x=>!cascadePendingDeletes.has(x.id));
-    const localOnes = cascades.slice();
-    // CAS-393/CAS-733/CAS-734: an agent that exists only on this device, which the account has never
-    // confirmed (absent from rawById) AND this device has never confirmed either (absent from oldKnown, so
-    // this isn't a row another device deleted), is genuinely new — folded straight in, matched by id. No
-    // dialog, no prompt: CAS-212's merge sheet (and the guest agent store it existed to reconcile) is gone.
-    // CAS-1099: onboarding's own roster no longer reaches this fold-in at all — it is created server-side
-    // by complete_membership() (using the SAME client-generated ids this device already holds), and this
-    // very loadAccount() call is membCompleteNewMembership()'s own explicit read-back afterwards. By the
-    // time this runs, rawById already has every one of the draft's ids, so the ordinary "no account
-    // counterpart" check below excludes them from localOnly on its own — no carve-out needed (CAS-959's own
-    // carve-out, needed only while the draft reached the server through a separate, racing sync pass, is
-    // retired along with that path).
-    const localOnly = localOnes.filter(x=>!rawById.has(x.id) && !oldKnown.has(x.id));
-    if(localOnly.length) remote=[...remote, ...localOnly];
-    // CAS-658/CAS-734: a local copy sharing an id with an account row is the SAME Cascade, not a new one —
-    // the account already has it. Which side wins is resolveCascadeConflict's call now, never an assumption
-    // in the local copy's favour with nothing to back it up — that unconditional assumption was this
-    // ticket's whole bug.
-    const remoteById = new Map(remote.map(x=>[x.id, x]));
-    let driftDirty = false;
-    localOnes.forEach(x=>{
-      const raw = rawById.get(x.id);
-      if(!raw) return;   // AC3d: no account counterpart at all — already handled by localOnly above
-      if(cascSigOf(rowToCascade(raw))===cascSigOf(x)) return;   // no actual drift, nothing to resolve
-      const resolved = resolveCascadeConflict(x, raw);
-      remote[remote.indexOf(remoteById.get(x.id))] = resolved;
-      remoteById.set(x.id, resolved);
-      if(cascSigOf(resolved)!==cascSigOf(rowToCascade(raw))) driftDirty = true;   // local won: push it back
-    });
+    const rows = (window.CascadeAccountStore.acctStore.cascades||[]).filter(r=>!r.deleted_at);   // CAS-1092
+    const remote = cascadeOpOverlay(rows).map(rowToCascade);
     remote.sort(cascadeOrderCmp);
     replaceCascades(remote);
-    // CAS-516: saveCascades() is rewired below (once accountActive()) to sync to the account instead of
-    // localStorage, so a signed-in device's local cache is otherwise never written and a cold start (the
-    // webview reloaded after being backgrounded) has nothing to paint until this network round trip
-    // returns — a 20+ second blank screen on a slow reconnect. Mirror the authoritative list into the
-    // guest cache directly (bypassing the rewired saveCascades, so this never schedules a duplicate
-    // account sync) purely so the NEXT cold start has something instant to show while this same fetch
-    // revalidates in the background.
+    // CAS-516: a signed-in device's local cache is otherwise never written and a cold start (the webview
+    // reloaded after being backgrounded) has nothing to paint until this network round trip returns — a
+    // 20+ second blank screen on a slow reconnect. Mirror the authoritative list into the guest cache
+    // directly so the NEXT cold start has something instant to show while this same fetch revalidates.
     saveCascadesLocal();
-    // CAS-734: cascadeKnown always reflects what the ACCOUNT holds right now, regardless of which side the
-    // merge above picked — a local win is then naturally "dirty" against this baseline (its content no
-    // longer matches what the account has) and the scheduleSync below pushes it, exactly like an ordinary
-    // edit would.
-    cascadeKnown = new Map(rawRows.filter(r=>isUuid(r.id))
-      .map(r=>{ const rc=rowToCascade(r); return [r.id, { sig: cascadeFullSigOf(rc), sigNoDefault: cascadeNonDefaultSigOf(rc), version: r.updated_at||null }]; }));
-    if(localOnly.length || langDirty || alertDirty || driftDirty) scheduleSync();
+    recordSyncOutcome("cascades", true);
     if(typeof afterSignIn==="function") afterSignIn();
-  }
-  // ---- CAS-408: live reconciliation, so two devices converge without re-signing-in -------------------
-  // loadAccount() REPLACES the screen and offers to bring stray local work up — right for a fresh
-  // sign-in, wrong for a routine background refresh (it would re-fire afterSignIn()'s splash/modal
-  // side effects on every tab focus). This MERGES instead: a Cascade new or edited on another device
-  // resolves through the SAME resolveCascadeConflict loadAccount uses; a Cascade this device knows was in
-  // the account (cascadeKnown) but has now gone is dropped locally (another device deleted it); anything
-  // this device has created but not yet pushed (its id isn't in cascadeKnown yet) is left alone, so a
-  // refresh landing mid-edit never undoes work still in flight.
-  // CAS-1090: an account row this device has ALREADY confirmed (oldKnown) but doesn't currently hold locally
-  // used to be treated as "this device must have deleted it" and skipped rather than pulled back down — that
-  // guess is exactly backwards once cascades can go transiently empty for a reason that ISN'T a delete (see
-  // flowStart's commit step). The only reliable "this device is mid-delete on it" signal is the explicit
-  // tombstone (cascadePendingDeletes), so that's what gates the skip now — anything else the account still
-  // holds is adopted, never silently dropped.
-  async function reconcileCascades(){
-    const c=client(); if(!c||!accountActive()) return;
-    const { data, error } = await acctRead("cascades", () => c.from("cascades").select("*").order("created_at"));
-    if(error){ console.warn("Cascade reconcile", error); return; }
-    const rawRows = data||[];
-    // CAS-560: same stale-lang push-back as loadAccount, for the background convergence path.
-    const langDirty = rawRows.some(r => ((r.criteria||{}).lang||[]).length);
-    const remoteIds = new Set(rawRows.map(r=>r.id));
-    const oldKnown = cascadeKnown;   // this device's OWN last-confirmed state, from before this fetch
-    rawRows.forEach(r=>{
-      const i=cascades.findIndex(x=>x.id===r.id);
-      if(i<0){
-        // CAS-1090: absent locally is pulled down UNLESS this device has an explicit tombstone out on it —
-        // that's the only case where the absence really is "this device deleted it, the push just hasn't
-        // landed". Anything else the account still reports (including an id oldKnown already had) is
-        // "not yet loaded here", never "deleted", and is adopted — see the file-level note above.
-        if(!cascadePendingDeletes.has(r.id)) cascades.push(rowToCascade(r));
-        return;
-      }
-      if(cascSigOf(cascades[i])===cascSigOf(rowToCascade(r))){ cascades[i]=rowToCascade(r); return; }
-      cascades[i]=resolveCascadeConflict(cascades[i], r);
-    });
-    for(let i=cascades.length-1;i>=0;i--){
-      const id=cascades[i].id;
-      if(oldKnown.has(id) && !remoteIds.has(id)){ cascades.splice(i,1); cascadeEditedAt.delete(id); }
-    }
-    reconcileActiveIds();
-    cascadeKnown = new Map(rawRows.filter(r=>isUuid(r.id))
-      .map(r=>{ const rc=rowToCascade(r); return [r.id, { sig: cascadeFullSigOf(rc), sigNoDefault: cascadeNonDefaultSigOf(rc), version: r.updated_at||null }]; }));
-    saveCascadeEditedAt();
-    // CAS-424: converge on whichever device last reordered — only once anyone actually has, so a background
-    // reconcile never reshuffles an account nobody has touched the Agents screen on.
-    if(cascades.some(x=>typeof x.order==="number")) cascades.sort(cascadeOrderCmp);
-    // CAS-516: keep the cold-start cache (see loadAccount's own note) fresh across ordinary background
-    // reconciles too, not just the first load — otherwise it drifts back out of date the longer a session
-    // runs and a later cold start shows stale cards instead of the last-known-good state.
-    saveCascadesLocal();
-    if(langDirty) scheduleSync();
-    if(typeof render==="function") render();
   }
   // CAS-733: CAS-212's "bring this device's work with you" merge sheet is gone along with the guest
   // agent store it existed to reconcile — signed-out is no longer a usable state, so there is nothing
@@ -20054,7 +19790,9 @@ else if(dedupedN)
     // agents an account never saw. Onboarding holds its build in memory only until the account exists.
     if(acct() && acct().enabled && !accountActive()) return;
     saveCascadesLocal();
-    if(accountActive()){ markCascadesEditedNow(); scheduleSync(); }
+    // CAS-1109: acctOp has no debounce to wait out — every changed row is pushed the instant this chokepoint
+    // runs, same as every other acctOp-backed table (no more scheduleSync/runSync's 400ms debounce).
+    if(accountActive()) syncCascadesToAccount();
   };
 
   // ---- react to auth state --------------------------------------------------
@@ -20063,7 +19801,7 @@ else if(dedupedN)
   async function fireAccountFanout(label){
     const _t460fanout = performance.now();
     console.log('[CAS-460] account fan-out start (' + label + ')', _t460fanout);
-    // CAS-1045: this device's own namespaced caches (prefs, outbox, cascades, cascadeKnown, ...) must
+    // CAS-1045: this device's own namespaced caches (prefs, outbox, cascades, ...) must
     // already belong to the account actually signing in before anything below looks at any of them — a live
     // account switch (sign out of A, sign in to B in the same tab) otherwise leaves them pointed at A (or
     // guest) for the whole span of the loads below, and user_prefs' own whole-row replay (see the
@@ -20100,12 +19838,11 @@ else if(dedupedN)
       const t1 = performance.now();
       console.log('[CAS-460] account fan-out end (' + label + ')', t1, 'elapsed_ms', (t1-_t460fanout).toFixed(1));
     });
-    // CAS-1107: every load above must settle — success or failure — BEFORE replayOutbox (and therefore
-    // runSync/any sync*ToAccount) ever runs. The old order let replayOutbox fire on whatever baseline this
-    // device booted with (an empty local `cascades` against a stale persisted cascadeKnown, in the traced
-    // incident) — a real account load hadn't confirmed anything yet, but a sync could already act as if it
-    // had. A table whose own load fails still leaves acctTableFail latched for it (see acctRead), which the
-    // sync side already gates on, so a failed load here still means zero writes to that table below.
+    // CAS-1107: every load above must settle — success or failure — BEFORE replayOutbox (and therefore any
+    // sync*ToAccount/sendQueue) ever runs. The old order let a sync fire on whatever baseline this device
+    // booted with before a real account load had confirmed anything. A table whose own load fails still
+    // leaves acctTableFail latched for it (see acctRead), which the sync side already gates on, so a failed
+    // load here still means zero writes to that table below.
     await allLoads;
     // CAS-1035 AC2: replay every outbox entry — a row this device owed the account before this boot — now
     // that every load above has had its chance to establish this session's real baseline first.
@@ -20132,7 +19869,6 @@ else if(dedupedN)
       // on-device set that no longer exists; the bell stops showing another account's news.
       currentUser = null; loadGuest(); loadGuestFilms(); loadGuestNotify(); realAlerts=[]; updateMovingBadge();
       invites=[]; invitesReady=true; updateInvitesBadge();   // CAS-886: same reasoning — a guest has no invites
-      cascadeKnown=new Map(); cascadeEditedAt=new Map(); saveCascadeEditedAt();
       agentFilms={}; agentFilmsReady=true;   // CAS-736: a guest has nothing to wait on
       watchKnown=new Map(); saveWatchKnown(); filmWatchReady=true;   // CAS-735: a guest has nothing to wait on
       userPrefsReady=true;   // CAS-740: a guest has nothing to wait on
@@ -20153,7 +19889,7 @@ else if(dedupedN)
     fireAccountFanout('boot-restore');
   }
   // CAS-1108: the "at boot" half of the gate — a direct call, not routed through reconcileOnReturn below, so
-  // boot never also re-triggers pollCatalogue/reconcileCascades/loadUserPrefs/loadRealAlerts a second time.
+  // boot never also re-triggers pollCatalogue/loadUserPrefs/loadRealAlerts a second time.
   checkBuildGate();
   // CAS-408: two devices only converge without a live subscription if SOMETHING re-pulls the account
   // — sign-in alone left a device that never signs out again permanently stuck on whatever it saw at
@@ -20168,9 +19904,8 @@ else if(dedupedN)
     // catalogue, so this runs unconditionally rather than behind the accountActive() gate.
     pollCatalogue();
     if(!accountActive()) return;
-    if(!syncing && !syncTimer) reconcileCascades();
-    // CAS-1096: user_films/film_watch/film_picks have no reconcile left to run here — every write is
-    // immediate (acctOp), so there is nothing background convergence would still need to pull.
+    // CAS-1096/CAS-1109: cascades/user_films/film_watch/film_picks have no reconcile left to run here —
+    // every write is immediate (acctOp), so there is nothing background convergence would still need to pull.
     // CAS-561: taste/watch_windows only pulled the account's answer on sign-in/boot before this —
     // a tab left open across a change on another device stayed on its stale baseline until reloaded.
     // CAS-1095: guarded on the acctOp queue holding no still-unsent user_prefs write, the same reasoning
@@ -20416,7 +20151,8 @@ else if(dedupedN)
   // given film — the "have I already accounted for this remote state" baseline applyWatchRows needs to tell
   // a genuinely newer remote manual pick from another device apart from an old row (an auto re-arm from a
   // device that hasn't caught up yet) this device has already seen and moved past locally. Same shape and
-  // persistence as CAS-734's cascadeKnown, scoped to one timestamp per film instead of a full-row sig.
+  // persistence as CAS-734's old per-row cascade baseline, scoped to one timestamp per film instead of a
+  // full-row sig.
   const WATCH_KNOWN_KEY = "cascade_watch_known";
   function loadWatchKnown(){
     try{
@@ -20640,11 +20376,14 @@ else if(dedupedN)
     if(deferCtx && deferCtx.owner!==owner) return;
     const attempt = deferCtx ? deferCtx.attempt : 0;
     // CAS-1064's ordering concern still applies even on acctOp: a cascade this device still holds but the
-    // account hasn't confirmed yet (cascadeKnown has no entry) would be rejected outright by the FK if
-    // raced ahead of that cascade's own upsert — wait for the confirmation. A cascade_id this device does
-    // NOT hold at all is a different case (deleted locally before ever syncing) — nothing will ever confirm
-    // it, so it is sent anyway and left to acctOp's own permanent-failure handling.
-    if(cascades.some(cc=>cc.id===cascadeId) && !cascadeKnown.has(cascadeId) && attempt<AGENT_FILM_DEFER_MAX_ATTEMPTS){
+    // account hasn't confirmed yet (absent from CascadeAccountStore's own cascades mirror — CAS-1109) would
+    // be rejected outright by the FK if raced ahead of that cascade's own insert — wait for the confirmation.
+    // A cascade_id this device does NOT hold at all is a different case (deleted
+    // locally before ever syncing) — nothing will ever confirm it, so it is sent anyway and left to acctOp's
+    // own permanent-failure handling.
+    const acctCascades = window.CascadeAccountStore ? window.CascadeAccountStore.acctStore.cascades : null;
+    const cascadeConfirmed = Array.isArray(acctCascades) && acctCascades.some(r=>r.id===cascadeId);
+    if(cascades.some(cc=>cc.id===cascadeId) && !cascadeConfirmed && attempt<AGENT_FILM_DEFER_MAX_ATTEMPTS){
       setTimeout(()=>pushAgentFilmAdmission(cascadeId, movieId, row, { owner, attempt:attempt+1 }), AGENT_FILM_DEFER_MS);
       return;
     }
@@ -20963,21 +20702,14 @@ else if(dedupedN)
   savePrefs = function(){ savePrefsLocal(); };
 
   // ---- CAS-1035: flush every pending account write the instant the tab is about to disappear ----------
-  // flushUsageEvents (analytics, wired the same way near the top of this file) was the only flush that
-  // existed before this ticket — every account sync above just waited out its own debounce, so a tab
-  // closed (or backgrounded and killed) inside that window lost the edit outright. Cancel every debounce
-  // and attempt the push right now — synchronously kicked off, never awaited here, so the request is
-  // already in flight before this function (and the event that called it) returns.
+  // CAS-1109: cascades was the last table with a debounce to cancel here (scheduleSync/runSync) — every
+  // table now writes through acctOp, which persists its own queue synchronously on every call with nothing
+  // to coalesce. Kept (rather than removed outright) as the one forced-persist of the CAS-1035 outbox object
+  // itself, which still exists as a generic pending-write signal (see acctSavePending) even though no
+  // production write path marks it into any more.
   function flushAccountSync(){
     if(!accountActive()) return;
-    // CAS-1035: force the outbox durably to localStorage right now — outboxMark's own persist is coalesced
-    // onto a microtask for perf (recomputeFound's bulk admission pass), which is not guaranteed to have run
-    // yet the instant a real pagehide/hidden fires; a reload landing in that gap must not lose the mark.
     outboxPersistNow();
-    clearTimeout(syncTimer); runSync();
-    // CAS-1096/CAS-1097: user_films/film_watch/film_picks/agent_films have nothing left to flush here —
-    // acctOp pushes (and durably persists its own queue) immediately, on every call, with no debounce to
-    // cancel.
   }
   if(typeof document!=="undefined" && document.addEventListener){
     document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushAccountSync(); });
@@ -20985,24 +20717,18 @@ else if(dedupedN)
   if(typeof window!=="undefined" && window.addEventListener){
     window.addEventListener("pagehide", flushAccountSync);
   }
-  // CAS-1035 AC2: the boot-time counterpart — every outbox entry, retried and AWAITED (unlike
-  // flushAccountSync above) so fireAccountFanout can rely on "replayed" meaning "already attempted"
-  // before it fires the loads that would otherwise apply older remote rows over an unsent one.
+  // CAS-1035 AC2: the boot-time counterpart — every queued-but-unsent acctOp from before this boot, sent and
+  // AWAITED (unlike flushAccountSync above) so fireAccountFanout can rely on "replayed" meaning "already
+  // attempted" before it fires the loads that would otherwise apply older remote rows over an unsent one.
+  // CAS-1109: cascades' own replay (the old runSync call here) retired along with its debounce — acctOp's
+  // persisted queue (cascade_ops@<uid>) is this table's durability story now, the same as every other
+  // acctOp-backed table, so sendQueue alone covers it.
   async function replayOutbox(){
     if(!accountActive()) return;
-    await runSync();
-    // CAS-1095/CAS-1096/CAS-1097: user_prefs/notify_prefs/user_films/film_watch/film_picks/agent_films have
-    // no outbox of their own to replay — acctOp's own persisted queue (cascade_ops@<uid>) is what a
-    // genuinely unsent edit from before this boot lives in now, the same "this device still owes the
-    // account a write" case replayOutbox exists to cover for every other table above. One best-effort
-    // attempt this boot, same as the rest of this function — sendQueue's own "online" listener
-    // (CascadeAccountStore) covers a later reconnect, and pushAgentFilmAdmission's own cascadeKnown wait
-    // covers the CAS-1064 cascades-before-agent_films ordering this used to need runSync() sequenced ahead
-    // of explicitly.
     if(window.CascadeAccountStore) await window.CascadeAccountStore.sendQueue();
   }
 
-  window.CascadePersistence = { loadAccount, syncNow: runSync, accountActive, isUuid,
+  window.CascadePersistence = { loadAccount, syncNow: () => window.CascadeAccountStore.sendQueue(), accountActive, isUuid,
                                 // CAS-1108: the minimum client build gate's own read+decide step — exposed
                                 // so a test can drive a real stubbed app_config read and assert the shared
                                 // buildGateBlocked flag (top-level, exported directly in engine.mjs) rather
@@ -21021,8 +20747,8 @@ else if(dedupedN)
                                 // a test can drive the pagehide/reboot paths directly (mirrors the wire-code
                                 // listeners this module itself registers, same reasoning as
                                 // reconcileOnReturn/pollCatalogue below), outboxPending/outboxHasAny to
-                                // inspect state, and outbox itself by reference (like cascadeKnown) so a
-                                // test can seed/clear it without waiting on a real failed push.
+                                // inspect state, and outbox itself by reference so a test can seed/clear it
+                                // without waiting on a real failed push.
                                 flushAccountSync, replayOutbox, outboxPending, outboxHasAny,
                                 get outbox(){ return outbox; },
                                 // CAS-1063: the saving-dot's own decision/wire split, exposed the same way
@@ -21034,7 +20760,13 @@ else if(dedupedN)
                                 get SAVING_INDICATOR_DELAY_MS(){ return SAVING_INDICATOR_DELAY_MS; },
                                 set SAVING_INDICATOR_DELAY_MS(v){ SAVING_INDICATOR_DELAY_MS=v; },
                                 get acctSuffix(){ return acctSuffix; },
-                                dropRefusedCascade,
+                                // CAS-1109: the real cascades write chokepoints — deleteCascadeFromAccount is
+                                // the one place an agent is ever deleted from the account (an immediate
+                                // rpc("delete_agent") acctOp), syncCascadesToAccount is the one place a
+                                // create/edit is ever pushed (an acctOp insert, or an update of only the
+                                // changed columns), and cascadeAccountRow is the per-id lookup both read
+                                // against — exposed the same way every other real write chokepoint here is.
+                                deleteCascadeFromAccount, syncCascadesToAccount, cascadeAccountRow,
                                 // CAS-1096: pushFilmVerdict/pushFilmWatch/pushFilmPick are the real per-row
                                 // acctOp write seams for user_films/film_watch/film_picks — exposed the same
                                 // way every other real write chokepoint here is (pushNotifyPrefs/
@@ -21060,26 +20792,14 @@ else if(dedupedN)
                                 // same way fireAccountFanout drives it for real against a live loadNotifyPrefs().
                                 get notifyPrefsReady(){ return notifyPrefsReady; },
                                 set notifyPrefsReady(v){ notifyPrefsReady=!!v; },
-                                // CAS-408: the live-reconcile seam, so the cross-device convergence story
-                                // can be exercised without waiting on a real focus/visibilitychange event.
-                                // CAS-1096: user_films no longer has one — every write is immediate (acctOp),
-                                // so there is nothing left for a background reconcile to converge.
-                                reconcileCascades,
-                                // CAS-734: cascades' own per-row conflict resolver (the ONE function both
-                                // loadAccount and reconcileCascades call) plus the private timestamp maps it
-                                // reads — exposed by reference, like notify/realAlerts elsewhere in this
-                                // object, so a test can seed "this device edited agent X at time T" directly
-                                // rather than waiting on a real clock. cascadeOrderCmp/cascadeFullSigOf/
-                                // cascadeDirtyRows let a test assert the total-order tie-break and the
-                                // single-row-upsert behaviour directly.
-                                resolveCascadeConflict, cascadeOrderCmp, cascadeFullSigOf,
-                                cascadeDirtyRows, cascadePendingDeleteIds,
-                                get cascadeKnown(){ return cascadeKnown; },
-                                get cascadeEditedAt(){ return cascadeEditedAt; },
-                                // CAS-1090: the tombstone set itself, by reference like cascadeKnown above —
-                                // so a test can seed/inspect exactly what this device has marked for deletion
-                                // without waiting on a real deleteAgentAsk() confirm() dialog.
-                                get cascadePendingDeletes(){ return cascadePendingDeletes; },
+                                // CAS-1109: cascadeOrderCmp still backs the agent list's own sort — exposed by
+                                // reference the same way every other pure helper here is, so a test can assert
+                                // the total-order tie-break directly. No background reconcile left to run
+                                // (cascades, like every other acctOp-backed table, writes immediately) and no
+                                // per-row conflict resolver of its own — a concurrent edit resolves through
+                                // acctOp's own generic expectUpdatedAt handling (processOp), not a
+                                // cascades-specific function.
+                                cascadeOrderCmp,
                                 // CAS-691: the guest-cache reload seam (what a cold boot re-reads localStorage
                                 // into before the account fan-out ever runs), the wrapped save chokepoints
                                 // themselves (so a test exercises the real write path an Edit-screen tap
@@ -21095,9 +20815,8 @@ else if(dedupedN)
                                 acctRead, renderAcctBanner, acctBannerText,
                                 // CAS-787: the write-side counterpart to acctRead/acctTableFail above — one
                                 // outcome per sync target, overwritten each attempt, plus the derived
-                                // degraded flag the banner reads. Exposed by reference (get syncOutcome)
-                                // like cascadeKnown elsewhere, so a test can inspect state without reaching
-                                // into the DOM.
+                                // degraded flag the banner reads. Exposed by reference (get syncOutcome), so a
+                                // test can inspect state without reaching into the DOM.
                                 get syncOutcome(){ return syncOutcome; },
                                 syncOutcomeReport, anySyncTargetDegraded,
                                 get ACCT_READ_DELAYS(){ return ACCT_READ_DELAYS; },
@@ -21110,7 +20829,7 @@ else if(dedupedN)
                                 // write is immediate) and no confirmed-value baseline map to hold (acctOp's
                                 // own persisted queue is this table's durability story now).
                                 loadFilmWatches, watchRows, applyWatchRows, pushFilmWatch, filmWatchRowSig,
-                                // CAS-735: watchKnown (by reference, like cascadeKnown above) is the per-film
+                                // CAS-735: watchKnown (by reference) is the per-film
                                 // "have I already applied this remote state" baseline applyWatchRows uses to
                                 // tell a genuinely newer manual pick apart from a stale auto re-arm. filmWatchReady
                                 // is exposed read/write (not by reference — it's a primitive) so a test can drive
