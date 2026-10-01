@@ -192,10 +192,22 @@ export const numberIn = s => {
  * no agents, so the wizard runs exactly as it did signed out; only membScreen's email gate (toListing,
  * below) differs, and it already no-ops when the device is already signed in. Specs testing the
  * splash/onboarding entry itself, or sign-in/out mechanics directly, boot signed out on purpose and don't
- * call this. */
+ * call this.
+ * CAS-1136: afterSignIn()'s own "never really onboarded" branch (CAS-1082) auto-starts the flow the moment
+ * the account fan-out resolves a freshly-signed-in, cascade-less account — exactly the account this helper
+ * boots with — racing the splash's documented boot -> auto-redirect flash (CAS-409) against this click. A
+ * qa run's own network/console log (CAS-1136 decision 2) showed the redirect (flow_start/onbstep_shown)
+ * landing well under a second after boot, before this click ever ran, which is what hung this helper for a
+ * full 90s: #splashCta was already gone, so the click waited for an element that would never reappear. Not
+ * a CAS-1136 app regression — this race exists independent of that ticket's own diff — so wait for whichever
+ * actually happens instead of assuming the splash wins. */
 export async function toShortlist(page, kind){
   await freshAppSignedIn(page);
-  await page.locator("#splashCta").click();
+  await page.waitForFunction(() => flowOn === true || document.querySelector("#splashCta"));
+  if(!(await page.evaluate(() => flowOn === true))){
+    try{ await page.locator("#splashCta").click({ timeout: 5000 }); }
+    catch(e){ if(!(await page.evaluate(() => flowOn === true))) throw e; }
+  }
   // CAS-1018: scoped to #onbStepInner, not a bare ".obhd" — gotoStep's dual-pane slide leaves the
   // outgoing step's .obhd in the DOM alongside the incoming one for the length of the transition
   // (intentional, see gotoStep's own comment), and #onbStepInner is the id it moves onto the
