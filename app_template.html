@@ -3702,7 +3702,7 @@
     <input id="cName" class="namein" type="text" maxlength="40" autocomplete="off">
 
     <div class="zone">
-      <div class="zhead">Where &amp; when</div>
+      <div class="zhead">Service tracking</div>
       <!-- CAS-502: was "...and which ones are worth a 📣 when one of the films it found lands there" — the
            per-window bell that sentence promised is gone (it never notified anyone once alert_moments stopped
            being read for delivery). Only a film's own Watch it tick notifies now. -->
@@ -4126,7 +4126,7 @@
      Preferences page. Retires the old Taste Baseline concept (Genre/How far back/Age rating dropped
      entirely; new agents use fixed system defaults). Body rendered by renderWhereWhen(). Reached from the
      top menu's Settings screen (CAS-1126). -->
-<div class="uscreen" id="wwScreen" role="dialog" aria-modal="true" aria-label="Where &amp; when you'll watch">
+<div class="uscreen" id="wwScreen" role="dialog" aria-modal="true" aria-label="Service tracking">
   <div class="uwrap" id="wwBody"></div>
 </div>
 
@@ -11748,7 +11748,7 @@ function renderWhereWhen(){
   prefsWatchMode=true;   // retargets winFlags/agentWindows/wwToggleWin/wwChanged at watchPrefs
   $("wwBody").innerHTML=`
     <div class="ostop"><button class="osback" type="button" onclick="closeWhereWhen()" aria-label="Back">←</button>
-      <h2 class="osh">Where &amp; when you'll watch</h2></div>
+      <h2 class="osh">Service tracking</h2></div>
     <p class="ossub">Turn on the windows you watch in. Your agents follow each film into them and tell you
       when it arrives in the one it's set to Watch On.</p>
     <div id="wwLanes"></div>`;
@@ -11816,7 +11816,7 @@ const HELP_ARTICLES = [
    body:"Every film in Cascade carries one Cascade score, from 0 to 100 — not two separate numbers you have to weigh against each other.\n\nOnce a film is released — including PVOD, rental and streaming — that score is built from two things: what people who watched it thought (People), and what critics thought (Critics). When both exist, the score blends them; when only one does, the score is that one alone.\n\nBefore a film opens in cinemas there's nothing to review yet, so its score is built from how much it's being talked about instead — its buzz. Once it's in cinemas, real reviews start counting again: if a People or Critics score exists yet, the score blends it in with buzz rather than switching over to it outright. Either way it lands on the same 0-100 scale, so a marker you set once means the same thing whether the film is still upcoming or already out."},
   {slug:"setting-the-bar", title:"Setting the bar",
    summary:"Markers per window, the single admission floor, and that moving a marker re-places films immediately.",
-   body:"Each window an agent tracks — Cinema, Premium, Rent, Stream — can carry its own marker: a minimum score for a film to be listed once it reaches that window. But your agent doesn't re-test a film against a fresh marker every time it moves on — it's admitted the moment it clears the lowest marker among every window you're tracking, and stays admitted from there. Markers still decide where a film is placed: the earliest window you've given a marker is where an agent judges a film in, while a later window you're tracking but haven't marked just carries it forward once it's already admitted.\n\nYou can set a window's marker to Off, which lists everything that reaches that window regardless of score. Turning a window off entirely, so it's never tracked at all, isn't something an agent decides for itself — that's set account-wide, in Where & when you'll watch.\n\nDrag a marker and Cascade re-checks every film your agent has already found against the new bar straight away — no refresh needed. A film that no longer clears it drops from the agent's list; one that now does appears. (A film you've set Watch On for yourself by hand is protected from this — see “Watch On and overrides”.)"},
+   body:"Each window an agent tracks — Cinema, Premium, Rent, Stream — can carry its own marker: a minimum score for a film to be listed once it reaches that window. But your agent doesn't re-test a film against a fresh marker every time it moves on — it's admitted the moment it clears the lowest marker among every window you're tracking, and stays admitted from there. Markers still decide where a film is placed: the earliest window you've given a marker is where an agent judges a film in, while a later window you're tracking but haven't marked just carries it forward once it's already admitted.\n\nYou can set a window's marker to Off, which lists everything that reaches that window regardless of score. Turning a window off entirely, so it's never tracked at all, isn't something an agent decides for itself — that's set account-wide, in Service tracking.\n\nDrag a marker and Cascade re-checks every film your agent has already found against the new bar straight away — no refresh needed. A film that no longer clears it drops from the agent's list; one that now does appears. (A film you've set Watch On for yourself by hand is protected from this — see “Watch On and overrides”.)"},
   {slug:"the-cascade", title:"The cascade",
    summary:"Cinema to rent to stream, the start window, and that the entry bar is the lowest marker you've set.",
    body:"A film moves through the same four windows in order: Cinema, Premium, Rent, then Stream. That order is the whole idea behind the name — a film cascades down through them over time, and Cascade watches for it at whichever window you've chosen to track.\n\nThe earliest window you've armed with a marker is your agent's start window. Every window you're tracking after it is always followed, marker or not — a later window's chip reads “follows Rent” instead of showing a score of its own, because it doesn't need one. Your agent's entry bar itself is simply the lowest marker among every window you've set one on — not necessarily the start window's — so once a film clears it, the film doesn't need to clear a fresh bar just because it's moved further down the cascade."},
@@ -11834,7 +11834,7 @@ const HELP_ARTICLES = [
    body:"Moving is where Cascade tells you what's happened lately, split into two kinds of row. New is a film's first appearance for a given agent — something it's never found before. Changed is everything else: a film the agent already had, that's now moved to a different window. A film is never counted as both at once.\n\nYou choose how far back to look — Today, Week, 2 weeks or Month — and Moving shows only what falls inside that window, measured back from right now. Every row names the agent that actually owns the film today, so nothing is shown under an agent that no longer has it."},
   {slug:"notifications", title:"Notifications",
    summary:"Exactly what will reach you, by which channel, and when the daily report runs.",
-   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Where & when you'll watch — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
+   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Service tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
   {slug:"your-account-and-data", title:"Your account and data",
    summary:"What is stored, where, and how to delete it.",
    body:`Signed out, everything Cascade knows about you — your agents, what you've watched, your preferences — is stored only on this device, in this browser or app install. Nothing about it reaches anywhere else.\n\nSigned in, that same information is mirrored to your account so it's there again on another device you sign into. Signing out doesn't erase it — it's still on your account, waiting for you to sign back in.\n\nDeleting your account is on the Account screen itself: type DELETE to confirm, and it permanently removes your agents, everything they've found for you, what you've marked watched, your invites and friends, your notification history and your sign-in — there's nothing left to undo.${MEMBERSHIP_ENABLED ? " It doesn't cancel an active App Store subscription, which you'll need to manage separately." : ""}`},
@@ -14893,7 +14893,7 @@ const SHARP_STEPS = {
   // The count moves live as lanes are ticked, because ticking a lane really does widen or narrow what the
   // agent watches — a screen whose controls didn't move the number would be a form, not a choice.
   watching: {
-    title: "Where & when you'll watch",
+    title: "Service tracking",
     progress: 70,
     noAgent: true,
     noSkip: true,       // inside the hub's door — Done confirms it, Back leaves it alone
@@ -16985,7 +16985,7 @@ function renderSettings(){
     <p class="ossub">How Cascade works for you.</p>
 
     <div class="ucard">
-      ${acctRow("🕒","Where & when you'll watch", null, "settingsOpenWhereWhen()")}
+      ${acctRow("🕒","Service tracking", null, "settingsOpenWhereWhen()")}
       ${acctRow("🔔","How you're told", esc(notif) + (notifyPrefs.emailOn && notifyPrefs.email
                 ? ` · ${esc(notifyPrefs.email)}` : ""), "openSettingsStep('notifysettings')")}
       ${acctRow("📺","My services", null, "settingsOpenServices()")}

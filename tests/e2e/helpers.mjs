@@ -243,7 +243,7 @@ export async function bootAlreadySignedIn(page, { supabaseScript, resolveFnName,
 export async function openWhereWhenScreen(page){
   await page.locator("#navMenuBtn").click();
   await page.locator("#navMenu .navitem", { hasText: "Settings" }).click();
-  await page.locator("#settingsScreen .urow", { hasText: "Where & when you'll watch" }).click();
+  await page.locator("#settingsScreen .urow", { hasText: "Service tracking" }).click();
 }
 /** Back out of Where & when — which (CAS-1126) now resumes Settings rather than just closing, since
  * that's where this test opened it from — then back out of Settings too, landing on the listing

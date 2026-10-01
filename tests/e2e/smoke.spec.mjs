@@ -315,7 +315,7 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   await expect(page.locator(".wtabbtn", { hasText: "Premium" })).toHaveCount(0);
 
   await openWhereWhenScreen(page);
-  await expect(page.locator(".osh", { hasText: "Where & when you'll watch" })).toBeVisible();
+  await expect(page.locator(".osh", { hasText: "Service tracking" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
   await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).toHaveClass(/on/);
@@ -384,7 +384,7 @@ test("an agent created with every window enabled lists films at rental or stream
   await toListing(page);
 
   await openWhereWhenScreen(page);
-  await expect(page.locator(".osh", { hasText: "Where & when you'll watch" })).toBeVisible();
+  await expect(page.locator(".osh", { hasText: "Service tracking" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
   await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).toHaveClass(/on/);
