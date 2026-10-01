@@ -124,11 +124,15 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
     await pageB.reload();
     await pageB.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
     await settleListing(pageB);
+    // CAS-1132: expect.poll's callback is re-invoked with no arguments — the earlier `(id) => ...` here
+    // always ran with id===undefined, so this always read cascades.find(x => x.id === undefined) (undefined),
+    // never seededAgent.id, however long it polled. Captured via closure instead, like every other poll in
+    // this file (see S7's identical fix, 25503c7).
     await expect.poll(
-      (id) => pageB.evaluate((agentId) => {
+      () => pageB.evaluate((agentId) => {
         const c = cascades.find(x => x.id === agentId);
         return c && c.name;
-      }, id),
+      }, seededAgent.id),
       { timeout: 15_000 },
     ).toBe(newName);
   } finally {
