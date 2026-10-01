@@ -68,6 +68,43 @@ function parseTables(src) {
 
 const TABLES = parseTables(schemaSrc);
 
+// CAS-1141: app_config carries a deliberate `for select to anon` policy (min_client_build must
+// be readable before sign-in, CAS-1092/CAS-1108) — the only such table in schema.sql. Track it
+// explicitly so a new anon-read table is a decision (via checkPublicReadConsistency), not a
+// silent pass, and so app_config's own anon SELECT verdicts PASS instead of FAIL.
+export const PUBLIC_READ = new Set(['app_config']);
+
+export function parsePublicReadTables(src) {
+  const tables = new Set();
+  const re = /create policy\s+\S+\s+on\s+public\.(\w+)\s+for\s+select\s+to\s+([^\n;]+)/gi;
+  let m;
+  while ((m = re.exec(src))) {
+    const [, table, roles] = m;
+    if (/\banon\b/i.test(roles)) tables.add(table);
+  }
+  return tables;
+}
+
+export function checkPublicReadConsistency(parsed, declared = PUBLIC_READ) {
+  const errors = [];
+  for (const table of parsed) {
+    if (!declared.has(table)) errors.push(`app_config_read-style policy on ${table} is not in PUBLIC_READ`);
+  }
+  for (const table of declared) {
+    if (!parsed.has(table)) errors.push(`PUBLIC_READ names ${table} which has no anon select policy`);
+  }
+  return errors;
+}
+
+export function selectVerdict(table, total, publicRead = PUBLIC_READ) {
+  if (publicRead.has(table)) {
+    if (total > 0) return { verdict: 'PASS', detail: 'expected public' };
+    return { verdict: 'FAIL', detail: 'anon SELECT was rejected but the client needs this read' };
+  }
+  if (total === 0) return { verdict: 'PASS' };
+  return { verdict: 'FAIL', detail: `anon SELECT returned ${total ?? 'an unknown number of'} row(s)` };
+}
+
 function authHeaders(extra = {}) {
   return { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}`, ...extra };
 }
@@ -100,8 +137,7 @@ async function probeSelect(table) {
   const res = await fetch(`${REST}/${table}?select=*&limit=5`, { headers: authHeaders({ Prefer: 'count=exact' }) });
   if (res.status === 404) return { verdict: 'SKIPPED', detail: 'not deployed (PGRST205)' };
   const total = rangeTotal(res);
-  if (total === 0) return { verdict: 'PASS' };
-  return { verdict: 'FAIL', detail: `anon SELECT returned ${total ?? 'an unknown number of'} row(s)` };
+  return selectVerdict(table, total, PUBLIC_READ);
 }
 
 function insertBody(table, columns) {
@@ -195,6 +231,12 @@ async function probeDeleteMyAccount() {
 }
 
 async function main() {
+  const mismatches = checkPublicReadConsistency(parsePublicReadTables(schemaSrc), PUBLIC_READ);
+  if (mismatches.length > 0) {
+    for (const msg of mismatches) console.error(`[FAIL] ${msg}`);
+    process.exit(1);
+  }
+
   const stabilityTables = ['invites', 'invite_replies'];
   const before = {};
   for (const t of stabilityTables) before[t] = await countTable(t);
@@ -239,7 +281,12 @@ async function main() {
   process.exit(failed > 0 ? 1 : 0);
 }
 
-main().catch((err) => {
-  console.error('tests/rls/matrix.mjs crashed:', err);
-  process.exit(1);
-});
+// Guarded so importing this module (tests/rls/matrix.test.mjs) for the pure parsing/verdict
+// functions never triggers a live network run — only `node tests/rls/matrix.mjs` itself does.
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) {
+  main().catch((err) => {
+    console.error('tests/rls/matrix.mjs crashed:', err);
+    process.exit(1);
+  });
+}
