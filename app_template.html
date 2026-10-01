@@ -20392,7 +20392,17 @@ else if(dedupedN)
     if(cur.length) out.push(cur);
     return out;
   }
-  function flushAgentFilmPushes(){
+  // CAS-1136: sequential, not fire-and-forget. A wide-open agent's first sign-in sweep can admit a large
+  // share of the real catalogue (thousands of rows) — chunked, this is still a handful of batches, but
+  // firing every batch's acctOp() back to back in one synchronous loop pushed all of them onto the shared
+  // queue before any had a chance to actually send: acctOp's own persistQueue() re-serializes the WHOLE
+  // queue on every call, so a queue that keeps growing across a dozen-plus still-unsent batches turned one
+  // flush into a re-serialize of a steadily bigger array, over and over — easily tens of seconds of
+  // uninterrupted main-thread work on a big enough admission, which is exactly what "the app hangs" looks
+  // like from outside (no paint, no input handling, including whatever Playwright's own driver needs to run
+  // in the page). Awaiting each batch before queuing the next keeps the queue down to one agent_films batch
+  // at a time — the same few requests as before, just sent one at a time instead of all enqueued at once.
+  async function flushAgentFilmPushes(){
     agentFilmPushFlushTimer = null;
     const pending = [...pendingAgentFilmPushes.values()];
     pendingAgentFilmPushes.clear();
@@ -20402,15 +20412,15 @@ else if(dedupedN)
     const owner = uid();
     const ready = pending.filter(p=>p.owner===owner);
     if(!ready.length) return;
-    chunkAgentFilmPushes(ready).forEach(batch=>{
+    for(const batch of chunkAgentFilmPushes(ready)){
       const op={ table:"agent_films", kind:"upsert_many",
                  items: batch.map(p=>({ match:{ user_id:p.owner, cascade_id:p.cascadeId, movie_id:p.movieId },
                                          fields:{ admitted_at:p.row.admitted_at, admission_score:p.row.admission_score,
                                                   admission_status:p.row.admission_status, agent_sig:p.row.agent_sig } })),
                  onConflict:"user_id,cascade_id,movie_id" };
       op.onDone=(ok,err)=>recordSyncOutcome("agent_films", ok, err);
-      window.CascadeAccountStore.acctOp(op);
-    });
+      await window.CascadeAccountStore.acctOp(op);
+    }
   }
   function pushAgentFilmAdmission(cascadeId, movieId, row, deferCtx){
     if(!accountActive()) return;
@@ -21084,6 +21094,26 @@ else if(dedupedN)
   // (offline, DNS) has no HTTP response at all — treated the same as a 5xx, not as a 4xx.
   function isTransient(status){ return !status || status >= 500; }
 
+  // CAS-1136: a defensive net, not a fix in itself — a sendOnce() call that never settles (a request that
+  // never comes back) used to leave processOp's own await stuck forever, with nothing to log and no retry
+  // ever firing. Comfortably above real local/CI latency, named so a test can shrink it the same way
+  // ACCT_OP_RETRY_DELAYS/AGENT_FILM_DEFER_MS already are.
+  let SEND_ONCE_TIMEOUT_MS = 15000;
+  async function sendOnceWithTimeout(c, op){
+    const startedAt = Date.now();
+    let timer;
+    const timedOut = new Promise(resolve => {
+      timer = setTimeout(() => resolve({ error: new Error("acctOp: sendOnce timed out"), status: 0 }), SEND_ONCE_TIMEOUT_MS);
+    });
+    try{
+      const result = await Promise.race([sendOnce(c, op), timedOut]);
+      if(result && result.error && result.error.message === "acctOp: sendOnce timed out"){
+        console.warn("acctOp sendOnce timeout", op.table, op.kind, (Date.now()-startedAt)+"ms");
+      }
+      return result;
+    } finally { clearTimeout(timer); }
+  }
+
   async function sendOnce(c, op){
     if(op.kind === "insert"){
       // Client-generated uuid, upserted on id with ignoreDuplicates — a retry of the same op can never
@@ -21128,7 +21158,7 @@ else if(dedupedN)
   async function processOp(c, op){
     for(let attempt=0; attempt<=ACCT_OP_RETRY_DELAYS.length; attempt++){
       let result;
-      try{ result = await sendOnce(c, op); }
+      try{ result = await sendOnceWithTimeout(c, op); }
       catch(e){ result = { error:e, status:0 }; }
       const { error, status, data } = result;
       if(!error){
@@ -21204,6 +21234,8 @@ else if(dedupedN)
     get queue(){ ensureQueueForCurrentUid(); return queue; },
     get ACCT_OP_RETRY_DELAYS(){ return ACCT_OP_RETRY_DELAYS; },
     set ACCT_OP_RETRY_DELAYS(v){ ACCT_OP_RETRY_DELAYS = v; },
+    get SEND_ONCE_TIMEOUT_MS(){ return SEND_ONCE_TIMEOUT_MS; },
+    set SEND_ONCE_TIMEOUT_MS(v){ SEND_ONCE_TIMEOUT_MS = v; },
   };
 })();
 </script>
