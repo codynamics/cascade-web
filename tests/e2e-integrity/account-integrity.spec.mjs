@@ -155,6 +155,11 @@ test("S1: a new member's onboarded roster exists on the server", async ({ page }
   // Walk real onboarding (splash → flow → membScreen → sign-up) to a brand-new account and assert its
   // roster exists in `cascades` server-side, through the real complete_membership() RPC — not a direct
   // insert this suite would otherwise be blind to.
+  // CAS-1099 (requeue): this is the first scenario in this suite to drive a browser-side client.rpc() call
+  // against the local stack — forwarded the same way CAS-1132's S4 fix (25503c7) did, since a prior run of
+  // this exact test failed on a bare `locator.click` timeout with no other evidence in the CI log.
+  page.on("console", msg => console.log(`[S1 console.${msg.type()}] ${msg.text()}`));
+  page.on("pageerror", err => console.log(`[S1 pageerror] ${err}`));
   const email = testEmail("s1");
 
   await gotoIntegrityFresh(page);
@@ -198,6 +203,10 @@ test("S6: onboarding into a previously-held account by email keeps that account'
   // an account — X's existing server-side agents must survive un-touched, not be overwritten by the fresh
   // onboarding roster. AC6's own gate (email_has_account, no code sent) is what actually prevents the
   // overwrite here — this is also the scenario that proves AC6 (see the header comment on S14's stale number).
+  // CAS-1099 (requeue): forwarded for the same reason as S1 above — a prior run failed with no browser-side
+  // evidence in the CI log.
+  page.on("console", msg => console.log(`[S6 console.${msg.type()}] ${msg.text()}`));
+  page.on("pageerror", err => console.log(`[S6 pageerror] ${err}`));
   const email = testEmail("s6");
   const user = await createTestUser(email);
   const seeded = await seedCascades(user.id, [{ name: "Existing Agent" }]);
@@ -232,6 +241,10 @@ test("S10: abandoning onboarding before membership completes leaves no server-si
   // Change 4's exact shape: a reload abandons the draft (never written anywhere) rather than completing
   // membership. email_has_account — the real server-side check this ticket's own email gate uses — must
   // say false, proving no row for this email exists at all, not merely that `cascades` is empty for it.
+  // CAS-1099 (requeue): forwarded for the same reason as S1 above — a prior run failed with no browser-side
+  // evidence in the CI log.
+  page.on("console", msg => console.log(`[S10 console.${msg.type()}] ${msg.text()}`));
+  page.on("pageerror", err => console.log(`[S10 pageerror] ${err}`));
   const email = testEmail("s10");
 
   await gotoIntegrityFresh(page);

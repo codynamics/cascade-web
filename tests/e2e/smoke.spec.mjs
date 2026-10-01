@@ -1047,6 +1047,13 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
         },
       },
       from: () => chain(),
+      // CAS-1099: membStart() now calls rpc("email_has_account") before requesting a code, and
+      // rpc("complete_membership") once the code verifies — neither existed when this fixture was written,
+      // so an un-stubbed client.rpc(...) threw synchronously (client.rpc is not a function) the instant the
+      // membership button was pressed, hanging every caller of toListing() against this fixture. This test
+      // only exercises the ordinary brand-new-signup path, so both resolve as a fresh success: no existing
+      // account, membership created.
+      rpc: async (fn) => fn === "email_has_account" ? { data: false, error: null } : { data: "created", error: null },
     };
   } };
 `;
@@ -1270,6 +1277,9 @@ const CAS1035_FAKE_SUPABASE_GLOBAL = `
         signOut: async () => { writeSession(null); return { error: null }; },
       },
       from: (table) => table === "film_watch" ? filmWatchTable() : chain(),
+      // CAS-1099: see CAS913_FAKE_SUPABASE_GLOBAL's identical stub above — this test also walks finishFlow
+      // + toListing() through membStart(), which now needs both RPCs to resolve rather than throw.
+      rpc: async (fn) => fn === "email_has_account" ? { data: false, error: null } : { data: "created", error: null },
     };
   } };
 `;
