@@ -19575,9 +19575,17 @@ else if(dedupedN)
     if(acctTableFail.cascades) return;   // CAS-656 AC2: a failed load must not push local state back over it
     const dirty = cascadeDirtyRows();
     const deletes = cascadePendingDeleteIds();
+    // CAS-1132: S4's DB poll still times out with zero console.warn ever printed, even with this ticket's
+    // runSync fix (the lost-retry race) landed — meaning no run has yet shown whether a push was even
+    // attempted. This is the one chokepoint both the debounced auto-sync and a caller's explicit syncNow()
+    // funnel through, so logging dirty.length and the upsert's own response here (success or failure, not
+    // only the existing warn-on-error below) is the one thing that can finally tell "nothing was dirty"
+    // apart from "it pushed and the write still didn't stick" without needing Docker to run the suite.
+    console.log("[CAS-1132] syncToAccount dirty", dirty.length, dirty.map(x=>x.id));
     if(dirty.length){
       const rows = dirty.map(cascadeToRow);
       let { data, error } = await c.from("cascades").upsert(rows, { onConflict:"id" }).select("id,updated_at");
+      console.log("[CAS-1132] syncToAccount upsert result", { error, data });
       // CAS-957: 42501 is RLS's USING clause refusing the write — this device pushing a row it does not
       // own, almost always a row this device cached under a different account before local storage was
       // namespaced. Re-pushing it every sync would latch the degraded banner forever over a row that will
