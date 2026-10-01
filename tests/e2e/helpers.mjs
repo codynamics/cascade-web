@@ -37,6 +37,41 @@ export async function freshApp(page){
   return gotoFresh(page);
 }
 
+/** CAS-1110: CASCADE_E2E_SUPABASE_URL/ANON_KEY/SESSION are set by scripts/test-e2e.mjs, which starts a
+ * local Supabase stack and creates the one shared signed-in test user the whole suite runs as — never the
+ * live project, which this never touches. Thrown lazily (not at import time) so specs that don't call
+ * freshAppSignedIn()/toShortlist() can still import this module without the wrapper script running. */
+function signedInEnv(){
+  const url = process.env.CASCADE_E2E_SUPABASE_URL;
+  const anonKey = process.env.CASCADE_E2E_SUPABASE_ANON_KEY;
+  const sessionJson = process.env.CASCADE_E2E_SESSION;
+  if(!url || !anonKey || !sessionJson){
+    throw new Error('freshAppSignedIn()/toShortlist() need CASCADE_E2E_SUPABASE_URL, CASCADE_E2E_SUPABASE_ANON_KEY and CASCADE_E2E_SESSION — run this suite via "npm run test:e2e", not Playwright directly');
+  }
+  return { url, anonKey, session: JSON.parse(sessionJson) };
+}
+
+/** CAS-1110: the signed-in equivalent of freshApp — routes config.js at the local Supabase stack and
+ * injects the shared test user's real session into localStorage before the app's first script runs, so
+ * CascadeAuth resolves signed-in on boot instead of guest. The storage key matches supabase-js's own
+ * default derivation from the project URL (see supabase-js.js / app_template.html's own createClient
+ * call: `sb-${new URL(url).hostname.split(".")[0]}-auth-token`) — a real confirmed session against the
+ * real local stack, not a fake client. gotoFresh's own clear-storage-then-reload is unaffected: addInitScript
+ * re-runs on every navigation in this page, so the session is back in place by the second `goto`. */
+export async function freshAppSignedIn(page){
+  const { url, anonKey, session } = signedInEnv();
+  const storageKey = `sb-${new URL(url).hostname.split(".")[0]}-auth-token`;
+  await page.route("**/config.js", route => route.fulfill({
+    status: 200,
+    contentType: "application/javascript",
+    body: `window.CASCADE_CONFIG = { SUPABASE_URL: ${JSON.stringify(url)}, SUPABASE_ANON_KEY: ${JSON.stringify(anonKey)} };`,
+  }));
+  await page.addInitScript(([key, value]) => {
+    try{ localStorage.setItem(key, value); }catch(e){}
+  }, [storageKey, JSON.stringify(session)]);
+  return gotoFresh(page);
+}
+
 /** Read the integer out of a "28 films match right now" / "Continue · 28 films" style string. */
 export const numberIn = s => {
   const m = String(s == null ? "" : s).replace(/,/g, "").match(/-?\d+/);
@@ -49,9 +84,13 @@ export const numberIn = s => {
  * "v2_services", the same relative point in the flow "services" (S4) used to be the old sequence's
  * first counted step. Kept the name from the old flow's shortlist-of-agents screen this replaces;
  * `kind` only nudges the cinema question now, since every roster this builds is a MIX of agents —
- * there is no lane left to choose. */
+ * there is no lane left to choose.
+ * CAS-1110: boots signed in (freshAppSignedIn), not guest — the shared test user starts with no agents,
+ * so the wizard runs exactly as it did signed out; only membScreen's email gate (toListing, below) differs,
+ * and it already no-ops when the device is already signed in. Specs testing the splash/onboarding entry
+ * itself, or sign-in/out mechanics directly, boot signed out on purpose and don't call this. */
 export async function toShortlist(page, kind){
-  await freshApp(page);
+  await freshAppSignedIn(page);
   await page.locator("#splashCta").click();
   // CAS-1018: scoped to #onbStepInner, not a bare ".obhd" — gotoStep's dual-pane slide leaves the
   // outgoing step's .obhd in the DOM alongside the incoming one for the length of the transition
