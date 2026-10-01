@@ -495,13 +495,20 @@ WATCHMODE_IDMAP_URL = "https://api.watchmode.com/datasets/title_id_map.csv"
 
 _WM_ID_COL_NAMES = ("wm_id", "id", "watchmode id", "watchmode_id")
 _TMDB_ID_COL_NAMES = ("tmdb_id", "tmdbid", "tmdb id")
+# CAS-1134: TMDB numbers films and TV shows separately, so the same TMDB ID often appears on both
+# a movie row and a TV row of this CSV — unfiltered, `_invert_watchmode_idmap`'s last-row-wins
+# join silently resolved a film to whichever medium's row came last (every TV row in the real file
+# sorts after every movie row), handing the film a TV show's ratings or hiding it behind a TV
+# show's empty ones.
+_TMDB_TYPE_COL_NAMES = ("tmdb type", "tmdb_type", "type")
 
 
 def _parse_watchmode_idmap_csv(text: str) -> dict:
-    """Watchmode id (str) -> tmdb_id (int) for every row that actually carries a tmdb_id. Column
-    names are matched case/spacing-insensitively (exact match on the stripped/lowered name, so
-    `TMDB Type` is never mistaken for `TMDB ID`). Pure and network-free so it's testable straight
-    off a sample CSV string."""
+    """Watchmode id (str) -> tmdb_id (int) for every MOVIE row that actually carries a tmdb_id — a
+    TV row sharing the same tmdb_id is dropped (CAS-1134). Column names are matched case/spacing-
+    insensitively (exact match on the stripped/lowered name, so `TMDB Type` is never mistaken for
+    `TMDB ID`). A CSV with no TMDB Type column keeps every row, same as before CAS-1134, with one
+    [warn] line. Pure and network-free so it's testable straight off a sample CSV string."""
     idmap = {}
     reader = csv.DictReader(io.StringIO(text))
     cols = reader.fieldnames or []
@@ -509,10 +516,16 @@ def _parse_watchmode_idmap_csv(text: str) -> dict:
     tmdb_col = next((c for c in cols if c.strip().lower() in _TMDB_ID_COL_NAMES), None)
     if not wm_col or not tmdb_col:
         return idmap
+    type_col = next((c for c in cols if c.strip().lower() in _TMDB_TYPE_COL_NAMES), None)
+    if not type_col:
+        print("[warn] Watchmode: ID map CSV has no TMDB Type column — keeping movie and TV rows "
+              "both, same as before CAS-1134.")
     for row in reader:
         wm_id = row.get(wm_col)
         tmdb_id = row.get(tmdb_col)
         if not wm_id or not tmdb_id:
+            continue
+        if type_col and (row.get(type_col) or "").strip().lower() != "movie":
             continue
         try:
             idmap[str(wm_id)] = int(tmdb_id)
@@ -521,9 +534,48 @@ def _parse_watchmode_idmap_csv(text: str) -> dict:
     return idmap
 
 
+def _parse_watchmode_tv_tmdb_ids_csv(text: str) -> set:
+    """CAS-1134: the TMDB ids that carry a TV row in the same id-map CSV `_parse_watchmode_idmap_
+    csv` reads — used to find films that were fetched under the pre-fix movie/TV collision (the
+    repair tier in `probe_candidates`/`enrich_watchmode_fields_nightly`). Empty if the CSV has no
+    TMDB Type column (nothing to distinguish TV rows with). Pure and network-free."""
+    ids = set()
+    reader = csv.DictReader(io.StringIO(text))
+    cols = reader.fieldnames or []
+    tmdb_col = next((c for c in cols if c.strip().lower() in _TMDB_ID_COL_NAMES), None)
+    type_col = next((c for c in cols if c.strip().lower() in _TMDB_TYPE_COL_NAMES), None)
+    if not tmdb_col or not type_col:
+        return ids
+    for row in reader:
+        if (row.get(type_col) or "").strip().lower() != "tv":
+            continue
+        try:
+            ids.add(int(row.get(tmdb_col)))
+        except (TypeError, ValueError):
+            continue
+    return ids
+
+
+# CAS-1134: the raw text of the last `_fetch_watchmode_idmap()` download this run, so a caller
+# that also needs `_watchmode_tv_tmdb_ids()` gets it from the SAME CSV download rather than a
+# second one — set only by the real fetch below, never by a test that replaces that function.
+_WATCHMODE_IDMAP_RAW_TEXT: str | None = None
+
+
 def _fetch_watchmode_idmap() -> dict:
     """The one network call for the whole run's ID map — see the module docstring above."""
-    return _parse_watchmode_idmap_csv(get_text(f"{WATCHMODE_IDMAP_URL}?apiKey={WATCHMODE_KEY}"))
+    global _WATCHMODE_IDMAP_RAW_TEXT
+    text = get_text(f"{WATCHMODE_IDMAP_URL}?apiKey={WATCHMODE_KEY}")
+    _WATCHMODE_IDMAP_RAW_TEXT = text
+    return _parse_watchmode_idmap_csv(text)
+
+
+def _watchmode_tv_tmdb_ids() -> set:
+    """The TV-row TMDB id set for this run's already-downloaded id map (see
+    `_WATCHMODE_IDMAP_RAW_TEXT`) — empty if `_fetch_watchmode_idmap` hasn't actually run yet."""
+    if _WATCHMODE_IDMAP_RAW_TEXT is None:
+        return set()
+    return _parse_watchmode_tv_tmdb_ids_csv(_WATCHMODE_IDMAP_RAW_TEXT)
 
 
 def _fetch_watchmode_status() -> dict:
@@ -685,8 +737,9 @@ def enrich_watchmode_fields(movie: dict, wm_idmap: dict, budget: dict,
     WM_NIGHTLY_COHORT_TTL_DAYS so an upcoming/in_cinema title refreshes weekly, not monthly.
 
     Returns 'ok' (fetched and wrote fields), 'cached' (already fresh, no credit spent), 'no-id'
-    (no Watchmode id resolves for this title), 'skip' (budget exhausted), or an `_api_call`
-    outcome ('skip'/'stop') on a failed fetch.
+    (no Watchmode id resolves for this title), 'skip' (budget exhausted), 'mismatch' (CAS-1134 —
+    the detail response identifies a different tmdb_id or a non-movie type; nothing is written),
+    or an `_api_call` outcome ('skip'/'stop') on a failed fetch.
 
     CAS-1023: this is the one call every Watchmode-scoreable title must pass through (isScoreable
     needs at least one of these fields), but a title ingested via `_watchmode_record` or
@@ -708,6 +761,17 @@ def enrich_watchmode_fields(movie: dict, wm_idmap: dict, budget: dict,
     budget["remaining"] -= 1
     if outcome != "ok":
         return outcome
+    # CAS-1134: a defensive second check, independent of the id-map's own movie-only filter — if
+    # the details endpoint itself ever identifies a different title or a non-movie type, write
+    # nothing rather than trust an id that has already proven it can collide across media types.
+    resp_tmdb_id = detail.get("tmdb_id")
+    resp_tmdb_type = detail.get("tmdb_type")
+    resp_type = detail.get("type")
+    if ((resp_tmdb_id is not None and resp_tmdb_id != movie.get("tmdb_id"))
+            or (resp_tmdb_type is not None and resp_tmdb_type != "movie")
+            or (resp_type is not None and resp_type != "movie")):
+        return "mismatch"
+    movie["wm_id"] = wm_id
     movie["wm_user_rating"] = _num(detail.get("user_rating"))
     movie["wm_critic_score"] = _int(detail.get("critic_score"))
     percentile = _num(detail.get("popularity_percentile"))
@@ -732,8 +796,11 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
     to the catalogue since the last manual run carried no Cascade score at all, and an upcoming
     title's popularity went stale until someone remembered to dispatch it.
 
-    Spends one shared budget, WM_NIGHTLY_MAX_CREDITS by default, across three priority tiers,
+    Spends one shared budget, WM_NIGHTLY_MAX_CREDITS by default, across four priority tiers,
     highest first:
+      0. CAS-1134 repair — titles fetched under the pre-fix movie/TV id-map collision (a
+         wm_fields_fetched_at stamp but no wm_id, whose tmdb_id also carries a TV row in the id
+         map), forced stale regardless of how recently that bad fetch happened;
       1. titles with no wm_fields_fetched_at at all (never fetched);
       2. upcoming/in_cinema titles stale past WM_NIGHTLY_COHORT_TTL_DAYS (7 days);
       3. every other title stale past WATCHMODE_CACHE_TTL_DAYS (30 days).
@@ -746,7 +813,9 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
     health` gives a throttled provider elsewhere in this module — `_api_call` already prints its
     own [warn]/[error] line and returns 'stop' for a rejected key encountered mid-run.
 
-    Returns an {'ok', 'cached', 'no-id', 'skip', 'stop'} outcome-count dict."""
+    Returns an {'ok', 'cached', 'no-id', 'skip', 'stop'} outcome-count dict (plus 'mismatch' if
+    CAS-1134's identity guard ever actually tripped this run — never pre-declared, so a run that
+    never trips it keeps the exact same dict shape as before)."""
     outcomes = {"ok": 0, "cached": 0, "no-id": 0, "skip": 0, "stop": 0}
     if not WATCHMODE_KEY:
         print("[warn] Watchmode: WATCHMODE_API_KEY not set — skipping the nightly Watchmode "
@@ -764,13 +833,22 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
               "fields step.")
         return outcomes
     wm_idmap = _invert_watchmode_idmap(idmap)
+    tv_tmdb_ids = _watchmode_tv_tmdb_ids()
 
     if budget is None:
         budget = {"remaining": WM_NIGHTLY_MAX_CREDITS, "skipped": 0}
 
     seen = set()
+    repair = []
+    for m in movies:
+        if m.get("wm_fields_fetched_at") and not m.get("wm_id") and m.get("tmdb_id") in tv_tmdb_ids:
+            repair.append(m)
+            seen.add(id(m))
+
     unfetched = []
     for m in movies:
+        if id(m) in seen:
+            continue
         if not m.get("wm_fields_fetched_at"):
             unfetched.append(m)
             seen.add(id(m))
@@ -785,12 +863,18 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
 
     rest = [m for m in movies if id(m) not in seen and _watchmode_fields_stale(m)]
 
+    for m in repair:
+        result = enrich_watchmode_fields(m, wm_idmap, budget, ttl_days=0)
+        outcomes[result] = outcomes.get(result, 0) + 1
     for m in unfetched:
-        outcomes[enrich_watchmode_fields(m, wm_idmap, budget)] += 1
+        result = enrich_watchmode_fields(m, wm_idmap, budget)
+        outcomes[result] = outcomes.get(result, 0) + 1
     for m in cohort:
-        outcomes[enrich_watchmode_fields(m, wm_idmap, budget, WM_NIGHTLY_COHORT_TTL_DAYS)] += 1
+        result = enrich_watchmode_fields(m, wm_idmap, budget, WM_NIGHTLY_COHORT_TTL_DAYS)
+        outcomes[result] = outcomes.get(result, 0) + 1
     for m in rest:
-        outcomes[enrich_watchmode_fields(m, wm_idmap, budget)] += 1
+        result = enrich_watchmode_fields(m, wm_idmap, budget)
+        outcomes[result] = outcomes.get(result, 0) + 1
     return outcomes
 
 
@@ -921,9 +1005,28 @@ def refresh_enriched_candidates(candidates: dict, enriched: list, today_iso: str
         if m.get("wm_fields_fetched_at") == today_iso and prior.get("last_probed") != today_iso:
             candidates[key]["last_probed"] = today_iso
             candidates[key]["probe_count"] = (prior.get("probe_count") or 0) + 1
+            # CAS-1134: popularity_percentile alone only counts as a score for an upcoming/
+            # in_cinema title (_is_ladder_cohort) — a released title needs a real rating.
             has_score = (m.get("wm_user_rating") is not None or m.get("wm_critic_score") is not None
-                        or m.get("wm_popularity_percentile") is not None)
+                        or (m.get("wm_popularity_percentile") is not None and _is_ladder_cohort(m)))
             candidates[key]["outcome"] = "scored" if has_score else "no_score"
+
+
+def reclassify_stale_scored_candidates(candidates: dict) -> int:
+    """CAS-1134 Change #5, one-time in effect: before this fix, a non-ladder-cohort candidate with
+    only wm_popularity_percentile (no real rating) was wrongly marked 'scored', so tier 3's
+    no_score recovery never picked it up. Reclassifies every such candidate still in the pool to
+    'no_score' with last_probed cleared, so it is immediately due for tier 3. Self-limiting — a
+    candidate this already fixed no longer matches, so re-running this is a no-op. Returns the
+    count reclassified."""
+    fixed = 0
+    for c in candidates.values():
+        if (c.get("outcome") == "scored" and not _is_ladder_cohort(c)
+                and c.get("wm_user_rating") is None and c.get("wm_critic_score") is None):
+            c["outcome"] = "no_score"
+            c["last_probed"] = None
+            fixed += 1
+    return fixed
 
 
 def _scoreability_recovery_due(c: dict, today: datetime.date) -> bool:
@@ -940,9 +1043,12 @@ def _scoreability_recovery_due(c: dict, today: datetime.date) -> bool:
 
 
 def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idmap: dict,
-                      published_ids: set) -> dict:
-    """CAS-986's own nightly scoreability probe, spending `budget` Watchmode credits across three
+                      published_ids: set, tv_tmdb_ids: set = frozenset()) -> dict:
+    """CAS-986's own nightly scoreability probe, spending `budget` Watchmode credits across four
     priority tiers, highest first — the order matters and must not be rearranged:
+      0. CAS-1134 repair — candidates fetched under the pre-fix movie/TV id-map collision (a
+         wm_fields_fetched_at stamp but no wm_id, whose tmdb_id also carries a TV row in
+         `tv_tmdb_ids`), forced stale regardless of how recently that bad fetch happened.
       1. published titles (`published_ids` — yesterday's movies.json) whose Watchmode fields are
          stale (30 days, or 7 for an upcoming/in_cinema ladder-cohort title) — first, because
          letting a published title's fields expire silently removes it from the app.
@@ -951,14 +1057,18 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
          tail without re-asking every night.
     Reuses enrich_watchmode_fields for the actual per-title fetch (CAS-921) — never a second fetch/
     parse of Watchmode's response. Mutates each probed candidate's own last_probed/probe_count/
-    outcome in place. Returns the {'ok','cached','no-id','skip','stop'} tally plus 'probed', the
-    count of candidates that actually got a fresh answer (ok or no-id) this run."""
+    outcome in place. Returns the {'ok','cached','no-id','skip','stop'} tally (plus 'mismatch' if
+    CAS-1134's identity guard ever actually tripped this run) plus 'probed', the count of
+    candidates that actually got a fresh answer (ok or no-id) this run."""
     bd = {"remaining": budget, "skipped": 0}
     today_iso = today.isoformat()
 
     def _by_popularity(items):
         return sorted(items, key=lambda m: m.get("popularity") or 0, reverse=True)
 
+    repair_tier = _by_popularity(
+        c for c in candidates.values()
+        if c.get("wm_fields_fetched_at") and not c.get("wm_id") and c.get("tmdb_id") in tv_tmdb_ids)
     tier1 = _by_popularity(
         c for c in candidates.values()
         if c["tmdb_id"] in published_ids
@@ -969,9 +1079,11 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
                            and _scoreability_recovery_due(c, today))
 
     outcomes = {"ok": 0, "cached": 0, "no-id": 0, "skip": 0, "stop": 0, "probed": 0}
-    for tier in (tier1, tier2, tier3):
+    for tier, forced_ttl in ((repair_tier, 0), (tier1, None), (tier2, None), (tier3, None)):
         for c in tier:
-            ttl = SCOREABILITY_LADDER_STALE_DAYS if _is_ladder_cohort(c) else SCOREABILITY_STALE_DAYS
+            ttl = forced_ttl
+            if ttl is None:
+                ttl = SCOREABILITY_LADDER_STALE_DAYS if _is_ladder_cohort(c) else SCOREABILITY_STALE_DAYS
             result = enrich_watchmode_fields(c, wm_idmap, bd, ttl)
             outcomes[result] = outcomes.get(result, 0) + 1
             if result in ("ok", "no-id"):
@@ -981,9 +1093,11 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
                 if result == "no-id":
                     c["outcome"] = "no_wm_id"
                 else:
+                    # CAS-1134: popularity_percentile alone only counts for a ladder-cohort title.
                     has_score = (c.get("wm_user_rating") is not None
                                 or c.get("wm_critic_score") is not None
-                                or c.get("wm_popularity_percentile") is not None)
+                                or (c.get("wm_popularity_percentile") is not None
+                                    and _is_ladder_cohort(c)))
                     c["outcome"] = "scored" if has_score else "no_score"
     outcomes["spent"] = budget - bd["remaining"]   # CAS-987: actual credits this pass drew from `budget`
     return outcomes
@@ -1045,9 +1159,11 @@ def run_backcatalogue_probe(candidates: dict, today: datetime.date, max_credits:
             if result == "no-id":
                 c["outcome"] = "no_wm_id"
             else:
+                # CAS-1134: popularity_percentile alone only counts for a ladder-cohort title.
                 has_score = (c.get("wm_user_rating") is not None
                             or c.get("wm_critic_score") is not None
-                            or c.get("wm_popularity_percentile") is not None)
+                            or (c.get("wm_popularity_percentile") is not None
+                                and _is_ladder_cohort(c)))
                 c["outcome"] = "scored" if has_score else "no_score"
                 if not has_score:
                     outcomes["no_score"] += 1
@@ -1062,6 +1178,7 @@ _CANDIDATE_STUB_KEYS = frozenset({
     "first_seen", "last_probed", "outcome", "popularity", "popularity_percentile",
     "probe_count", "status", "title", "tmdb_id", "year",
     "wm_user_rating", "wm_critic_score", "wm_popularity_percentile", "wm_fields_fetched_at",
+    "wm_id",
 })
 
 
@@ -1211,7 +1328,8 @@ def run_scoreability_probe(candidates: dict, today: datetime.date, budget: int,
         print("[warn] Watchmode: no usable ID map this run — skipping the CAS-986 scoreability probe.")
         return empty
     wm_idmap = _invert_watchmode_idmap(idmap)
-    return probe_candidates(candidates, today, budget, wm_idmap, published_ids)
+    tv_tmdb_ids = _watchmode_tv_tmdb_ids()
+    return probe_candidates(candidates, today, budget, wm_idmap, published_ids, tv_tmdb_ids)
 
 
 def scoreable_ids(movies: list, floor: int = 0) -> set:
@@ -1344,6 +1462,13 @@ def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery
     if not_found_dropped:
         print(f"[info] CAS-997: dropped {not_found_dropped} candidate(s) TMDB reported not-found "
               f"on {TMDB_NOT_FOUND_DROP_STREAK} consecutive nightly runs.")
+
+    # CAS-1134: before the probe/engine pass, so a candidate this fixes is eligible for tier 3
+    # recovery the same run.
+    reclassified = reclassify_stale_scored_candidates(candidates)
+    if reclassified:
+        print(f"[info] CAS-1134: reclassified {reclassified} candidate(s) 'scored' on popularity "
+              f"alone (no real rating) to no_score.")
 
     probe_outcomes = run_scoreability_probe(candidates, today, probe_budget, previously_published_ids)
 
