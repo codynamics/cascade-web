@@ -75,6 +75,16 @@ function e2eTestEmail(){
  * signed-in boot immediately reloads. A fresh account per call keeps each test exactly as isolated as the
  * guest-mode suite always was. */
 export async function freshAppSignedIn(page){
+  // CAS-1136: temporary diagnostics — CI forwards nothing from inside the page by default, so when the
+  // signed-in smoke gate hangs to its own 90s test timeout, the [CAS-460] perf-timing lines already around
+  // recomputeFound/flushAgentFilmPushes (and any console.warn/error or uncaught page error) never reach the
+  // run's log at all. Forwarding them here, once per signed-in boot, is what actually lets a future red run
+  // show WHERE it stalled instead of just THAT it stalled.
+  page.on("console", msg => {
+    const text = msg.text();
+    if(text.includes("[CAS-460]") || msg.type() === "error" || msg.type() === "warning") console.log("[page]", text);
+  });
+  page.on("pageerror", e => console.log("[page error]", String(e)));
   const { url, anonKey, serviceRoleKey } = signedInEnv();
   const admin = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
   const email = e2eTestEmail();

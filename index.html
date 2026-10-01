@@ -20412,15 +20412,29 @@ else if(dedupedN)
     const owner = uid();
     const ready = pending.filter(p=>p.owner===owner);
     if(!ready.length) return;
-    for(const batch of chunkAgentFilmPushes(ready)){
+    // CAS-1136: additive-only timing, same [CAS-460] convention used elsewhere, so a stalled signed-in
+    // onboarding run (local or CI) shows exactly which batch of how many never came back, instead of the
+    // whole flush reading as one opaque hang.
+    const batches = chunkAgentFilmPushes(ready);
+    const _t460flush = performance.now();
+    console.log('[CAS-460] flushAgentFilmPushes start', _t460flush, 'rows', ready.length, 'batches', batches.length);
+    let i = 0;
+    for(const batch of batches){
+      i++;
       const op={ table:"agent_films", kind:"upsert_many",
                  items: batch.map(p=>({ match:{ user_id:p.owner, cascade_id:p.cascadeId, movie_id:p.movieId },
                                          fields:{ admitted_at:p.row.admitted_at, admission_score:p.row.admission_score,
                                                   admission_status:p.row.admission_status, agent_sig:p.row.agent_sig } })),
                  onConflict:"user_id,cascade_id,movie_id" };
       op.onDone=(ok,err)=>recordSyncOutcome("agent_films", ok, err);
+      const _t460batch = performance.now();
+      console.log('[CAS-460] flushAgentFilmPushes batch start', i+'/'+batches.length, 'rows', batch.length, _t460batch);
       await window.CascadeAccountStore.acctOp(op);
+      console.log('[CAS-460] flushAgentFilmPushes batch end', i+'/'+batches.length, 'elapsed_ms',
+                  (performance.now()-_t460batch).toFixed(1));
     }
+    console.log('[CAS-460] flushAgentFilmPushes end', performance.now(), 'elapsed_ms',
+                (performance.now()-_t460flush).toFixed(1));
   }
   function pushAgentFilmAdmission(cascadeId, movieId, row, deferCtx){
     if(!accountActive()) return;
@@ -21178,6 +21192,16 @@ else if(dedupedN)
       }
       if(isTransient(status)){
         if(attempt < ACCT_OP_RETRY_DELAYS.length){ await opWait(ACCT_OP_RETRY_DELAYS[attempt]); continue; }
+        // CAS-1136: "retry-later" leaves the op queued (correct — a later flush gets another shot), but it
+        // is NOT "done", so the two returns above never run their op._resolve()/op.onDone() — until now,
+        // nothing awaited acctOp()'s own promise, so a permanently-pending promise here was invisible.
+        // flushAgentFilmPushes is the first caller that awaits it per batch to bound the shared queue (CAS-1136,
+        // c8c3ccf): once a batch goes fully transient (every attempt, including each one's own
+        // SEND_ONCE_TIMEOUT_MS), that await hung forever with nothing to unblock it — the actual mechanism
+        // behind the signed-in smoke gate's hang, not the CPU-reserialization theory c8c3ccf fixed instead.
+        // Resolving here lets an awaiting caller move on; the op itself is untouched (still queued, not
+        // reverted) and still reaches onDone()/recordSyncOutcome() whenever a later flush actually settles it.
+        if(op._resolve) op._resolve();
         return "retry-later";
       }
       console.warn("acctOp", op.table, op.kind, error);
@@ -21186,6 +21210,7 @@ else if(dedupedN)
       if(op.onDone) op.onDone(false, error);
       return "done";
     }
+    if(op._resolve) op._resolve();
     return "retry-later";
   }
 
