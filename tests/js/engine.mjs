@@ -409,6 +409,13 @@ if(typeof window.CascadeAuth === "undefined"){
   // reasoning as CascadePersistence above, so a test can stub CascadeAuth.client with a fake Supabase and
   // call acctOp/acctLoad directly.
   get CascadeAccountStore(){ return window.CascadeAccountStore; },
+  // CAS-1108: BUILD_INFO is a plain object, exposed by reference (mutated, never reassigned) like cascades
+  // elsewhere in this file — a test sets BUILD_INFO.build directly to simulate a client on a given build.
+  // buildGateBlocked/buildGateUpdateUrl are reassigned wholesale by checkBuildGate (CascadePersistence,
+  // exposed above), so both are exposed through getters, like catalogueHash below.
+  BUILD_INFO,
+  get buildGateBlocked(){ return buildGateBlocked; },
+  get buildGateUpdateUrl(){ return buildGateUpdateUrl; },
   // CAS-843: momentsOf (alert_moments derivation, now off the account's own Where & when Notify switches
   // rather than a per-agent field) lives on window.CascadeShape, the same live-reference reasoning as
   // CascadePersistence above.

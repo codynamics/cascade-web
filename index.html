@@ -3413,6 +3413,17 @@
   .tutskip:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   .tutnext{background:var(--accentdeep);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-weight:700;font-size:14px;cursor:pointer}
   .tutnext:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  /* ---- Minimum client build gate (CAS-1108) ---- .tutscrim above tops out at 120; this has to sit above
+     literally everything (it is the one state nothing — not onboarding, not a sheet, not the tutorial — may
+     be interacted through), hence 200. */
+  .buildgate{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;align-items:center;
+    justify-content:center;gap:14px;padding:32px 28px;text-align:center;background:var(--bg)}
+  .buildgate h2{margin:0;font-family:var(--font-display);font-size:21px;color:var(--ink)}
+  .buildgate p{margin:0;max-width:320px;font-size:14px;line-height:1.5;color:var(--dim)}
+  .buildgate button{width:100%;max-width:280px;background:var(--grad);color:#fff;border:none;
+    border-radius:11px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;
+    text-shadow:0 1px 2px rgba(10,14,26,.55)}
+  .buildgate button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -3428,6 +3439,15 @@
       <path d="M10.3 9.1 15.1 12l-4.8 2.9Z" fill="#000"/>
     </mask>
   </defs></svg>
+</div>
+<!-- CAS-1108: minimum client build gate. Sits outside .phone, above everything (.tutscrim, the highest
+     thing before this, tops out at z-index 120 — see .buildgate's own z-index:200) — there is no state an
+     out-of-date client may act through. Hidden by default; renderBuildGate (classic script above) is the
+     only thing that ever shows it. -->
+<div class="buildgate" id="buildGate" role="dialog" aria-modal="true" aria-label="Cascade update required">
+  <p id="buildGateMsg"></p>
+  <button type="button" id="buildGateReload" onclick="buildGateReloadNow()">Reload</button>
+  <button type="button" id="buildGateUpdate" onclick="buildGateOpenUpdate()">Update</button>
 </div>
 <div class="phone">
   <header>
@@ -5552,6 +5572,41 @@ const buildCore = () => {
     foot.appendChild(env);
   }
 })();
+
+// ================= Minimum client build gate (CAS-1108) =================
+// A frozen TestFlight install or a web tab left open for days keeps running whatever client code it booted
+// with, indefinitely — nothing today stops an old client's writes from reaching the account even after a
+// newer build has shipped a different (possibly incompatible) write shape. checkBuildGate (account-sync
+// IIFE, further down — it already has the client()/uid() helpers this needs) reads public.app_config's
+// min_client_build row and flips buildGateBlocked once this session's own BUILD_INFO.build is confirmed
+// below it. Declared at the top level, not inside either account IIFE, so both the legacy cascades sync
+// (runSync) and the acctOp queue (sendQueue) can read the one flag before sending anything.
+let buildGateBlocked = false;
+let buildGateUpdateUrl = null;
+function renderBuildGate(){
+  const el = $("buildGate");
+  if(!el) return;
+  el.style.display = buildGateBlocked ? "flex" : "none";
+  if(!buildGateBlocked) return;
+  const native = typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform();
+  const msg = $("buildGateMsg");
+  if(msg) msg.textContent = native ? "Please update Cascade to keep using it."
+                                    : "A new version of Cascade is available.";
+  // Web always gets Reload (cache-busting reload is always possible); native gets Update only when
+  // app_config actually named somewhere to send it — the ticket's own "if that row exists" qualifier.
+  const reloadBtn = $("buildGateReload"), updateBtn = $("buildGateUpdate");
+  if(reloadBtn) reloadBtn.style.display = native ? "none" : "";
+  if(updateBtn) updateBtn.style.display = (native && buildGateUpdateUrl) ? "" : "none";
+}
+function buildGateReloadNow(){
+  const url = new URL(location.href);
+  url.searchParams.set("cb", Date.now());
+  location.href = url.toString();
+}
+function buildGateOpenUpdate(){
+  if(buildGateUpdateUrl) window.open(buildGateUpdateUrl, "_blank");
+}
+
 // CAS-346: the About page's build provenance stamp. #aboutBuild is created fresh each time renderAbout()
 // runs (the page is off-DOM until opened), so — unlike the footer stamp above — this can't be a one-shot
 // load-time IIFE; it has to be called from renderAbout() itself.
@@ -19180,6 +19235,26 @@ else if(dedupedN)
   const client = () => { const a=acct(); return (a && a.enabled && a.client) ? a.client : null; };
   const uid = () => { const a=acct(); return (a && a.session && a.session.user) ? a.session.user.id : null; };
   const accountActive = () => !!(client() && uid());
+  // CAS-1108: reads public.app_config's min_client_build (and update_url, if it exists) and flips the
+  // shared buildGateBlocked flag once this session's own BUILD_INFO.build is confirmed below it. Guest-safe
+  // like pollCatalogue below — app_config's read policy covers anon, so this runs whether or not anyone is
+  // signed in, the same reasoning CAS-488 gives pollCatalogue. A failed read or a missing row never blocks:
+  // there is nothing to gate against, and an unreachable account is already covered by the acctTableFail
+  // banner — this flag is reserved for "we positively know this build is too old".
+  async function checkBuildGate(){
+    const c = client();
+    if(!c) return;
+    const { data, error } = await c.from("app_config").select("key,value").in("key", ["min_client_build","update_url"]);
+    if(error || !data) return;
+    const minRow = data.find(r => r.key === "min_client_build");
+    if(!minRow) return;
+    const min = Number(minRow.value);
+    const updateRow = data.find(r => r.key === "update_url");
+    buildGateUpdateUrl = updateRow ? String(updateRow.value) : null;
+    const myBuild = Number((BUILD_INFO||{}).build);
+    buildGateBlocked = Number.isFinite(min) && Number.isFinite(myBuild) && myBuild < min;
+    renderBuildGate();
+  }
   // CAS-735: recomputeFound's placement-writing block must not act on a device's still-stale local `notify`
   // cache before this session's own film_watch state has actually been fetched from the account — that race
   // is what let a device re-arm `auto` over a manual pick another device had already made, and push the
@@ -19709,6 +19784,10 @@ else if(dedupedN)
   // only once a pass that re-reads the current dirty rows has actually finished.
   function runSync(){
     if(!accountActive()) return Promise.resolve();
+    // CAS-1108: an out-of-date client sends no account writes of any kind — this is the legacy cascades
+    // sync pass, the one account write path this ticket's gate covers that isn't acctOp's queue (see
+    // sendQueue's own check, ACCOUNT STORE IIFE below).
+    if(buildGateBlocked) return Promise.resolve();
     if(syncing){ syncAgain=true; return syncDone; }
     syncing=true;
     syncDone = (async()=>{
@@ -20073,12 +20152,18 @@ else if(dedupedN)
     try{ localStorage.setItem("cascade_had_account","1"); }catch(e){}
     fireAccountFanout('boot-restore');
   }
+  // CAS-1108: the "at boot" half of the gate — a direct call, not routed through reconcileOnReturn below, so
+  // boot never also re-triggers pollCatalogue/reconcileCascades/loadUserPrefs/loadRealAlerts a second time.
+  checkBuildGate();
   // CAS-408: two devices only converge without a live subscription if SOMETHING re-pulls the account
   // — sign-in alone left a device that never signs out again permanently stuck on whatever it saw at
   // its last sign-in. Returning to the tab is the natural moment: skip it while a push from THIS
   // device is in flight or queued, so a reconcile pull can never land on top of an edit that hasn't
   // reached the account yet and read as if it had been undone.
   function reconcileOnReturn(){
+    // CAS-1108: guest-safe, same reasoning as pollCatalogue below — runs every return-to-tab regardless of
+    // sign-in state, ahead of the accountActive() gate.
+    checkBuildGate();
     // CAS-488: guest-safe, unlike every account-sync call below — a signed-out tab still deserves a live
     // catalogue, so this runs unconditionally rather than behind the accountActive() gate.
     pollCatalogue();
@@ -20918,6 +21003,11 @@ else if(dedupedN)
   }
 
   window.CascadePersistence = { loadAccount, syncNow: runSync, accountActive, isUuid,
+                                // CAS-1108: the minimum client build gate's own read+decide step — exposed
+                                // so a test can drive a real stubbed app_config read and assert the shared
+                                // buildGateBlocked flag (top-level, exported directly in engine.mjs) rather
+                                // than poking it by hand.
+                                checkBuildGate,
                                 // CAS-1107: the real sign-in/account-switch chokepoint itself (the
                                 // auth-change listener and the boot-restore check below both call it
                                 // directly) — exposed so a test can drive the whole load-before-replay
@@ -21327,6 +21417,16 @@ else if(dedupedN)
   let sending = false;
   async function sendQueue(){
     if(sending) return;
+    // CAS-1108: an out-of-date client sends no account writes of any kind — the queue itself stays exactly
+    // as it is (nothing shifted, nothing persisted-away) until a reload gets this device onto a build that
+    // clears the gate; see checkBuildGate (account-sync IIFE) for where buildGateBlocked is actually set.
+    // Same resolve-without-removing shape as processOp's "retry-later" above: every op already queued still
+    // gets its acctOp() promise settled so an awaiting caller doesn't hang forever on a gate that may never
+    // lift this session (CAS-1136/r611b was the same bug class — a bail-out here must never skip _resolve).
+    if(buildGateBlocked){
+      for(const op of queue){ if(op._resolve) op._resolve(); }
+      return;
+    }
     const c = client(); if(!c || !uid()) return;
     ensureQueueForCurrentUid();
     sending = true;
