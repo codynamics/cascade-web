@@ -84,7 +84,7 @@ class RetiredLanguageFilter(unittest.TestCase):
     def test_agent_lang_field_is_ignored_when_account_taste_base_allows_it(self):
         movie = {"tmdb_id": "999900002", "title": "Foreign Film", "genres": ["Drama"],
                  "age_rating": "M", "language": "fr", "status": ["rental"],
-                 "imdb_rating": 7.0, "imdb_votes": 5000, "rt_critic": 70,
+                 "imdb_rating": 7.0, "imdb_votes": 5000, "wm_user_rating": 7.5, "wm_critic_score": 70,
                  "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}]}
         cascade = {"id": "c-lang", "user_id": "u-lang",
                   "criteria": {"lang": ["en"], "watchMarkers": dict(_OPEN)}}
@@ -103,7 +103,7 @@ class PrimaryGenreOnly(unittest.TestCase):
     def test_secondary_genre_does_not_admit(self):
         movie = {"tmdb_id": "999900001", "title": "Secondary Horror", "genres": ["Drama", "Horror"],
                  "age_rating": "M", "language": "en", "status": ["rental"],
-                 "imdb_rating": 7.0, "imdb_votes": 5000, "rt_critic": 70,
+                 "imdb_rating": 7.0, "imdb_votes": 5000, "wm_user_rating": 7.5, "wm_critic_score": 70,
                  "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}]}
         cascade = {"id": "c-genre", "user_id": "u-genre",
                   "criteria": {"genre": ["Horror"], "watchMarkers": dict(_OPEN)}}
@@ -115,7 +115,7 @@ class PrimaryGenreOnly(unittest.TestCase):
         # about genre ORDER and not some other field on the fixture.
         movie = {"tmdb_id": "999900003", "title": "Primary Horror", "genres": ["Horror", "Drama"],
                  "age_rating": "M", "language": "en", "status": ["rental"],
-                 "imdb_rating": 7.0, "imdb_votes": 5000, "rt_critic": 70,
+                 "imdb_rating": 7.0, "imdb_votes": 5000, "wm_user_rating": 7.5, "wm_critic_score": 70,
                  "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}]}
         cascade = {"id": "c-genre2", "user_id": "u-genre",
                   "criteria": {"genre": ["Horror"], "watchMarkers": dict(_OPEN)}}
@@ -132,7 +132,7 @@ class ServiceScopeAuthority(unittest.TestCase):
     def _stan_only_film(self):
         return {"tmdb_id": "999900853", "title": "Stan-Only Test Film", "genres": ["Drama"],
                 "age_rating": "M", "language": "en", "status": ["included_streaming"],
-                "imdb_rating": 7.0, "imdb_votes": 5000, "rt_critic": 70,
+                "imdb_rating": 7.0, "imdb_votes": 5000, "wm_user_rating": 7.5, "wm_critic_score": 70,
                 "offers": [{"service": "Stan", "type": "sub", "price": None}]}
 
     def test_excluded_when_services_only_is_on_and_the_service_is_not_picked(self):
@@ -163,7 +163,7 @@ class UpcomingCinemaGate(unittest.TestCase):
     def _upcoming_film(self):
         return {"tmdb_id": "999900854", "title": "CAS-854 Upcoming Test Film", "genres": ["Drama"],
                 "age_rating": "M", "language": "en", "status": ["upcoming"],
-                "popularity": 50, "award": None}
+                "popularity": 50, "wm_popularity_percentile": 70, "award": None}
 
     def test_stream_only_agent_does_not_admit_an_upcoming_film(self):
         movie = self._upcoming_film()

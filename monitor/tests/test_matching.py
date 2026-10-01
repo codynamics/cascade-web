@@ -4,12 +4,17 @@ Run:  python -m unittest monitor.tests.test_matching   (from the repo root)
 
 CAS-825: admission (which film a Cascade admits) is now asked of the real shipped engine via
 compute_admission() -> admit_shim.mjs, not recomputed field-by-field in Python. Every fixture
-Cascade below carries `watchMarkers` (so app_template.html's agentFloor() has a usable, 0-floor
-window rather than Infinity) and every fixture movie carries enough of a quality signal
-(wm_user_rating or wm_critic_score, CAS-919/920) and a `language` for the taste baseline to clear —
-without them the real engine holds a film back exactly as it would in the app, which is the whole
-point of this ticket, but makes an under-specified fixture film look unmatched for the wrong
-reason. `_admit()` below is the one place every test asks the engine for its answer.
+Cascade below carries `watchMarkers` (so app_template.html's agentFloor() has a usable window
+rather than Infinity) and every fixture movie carries enough of a quality signal (wm_user_rating
+or wm_critic_score, CAS-919/920) and a `language` for the taste baseline to clear — without them
+the real engine holds a film back exactly as it would in the app, which is the whole point of
+this ticket, but makes an under-specified fixture film look unmatched for the wrong reason.
+`_admit()` below is the one place every test asks the engine for its answer.
+
+CAS-1128: a 0 marker is no longer a score-gate bypass — normCascade migrates it to TRACK_MIN, a
+real floor (50) an under-scored fixture film can fail same as any other, so an in_cinema/upcoming
+fixture movie also needs a `wm_popularity_percentile` (cascadeScore blends in buzz for those
+statuses) or it reads as if it had no score at all.
 """
 import datetime as _dt
 import json
@@ -267,6 +272,7 @@ class WindowPlacementTests(unittest.TestCase):
     def _movie(self, tmdb_id=8001, title="Placed Film", status=("rental",)):
         return {"tmdb_id": tmdb_id, "title": title, "genres": ["Drama"], "status": list(status),
                 "cinema_date": "2026-01-01", "language": "en", "wm_critic_score": 70, "popularity": 50,
+                "wm_popularity_percentile": 70,
                 "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}],
                 "wm_user_rating": 7.5}
 
@@ -433,7 +439,7 @@ class OneAgentPerFilmTests(unittest.TestCase):
                  "offers": []}]
         today = [{"tmdb_id": 1, "title": "A", "status": ["rental"], "cinema_date": "2026-01-01",
                   "genres": [], "language": "en", "imdb_rating": 7.0, "imdb_votes": 5000,
-                  "rt_critic": 70,
+                  "wm_user_rating": 7.5, "wm_critic_score": 70,
                   "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}]}]
         return compute_transitions(prev, today, RUN_DATE)
 
@@ -506,7 +512,7 @@ class OwnerAttributionTests(unittest.TestCase):
                  "offers": []}]
         today = [{"tmdb_id": 1, "title": "A", "status": ["rental"], "cinema_date": "2026-01-01",
                   "genres": genres if genres is not None else ["Drama"], "language": "en",
-                  "imdb_rating": 7.0, "imdb_votes": 5000, "rt_critic": 70,
+                  "imdb_rating": 7.0, "imdb_votes": 5000, "wm_user_rating": 7.5, "wm_critic_score": 70,
                   "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}]}]
         return compute_transitions(prev, today, RUN_DATE)
 
@@ -634,7 +640,7 @@ class PerAgentChannels(unittest.TestCase):
                  "offers": []}]
         today = [{"tmdb_id": 1, "title": "A", "status": ["rental"], "cinema_date": "2026-01-01",
                   "genres": [], "language": "en", "imdb_rating": 7.0, "imdb_votes": 5000,
-                  "rt_critic": 70,
+                  "wm_user_rating": 7.5, "wm_critic_score": 70,
                   "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}]}]
         ts = compute_transitions(prev, today, RUN_DATE)
         cascades = [{"id": "c1", "user_id": "u1", "name": "Quiet one", "active": True,
@@ -660,7 +666,7 @@ class FilmWatchTests(unittest.TestCase):
                  "cinema_date": "2026-01-01", "offers": []}]
         today = [{"tmdb_id": 1, "title": "A", "status": [status], "cinema_date": "2026-01-01",
                   "genres": [], "language": "en", "imdb_rating": 7.0, "imdb_votes": 5000,
-                  "rt_critic": 70, "popularity": 50,
+                  "wm_user_rating": 7.5, "wm_critic_score": 70, "popularity": 50,
                   "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}]}]
         return compute_transitions(prev, today, RUN_DATE)
 
@@ -747,6 +753,7 @@ class NewlyQualifiedTests(unittest.TestCase):
     def _movie(self, imdb, status=("rental",), tmdb_id=9001, title="Rising Star", **extra):
         m = {"tmdb_id": tmdb_id, "title": title, "genres": ["Drama"], "status": list(status),
              "cinema_date": "2026-01-01", "language": "en", "wm_critic_score": 70,
+             "wm_popularity_percentile": 70,
              "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}],
              "wm_user_rating": imdb}
         m.update(extra)
@@ -930,7 +937,7 @@ class NewToAgentTests(unittest.TestCase):
                  "cinema_date": "2026-07-16", "offers": [], "wm_user_rating": 6.5}]
         today = [{"tmdb_id": 9102, "title": "Double Mover", "genres": ["Drama"], "status": ["in_cinema"],
                   "cinema_date": "2026-07-16", "offers": [], "language": "en", "wm_critic_score": 70,
-                  "popularity": 50, "wm_user_rating": 7.5}]
+                  "popularity": 50, "wm_popularity_percentile": 70, "wm_user_rating": 7.5}]
         transitions = compute_transitions(prev, today, _dt.date(2026, 7, 16))
         cascade = {"id": "c1", "user_id": "u1", "name": "Drama radar", "active": True,
                    "alert_moments": ["hits_cinema"], "criteria": _criteria(genre=["Drama"], imdb=7.0),
