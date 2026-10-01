@@ -1,385 +1,266 @@
 [
   {
-    "tmdb_id": 1368337,
-    "title": "The Odyssey",
+    "tmdb_id": 370172,
+    "title": "No Time to Die",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Amazon Prime Video",
+      "Amazon Prime Video with Ads"
+    ],
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 370172,
+    "title": "No Time to Die",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 206647,
+    "title": "Spectre",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Amazon Prime Video",
+      "Amazon Prime Video with Ads"
+    ],
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 206647,
+    "title": "Spectre",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 332562,
+    "title": "A Star Is Born",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 458723,
+    "title": "Us",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Amazon Prime Video",
+      "Amazon Prime Video with Ads"
+    ],
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 458723,
+    "title": "Us",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 1248832,
+    "title": "Digger",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 1248832,
+    "title": "Digger",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 1168719,
+    "title": "Silent Friend",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 1283515,
+    "title": "Verity",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 1283515,
+    "title": "Verity",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 1422011,
+    "title": "It Ends",
     "kind": "arrived",
     "new_window": "rental",
     "label": "Standard Rental (~$7)",
     "services": [
       "Amazon Video"
     ],
-    "detected": "2026-09-30"
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 1368337,
-    "title": "The Odyssey",
+    "tmdb_id": 1422011,
+    "title": "It Ends",
     "kind": "left",
     "lost_window": "in_cinema",
     "label": "In Cinema",
-    "detected": "2026-09-30"
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 1388805,
-    "title": "LINKIN PARK: UNSHATTER",
+    "tmdb_id": 1244523,
+    "title": "Beware Boi\u00fana",
     "kind": "arrived",
     "new_window": "in_cinema",
     "label": "In Cinema",
     "services": [],
-    "detected": "2026-09-30"
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 1388805,
-    "title": "LINKIN PARK: UNSHATTER",
+    "tmdb_id": 1244523,
+    "title": "Beware Boi\u00fana",
     "kind": "left",
     "lost_window": "upcoming",
     "label": "Upcoming",
-    "detected": "2026-09-30"
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 473311,
-    "title": "Cargo",
+    "tmdb_id": 399360,
+    "title": "Alpha",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Sony Pictures Core Amazon Channel"
+    ],
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 399360,
+    "title": "Alpha",
     "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 741652,
-    "title": "25 Years of Innocence",
+    "tmdb_id": 596161,
+    "title": "Let Him Go",
     "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 490001,
-    "title": "Believer",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 552758,
-    "title": "Fly By Night",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 833916,
-    "title": "Michael Cimino, God Bless America",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 934652,
-    "title": "The Kids in the Hall: Comedy Punks",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 372240,
-    "title": "National Theatre Live: Jane Eyre",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 960570,
-    "title": "The Takeover",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 541386,
-    "title": "Black Hole Apocalypse",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 623760,
-    "title": "Spring Tide",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 654387,
-    "title": "My Name Is Eftihia",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 923700,
-    "title": "The Trip",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 1752743,
-    "title": "Yeah Yeah Yeahs: Hidden in Pieces",
+    "tmdb_id": 1290424,
+    "title": "The Great Arch",
     "kind": "arrived",
     "new_window": "in_cinema",
     "label": "In Cinema",
     "services": [],
-    "detected": "2026-09-30"
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 1752743,
-    "title": "Yeah Yeah Yeahs: Hidden in Pieces",
+    "tmdb_id": 1290424,
+    "title": "The Great Arch",
     "kind": "left",
     "lost_window": "upcoming",
     "label": "Upcoming",
-    "detected": "2026-09-30"
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 851731,
-    "title": "Kumari",
+    "tmdb_id": 1472668,
+    "title": "Wick Is Pain",
     "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 1293849,
-    "title": "3BHK",
+    "tmdb_id": 541724,
+    "title": "Nostalgia",
     "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 878057,
-    "title": "Die Heimsuchung",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 1422634,
-    "title": "Flight 149: Hostage of War",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 1715598,
-    "title": "Pulp: What Do You Do for an Encore?",
+    "tmdb_id": 392982,
+    "title": "Marshall",
     "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-09-30"
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Sony Pictures Core Amazon Channel"
+    ],
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 1715598,
-    "title": "Pulp: What Do You Do for an Encore?",
+    "tmdb_id": 392982,
+    "title": "Marshall",
     "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 674813,
-    "title": "Beyond the Dream",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 1170841,
-    "title": "Seeking Haven for Mr. Rambo",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 814972,
-    "title": "Perfect Strangers",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 985416,
-    "title": "Spilt Gravy on Rice",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 1624803,
-    "title": "Doctor Who: Eve of the Daleks",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 374232,
-    "title": "2 Countries",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 74609,
-    "title": "Tom Sawyer",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 138248,
-    "title": "The Lightning Tree",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 1017781,
-    "title": "Wolf: Wanderer Without Borders",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 649815,
-    "title": "Sidik and the Panther",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 865561,
-    "title": "Necista krv Greh predaka",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 1173720,
-    "title": "Hobal",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 989601,
-    "title": "Watergate: High Crimes in the White House",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 573588,
-    "title": "Kaye Ballard - The Show Goes On!",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 873598,
-    "title": "Rise & Fall: The World Trade Center",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 802735,
-    "title": "Raja Raja Chora",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 1107675,
-    "title": "Devil in Agbada",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 437253,
-    "title": "Perfect Strangers",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 1537742,
-    "title": "Common Wealth",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 1428470,
-    "title": "Mukkam Post Devach Ghar",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 1406350,
-    "title": "Tina Turner: Simply the Best",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
-  },
-  {
-    "tmdb_id": 1004556,
-    "title": "Elsewhere Starts Here and It's All Happening",
+    "tmdb_id": 364220,
+    "title": "The Keeping Hours",
     "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-09-30"
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Amazon Prime Video",
+      "Amazon Prime Video with Ads"
+    ],
+    "detected": "2026-10-01"
   },
   {
-    "tmdb_id": 1004556,
-    "title": "Elsewhere Starts Here and It's All Happening",
+    "tmdb_id": 364220,
+    "title": "The Keeping Hours",
     "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-09-30"
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 1715914,
+    "title": "Wham! 10 Days in China",
+    "kind": "arrived",
+    "new_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "services": [
+      "Amazon Video"
+    ],
+    "detected": "2026-10-01"
+  },
+  {
+    "tmdb_id": 1715914,
+    "title": "Wham! 10 Days in China",
+    "kind": "left",
+    "lost_window": "pvod",
+    "label": "Premium Buy/Rent (~$30)",
+    "detected": "2026-10-01"
   }
 ]

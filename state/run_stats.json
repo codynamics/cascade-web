@@ -1,7 +1,7 @@
 {
-  "date": "2026-09-30",
+  "date": "2026-10-01",
   "tmdb": {
-    "calls": 5902,
+    "calls": 5906,
     "errors": 0,
     "not_found": 0,
     "status_counts": {}
@@ -9,7 +9,9 @@
   "watchmode": {
     "remaining_monthly_credits": 40000,
     "calls": 116,
-    "errors": 0
+    "errors": 0,
+    "mismatch": 0,
+    "mismatch_ids": []
   },
   "oscarbase": {
     "calls": 750,
