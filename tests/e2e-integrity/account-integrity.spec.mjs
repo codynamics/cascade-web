@@ -417,3 +417,26 @@ test("S13: a client may delete at most one account row per statement; cascades c
   const afterAccountFilms = await admin.from("user_films").select("movie_id").eq("user_id", user.id);
   expect(afterAccountFilms.data.length).toBe(0);
 });
+
+// CAS-1137: usage_events_insert's with check rejected every row where data is null (pg_column_size(null)
+// is null, and a with check that evaluates to null — not true — fails the row), which is how a signed-in
+// user's whole usage_events flush came back 42501 (queueUsageEvent's many call sites with no data argument
+// — splash_shown, flow_start, etc. — always send data: null). Drives a real signed-in supabase-js client
+// directly, the same way S13 asserts on a policy/trigger rather than app behaviour.
+test("S14: a signed-in client's usage_events insert succeeds with queueUsageEvent's exact row shape (data: null included); the same client cannot attribute a row to another user", async () => {
+  const email = testEmail("s14");
+  const user = await createTestUser(email);
+  const userClient = await signInDirect(email);
+
+  // AC1: the exact row shape queueUsageEvent sends, including the common data: null case.
+  const ownRow = { user_id: user.id, client_key: "s14-client", session: "s14-session", type: "splash_shown", data: null };
+  const ownInsert = await userClient.from("usage_events").insert(ownRow);
+  expect(ownInsert.error, "a signed-in user's own usage_events insert must succeed").toBeFalsy();
+
+  // AC2: the same client may not attribute a row to someone else's user id.
+  const otherUser = await createTestUser(testEmail("s14-other"));
+  const otherRow = { user_id: otherUser.id, client_key: "s14-client", session: "s14-session", type: "splash_shown", data: null };
+  const otherInsert = await userClient.from("usage_events").insert(otherRow);
+  expect(otherInsert.error, "a signed-in user must not be able to attribute a usage_events row to another user")
+    .toBeTruthy();
+});

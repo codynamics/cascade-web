@@ -596,13 +596,22 @@ create index if not exists usage_events_client_created_idx on public.usage_event
 
 alter table public.usage_events enable row level security;
 
+-- CAS-1137: the original with check below rejected every row with data is null — pg_column_size(null)
+-- is null, and a with check that evaluates to null (rather than true) fails the row, not just a row that
+-- is actually oversized. logEvent() call sites with no data argument (splash_shown, flow_start, etc.) hit
+-- this on every signed-in boot once their batch flushed, which is also why the whole flush (one multi-row
+-- insert) came back 42501: one bad row in a batch fails the entire statement. Guarded with `data is null
+-- or ...`, the same way `coalesce(session,'')` already guards the null session case just above it. Also
+-- adds the owner check the original policy never had: `user_id` is nullable (an anon/pre-login event), so
+-- the only enforceable rule is that a row may not be attributed to someone else's auth.uid().
 drop policy if exists usage_events_insert on public.usage_events;
 create policy usage_events_insert on public.usage_events
   for insert to anon, authenticated with check (
     length(type) <= 64
     and length(client_key) <= 200
     and length(coalesce(session,'')) <= 200
-    and pg_column_size(data) <= 4096
+    and (data is null or pg_column_size(data) <= 4096)
+    and (user_id is null or user_id = auth.uid())
   );
 
 -- security definer: counts every client_key's own rows to enforce the rate limit, the same
