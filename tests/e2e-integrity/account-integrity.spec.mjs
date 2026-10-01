@@ -209,8 +209,12 @@ test("S7: mark a film watched on A -> B shows it after reload; clear it on A lea
     await pageB.reload();
     await pageB.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
     await settleListing(pageB);
+    // CAS-1132: expect.poll's callback is re-invoked with no arguments — a callback declared to take one
+    // (the earlier `(id) => ...` here) always ran with id===undefined, so this always read opinionOf(undefined)
+    // (""), never the real filmId, however long it polled. Captured via closure instead, like every other
+    // poll in this file already does.
     await expect.poll(
-      (id) => pageB.evaluate((mid) => opinionOf(mid), id),
+      () => pageB.evaluate((mid) => opinionOf(mid), filmId),
       { timeout: 15_000 },
     ).toBe("liked");
 
@@ -258,18 +262,26 @@ test("S8: sign out then sign back in leaves every verdict, Watch On and pin inta
     pick: notify[c] && notify[c].source,
     pin: (notify[d] && notify[d].pinnedTo) || [],
   });
-  const before = await page.evaluate(readState, [verdictId, watchId, pickId, pinId]);
-  expect(before.verdict).toBe("wow");
-  expect(before.watch).toEqual(["rent", "stream"]);
-  expect(before.pick).toBe("manual");
-  expect(before.pin).toEqual(["s8-fake-agent"]);
+  // CAS-1132: settleListing() only waits on the cascades listing (#groups .group) — it says nothing about
+  // user_films/film_picks, which load in the same fireAccountFanout() Promise.allSettled but (unlike
+  // film_watch/user_prefs/notify_prefs's filmWatchReady/userPrefsReady/notifyPrefsReady — see app_template.html)
+  // have no readiness flag of their own for a test to wait on instead. A one-shot read right after
+  // settleListing() can win that race and read empty state despite the data already being seeded; poll
+  // instead, the same way every other post-sign-in/post-reload read of this suite already does (S4, S7, S9).
+  const before = { verdict: "wow", watch: ["rent", "stream"], pick: "manual", pin: ["s8-fake-agent"] };
+  await expect.poll(
+    () => page.evaluate(readState, [verdictId, watchId, pickId, pinId]),
+    { timeout: 15_000 },
+  ).toEqual(before);
 
   await signOutFromAccount(page);
   await signInFromSplash(page, email);
   await settleListing(page);
 
-  const after = await page.evaluate(readState, [verdictId, watchId, pickId, pinId]);
-  expect(after).toEqual(before);
+  await expect.poll(
+    () => page.evaluate(readState, [verdictId, watchId, pickId, pinId]),
+    { timeout: 15_000 },
+  ).toEqual(before);
 
   const liveFilms = await admin.from("user_films").select("movie_id,status").eq("user_id", user.id);
   expect(liveFilms.data).toEqual([{ movie_id: verdictId, status: "wow" }]);
