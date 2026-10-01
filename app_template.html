@@ -335,6 +335,9 @@
     font-size:14px;font-weight:600;padding:12px 14px;cursor:pointer}
   .navitem:last-child{border-bottom:0}
   .navitem:hover,.navitem:focus-visible{background:var(--panel2)}
+  /* CAS-1126: group divider — a second, thicker rule reusing the same border colour as .navitem's own
+     per-item border, above the first item of a new group. No heading text, per the ticket. */
+  .navitem.navsep{border-top:1px solid var(--line)}
   /* CAS-886: Invites' own unread count, next to its label in the dropdown. CAS-968 gave the hamburger
      icon's own bare dot a matching count badge instead (.navcountbadge, below) — a dot read as decoration,
      not news, once a real reply landed — and put a soft violet glow on both so they visibly agree
@@ -3518,7 +3521,11 @@
              CAS-551 shipped first and seated a single "Agent Preferences" row (renamed from Preferences)
              right under Manage Agents; CAS-562 lands second and splits that one row into Languages + Where
              & when you'll watch in the same slot — see the CAS-562 fix comment for how the two reconcile.
-             Account drops to second-last since it's reached for rarely. -->
+             Account drops to second-last since it's reached for rarely.
+             CAS-1126: regrouped into three divider-separated groups — day-to-day (Invites/Friends/Recommend
+             Cascade/Service analysis), Settings, and sign-in/info (Help/About/Account). Languages, Where &
+             when you'll watch, My services and Occasions leave the menu for the new Settings screen; their
+             navMenuGo keys stay wired for deep links and other callers. -->
         <div class="navmenu-wrap">
           <div class="iconbtn" id="navMenuBtn" title="Menu" role="button" tabindex="0" aria-haspopup="true"
                aria-expanded="false" aria-controls="navMenu" aria-label="Menu" onclick="toggleNavMenu(event)">☰
@@ -3531,15 +3538,12 @@
               <span class="navitem-badge" id="invitesNavBadge" style="display:none">0</span></button>
             <!-- CAS-928: Friends sits directly below Invites, the slot the design image gives it. -->
             <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('friends')">Friends</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('languages')">Languages</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('whereWhen')">Where &amp; when you'll watch</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('services')">My services</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('svcAnalysis')">Service analysis</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('occasions')">Occasions</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('account')">Account</button>
             <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('recommend')">Recommend Cascade</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('help')">Help</button>
+            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('svcAnalysis')">Service analysis</button>
+            <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('settings')">Settings</button>
+            <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('help')">Help</button>
             <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('about')">About</button>
+            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('account')">Account</button>
           </div>
         </div>
       </div>
@@ -4083,6 +4087,14 @@
   <div class="uwrap" id="accountBody"></div>
 </div>
 
+<!-- SETTINGS (CAS-1126) — the middle menu group: the screens that shape how Cascade behaves (Where & when
+     you'll watch, How you're told, My services, Languages, Occasions), split out of the old flat menu and
+     out of Account. Body rendered by renderSettings(). Each row opens the existing screen it always did;
+     closing that screen now returns here instead of just closing (see screenResume). -->
+<div class="uscreen" id="settingsScreen" role="dialog" aria-modal="true" aria-label="Settings">
+  <div class="uwrap" id="settingsBody"></div>
+</div>
+
 <!-- INVITES (CAS-886) — the sender's own list of who they've invited to watch something, and who's
      replied. Body rendered by renderInvitesScreen(). Reached from the top menu, its own top entry. -->
 <div class="uscreen" id="invitesScreen" role="dialog" aria-modal="true" aria-label="Invites">
@@ -4105,7 +4117,7 @@
 <!-- LANGUAGES (CAS-532, split into its own destination CAS-562) — the one language setting that applies
      to every agent, no per-agent override. Was the top half of a single "Preferences" page; CAS-562 split
      that page in two because "what films count" and "which windows I track" are unrelated questions. Body
-     rendered by renderLanguages(). Reached from the top menu. -->
+     rendered by renderLanguages(). Reached from the top menu's Settings screen (CAS-1126). -->
 <div class="uscreen" id="languagesScreen" role="dialog" aria-modal="true" aria-label="Languages">
   <div class="uwrap" id="languagesBody"></div>
 </div>
@@ -4113,7 +4125,7 @@
 <!-- WHERE & WHEN (CAS-532, split into its own destination CAS-562) — the other half of the old single
      Preferences page. Retires the old Taste Baseline concept (Genre/How far back/Age rating dropped
      entirely; new agents use fixed system defaults). Body rendered by renderWhereWhen(). Reached from the
-     top menu. -->
+     top menu's Settings screen (CAS-1126). -->
 <div class="uscreen" id="wwScreen" role="dialog" aria-modal="true" aria-label="Where &amp; when you'll watch">
   <div class="uwrap" id="wwBody"></div>
 </div>
@@ -4121,7 +4133,7 @@
 <!-- OCCASIONS (CAS-775) — manage the user's Occasions register: create, rename, delete. Replaces CAS-768's
      derived-from-agents set, which could not hold an occasion no agent yet carried, be renamed, or be
      deleted. Body rendered by
-     renderManageOccasionsScreen(). Reached from the top menu. -->
+     renderManageOccasionsScreen(). Reached from the top menu's Settings screen (CAS-1126). -->
 <div class="uscreen" id="manageOccasionsScreen" role="dialog" aria-modal="true" aria-label="Occasions">
   <div class="uwrap" id="manageOccasionsBody"></div>
 </div>
@@ -6002,7 +6014,7 @@ function openModal(el){ el.classList.add("open"); lockBodyScroll(true); }
 function closeModal(el){
   el.classList.remove("open");
   if(!document.querySelector(".modal.open")) lockBodyScroll(false);
-  if(typeof accountResume==="function") accountResume();   // CAS-206: Account steps aside for a modal, then resumes
+  if(typeof fireScreenResume==="function") fireScreenResume();   // CAS-206/CAS-1126: Account or Settings steps aside for a modal, then resumes
 }
 // CAS-150: the Filters button is gone from the header — the selection engine is the Cascade itself, and a
 // second one sitting above it was the clutter this ticket is about. The panel's controls stay in the DOM
@@ -11726,6 +11738,7 @@ window.openLanguages=()=>{
 window.closeLanguages=()=>{
   $("languagesScreen").classList.remove("open"); lockBodyScroll(false);
   syncWatchChip();
+  fireScreenResume();   // CAS-1126: back to Settings if that's where this was opened from
 };
 
 // ================= WHERE & WHEN (CAS-532, split into its own screen CAS-562) =================
@@ -11752,6 +11765,7 @@ window.closeWhereWhen=()=>{
   prefsWatchMode=false;
   $("wwScreen").classList.remove("open"); lockBodyScroll(false);
   syncWatchChip();
+  fireScreenResume();   // CAS-1126: back to Settings if that's where this was opened from
 };
 
 // ================= Top menu (CAS-345) =================
@@ -11858,7 +11872,8 @@ function helpIndexBody(){
     <div class="usec">Articles</div>
     <div class="ucard" id="helpList">${helpListHTML()}</div>
     <div class="usec">Still stuck?</div>
-    <div class="ucard">${acctRow("✉️","Send feedback", null, "openFeedback('help')")}</div>`;
+    <div class="ucard">${acctRow("✉️","Send feedback", null, "openFeedback('help')")}
+      ${acctRow("🔁","Replay the tour", null, "replayTutorial()")}</div>`;
 }
 function helpArticleBody(a){
   const paras=a.body.split("\n\n").map(p=>`<p class="ossub" style="margin-bottom:12px">${esc(p)}</p>`).join("");
@@ -11920,6 +11935,7 @@ window.navMenuGo=key=>{
   else if(key==="invites") openInvitesScreen();
   else if(key==="friends") openFriendsScreen();
   else if(key==="account") openAccount();
+  else if(key==="settings") openSettings();
   else if(key==="services") openMenuServices();
   else if(key==="svcAnalysis") openSvcAnalysis();
   else if(key==="languages") openLanguages();
@@ -13434,7 +13450,7 @@ function drawNotifyBy(){
     // Nothing to tailor, and nothing pretending otherwise. The way out is the screen that actually owns it.
     box.innerHTML=`<div class="wwnone"><p>You have no notification channels switched on, so this agent has
       nothing to send through — it will still keep its list up to date.</p>
-      <button type="button" class="oslink" onclick="openAccountStep('notifysettings')">Turn one on in Account →</button></div>`;
+      <button type="button" class="oslink" onclick="openSettingsStep('notifysettings')">Turn one on in Settings →</button></div>`;
     return;
   }
   box.innerHTML = avail.map(ch=>{
@@ -16774,6 +16790,7 @@ window.openManageOccasionsScreen=()=>{
 window.closeManageOccasionsScreen=()=>{
   $("manageOccasionsScreen").classList.remove("open"); lockBodyScroll(false);
   syncWatchChip();
+  fireScreenResume();   // CAS-1126: back to Settings if that's where this was opened from
 };
 window.startRenameOccasion=(id)=>{
   const row=document.querySelector(`.occrow[data-oid="${id}"]`); if(!row) return;   // ids are our own uuids — safe unescaped in an attribute selector
@@ -16935,22 +16952,15 @@ function accountWho(){
   if(a && a.status==="signed-in" && a.user) return {in:true, email:a.user.email||"your account"};
   return {in:false, email:null};
 }
+// CAS-1126: Account holds only sign-in and membership now — defaults (notifications) moved to the new
+// Settings screen, and Help/Feedback/Replay the tour consolidated onto the Help screen.
 function renderAccount(){
   const who=accountWho();
-  const notif=[notifyPrefs.inApp?"In-app":null, notifyPrefs.emailOn?"Email":null].filter(Boolean).join(" · ")
-            || "Nothing switched on";
   $("accountBody").innerHTML=`
     <div class="ostop menutop"><button class="osback" type="button" onclick="closeAccount()" aria-label="Back">←</button>
       <h2 class="osh">Account</h2></div>
-    <p class="ossub">How you're told, and your membership.</p>
+    <p class="ossub">Your sign-in and membership.</p>
 
-    <div class="usec">Default notifications</div>
-    <div class="ucard">
-      ${acctRow("🔔","How you're told", esc(notif) + (notifyPrefs.emailOn && notifyPrefs.email
-                ? ` · ${esc(notifyPrefs.email)}` : ""), "openAccountStep('notifysettings')")}
-    </div>
-
-    <div class="usec">Membership</div>
     <div class="ucard">
       ${who.in ? acctRow("👤","Signed in", esc(who.email), "openAccountAuth()")
                : acctRow("👤","Not signed in", "Sign in to sync across devices", "openAccountAuth()")}
@@ -16960,15 +16970,41 @@ function renderAccount(){
           : acctLink("⚙️","Manage or cancel", "A subscription bought in the app is cancelled in the App Store.", MANAGE_SUB_URL)) : ""}
       ${who.in ? acctRow("🗑️","Delete account", "This can't be undone.", "openDeleteAccount()") : acctSoon("🗑️","Delete account")}
     </div>
-    ${MEMBERSHIP_ENABLED ? `<p class="unone" style="margin:10px 2px 0">Prototype — no card is held and nothing is ever charged.</p>` : ""}
+    ${MEMBERSHIP_ENABLED ? `<p class="unone" style="margin:10px 2px 0">Prototype — no card is held and nothing is ever charged.</p>` : ""}`;
+}
+// CAS-1126: the Settings screen — the three defaults screens (Where & when, My services, Languages) plus
+// Occasions and the notification defaults, gathered in the menu's new middle group. Each row opens the
+// exact screen the old flat menu did; openSettingsStep/settingsOpen* set screenResume="settings" first so
+// closing that screen snaps back here instead of just closing.
+function renderSettings(){
+  const notif=[notifyPrefs.inApp?"In-app":null, notifyPrefs.emailOn?"Email":null].filter(Boolean).join(" · ")
+            || "Nothing switched on";
+  $("settingsBody").innerHTML=`
+    <div class="ostop menutop"><button class="osback" type="button" onclick="closeSettings()" aria-label="Back">←</button>
+      <h2 class="osh">Settings</h2></div>
+    <p class="ossub">How Cascade works for you.</p>
 
-    <div class="usec">Help &amp; feedback</div>
     <div class="ucard">
-      ${acctRow("📖","Help", null, "openHelp()")}
-      ${acctRow("✉️","Feedback form", null, "openFeedback('account')")}
-      ${acctRow("🔁","Replay the tour", null, "replayTutorial()")}
+      ${acctRow("🕒","Where & when you'll watch", null, "settingsOpenWhereWhen()")}
+      ${acctRow("🔔","How you're told", esc(notif) + (notifyPrefs.emailOn && notifyPrefs.email
+                ? ` · ${esc(notifyPrefs.email)}` : ""), "openSettingsStep('notifysettings')")}
+      ${acctRow("📺","My services", null, "settingsOpenServices()")}
+      ${acctRow("🌐","Languages", null, "settingsOpenLanguages()")}
+      ${acctRow("🎉","Occasions", null, "settingsOpenOccasions()")}
     </div>`;
 }
+window.openSettings=()=>{
+  renderSettings();
+  $("settingsScreen").scrollTop=0;
+  $("settingsScreen").classList.add("open"); lockBodyScroll(true);
+  syncWatchChip();
+  logEvent("settings_opened",{});
+};
+window.closeSettings=()=>{ $("settingsScreen").classList.remove("open"); lockBodyScroll(false); syncWatchChip(); };
+window.settingsOpenWhereWhen=()=>{ screenResume="settings"; closeSettings(); openWhereWhen(); };
+window.settingsOpenServices=()=>{ screenResume="settings"; closeSettings(); openMenuServices(); };
+window.settingsOpenLanguages=()=>{ screenResume="settings"; closeSettings(); openLanguages(); };
+window.settingsOpenOccasions=()=>{ screenResume="settings"; closeSettings(); openManageOccasionsScreen(); };
 window.openAccount=()=>{
   renderAccount();
   $("accountScreen").scrollTop=0;
@@ -17039,14 +17075,21 @@ window.confirmDeleteAccount=async()=>{
   toast("Your account has been deleted.");
 };
 // A defaults row opens the very screen the flow uses for that setting, rather than a second copy of it.
-// The step frame sits above this one, so Account steps aside and comes back when the step closes.
-let acctResume=false;
-window.openAccountStep=key=>{
-  acctResume=true; closeAccount();
+// The step frame sits above this one, so Account or Settings steps aside and comes back when the step
+// closes. CAS-1126 generalised this from Account-only (acctResume) to either screen (screenResume), since
+// "How you're told" moved from Account to Settings.
+let screenResume=null;   // null | "account" | "settings"
+window.openSettingsStep=key=>{
+  screenResume="settings"; closeSettings();
   openOnbStep(key);
 };
-window.openAccountAuth=()=>{ acctResume=true; closeAccount(); openModal($("authModal")); };
-function accountResume(){ if(!acctResume) return; acctResume=false; openAccount(); }
+window.openAccountAuth=()=>{ screenResume="account"; closeAccount(); openModal($("authModal")); };
+function fireScreenResume(){
+  if(!screenResume) return;
+  const target=screenResume; screenResume=null;
+  if(target==="account") openAccount();
+  else if(target==="settings") openSettings();
+}
 // ---- CAS-253: an email alert needs somewhere to send it ----------------------------------------------
 // Switching "Send me alerts by email" on and walking past the empty field left an agent whose email bell was
 // armed and undeliverable — the monitor's delivery_plan calls that state "wait" and quietly retries it
@@ -17382,7 +17425,7 @@ function openOnbStep(key, agentKey){
   renderOnbStep(key);   // CAS-955: fires onbstep_shown itself, now that entry is tracked centrally
   return true;
 }
-window.closeOnbStep=()=>{ flowStop(); if(typeof accountResume==="function") accountResume(); };
+window.closeOnbStep=()=>{ flowStop(); if(typeof fireScreenResume==="function") fireScreenResume(); };
 // The end of the flow. CAS-629: the roster was already committed on entering "working" (Change E1) — the
 // single-draft commit this used to do (onbApply/commitDraft, keyed off wiz.starter) is no longer reached
 // by the first run at all; that path only still exists for the "+ New Cascade" wizard/lane, which never
@@ -17841,16 +17884,17 @@ function endTutorial(markSeen){
   if(markSeen) markTutorialSeen();
   tutCards=[]; tutIdx=-1;
 }
-// Replay (from Account's Help & feedback row): Account is a .uscreen sitting over whatever was already
-// there, but that "whatever" isn't always the Watch listing — Account can be reached from Menu while
-// Moving or Agents is open underneath it, and closing Account alone would just uncover that screen instead
-// (CAS-1079: two of the tour's cards anchor to #groups .card controls that are covered, not gone, so they
-// resolved to real-but-invisible rects instead of being skipped). showAgentsHome() is the same "uncover the
-// Watch listing" call applyDeepLink() already uses for the same reason — closes Moving/Agents if either is
-// open, then Account's own close reveals the listing underneath both.
+// Replay (from the Help screen's "Still stuck?" row — CAS-1126 moved it here from Account's old Help &
+// feedback card, the only place it now lives). Help is a .uscreen sitting over whatever was already there,
+// but that "whatever" isn't always the Watch listing — Help can be reached from Menu while Moving or Agents
+// is open underneath it, and closing Help alone would just uncover that screen instead (CAS-1079: two of
+// the tour's cards anchor to #groups .card controls that are covered, not gone, so they resolved to
+// real-but-invisible rects instead of being skipped). showAgentsHome() is the same "uncover the Watch
+// listing" call applyDeepLink() already uses for the same reason — closes Moving/Agents if either is open,
+// then Help's own close reveals the listing underneath both.
 // Bypasses tutorialSeen() on purpose, same as any other explicit "show me that again" control.
 function replayTutorial(){
-  closeAccount();
+  closeHelp();
   showAgentsHome();
   requestAnimationFrame(()=>requestAnimationFrame(startTutorial));
 }
@@ -18773,12 +18817,12 @@ function openSharedFromURL(){
 //   has none      -> into the flow. An empty account with a splash telling them to log in again would
 //                    be a dead end, and "you have nothing yet" is honestly a first run.
 // Called by the persistence block once loadAccount() has replaced the on-screen list.
-// CAS-388: the auth modal is often opened from the Account screen (openAccountAuth sets acctResume so
+// CAS-388: the auth modal is often opened from the Account screen (openAccountAuth sets screenResume so
 // closing ANY other modal returns you there) — but a successful sign-in is not "cancel, go back", it's
-// arrival. Clear the flag first so closeModal's generic resume doesn't reopen Account on top of the
-// listing this function is about to show.
+// arrival. Clear the flag first so closeModal's generic resume doesn't reopen Account (or Settings) on
+// top of the listing this function is about to show.
 function afterSignIn(){
-  acctResume=false;
+  screenResume=null;
   const splashUp=$("splash").classList.contains("open");
   closeModal($("authModal"));
   try{ localStorage.setItem("cascade_onboarded","1"); }catch(e){}

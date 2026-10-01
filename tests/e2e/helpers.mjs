@@ -238,6 +238,36 @@ export async function bootAlreadySignedIn(page, { supabaseScript, resolveFnName,
   if(readyFlagExpr) await page.waitForFunction(readyFlagExpr, null, { timeout: 5000 });
 }
 
+/** CAS-1126: "Where & when you'll watch" left the top menu for the new Settings screen — reach it via
+ * Menu -> Settings -> the row, matching how a person actually gets there now. */
+export async function openWhereWhenScreen(page){
+  await page.locator("#navMenuBtn").click();
+  await page.locator("#navMenu .navitem", { hasText: "Settings" }).click();
+  await page.locator("#settingsScreen .urow", { hasText: "Where & when you'll watch" }).click();
+}
+/** Back out of Where & when — which (CAS-1126) now resumes Settings rather than just closing, since
+ * that's where this test opened it from — then back out of Settings too, landing on the listing
+ * underneath both, the same two taps a person would make. */
+export async function closeWhereWhenScreen(page){
+  await page.locator("#wwScreen .osback").click();
+  await expect(page.locator("#wwScreen")).not.toHaveClass(/open/);
+  await page.locator("#settingsScreen .osback").click();
+  await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
+}
+/** CAS-1126: "My services" left the top menu for the new Settings screen too. */
+export async function openMyServicesScreen(page){
+  await page.locator("#navMenuBtn").click();
+  await page.locator("#navMenu .navitem", { hasText: "Settings" }).click();
+  await page.locator("#settingsScreen .urow", { hasText: "My services" }).click();
+}
+/** Back out of My services (its onbStep frame) then out of the Settings screen it resumes to (CAS-1126). */
+export async function closeMyServicesScreen(page){
+  await page.locator("#onbStep .osback").click();
+  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+  await page.locator("#settingsScreen .osback").click();
+  await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
+}
+
 /** The listing's section headers, as {window, count}. */
 export function sectionCounts(page){
   return page.locator("#groups .group").evaluateAll(gs => gs.map(g => ({

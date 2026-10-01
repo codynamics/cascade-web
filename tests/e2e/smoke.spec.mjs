@@ -10,6 +10,7 @@
 import { test, expect } from "@playwright/test";
 import {
   freshApp, gotoFresh, toShortlist, shortlistCards, finishFlow, toListing, settleListing, ctaLocator, sectionCounts,
+  openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen,
 } from "./helpers.mjs";
 
 // Mirrors cas565.spec.mjs's addSecondAgent — a second agent made from "+ Add" stops at the Briefing hub
@@ -313,14 +314,12 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
 
   await expect(page.locator(".wtabbtn", { hasText: "Premium" })).toHaveCount(0);
 
-  await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "Where & when you'll watch" }).click();
+  await openWhereWhenScreen(page);
   await expect(page.locator(".osh", { hasText: "Where & when you'll watch" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
   await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).toHaveClass(/on/);
-  await page.locator("#wwScreen .osback").click();
-  await expect(page.locator("#wwScreen")).not.toHaveClass(/open/);
+  await closeWhereWhenScreen(page);
 
   const premiumTab = page.locator(".wtabbtn", { hasText: "Premium" });
   await expect(premiumTab).toBeVisible();
@@ -368,11 +367,10 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   await page.locator(".wtabbtn", { hasText: "Streaming" }).click();
   await expect(page.locator(`#${cardId}`)).toHaveCount(0);
 
-  await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "Where & when you'll watch" }).click();
+  await openWhereWhenScreen(page);
   await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).not.toHaveClass(/on/);
-  await page.locator("#wwScreen .osback").click();
+  await closeWhereWhenScreen(page);
   await expect(page.locator(".wtabbtn", { hasText: "Premium" })).toHaveCount(0);
 });
 
@@ -385,14 +383,12 @@ test("an agent created with every window enabled lists films at rental or stream
   await finishFlow(page);
   await toListing(page);
 
-  await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "Where & when you'll watch" }).click();
+  await openWhereWhenScreen(page);
   await expect(page.locator(".osh", { hasText: "Where & when you'll watch" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
   await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).toHaveClass(/on/);
-  await page.locator("#wwScreen .osback").click();
-  await expect(page.locator("#wwScreen")).not.toHaveClass(/open/);
+  await closeWhereWhenScreen(page);
 
   // CAS-897: this used to read the rendered Watch listing (settleListing + sectionCounts), but that listing
   // is gated by CAS-713/823's per-tab Watch On tracking (filmMatchesWatchTab requires a film's own notify
@@ -467,13 +463,11 @@ test("Mission screen: one score track, exactly one handle; Premium becomes a fol
   await page.locator("#onbStep .osback").click();
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
 
-  await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "Where & when you'll watch" }).click();
+  await openWhereWhenScreen(page);
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
   await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).toHaveClass(/on/);
-  await page.locator("#wwScreen .osback").click();
-  await expect(page.locator("#wwScreen")).not.toHaveClass(/open/);
+  await closeWhereWhenScreen(page);
 
   await openFirstAgentMission(page);
   // CAS-1113: Premium now ranks after Cinema (this agent's start window), so switching it on makes it a
@@ -632,8 +626,7 @@ test("'Only show films on my services' changes what a new agent finds", async ({
   await addSecondAgent(page);
   const agentId = await page.evaluate(ids => cascades.map(c => c.id).find(id => !ids.includes(id)), idsSeed);
 
-  await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "My services" }).click();
+  await openMyServicesScreen(page);
   await expect(page.locator(".osh", { hasText: "My services" })).toBeVisible();
 
   if(await page.evaluate(() => prefs.on)) await page.locator("#onbSvcOnly").click();
@@ -644,8 +637,7 @@ test("'Only show films on my services' changes what a new agent finds", async ({
 
   await page.locator("#onbSvcOnly").click();
   await expect(page.locator("#onbSvcOnly")).toHaveClass(/\bon\b/);
-  await page.locator("#onbStep .osback").click();   // CAS-934: no Done button any more — back to the listing
-  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+  await closeMyServicesScreen(page);   // CAS-934: no Done button any more — back to the listing
 
   const after = await listedCountFor(agentId);
   expect(after, `before=${before} after=${after}`).toBeLessThan(before);
