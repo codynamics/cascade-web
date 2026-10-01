@@ -315,6 +315,11 @@ test("a cold load with onboarding seen shows the header, not Moving", async ({ p
 // a fixed three — this walks that path directly (enable Premium, place a film there, disable it again)
 // rather than asserting the derivation's internals.
 test("the Watch screen's tab strip follows the enabled watch windows", async ({ page }) => {
+  // Lee's decision, 2026-10-02: quarantine this spec's signed-in run only — the Premium listing renders
+  // empty signed in ([ios]/WebKit, CAS-1133's open diagnostic), but the same spec passes signed out.
+  // CASCADE_E2E_SUPABASE_URL is the flag scripts/test-e2e.mjs's signed-in step already sets (see
+  // helpers.mjs's signedInEnv), so this stays a no-op the moment a signed-out run exercises this spec again.
+  test.fixme(!!process.env.CASCADE_E2E_SUPABASE_URL, "CAS-1133: Premium listing empty when signed in — quarantined by Lee's decision 2026-10-02");
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
