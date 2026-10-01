@@ -1,7 +1,7 @@
 """Nightly health assertions (CAS-974, CAS-985).
 
 Every silent failure Cascade has actually had passed CI: a green `daily.yml` run is not
-evidence the night's work actually happened. This module asserts fourteen concrete things about
+evidence the night's work actually happened. This module asserts eighteen concrete things about
 the run that just finished and writes the answer to ``state/health.json`` as
 ``{checked_at, checks: [{name, ok, value, threshold, detail}], ok}`` — exiting non-zero on any
 real failure so `alert.yml` (CAS-973) fires.
@@ -93,6 +93,23 @@ USAGE_WINDOW_MIN_APP_OPEN = 50
 CLIENT_ERROR_RATE_MAX_PCT = 0.05
 CLIENT_ERROR_RATE_MAX_ABS = 20
 EMPTY_ACCOUNT_RATE_MAX_PCT = 0.10
+
+# CAS-1135: a short, fixed list of films certain to be in Australian distribution and highly
+# rated — never an attempt to cover the whole catalogue, just a tripwire for the CAS-1134 class of
+# defect (a published film silently carrying a TV show's ratings, or hidden behind its empty ones).
+LANDMARK_FILMS = {
+    286217: "The Martian",
+    105: "Back to the Future",
+    578: "Jaws",
+    240: "The Godfather Part II",
+    324857: "Spider-Man: Into the Spider-Verse",
+    330457: "Frozen II",
+    271110: "Captain America: Civil War",
+}
+
+# CAS-1135: written once a run by poc_pipeline._save_watchmode_tv_tmdb_ids — this process has no
+# id map of its own and must never download one just to run watchmode_remap_backlog.
+WM_TV_TMDB_IDS_FILE = os.path.join(_REPO_ROOT, "state", "wm_tv_tmdb_ids.json")
 
 
 # ---------------------------------------------------------------------------
@@ -583,12 +600,111 @@ def check_activity_floor(window: dict | None) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# watchmode_identity / watchmode_remap_backlog / released_scored_without_rating / landmark_films
+# — CAS-1135: none of CAS-974's original fourteen checks measure identity (only volume/coverage),
+# so CAS-1134's movie/TV id-map collision tripped none of them. See each check's own docstring.
+# ---------------------------------------------------------------------------
+def check_watchmode_identity(stats: dict | None) -> dict:
+    """CAS-1134's details-response identity guard (poc_pipeline.enrich_watchmode_fields) returns
+    'mismatch' — writing nothing — whenever a Watchmode id it was about to trust turns out to
+    identify a different tmdb_id or a non-movie type. Zero is the only acceptable count; this is
+    exactly the check that would have caught CAS-1134's own defect before Lee found it by hand."""
+    if not stats:
+        return _check("watchmode_identity", None, None, None,
+                      "no run_stats.json entry this run — unavailable.")
+    mismatches = stats.get("mismatch", 0)
+    if not mismatches:
+        return _check("watchmode_identity", True, 0, 0, "0 identity mismatch(es) this run.")
+    names = ", ".join(str(i) for i in (stats.get("mismatch_ids") or [])[:5])
+    detail = f"{mismatches} identity mismatch(es) this run."
+    if names:
+        detail += f" TMDB id(s): {names}."
+    return _check("watchmode_identity", False, mismatches, 0, detail)
+
+
+def _load_watchmode_tv_tmdb_ids(today: _dt.date):
+    """None when the id map wasn't downloaded by today's poc_pipeline.py run (the file is absent,
+    unreadable, or stamped an earlier date) — never re-fetched here; a second Watchmode download
+    just so this check can run is not worth the credit (CAS-1135)."""
+    if not os.path.exists(WM_TV_TMDB_IDS_FILE):
+        return None
+    try:
+        data = json.load(open(WM_TV_TMDB_IDS_FILE, encoding="utf-8"))
+    except Exception:
+        return None
+    if data.get("date") != today.isoformat():
+        return None
+    return set(data.get("tv_tmdb_ids") or [])
+
+
+def check_watchmode_remap_backlog(records: list, tv_tmdb_ids, prev_value) -> dict:
+    """The count of records still carrying a wm_fields_fetched_at stamp but no wm_id, whose
+    tmdb_id also carries a TV row in the id map — exactly the shape CAS-1134's repair tier
+    (poc_pipeline.enrich_watchmode_fields_nightly/probe_candidates tier 0) re-fetches, a few at a
+    time, every night. `tv_tmdb_ids` is None when this run's id map was never downloaded —
+    reported skipped rather than claiming a count that can't be measured. `prev_value` is last
+    night's own count (read back from state/health.json): a shrinking backlog warns rather than
+    fails, since the repair tier is visibly working; a stalled or growing one fails."""
+    if tv_tmdb_ids is None:
+        return _check("watchmode_remap_backlog", None, None, None,
+                      "the id map wasn't downloaded this run — unavailable.", status="skipped")
+    backlog = sum(1 for r in records
+                 if r.get("wm_fields_fetched_at") and not r.get("wm_id")
+                 and r.get("tmdb_id") in tv_tmdb_ids)
+    if backlog == 0:
+        return _check("watchmode_remap_backlog", True, 0, 0, "0 record(s) awaiting repair.")
+    if isinstance(prev_value, (int, float)) and backlog < prev_value:
+        return _check("watchmode_remap_backlog", None, backlog, prev_value,
+                      f"{backlog} record(s) awaiting repair, down from {prev_value} last night.",
+                      status="warn")
+    prev_text = f"{prev_value} last night" if isinstance(prev_value, (int, float)) else "no previous count"
+    return _check("watchmode_remap_backlog", False, backlog, prev_value,
+                  f"{backlog} record(s) awaiting repair, not down from {prev_text}.")
+
+
+def check_released_scored_without_rating(candidates: list) -> dict:
+    """CAS-1134 tightened 'scored' to require a real rating outside the upcoming/in_cinema ladder
+    cohort (wm_popularity_percentile alone no longer counts) and swept the backlog once via
+    reclassify_stale_scored_candidates — this asserts the rule actually holds every night, not
+    just the one run it shipped in."""
+    bad = [c.get("title", c.get("tmdb_id")) for c in candidates
+          if c.get("outcome") == "scored" and not pp._is_ladder_cohort(c)
+          and c.get("wm_user_rating") is None and c.get("wm_critic_score") is None]
+    if bad:
+        return _check("released_scored_without_rating", False, len(bad), 0,
+                      f"{len(bad)} 'scored' candidate(s) outside the ladder cohort carry no "
+                      f"rating: {bad[:5]}")
+    return _check("released_scored_without_rating", True, 0, 0,
+                  "every 'scored' candidate outside the ladder cohort carries a real rating.")
+
+
+def check_landmark_films(movies: list) -> dict:
+    """Asks the shipped engine (poc_pipeline.scoreable_ids -> scripts/scoreable_shim.mjs ->
+    isScoreable — the same route tests/test_data_quality.py's own publication-floor test uses,
+    never a Python re-implementation of the score) whether each of LANDMARK_FILMS is published
+    and clears WM_PUBLISH_FLOOR today. These are certain to be in Australian distribution and
+    highly rated, so a failure here means something broke upstream in a way that moves neither
+    the catalogue's volume nor its score-coverage checks (CAS-1134's own defect, exactly)."""
+    by_id = {m.get("tmdb_id"): m for m in movies}
+    scoreable = pp.scoreable_ids(movies, floor=pp.WM_PUBLISH_FLOOR)
+    missing = [name for tmdb_id, name in LANDMARK_FILMS.items()
+              if tmdb_id not in by_id or tmdb_id not in scoreable]
+    if missing:
+        return _check("landmark_films", False, len(missing), 0,
+                      f"missing or below WM_PUBLISH_FLOOR: {', '.join(missing)}")
+    return _check("landmark_films", True, len(LANDMARK_FILMS), len(LANDMARK_FILMS),
+                  f"all {len(LANDMARK_FILMS)} landmark film(s) published and scoreable.")
+
+
+# ---------------------------------------------------------------------------
 # assemble + report
 # ---------------------------------------------------------------------------
 CHECK_NAMES = ("catalogue_size", "catalogue_integrity", "tmdb_fetch", "watchmode_fetch",
               "watchmode_pace", "oscarbase_fetch", "score_coverage", "email_send", "push_send",
               "usage_events_insert", "auth_signin",
-              "client_error_rate", "empty_account_rate", "activity_floor")
+              "client_error_rate", "empty_account_rate", "activity_floor",
+              "watchmode_identity", "watchmode_remap_backlog", "released_scored_without_rating",
+              "landmark_films")
 
 # CAS-993: the monitor only runs in alerts.yml now, so email_send/push_send — the two checks that
 # read THIS run's delivery stats — can only be asserted there. Every other check still runs in
@@ -598,7 +714,8 @@ DAILY_CHECK_NAMES = tuple(n for n in CHECK_NAMES if n not in ALERT_CHECK_NAMES)
 
 
 def run_checks(*, today_movies=None, prev_movies=None, stats=None, usage_probe=None, auth_probe=None,
-              apns_configured=None, wm_cycle=None, today=None, usage_window=None, names=None) -> list:
+              apns_configured=None, wm_cycle=None, today=None, usage_window=None, names=None,
+              candidates=None, tv_tmdb_ids=None, remap_backlog_prev=None) -> list:
     """Compute only the checks named in `names` (default: every check in CHECK_NAMES, unchanged
     legacy behaviour). Each check is a lazy thunk, so a scoped caller (daily.yml's
     DAILY_CHECK_NAMES or alerts.yml's ALERT_CHECK_NAMES) never pays for — or needs to supply
@@ -623,6 +740,11 @@ def run_checks(*, today_movies=None, prev_movies=None, stats=None, usage_probe=N
         "client_error_rate": lambda: check_client_error_rate(usage_window),
         "empty_account_rate": lambda: check_empty_account_rate(usage_window),
         "activity_floor": lambda: check_activity_floor(usage_window),
+        "watchmode_identity": lambda: check_watchmode_identity(stats.get("watchmode")),
+        "watchmode_remap_backlog": lambda: check_watchmode_remap_backlog(
+            (today_movies or []) + (candidates or []), tv_tmdb_ids, remap_backlog_prev),
+        "released_scored_without_rating": lambda: check_released_scored_without_rating(candidates or []),
+        "landmark_films": lambda: check_landmark_films(today_movies or []),
     }
     return [thunks[n]() for n in CHECK_NAMES if n in names]
 
@@ -684,9 +806,20 @@ def _dry_run_inputs():
     today = _dt.date(2026, 9, 15)
     today_movies = _synthetic_catalogue(5600, scored_pct=1.0)
     prev_movies = _synthetic_catalogue(5580, scored_pct=1.0)
+    # CAS-1135: landmark_films needs each of LANDMARK_FILMS actually present and clearing
+    # WM_PUBLISH_FLOOR — a real rating well above the floor, a non-ladder-cohort status so
+    # isScoreable() scores it on wmQScore alone.
+    for tmdb_id, name in LANDMARK_FILMS.items():
+        today_movies.append({
+            "tmdb_id": tmdb_id, "title": name, "cinema_date": "2020-01-01",
+            "status": ["included_streaming"], "wm_user_rating": 8.5, "wm_critic_score": 85,
+            "wm_fields_fetched_at": "2026-09-14", "wm_id": f"fixture-{tmdb_id}",
+        })
+    candidates = []   # CAS-1135: empty — released_scored_without_rating has nothing to flag.
+    tv_tmdb_ids = set()   # CAS-1135: empty but not None — watchmode_remap_backlog runs at 0.
     stats = {
         "tmdb": {"calls": 5600, "errors": 0},
-        "watchmode": {"calls": 40, "errors": 0, "remaining_monthly_credits": 30000},
+        "watchmode": {"calls": 40, "errors": 0, "remaining_monthly_credits": 30000, "mismatch": 0},
         "oscarbase": {"calls": 20, "errors": 0},
         "email": {"attempted": 3, "delivered": 3, "errors": 0},
         "push": {"attempted": 2, "delivered": 2, "errors": 0},
@@ -709,7 +842,8 @@ def _dry_run_inputs():
               for i in range(5)]
     rows_prev = [{"type": "app_open", "client_key": f"fixture-device-{i % 50}", "data": None} for i in range(180)]
     usage_window = {"rows24": rows24, "rows_prev": rows_prev}
-    return today_movies, prev_movies, stats, usage_probe, auth_probe, True, wm_cycle, today, usage_window
+    return (today_movies, prev_movies, stats, usage_probe, auth_probe, True, wm_cycle, today,
+           usage_window, candidates, tv_tmdb_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -737,24 +871,42 @@ def main(argv=None) -> int:
 
     names = {"daily": DAILY_CHECK_NAMES, "alerts": ALERT_CHECK_NAMES}.get(args.scope)
 
+    out_path = args.out or HEALTH_FILE
+    existing = None
+    if os.path.exists(out_path):
+        try:
+            existing = json.load(open(out_path, encoding="utf-8"))
+        except Exception:
+            existing = None
+
+    def _prev_check_value(name):
+        return next((c.get("value") for c in (existing.get("checks", []) if existing else [])
+                    if c.get("name") == name), None)
+
     if args.dry_run:
         (today_movies, prev_movies, stats, usage_probe, auth_probe, apns_configured,
-         wm_cycle, today, usage_window) = _dry_run_inputs()
+         wm_cycle, today, usage_window, candidates, tv_tmdb_ids) = _dry_run_inputs()
+        remap_backlog_prev = None
     elif args.scope == "alerts":
         # The only inputs email_send/push_send read are state/run_stats.json's email/push
         # sections (just written by this same job's monitor step) and the APNS_* env vars — skip
         # the rest of the live gather entirely, including probe_usage_events_insert's real INSERT,
         # which this scope must not repeat a second time in the same day.
         today = _dt.date.today()
-        today_movies, prev_movies = [], []
+        today_movies, prev_movies, candidates = [], [], []
         stats = runstats.load()
         usage_probe = auth_probe = usage_window = None
         apns_configured = all(os.environ.get(v) for v in APNS_ENV_VARS)
         wm_cycle = {}
+        tv_tmdb_ids = None
+        remap_backlog_prev = None
     else:
         today = _dt.date.today()
         today_movies = movies_of(load_today())
         prev_movies = movies_of(load_yesterday_from_git())
+        candidates = list(pp.load_candidates().values())
+        tv_tmdb_ids = _load_watchmode_tv_tmdb_ids(today)
+        remap_backlog_prev = _prev_check_value("watchmode_remap_backlog")
         stats = runstats.load()
         supabase_url = os.environ.get(SUPABASE_URL_ENV)
         anon_key = os.environ.get(SUPABASE_ANON_KEY_ENV)
@@ -768,21 +920,17 @@ def main(argv=None) -> int:
 
     checks = run_checks(today_movies=today_movies, prev_movies=prev_movies, stats=stats,
                         usage_probe=usage_probe, auth_probe=auth_probe, apns_configured=apns_configured,
-                        wm_cycle=wm_cycle, today=today, usage_window=usage_window, names=names)
+                        wm_cycle=wm_cycle, today=today, usage_window=usage_window, names=names,
+                        candidates=candidates, tv_tmdb_ids=tv_tmdb_ids,
+                        remap_backlog_prev=remap_backlog_prev)
 
     for c in checks:
-        marker = {"ok": "OK", "fail": "FAIL", "unknown": "unknown", "skipped": "skipped"}[c["status"]]
+        marker = {"ok": "OK", "fail": "FAIL", "unknown": "unknown", "skipped": "skipped",
+                  "warn": "WARN"}[c["status"]]
         print(f"[health] {c['name']}: {marker} — {c['detail']}")
 
-    out_path = args.out or HEALTH_FILE
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     if args.scope in ("daily", "alerts"):
-        existing = None
-        if os.path.exists(out_path):
-            try:
-                existing = json.load(open(out_path, encoding="utf-8"))
-            except Exception:
-                existing = None
         report = merge_report(existing, checks, checked_at)
     else:
         report = build_report(checks, checked_at)

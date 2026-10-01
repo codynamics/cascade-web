@@ -578,6 +578,25 @@ def _watchmode_tv_tmdb_ids() -> set:
     return _parse_watchmode_tv_tmdb_ids_csv(_WATCHMODE_IDMAP_RAW_TEXT)
 
 
+# CAS-1135: monitor.health's watchmode_remap_backlog check runs in its own process, after this
+# one has already exited, with no id map of its own — this is the one file that lets it measure
+# the CAS-1134 repair backlog without ever downloading the CSV a second time just to check it.
+WM_TV_TMDB_IDS_FILE = os.path.join(STATE_DIR, "wm_tv_tmdb_ids.json")
+
+
+def _save_watchmode_tv_tmdb_ids(today: datetime.date) -> None:
+    """Persists this run's already-downloaded TV-row id set (see `_watchmode_tv_tmdb_ids`) dated
+    today, so a later `monitor.health` process can tell whether the id map was actually downloaded
+    today at all. A no-op — leaves any existing file alone — when this run never fetched an id map
+    (WATCHMODE_API_KEY unset/rejected, or the fetch itself failed)."""
+    tv_ids = _watchmode_tv_tmdb_ids()
+    if not tv_ids:
+        return
+    os.makedirs(STATE_DIR, exist_ok=True)
+    json.dump({"date": today.isoformat(), "tv_tmdb_ids": sorted(tv_ids)},
+              open(WM_TV_TMDB_IDS_FILE, "w", encoding="utf-8"))
+
+
 def _fetch_watchmode_status() -> dict:
     """CAS-994: Watchmode's own live account usage — {'quota', 'quotaUsed'} — costs 0 credits.
     Only called with a non-zero WM_RUN_MAX_CREDITS ceiling (see wm_run_allowance): it's not worth
@@ -790,6 +809,20 @@ def _is_ladder_cohort(movie: dict) -> bool:
     return bool({"upcoming", "in_cinema"} & set(movie.get("status") or []))
 
 
+# CAS-1135: nightly fields and the CAS-986 scoreability probe each tally enrich_watchmode_fields'
+# outcomes the same way — adding this here so both also capture up to 5 tmdb_ids behind a
+# 'mismatch' outcome, for monitor.health's watchmode_identity check to name in its detail line.
+_MISMATCH_IDS_SAMPLE_CAP = 5
+
+
+def _bump_wm_outcome(outcomes: dict, result: str, tmdb_id) -> None:
+    outcomes[result] = outcomes.get(result, 0) + 1
+    if result == "mismatch":
+        ids = outcomes.setdefault("mismatch_ids", [])
+        if len(ids) < _MISMATCH_IDS_SAMPLE_CAP:
+            ids.append(tmdb_id)
+
+
 def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) -> dict:
     """CAS-921: the nightly poc_pipeline.py run's own Watchmode fields pass. The earlier CAS-830/
     850 backfill only ever fires from the manual watchmode-backfill.yml dispatch, so a title added
@@ -865,16 +898,16 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
 
     for m in repair:
         result = enrich_watchmode_fields(m, wm_idmap, budget, ttl_days=0)
-        outcomes[result] = outcomes.get(result, 0) + 1
+        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
     for m in unfetched:
         result = enrich_watchmode_fields(m, wm_idmap, budget)
-        outcomes[result] = outcomes.get(result, 0) + 1
+        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
     for m in cohort:
         result = enrich_watchmode_fields(m, wm_idmap, budget, WM_NIGHTLY_COHORT_TTL_DAYS)
-        outcomes[result] = outcomes.get(result, 0) + 1
+        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
     for m in rest:
         result = enrich_watchmode_fields(m, wm_idmap, budget)
-        outcomes[result] = outcomes.get(result, 0) + 1
+        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
     return outcomes
 
 
@@ -1085,7 +1118,7 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
             if ttl is None:
                 ttl = SCOREABILITY_LADDER_STALE_DAYS if _is_ladder_cohort(c) else SCOREABILITY_STALE_DAYS
             result = enrich_watchmode_fields(c, wm_idmap, bd, ttl)
-            outcomes[result] = outcomes.get(result, 0) + 1
+            _bump_wm_outcome(outcomes, result, c.get("tmdb_id"))
             if result in ("ok", "no-id"):
                 outcomes["probed"] += 1
                 c["last_probed"] = today_iso
@@ -1505,6 +1538,8 @@ def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery
         "candidates": len(candidates), "unprobed": unprobed,
         "probed_today": probe_outcomes["probed"], "engine_ok": engine_ok,
         "wm_spent": probe_outcomes.get("spent", 0),   # CAS-987: this pass's actual draw on probe_budget
+        "mismatch": probe_outcomes.get("mismatch", 0),   # CAS-1135
+        "mismatch_ids": probe_outcomes.get("mismatch_ids", []),   # CAS-1135
         "not_found_dropped": not_found_dropped,
         "publish_guard_eligible": enrich_stats["eligible"],
         "publish_guard_enriched": enrich_stats["enriched"],
@@ -3109,7 +3144,13 @@ def run(simulate_day: bool = False):
         # Watchmode activity (on-demand + nightly fields + the CAS-986 scoreability probe), so
         # monitor.health's watchmode_fetch check (which reads run_stats.watchmode.calls) is
         # measuring what it claims to measure instead of only the on-demand slice.
-        runstats.bump("watchmode", calls=run_spent, errors=counts["wm_fails"])
+        # CAS-1135: same reasoning for 'mismatch' — the nightly-fields pass and the probe are the
+        # only two callers of enrich_watchmode_fields that can ever see that outcome.
+        mismatch_total = wm_outcomes.get("mismatch", 0) + cas986_report.get("mismatch", 0)
+        mismatch_ids = (wm_outcomes.get("mismatch_ids", []) + cas986_report.get("mismatch_ids", []))
+        runstats.bump("watchmode", calls=run_spent, errors=counts["wm_fails"], mismatch=mismatch_total)
+        runstats.set_value("watchmode", mismatch_ids=mismatch_ids[:5])
+        _save_watchmode_tv_tmdb_ids(today)
         today_total_spent = cycle["days"].get(today_iso, 0) + run_spent
         cycle["days"][today_iso] = today_total_spent
         _save_wm_cycle_budget(cycle, today)
