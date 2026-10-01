@@ -366,10 +366,13 @@ class AutoPlacementTests(unittest.TestCase):
     manual, or a legacy pre-CAS-1096 auto one — always wins outright."""
 
     def _movie(self, tmdb_id=9001, status=("included_streaming",)):
+        # showable() (matchesCriteria's own first gate) requires a CONFIRMED offer — a "sub" offer is
+        # what windowOf() maps to "included_streaming" (app_template.html ~18709), matching `status`
+        # above; without one hasConfirmedOffer() is false and every admission here reads empty.
         return {"tmdb_id": tmdb_id, "title": "Auto Placed Film", "genres": ["Drama"],
                 "status": list(status), "cinema_date": "2026-01-01", "language": "en",
                 "wm_critic_score": 70, "popularity": 50, "wm_popularity_percentile": 70,
-                "wm_user_rating": 7.5}
+                "wm_user_rating": 7.5, "offers": [{"service": "Netflix", "type": "sub"}]}
 
     def _cascade(self, moments, stream_marker=50):
         # Only `stream` is a usable window — in_cinema/premium/rent are off (Never), so the score-earn
