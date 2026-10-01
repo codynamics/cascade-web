@@ -2749,6 +2749,42 @@ test("CAS-743 AC3: an agent whose watchMarkers is still normCascade's default gu
     "an agent with a real, user-set marker change must still reach the rows handed to the upsert");
 }));
 
+// ---- A RENAME ON A ROW THAT STILL CARRIES A *Defaulted GUESS MUST STILL SYNC (CAS-1132) -------------------
+// CAS-743 AC3 (above) proved a still-guessed watchMarkers must never, on its own, make a row look dirty. Its
+// actual fix compared cascadeFullSigOf (every field at once) and suppressed the WHOLE row whenever any
+// *Defaulted flag was set, so it also suppressed a genuine edit to any OTHER field on that same row — this is
+// the real cause CAS-1132 traced the account-integrity suite's S4 failure to: a seeded agent with no
+// watchMarkers in its criteria defaults one locally on load and never gets it confirmed by the account, so a
+// rename made afterwards never reached cascadeDirtyRows at all.
+test("CAS-1132: a rename on a row whose watchMarkers is still normCascade's default guess still reaches the rows handed to the upsert", () => withCas734State(async () => {
+  const id = uuidFor(11);
+  // Seeded with no watchMarkers at all — the exact shape seedCascades() gives the integrity suite's fixtures.
+  const remoteRow = { id, user_id: "cas681-test-user", name: "Blockbusters",
+    criteria: { order: 0 }, alert_moments: [], active: true,
+    created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" };
+  const { client, state } = fakeCascadesSupabase([remoteRow]);
+  signInWithClient(client);
+
+  await E.CascadePersistence.loadAccount();
+  const loaded = E.cascades.find(c => c.id === id);
+  assert.ok(loaded._watchMarkersDefaulted, "harness check: a row with no criteria.watchMarkers loads as a guess");
+  assert.ok(!E.CascadePersistence.cascadeDirtyRows().some(c => c.id === id),
+    "harness check: untouched right after load, this row must not be dirty");
+
+  loaded.name = "Blockbusters (edited)";
+  E.CascadePersistence.saveCascades();
+  assert.ok(loaded._watchMarkersDefaulted, "the rename alone must not clear the unrelated watchMarkers guess");
+
+  const dirty = E.CascadePersistence.cascadeDirtyRows();
+  assert.ok(dirty.some(c => c.id === id),
+    "a real edit to a non-defaulted field must reach the rows handed to the upsert, even while watchMarkers is still a guess");
+
+  await E.CascadePersistence.syncNow();
+  const lastUpsert = state.upsertCalls[state.upsertCalls.length - 1] || [];
+  assert.ok(lastUpsert.some(r => r.id === id && r.name === "Blockbusters (edited)"),
+    "the rename must actually be pushed to the account");
+}));
+
 // ---- MANUAL WATCH ON NEVER OVERWRITTEN, EVEN ACROSS DEVICES (CAS-735) -----------------------------------
 // Two independent gaps let an explicit manual Watch On pick get silently reverted to auto: applyWatchRows
 // carried no precedence rule at all (a remote row that simply didn't mention the ticked rung was enough to

@@ -19341,6 +19341,17 @@ else if(dedupedN)
   // field an upsert would actually write, or a real change (a reorder) would never look dirty and would
   // never sync.
   const cascadeFullSigOf = c => { const r=cascadeToRow(c); return JSON.stringify([r.name, r.criteria, r.alert_moments, r.active]); };
+  // CAS-1132: the same full signature, but with every still-guessed *Defaulted field stripped out first.
+  // cascadeDirtyRows diffs THIS against cascadeKnown's own sigNoDefault (recorded the same way everywhere
+  // cascadeKnown is populated) so a field that is nothing but normCascade's own guess can never, on its own,
+  // make a row look dirty — while a real edit to any OTHER field on that same row still shows up here exactly
+  // as it would in cascadeFullSigOf. See cascadeDirtyRows below for why a single combined signature couldn't
+  // tell those two cases apart.
+  const cascadeNonDefaultSigOf = c => {
+    const r=cascadeToRow(c);
+    DEFAULTABLE_CASCADE_FIELDS.forEach(({key,flag})=>{ if(c[flag]) delete r.criteria[key]; });
+    return JSON.stringify([r.name, r.criteria, r.alert_moments, r.active]);
+  };
   // expose the pure mappers for the monitor stories / tests to mirror
   window.CascadeShape = { cascadeToRow, rowToCascade, momentsOf };
 
@@ -19514,16 +19525,21 @@ else if(dedupedN)
   // Dirty rows to push and rows to delete are DERIVED by diffing the live `cascades` array against
   // cascadeKnown, rather than tracked by instrumenting every edit call site — the same reasoning CAS-692
   // gives watchlistDirtyRows/watchlistPendingDeleteIds.
-  // CAS-743: a row the account already knows (known is set) never pushes while it still carries a *Defaulted
-  // flag — a guessed value must never overwrite whatever the account already confirmed for that field, and a
-  // guess is also exactly what makes an old row's cascadeFullSigOf disagree with a known.sig recorded before
-  // the field existed, which would otherwise mark it dirty for a reason the user never caused. A row the
-  // account has never confirmed at all (known is unset) still always pushes, guess or not — there is nothing
-  // of the account's to protect on a genuinely new agent's first sync.
+  // CAS-743 found that a *Defaulted field is also exactly what makes an old row's cascadeFullSigOf disagree
+  // with a known.sig recorded before the field existed, which would otherwise mark a row dirty for a reason
+  // the user never caused. Its fix compared the FULL signature and suppressed the whole row whenever any
+  // *Defaulted flag was set — which also suppressed every OTHER genuine edit on that same row (a rename, say)
+  // for as long as the guess stood, since one combined signature can't tell "only the guess disagrees" apart
+  // from "something real changed too" (CAS-1132: this is why a renamed agent could go an unbounded number of
+  // syncs without ever reaching the account while its watchMarkers stayed an unconfirmed guess). Comparing the
+  // non-default signature instead keeps CAS-743's original protection — cascadeKnown's own sigNoDefault is
+  // recorded through the exact same stripping, so a guess that merely recomputes differently still matches —
+  // while still catching a real change to any other field. A row the account has never confirmed at all
+  // (known is unset) still always pushes, guess or not — there is nothing of the account's to protect on a
+  // genuinely new agent's first sync.
   const cascadeDirtyRows = () => cascades.filter(c=>{
     const known=cascadeKnown.get(c.id);
-    if(known && DEFAULTABLE_CASCADE_FIELDS.some(({flag})=>c[flag])) return false;
-    return !known || known.sig!==cascadeFullSigOf(c);
+    return !known || known.sigNoDefault!==cascadeNonDefaultSigOf(c);
   });
   // CAS-1090: explicit only, never inferred. The live `cascades` array plays no part in this any more — an
   // id is a candidate for a server delete purely because deleteAgentAsk tombstoned it, and only for as long
@@ -19575,17 +19591,9 @@ else if(dedupedN)
     if(acctTableFail.cascades) return;   // CAS-656 AC2: a failed load must not push local state back over it
     const dirty = cascadeDirtyRows();
     const deletes = cascadePendingDeleteIds();
-    // CAS-1132: S4's DB poll still times out with zero console.warn ever printed, even with this ticket's
-    // runSync fix (the lost-retry race) landed — meaning no run has yet shown whether a push was even
-    // attempted. This is the one chokepoint both the debounced auto-sync and a caller's explicit syncNow()
-    // funnel through, so logging dirty.length and the upsert's own response here (success or failure, not
-    // only the existing warn-on-error below) is the one thing that can finally tell "nothing was dirty"
-    // apart from "it pushed and the write still didn't stick" without needing Docker to run the suite.
-    console.log("[CAS-1132] syncToAccount dirty", dirty.length, dirty.map(x=>x.id));
     if(dirty.length){
       const rows = dirty.map(cascadeToRow);
       let { data, error } = await c.from("cascades").upsert(rows, { onConflict:"id" }).select("id,updated_at");
-      console.log("[CAS-1132] syncToAccount upsert result", { error, data });
       // CAS-957: 42501 is RLS's USING clause refusing the write — this device pushing a row it does not
       // own, almost always a row this device cached under a different account before local storage was
       // namespaced. Re-pushing it every sync would latch the degraded banner forever over a row that will
@@ -19610,7 +19618,7 @@ else if(dedupedN)
       const versionById = new Map((data||[]).map(r=>[r.id, r.updated_at]));
       dirty.forEach(x=>{
         if(!versionById.has(x.id)) return;   // refused (dropped above) or otherwise not written this pass
-        cascadeKnown.set(x.id, { sig: cascadeFullSigOf(x), version: versionById.get(x.id)||null });
+        cascadeKnown.set(x.id, { sig: cascadeFullSigOf(x), sigNoDefault: cascadeNonDefaultSigOf(x), version: versionById.get(x.id)||null });
         cascadeEditedAt.delete(x.id);   // pushed — the account now holds this device's edit
       });
       saveCascadeEditedAt();
@@ -19745,7 +19753,7 @@ else if(dedupedN)
     // longer matches what the account has) and the scheduleSync below pushes it, exactly like an ordinary
     // edit would.
     cascadeKnown = new Map(rawRows.filter(r=>isUuid(r.id))
-      .map(r=>[r.id, { sig: cascadeFullSigOf(rowToCascade(r)), version: r.updated_at||null }]));
+      .map(r=>{ const rc=rowToCascade(r); return [r.id, { sig: cascadeFullSigOf(rc), sigNoDefault: cascadeNonDefaultSigOf(rc), version: r.updated_at||null }]; }));
     if(localOnly.length || langDirty || alertDirty || driftDirty) scheduleSync();
     if(typeof afterSignIn==="function") afterSignIn();
   }
@@ -19791,7 +19799,7 @@ else if(dedupedN)
     }
     reconcileActiveIds();
     cascadeKnown = new Map(rawRows.filter(r=>isUuid(r.id))
-      .map(r=>[r.id, { sig: cascadeFullSigOf(rowToCascade(r)), version: r.updated_at||null }]));
+      .map(r=>{ const rc=rowToCascade(r); return [r.id, { sig: cascadeFullSigOf(rc), sigNoDefault: cascadeNonDefaultSigOf(rc), version: r.updated_at||null }]; }));
     saveCascadeEditedAt();
     // CAS-424: converge on whichever device last reordered — only once anyone actually has, so a background
     // reconcile never reshuffles an account nobody has touched the Agents screen on.
