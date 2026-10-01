@@ -249,11 +249,20 @@ if(typeof window.CascadeAuth === "undefined"){
   // reveal-time cap they solve against — exported so a test can build a real onboarding roster
   // from a fixed answer set and assert watchCount() against the cap directly.
   onbAnswersV2Default, buildOnbAgentsV2, ONB_AGENT_CAP_V2,
-  // CAS-959: the v2 onboarding commit marker (set at v2_done, cleared by flowStart or a completed/dropped
-  // load) — exported so a test can seed "this device just built an unconfirmed onboarding draft" the same
-  // way v2_done itself does, without driving the whole wired flow through the DOM stub.
-  onbV2CommittedSave, onbV2CommittedLoad, onbV2CommittedClear,
-  tasteBase, cascades,
+  // CAS-1099: membCompleteNewMembership is the one complete_membership() RPC chokepoint a brand-new,
+  // signed-out signup drives — exported so a test can call it directly against a stubbed CascadeAuth.client,
+  // the same convention CascadePersistence's own write seams use. membNeedsEmail/membStart/membStartWork are
+  // window-assigned (or plain) wire code alongside it; onbDraftModeOn is reassigned wholesale by flowStart/
+  // flowStop/membCompleteNewMembership, so it's exposed through a getter/setter like flowKind elsewhere here.
+  membCompleteNewMembership, membNeedsEmail,
+  get onbDraftModeOn(){ return onbDraftModeOn; },
+  setOnbDraftModeOn(v){ onbDraftModeOn=!!v; },
+  get onbMembershipInFlight(){ return onbMembershipInFlight; },
+  // CAS-1099: tasteBase is reassigned wholesale in more places than loadUserPrefs/maybeSwitchAcctSuffix now
+  // (flowStart()'s own leftover-@guest-draft reset) — exposed through a getter, like watchPrefs/notifyPrefs
+  // below, so a test sees the CURRENT binding even across a reassignment, not a snapshot frozen at load time.
+  get tasteBase(){ return tasteBase; },
+  cascades,
   get onbFlow(){ return onbFlow; },
   get flowKind(){ return flowKind; },
   setFlowKind(k){ flowKind = k; },

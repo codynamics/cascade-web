@@ -4208,6 +4208,14 @@ let diagLog = [];
 // counter always exists by the time any of this script's later code could possibly throw.
 const CLIENT_HEALTH_EVENT_CAP = 10;
 let clientHealthEventCounts = {};
+// CAS-1099: true for the span of a first-run, signed-out onboarding walkthrough (set at flowStart() when
+// signed out, cleared at flowStop()) — every save*() chokepoint for the onboarding draft (agents, services,
+// taste, occasions, notify choices) checks this before touching localStorage, so none of it reaches disk
+// until complete_membership() has actually run. Declared this early (flowOn/membNeedsEmail, declared much
+// further down, must never be read from inside a save*() function — migrateOccasionNamesIfNeeded() below
+// calls saveCascades() at top-level load time, before either would exist, same TDZ hazard logClientHealthEvent
+// is commented against above) so every save*() function can check a plain boolean with no ordering risk.
+let onbDraftModeOn = false;
 // logEvent (below, ~line 5557) isn't defined yet this early — it's a hoisted function declaration, so the
 // reference itself is safe, but the `let`s it reads (usageLog/usageQueue, also further down) are not: a
 // throw during this script's own top-level execution, before those initialise, would hit their temporal
@@ -4912,6 +4920,7 @@ let notifyPrefs = notifyPrefsDefault();
 try{ const o=JSON.parse(localStorage.getItem(acctKey(NOTIFY_PREFS_KEY))||"null");
      if(o && typeof o==="object") notifyPrefs={...notifyPrefsDefault(), ...o}; }catch(e){}
 function saveNotifyPrefs(){
+  if(onbDraftModeOn) return;   // CAS-1099: a pre-membership draft's notify choices stay memory-only
   try{ localStorage.setItem(acctKey(NOTIFY_PREFS_KEY), JSON.stringify(notifyPrefs)); }catch(e){}
 }
 const NOTIFY_KEY="cascade_notify";
@@ -5216,7 +5225,9 @@ function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem(acctKey("casc
   const canon = xs => new Set((xs||[]).map(s=>svcFold(svcCanon(s))));
   return {on:!!p.on, touched:!!p.touched, sub:canon(p.sub), store:canon(p.store)}; }
   catch(e){ return {on:false,touched:false,sub:new Set(),store:new Set()}; } }
-function savePrefs(){ try{ localStorage.setItem(acctKey("cascade_prefs"),
+function savePrefs(){
+  if(onbDraftModeOn) return;   // CAS-1099: a pre-membership draft's services stay memory-only
+  try{ localStorage.setItem(acctKey("cascade_prefs"),
   JSON.stringify({on:prefs.on,touched:prefs.touched,sub:[...prefs.sub],store:[...prefs.store]})); }catch(e){} }
 // CAS-1095: savePrefs() backs more than one distinct user_prefs settings change (services picked, and
 // services-only/touched) — each call site names exactly which column(s) its own edit touched. A no-op
@@ -5303,7 +5314,9 @@ function loadCascades(){
                 // language/rating-stop controls existed still opens clean, and means what it always meant.
   }catch(e){ return []; }
 }
-function saveCascades(){ try{ localStorage.setItem(acctKey("cascade_cascades"), JSON.stringify(cascades)); }catch(e){} }
+function saveCascades(){
+  if(onbDraftModeOn) return;   // CAS-1099: a pre-membership draft's agents stay memory-only
+  try{ localStorage.setItem(acctKey("cascade_cascades"), JSON.stringify(cascades)); }catch(e){} }
 // CAS-1090: a placeholder here, in the same outer scope as saveCascades above — a guest device has no
 // account to tombstone a delete against. The account-sync IIFE further down reassigns this (exactly the way
 // it reassigns saveCascades itself, "wrap the one save chokepoint") to the real implementation, which is
@@ -5379,6 +5392,12 @@ function reconcileActiveIds(){
 }
 reconcileActiveIds();
 
+// CAS-1099: these two onboarding-draft keys are never written again (the draft lives in memory only until
+// membership completes) — a one-time removal so a device carrying either from an abandoned pre-ticket
+// onboarding run never has it resurface.
+try{ localStorage.removeItem("cascade_onb_v2_committed"); }catch(e){}
+try{ localStorage.removeItem("cascade_onb_answers_v2"); }catch(e){}
+
 // ---- CAS-775: Occasions register — account-level, one per user, replacing CAS-768's derived-from-agents
 // set (the list of occasions was the union of what agents happened to carry, so one that no agent carried
 // could not exist, be renamed, or be deleted). c.occasions on an agent now holds REGISTER IDS, not names —
@@ -5397,6 +5416,7 @@ function loadOccasionReg(){
 const occasionReg = loadOccasionReg();
 let occasionRegSaved=null;
 function saveOccasionReg(){
+  if(onbDraftModeOn) return;   // CAS-1099: a pre-membership draft's occasions stay memory-only
   const s=JSON.stringify(occasionReg);
   if(s===occasionRegSaved) return;
   occasionRegSaved=s;
@@ -12778,31 +12798,13 @@ function onbAnswersV2Default(){
           partner:null, partnerDiff:null, partnerStyles:[], kids:null, kidAges:["G","PG"],
           services:[]};
 }
-// Deliberately its own storage key — a half-migrated device must not have this loader read the
-// old shape, or the old loader read this one.
-const ONB_ANSWERS_V2_KEY = "cascade_onb_answers_v2";
-function onbAnswersV2Load(){
-  try{ const raw=localStorage.getItem(ONB_ANSWERS_V2_KEY);
-       return raw ? {...onbAnswersV2Default(), ...JSON.parse(raw)} : onbAnswersV2Default(); }
-  catch(e){ return onbAnswersV2Default(); }
-}
-function onbAnswersV2Save(a){
-  try{ localStorage.setItem(ONB_ANSWERS_V2_KEY, JSON.stringify(a)); }catch(e){}
-}
-// CAS-951: v2_done's commit, persisted so a reload that lands the flow back on v2_done before
-// flowStart() runs again re-renders the SAME committed roster instead of building and pushing a
-// second one. flowStart() clears this, so a genuinely new run commits fresh.
-const ONB_V2_COMMITTED_KEY = "cascade_onb_v2_committed";
-function onbV2CommittedLoad(){
-  try{ const raw=localStorage.getItem(ONB_V2_COMMITTED_KEY); return raw ? JSON.parse(raw) : null; }
-  catch(e){ return null; }
-}
-function onbV2CommittedSave(agents){
-  try{ localStorage.setItem(ONB_V2_COMMITTED_KEY, JSON.stringify(agents)); }catch(e){}
-}
-function onbV2CommittedClear(){
-  try{ localStorage.removeItem(ONB_V2_COMMITTED_KEY); }catch(e){}
-}
+// CAS-1099: memory only — the whole onboarding draft (this included) lives only until membership
+// completes, so there is nothing left to half-migrate between builds. onbAnswersV2Mem is reset to the
+// default by flowStart() (a genuinely new run), the same "cleared ahead of the next first run" rule the
+// old localStorage key followed, minus ever touching disk.
+let onbAnswersV2Mem = onbAnswersV2Default();
+function onbAnswersV2Load(){ return onbAnswersV2Mem; }
+function onbAnswersV2Save(a){ onbAnswersV2Mem = a; }
 // Recipes 1 and 2 both open on this: the furthest-forward window the account can actually use.
 function onbBigWindowV2(ans){
   return ans.cinema==="yes" ? "in_cinema" : (ans.rent==="yes" ? "rent" : "stream");
@@ -13800,7 +13802,9 @@ const tbNone = v => v===null;                 // explicitly cleared
 let tasteBase = baseDefaults();
 try{ const o=JSON.parse(localStorage.getItem(acctKey(BASE_KEY))||"null");
      if(o && typeof o==="object") tasteBase={...baseDefaults(), ...o}; }catch(e){}
-function saveTasteBase(){ try{ localStorage.setItem(acctKey(BASE_KEY), JSON.stringify(tasteBase)); }catch(e){} }
+function saveTasteBase(){
+  if(onbDraftModeOn) return;   // CAS-1099: a pre-membership draft's taste stays memory-only
+  try{ localStorage.setItem(acctKey(BASE_KEY), JSON.stringify(tasteBase)); }catch(e){} }
 // CAS-250: the baseline asks the same question as the agent's own how-far-back, so it answers it the same
 // way — a rolling number of years, converted once from the old index.
 const baseYearsBack = () => (typeof tasteBase.yearsBack==="number")
@@ -15756,11 +15760,10 @@ const SHARP_STEPS = {
   // ---- CAS-911: the roster commits HERE, the only place onboarding writes agents — every earlier
   // reveal screen renders from the same buildOnbAgentsV2 call but commits nothing (see FLOWS below).
   // Re-entering this step (Back from here, then Continue again) must not commit a second time, so
-  // wire() only builds once, guarded by onbFlow.workingAgents — same shape "working" used for the old
-  // flow. CAS-951: that in-memory guard alone survives a Back/Forward but not a reload, so the commit
-  // also (a) REPLACES the device's roster rather than appending to it, and (b) persists once made
-  // (onbV2Committed*, cleared only by flowStart()) so a reload that lands back on this same run's
-  // v2_done re-renders the committed roster instead of building and pushing a second one.
+  // wire() only builds once, guarded by onbFlow.workingAgents. CAS-1099: unlike CAS-951's own guard, this
+  // is now the WHOLE story — a reload mid-flow genuinely loses the draft (saveCascades() below is a no-op
+  // while onbDraftModeOn, and there is no persisted committed-roster marker left to re-render from), the
+  // same "abandon means lost" rule every other piece of the draft follows until membership completes.
   v2_done: {
     noAgent: true, noSkip: true,
     progress: 100,
@@ -15779,46 +15782,38 @@ const SHARP_STEPS = {
     wire(){
       onbFlow.answersV2=onbAnswersV2Load();
       if(!onbFlow.workingAgents){
-        const already=onbV2CommittedLoad();
-        if(already){
-          // CAS-951: this run already committed once (a reload landed the flow back here before
-          // flowStart() ran again) — re-render the same roster rather than build and push a second one.
-          onbFlow.workingAgents=already;
-        } else {
-          const agents=buildOnbAgentsV2(onbFlow.answersV2);
-          agents.forEach(c=>{ c.id=cascadeNewId(); });
-          // CAS-915: the occasions these answers imply, created only now — at commit — via createOccasion()
-          // (idempotent by name, writes the register immediately) so backing out of the flow before this
-          // screen never leaves an orphan register entry.
-          const me=createOccasion("Me");
-          const partner = onbFlow.answersV2.partner==="yes" ? createOccasion("Partner") : null;
-          const family = onbFlow.answersV2.kids==="yes" ? createOccasion("Family") : null;
-          const allOcc=[me, partner, family].filter(Boolean).map(o=>o.id);
-          agents.forEach(c=>{
-            if(c.template==="onb_massive") c.occasions=allOcc.slice();
-            else if(c.template==="onb_favs") c.occasions=[me.id];
-            else if(c.template==="onb_date" && partner) c.occasions=[partner.id];
-            else if(c.template==="onb_family" && family) c.occasions=[family.id];
-          });
-          // CAS-951: first-run onboarding ESTABLISHES the device's roster — it replaces whatever
-          // cascades already holds (a stale account's set, or an earlier commit this same run),
-          // it never appends to it.
-          // CAS-1090: UNLESS cascadeKnown already has entries — that only happens once a real account load
-          // or reconcile has actually confirmed the account holds agents of its own, which means this was
-          // never a genuine empty first run to begin with. The production incident this guards against was
-          // exactly this: the boot-time splash (showSplash(), gated on the device-local onboardingSeen()
-          // flag, not on account state) can open onboarding for an already-signed-in device before that
-          // flag catches up, and completing it here used to wipe the 43 real agents the account load had
-          // already landed by the time the user reached this screen. Append instead of replacing, so
-          // whatever the account already had survives — same "always lands on its agents" guarantee
-          // cascadePendingDeleteIds' tombstone gives the sync side, applied here at the source.
-          if(accountHasConfirmedCascades()) cascades.push(...agents);
-          else { cascades.length=0; cascades.push(...agents); }
-          saveCascades();
-          setActive(agents[0].id);
-          onbFlow.workingAgents=agents;
-          onbV2CommittedSave(agents);
-        }
+        const agents=buildOnbAgentsV2(onbFlow.answersV2);
+        agents.forEach(c=>{ c.id=cascadeNewId(); });
+        // CAS-915: the occasions these answers imply, created only now — at commit — via createOccasion()
+        // (idempotent by name; memory-only while onbDraftModeOn, see saveOccasionReg) so backing out of
+        // the flow before this screen never leaves an orphan register entry.
+        const me=createOccasion("Me");
+        const partner = onbFlow.answersV2.partner==="yes" ? createOccasion("Partner") : null;
+        const family = onbFlow.answersV2.kids==="yes" ? createOccasion("Family") : null;
+        const allOcc=[me, partner, family].filter(Boolean).map(o=>o.id);
+        agents.forEach(c=>{
+          if(c.template==="onb_massive") c.occasions=allOcc.slice();
+          else if(c.template==="onb_favs") c.occasions=[me.id];
+          else if(c.template==="onb_date" && partner) c.occasions=[partner.id];
+          else if(c.template==="onb_family" && family) c.occasions=[family.id];
+        });
+        // CAS-951: first-run onboarding ESTABLISHES the device's roster — it replaces whatever
+        // cascades already holds (a stale account's set, or an earlier commit this same run),
+        // it never appends to it.
+        // CAS-1090: UNLESS cascadeKnown already has entries — that only happens once a real account load
+        // or reconcile has actually confirmed the account holds agents of its own, which means this was
+        // never a genuine empty first run to begin with. The production incident this guards against was
+        // exactly this: the boot-time splash (showSplash(), gated on the device-local onboardingSeen()
+        // flag, not on account state) can open onboarding for an already-signed-in device before that
+        // flag catches up, and completing it here used to wipe the 43 real agents the account load had
+        // already landed by the time the user reached this screen. Append instead of replacing, so
+        // whatever the account already had survives — same "always lands on its agents" guarantee
+        // cascadePendingDeleteIds' tombstone gives the sync side, applied here at the source.
+        if(accountHasConfirmedCascades()) cascades.push(...agents);
+        else { cascades.length=0; cascades.push(...agents); }
+        saveCascades();   // CAS-1099: a no-op while onbDraftModeOn — see that flag's own comment
+        setActive(agents[0].id);
+        onbFlow.workingAgents=agents;
       }
     },
   },
@@ -15949,7 +15944,11 @@ function flowStart(startKey){
   onbDone=freshDone(); onbDoor=null; onbDoorIdx=0; onbDonePulse=null;
   onbFlow.draft=null;          // no agent yet — nothing on the first two screens quotes a count
   onbFlow.workingAgents=null; onbFlow.reportStats=null;   // CAS-629: a fresh roster commits fresh every run
-  onbV2CommittedClear();       // CAS-951: a genuinely new run may commit again
+  // CAS-1099: true only for a genuinely new, signed-out run — the whole draft (agents, services, taste,
+  // occasions, notify choices, answers) lives in memory only until membership completes. False for a
+  // guest/no-config build (membNeedsEmail() needs CascadeAuth.enabled) and for an already-signed-in
+  // "+ New Cascade"/empty-account redo, both of which keep saving/syncing exactly as before.
+  onbDraftModeOn = membNeedsEmail();
   // CAS-1106: onboarding runs signed out (acctSuffix "guest"), so without this the services step reads
   // prefs.sub/prefs.store straight off whatever an earlier session on this device left in the @guest key —
   // never this new person's own choice. Only the first flow start of THIS page load clears it: once
@@ -15957,6 +15956,17 @@ function flowStart(startKey){
   // and must not wipe the services they only just picked.
   if(acctSuffix==="guest" && !onbGuestPrefsResetDone){
     prefs.sub=new Set(); prefs.store=new Set(); prefs.touched=false; savePrefs();
+    // CAS-1099 AC5: the same leftover-@guest-key problem CAS-1106 found for services alone also applies to
+    // taste, notify choices and the occasions register for a configured, signed-out first run — cleared in
+    // memory the same way, so a device carrying any stale draft from before this ticket shipped never shows
+    // a step pre-selected. onbDraftModeOn (just set above) means none of this is written back for a
+    // configured build; a guest/no-config build has no draft to protect and never sets it, so it is
+    // unaffected.
+    if(onbDraftModeOn){
+      tasteBase=baseDefaults();
+      notifyPrefs=notifyPrefsDefault();
+      occasionReg.length=0;
+    }
     onbGuestPrefsResetDone=true;
   }
   // CAS-1047: a genuinely new first run (splash/film-page signup) must not inherit a previous person's
@@ -15971,6 +15981,7 @@ function flowStart(startKey){
 }
 function flowStop(){
   flowOn=false; flowNewAgent=false; briefOn=false; menuStepOn=false;
+  onbDraftModeOn=false;
   if(flowSlideT){ clearTimeout(flowSlideT); flowSlideT=null; endSlide(); }
   $("onbStep").classList.remove("open","chromed","sliding"); lockBodyScroll(false);
   $("stepHdr").hidden=true; $("stepNav").hidden=true;
@@ -17688,6 +17699,9 @@ function openMembership(agentKey, nameOverride, cascade){
     <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
            placeholder="you@example.com">
     <p class="fielderr" id="membEmailErr" role="alert" hidden></p>
+    <p class="fielderr" id="membAcctExists" hidden>There's already a Cascade account for that email.
+      <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
+              style="vertical-align:baseline">Sign in</button></p>
     <p class="pnote">By continuing you agree to our
       <a href="https://www.codynamics.com.au/privacy" target="_blank" rel="noopener">Privacy policy</a>.</p>` : ""}
     <button class="membcta" type="button" onclick="membStart()">Save my agents</button>
@@ -17753,6 +17767,9 @@ function openOnbMembership(){
     <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
            placeholder="you@example.com">
     <p class="fielderr" id="membEmailErr" role="alert" hidden></p>
+    <p class="fielderr" id="membAcctExists" hidden>There's already a Cascade account for that email.
+      <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
+              style="vertical-align:baseline">Sign in</button></p>
     <p class="pnote">By continuing you agree to our
       <a href="https://www.codynamics.com.au/privacy" target="_blank" rel="noopener">Privacy policy</a>.</p>` : ""}
     <button class="membcta" type="button" onclick="membStart()">Save my agents</button>
@@ -17783,6 +17800,13 @@ window.onbMembBack=()=>{
 // the compositor has shown it — because a plain setTimeout(0) can still run before the paint.
 // membStarting is the double-tap guard; it also survives the work throwing, via the finally.
 let membStarting=false;
+// CAS-1099: true for the span between the membership email code being confirmed and complete_membership()
+// resolving — read by the cascade-auth-change listener (the account-sync IIFE, further down) to stand down
+// its own automatic loadAccount()/replayOutbox() for exactly that window. See that listener's own comment.
+let onbMembershipInFlight=false;
+// The email this device's membership screen was told already has an account, for the Sign in button under
+// the message to reopen Sign in pre-filled with it (membAcctExistsShow/Hide, membSignInFromAcctExists).
+let membAcctExistsEmail=null;
 // CAS-387: only a configured, signed-out build needs the email gate — guest (no config.js, e.g. the
 // e2e suite) and an already-signed-in return visit have nothing to create and skip it.
 function membNeedsEmail(){
@@ -17793,6 +17817,39 @@ function membEmailError(msg){
   const err=$("membEmailErr"); if(!err) return;
   err.hidden=!msg; err.textContent=msg||"";
 }
+// CAS-1099: shown under the email field instead of requesting a code, when email_has_account(email) says
+// this email already has an account — paired with membAcctExistsHide, called whenever the field is
+// resubmitted or the screen is reopened fresh.
+function membAcctExistsShow(email){
+  membAcctExistsEmail=email;
+  const el=$("membAcctExists"); if(el) el.hidden=false;
+}
+function membAcctExistsHide(){
+  membAcctExistsEmail=null;
+  const el=$("membAcctExists"); if(el) el.hidden=true;
+}
+// CAS-1099: discards the whole onboarding draft in memory — shared by membSignInFromAcctExists below and
+// membCompleteNewMembership's own 'account_exists' outcome. An existing account is never merged with a
+// draft (do-not-re-raise): without this, the draft's agents would still be sitting in `cascades` the next
+// time a real sign-in's own fold-in logic runs (CAS-393/733/734), and fold straight into the account they
+// were never a part of.
+function discardOnbDraft(){
+  cascades.length=0;
+  prefs.on=false; prefs.touched=false; prefs.sub=new Set(); prefs.store=new Set();
+  tasteBase=baseDefaults();
+  notifyPrefs=notifyPrefsDefault();
+  occasionReg.length=0;
+  onbFlow.workingAgents=null;
+}
+// The membership screen's own "Sign in" button, shown only alongside membAcctExistsShow's message —
+// abandons the draft exactly as any other "back to splash" exit would (CAS-1099 change 4: the draft was
+// never written anywhere, so there is nothing left to carry into Sign in but the email itself).
+window.membSignInFromAcctExists=()=>{
+  const email=membAcctExistsEmail;
+  discardOnbDraft();
+  closeMembership();
+  if(window.CascadeAuth && typeof window.CascadeAuth.openSignIn==="function") window.CascadeAuth.openSignIn(email);
+};
 window.membStart=()=>{
   if(membStarting) return;              // second tap while the listing builds — ignore, don't queue
   const needsEmail=membNeedsEmail();
@@ -17805,6 +17862,7 @@ window.membStart=()=>{
       return;
     }
     membEmailError(null);
+    membAcctExistsHide();
   }
   membStarting=true;
   const btn=document.querySelector(".membcta");
@@ -17824,19 +17882,37 @@ window.membStart=()=>{
   logEvent("membership_start");
   // The membership screen stays up until the listing is ready, so the spinner is what the user watches
   // instead of a half-built page. closeMembership() is the last thing, once there is something to reveal.
-  const proceed=()=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    try{ membStartWork(); }
-    finally{ idle(); }
+  // CAS-1099: viaNewSignup tells membStartWork() whether this run is a genuinely new, signed-out signup
+  // (drive complete_membership) or an already-signed-in return (the old direct-commit body, unchanged).
+  const proceed=(viaNewSignup)=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    membStartWork(viaNewSignup).finally(idle);
   }));
   if(needsEmail){
-    // CAS-1056: continueWithEmail only requests a code now — it never signs in on its own. The code is
-    // entered in the account modal's own verify step (this screen carries no code-entry UI of its own),
-    // which runs proceed() itself once that code confirms; idle() just hands this button back meanwhile.
-    window.CascadeAuth.continueWithEmail(email, { createUser: true }).then(result=>{
-      if(result.ok){ window.CascadeAuth.openVerify(email, proceed); idle(); }
-      else{ membEmailError(result.error||"Could not send a sign-in code — try again."); idle(); }
+    // CAS-1099: set before any network call below — the SIGNED_IN event a confirmed code produces can
+    // otherwise race ahead of membStartWork()'s own complete_membership() call (see the cascade-auth-change
+    // listener's own comment). Cleared by membCompleteNewMembership() once that RPC actually resolves.
+    onbMembershipInFlight=true;
+    const client=window.CascadeAuth.client;
+    // CAS-1099 change 2: before requesting a code at all, ask whether this email already has an account —
+    // if so, send no code; show the message and Sign in button instead.
+    const checkExisting = client ? client.rpc("email_has_account", {p_email:email}) : Promise.resolve({data:false, error:null});
+    checkExisting.then(({data, error})=>{
+      if(error) console.warn("email_has_account", error);
+      if(data===true){
+        onbMembershipInFlight=false;
+        membAcctExistsShow(email);
+        idle();
+        return;
+      }
+      // CAS-1056: continueWithEmail only requests a code now — it never signs in on its own. The code is
+      // entered in the account modal's own verify step (this screen carries no code-entry UI of its own),
+      // which runs proceed(true) itself once that code confirms; idle() just hands this button back meanwhile.
+      window.CascadeAuth.continueWithEmail(email, { createUser: true }).then(result=>{
+        if(result.ok){ window.CascadeAuth.openVerify(email, ()=>proceed(true)); idle(); }
+        else{ onbMembershipInFlight=false; membEmailError(result.error||"Could not send a sign-in code — try again."); idle(); }
+      });
     });
-  } else proceed();
+  } else proceed(false);
 };
 // ---- FIRST-RUN TUTORIAL (CAS-976) — five coach marks anchored to the real listing controls, shown once
 // per account the first time the listing paints after onboarding. "Seen" is account-namespaced the same
@@ -17967,9 +18043,16 @@ function replayTutorial(){
   showAgentsHome();
   requestAnimationFrame(()=>requestAnimationFrame(startTutorial));
 }
-function membStartWork(){
+async function membStartWork(viaNewSignup){
   try{ localStorage.setItem("cascade_onboarded","1"); }catch(e){}
-  if(!cascades.length){
+  if(viaNewSignup){
+    // CAS-1099: the brand-new, signed-out signup path — complete_membership() is the only way this
+    // draft reaches the server. An error leaves the draft in memory and the membership screen open for a
+    // retry (membStart() calls straight back into this, needsEmail now false since the code already
+    // verified), same "allow retry" rule the ticket's own change 3 describes.
+    const outcome = await membCompleteNewMembership();
+    if(outcome==="error") return;
+  } else if(!cascades.length){
     const s=STARTERS.find(x=>x.key==="streaming");   // CAS-143: the R5 presets replaced watch_tonight
     if(s){ draft=normCascade(draftFromTemplate({key:s.key, icon:s.icon, name:s.name, crit:s.crit})); commitDraft(); }
   }
@@ -17991,6 +18074,41 @@ function membStartWork(){
   // applyDeepLink() so a deep-link destination it opened wins; maybeStartTutorial's own "any other screen
   // open" check is what actually enforces that.
   maybeStartTutorial();
+}
+// CAS-1099: the only path a brand-new onboarding draft reaches the server through — one complete_membership
+// RPC call, built straight from this device's in-memory draft. Reuses the exact row shapes an ordinary
+// signed-in save already pushes (cascadeToRow for an agent; userPrefsRow/prefsRow, minus user_id, for
+// prefs/notify) rather than re-deriving them. Returns 'created'/'account_exists' on success, 'error' (the
+// draft kept in memory, nothing sent) otherwise.
+async function membCompleteNewMembership(){
+  const auth=window.CascadeAuth, client=auth && auth.client, CP=window.CascadePersistence;
+  if(!client || !CP){
+    onbMembershipInFlight=false;
+    membEmailError("Account sync is not available right now.");
+    return "error";
+  }
+  const prefsFields=CP.userPrefsRow(); delete prefsFields.user_id;
+  const notifyFields=CP.prefsRow(); delete notifyFields.user_id;
+  const agents=cascades.map(c=>{
+    const row=window.CascadeShape.cascadeToRow(c);
+    return { id:row.id, name:row.name, criteria:row.criteria, alert_moments:row.alert_moments, active:row.active };
+  });
+  let outcome="error", errMsg=null;
+  try{
+    const { data, error } = await client.rpc("complete_membership", { p:{ agents, prefs:prefsFields, notify:notifyFields } });
+    if(error) errMsg=error.message;
+    else outcome=data;
+  }catch(e){ errMsg=(e&&e.message)||String(e); }
+  onbMembershipInFlight=false;
+  if(outcome!=="created" && outcome!=="account_exists"){
+    membEmailError(errMsg||"Could not save your account — check your connection and try again.");
+    return "error";
+  }
+  if(outcome==="account_exists") discardOnbDraft();   // AC: an existing account is never merged with a draft
+  onbDraftModeOn=false;   // membership is settled either way — ordinary save/sync resumes from here
+  await CP.fireAccountFanout("membership-complete");
+  if(outcome==="account_exists") toast("You already have a Cascade account — you're signed in.");
+  return outcome;
 }
 // ================= CAS-205: the membership setup bar is gone ==========================================
 // It was the last thing between the header and the Cascades deck, and by 0.8 it was arguing with the flow
@@ -19488,22 +19606,11 @@ else if(dedupedN)
     if(nextSuffix === acctSuffix) return;
     const fromGuest = acctSuffix === "guest";
     migrateLegacyAcctKeysOnce();
-    // CAS-1114: onboarding runs signed out, so everything it set (services, occasions, watch windows,
-    // notification choices) lives only under the guest namespace. A guest -> new-uid switch immediately
-    // after onboarding just committed its roster (the marker below) carries those guest values into the
-    // new account's own namespace here, rather than leaving the (empty, brand-new) account keys to be read
-    // as "nothing was ever chosen". They then reach the server through the existing load path — loadUserPrefs/
-    // loadNotifyPrefs push them when the account has no row of its own yet, or discard them in favour of the
-    // account's own row when it already has one, exactly as any other local edit would. Any other guest -> uid
-    // switch (no onboarding just completed) is untouched — carryOnboarding is false and nothing here fires.
-    const carryOnboarding = fromGuest && nextSuffix!=="guest" && !!onbV2CommittedLoad();
-    if(carryOnboarding){
-      ["cascade_prefs", BASE_KEY, WATCH_PREFS_KEY, NOTIFY_PREFS_KEY, OCCASIONS_KEY].forEach(base=>{
-        const raw = localStorage.getItem(base+"@guest");
-        if(raw!=null){ try{ localStorage.setItem(base+"@"+nextSuffix, raw); }catch(e){} }
-        try{ localStorage.removeItem(base+"@guest"); }catch(e){}
-      });
-    }
+    // CAS-1099: CAS-1114's own carry-across-the-switch step is gone — onboarding no longer writes services,
+    // occasions, taste or notify choices under the guest namespace at all (onbDraftModeOn keeps every one
+    // of them memory-only), so there is nothing left under "@guest" for a guest -> new-uid switch to carry
+    // forward. The draft reaches the server through complete_membership() instead, and acctLoad()/
+    // loadUserPrefs/loadNotifyPrefs read it straight back off the account afterwards.
     acctSuffix = nextSuffix;
     try{ localStorage.setItem(ACCT_SUFFIX_KEY, acctSuffix); }catch(e){}
     // CAS-393/733/734's "offer up what's genuinely new" only ever makes sense for a Cascade built on THIS
@@ -19749,21 +19856,15 @@ else if(dedupedN)
     // confirmed (absent from rawById) AND this device has never confirmed either (absent from oldKnown, so
     // this isn't a row another device deleted), is genuinely new — folded straight in, matched by id. No
     // dialog, no prompt: CAS-212's merge sheet (and the guest agent store it existed to reconcile) is gone.
-    // CAS-959: onboarding's own roster used to be treated as this same "genuinely new" case — the membership
-    // step's email gate (CAS-387) can sign into an account seconds after onboarding committed the agents it
-    // just built, and that account can already hold its own roster from an earlier run (a second device, or
-    // a sign-out/back-in that walked the generator again before this load resolved). Folding the draft in
-    // duplicated it. A draft still sitting in ONB_V2_COMMITTED_KEY, unconfirmed by any account, is excluded
-    // from the fold whenever the account being loaded already has agents of its own — the account's roster
-    // wins outright and the draft is dropped, never merged in.
-    const onbDraftIds = new Set((onbV2CommittedLoad()||[]).map(a=>a.id));
-    const localOnly = localOnes.filter(x=>!rawById.has(x.id) && !oldKnown.has(x.id)
-      && !(rawRows.length && onbDraftIds.has(x.id)));
+    // CAS-1099: onboarding's own roster no longer reaches this fold-in at all — it is created server-side
+    // by complete_membership() (using the SAME client-generated ids this device already holds), and this
+    // very loadAccount() call is membCompleteNewMembership()'s own explicit read-back afterwards. By the
+    // time this runs, rawById already has every one of the draft's ids, so the ordinary "no account
+    // counterpart" check below excludes them from localOnly on its own — no carve-out needed (CAS-959's own
+    // carve-out, needed only while the draft reached the server through a separate, racing sync pass, is
+    // retired along with that path).
+    const localOnly = localOnes.filter(x=>!rawById.has(x.id) && !oldKnown.has(x.id));
     if(localOnly.length) remote=[...remote, ...localOnly];
-    // The draft never gets a second chance to commit itself once dropped here — clear its marker (and the
-    // in-memory roster v2_done cached) so re-entering onboarding, if the flow is still open, builds fresh
-    // rather than re-showing/re-committing the discarded set.
-    if(rawRows.length && onbDraftIds.size){ onbV2CommittedClear(); onbFlow.workingAgents=null; }
     // CAS-658/CAS-734: a local copy sharing an id with an account row is the SAME Cascade, not a new one —
     // the account already has it. Which side wins is resolveCascadeConflict's call now, never an assumption
     // in the local copy's favour with nothing to back it up — that unconditional assumption was this
@@ -19936,7 +20037,12 @@ else if(dedupedN)
         // CAS-517: this device now knows it's an account device, so its NEXT cold start starts out
         // waiting on loadAccount() before trusting an empty `cascades` as the real answer.
         try{ localStorage.setItem("cascade_had_account","1"); }catch(e){}
-        fireAccountFanout('auth-change');
+        // CAS-1099: a brand-new membership sign-in fires this SIGNED_IN event before membStartWork() has
+        // had any chance to call complete_membership() — letting this run its own loadAccount()/
+        // replayOutbox() here would race it, reaching the server through the old whole-table sync instead
+        // of the one complete_membership() call the ticket requires. membCompleteNewMembership() clears the
+        // flag and drives the equivalent fan-out itself once that RPC actually resolves.
+        if(!onbMembershipInFlight) fireAccountFanout('auth-change');
       }
     } else if(currentUser !== null){
       // CAS-733: signed out → the agent list empties (loadGuest, above) rather than reverting to an
@@ -21330,7 +21436,8 @@ else if(dedupedN)
   const unavailable = async () => ({ ok: false, error: 'Account sync is not available right now.' });
   const api = window.CascadeAuth = { enabled: configured, client: null, user: null, session: null, status: 'guest',
     continueWithEmail: unavailable, verifyEmailCode: unavailable,
-    openVerify: () => { toastSafe("Account sync is not available right now."); } };
+    openVerify: () => { toastSafe("Account sync is not available right now."); },
+    openSignIn: () => { toastSafe("Account sync is not available right now."); } };
   const announce = () => window.dispatchEvent(new CustomEvent('cascade-auth-change',
     { detail: { user: api.user, session: api.session, status: api.status } }));
 
@@ -21374,6 +21481,15 @@ else if(dedupedN)
   // panel) — it hands off here instead: open this modal straight onto the verify step for the code it
   // just requested, and run its own continuation once that code is confirmed.
   api.openVerify = (email, onVerified) => { openAuth(); enterVerify(email, onVerified); };
+  // CAS-1099: the membership screen's "already have an account" message hands off here — opens this
+  // modal on the plain email step (not straight to verify, since that step has not requested a code for
+  // this email at all), pre-filled so the user only has to press Continue.
+  api.openSignIn = (email) => {
+    openAuth();
+    showPanel('authSignedOut');
+    gid('authEmail').value = email || '';
+    gid('authMsg').textContent = '';
+  };
 
   // CAS-317: found while verifying this module — setSignedIn/Out/Guest each referenced an undefined
   // `btn` (the header account icon CAS-345 removed in favour of the top-menu Account item), throwing

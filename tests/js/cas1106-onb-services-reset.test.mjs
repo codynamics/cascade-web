@@ -40,3 +40,31 @@ test("CAS-1106: a signed-in device's own picks are untouched by flowStart() (+ N
   assert.equal(E.prefs.sub.size, 1, "a signed-in device's own service picks must survive flowStart()");
   assert.equal(E.prefs.store.size, 1, "a signed-in device's own service picks must survive flowStart()");
 });
+
+// CAS-1099 AC5: the same leftover-@guest-key problem, now also covering taste, notify choices and the
+// occasions register — and, for a configured (CascadeAuth.enabled) build, the reset itself must not be
+// written back either, since the whole draft stays in memory until membership completes.
+test("CAS-1099 AC5: flowStart() also clears leftover @guest taste/notify/occasions for a configured, signed-out run, in memory only", () => {
+  const store = new Map();
+  store.set("cascade_prefs@guest", JSON.stringify({ on:false, touched:true, sub:["Netflix"], store:["Apple TV Store"] }));
+  store.set("cascade_taste_base@guest", JSON.stringify({ genres:["Horror"], year:2000, langs:["fr"], ageLo:0, ageHi:1 }));
+  store.set("cascade_notifyprefs@guest", JSON.stringify({ inApp:true, emailOn:true, email:"stale@example.com" }));
+  store.set("cascade_occasions@guest", JSON.stringify([{ id:"me", name:"Me" }]));
+  const E = loadEngine({ localStorageStore: store });
+  E.CascadeAuth.enabled = true;   // a configured build — membNeedsEmail() now depends on sign-in status alone
+
+  assert.equal(E.occasionReg.length, 1, "sanity: the engine loaded the leftover @guest occasion");
+
+  E.flowStart();
+
+  assert.equal(E.onbDraftModeOn, true, "a configured, signed-out run must be in draft mode");
+  assert.equal(E.prefs.sub.size, 0, "services must still reset");
+  assert.equal(JSON.stringify(E.tasteBase.genres), JSON.stringify([]), "taste must reset to defaults, not the leftover @guest pick");
+  assert.equal(E.notifyPrefs.email, "", "notify choices must reset to defaults, not the leftover @guest pick");
+  assert.equal(E.occasionReg.length, 0, "the occasions register must reset to empty");
+
+  assert.equal(store.get("cascade_taste_base@guest"), JSON.stringify({ genres:["Horror"], year:2000, langs:["fr"], ageLo:0, ageHi:1 }),
+    "the reset must not be written back for a configured build — onbDraftModeOn keeps it memory-only");
+  assert.equal(store.get("cascade_occasions@guest"), JSON.stringify([{ id:"me", name:"Me" }]),
+    "same for the occasions register — the leftover key itself is left untouched, just never trusted again");
+});

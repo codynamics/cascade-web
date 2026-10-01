@@ -123,3 +123,13 @@ export async function signInDirect(email){
   if(error) throw new Error(`signInDirect(${email}) failed: ${error.message}`);
   return client;
 }
+
+/** The real email_has_account(p_email) RPC, called the same way the app itself does — anon key, no
+ * session — rather than through the service_role `admin` client, which the migration never grants EXECUTE
+ * on this function to. */
+export async function emailHasAccount(email){
+  const client = createClient(SUPABASE_URL, ANON_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data, error } = await client.rpc("email_has_account", { p_email: email });
+  if(error) throw new Error(`email_has_account(${email}) failed: ${error.message}`);
+  return data;
+}

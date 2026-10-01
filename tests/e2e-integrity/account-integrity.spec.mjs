@@ -5,23 +5,27 @@
 // rows, not only the screen — a regression that only breaks the screen while quietly leaving the account
 // intact is not the class of bug this suite exists to catch.
 //
-// What must pass now (decision, 2026-10-01 build chat, scoping CAS-1093 AC2): exactly S2 and S3. Every
-// other scenario is `test.fixme()`, not deleted — including S4 and S7-S9, which have each passed in CI
-// before this decision but are fixme'd anyway because their own features/tickets aren't done yet. Later
-// tickets in the server-first account-store rework
+// What must pass now (decision, 2026-10-01 build chat, scoping CAS-1093 AC2): S2, S3, plus S1/S6/S10 added
+// by CAS-1099 below. Every other scenario stays `test.fixme()`, not deleted — including S4 and S7-S9, which
+// have each passed in CI before that decision but are fixme'd anyway because their own features/tickets
+// aren't done yet. Later tickets in the server-first account-store rework
 // (https://codynamics.atlassian.net/wiki/spaces/Cascade/pages/64815105) un-fixme them as the features they
 // depend on land, and add scenarios of their own for their own tables.
-//   - S1, S6: once onboarding commits through complete_membership (CAS-1098/CAS-1099).
 //   - S4, S5: once agents move onto the account store (CAS-1094+).
 //   - S7, S8, S9: added by later tickets (CAS-1096, CAS-1095) — theirs to un-fixme.
 // S13 (CAS-1102, migration 0003_delete_guard.sql) asserts on that migration's own trigger directly via a
 // signed-in supabase-js client, not the browser — see its own comment below.
+// CAS-1099: S1 and S6 are un-fixme'd below — onboarding now commits through complete_membership(), the
+// migration 0002 RPC. S10 (abandon before membership) is new. AC6's own scenario number (originally "S14")
+// is stale — CAS-1137 claimed S14 for an unrelated usage_events fix in the meantime — S6 below proves the
+// same email_has_account gate AC6 describes as part of its own "agents intact" story, so no separate
+// scenario was added only to claim a fresh number.
 import { test, expect } from "@playwright/test";
 import {
   admin, createTestUser, seedCascades, liveCascades, testEmail,
-  gotoIntegrityFresh, signInFromSplash, signOutFromAccount, signInDirect,
+  gotoIntegrityFresh, signInFromSplash, signOutFromAccount, signInDirect, fetchOtp, emailHasAccount,
 } from "./helpers.mjs";
-import { settleListing } from "../e2e/helpers.mjs";
+import { settleListing, finishFlow } from "../e2e/helpers.mjs";
 
 function idsOf(rows){ return rows.map(r => r.id).slice().sort(); }
 
@@ -149,9 +153,29 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
 
 test("S1: a new member's onboarded roster exists on the server", async ({ page }) => {
   // Walk real onboarding (splash → flow → membScreen → sign-up) to a brand-new account and assert its
-  // roster exists in `cascades` server-side. Fixme'd because onboarding doesn't commit through
-  // complete_membership yet — it still writes locally-then-syncs, which this suite isn't asserting on.
-  test.fixme(true, "until onboarding commits through complete_membership");
+  // roster exists in `cascades` server-side, through the real complete_membership() RPC — not a direct
+  // insert this suite would otherwise be blind to.
+  const email = testEmail("s1");
+
+  await gotoIntegrityFresh(page);
+  await page.locator("#splashCta").click();
+  await finishFlow(page);
+
+  await page.locator("#membEmail").fill(email);
+  await page.locator(".membcta").click();
+  await expect(page.locator("#authVerify")).toBeVisible({ timeout: 30_000 });
+  const code = await fetchOtp(email);
+  await page.locator("#authCode").fill(code);
+  await page.locator("#authVerifyBtn").click();
+  await expect(page.locator("#membScreen.open")).toBeHidden({ timeout: 30_000 });
+  await settleListing(page);
+
+  const userId = await page.evaluate(() => window.CascadeAuth.user.id);
+  const onScreenIds = await page.evaluate(() => cascades.map(c => c.id).sort());
+  expect(onScreenIds.length, "onboarding must have committed at least one agent").toBeGreaterThan(0);
+
+  const live = await liveCascades(userId);
+  expect(idsOf(live)).toEqual(onScreenIds);
 });
 
 test("S4 (second half): editing the same agent on both contexts gets a conflict toast, no data lost", async ({ page }) => {
@@ -170,10 +194,56 @@ test("S5: deleting one agent on A leaves the others intact on B", async ({ page 
 });
 
 test("S6: onboarding into a previously-held account by email keeps that account's agents intact", async ({ page }) => {
-  // A context that previously held account X (signed out, or never synced) walks onboarding again and
-  // completes membership with X's email — X's existing server-side agents must survive un-touched, not be
-  // overwritten by the fresh onboarding roster. Fixme'd alongside S1: both need complete_membership.
-  test.fixme(true, "until onboarding commits through complete_membership");
+  // A fresh context walks onboarding, building its own draft roster, then types an email that already has
+  // an account — X's existing server-side agents must survive un-touched, not be overwritten by the fresh
+  // onboarding roster. AC6's own gate (email_has_account, no code sent) is what actually prevents the
+  // overwrite here — this is also the scenario that proves AC6 (see the header comment on S14's stale number).
+  const email = testEmail("s6");
+  const user = await createTestUser(email);
+  const seeded = await seedCascades(user.id, [{ name: "Existing Agent" }]);
+
+  await gotoIntegrityFresh(page);
+  await page.locator("#splashCta").click();
+  await finishFlow(page);   // builds a fresh draft roster in memory, never reaching the server
+
+  await page.locator("#membEmail").fill(email);
+  await page.locator(".membcta").click();
+  // AC6: no code is requested — the message and Sign in button show instead.
+  await expect(page.locator("#membAcctExists")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("#authVerify")).toBeHidden();
+  await page.locator("#membSigninBtn").click();
+  await expect(page.locator("#authSignedOut")).toBeVisible();
+  expect(await page.locator("#authEmail").inputValue()).toBe(email);
+  await page.locator("#authContinue").click();
+  await expect(page.locator("#authVerify")).toBeVisible({ timeout: 30_000 });
+  const code = await fetchOtp(email);
+  await page.locator("#authCode").fill(code);
+  await page.locator("#authVerifyBtn").click();
+  await expect(page.locator("#authModal.open")).toBeHidden({ timeout: 30_000 });
+  await settleListing(page);
+
+  const onScreenIds = await page.evaluate(() => cascades.map(c => c.id).sort());
+  expect(onScreenIds).toEqual(idsOf(seeded));
+  const live = await liveCascades(user.id);
+  expect(idsOf(live)).toEqual(idsOf(seeded));
+});
+
+test("S10: abandoning onboarding before membership completes leaves no server-side rows for that email", async ({ page }) => {
+  // Change 4's exact shape: a reload abandons the draft (never written anywhere) rather than completing
+  // membership. email_has_account — the real server-side check this ticket's own email gate uses — must
+  // say false, proving no row for this email exists at all, not merely that `cascades` is empty for it.
+  const email = testEmail("s10");
+
+  await gotoIntegrityFresh(page);
+  await page.locator("#splashCta").click();
+  await finishFlow(page);
+  await page.locator("#membEmail").fill(email);
+
+  await page.reload();
+  await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
+
+  const hasAccount = await emailHasAccount(email);
+  expect(hasAccount, "abandoning before membership must leave no server-side account for this email").toBe(false);
 });
 
 // CAS-1096: verdicts (user_films) moved onto acctOp — S7 proves a verdict set by hand on one device reaches
