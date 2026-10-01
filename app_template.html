@@ -20005,13 +20005,17 @@ else if(dedupedN)
     const allLoads = Promise.allSettled([
       loadAccount(), loadAccountFilms(), loadNotifyPrefs(), loadRealAlerts(),
       loadFilmPicks(), loadInvites(), loadFriends(),
-      loadFilmWatches().finally(()=>{ filmWatchReady=true; }),
+      // CAS-1133: recomputeFound()'s own Watch-On placement step (the thing that decides which tab a newly
+      // admitted film lands in) is gated on both flags below via `placementReady` and silently skips placement
+      // — not just this pass, forever — if render() never runs again after they flip true. Every other flag
+      // in this fan-out (CAS-1053's userPrefsReady) already re-renders itself for exactly this reason.
+      loadFilmWatches().finally(()=>{ filmWatchReady=true; if(typeof render==="function") render(); }),
       // CAS-1053: loadUserPrefs already re-renders on its own successful-apply path, but a branch that
       // returns early (no row yet, or a genuinely pending local edit) never does — without this, a device
       // that took one of those branches would be stuck on watchPrefsLoadingHTML() until some unrelated
       // render() happened to fire.
       loadUserPrefs().finally(()=>{ userPrefsReady=true; if(typeof render==="function") render(); }),
-      loadAgentFilms().finally(()=>{ agentFilmsReady=true; }),
+      loadAgentFilms().finally(()=>{ agentFilmsReady=true; if(typeof render==="function") render(); }),
     ]);
     allLoads.then(()=>{
       const t1 = performance.now();
