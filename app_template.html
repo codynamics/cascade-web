@@ -7296,6 +7296,7 @@ function openFilmPage(id){
     : `<div class="fpclose"><button type="button" class="ebtn" onclick="closeFilmPage()">✕</button></div>
        <div class="fptitle">Film not found</div>
        <div class="fpmeta">This title isn't in Cascade's catalogue right now.</div>`;
+  observeLazyPosters(el);   // CAS-1103: filmPageHTML shares cardTopHTML's poster tile with the card
   el.classList.add("open"); lockBodyScroll(true);
   // CAS-1119: the coach-mark tour must never sit underneath the film page — a film page that opens WHILE
   // the tour is showing (a late-resolving invite route, or another #/film/ hashchange) closes it at once
@@ -7595,6 +7596,32 @@ window.closeVideoModal=()=>{
   $("vidFrame").src="";   // stop playback — an emptied src beats a paused iframe still holding the stream open
 };
 $("videoModalClose").onclick=closeVideoModal;
+// ---- CAS-1103: lazy posters ------------------------------------------------------------------
+// Card, film-page (cardTopHTML is shared by both, CAS-1119) and splash-wall posters are TMDB images with no
+// lazy loading today — a long listing or the 54-tile splash wall fetched every poster on paint, most of
+// them never scrolled into view. Elements carry their image in data-lazybg instead of an inline
+// background-image; this observer sets the real background only once the tile is about to be on screen,
+// then stops watching it. observe() on an already-observed target is a documented no-op, so callers never
+// need to track which tiles were already registered. Falls back to loading immediately if
+// IntersectionObserver is unavailable, so a poster can never go permanently blank.
+const posterObserver = (typeof IntersectionObserver!=="undefined") ? new IntersectionObserver(entries=>{
+  entries.forEach(entry=>{
+    if(!entry.isIntersecting) return;
+    const el=entry.target;
+    if(el.dataset.lazybg){ el.style.backgroundImage=`url(${el.dataset.lazybg})`; delete el.dataset.lazybg; }
+    posterObserver.unobserve(el);
+  });
+}, {rootMargin:"200px"}) : null;
+function lazyPoster(el){
+  if(!el || !el.dataset || !el.dataset.lazybg) return;
+  if(!posterObserver){ el.style.backgroundImage=`url(${el.dataset.lazybg})`; delete el.dataset.lazybg; return; }
+  posterObserver.observe(el);
+}
+// Scopes to `root` (default the whole document) so a freshly-inserted batch of cards, or the splash wall's
+// own single paint, only re-scans what it just added rather than the entire listing every time.
+function observeLazyPosters(root){
+  (root||document).querySelectorAll("[data-lazybg]").forEach(lazyPoster);
+}
 // CAS-1119: the expanded card's whole "about this film" block — poster (with trailer play button), title,
 // age rating and Cascade score, genres/language and the full synopsis, Budget/Gross, People/Critics, badges,
 // Director/Cast. Shared verbatim between cardHTML (below) and the invite/film page (filmPageHTML) so the
@@ -7608,7 +7635,9 @@ function cardTopHTML(m){
   // CAS-135: the chip reads the film's LANGUAGE (e.g. "English"), now that selection is language-based —
   // not the old genre-ish "Western" culture bucket.
   const cult = m.language ? ` · <span class="culttag">${langName(m.language)}</span>` : "";
-  const poster = m.poster ? `background-image:url(https://image.tmdb.org/t/p/w185${m.poster})` : "";
+  // CAS-1103: no inline background-image — lazyPoster/observeLazyPosters set it once the tile nears the
+  // viewport (data-lazybg carries the URL until then).
+  const posterAttr = m.poster ? ` data-lazybg="${escA(`https://image.tmdb.org/t/p/w185${m.poster}`)}"` : "";
   // The ▶ on the poster goes straight to the film's first trailer. No trailer, no button.
   const firstTrailer=(m.trailers||[])[0];
   const play = firstTrailer
@@ -7621,7 +7650,7 @@ function cardTopHTML(m){
   return `<div class="ctop">
       <!-- CAS-276: the tombstone is the POSTER, and nothing else. -->
       <div class="ptomb">
-        <div class="poster" style="${poster}">${play}</div>
+        <div class="poster"${posterAttr}>${play}</div>
       </div>
       <!-- CAS-373: the title text gets its own span so it (not the badge) is what truncates — the rating
            badge is flex:none and always shows, collapsed or expanded. -->
@@ -8596,20 +8625,54 @@ function isRecent(m){
   return !!d && daysSince(d) < NEW_DAYS;
 }
 
-// ---- CAS-488/503: runtime catalogue refresh + live clock ---------------------------------------
+// ---- CAS-488/503/1103: runtime catalogue refresh + live clock -----------------------------------
 // MOVIES/BUILD_DATE above ship baked at build time so first paint needs no network — but a tab left open for
-// hours (or days) would otherwise never see a film added, a status change, or a glow recompute. movies.json
-// is the exact payload the build reads, already served next to index.html (same origin, no new publishing
-// step). {cache:"no-cache"} forces a real conditional request every poll instead of trusting the browser's
-// own freshness window — GitHub Pages already answers those with a 304 when nothing changed, so an
-// unchanged poll costs a round trip of headers, not the ~11MB body (verified against the live URL).
-let catalogueEtag = null, cataloguePolling = false;
+// hours (or days) would otherwise never see a film added, a status change, or a glow recompute.
+// CAS-1103: polling the full movies.json body every tick cost an ~11MB parse each time on iOS — its
+// capacitor://localhost origin is cross-origin to the real host, so the ETag response header the old web-only
+// 304 trick relied on is invisible there (the Fetch spec exposes only a handful of "simple" response headers
+// cross-origin), and the installed app downloaded and parsed the whole file every 3 minutes while open. The
+// pipeline (CAS-1101) now also publishes a tiny pointer, catalogue.json ({file, hash, generated, count}),
+// alongside a compact content-hashed catalogue/catalogue.<hash>.json carrying only the fields the app reads.
+// Polling the pointer and fetching the hashed file only when its hash actually changes turns a guaranteed
+// ~11MB round trip into a few bytes on almost every poll, on both platforms — the ETag approach is retired
+// with it. (Boot still reads the build-inlined MOVIES array unchanged — deferred, see this ticket's
+// build-chat decision; only this steady-state poll moved.)
+let catalogueHash = null, cataloguePolling = false;
 // CAS-527: the installed iOS app has no server.url (capacitor.config.json), so its WebView runs from a
 // locally bundled www/ with no live network origin — a relative fetch resolves against that empty bundle
 // and silently no-ops forever. Native builds must hit the real production host instead; the web build keeps
 // its same-origin relative fetch (no CORS, unaffected by whatever domain it's served from).
-const CATALOGUE_URL = (typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform())
-  ? "https://cascademovies.com/movies.json" : "movies.json";
+const CATALOGUE_IS_NATIVE = typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform();
+const CATALOGUE_POINTER_URL = CATALOGUE_IS_NATIVE ? "https://cascademovies.com/catalogue.json" : "catalogue.json";
+// The pointer's own `file` is always a site-root-relative path (e.g. "catalogue/catalogue.<hash>.json") —
+// resolved against the same host switch the pointer URL above uses.
+const catalogueFileUrl = file => CATALOGUE_IS_NATIVE ? `https://cascademovies.com/${file}` : file;
+const CATALOGUE_CACHE_NAME = "cascade-catalogue";
+// CAS-1103: the hashed file's name IS its content hash, so unlike the pointer it's safe — and worth —
+// caching with the Cache API: a later poll that already has today's hash never needs the network for it at
+// all. The Cache API is Promise-only and not guaranteed everywhere (it can throw under capacitor://'s
+// WKWebView on some iOS versions), so every step here degrades to a plain fetch rather than ever failing
+// the poll outright.
+async function fetchCatalogueFile(url){
+  let cache = null;
+  try{ if(typeof caches!=="undefined") cache = await caches.open(CATALOGUE_CACHE_NAME); }catch(e){ cache = null; }
+  if(cache){
+    try{ const hit = await cache.match(url); if(hit) return hit.json(); }catch(e){}
+  }
+  const res = await fetch(url, {cache:"no-cache"});
+  if(!res.ok) throw new Error("catalogue fetch failed: "+res.status);
+  const records = await res.clone().json();
+  if(cache){
+    // Only the file just fetched is worth keeping — anything else is a stale hash nobody will ask for again.
+    try{
+      await cache.put(url, res);
+      const keys = await cache.keys();
+      await Promise.all(keys.filter(k=>k.url!==res.url).map(k=>cache.delete(k)));
+    }catch(e){}
+  }
+  return records;
+}
 // Applied only when nothing is mid-interaction. Every modal/full-screen panel/onboarding step/filmpage
 // locks the body via lockBodyScroll(true) while open (openModal and its siblings all share that convention),
 // and a per-card Watch/Notify/Lists popup or the deck's own filter panel (.cpop) lives INSIDE the very DOM
@@ -8639,34 +8702,38 @@ async function pollCatalogue(){
     let res;
     const _t460fetch = performance.now();
     console.log('[CAS-460] pollCatalogue fetch start', _t460fetch);
-    try{ res = await fetch(CATALOGUE_URL, {cache:"no-cache"}); }
+    try{ res = await fetch(CATALOGUE_POINTER_URL, {cache:"no-cache"}); }
     catch(e){ res = null; }                     // offline or blocked — the baked/last-known catalogue keeps serving
     console.log('[CAS-460] pollCatalogue fetch end', performance.now(), 'elapsed_ms', (performance.now()-_t460fetch).toFixed(1), 'ok', !!(res && res.ok));
     if(res && res.ok){
-      const etag = res.headers.get("etag");
-      if(!etag || etag!==catalogueEtag){         // unchanged etag — skip parsing an ~11MB body for nothing
-        let payload = null;
-        try{ payload = await res.json(); }catch(e){}
-        if(payload && Array.isArray(payload.movies)){
-          catalogueEtag = etag;
-          MOVIES = canonMovieAgeRatings(payload.movies);
-          // CAS-742: _scaleInferCache/_awardRankCache are keyed off tmdb_id and read m.budget/m.award, both
-          // properties of the REPLACED array's own films — nothing else in the swap touches them, so this is
-          // the one point that must.
-          invalidateComputeCaches();
-          // BUILD_DATE tracks the catalogue's own build stamp; the header's freshness-date label reads it
-          // directly and isn't part of render()'s rebuild, so it's kept honest here — unconditionally, since
-          // a one-line text write can never disturb an open modal/drawer/popup the way a full rebuild could.
-          // CAS-689: no "Updated " prefix — see the initial-paint site's comment.
-          if(payload.generated){ BUILD_DATE = payload.generated; $("updated").textContent = fmtDay(BUILD_DATE); }
-          captureClaimedStatus();
-          // CAS-490: MOVIES was just replaced wholesale, so any ?fixtures=1 merge (CAS-486) is gone — re-apply
-          // it here rather than only on cascade-auth-change, so a fixture film survives a catalogue refresh
-          // instead of silently vanishing the next time the tab regains focus. No-ops unless the gate is met.
-          await maybeLoadFixtures();
-          rederiveStatuses();
-          dirty = true;
-        }
+      let pointer = null;
+      try{ pointer = await res.json(); }catch(e){}
+      // CAS-1103: the pointer is the whole catalogue swap's gate now — a hash equal to what's already live
+      // means nothing changed, so the ~11MB hashed file is never even requested.
+      if(pointer && pointer.hash && pointer.hash!==catalogueHash){
+        try{
+          const records = await fetchCatalogueFile(catalogueFileUrl(pointer.file));
+          if(Array.isArray(records)){
+            catalogueHash = pointer.hash;
+            MOVIES = canonMovieAgeRatings(records);
+            // CAS-742: _scaleInferCache/_awardRankCache are keyed off tmdb_id and read m.budget/m.award, both
+            // properties of the REPLACED array's own films — nothing else in the swap touches them, so this is
+            // the one point that must.
+            invalidateComputeCaches();
+            // BUILD_DATE tracks the catalogue's own build stamp; the header's freshness-date label reads it
+            // directly and isn't part of render()'s rebuild, so it's kept honest here — unconditionally, since
+            // a one-line text write can never disturb an open modal/drawer/popup the way a full rebuild could.
+            // CAS-689: no "Updated " prefix — see the initial-paint site's comment.
+            if(pointer.generated){ BUILD_DATE = pointer.generated; $("updated").textContent = fmtDay(BUILD_DATE); }
+            captureClaimedStatus();
+            // CAS-490: MOVIES was just replaced wholesale, so any ?fixtures=1 merge (CAS-486) is gone — re-apply
+            // it here rather than only on cascade-auth-change, so a fixture film survives a catalogue refresh
+            // instead of silently vanishing the next time the tab regains focus. No-ops unless the gate is met.
+            await maybeLoadFixtures();
+            rederiveStatuses();
+            dirty = true;
+          }
+        }catch(e){}   // hashed-file fetch failed mid-flight — catalogueHash is unchanged, so the next poll retries
       }
     }
     if(dirty){
@@ -12048,8 +12115,10 @@ const SPLASH_WALL_N = 54;
 function paintSplashWall(target){
   const box=target || $("splashWall"); if(!box || box.childElementCount) return;
   const picks=MOVIES.filter(m=>m.poster).sort(byPopularity).slice(0, SPLASH_WALL_N);
+  // CAS-1103: lazy, same as the card poster above — a 54-tile wall otherwise fetched every image at once.
   box.innerHTML=picks.map(m=>
-    `<div class="swp" style="background-image:url(https://image.tmdb.org/t/p/w185${escA(m.poster)})"></div>`).join("");
+    `<div class="swp" data-lazybg="${escA(`https://image.tmdb.org/t/p/w185${m.poster}`)}"></div>`).join("");
+  observeLazyPosters(box);
 }
 function showSplash(){
   paintSplashWall();
@@ -16652,6 +16721,7 @@ function renderMovingScreen(){
   // see those functions' own comments for how they were generalised to take a container.
   const jumpCtl=`<div class="listctl" id="movingListCtl"><div class="jumpbar" id="movingJumpBar" hidden></div></div>`;
   $("movingBody").innerHTML = head + alertHTML + jumpCtl + `<div id="movingGroups">${sectionsHTML}</div>`;
+  observeLazyPosters($("movingBody"));   // CAS-1103: movingRowHTML's cards carry the same lazy poster tiles
   renderJumpBar({jumpBarId:"movingJumpBar", listCtlId:"movingListCtl", groupsSel:"#movingGroups .group", isOwn:()=>false, label:"Jump to"});
   syncHeaderHeight();   // CAS-852: #movingHead's height can change (window switch) — re-measure so the lane heading's --stickyh offset never drifts
 }
@@ -18097,6 +18167,7 @@ function fillListChunked(listEl, items, gen, freshFn, onDone){
     for(; i<end; i++){ const m=items[i];
       buf += taggedOut(m) ? stubHTML(m) : cardHTML(m, freshFn?freshFn(m):false); }
     listEl.insertAdjacentHTML("beforeend", buf);
+    observeLazyPosters(listEl);   // CAS-1103: register this batch's new poster tiles, not the whole list again
     if(i<items.length) requestAnimationFrame(step);
     else onDone && onDone();
   };
@@ -18494,6 +18565,7 @@ function fastPatchFindRow(id){
   if(!m || !row || !filmInWatchRows(m)) return false;
   const t=document.createElement("template");
   t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m))).trim();
+  observeLazyPosters(t.content);   // CAS-1103: this single swapped-in card's own poster tile
   row.replaceWith(t.content.firstElementChild);
   patchFindCounts();
   return true;

@@ -515,6 +515,13 @@ if(typeof window.CascadeAuth === "undefined"){
   get usageQueue(){ return usageQueue; },
   clearUsageQueue(){ usageQueue = []; },
   get diagLog(){ return diagLog; },
+  // CAS-1103: pollCatalogue is a plain top-level function, exported directly like recomputeFound above.
+  // catalogueHash is reassigned wholesale on every successful swap (never mutated in place), so it's
+  // exposed through a getter/setter like watchPrefs/flowKind elsewhere in this file — a test resets it to
+  // null to simulate a fresh load, or reads it back to assert a swap actually landed.
+  pollCatalogue,
+  get catalogueHash(){ return catalogueHash; },
+  setCatalogueHash(v){ catalogueHash = v; },
 };
 `;
 
