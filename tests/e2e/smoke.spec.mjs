@@ -10,8 +10,15 @@
 import { test, expect } from "@playwright/test";
 import {
   freshApp, gotoFresh, toShortlist, shortlistCards, finishFlow, toListing, settleListing, ctaLocator, sectionCounts,
-  openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen,
+  openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen, dumpSignedInDiagnostics,
 } from "./helpers.mjs";
+
+// CAS-1136 decision 2: on a failed or timed-out test, show the in-flight requests and buffered console
+// lines helpers.mjs recorded for whichever signed-in boot this test used — a no-op for guest-mode tests
+// and for passing ones. Playwright still runs afterEach hooks on a timeout, which is the whole point.
+test.afterEach(async ({ page }, testInfo) => {
+  dumpSignedInDiagnostics(page, testInfo);
+});
 
 // Mirrors cas565.spec.mjs's addSecondAgent — a second agent made from "+ Add" stops at the Briefing hub
 // instead of walking the splash flow, so it needs its own exit.

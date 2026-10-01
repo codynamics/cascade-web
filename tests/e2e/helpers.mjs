@@ -52,6 +52,35 @@ function signedInEnv(){
   return { url, anonKey, serviceRoleKey };
 }
 
+/** CAS-1136 decision 2: per-page network/console diagnostics for the signed-in specs, so a test that
+ * times out can still show what was actually happening instead of just that it stalled. Populated by
+ * freshAppSignedIn below; read by dumpSignedInDiagnostics, which the spec's own test.afterEach calls. */
+const netDiagnostics = new WeakMap();
+
+/** Strips everything but the path — no query string (so no tokens/keys riding along in it either). */
+function urlPath(u){
+  try{ return new URL(u).pathname; }catch(e){ return u; }
+}
+
+/** CAS-1136 decision 2: on a failed or timed-out test, print every request still in flight (method,
+ * path, elapsed so far) and the last 30 buffered [page] console lines for whichever page called
+ * freshAppSignedIn. A no-op for guest-mode tests (no diagnostics were ever recorded for their page) and
+ * for passing tests (nothing useful to add). */
+export function dumpSignedInDiagnostics(page, testInfo){
+  const diag = netDiagnostics.get(page);
+  if(!diag || testInfo.status === testInfo.expectedStatus) return;
+  if(diag.inFlight.size > 0){
+    console.log(`[net] ${diag.inFlight.size} request(s) still in flight at failure:`);
+    for(const { method, path, start } of diag.inFlight.values()){
+      console.log(`[net]   ${method} ${path} (${Date.now() - start}ms so far)`);
+    }
+  }
+  if(diag.consoleLines.length > 0){
+    console.log(`[page] last ${diag.consoleLines.length} console line(s):`);
+    for(const line of diag.consoleLines) console.log(line);
+  }
+}
+
 let e2eUserSeq = 0;
 /** A fresh, never-reused test email per call to freshAppSignedIn — see the function's own comment for why
  * a shared account across the whole run isn't safe here. */
@@ -80,11 +109,47 @@ export async function freshAppSignedIn(page){
   // recomputeFound/flushAgentFilmPushes (and any console.warn/error or uncaught page error) never reach the
   // run's log at all. Forwarding them here, once per signed-in boot, is what actually lets a future red run
   // show WHERE it stalled instead of just THAT it stalled.
+  const diag = { inFlight: new Map(), consoleLines: [] };
+  netDiagnostics.set(page, diag);
+  const bufferLine = line => {
+    diag.consoleLines.push(line);
+    if(diag.consoleLines.length > 30) diag.consoleLines.shift();
+  };
   page.on("console", msg => {
     const text = msg.text();
-    if(text.includes("[CAS-460]") || msg.type() === "error" || msg.type() === "warning") console.log("[page]", text);
+    const line = `[page] ${text}`;
+    if(text.includes("[CAS-460]") || msg.type() === "error" || msg.type() === "warning") console.log(line);
+    bufferLine(line);
   });
-  page.on("pageerror", e => console.log("[page error]", String(e)));
+  page.on("pageerror", e => {
+    const line = `[page error] ${String(e)}`;
+    console.log(line);
+    bufferLine(line);
+  });
+  // CAS-1136 decision 2: network logging for the signed-in specs, added to find where
+  // "onboarding commits a real, de-duplicated agent roster" actually stalls — CI forwards no network
+  // activity from inside the page by default, same blind spot the console/pageerror forwarding above
+  // was added to close.
+  page.on("request", req => {
+    const path = urlPath(req.url());
+    diag.inFlight.set(req, { method: req.method(), path, start: Date.now() });
+    console.log(`[net] -> ${req.method()} ${path}`);
+  });
+  page.on("requestfinished", async req => {
+    const info = diag.inFlight.get(req);
+    diag.inFlight.delete(req);
+    const duration = info ? Date.now() - info.start : null;
+    let status = null;
+    try{ const res = await req.response(); status = res ? res.status() : null; }catch(e){}
+    console.log(`[net] <- ${req.method()} ${urlPath(req.url())} ${status} ${duration}ms`);
+  });
+  page.on("requestfailed", req => {
+    const info = diag.inFlight.get(req);
+    diag.inFlight.delete(req);
+    const duration = info ? Date.now() - info.start : null;
+    const errorText = (req.failure() && req.failure().errorText) || "unknown error";
+    console.log(`[net] x  ${req.method()} ${urlPath(req.url())} FAILED ${errorText} ${duration}ms`);
+  });
   const { url, anonKey, serviceRoleKey } = signedInEnv();
   const admin = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
   const email = e2eTestEmail();
