@@ -8,4 +8,5 @@ crons = [
   "0 20 * * *",  # once a day -> daily.yml
   "0 6 * * *",   # candidate -> alerts.yml, only when this is 17:00 in Sydney (AEDT)
   "0 7 * * *",   # candidate -> alerts.yml, only when this is 17:00 in Sydney (AEST)
+  "*/5 * * * *", # candidate -> recommend.yml, only when Supabase reports unsent mail
 ]

@@ -17,8 +17,15 @@ name: Outgoing email (invites + recommendations)
 
 on:
   schedule:
-    - cron: "5 * * * *"        # five past every hour
+    - cron: "5 * * * *"        # five past every hour — fallback; CAS-1130's Worker dispatches
+                                # this workflow every 5 minutes when there's unsent mail
   workflow_dispatch:            # manual "Run workflow" button
+
+# CAS-1130: the Cloudflare scheduler Worker can dispatch this on top of the cron above, so two
+# runs must never execute concurrently.
+concurrency:
+  group: outgoing-email
+  cancel-in-progress: false
 
 jobs:
   recommend:
