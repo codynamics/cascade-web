@@ -486,10 +486,16 @@ test("Mission screen: dragging the single handle moves every listed window's sco
   await openFirstAgentMission(page);
 
   // Arrange a known starting point — Cinema, Rent and Stream all listed at the same real score, through the
-  // real mutator (setAgentScore) rather than poking watchMarkers by hand. msnRebuild() re-renders
-  // #msnTrackArea and rewires it, the same way a real pill tap does whenever the ON set or its score changes.
+  // real mutator (setAgentScore) rather than poking watchMarkers by hand. The Massive Movies agent this
+  // onboarding path creates starts with only its BIG window (in_cinema) armed and the rest null by design
+  // (onbMassiveCritV2) — setAgentScore's own "ticked set unchanged" rule (CAS-1128) means calling it once
+  // from that state would only move in_cinema. Dropping to Off first makes every account-enabled window
+  // null, so the next call lands on the "Off to a score" rule instead, which arms all of them. msnRebuild()
+  // re-renders #msnTrackArea and rewires it, the same way a real pill tap does whenever the ON set or its
+  // score changes.
   await page.evaluate(() => {
     const c = onbFlow.draft;
+    setAgentScore(c, 0);
     setAgentScore(c, 90);
     msnRebuild();
   });
