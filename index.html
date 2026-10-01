@@ -2499,8 +2499,6 @@
   .svcnum{display:block;font-size:20px;font-weight:800;color:var(--ink)}
   .svcnum.zero,.svcnum.plus{color:var(--green)}
   .svcnumlbl{display:block;font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--faint)}
-  .svcwarn{border:1px solid var(--amber);background:rgba(240,163,54,.08);border-radius:12px;padding:10px 12px;
-    font-size:12.5px;color:#ffce8f;line-height:1.5;margin:4px 0 10px}
   /* ---- plain-English setup (rules-based preview) ---- */
 
   .nlrow .namein{flex:1;min-width:0;font-size:16px;font-weight:500}
@@ -11432,25 +11430,22 @@ function svcAdviceFilms(){
 }
 // One entry per canonical service (svcCanon), never a raw provider string — "Netflix" and "Netflix Standard
 // with Ads" are the same row everywhere on this screen.
+// CAS-1124: this is a STREAMING service analysis — the headline population is filmSvc (films with at least
+// one sub/free offer), not the full svcAdviceFilms() population, which also carries films no streaming
+// service can ever cover (in cinemas, unreleased, rent/buy-only). Counting those in the total made the
+// "Worth adding" rows structurally unable to ever close the gap to 100%. popTotal is kept separately, only
+// to tell "no agent has matched anything yet" apart from "matches exist, none are on streaming".
 function serviceAdvice(){
   const pop=svcAdviceFilms();
-  const total=pop.length;
-  const withOffer=pop.filter(e=>(e.m.offers||[]).length);
-  // "No offers" is not the same as "in cinemas". pop carries films that haven't been RELEASED yet (a Cascade
-  // lists them all the way in), and they have no offers either — so lumping the two together would have told
-  // the user that unreleased films were "still in cinemas".
-  const noOffer=pop.filter(e=>!(e.m.offers||[]).length);
-  const upcoming=noOffer.filter(e=>primaryStatus(e.m)==="upcoming").length;
-  const inCinema=noOffer.length-upcoming;
+  const popTotal=pop.length;
 
   const filmSvc=new Map();   // tmdb_id -> Set(canon services that sub/free-cover it)
-  let rentOnly=0;
-  withOffer.forEach(e=>{
-    const offers=dedupOffers(e.m.offers);
+  pop.forEach(e=>{
+    const offers=dedupOffers(e.m.offers||[]);
     const svcSet=new Set(offers.filter(o=>o.type==="sub"||o.type==="free").map(o=>svcCanon(o.service)));
     if(svcSet.size) filmSvc.set(e.m.tmdb_id, svcSet);
-    else if(offers.some(o=>o.type==="rent"||o.type==="buy")) rentOnly++;   // reachable only by renting/buying
   });
+  const total=filmSvc.size;
 
   const humanById=new Map(pop.map(e=>[e.m.tmdb_id, e.human]));
   const mySvcs=prefs.sub;
@@ -11495,10 +11490,9 @@ function serviceAdvice(){
     .filter(x=>x.marginal>0)
     .sort((a,b)=> b.marginal-a.marginal || a.svc.localeCompare(b.svc));
 
-  const rentWatched=cascades.some(c=>!c.paused && windowUsable(c,"rent"));
-  return {total, home:withOffer.length, inCinema, upcoming, rentOnly,
+  return {total, popTotal,
     coveredHuman, coveredAgent, notCovered:total-coveredTotal, coveredTotal, coveredPct,
-    mine, worth, rentWatched, hasStore:prefs.store.size>0};
+    mine, worth};
 }
 let svcRankBy="most";   // "most" | "least" — resets to the default every time the screen opens (AC3)
 window.svcSetRank=mode=>{ if(svcRankBy===mode) return; svcRankBy=mode; renderSvcAnalysis(); };
@@ -11532,7 +11526,7 @@ function renderSvcAnalysis(){
   const el=$("svcAnalysisBody"); if(!el) return;
   const a=serviceAdvice();
   let body;
-  if(!a.total){
+  if(!a.popTotal){
     // Same zero-population number, two honest reasons: no agent has matched anything yet, or every match has
     // already been watched/blocked (AC7) — the copy shouldn't claim "create an agent" when one already exists.
     body = cascades.some(c=>!c.paused)
@@ -11541,11 +11535,6 @@ function renderSvcAnalysis(){
       : `<div class="pnote">Create an agent and it starts finding films for you — then we'll work out which
           of your services cover them, and which one might be worth adding.</div>`;
   } else {
-    const notes=[];
-    if(a.inCinema) notes.push(`${a.inCinema} of the ${a.total} film${a.total===1?"":"s"}
-      ${a.inCinema===1?"is":"are"} still in cinemas, so no service can cover ${a.inCinema===1?"it":"them"} yet.`);
-    if(a.upcoming) notes.push(`${a.upcoming} ${a.upcoming===1?"hasn't":"haven't"} been released yet — your
-      agents are watching ${a.upcoming===1?"it":"them"} all the way in.`);
     const mineRows=[...a.mine].sort((x,y)=>
       svcRankBy==="least" ? (x.onlyHere-y.onlyHere || y.total-x.total) : (y.total-x.total || x.svc.localeCompare(y.svc)));
     const mineBody = !a.mine.length
@@ -11556,36 +11545,31 @@ function renderSvcAnalysis(){
         </div>
         ${mineRows.map(e=>svcRowHTML(e, svcRankBy)).join("")}
         <div class="advfoot">"Only here" is what you'd lose if you dropped it — films no other service you have carries.</div>`;
-    const rentNote = a.rentWatched
-      ? `<div class="svcwarn">⚠️ Your agents watch the Rent window${a.hasStore
-          ? `, and you have a rental store — ${esc([...prefs.store].map(svcName).join(", "))}. ${a.rentOnly}
-             film${a.rentOnly===1?"":"s"} in your population ${a.rentOnly===1?"is":"are"} rent-only.`
-          : `, but you don't have a rental store. ${a.rentOnly} film${a.rentOnly===1?"":"s"} in your population
-             can only be reached by renting or buying — none of them count toward your services' coverage above.`}
-        </div>`
-      : "";
     const worthBody = !a.worth.length
       ? `<div class="pnote">No other service would add anything you don't already have.</div>`
       : a.worth.map(svcWorthRowHTML).join("")
         + `<div class="advfoot">Ranked by what each one would ADD, not by its total catalogue. We don't hold
            subscription prices, so nothing here is a cost comparison.</div>`;
+    // CAS-1124 AC4: a streaming total of 0 (population exists, but none of it is on a streaming service)
+    // replaces the numeric headline with a plain statement — there is nothing to show a bar/percentage of.
+    const headline = a.total
+      ? `<div class="svchead">
+          <div class="svcheadnum">${a.coveredTotal}<span class="svcheadof">of ${a.total} covered · ${a.coveredPct}%</span></div>
+          <div class="svcbar">
+            <span class="human" style="width:${a.coveredHuman/a.total*100}%"></span>
+            <span class="agent" style="width:${a.coveredAgent/a.total*100}%"></span>
+          </div>
+          <div class="svcleg"><span class="dot human"></span>${a.coveredHuman} you chose
+            <span class="dot agent"></span>${a.coveredAgent} suggested
+            <span class="dot none"></span>${a.notCovered} not covered</div>
+        </div>`
+      : `<div class="pnote">None of the films your agents want are on a streaming service yet.</div>`;
     body=`
-      <div class="svcpop">Measured against the <b>${a.total}</b> film${a.total===1?"":"s"} your agents would
-        want if you had every service and could watch in any window. Films you've watched are excluded.
-        ${notes.join(" ")}</div>
+      <div class="svcpop">Measured against the <b>${a.total}</b> film${a.total===1?"":"s"} your agents want
+        that are on a streaming service. Films you've watched are excluded.</div>
       <div class="flabel">My services</div>
-      <div class="svchead">
-        <div class="svcheadnum">${a.coveredTotal}<span class="svcheadof">of ${a.total} covered · ${a.coveredPct}%</span></div>
-        <div class="svcbar">
-          <span class="human" style="width:${a.total?a.coveredHuman/a.total*100:0}%"></span>
-          <span class="agent" style="width:${a.total?a.coveredAgent/a.total*100:0}%"></span>
-        </div>
-        <div class="svcleg"><span class="dot human"></span>${a.coveredHuman} you chose
-          <span class="dot agent"></span>${a.coveredAgent} suggested
-          <span class="dot none"></span>${a.notCovered} not covered</div>
-      </div>
+      ${headline}
       ${mineBody}
-      ${rentNote}
       <div class="flabel">Worth adding</div>
       ${worthBody}`;
   }

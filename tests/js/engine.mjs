@@ -175,6 +175,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // parsing the rendered HTML the DOM stub swallows.
   watchMineOnlyOn, watchMineOnlyEmptyKind,
   svcCanon, svcName, SVC_LEAD, myService,
+  // CAS-1124: serviceAdvice/svcAdviceFilms are the Service analysis screen's own arithmetic (headline
+  // total/coverage, "worth adding" ranking) — exported so a test can drive them against a controlled
+  // population rather than the DOM they normally render into.
+  serviceAdvice, svcAdviceFilms,
   SUB_SERVICES, STORE_SERVICES, stageDate, curSlot, cinemaState, EST_OFFSET, TODAY,
   inCinemaRun, CINEMA_RUN_DAYS, LISTING_ORDER, orderFor, listingOrder,
   // CAS-702: the one default-sort constant, and the raw comparator dispatch, so a test can assert the
