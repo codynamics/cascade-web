@@ -76,6 +76,12 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
   try{
     const pageA = await ctxA.newPage();
     const pageB = await ctxB.newPage();
+    // CAS-1132: this job has never captured browser console/page errors — the only evidence of this
+    // test's 15s timeout CI has ever produced is the bare "expected X, received Y" line. Forwarded here so
+    // a run that still fails after this ticket at least prints whatever syncToAccount's own
+    // console.warn("Cascade upsert", error) (or any uncaught exception) actually says, instead of nothing.
+    pageA.on("console", msg => console.log(`[S4 pageA console.${msg.type()}] ${msg.text()}`));
+    pageA.on("pageerror", err => console.log(`[S4 pageA pageerror] ${err}`));
 
     await gotoIntegrityFresh(pageA);
     await signInFromSplash(pageA, email);
@@ -95,6 +101,16 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
     await pageA.locator("#onbStepName").fill(newName);
     await pageA.locator("#onbStepInner .osback").click();
     await pageA.locator("#onbStepInner .osback").click();
+
+    // CAS-1132: bisect "the UI never committed the rename locally" from "the commit landed but the push to
+    // the server failed/never fired" — the two candidate causes the ticket itself names — before ever
+    // asking the (real) network. If this reads newName, the bug is sync-side; if it still reads the old
+    // name, the bug is in the briefClose/briefCommit/commitDraft chain above, never reaching syncNow at all.
+    await expect.poll(
+      () => pageA.evaluate((id) => { const c = cascades.find(x => x.id === id); return c && c.name; }, seededAgent.id),
+      { timeout: 5_000 },
+    ).toBe(newName);
+
     // saveCascades() debounces the actual push 400ms out (scheduleSync); force it rather than waiting on
     // the timer — window.CascadePersistence.syncNow is runSync itself, idempotent to call directly.
     await pageA.evaluate(() => window.CascadePersistence.syncNow());
@@ -155,6 +171,10 @@ test("S6: onboarding into a previously-held account by email keeps that account'
 test("S7: mark a film watched on A -> B shows it after reload; clear it on A leaves every other user_films row intact", async ({ browser }) => {
   const email = testEmail("s7");
   const user = await createTestUser(email);
+  // CAS-1132: a signed-in account with zero agents routes straight into onboarding (afterSignIn's
+  // "signin_empty_account" branch, CAS-1082) instead of the listing settleListing() waits on — this suite's
+  // own S2/S3/S4 already seed an agent before signing in for exactly this reason; S7 only forgot to.
+  await seedCascades(user.id, [{ name: "S7 agent" }]);
   const otherRows = [
     { user_id: user.id, movie_id: "9700001", status: "liked" },
     { user_id: user.id, movie_id: "9700002", status: "disliked" },
@@ -214,6 +234,8 @@ test("S7: mark a film watched on A -> B shows it after reload; clear it on A lea
 test("S8: sign out then sign back in leaves every verdict, Watch On and pin intact", async ({ page }) => {
   const email = testEmail("s8");
   const user = await createTestUser(email);
+  // CAS-1132: same zero-agent-routes-to-onboarding gap as S7 — see its comment above.
+  await seedCascades(user.id, [{ name: "S8 agent" }]);
   const verdictId = "9800001", watchId = "9800002", pickId = "9800003", pinId = "9800004";
   const seeds = [
     admin.from("user_films").insert({ user_id: user.id, movie_id: verdictId, status: "wow" }),
@@ -263,6 +285,8 @@ test("S8: sign out then sign back in leaves every verdict, Watch On and pin inta
 test("S9: a service change on A, a language change on B, and a notify switch on B all land on both after reload", async ({ browser }) => {
   const email = testEmail("s9");
   const user = await createTestUser(email);
+  // CAS-1132: same zero-agent-routes-to-onboarding gap as S7/S8 — see S7's comment above.
+  await seedCascades(user.id, [{ name: "S9 agent" }]);
   await admin.from("user_prefs").insert({ user_id: user.id });
   await admin.from("notify_prefs").insert({ user_id: user.id });
 
