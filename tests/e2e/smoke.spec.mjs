@@ -344,7 +344,12 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   // pick. prefs.on off is the account-wide twin of the per-tab mineOnly switch already turned off just below —
   // both are "a different feature's default doing its job, not this test's own concern", the same reasoning
   // CAS-897's own comment already gives for the per-tab one.
-  await page.evaluate(() => {
+  // CAS-1133 (release-chat decision, 2026-10-02): temporary diagnostic — the [ios]/WebKit-only
+  // failure below is a deterministic 0-match, not a timing flake, and there's no way to see real
+  // WebKit console/DOM state from a CC session. This pins down which of the two live hypotheses
+  // (no admissible donor found vs. a genuine WebKit render bug) is actually happening before any
+  // fix is attempted. Remove once the next qa run's [ios] log line has been read.
+  const cas1133Diag = await page.evaluate(() => {
     const donor = MOVIES.find(m => primaryStatus(m) === "pvod" && showable(m));
     if(donor){
       Object.assign(donor, { wm_user_rating: 10, wm_critic_score: 100, language: "en", age_rating: "M", cinema_date: TODAY });
@@ -352,7 +357,17 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
       recomputeFound();
       render();
     }
+    const entry = donor ? notify[donor.tmdb_id] : null;
+    return {
+      donorId: donor ? donor.tmdb_id : null,
+      status: donor ? primaryStatus(donor) : null,
+      showable: donor ? showable(donor) : null,
+      admitted: donor ? !!(entry && entry.cascadeIds && entry.cascadeIds.length > 0) : null,
+      cards: document.querySelectorAll("#groups .card").length,
+      premiumTab: Array.from(document.querySelectorAll(".wtabbtn")).some(el => el.textContent.includes("Premium")),
+    };
   });
+  console.log(`CAS-1133 donor=${cas1133Diag.donorId ?? "NONE"} status=${cas1133Diag.status} showable=${cas1133Diag.showable} admitted=${cas1133Diag.admitted} cards=${cas1133Diag.cards} premiumTab=${cas1133Diag.premiumTab}`);
 
   await premiumTab.click();
   // CAS-897: "Show only available on my services" (CAS-753) defaults ON per tab, and this guest session
@@ -369,7 +384,14 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   // Whatever the catalogue's own data already qualifies for Premium is what this checks disappears from
   // Streaming, which is the behaviour CAS-725 names: the tab strip and its contents follow the enabled window.
   const premiumCard = page.locator('#groups .card').first();
-  await expect(premiumCard).toBeVisible();
+  try{
+    await expect(premiumCard).toBeVisible();
+  }catch(e){
+    // CAS-1133 diagnostic (see above): the step 1 decision asks for #groups' innerHTML on failure too.
+    const groupsHtml = await page.evaluate(() => (document.querySelector("#groups") || {}).innerHTML || "");
+    console.log(`CAS-1133 #groups innerHTML (first 500 chars): ${groupsHtml.slice(0, 500)}`);
+    throw e;
+  }
   const cardId = await premiumCard.getAttribute("id");
   await page.locator(".wtabbtn", { hasText: "Streaming" }).click();
   await expect(page.locator(`#${cardId}`)).toHaveCount(0);
