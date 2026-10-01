@@ -421,6 +421,19 @@ jobs:
           set -o pipefail
           npm run test:integrity 2>&1 | tee integrity.log
 
+      # CAS-1093 (decision, 2026-10-01 build chat): unlike the smoke suite's "if: failure()" report upload,
+      # this runs every time — a green run's traces are what a *next* flake needs to compare against, and
+      # this job (unlike the smoke suite's matrix) is a single worker, so the artifact stays small.
+      - name: Upload integrity report (HTML + traces)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-integrity
+          path: |
+            playwright-report-integrity/
+            test-results/
+          retention-days: 7
+
       - name: Capture failure detail
         if: failure()
         run: |

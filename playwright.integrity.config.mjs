@@ -21,7 +21,10 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
-    trace: process.env.PWTRACE ? "retain-on-failure" : "off",
+    // CAS-1093 (decision, 2026-10-01 build chat): unlike the smoke suite, CI uploads this job's HTML
+    // report + traces on every run (qa.yml), so a failure is self-diagnosing without a local
+    // Docker/Supabase CLI reproduction — on by default in CI; PWTRACE still opts a local run in.
+    trace: (process.env.CI || process.env.PWTRACE) ? "retain-on-failure" : "off",
     screenshot: "off",
     video: "off",
     serviceWorkers: "block",

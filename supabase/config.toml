@@ -26,3 +26,11 @@ additional_redirect_urls = ["http://127.0.0.1:8974"]
 [auth.email]
 enable_signup = true
 enable_confirmations = false
+
+# CAS-1093 (decision, 2026-10-01 build chat): the CLI default email_sent = 2/hour throttles this suite
+# immediately — every S2/S3/S4/S7/S8/S9/S13 sign-in sends a fresh OTP to a disposable, never-reused test
+# user. Raised for this disposable local test stack only; the live project is untouched by this file.
+[auth.rate_limit]
+email_sent = 1000
+sign_in_sign_ups = 1000
+token_verifications = 1000

@@ -5,12 +5,15 @@
 // rows, not only the screen — a regression that only breaks the screen while quietly leaving the account
 // intact is not the class of bug this suite exists to catch.
 //
-// What must pass now (CAS-1093 AC2): S2 and S3, plus S4's propagation half — the stop-gap tickets CAS-1090
-// and CAS-1107 are already in place for them. The rest are `test.fixme()`, not deleted: later tickets in
-// the server-first account-store rework (https://codynamics.atlassian.net/wiki/spaces/Cascade/pages/64815105)
-// un-fixme them as the features they depend on land, and add scenarios of their own for their own tables.
+// What must pass now (decision, 2026-10-01 build chat, scoping CAS-1093 AC2): exactly S2 and S3. Every
+// other scenario is `test.fixme()`, not deleted — including S4 and S7-S9, which have each passed in CI
+// before this decision but are fixme'd anyway because their own features/tickets aren't done yet. Later
+// tickets in the server-first account-store rework
+// (https://codynamics.atlassian.net/wiki/spaces/Cascade/pages/64815105) un-fixme them as the features they
+// depend on land, and add scenarios of their own for their own tables.
 //   - S1, S6: once onboarding commits through complete_membership (CAS-1098/CAS-1099).
-//   - S4's conflict half, S5: once agents move onto the account store (CAS-1094+).
+//   - S4, S5: once agents move onto the account store (CAS-1094+).
+//   - S7, S8, S9: added by later tickets (CAS-1096, CAS-1095) — theirs to un-fixme.
 // S13 (CAS-1102, migration 0003_delete_guard.sql) asserts on that migration's own trigger directly via a
 // signed-in supabase-js client, not the browser — see its own comment below.
 import { test, expect } from "@playwright/test";
@@ -66,6 +69,9 @@ test("S3: sign out then sign back in on the same context deletes none (the 2026-
 });
 
 test("S4 (first half): an edit on context A reaches context B on reload", async ({ browser }) => {
+  // CAS-1093 (decision, 2026-10-01 build chat): scope of what must pass now is exactly S2 and S3 — fixme'd
+  // alongside S4's second half, same reason, even though this half has passed in CI before this decision.
+  test.fixme(true, "until agents move onto the account store");
   const email = testEmail("s4");
   const user = await createTestUser(email);
   const [seededAgent] = await seedCascades(user.id, [{ name: "Blockbusters" }]);
@@ -173,6 +179,10 @@ test("S6: onboarding into a previously-held account by email keeps that account'
 // CAS-1096: verdicts (user_films) moved onto acctOp — S7 proves a verdict set by hand on one device reaches
 // another on reload, and clearing it back out is a delete of exactly that one row, every other row untouched.
 test("S7: mark a film watched on A -> B shows it after reload; clear it on A leaves every other user_films row intact", async ({ browser }) => {
+  // CAS-1093 (decision, 2026-10-01 build chat): scope of what must pass now is exactly S2 and S3 — S7-S9
+  // belong to the later tickets that added them (CAS-1096/CAS-1095), fixme'd here even though they have
+  // passed in CI before this decision.
+  test.fixme(true, "added by a later ticket");
   const email = testEmail("s7");
   const user = await createTestUser(email);
   // CAS-1132: a signed-in account with zero agents routes straight into onboarding (afterSignIn's
@@ -240,6 +250,9 @@ test("S7: mark a film watched on A -> B shows it after reload; clear it on A lea
 // cycle on the same context), on screen and server-side, unlike anything that would come back from a whole-
 // table diff resync.
 test("S8: sign out then sign back in leaves every verdict, Watch On and pin intact", async ({ page }) => {
+  // CAS-1093 (decision, 2026-10-01 build chat): scope of what must pass now is exactly S2 and S3 — see S7's
+  // identical fixme above.
+  test.fixme(true, "added by a later ticket");
   const email = testEmail("s8");
   const user = await createTestUser(email);
   // CAS-1132: same zero-agent-routes-to-onboarding gap as S7 — see its comment above.
@@ -299,6 +312,9 @@ test("S8: sign out then sign back in leaves every verdict, Watch On and pin inta
 // column plus a notify_prefs column) with no updated_at conflict check, and both changes still survive on
 // both devices after a reload — the "last write of EACH column wins independently" rule this ticket adds.
 test("S9: a service change on A, a language change on B, and a notify switch on B all land on both after reload", async ({ browser }) => {
+  // CAS-1093 (decision, 2026-10-01 build chat): scope of what must pass now is exactly S2 and S3 — see S7's
+  // identical fixme above.
+  test.fixme(true, "added by a later ticket");
   const email = testEmail("s9");
   const user = await createTestUser(email);
   // CAS-1132: same zero-agent-routes-to-onboarding gap as S7/S8 — see S7's comment above.
