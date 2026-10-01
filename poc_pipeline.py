@@ -95,10 +95,6 @@ API_BUDGET_FILE = os.path.join(STATE_DIR, "api_budget.json")    # CAS-384: today
 WM_MONTHLY_FILE = os.path.join(STATE_DIR, "watchmode_monthly.json")   # CAS-974: cumulative spend this month
 REFRESH_LOG_FILE = os.path.join(STATE_DIR, "refresh_log.json")   # CAS-1046: per-run history for the admin site
 REFRESH_LOG_CAP = 120
-# Watchmode's own quoted allowance (see the REVALIDATION_DAILY_BUDGET comment above) — reused here
-# rather than re-guessed, so monitor.health's remaining-credits check has a real number to compare
-# this month's cumulative on-demand spend against.
-WATCHMODE_MONTHLY_CREDITS = int(os.getenv("WATCHMODE_MONTHLY_CREDITS", "40000"))
 
 # CAS-987: the real plan this key is on, and how state/api_budget.json paces nightly spend
 # against it — a plan change (trial -> Startup -> Business) is one variable, not a code change.
@@ -2445,13 +2441,20 @@ def _wm_cycle_bounds(today: datetime.date, reset_day: int = WM_QUOTA_RESET_DAY) 
 
 
 def _load_wm_cycle_budget(today: datetime.date) -> dict:
-    """Loads state/api_budget.json as the current cycle's {cycle_start, cycle_end, quota, spent,
-    updated_at, days} shape. A pre-CAS-987 {date, wm_spent} file, a file from a cycle that has
-    since rolled over (today has crossed WM_QUOTA_RESET_DAY), or a missing/unparseable file all
-    read the same honest way: a fresh cycle starting now, spent back to 0 — never a raised error."""
+    """Loads state/api_budget.json as the current cycle's {cycle_start, cycle_end, quota,
+    quota_live, spent, updated_at, days} shape. A pre-CAS-987 {date, wm_spent} file, a file from a
+    cycle that has since rolled over (today has crossed WM_QUOTA_RESET_DAY), or a missing/
+    unparseable file all read the same honest way: a fresh cycle starting now, spent back to 0 —
+    never a raised error.
+
+    CAS-1138: `quota_live` is False until a GET /status call has actually confirmed `quota` —
+    `quota` itself still defaults to WM_MONTHLY_QUOTA so the cycle-pacing math always has a number
+    to work with, but reporting code (monitor.health's watchmode_pace) must check `quota_live`
+    before treating that number as real, never silently trusting the fallback."""
     cycle_start, cycle_end = _wm_cycle_bounds(today)
     fresh = {"cycle_start": cycle_start.isoformat(), "cycle_end": cycle_end.isoformat(),
-             "quota": WM_MONTHLY_QUOTA, "spent": 0, "updated_at": today.isoformat(), "days": {}}
+             "quota": WM_MONTHLY_QUOTA, "quota_live": False, "spent": 0,
+             "updated_at": today.isoformat(), "days": {}}
     if not os.path.exists(API_BUDGET_FILE):
         return fresh
     try:
@@ -2462,7 +2465,8 @@ def _load_wm_cycle_budget(today: datetime.date) -> dict:
         return fresh
     days = data.get("days") or {}
     return {"cycle_start": data.get("cycle_start", fresh["cycle_start"]), "cycle_end": data["cycle_end"],
-            "quota": data.get("quota", WM_MONTHLY_QUOTA), "spent": sum(days.values()),
+            "quota": data.get("quota", WM_MONTHLY_QUOTA), "quota_live": data.get("quota_live", False),
+            "spent": sum(days.values()),
             "updated_at": data.get("updated_at", fresh["updated_at"]), "days": days}
 
 
@@ -2472,6 +2476,18 @@ def _save_wm_cycle_budget(cycle: dict, today: datetime.date) -> None:
     out["spent"] = sum(out.get("days", {}).values())
     out["updated_at"] = today.isoformat()
     json.dump(out, open(API_BUDGET_FILE, "w", encoding="utf-8"), indent=2, sort_keys=True)
+
+
+def _apply_live_wm_quota(cycle: dict, status_out: dict) -> dict:
+    """CAS-1138: folds wm_run_allowance's status_out (this run's live /status quota, or all-None
+    when /status wasn't called or failed) into the cycle record about to be saved to
+    state/api_budget.json — replacing the WM_MONTHLY_QUOTA default with the real figure once it's
+    known. A no-op when this run has no live quota: a prior cycle's already-live quota (or the
+    untouched default) carries forward unchanged rather than being overwritten with a guess."""
+    if status_out.get("quota") is not None:
+        cycle["quota"] = status_out["quota"]
+        cycle["quota_live"] = True
+    return cycle
 
 
 def compute_wm_today_allowance(quota: int, reserve_pct: float, spent_this_cycle: int,
@@ -2504,7 +2520,8 @@ def split_wm_pot(pot: int, nightly_weight: int, ondemand_weight: int,
     return ondemand_cap, nightly_cap, scoreability_cap
 
 
-def wm_run_allowance(today: datetime.date, run_max_credits: int | None = None) -> int:
+def wm_run_allowance(today: datetime.date, run_max_credits: int | None = None,
+                     status_out: dict | None = None) -> int:
     """CAS-994: this run's whole Watchmode credit pot — the single gate every credit-costing call
     path (the nightly fields pass, on-demand enrichment, the CAS-986 scoreability probe) is capped
     against, via split_wm_pot.
@@ -2521,7 +2538,14 @@ def wm_run_allowance(today: datetime.date, run_max_credits: int | None = None) -
     (this ticket's own Why). state/api_budget.json stays as a spend record (run() still writes to
     it) but no longer drives the allowance itself. A failed /status call spends nothing this run
     rather than falling back to any locally-tracked number — the honest answer when the one source
-    of truth this now relies on is unavailable."""
+    of truth this now relies on is unavailable.
+
+    CAS-1138: `status_out`, when given a dict, is filled in with this run's real
+    {quota, quota_used, remaining_monthly_credits} so the caller can record them in
+    state/run_stats.json and state/api_budget.json — never a constant. Left at all-None when
+    /status was never called (the ceiling is 0) or the call failed."""
+    if status_out is not None:
+        status_out.update({"quota": None, "quota_used": None, "remaining_monthly_credits": None})
     if run_max_credits is None:
         run_max_credits = WM_RUN_MAX_CREDITS
     if run_max_credits <= 0:
@@ -2533,6 +2557,9 @@ def wm_run_allowance(today: datetime.date, run_max_credits: int | None = None) -
         return 0
     quota = status.get("quota", 0)
     quota_used = status.get("quotaUsed", 0)
+    if status_out is not None:
+        status_out.update({"quota": quota, "quota_used": quota_used,
+                           "remaining_monthly_credits": max(0, quota - quota_used)})
     cycle_start, cycle_end = _wm_cycle_bounds(today)
     days_remaining = (cycle_end - today).days
     paced = compute_wm_today_allowance(quota, WM_CYCLE_RESERVE_PCT, quota_used, days_remaining)
@@ -3022,7 +3049,8 @@ def run(simulate_day: bool = False):
         # (cycle["days"]) but no longer drives the allowance itself — see wm_run_allowance.
         cycle = _load_wm_cycle_budget(today)
         today_iso = today.isoformat()
-        wm_pot = wm_run_allowance(today)
+        wm_status = {}
+        wm_pot = wm_run_allowance(today, status_out=wm_status)
 
         # WM_NIGHTLY_MAX_CREDITS/ONDEMAND_WM_CAP/SCOREABILITY_PROBE_BUDGET stop being independent
         # fixed pots and become weighted shares of `wm_pot` — their old fixed values are reused
@@ -3072,8 +3100,12 @@ def run(simulate_day: bool = False):
         prior_monthly = _load_monthly_wm_spend(today)
         monthly_spent = prior_monthly.get("wm_spent", 0) + counts["wm_calls"]
         _save_monthly_wm_spend(today, monthly_spent)
-        runstats.set_value("watchmode",
-                           remaining_monthly_credits=max(0, WATCHMODE_MONTHLY_CREDITS - monthly_spent))
+        # CAS-1138: quota/quota_used/remaining_monthly_credits come straight from this run's own
+        # wm_run_allowance /status call (wm_status) — None on every field when /status wasn't
+        # called or failed, never a constant standing in for an account figure it doesn't know.
+        runstats.set_value("watchmode", quota=wm_status.get("quota"),
+                           quota_used=wm_status.get("quota_used"),
+                           remaining_monthly_credits=wm_status.get("remaining_monthly_credits"))
     else:
         print("[sample] no API keys set — using bundled illustrative data.")
         records = json.load(open(SAMPLE_FILE, encoding="utf-8"))["movies"]
@@ -3153,6 +3185,7 @@ def run(simulate_day: bool = False):
         _save_watchmode_tv_tmdb_ids(today)
         today_total_spent = cycle["days"].get(today_iso, 0) + run_spent
         cycle["days"][today_iso] = today_total_spent
+        cycle = _apply_live_wm_quota(cycle, wm_status)
         _save_wm_cycle_budget(cycle, today)
         print(f"watchmode cycle {cycle['cycle_start']}..{cycle['cycle_end']} quota={cycle['quota']} "
               f"spent={sum(cycle['days'].values())} run_pot={wm_pot} "

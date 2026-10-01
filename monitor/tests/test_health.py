@@ -120,38 +120,49 @@ class WatchmodeFetch(unittest.TestCase):
     """CAS-1003: every case below that expects the base fetch/credits logic to run must pass an
     explicit positive `run_max_credits_raw` — the default (None, meaning WM_RUN_MAX_CREDITS is
     unset) now short-circuits to the unset-gate branch tested separately below, exactly the
-    ambiguity this ticket removes."""
+    ambiguity this ticket removes.
+
+    CAS-1138: `quota` is no longer a separate argument — it's read from `stats['quota']`, the
+    live Watchmode /status figure poc_pipeline.wm_run_allowance records in run_stats.json."""
 
     def test_pass_calls_no_errors_credits_ok(self):
         c = health.check_watchmode_fetch(
-            {"calls": 40, "errors": 0, "remaining_monthly_credits": 30000}, quota=40000,
+            {"calls": 40, "errors": 0, "quota": 40000, "remaining_monthly_credits": 30000},
             run_max_credits_raw="500")
         self.assertTrue(c["ok"])
 
     def test_fail_low_remaining_credits(self):
         # quota 10000 -> floor 1500 (15%); 100 remaining is below it.
         c = health.check_watchmode_fetch(
-            {"calls": 40, "errors": 0, "remaining_monthly_credits": 100}, quota=10000,
+            {"calls": 40, "errors": 0, "quota": 10000, "remaining_monthly_credits": 100},
             run_max_credits_raw="500")
         self.assertFalse(c["ok"])
 
     def test_fail_has_errors(self):
         c = health.check_watchmode_fetch(
-            {"calls": 40, "errors": 2, "remaining_monthly_credits": 30000}, quota=40000,
+            {"calls": 40, "errors": 2, "quota": 40000, "remaining_monthly_credits": 30000},
             run_max_credits_raw="500")
         self.assertFalse(c["ok"])
 
-    def test_floor_reads_from_the_passed_in_quota_not_a_hardcoded_plan_size(self):
+    def test_floor_reads_from_the_live_quota_not_a_hardcoded_plan_size(self):
         # AC5: quota 40000 -> floor 6000. 6500 remaining clears it, 5500 doesn't.
         clears = health.check_watchmode_fetch(
-            {"calls": 40, "errors": 0, "remaining_monthly_credits": 6500}, quota=40000,
+            {"calls": 40, "errors": 0, "quota": 40000, "remaining_monthly_credits": 6500},
             run_max_credits_raw="500")
         below = health.check_watchmode_fetch(
-            {"calls": 40, "errors": 0, "remaining_monthly_credits": 5500}, quota=40000,
+            {"calls": 40, "errors": 0, "quota": 40000, "remaining_monthly_credits": 5500},
             run_max_credits_raw="500")
         self.assertEqual(clears["threshold"], 6000)
         self.assertTrue(clears["ok"])
         self.assertFalse(below["ok"])
+
+    def test_unknown_when_the_live_quota_is_unavailable(self):
+        # CAS-1138 AC1d: a failed /status leaves quota/remaining_monthly_credits null — this must
+        # report unknown, never fall back to a hard-coded plan size.
+        c = health.check_watchmode_fetch(
+            {"calls": 40, "errors": 0, "quota": None, "remaining_monthly_credits": None},
+            run_max_credits_raw="500")
+        self.assertIsNone(c["ok"])
 
 
 class WatchmodeFetchUnsetVsExplicitZero(unittest.TestCase):
@@ -161,7 +172,7 @@ class WatchmodeFetchUnsetVsExplicitZero(unittest.TestCase):
 
     def test_ac1_unset_with_unfilled_records_fails_and_names_both(self):
         c = health.check_watchmode_fetch(
-            {"calls": 0, "errors": 0}, quota=40000,
+            {"calls": 0, "errors": 0, "quota": 40000},
             run_max_credits_raw=None, unfilled_count=2134)
         self.assertFalse(c["ok"])
         self.assertEqual(c["status"], "fail")
@@ -171,26 +182,26 @@ class WatchmodeFetchUnsetVsExplicitZero(unittest.TestCase):
     def test_ac1_empty_string_reads_the_same_as_unset(self):
         # the shape GH Actions actually produces for an unreferenced repo variable.
         c = health.check_watchmode_fetch(
-            {"calls": 0, "errors": 0}, quota=40000,
+            {"calls": 0, "errors": 0, "quota": 40000},
             run_max_credits_raw="", unfilled_count=2134)
         self.assertFalse(c["ok"])
 
     def test_ac2_explicit_zero_still_skips_and_does_not_fail(self):
         c = health.check_watchmode_fetch(
-            {"calls": 0, "errors": 0}, quota=40000,
+            {"calls": 0, "errors": 0, "quota": 40000},
             run_max_credits_raw="0", unfilled_count=2134)
         self.assertIsNone(c["ok"])
         self.assertEqual(c["status"], "skipped")
 
     def test_ac3_positive_integer_behaves_exactly_as_today(self):
         c = health.check_watchmode_fetch(
-            {"calls": 40, "errors": 0, "remaining_monthly_credits": 30000}, quota=40000,
+            {"calls": 40, "errors": 0, "quota": 40000, "remaining_monthly_credits": 30000},
             run_max_credits_raw="500", unfilled_count=2134)
         self.assertTrue(c["ok"])
 
     def test_ac4_unset_with_no_unfilled_records_does_not_fail(self):
         c = health.check_watchmode_fetch(
-            {"calls": 0, "errors": 0}, quota=40000,
+            {"calls": 0, "errors": 0, "quota": 40000},
             run_max_credits_raw=None, unfilled_count=0)
         self.assertIsNot(c["ok"], False)
         self.assertEqual(c["status"], "skipped")
@@ -210,7 +221,7 @@ class WatchmodeFetchRunStatsAggregate(unittest.TestCase):
         # on-demand 0, nightly-fields 39, scoreability probe 81 -> aggregate 120 (run #80's own
         # figures from state/api_budget.json on origin/staging at commit b4fba42).
         c = health.check_watchmode_fetch(
-            {"calls": 120, "errors": 0, "remaining_monthly_credits": 30000}, quota=10000,
+            {"calls": 120, "errors": 0, "quota": 10000, "remaining_monthly_credits": 30000},
             run_max_credits_raw="60")
         self.assertTrue(c["ok"])
         self.assertNotIn("0 calls made this run", c["detail"])
@@ -220,7 +231,7 @@ class WatchmodeFetchRunStatsAggregate(unittest.TestCase):
         # (split_wm_pot), so run_spent (and thus the aggregate bump) is 0 -- CAS-1003's "explicit
         # 0 reads as skipped, not failed" must still hold with nothing to regress it.
         c = health.check_watchmode_fetch(
-            {"calls": 0, "errors": 0}, quota=10000, run_max_credits_raw="0")
+            {"calls": 0, "errors": 0, "quota": 10000}, run_max_credits_raw="0")
         self.assertIsNone(c["ok"])
         self.assertEqual(c["status"], "skipped")
 
@@ -228,8 +239,9 @@ class WatchmodeFetchRunStatsAggregate(unittest.TestCase):
 class WatchmodePace(unittest.TestCase):
     """AC1/AC2/AC3 — extrapolate the cycle's recent daily burn to the reset date."""
 
-    def _cycle(self, days, quota=10000, cycle_end="2026-10-12"):
+    def _cycle(self, days, quota=10000, cycle_end="2026-10-12", quota_live=True):
         return {"cycle_start": "2026-09-12", "cycle_end": cycle_end, "quota": quota,
+               "quota_live": quota_live,
                "spent": sum(days.values()), "updated_at": "2026-09-15", "days": days}
 
     def test_fail_pace_exceeds_quota_before_reset(self):
@@ -252,6 +264,14 @@ class WatchmodePace(unittest.TestCase):
 
     def test_unknown_when_no_cycle_available(self):
         c = health.check_watchmode_pace(None, datetime.date(2026, 9, 15))
+        self.assertIsNone(c["ok"])
+
+    def test_unknown_when_the_live_quota_has_never_been_confirmed(self):
+        # CAS-1138 AC1d: a cycle still carrying the WM_MONTHLY_QUOTA fallback (quota_live False —
+        # /status has never succeeded this cycle) must not be paced against as if it were real.
+        cycle = self._cycle({"2026-09-12": 250, "2026-09-13": 250, "2026-09-14": 250},
+                            quota_live=False)
+        c = health.check_watchmode_pace(cycle, datetime.date(2026, 9, 15))
         self.assertIsNone(c["ok"])
 
 

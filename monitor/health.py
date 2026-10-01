@@ -227,10 +227,12 @@ def check_oscarbase_fetch(stats: dict | None) -> dict:
     return _check_fetch("oscarbase_fetch", stats)
 
 
-def check_watchmode_fetch(stats: dict | None, quota: int, run_max_credits_raw: str | None = None,
+def check_watchmode_fetch(stats: dict | None, run_max_credits_raw: str | None = None,
                           unfilled_count: int = 0) -> dict:
-    """CAS-988: the floor is 15% of `quota` — the real state/api_budget.json cycle quota (CAS-987),
-    passed in by the caller rather than assumed here, so a plan change moves the floor with it.
+    """CAS-988: the floor is 15% of the quota. CAS-1138: that quota is read from `stats['quota']`
+    — this run's own live Watchmode /status figure (poc_pipeline.wm_run_allowance via
+    state/run_stats.json), never a passed-in cycle number or a hard-coded plan size, so a plan
+    change (the account has moved plans before) moves the floor with it automatically.
 
     CAS-994: an explicit WM_RUN_MAX_CREDITS of 0 means the run is DELIBERATELY spending nothing
     on Watchmode this run — 0 calls is then the expected, correct outcome, not the failure
@@ -260,18 +262,19 @@ def check_watchmode_fetch(stats: dict | None, quota: int, run_max_credits_raw: s
     base = _check_fetch("watchmode_fetch", stats)
     if base["ok"] is not True:
         return base
-    floor = round(quota * WATCHMODE_FLOOR_PCT)
+    quota = (stats or {}).get("quota")
     remaining = (stats or {}).get("remaining_monthly_credits")
-    if remaining is None:
-        return _check("watchmode_fetch", None, base["value"], floor,
-                      "calls/errors OK but remaining_monthly_credits unavailable.")
+    if quota is None or remaining is None:
+        return _check("watchmode_fetch", None, base["value"], None,
+                      "calls/errors OK but the live Watchmode quota is unavailable this run.")
+    floor = round(quota * WATCHMODE_FLOOR_PCT)
     if remaining < floor:
         return _check("watchmode_fetch", False, remaining, floor,
-                      f"only {remaining} Watchmode credit(s) left this month "
-                      f"(floor {floor}, 15% of the {quota}-credit quota).")
+                      f"only {remaining} of {quota} Watchmode credit(s) remaining this month "
+                      f"(floor {floor}, 15% of quota).")
     return _check("watchmode_fetch", True, base["value"], floor,
-                  f"{base['value']} call(s), 0 errors, {remaining} credit(s) remaining this month "
-                  f"(floor {floor}).")
+                  f"{base['value']} call(s), 0 errors, {remaining} of {quota} credit(s) "
+                  f"remaining this month (floor {floor}).")
 
 
 # ---------------------------------------------------------------------------
@@ -286,10 +289,17 @@ def check_watchmode_pace(cycle: dict | None, today: _dt.date) -> dict:
     """CAS-988: a floor only tells you after the quota's half gone. This projects the last (up to)
     seven days of state/api_budget.json's `days` map forward to the cycle's reset date, and fires
     red when that projection would exceed the quota — in time to act, not after the fact. Too few
-    days of cycle data (a fresh cycle) reports unknown rather than false-alarming."""
+    days of cycle data (a fresh cycle) reports unknown rather than false-alarming.
+
+    CAS-1138: `cycle['quota']` defaults to WM_MONTHLY_QUOTA (poc_pipeline._load_wm_cycle_budget)
+    until a live /status call has actually confirmed it — `quota_live` is that confirmation, and
+    this reports unavailable rather than pacing against a plan size nobody has verified."""
     if not cycle:
         return _check("watchmode_pace", None, None, None,
                       "no state/api_budget.json — unavailable.")
+    if not cycle.get("quota_live"):
+        return _check("watchmode_pace", None, None, None,
+                      "the live Watchmode quota hasn't been confirmed this cycle — unavailable.")
     days_map = cycle.get("days") or {}
     if len(days_map) < WATCHMODE_PACE_MIN_DAYS:
         return _check("watchmode_pace", None, len(days_map), WATCHMODE_PACE_MIN_DAYS,
@@ -727,7 +737,7 @@ def run_checks(*, today_movies=None, prev_movies=None, stats=None, usage_probe=N
         "catalogue_integrity": lambda: check_catalogue_integrity(today_movies),
         "tmdb_fetch": lambda: check_tmdb_fetch(stats.get("tmdb")),
         "watchmode_fetch": lambda: check_watchmode_fetch(
-            stats.get("watchmode"), wm_cycle["quota"],
+            stats.get("watchmode"),
             run_max_credits_raw=os.environ.get("WM_RUN_MAX_CREDITS"),
             unfilled_count=sum(1 for m in today_movies if not m.get("wm_fields_fetched_at"))),
         "watchmode_pace": lambda: check_watchmode_pace(wm_cycle, today),
@@ -819,7 +829,8 @@ def _dry_run_inputs():
     tv_tmdb_ids = set()   # CAS-1135: empty but not None — watchmode_remap_backlog runs at 0.
     stats = {
         "tmdb": {"calls": 5600, "errors": 0},
-        "watchmode": {"calls": 40, "errors": 0, "remaining_monthly_credits": 30000, "mismatch": 0},
+        "watchmode": {"calls": 40, "errors": 0, "quota": 40000, "quota_used": 10000,
+                     "remaining_monthly_credits": 30000, "mismatch": 0},
         "oscarbase": {"calls": 20, "errors": 0},
         "email": {"attempted": 3, "delivered": 3, "errors": 0},
         "push": {"attempted": 2, "delivered": 2, "errors": 0},
@@ -828,8 +839,8 @@ def _dry_run_inputs():
     auth_probe = {"ok": True, "detail": "fixture — offline demo."}
     # a well-paced cycle: 250 credit(s)/day over 3 days of a 40000-credit quota, nowhere near
     # exhausting before the reset — keeps the --dry-run fixture all-green.
-    wm_cycle = {"cycle_start": "2026-09-12", "cycle_end": "2026-10-12", "quota": 40000, "spent": 750,
-               "updated_at": today.isoformat(),
+    wm_cycle = {"cycle_start": "2026-09-12", "cycle_end": "2026-10-12", "quota": 40000,
+               "quota_live": True, "spent": 750, "updated_at": today.isoformat(),
                "days": {"2026-09-12": 250, "2026-09-13": 250, "2026-09-14": 250}}
     # CAS-985: 200 app_open rows across 50 devices (well above the 50-row floor), 3 error rows (1.5%,
     # under both the 5%/20-row ceilings), 5 empty-account sign-ins of 155 (3.2%, under the 10% ceiling),
