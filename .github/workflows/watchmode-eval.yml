@@ -58,7 +58,7 @@ jobs:
 
       - name: Publish the report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: watchmode-eval-report
           path: watchmode_eval_report.md
@@ -93,7 +93,7 @@ jobs:
 
       - name: Publish the report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: watchmode-trial-eval-report
           path: watchmode_trial_eval_report.md
@@ -128,7 +128,7 @@ jobs:
 
       - name: Publish the report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: watchmode-reprobe-report
           path: watchmode_reprobe_report.md
