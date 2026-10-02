@@ -13633,6 +13633,21 @@ function syncWatchPrefsToCascades(){
   saveCascades();
 }
 syncWatchPrefsToCascades();   // once at boot, so a cascade saved before CAS-532 opens already in lockstep
+// CAS-1157: the one function the v2_cinema/v2_rent answers and the v2_done roster commit all call to keep
+// the account's Where & when windows in step with them — the only place this mapping lives. A "no" switches
+// the window off ({list:false}, CAS-1156's stored shape); anything else (yes, or not yet answered) leaves it
+// at watchPrefsDefaults(). Premium is never touched by onboarding; stream is always on.
+function onbApplyWatchPrefsV2(ans){
+  const w = watchPrefsDefaults();
+  if(ans.cinema==="no"){ w.upcoming={list:false}; w.in_cinema={list:false}; }
+  if(ans.rent==="no") w.rent={list:false};
+  watchPrefs = w;
+  // CAS-1099: a pre-membership draft's windows stay memory-only — complete_membership's own
+  // CP.userPrefsRow() reads watchPrefs directly, so the draft still reaches the account at that point.
+  if(onbDraftModeOn) return;
+  saveWatchPrefs();
+  syncWatchPrefsToCascades();
+}
 // CAS-532: hubWatchSummary retired with the hub's "watch" door — there is no remaining caller.
 // CAS-1123 (Lee, 2026-10-01): one card per window, one switch on the face of it — Watch. A window that's
 // on both lists matching films AND tells you when one arrives there; the old Track/Notify pair (CAS-228)
@@ -15603,6 +15618,7 @@ const SHARP_STEPS = {
       wireObOpt($("obCinemaOpts"), val=>{
         onbFlow.answersV2.cinema=val;
         onbAnswersV2Save(onbFlow.answersV2);
+        onbApplyWatchPrefsV2(onbFlow.answersV2);   // CAS-1157
         renderOnbStep("v2_cinema");
       });
     },
@@ -15624,6 +15640,7 @@ const SHARP_STEPS = {
       wireObOpt($("obRentOpts"), val=>{
         onbFlow.answersV2.rent=val;
         onbAnswersV2Save(onbFlow.answersV2);
+        onbApplyWatchPrefsV2(onbFlow.answersV2);   // CAS-1157
         renderOnbStep("v2_rent");
       });
     },
@@ -15970,6 +15987,7 @@ const SHARP_STEPS = {
     },
     wire(){
       onbFlow.answersV2=onbAnswersV2Load();
+      onbApplyWatchPrefsV2(onbFlow.answersV2);   // CAS-1157: re-derived once more at the roster commit
       if(!onbFlow.workingAgents){
         const agents=buildOnbAgentsV2(onbFlow.answersV2);
         agents.forEach(c=>{ c.id=cascadeNewId(); });
@@ -16156,6 +16174,11 @@ function flowStart(startKey){
       notifyPrefs=notifyPrefsDefault();
       occasionReg.length=0;
     }
+    // CAS-1157: a signed-out first run's Where & when answer is governed entirely by the cinema/rent
+    // questions still to come, not whatever this device's local cascade_watch_prefs last held. "+ New
+    // Cascade" (startKey "pickagent") is excluded, the same as onbAnswersV2Save below — it's an existing
+    // member adding an agent, not a new person answering again.
+    if(startKey!=="pickagent") watchPrefs = watchPrefsDefaults();
     onbGuestPrefsResetDone=true;
   }
   // CAS-1047: a genuinely new first run (splash/film-page signup) must not inherit a previous person's
@@ -18039,6 +18062,7 @@ function discardOnbDraft(){
   tasteBase=baseDefaults();
   notifyPrefs=notifyPrefsDefault();
   occasionReg.length=0;
+  watchPrefs=watchPrefsDefaults();   // CAS-1157: the draft's cinema/rent-derived windows go with it
   onbFlow.workingAgents=null;
 }
 // The membership screen's own "Sign in" button, shown only alongside membAcctExistsShow's message —

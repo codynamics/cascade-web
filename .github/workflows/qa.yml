@@ -493,7 +493,7 @@ jobs:
       - name: Dispatch promote.yml
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run promote.yml --ref main
+        run: gh workflow run promote.yml --ref main -f sha=${{ github.sha }}
 
   # CAS-482: the failure-path mirror of mark-on-staging above. `if: failure()` on a job whose
   # `needs` list is the same QA jobs runs exactly when at least one of them went red — GitHub's

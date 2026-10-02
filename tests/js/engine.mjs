@@ -249,6 +249,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // reveal-time cap they solve against — exported so a test can build a real onboarding roster
   // from a fixed answer set and assert watchCount() against the cap directly.
   onbAnswersV2Default, buildOnbAgentsV2, ONB_AGENT_CAP_V2,
+  // CAS-1157: the cinema/rent-to-Where&when mapping the v2_cinema/v2_rent/v2_done wire code calls, and the
+  // draft-discard reset that also carries the derived windows away with the rest of the draft — exported
+  // directly so a test can drive the same function the flow itself calls.
+  onbApplyWatchPrefsV2, discardOnbDraft,
   // CAS-1099: membCompleteNewMembership is the one complete_membership() RPC chokepoint a brand-new,
   // signed-out signup drives — exported so a test can call it directly against a stubbed CascadeAuth.client,
   // the same convention CascadePersistence's own write seams use. membNeedsEmail/membStart/membStartWork are

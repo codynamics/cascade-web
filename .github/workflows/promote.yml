@@ -15,6 +15,10 @@ on:
     types: [completed]
     branches: [staging]
   workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit to merge into main (defaults to the head of staging when empty)"
+        required: false
 
 permissions:
   contents: write
@@ -46,7 +50,9 @@ jobs:
           git config user.email "ci@codynamics.com.au"
           before=$(git rev-parse HEAD)
           echo "before=$before" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.sha }}" ]; then
+            sha="${{ inputs.sha }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             git fetch origin staging
             sha=$(git rev-parse origin/staging)
           else
