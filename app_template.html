@@ -18305,6 +18305,10 @@ async function membCompleteNewMembership(){
   }
   const prefsFields=CP.userPrefsRow(); delete prefsFields.user_id;
   const notifyFields=CP.prefsRow(); delete notifyFields.user_id;
+  // CAS-1155: a new account starts with email alerts on, sent to the address it just confirmed with
+  // its sign-up code — not notifyPrefsDefault()'s signed-out device default that CP.prefsRow() read.
+  notifyFields.email_on = true;
+  notifyFields.email_address = ((auth.user && auth.user.email) || "").trim() || null;
   const agents=cascades.map(c=>{
     const row=window.CascadeShape.cascadeToRow(c);
     return { id:row.id, name:row.name, criteria:row.criteria, alert_moments:row.alert_moments, active:row.active };
@@ -20131,8 +20135,14 @@ else if(dedupedN)
     const owner=uid();
     const row=(window.CascadeAccountStore.acctStore.notify_prefs||[])[0];
     if(!row){
-      c.from("notify_prefs").upsert([{ user_id:owner }], { onConflict:"user_id" }).then(({error})=>{
-        if(error) console.warn("notify_prefs bootstrap insert", error);
+      // CAS-1155: a genuinely missing row starts email alerts on, sent to the signed-in account's own
+      // email — not a device default, since a fixed default written at row creation is not device state.
+      const bootEmail = ((acct().user && acct().user.email) || "").trim() || null;
+      c.from("notify_prefs").upsert([{ user_id:owner, email_on:true, email_address:bootEmail }], { onConflict:"user_id" }).then(({error})=>{
+        if(error){ console.warn("notify_prefs bootstrap insert", error); return; }
+        notifyPrefs.emailOn = true;
+        notifyPrefs.email = bootEmail || "";
+        saveNotifyPrefsLocal();
       });
       notifyPrefsReady=true;
       return;

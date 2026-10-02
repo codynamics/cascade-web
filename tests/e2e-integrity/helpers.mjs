@@ -57,6 +57,16 @@ export async function liveCascades(userId){
   return data;
 }
 
+/** The notify_prefs row currently on the server for this account, or null if none exists yet. */
+export async function liveNotifyPrefs(userId){
+  const { data, error } = await admin.from("notify_prefs")
+    .select("in_app,email_on,email_address")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if(error) throw new Error(`liveNotifyPrefs failed: ${error.message}`);
+  return data;
+}
+
 /** The one-time code a real sign-in would have emailed — fetched via the admin API instead of standing up
  * a mail-capture dependency this suite has no other use for. */
 export async function fetchOtp(email){

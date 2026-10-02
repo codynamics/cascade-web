@@ -24,7 +24,7 @@
 // as B on the same context — nothing of A visible, A's server rows unchanged) are new, and must pass.
 import { test, expect } from "@playwright/test";
 import {
-  admin, createTestUser, seedCascades, liveCascades, testEmail,
+  admin, createTestUser, seedCascades, liveCascades, liveNotifyPrefs, testEmail,
   gotoIntegrityFresh, signInFromSplash, signOutFromAccount, signInDirect, fetchOtp, emailHasAccount,
 } from "./helpers.mjs";
 import { settleListing, finishFlow, walkToServices } from "../e2e/helpers.mjs";
@@ -560,6 +560,76 @@ test("S13: a client may delete at most one account row per statement; cascades c
 // user's whole usage_events flush came back 42501 (queueUsageEvent's many call sites with no data argument
 // — splash_shown, flow_start, etc. — always send data: null). Drives a real signed-in supabase-js client
 // directly, the same way S13 asserts on a policy/trigger rather than app behaviour.
+// CAS-1155: a new account starts with email alerts ON, addressed to whatever email it signed up (or first
+// signed in) with — not notifyPrefsDefault()'s signed-out device default (emailOn:false), which is what every
+// account got before this ticket (membCompleteNewMembership() and loadNotifyPrefs()'s bootstrap insert both
+// used to carry that default straight to the server). A row that already exists is never touched either way.
+test("CAS-1155 S1: a new sign-up's notify_prefs row has email alerts on, addressed to the sign-up email", async ({ page }) => {
+  page.on("console", msg => console.log(`[CAS-1155 S1 console.${msg.type()}] ${msg.text()}`));
+  page.on("pageerror", err => console.log(`[CAS-1155 S1 pageerror] ${err}`));
+  const email = testEmail("cas1155-s1");
+
+  await gotoIntegrityFresh(page);
+  await page.locator("#splashCta").click();
+  await walkToServices(page, "cinema");
+  await finishFlow(page);
+
+  await page.locator("#membEmail").fill(email);
+  await page.locator(".membcta").click();
+  await expect(page.locator("#authVerify")).toBeVisible({ timeout: 30_000 });
+  const code = await fetchOtp(email);
+  await page.locator("#authCode").fill(code);
+  await page.locator("#authVerifyBtn").click();
+  await expect(page.locator("#membScreen.open")).toBeHidden({ timeout: 30_000 });
+  await settleListing(page);
+
+  const userId = await page.evaluate(() => window.CascadeAuth.user.id);
+  await expect.poll(async () => {
+    const row = await liveNotifyPrefs(userId);
+    return row && { email_on: row.email_on, email_address: row.email_address };
+  }, { timeout: 15_000 }).toEqual({ email_on: true, email_address: email });
+
+  // AC: Settings' "How you're told" row shows Email and the sign-up address — read from the rendered DOM,
+  // not notifyPrefs, so a load that wrote the server row but never updated the in-memory copy would be caught.
+  await page.evaluate(() => window.openSettings());
+  const row = page.locator("#settingsBody .urow", { hasText: "How you're told" });
+  await expect(row).toContainText("Email");
+  await expect(row).toContainText(email);
+});
+
+test("CAS-1155 S2: a missing notify_prefs row turns email alerts on at sign-in; an existing off row stays off", async ({ page }) => {
+  const email = testEmail("cas1155-s2");
+  const user = await createTestUser(email);
+  // CAS-1132: a signed-in account with zero agents routes straight into onboarding instead of the listing
+  // settleListing() waits on — seed one agent for exactly the reason S2/S3/S7 above already do.
+  await seedCascades(user.id, [{ name: "CAS-1155 agent" }]);
+
+  await gotoIntegrityFresh(page);
+  await signInFromSplash(page, email);
+  await settleListing(page);
+
+  await expect.poll(async () => {
+    const row = await liveNotifyPrefs(user.id);
+    return row && { email_on: row.email_on, email_address: row.email_address };
+  }, { timeout: 15_000 }).toEqual({ email_on: true, email_address: email });
+
+  // An account whose existing row is already off must stay off — the bootstrap-only default above must
+  // never touch a row that already exists.
+  const emailOff = testEmail("cas1155-s2-off");
+  const userOff = await createTestUser(emailOff);
+  await seedCascades(userOff.id, [{ name: "CAS-1155 off agent" }]);
+  const { error: seedErr } = await admin.from("notify_prefs")
+    .insert({ user_id: userOff.id, email_on: false, email_address: null });
+  if(seedErr) throw new Error(`CAS-1155 S2 seeding failed: ${seedErr.message}`);
+
+  await gotoIntegrityFresh(page);
+  await signInFromSplash(page, emailOff);
+  await settleListing(page);
+
+  const rowOff = await liveNotifyPrefs(userOff.id);
+  expect(rowOff.email_on, "a row that already exists off must never be flipped on at sign-in").toBe(false);
+});
+
 test("S14: a signed-in client's usage_events insert succeeds with queueUsageEvent's exact row shape (data: null included); the same client cannot attribute a row to another user", async () => {
   const email = testEmail("s14");
   const user = await createTestUser(email);
