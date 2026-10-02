@@ -49,7 +49,7 @@ jobs:
           fetch-depth: 0         # full history: the health step's catalogue_size/score_coverage checks anchor "yesterday" to the last refresh on an EARLIER day, not HEAD~1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
