@@ -108,6 +108,11 @@ export async function signInFromSplash(page, email){
 export async function signOutFromAccount(page){
   await page.evaluate(() => window.openAccountAuth());
   await expect(page.locator("#authSignedIn")).toBeVisible();
+  // CAS-1100: the sign-out button confirms first ("Some changes haven't saved yet. Sign out anyway?") if the
+  // acctOp queue still owes a write — e.g. a background agent_films admission push still in flight. Playwright
+  // auto-dismisses an unhandled dialog, which would read as "no, stay signed in" and hang this forever, so
+  // accept it the way a tester who already clicked Sign out would.
+  page.once("dialog", dialog => dialog.accept());
   await page.locator("#authSignOut").click();
   await expect.poll(() => page.evaluate(() => window.CascadeAuth.status), { timeout: 15_000 }).toBe("signed-out");
 }

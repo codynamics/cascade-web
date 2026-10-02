@@ -182,7 +182,11 @@ test("CAS-761 AC5: --stickyh equals the measured header+cascbar chrome height, a
   expect(Math.abs(measured.stickyh - measured.chrome)).toBeLessThanOrEqual(1);
 
   await page.evaluate(() => window.jumpToSection("opening_week"));
-  await page.waitForTimeout(1200);   // smooth scroll + the settle loop's re-aim corrections
+  // CAS-1150 requeue: jumpToSection's own settle loop (app_template.html) can retry for up to
+  // 420ms + 40*80ms (~3.6s) before it gives up re-aiming against a still-growing list — this spec's extra
+  // Also-show sections above mean more content to lay out, so 1200ms could catch it mid-settle under CI's
+  // slower headless WebKit. Wait out the loop's full worst case instead of guessing a shorter number.
+  await page.waitForTimeout(3800);
   const landed = await page.evaluate(() => {
     const stickyh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--stickyh")) || 0;
     const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1;

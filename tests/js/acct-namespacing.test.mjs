@@ -3,7 +3,7 @@
 // localStorage, and the account fan-out's own "offer up what's genuinely new" merge then tried to push those
 // inherited rows back to Supabase under the wrong owner, which RLS correctly refused (42501) — or, worse,
 // silently accepted for an id the account had simply never seen. These tests drive the real seam
-// (loadAccount/loadGuest/CascadePersistence.syncCascadesToAccount, the same ones the auth-change listener
+// (loadAccount/signOutReset/CascadePersistence.syncCascadesToAccount, the same ones the auth-change listener
 // calls in production) with a stubbed Supabase client.
 //
 // CAS-1109: agents moved onto the account store (acctLoad/acctOp) — rewritten against that architecture's own
@@ -11,6 +11,12 @@
 // .upsert(fields, {onConflict:"id", ignoreDuplicates:true}); an "update" calls
 // .update(fields).match(match)[.eq("updated_at", v)].select()), the same shapes cas1096-account-store.test.mjs
 // and cas1097-agent-films-acctop.test.mjs use for their own tables.
+//
+// CAS-1100: CAS-957's own fix (per-account acctKey namespacing) is retired — a real sign-out now wipes
+// cascade_cascades (and every other account-local key) outright, so there is no longer a different
+// account's leftover cache to collide with in the first place. AC4/AC5 below were rewritten to prove THAT
+// guarantee instead of the namespacing it replaced; AC2/AC3 (RLS-refusal and no-change-no-write behaviour)
+// are unaffected by the architecture change and still drive the same real seam.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -81,7 +87,7 @@ test("CAS-957 AC2: a second account signing in on the same device never inherits
 
   // Sign out.
   E.CascadeAuth.enabled = false; E.CascadeAuth.client = null; E.CascadeAuth.session = null;
-  E.CascadePersistence.loadGuest();
+  E.CascadePersistence.signOutReset();
   assert.equal(E.cascades.length, 0, "signed out shows no agents");
 
   // Sign in as B, whose account already has one agent of its own. Built through the real cascadeToRow (not
@@ -125,23 +131,32 @@ test("CAS-957 AC3: a refused (42501) new-agent insert is dropped from the local 
   assert.equal(secondClient.upsertCalls.length, 0, "a dropped row must never be retried on the next sync — it no longer exists in `cascades`");
 });
 
-test("CAS-957 AC4: a device carrying pre-namespacing cascade_cascades data does not leak it into a different account signing in, and the legacy key is cleaned up", async () => {
+test("CAS-1100 AC4: a real sign-out wipes cascade_cascades from disk, so a different account signing in on this device never inherits it", async () => {
   const E = loadEngine();
-  E.localStorage.setItem("cascade_cascades", JSON.stringify([
-    { id: "legacy-a-1", name: "A's old agent", kind: "stream", status: [] },
-  ]));
 
+  // Sign in as A, leaving its own local mirror on disk (CAS-516's saveCascadesLocal).
+  const A_ROW = { id: "a0000000-0000-4000-8000-0000000000a1", user_id: "cas1100-acct-A", name: "A agent", criteria: {}, alert_moments: [], active: true, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" };
+  signIn(E, "cas1100-acct-A", fakeCascadesClient({ selectRows: [A_ROW] }));
+  await E.CascadePersistence.loadAccount();
+  assert.ok(E.localStorage.getItem("cascade_cascades"), "sanity: A's own load mirrored its agent locally");
+
+  // Sign out — the real chokepoint every sign-out path (button, session expiry, account deletion) runs.
+  E.CascadeAuth.enabled = false; E.CascadeAuth.client = null; E.CascadeAuth.session = null;
+  E.CascadePersistence.signOutReset();
+  assert.equal(E.localStorage.getItem("cascade_cascades"), null, "sign-out must wipe the local mirror outright, not merely stop trusting it");
+
+  // Sign in as B, whose account has never heard of A's agent.
   const B_ID = "b0000000-0000-4000-8000-0000000000b1";
-  const bRow = { id: B_ID, user_id: "cas957-acct-d-B", name: "B real agent", criteria: {}, alert_moments: [], active: true, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" };
-  signIn(E, "cas957-acct-d-B", fakeCascadesClient({ selectRows: [bRow] }));
+  const bRow = { id: B_ID, user_id: "cas1100-acct-B", name: "B real agent", criteria: {}, alert_moments: [], active: true, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" };
+  signIn(E, "cas1100-acct-B", fakeCascadesClient({ selectRows: [bRow] }));
   await E.CascadePersistence.loadAccount();
 
-  assert.equal(JSON.stringify(E.cascades.map(c => c.id)), JSON.stringify([B_ID]), "the legacy account's agents must never reach a different account signing in");
-  assert.equal(E.localStorage.getItem("cascade_cascades"), null, "the unnamespaced legacy key must be gone after the one-time migration");
+  assert.equal(JSON.stringify(E.cascades.map(c => c.id)), JSON.stringify([B_ID]), "A's agent must never reach a different account signing in after a real sign-out");
 });
 
-test("CAS-957 AC5: every read of the agent-list cache goes through the namespaced accessor, never the bare literal key", () => {
+test("CAS-1100 AC5: the sign-out wipe names every account-local key a real sign-out must clear, cascade_cascades included", () => {
   const src = fs.readFileSync(path.join(ROOT, "app_template.html"), "utf8");
-  const count = (src.match(/localStorage\.getItem\("cascade_cascades"\)/g) || []).length;
-  assert.equal(count, 0, "grep -c 'localStorage.getItem(\"cascade_cascades\")' app_template.html must return 0");
+  const match = src.match(/const ACCOUNT_LOCAL_KEYS = \[([^\]]*)\]/);
+  assert.ok(match, "wipeAccountLocalState's own key list must still exist under this name");
+  assert.match(match[1], /"cascade_cascades"/, "cascade_cascades must be one of the keys a sign-out wipes");
 });

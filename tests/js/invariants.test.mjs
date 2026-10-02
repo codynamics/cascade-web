@@ -2671,11 +2671,10 @@ test("CAS-738 AC3: saveWatchStatus writes cascade_wow and cascade_enjoyed to loc
 
     E.CascadePersistence.saveWatchStatus();
 
-    // CAS-957: the cache is namespaced by account (acctKey), so the literal "cascade_wow"/"cascade_enjoyed"
-    // keys are never written to directly any more — read back through the same suffix the save just used.
-    const suffix = E.CascadePersistence.acctSuffix;
-    const storedWow = JSON.parse(E.localStorage.getItem(`cascade_wow@${suffix}`) || "[]");
-    const storedEnjoyed = JSON.parse(E.localStorage.getItem(`cascade_enjoyed@${suffix}`) || "[]");
+    // CAS-1100: cascade_wow/cascade_enjoyed are plain, un-namespaced keys now (CAS-957's acctKey is
+    // retired — a real sign-out wipes them outright instead), so they're read back directly.
+    const storedWow = JSON.parse(E.localStorage.getItem("cascade_wow") || "[]");
+    const storedEnjoyed = JSON.parse(E.localStorage.getItem("cascade_enjoyed") || "[]");
     assert.ok(storedWow.includes(wowId),
       "cascade_wow must reach localStorage the instant saveWatchStatus runs, not only be scheduled for the account");
     assert.ok(storedEnjoyed.includes(enjoyedId),
@@ -2870,11 +2869,10 @@ function fakeSingleRowTable(table, row){
 }
 function fakeCas740Supabase(row){ return fakeSingleRowTable("user_prefs", row); }
 function withCas740State(fn){
-  // CAS-957: both keys are namespaced by account now (acctKey) — signInWithClient never changes acctSuffix
-  // (it pokes CascadeAuth directly, bypassing the real sign-in chokepoint), so every test in this file reads
-  // and writes the same "@guest"-suffixed keys throughout; snapshot/restore through that same suffix.
-  const onbKey = `cascade_onb_answers@${E.CascadePersistence.acctSuffix}`;
-  const uxKey = `cascade_ux@${E.CascadePersistence.acctSuffix}`;
+  // CAS-1100: both keys are plain now (CAS-957's acctKey namespacing is retired) — snapshot/restore them
+  // directly.
+  const onbKey = "cascade_onb_answers";
+  const uxKey = "cascade_ux";
   const savedTouched = E.prefs.touched;
   const savedOnb = E.localStorage.getItem(onbKey);
   const savedUx = E.localStorage.getItem(uxKey);

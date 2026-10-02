@@ -20,12 +20,26 @@ const FILM_A = 900760001, FILM_A2 = 900760011, FILM_B = 900760002, FILM_C = 9007
 const ALL_FILMS = [FILM_A, FILM_A2, FILM_B, FILM_C, FILM_OTHER];
 const PAUSED_CLONE_ID = "cas760-paused-clone";
 
-/** Onboard a fresh streaming roster and return its cascade ids, in `cascades` array order. */
+/** Onboard a fresh streaming roster and return its cascade ids, in `cascades` array order.
+ * CAS-1150 requeue: onboarding's own starter roster size has changed since this test was written and can
+ * no longer be relied on to produce three agents by itself (seen in CI: 2, not >=3) — pad with clones of
+ * the first, the same CAS-682 clone technique addPausedClone below already uses, so the rank-tint
+ * assertions always have three real, distinct cascades to rank regardless of how many onboarding itself
+ * seeds. rankCascades (below) overwrites every clone's .order anyway, so the duplicated criteria cost
+ * nothing here. */
 async function toWatchScreen(page){
   await toShortlist(page, "stream");
   await finishFlow(page);
   await toListing(page);
-  return page.evaluate(() => cascades.map(c => c.id));
+  return page.evaluate(() => {
+    let i = 0;
+    while(cascades.length < 3){
+      const clone = JSON.parse(JSON.stringify(cascades[0]));
+      clone.id = `cas760-extra-${i++}`;
+      cascades.push(clone);
+    }
+    return cascades.map(c => c.id);
+  });
 }
 
 /** Rank cascadeIds[0..2] 1/2/3 (order 10/20/30), make them status-permissive, and add the paused clone
@@ -80,6 +94,9 @@ test.afterEach(async ({ page }) => {
     });
     const ci = cascades.findIndex(c => c.id === PAUSED_CLONE_ID);
     if(ci >= 0) cascades.splice(ci, 1);
+    for(let i = cascades.length - 1; i >= 0; i--){
+      if(String(cascades[i].id).startsWith("cas760-extra-")) cascades.splice(i, 1);
+    }
   }, { ids: ALL_FILMS, PAUSED_CLONE_ID });
 });
 

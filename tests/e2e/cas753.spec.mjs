@@ -87,18 +87,23 @@ test("CAS-753 AC1/AC2: default on hides a film only on an unpicked service; the 
 
 test("CAS-753 AC3: the toggle persists across a reload; a brand new list still starts on", async ({ page }) => {
   await toWatchScreen(page, "stream");
-  await page.evaluate(() => setWatchMineOnly(false));
-  await expect.poll(() => page.evaluate(() => watchMineOnly[watchTab])).toBe(false);
+  // CAS-1150 requeue: pin to "stream" explicitly rather than reading watchMineOnly[watchTab] — watchTab
+  // itself is never persisted (pickLandingWatchTab re-derives it from the catalogue on every boot,
+  // app_template.html ~18271/19300), so a reload can land on a different tab than whichever one was active
+  // when the toggle was set, and this test isn't about which tab happens to land, only whether the toggle
+  // itself survives a reload.
+  await page.evaluate(() => { setWatchTab("stream"); setWatchMineOnly(false); });
+  await expect.poll(() => page.evaluate(() => watchMineOnly.stream)).toBe(false);
 
   await page.reload();
   await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
-  expect(await page.evaluate(() => watchMineOnly[watchTab])).toBe(false);
+  expect(await page.evaluate(() => watchMineOnly.stream)).toBe(false);
 
   // A record this device has never seen before (nothing stored yet) takes the default — on.
   await page.evaluate(() => localStorage.removeItem("cascade_watch_mineonly"));
   await page.reload();
   await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
-  expect(await page.evaluate(() => watchMineOnly[watchTab])).toBe(true);
+  expect(await page.evaluate(() => watchMineOnly.stream)).toBe(true);
 });
 
 test("CAS-753 AC4: on with no services picked shows the honest dead end, not a silent empty list", async ({ page }) => {

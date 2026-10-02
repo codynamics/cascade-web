@@ -20,6 +20,8 @@
 // is stale — CAS-1137 claimed S14 for an unrelated usage_events fix in the meantime — S6 below proves the
 // same email_has_account gate AC6 describes as part of its own "agents intact" story, so no separate
 // scenario was added only to claim a fresh number.
+// CAS-1100: S11 (a real sign-out leaves no account-data key in localStorage) and S12 (sign out of A, sign in
+// as B on the same context — nothing of A visible, A's server rows unchanged) are new, and must pass.
 import { test, expect } from "@playwright/test";
 import {
   admin, createTestUser, seedCascades, liveCascades, testEmail,
@@ -70,6 +72,58 @@ test("S3: sign out then sign back in on the same context deletes none (the 2026-
   const live = await liveCascades(user.id);
   expect(idsOf(live), "the exact 2026-09-30 incident shape: a sign-out/sign-in cycle must delete nothing")
     .toEqual(idsOf(seeded));
+});
+
+// CAS-1100: a real sign-out wipes every key that mirrors account content or account sync state outright
+// (wipeAccountLocalState, via the cascade-auth-change listener's signOutReset) — no leftover cache for a
+// future sign-in, this device's own or anyone else's, to find or inherit.
+const ACCOUNT_DATA_KEY_NAMES = ["cascade_cascades", "cascade_watched", "cascade_disliked", "cascade_blocked",
+  "cascade_indifferent", "cascade_wow", "cascade_enjoyed", "cascade_notify", "cascade_watch_known",
+  "cascade_notifyprefs", "cascade_prefs", "cascade_ux", "cascade_taste_base", "cascade_watch_prefs",
+  "cascade_moving_seen", "cascade_occasions", "cascade_onb_answers", "cascade_tutorial_seen",
+  "cascade_review_sessions", "cascade_review_asked_ver"];
+
+test("S11: sign out leaves no account-data key in localStorage", async ({ page }) => {
+  const email = testEmail("s11");
+  const user = await createTestUser(email);
+  await seedCascades(user.id, [{ name: "S11 agent" }]);
+
+  await gotoIntegrityFresh(page);
+  await signInFromSplash(page, email);
+  await settleListing(page);
+
+  await signOutFromAccount(page);
+
+  const keys = await page.evaluate(() => Object.keys(localStorage));
+  const accountDataKeys = keys.filter(k => k.indexOf("cascade_ops@")===0 || ACCOUNT_DATA_KEY_NAMES.includes(k));
+  expect(accountDataKeys, `no account-data key may survive a sign-out; localStorage held: ${JSON.stringify(keys)}`)
+    .toEqual([]);
+});
+
+test("S12: sign out of A and sign in as B on the same context shows nothing of A, and A's server rows are unchanged", async ({ page }) => {
+  const emailA = testEmail("s12a");
+  const userA = await createTestUser(emailA);
+  const seededA = await seedCascades(userA.id, [{ name: "A agent" }]);
+
+  const emailB = testEmail("s12b");
+  const userB = await createTestUser(emailB);
+  const seededB = await seedCascades(userB.id, [{ name: "B agent" }]);
+
+  await gotoIntegrityFresh(page);
+  await signInFromSplash(page, emailA);
+  await settleListing(page);
+
+  await signOutFromAccount(page);
+  await signInFromSplash(page, emailB);
+  await settleListing(page);
+
+  const onScreen = await page.evaluate(() => cascades.map(c => ({ id: c.id, name: c.name })));
+  expect(idsOf(onScreen)).toEqual(idsOf(seededB));
+  expect(onScreen.some(c => c.name === "A agent"), "nothing of A may be visible after signing in as B").toBe(false);
+
+  const liveA = await liveCascades(userA.id);
+  expect(idsOf(liveA), "A's server rows must be unchanged by B signing in on the same device")
+    .toEqual(idsOf(seededA));
 });
 
 test("S4 (first half): an edit on context A reaches context B on reload", async ({ browser }) => {

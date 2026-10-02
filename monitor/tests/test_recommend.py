@@ -3,11 +3,13 @@
 Run:  python -m unittest monitor.tests.test_recommend
 """
 import datetime as _dt
+import json
 import unittest
+import urllib.parse
 from unittest import mock
 
 from monitor.recommend import email_subject, main, render_email
-from monitor.store import InMemoryStore
+from monitor.store import InMemoryStore, SupabaseStore
 
 
 def _row(id=1, sender_id="u1", sender_name="lee", to_name="Priya", to_email="priya@example.test",
@@ -141,6 +143,73 @@ class RecommendationsFixtureFlagTests(unittest.TestCase):
                                "monitor/fixtures/recommendations_empty.json"])
         self.assertEqual(exit_code, 0)
         send.assert_not_called()
+
+
+class _FakeResponse:
+    """Minimal stand-in for the object urllib.request.urlopen() hands back as a context manager."""
+
+    def __init__(self, rows, content_range=None):
+        self._body = json.dumps(rows).encode("utf-8")
+        self.headers = {"Content-Range": content_range} if content_range else {}
+
+    def read(self):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+
+class MainAgainstARealSupabaseStoreTests(unittest.TestCase):
+    """CAS-1154: fetch_recent_sent_recommendations() previously called _get() with no explicit
+    `order=`, so _get's CAS-1091 stable-paging guard raised ValueError as soon as any row existed —
+    crashing main() before it could send anything, even an unrelated unsent row. InMemoryStore
+    (every other test in this file) never calls _get() at all, so it can't catch that: this test
+    drives main() against a fake HTTP layer behind a real SupabaseStore instead."""
+
+    @staticmethod
+    def _fake_urlopen(rows):
+        def fake(req, timeout=None):
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(req.full_url).query)
+            if req.get_method() == "GET":
+                sent_at = qs.get("sent_at", [None])[0]
+                if sent_at == "is.null":
+                    page = [r for r in rows if r.get("sent_at") is None]
+                elif sent_at and sent_at.startswith("gte."):
+                    since = urllib.parse.unquote(sent_at[len("gte."):])
+                    page = [r for r in rows if r.get("sent_at") and r["sent_at"] >= since]
+                else:
+                    page = list(rows)
+                body = [dict(r) for r in page]
+                return _FakeResponse(body, content_range=f"0-{max(len(body) - 1, 0)}/{len(body)}")
+            # PATCH mark_recommendations_sent
+            ids_part = qs.get("id", [""])[0]
+            ids = {int(i) for i in ids_part[len("in.("):-1].split(",") if i}
+            data = json.loads(req.data.decode("utf-8"))
+            updated = []
+            for r in rows:
+                if r.get("id") in ids:
+                    r["sent_at"] = data["sent_at"]
+                    updated.append(dict(r))
+            return _FakeResponse(updated, content_range=f"0-{max(len(updated) - 1, 0)}/{len(updated)}")
+        return fake
+
+    def test_an_unsent_row_still_sends_while_a_recently_sent_row_exists(self):
+        two_days_ago = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=2)).isoformat()
+        rows = [
+            _row(1, sender_id="u1", to_email="priya@example.test", sent_at=None),
+            _row(2, sender_id="u2", to_email="other@example.test", sent_at=two_days_ago),
+        ]
+        store = SupabaseStore("https://example.test.invalid", "fake-key")
+        with mock.patch("monitor.store.urllib.request.urlopen",
+                         side_effect=self._fake_urlopen(rows)), \
+             mock.patch("monitor.recommend.store_from_env", return_value=store), \
+             mock.patch("monitor.recommend.send_via_resend") as send:
+            exit_code = main([])
+        self.assertEqual(exit_code, 0)
+        send.assert_called_once()
 
 
 if __name__ == "__main__":

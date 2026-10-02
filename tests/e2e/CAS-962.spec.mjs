@@ -27,10 +27,13 @@ function b64urlShare(obj){
  * Assumes the page has already navigated (with whatever ?dl= is under test already in the URL). */
 async function walkOnboarding(page, { kids = "no" } = {}){
   await page.locator("#splashCta").click();
-  await expect(page.locator(".obhd")).toContainText("Cascade finds your movies for you.");   // v2_about
+  // CAS-1018: scoped to #onbStepInner, not a bare ".obhd" — gotoStep's dual-pane slide leaves the
+  // outgoing step's .obhd in the DOM alongside the incoming one for the length of the transition, so a
+  // bare ".obhd" is a strict-mode violation (resolves to 2 elements) for as long as that overlap lasts.
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator(".obhd")).toContainText("Massive Movies");                       // v2_intro
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");                       // v2_intro
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
   await expect(page.locator("#obCinemaOpts")).toBeVisible();                                 // v2_cinema

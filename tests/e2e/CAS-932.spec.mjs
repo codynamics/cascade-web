@@ -31,8 +31,13 @@ function fakeSupabaseScript(){
           signOut: async () => ({ error: null }),
         },
         from: (table) => {
-          if(table === "cascades") return { select: () => ({ order: () => Promise.resolve({ data: [SEEDED_CASCADE], error: null }) }),
+          // CAS-1109: acctLoad reads every table as .select("*").order(pk,{ascending:true}).range(from,to) —
+          // the chain must go one level deeper than a bare .order() resolving, or .range() throws on the
+          // resolved value and acctLoad never reaches loadAccount()'s afterSignIn() call (same pattern as
+          // smoke.spec.mjs's own SEEDED_CASCADE mock).
+          if(table === "cascades") return { select: () => ({ order: () => ({ range: () => Promise.resolve({ data: [SEEDED_CASCADE], error: null }) }) }),
             upsert: () => chain(), delete: () => chain() };
+          // loadFriends() reads this table directly (no acctLoad), so a bare .order() resolving is correct.
           if(table === "friends") return {
             select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
             insert: (rows) => ({ select: () => ({ single: () => {

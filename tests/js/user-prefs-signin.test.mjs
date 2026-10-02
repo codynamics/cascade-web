@@ -76,15 +76,15 @@ test("CAS-1095: another device's newer services are adopted on the next sign-in,
   await E.CascadePersistence.loadAccount();
   await E.CascadePersistence.loadUserPrefs();
 
-  E.CascadePersistence.loadGuest();
-  assert.equal(E.prefs.touched, false, "sanity: signed out, in-memory prefs are the guest's blank defaults");
+  E.CascadePersistence.signOutReset();
+  assert.equal(E.prefs.touched, false, "sanity: signed out, in-memory prefs are the blank defaults");
 
   // Another device added a service while this one was signed out.
   const client2 = fakeClient(selectServerRow(serverRow(acctId, { sub_services: ["Netflix", "Stan", "Binge"] })));
   signIn(E, acctId, client2);
-  await E.CascadePersistence.replayOutbox();
+  await E.CascadeAccountStore.sendQueue();
   assert.equal(client2.calls.filter(c => c.kind !== "select").length, 0,
-    "replayOutbox must never write user_prefs when this device has nothing genuinely queued for it");
+    "sending the queue must never write user_prefs when this device has nothing genuinely queued for it");
 
   await E.CascadePersistence.loadAccount();
   await E.CascadePersistence.loadUserPrefs();
@@ -114,7 +114,7 @@ test("CAS-1095: a user_prefs acctOp still queued (but unsent) from before this b
       fields: { sub_services: ["Binge"] } },
   ]));
 
-  await E.CascadePersistence.replayOutbox();
+  await E.CascadeAccountStore.sendQueue();
 
   assert.equal(updateCalls, 1, "a queued-but-unsent user_prefs op from a previous session must still be sent this boot");
 

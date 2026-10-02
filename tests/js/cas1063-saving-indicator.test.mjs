@@ -13,18 +13,18 @@ import { loadEngine } from "./engine.mjs";
 const E = loadEngine();
 const P = E.CascadePersistence;
 
-// outbox is exposed by reference (like cascadeKnown elsewhere) — mutate it directly, then call
-// renderAcctBanner(), the same chokepoint every real save chokepoint (outboxPersistNow, setAcctTablePending,
-// recordSyncOutcome) already routes through on a state change.
+// acctTablePending is exposed by reference (like cascadeKnown elsewhere) — mutate it directly, then call
+// renderAcctBanner(), the same chokepoint every real save chokepoint (setAcctTablePending, recordSyncOutcome)
+// already routes through on a state change. "cascades" stands in for any pending table — acctSavePending
+// only cares whether ANY table is pending.
 function setOutboxPending(hasRow){
-  if(hasRow) P.outbox.cas1063test = { row1: { id: 1 } };
-  else delete P.outbox.cas1063test;
+  P.acctTablePending.cascades = hasRow;
   P.renderAcctBanner();
 }
 
 test.afterEach(() => { setOutboxPending(false); });
 
-test("acctSavePending: false with an empty outbox, true the instant a row is owed, false again once it clears", () => {
+test("acctSavePending: false with nothing pending, true the instant a row is owed, false again once it clears", () => {
   assert.equal(P.acctSavePending(), false, "sanity: nothing pending before this test seeds anything");
   setOutboxPending(true);
   assert.equal(P.acctSavePending(), true);

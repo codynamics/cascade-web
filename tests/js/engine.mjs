@@ -258,9 +258,9 @@ if(typeof window.CascadeAuth === "undefined"){
   get onbDraftModeOn(){ return onbDraftModeOn; },
   setOnbDraftModeOn(v){ onbDraftModeOn=!!v; },
   get onbMembershipInFlight(){ return onbMembershipInFlight; },
-  // CAS-1099: tasteBase is reassigned wholesale in more places than loadUserPrefs/maybeSwitchAcctSuffix now
-  // (flowStart()'s own leftover-@guest-draft reset) — exposed through a getter, like watchPrefs/notifyPrefs
-  // below, so a test sees the CURRENT binding even across a reassignment, not a snapshot frozen at load time.
+  // CAS-1099: tasteBase is reassigned wholesale in more places than loadUserPrefs now (flowStart()'s own
+  // leftover-draft reset) — exposed through a getter, like watchPrefs/notifyPrefs below, so a test sees
+  // the CURRENT binding even across a reassignment, not a snapshot frozen at load time.
   get tasteBase(){ return tasteBase; },
   cascades,
   get onbFlow(){ return onbFlow; },
