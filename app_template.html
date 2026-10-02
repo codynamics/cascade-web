@@ -16445,23 +16445,34 @@ function agentMetricsCompute(c){
   const films=MOVIES.filter(m=>listedBy(m,c) && !taggedOut(m));   // Total listed — same test the listing itself runs
   // CAS-867: lastFind has no time window — a film with no firstFound stamp (never picked up, or its stamp
   // already pruned) contributes to none of these three figures. oldestFound tracks the earliest stamp this
-  // agent's OWN films carry, so the rate below can tell a genuinely young agent from a quiet one.
-  let lastFind=null, oldestFound=null, trendCount=0, recentCount=0;
+  // agent's OWN films carry, so perMonth's born fallback below can tell a genuinely young agent from a quiet one.
+  let lastFind=null, oldestFound=null, recentCount=0;
   films.forEach(m=>{
     const d=firstFound[m.tmdb_id]; if(!d) return;
     const t=Date.parse(d);
     if(lastFind===null || t>Date.parse(lastFind)) lastFind=d;
     if(oldestFound===null || t<Date.parse(oldestFound)) oldestFound=d;
-    const n=daysSince(d);
-    if(n<AGENT_NEW_TREND_DAYS) trendCount++;
-    if(n<NEW_DAYS) recentCount++;
+    if(daysSince(d)<NEW_DAYS) recentCount++;
   });
-  // Lee's decision, 2026-09-08: divide by however much of the window this agent actually HAS, not always by
-  // the full window — a 3-day-old agent's rate is extrapolated from 3 days, not diluted by 27 days that
-  // haven't happened yet. Zero elapsed days (the agent's first find landed today) can't support a rate at
-  // all, and neither can zero finds — both print nothing rather than a number the data can't back.
-  const spanDays = oldestFound===null ? 0 : Math.min(AGENT_NEW_TREND_DAYS, daysSince(oldestFound));
-  const perMonth = spanDays<=0 ? null : (trendCount/spanDays)*30;
+  // CAS-1145: on a new account every film an agent holds was first found on the agent's own first day, so
+  // dividing by however much of the window the agent "has" (the 2026-09-08 rule this replaces) extrapolated
+  // that one-time back-catalogue fill into a monthly rate (77 films -> ~2310/month). perMonth now anchors on
+  // `born` (the agent's own creation day, falling back to its oldest find when created_at is missing) and
+  // counts only films found strictly after that day — the back-catalogue fill itself never counts as "new".
+  // An agent younger than a week prints no rate at all; there isn't enough history to support one yet.
+  const CP = (typeof window!=="undefined") ? window.CascadePersistence : null;
+  const born = (c.created_at && c.created_at.slice(0,10)) || (oldestFound && oldestFound.slice(0,10)) || null;
+  const ageDays = born===null ? 0 : daysSince(born);
+  let newCount=0;
+  if(ageDays>=7){
+    films.forEach(m=>{
+      const row = CP && CP.getAgentFilm(c.id, m.tmdb_id);
+      const d = (row && row.admitted_at) || firstFound[m.tmdb_id];
+      if(!d) return;
+      if(d.slice(0,10)>born && daysSince(d)<AGENT_NEW_TREND_DAYS) newCount++;
+    });
+  }
+  const perMonth = ageDays<7 ? null : (newCount/Math.min(AGENT_NEW_TREND_DAYS, ageDays))*30;
   return {total:films.length, perMonth, lastFind, recentCount};
 }
 // recomputeFound-scale sweeps (50-155ms measured) are too slow to run six times per Agents-screen render —
