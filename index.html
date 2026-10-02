@@ -415,6 +415,10 @@
      header (z-index:29, see .uscreen comment below) and so already sit under the shared z-index:50 every
      other .modal uses without needing this override. */
   #deleteAcct.open{z-index:91}
+  /* CAS-1170: Privacy opens from renderAbout()'s #aboutScreen (a .uscreen, z-index:84) and from both
+     membership functions' #membScreen (.memb, z-index:86) — the highest of either, same reasoning as
+     #authModal.open above, so it always stacks over whichever one launched it. */
+  #privacyScreen.open{z-index:91}
   /* CAS-437: the public film page. Same phone-width-capped full page as .modal, but its own z-index so it
      sits over the splash (80) too — a share link has to show the film regardless of what boot put up. */
   /* CAS-554 device-parity-ignore: R2 — same reasoning as .modal above: top:0 carries no padding of its own
@@ -4065,6 +4069,13 @@
      modal. Body rendered by renderAbout(). -->
 <div class="uscreen" id="aboutScreen" role="dialog" aria-modal="true" aria-label="About">
   <div class="uwrap" id="aboutBody"></div>
+</div>
+
+<!-- PRIVACY (CAS-1170) — the privacy policy rendered as a Cascade screen, built the same way as
+     #aboutScreen, so a person reading it never leaves the look of the app (or, from #membScreen, the
+     sign-up they're in the middle of) for the plain company-site page. -->
+<div class="uscreen" id="privacyScreen" role="dialog" aria-modal="true" aria-label="Privacy">
+  <div class="uwrap" id="privacyBody"></div>
 </div>
 
 <!-- HELP (CAS-977) — an in-app reference, ten static articles, deep-linkable via ?help=<slug>. Replaces the
@@ -11972,7 +11983,7 @@ function renderAbout(){
     <button class="applybtn" id="aboutScreenContact" type="button" style="width:100%;margin:0 0 8px">Contact us</button>
     <div class="flabel">Legal</div>
     <div class="ucard">
-      ${acctLink("🔒","Privacy policy", null, "https://www.codynamics.com.au/privacy")}
+      ${acctRow("🔒","Privacy policy", null, "openPrivacy('about')")}
       ${acctLink("🛟","Support", null, "https://www.codynamics.com.au/support")}
     </div>
     <div class="flabel">Data</div>
@@ -11997,6 +12008,58 @@ window.openAbout=()=>{
   logEvent("about_opened",{});
 };
 window.closeAbout=()=>{ $("aboutScreen").classList.remove("open"); lockBodyScroll(false); syncWatchChip(); };
+
+// ================= Privacy (CAS-1170) =================
+// Lee's word-for-word policy text, held as data so it is written once and rendered everywhere it's
+// needed, rather than retyped into the screen's markup and this file's own test. Edit the wording only
+// on Lee's say — do not shorten or "improve" it on the way past.
+const PRIVACY_LEDE = "How Cascade, made by CoDynamics Pty Ltd, handles your information. Last updated 25 September 2026.";
+const PRIVACY_SECTIONS = [
+  {heading:"Who we are",
+   paras:["Cascade (cascademovies.com and the Cascade iPhone app) is operated by CoDynamics Pty Ltd, ABN 28 135 826 809, Gordon NSW 2072, Australia. Questions about privacy go to lee@codynamics.com.au."]},
+  {heading:"What we collect",
+   paras:[
+    "Your account. Cascade needs an account. We collect your email address to create it and to send you a one-time sign-in code. We record app activity (for example, which screens are opened and which features are used) so we can see what works and fix what doesn't, and we strip anything that looks like an email address out of it before it is stored. We store your agents, the films you pin, rate or mark, your streaming services and viewing preferences, and your notification settings, so they follow you between devices.",
+    "Alerts. If you turn on alerts, we store where to send them: your email address, or, on iPhone, a push-notification token issued by Apple.",
+    "Friends and invites. If you invite someone or share a film, we store the name and the email address or mobile number you give us for that person, and send them the invite you asked us to send. On iPhone you can choose a contact to fill this in; Cascade receives only the contact you pick, never your address book.",
+    "Messages to us. If you contact us or send feedback from the app, we keep what you send, including any file you attach.",
+   ]},
+  {heading:"What we use it for",
+   paras:["To run Cascade: keep your agents, find films for you, send the alerts and invites you ask for, answer your messages, and understand how the app is used so we can improve it. We do not sell your information, show you third-party advertising, or use third-party analytics or advertising trackers."]},
+  {heading:"Who helps us run it",
+   paras:["We use a small number of service providers, who process information only to provide their service to us: Supabase (accounts and database), Resend and Amazon SES (sending email), Apple (push notifications on iPhone), Cloudflare and GitHub (hosting and scheduled jobs). Their servers may be outside Australia. Film information comes from The Movie Database (TMDB), Watchmode and other film data sources; we do not send them your personal information."]},
+  {heading:"Your choices",
+   paras:["You can turn alerts off at any time in the app. You can delete your account in the app (Menu → Account → Delete account); this deletes your account and the information stored with it. You can also ask us for a copy of your information, to correct it, or to delete it, by emailing lee@codynamics.com.au."]},
+  {heading:"Children",
+   paras:["Cascade is not directed at children under 13, and we do not knowingly collect their personal information."]},
+  {heading:"Changes",
+   paras:["If we change how we handle your information, we will update this page and its date."]},
+];
+// The four "What we collect" paragraphs each lead with a bold term (AC3); every other paragraph has none.
+const PRIVACY_BOLD_LEADS = ["Your account.", "Alerts.", "Friends and invites.", "Messages to us."];
+function privacyParaHTML(text){
+  const lead = PRIVACY_BOLD_LEADS.find(l=>text.startsWith(l));
+  const rest = lead ? text.slice(lead.length) : text;
+  const linked = esc(rest).replace(/lee@codynamics\.com\.au/g,
+    `<a href="mailto:lee@codynamics.com.au" style="color:var(--accenttext)">lee@codynamics.com.au</a>`);
+  return `<p class="ossub" style="margin-bottom:12px">${lead?`<b style="color:var(--ink)">${esc(lead)}</b>`:""}${linked}</p>`;
+}
+function renderPrivacy(){
+  $("privacyBody").innerHTML=`
+    <div class="ostop"><button class="osback" type="button" onclick="closePrivacy()" aria-label="Back">←</button>
+      <h2 class="osh">Privacy</h2></div>
+    <p class="ossub">${esc(PRIVACY_LEDE)}</p>
+    ${PRIVACY_SECTIONS.map(s=>`<div class="usec">${esc(s.heading)}</div>${s.paras.map(privacyParaHTML).join("")}`).join("")}`;
+}
+window.openPrivacy=from=>{
+  renderPrivacy();
+  $("privacyScreen").scrollTop=0;
+  $("privacyScreen").classList.add("open"); lockBodyScroll(true);
+  syncWatchChip();
+  logEvent("privacy_opened",{from});
+};
+window.closePrivacy=()=>{ $("privacyScreen").classList.remove("open"); lockBodyScroll(false); syncWatchChip(); };
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $("privacyScreen").classList.contains("open")) closePrivacy(); });
 
 // CAS-1076: v1.0.0 ships free — paid membership returns after launch via In-App Purchase (CAS-970/971/972).
 // Every price/free-month/subscription-management/cancellation mention in the template is gated on this one
@@ -17835,7 +17898,7 @@ function openMembership(agentKey, nameOverride, cascade){
                 style="vertical-align:baseline">Resend code</button></p>
     </div>
     <p class="pnote">By continuing you agree to our
-      <a href="https://www.codynamics.com.au/privacy" target="_blank" rel="noopener">Privacy policy</a>.</p>` : ""}
+      <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button>.</p>` : ""}
     <button class="membcta" type="button" onclick="membStart()">Start my free month</button>
     ${posters?`<div class="rvgrid membgrid">${posters}</div>`:""}`;
   membResetCodeState();   // B10: always opens in State A
@@ -17914,7 +17977,7 @@ function openOnbMembership(){
                 style="vertical-align:baseline">Resend code</button></p>
     </div>
     <p class="pnote">By continuing you agree to our
-      <a href="https://www.codynamics.com.au/privacy" target="_blank" rel="noopener">Privacy policy</a>.</p>` : ""}
+      <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button>.</p>` : ""}
     <button class="membcta" type="button" onclick="membStart()">Start my free month</button>
     ${posters?`<div class="rvgrid membgrid">${posters}</div>`:""}`;
   membResetCodeState();   // B10: always opens in State A
