@@ -4982,6 +4982,11 @@ function loadNotify(){
 const notify = loadNotify();
 let notifySaved=null;
 function saveNotify(){
+  // CAS-1153: no session means nothing persists — a signed-out render's recompute must not resurrect
+  // the key wipeAccountLocalState() just removed. Dropping the cache sentinel too (rather than leaving
+  // it stale) guarantees the first write after the next sign-in is never skipped as a false no-op.
+  const a=window.CascadeAuth;
+  if(!(a && a.session && a.session.user)){ notifySaved=null; return; }
   const s=JSON.stringify(notify);
   if(s===notifySaved) return;                       // recompute runs on every render — only real changes write
   notifySaved=s;
@@ -20930,6 +20935,9 @@ else if(dedupedN)
     }catch(e){ queue = []; }
   }
   function persistQueue(){
+    // CAS-1153: a flush already in flight when sign-out lands must never write the queue back under a
+    // null/missing uid — wipeAccountLocalState() has already removed every real cascade_ops@<uid> key.
+    if(!uid()) return;
     try{
       // CAS-1096: onConflict travels too — an "upsert" kind op (the composite-key tables this ticket
       // moves onto acctOp) needs its real conflict target on every retry, including one that only starts
