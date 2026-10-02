@@ -395,9 +395,9 @@
      only cleared the splash, so .memb's own content sat on top and intercepted every tap on #authVerifyBtn.
      Raised to the same 91 used below for a panel that has to clear an already-open surface. */
   #authModal.open{z-index:91}
-  /* CAS-838: the contact sheet opens from #aboutPage (z-index:90) and from renderAbout()'s #aboutScreen
-     (a .uscreen, z-index:84) — the highest of either, so it stacks over both rather than opening behind
-     the surface that launched it, same reasoning as #authModal.open above. */
+  /* CAS-838: the contact sheet opens from renderAbout()'s #aboutScreen (a .uscreen, z-index:84) and, since
+     CAS-1165, from #authModal (z-index:91) for a signed-out visitor who can't sign in — the highest of
+     either, so it stacks over whichever one launched it, same reasoning as #authModal.open above. */
   #contact.open{z-index:91}
   /* CAS-978: the Feedback sheet opens from renderAccount()'s #accountScreen and renderHelpScreen()'s
      #helpScreen — both .uscreen, z-index:84 — same over-the-launching-surface treatment as #contact.open
@@ -1766,56 +1766,16 @@
   .splashlogin:hover{border-color:var(--violet);color:var(--ink)}
   .splashlogin:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 
-  /* ===== PUBLIC ABOUT PAGE ==============================================
-     A one-screen answer to "what is this?", reachable WITHOUT an account.
-     Same shell as .filmpage so it inherits the app's page geometry rather
-     than inventing a second one; z-index 90 puts it above both the splash
-     (80) and the film page (85), so it can be opened from either. */
-  /* CAS-605 device-parity-ignore: R2 — same reasoning as .modal/.filmpage above: top:0 carries no padding
-     of its own because .abclose (always the first child) is sticky at this same top:0 and already owns
-     the env(safe-area-inset-top) clearance; padding it here too would double it. */
-  .about{position:fixed;top:0;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;
-    background:var(--bg);z-index:90;display:none;overflow-y:auto;
-    /* device-parity-ignore: R2 — top inset handled inside: .abclose is sticky with
-       padding-top calc(14px + env(safe-area-inset-top,0px)), same pattern as .filmpage/.modal */
-    padding:0 20px calc(48px + env(safe-area-inset-bottom,0px))}
-  .about.open{display:block}
-  .abclose{position:sticky;top:0;background:var(--bg);display:flex;justify-content:flex-end;
-    padding:calc(14px + env(safe-area-inset-top,0px)) 0 6px;z-index:2}
-  .abclose button{background:none;border:0;color:var(--dim);font:inherit;font-size:14px;
-    padding:6px 2px;cursor:pointer}
-  .abclose button:hover{color:var(--ink)}
-  .abword{font-family:var(--font-body);font-weight:500;letter-spacing:.44em;font-size:17px;
-    color:var(--ink);text-align:center;margin:2px 0 6px}
-  .abtag{font-family:var(--font-body);font-weight:500;letter-spacing:.14em;font-size:12px;
-    text-transform:uppercase;color:var(--faint);text-align:center;margin:0 0 26px}
-  .abh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
-    color:var(--faint);margin:26px 0 9px}
-  .abp{font-size:14.5px;line-height:1.62;color:var(--dim);margin:0 0 12px}
-  .abp strong{color:var(--ink);font-weight:600}
-  .abp a{color:var(--dim)}
-  /* the ladder as a list, not the splash's pills — here it is the explanation, not a badge row */
-  .abwin{list-style:none;margin:0 0 4px;padding:0}
-  .abwin li{display:flex;align-items:baseline;gap:11px;padding:7px 0;
-    border-top:1px solid var(--line);font-size:14px;color:var(--dim)}
-  .abwin li:first-child{border-top:0}
-  .abwin b{color:var(--ink);font-weight:600;min-width:92px;display:inline-block}
-  .abdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;position:relative;top:-1px}
-  .abnote{border:1px solid var(--line);background:var(--panel);border-radius:12px;
-    padding:13px 15px;margin:6px 0 0}
-  .abnote p{margin:0;font-size:13.5px;line-height:1.6;color:var(--dim)}
-  .abnote p+p{margin-top:8px}
+  /* ===== DATA CREDITS ====================================================
+     CAS-1165: the public, signed-out About page these came from is gone — the
+     splash's own lines and the first onboarding screen (v2_about) now say what
+     Cascade is. The TMDB/Watchmode/JustWatch notices still have to live
+     somewhere, so they move into renderAbout()'s signed-in screen; the rules
+     below are the only part of that page's styling worth keeping. */
   .abcred{margin:8px 0 0;font-size:12px;line-height:1.65;color:var(--faint)}
   .abcred p{margin:0 0 6px}
   .abcred a{color:var(--dim);text-decoration:none}
   .abcred a:hover{text-decoration:underline}
-  .abfoot{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);
-    font-size:12px;color:var(--faint);text-align:center}
-  /* the door on the splash — deliberately quiet, below Log in */
-  .splashabout{display:block;width:100%;margin-top:14px;padding:4px;background:none;border:0;
-    color:var(--faint);font:inherit;font-size:13px;text-decoration:underline;
-    text-underline-offset:3px;cursor:pointer}
-  .splashabout:hover{color:var(--dim)}
   @media (prefers-reduced-motion:reduce){ .splashinner{animation:none} }
 
   /* ---- agent cards (CAS-75, rebuilt CAS-112 / mock: 02-agent-select.html) ----
@@ -3832,6 +3792,8 @@
     <div class="cascfoot" style="margin-top:12px">
       <button class="applybtn" id="authContinue">Continue</button>
     </div>
+    <p class="pnote" style="margin-top:10px">Trouble signing in?
+      <button type="button" class="linkbtn" id="authContact" style="vertical-align:baseline">Contact us</button></p>
   </div>
 
   <!-- code sent → verify (CAS-1056: email OTP, replacing the derived-password scheme). continueWithEmail()
@@ -3848,6 +3810,8 @@
     </div>
     <p class="pnote" style="margin-top:10px">Didn't get it?
       <button type="button" class="linkbtn" id="authResend" style="vertical-align:baseline">Resend code</button></p>
+    <p class="pnote" style="margin-top:10px">Trouble signing in?
+      <button type="button" class="linkbtn" id="authVerifyContact" style="vertical-align:baseline">Contact us</button></p>
   </div>
 
   <!-- signed in → who, and sign out -->
@@ -3873,11 +3837,13 @@
   <div class="cascfoot"><button class="applybtn" id="saveAsGo">Save Cascade</button></div>
 </div>
 
-<!-- CONTACT US (CAS-838) — one shared sheet opened from both About surfaces: the signed-out #aboutPage
-     and renderAbout()'s signed-in screen. #contact.open gets its own z-index override below, same reason
-     as #authModal.open — it has to sit over whichever About surface opened it, both of which already sit
-     above the shared .modal z-index. Body rebuilt fresh by renderContactForm() every open, same convention
-     as renderAbout() itself, so the form and its category selection never carry state from a prior visit. -->
+<!-- CONTACT US (CAS-838) — one shared sheet, opened from renderAbout()'s signed-in screen and, since
+     CAS-1165 retired the public About page, from the sign-in sheet's own #authSignedOut/#authVerify
+     panels for a signed-out visitor who can't get in. #contact.open gets its own z-index override below,
+     same reason as #authModal.open — it has to sit over whichever surface opened it, all of which already
+     sit at or above the shared .modal z-index. Body rebuilt fresh by renderContactForm() every open, same
+     convention as renderAbout() itself, so the form and its category selection never carry state from a
+     prior visit. -->
 <div class="modal" id="contact">
   <div class="modalhead"><h3>Contact us</h3><button class="donebtn" id="contactClose">Cancel</button></div>
   <div id="contactBody"></div>
@@ -3994,7 +3960,6 @@
          only has to name the door. It also puts the two doors in the same grammar — Sign up / Log in. -->
     <button class="splashcta" id="splashCta" type="button">Sign up</button>
     <button class="splashlogin" id="splashLogin" type="button">Sign in</button>
-    <button class="splashabout" id="splashAbout" type="button">What is Cascade?</button>
   </div>
 </div>
 
@@ -4003,61 +3968,6 @@
      the signup flow. Sits above the splash (z-index 85 > 80) so it shows whatever else the boot decided to
      put up behind it, and closing it reveals that page rather than a dead end. -->
 <div class="filmpage" id="filmPage" role="dialog" aria-modal="true" aria-label="Film"></div>
-
-<!-- PUBLIC ABOUT PAGE. Reachable from the splash without an account, because the first question
-     anyone who is not already a user asks is "what is this?" — and until now the only answer was a
-     Sign up button. It is also the page a data vendor, an app-store reviewer, or anyone sent the
-     link will land on, which is why "in development / free / nothing for sale" is stated plainly
-     rather than left to be inferred. -->
-<div class="about" id="aboutPage" role="dialog" aria-modal="true" aria-label="About Cascade">
-  <div class="abclose"><button type="button" id="aboutClose">Close</button></div>
-
-  <div class="abword">CASCADE</div>
-  <div class="abtag">It does the watching for you</div>
-
-  <p class="abp"><strong>Cascade watches how films move.</strong></p>
-  <p class="abp">Every film travels the same path — announced, into cinemas, out to premium digital,
-    then rental, then streaming. Cascade follows that path for Australia and tells you the moment a
-    film you have been waiting for lands somewhere you can actually watch it.</p>
-  <p class="abp">It is not a search box for what is on tonight. It is a standing watch on the films
-    you mean to see, so you stop finding out six weeks late.</p>
-
-  <div class="abh">The five windows</div>
-  <ul class="abwin">
-    <li><span class="abdot" style="background:var(--upcoming)"></span><b>Upcoming</b> announced, dated, not yet out</li>
-    <li><span class="abdot" style="background:var(--amber)"></span><b>In cinemas</b> showing on Australian screens</li>
-    <li><span class="abdot" style="background:var(--purple)"></span><b>Premium</b> early digital, before rental</li>
-    <li><span class="abdot" style="background:var(--blue)"></span><b>Rental</b> rent or buy at the usual price</li>
-    <li><span class="abdot" style="background:var(--green)"></span><b>Streaming</b> included with a service you pay for</li>
-  </ul>
-
-  <div class="abh">Who it is for</div>
-  <p class="abp">People who keep a running list of films they mean to see, and keep missing the
-    moment those films become watchable.</p>
-
-  <div class="abh">Where it is up to</div>
-  <div class="abnote">
-    <p><strong>Cascade is in development.</strong></p>
-    <p>It covers <strong>Australia only</strong>, and currently tracks films across cinema and
-      every major Australian streaming, rental and free service.</p>
-  </div>
-
-  <div class="abh">Where the data comes from</div>
-  <div class="abcred">
-    <p>This product uses the TMDB API but is not endorsed or certified by TMDB.
-      <a href="https://www.themoviedb.org" target="_blank" rel="noopener">The Movie Database &#8599;</a></p>
-    <p>Powered by <a href="https://api.watchmode.com" target="_blank" rel="noopener">Watchmode &#8599;</a></p>
-    <p>Streaming availability by <a href="https://www.justwatch.com" target="_blank" rel="noopener">JustWatch &#8599;</a></p>
-    <p>Cascade is not affiliated with any streaming service, and does not play or host video.
-      Watching a film still needs whatever subscription or purchase the service asks for.</p>
-  </div>
-
-  <div class="abh">Contact us</div>
-  <p class="abp">Spotted a bug, have a suggestion, or a question about your account? We read every message.</p>
-  <button class="applybtn" id="aboutPageContact" type="button" style="width:100%;margin:0 0 4px">Contact us</button>
-
-  <div class="abfoot">Codynamics &middot; Australia</div>
-</div>
 
 <!-- THE SIGNUP FLOW (CAS-188) — one frame for every step of it, from "what's your priority?" through to
      notify settings. The body per step is rendered by renderOnbStep(); progress, summary and counts all
@@ -12065,6 +11975,15 @@ function renderAbout(){
       ${acctLink("🔒","Privacy policy", null, "https://www.codynamics.com.au/privacy")}
       ${acctLink("🛟","Support", null, "https://www.codynamics.com.au/support")}
     </div>
+    <div class="flabel">Data</div>
+    <div class="abcred" id="aboutCredits">
+      <p>This product uses the TMDB API but is not endorsed or certified by TMDB.
+        <a href="https://www.themoviedb.org" target="_blank" rel="noopener">The Movie Database &#8599;</a></p>
+      <p>Powered by <a href="https://api.watchmode.com" target="_blank" rel="noopener">Watchmode &#8599;</a></p>
+      <p>Streaming availability by <a href="https://www.justwatch.com" target="_blank" rel="noopener">JustWatch &#8599;</a></p>
+      <p>Cascade is not affiliated with any streaming service, and does not play or host video.
+        Watching a film still needs whatever subscription or purchase the service asks for.</p>
+    </div>
     <div class="flabel">Build</div>
     <div class="pnote" id="aboutBuild">—</div>`;
   stampAboutBuild();
@@ -12345,18 +12264,13 @@ $("splashLogin").onclick=()=>{
 // door doesn't work rather than hiding it. So the door always shows, and what's behind it tells the
 // truth either way.
 
-// ---- CAS-582: the third splash door — "What is Cascade?", reachable without an account -----------
-// Open/close only, the same contract .filmpage already honours: the splash stays up underneath,
-// untouched, so closing returns the visitor exactly where they were.
-$("splashAbout").onclick=()=>{
-  logEvent("splash_about");
-  $("aboutPage").scrollTop=0;
-  $("aboutPage").classList.add("open");
-};
-$("aboutClose").onclick=()=>$("aboutPage").classList.remove("open");
-$("aboutPageContact").onclick=()=>openContact("aboutPage");
+// ---- CAS-1165: Contact us from the sign-in sheet, for a signed-out visitor who can't get in. The
+// sheet opens on top of #authModal (see #contact.open above) and closing it returns the visitor to
+// whichever panel they were on, untouched — opening contact never closes or rewrites #authModal.
+$("authContact").onclick=()=>openContact("authModal");
+$("authVerifyContact").onclick=()=>openContact("authModal");
 
-// ---- CAS-838: Contact us — one shared sheet, opened from both About surfaces above -----------------
+// ---- CAS-838: Contact us — one shared sheet, opened from the surfaces above -----------------
 const CONTACT_CATEGORIES=[
   {key:"bug",label:"Bug"},
   {key:"suggestion",label:"Suggestion"},
@@ -12531,8 +12445,6 @@ window.sendContact=async()=>{
     errEl.hidden=false;
   }
 };
-document.addEventListener("keydown", e => { if(e.key==="Escape" && $("aboutPage").classList.contains("open")) $("aboutPage").classList.remove("open"); });
-
 // ---- CAS-978: Feedback — Account's dead row + Help's footer, wired onto the same contact_messages
 // pipeline as Contact us above, with its own category taxonomy and an explicit diagnostics opt-out ------
 const FEEDBACK_CATEGORIES=[
@@ -15569,8 +15481,8 @@ const SHARP_STEPS = {
   // listed in FLOWS: the cutover (wiring these in, retiring the old sequence) is CAS-911. Every screen here
   // writes onbFlow.answersV2 and persists through onbAnswersV2Save() — onbFlow.answers/onbAnswersDefault()/
   // ONB_ANSWERS_KEY (the live sequence's own) are untouched.
-  // CAS-953 Change 2: the first screen of the whole sequence — separate from the public "What is Cascade?"
-  // page behind #splashAbout, which this must not touch or reuse.
+  // CAS-953 Change 2: the first screen of the whole sequence. CAS-1165 retired the splash's public
+  // "What is Cascade?" page this screen was originally kept separate from; v2_about stands on its own now.
   v2_about: {
     noAgent: true, noSkip: true,
     progress: 0,
