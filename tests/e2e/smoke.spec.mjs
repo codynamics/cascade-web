@@ -1215,6 +1215,154 @@ test("CAS-913: a device that has onboarded but never signed in boots into the ap
   await expect(page.locator("#authModal")).not.toHaveClass(/open/);
 });
 
+// ---- CAS-1169: membership sign-up enters its code on #membScreen itself, never on #authModal -----------
+// Same "configured-but-signed-out" technique as CAS-913 above (cas913GotoConfigured/cas913WalkToShortlist),
+// but its own fake Supabase client, since CAS913_FAKE_SUPABASE_GLOBAL's verifyOtp accepts any code —
+// AC4 needs one that actually rejects a wrong one.
+const CAS1169_GOOD_CODE = "123456";
+const CAS1169_FAKE_SUPABASE_GLOBAL = `
+  const SESSION_KEY = "cas1169-fake-session";
+  const readSession = () => {
+    try{ const raw = localStorage.getItem(SESSION_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+  };
+  const writeSession = session => {
+    try{ session ? localStorage.setItem(SESSION_KEY, JSON.stringify(session)) : localStorage.removeItem(SESSION_KEY); }catch(e){}
+  };
+  let listeners = [];
+  function chain(){
+    return new Proxy(() => {}, {
+      get: (_t, prop) => prop === "then" ? (resolve) => resolve({ data: [], error: null }) : () => chain(),
+      apply: () => chain(),
+    });
+  }
+  // Same fixture-vs-acctLoad gap CAS913_FAKE_SUPABASE_GLOBAL's own comment explains above.
+  let cascadeRows = [];
+  function cascadesTable(){
+    return {
+      select: () => ({ order: () => ({ range: () => Promise.resolve({ data: cascadeRows.slice(), error: null }) }) }),
+      upsert: (fields) => {
+        const row = Array.isArray(fields) ? fields[0] : fields;
+        const i = cascadeRows.findIndex(r => r.id === row.id);
+        if(i >= 0) Object.assign(cascadeRows[i], row); else cascadeRows.push(Object.assign({}, row));
+        return { then: (resolve) => resolve({ data: [row], error: null }) };
+      },
+      delete: () => chain(),
+    };
+  }
+  window.supabase = { createClient(){
+    return {
+      auth: {
+        getSession: async () => ({ data: { session: readSession() } }),
+        onAuthStateChange: (cb) => {
+          listeners.push(cb);
+          return { data: { subscription: { unsubscribe(){ listeners = listeners.filter(f => f !== cb); } } } };
+        },
+        signInWithOtp: async () => ({ data: {}, error: null }),
+        // Unlike CAS913_FAKE_SUPABASE_GLOBAL's always-succeeds stub, this one actually checks the code —
+        // AC4 needs a wrong one to stay wrong.
+        verifyOtp: async ({ email, token }) => {
+          if(token !== "${CAS1169_GOOD_CODE}") return { data: {}, error: { message: "Token has expired or is invalid" } };
+          const session = { user: { id: "cas1169-user", email }, access_token: "fake" };
+          writeSession(session);
+          listeners.forEach(cb => cb("SIGNED_IN", session));
+          return { data: { session }, error: null };
+        },
+        signOut: async () => { writeSession(null); return { error: null }; },
+      },
+      from: (table) => table === "cascades" ? cascadesTable() : chain(),
+      rpc: async (fn, params) => {
+        if(fn === "email_has_account") return { data: false, error: null };
+        if(fn === "complete_membership"){
+          const agents = (params && params.p && params.p.agents) || [];
+          agents.forEach(a => {
+            const row = Object.assign({ user_id: "cas1169-user", created_at: new Date().toISOString() }, a);
+            const i = cascadeRows.findIndex(r => r.id === row.id);
+            if(i >= 0) Object.assign(cascadeRows[i], row); else cascadeRows.push(row);
+          });
+        }
+        return { data: "created", error: null };
+      },
+    };
+  } };
+`;
+async function cas1169GotoConfigured(page){
+  await page.route("**/config.js", route => route.fulfill({
+    contentType: "application/javascript",
+    body: `window.CASCADE_CONFIG = { SUPABASE_URL: "https://fake-project.supabase.test", SUPABASE_ANON_KEY: "fake-anon-key-not-a-real-secret" };`,
+  }));
+  await page.route("**/supabase-js.js", route => route.fulfill({
+    contentType: "application/javascript",
+    body: CAS1169_FAKE_SUPABASE_GLOBAL,
+  }));
+  await gotoFresh(page);
+  await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
+}
+
+test("CAS-1169 AC3: a valid new email moves straight to the code step on #membScreen, never opening #authModal", async ({ page }) => {
+  await cas1169GotoConfigured(page);
+  await cas913WalkToShortlist(page);
+  await finishFlow(page);
+
+  await page.locator("#membEmail").fill("cas1169-ac3@example.com");
+  await page.locator(".membcta").click();
+
+  await expect(page.locator("#membCode")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("#authModal")).not.toHaveClass(/open/);
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe("membCode");
+  expect(await page.locator("#membEmail").evaluate(el => el.readOnly)).toBe(true);
+
+  const box = await page.locator(".membcta").boundingBox();
+  const viewport = page.viewportSize();
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+});
+
+test("CAS-1169 AC4: a wrong code stays in State B with an error; Change email returns to State A; a correct code lands on the listing", async ({ page }) => {
+  await cas1169GotoConfigured(page);
+  await cas913WalkToShortlist(page);
+  await finishFlow(page);
+  const email = "cas1169-ac4@example.com";
+
+  await page.locator("#membEmail").fill(email);
+  await page.locator(".membcta").click();
+  await expect(page.locator("#membCode")).toBeVisible({ timeout: 30_000 });
+
+  await page.locator("#membCode").fill("000000");
+  await page.locator(".membcta").click();
+  await expect(page.locator("#membCodeErr")).toContainText("Wrong or expired code");
+  await expect(page.locator("#membScreen.open")).toBeVisible();
+  await expect(page.locator("#membCode")).toBeVisible();
+
+  await page.locator("#membChangeEmail").click();
+  await expect(page.locator("#membCode")).toBeHidden();
+  expect(await page.locator("#membEmail").evaluate(el => el.readOnly)).toBe(false);
+
+  await page.locator("#membEmail").fill(email);
+  await page.locator(".membcta").click();
+  await expect(page.locator("#membCode")).toBeVisible({ timeout: 30_000 });
+  await page.locator("#membCode").fill(CAS1169_GOOD_CODE);
+  await page.locator(".membcta").click();
+  await expect(page.locator("#membScreen.open")).toBeHidden({ timeout: 30_000 });
+});
+
+test("CAS-1169 AC5: an invalid email's error clears on correction without pressing the button; the resend throttle starts at 0:59", async ({ page }) => {
+  await cas1169GotoConfigured(page);
+  await cas913WalkToShortlist(page);
+  await finishFlow(page);
+
+  await page.locator("#membEmail").fill("not-an-email");
+  await page.locator(".membcta").click();
+  await expect(page.locator("#membEmailErr")).toBeVisible();
+
+  await page.locator("#membEmail").fill("cas1169-ac5@example.com");
+  await expect(page.locator("#membEmailErr")).toBeHidden();
+
+  await page.locator(".membcta").click();
+  await expect(page.locator("#membResend")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("#membResend")).toBeDisabled();
+  await expect(page.locator("#membResend")).toHaveText(/^Resend code in 0:\d\d$/);
+});
+
 // CAS-1076: v1.0.0 ships free (Lee, 24-26 Sep 2026) — paid membership returns after launch via In-App
 // Purchase (CAS-970/971/972). Every price/free-month/subscription-management/cancellation mention is
 // gated behind the one MEMBERSHIP_ENABLED flag (app_template.html) rather than deleted outright, so it can

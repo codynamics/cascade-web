@@ -310,18 +310,16 @@ export async function toListing(page, opts = {}){
   const needsEmail = await membEmail.count() > 0;
   if(needsEmail) await membEmail.fill("e2e-smoke@example.com");
   await page.locator(".membcta").click();
-  // CAS-1056: membStart() now only requests a one-time code (continueWithEmail) — it no longer signs in
-  // by itself. The rest happens in the account modal's own #authVerify step (CascadeAuth.openVerify),
-  // since the membership screen carries no code-entry UI of its own; a fake client's verifyOtp in these
-  // specs accepts any code, so the exact value here doesn't matter.
+  // CAS-1169: membStart() now only requests a one-time code (continueWithEmail) — it no longer signs in
+  // by itself. The code is confirmed right here on #membScreen (State B), never on #authModal; a fake
+  // client's verifyOtp in these specs accepts any code, so the exact value here doesn't matter.
   if(needsEmail){
-    await expect(page.locator("#authVerify")).toBeVisible({ timeout: 30_000 });
-    // CAS-1056 AC2: the email alone (just submitted via .membcta above) must not have created a session —
-    // only a confirmed code does that.
+    await expect(page.locator("#membCode")).toBeVisible({ timeout: 30_000 });
+    // CAS-1056 AC2 (carried over): the email alone (just submitted via .membcta above) must not have
+    // created a session — only a confirmed code does that.
     expect(await page.evaluate(() => window.CascadeAuth.status)).not.toBe("signed-in");
-    await page.locator("#authCode").fill("123456");
-    await page.locator("#authVerifyBtn").click();
-    await expect(page.locator("#authModal.open")).toBeHidden({ timeout: 30_000 });
+    await page.locator("#membCode").fill("123456");
+    await page.locator(".membcta").click();
     expect(await page.evaluate(() => window.CascadeAuth.status)).toBe("signed-in");
   }
   await expect(page.locator("#membScreen.open")).toBeHidden({ timeout: 30_000 });
