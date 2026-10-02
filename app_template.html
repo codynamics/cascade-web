@@ -18176,27 +18176,47 @@ function showTutorialCard(){
   if(c.el) c.el.scrollIntoView({block:"center", inline:"center"});
   requestAnimationFrame(()=>requestAnimationFrame(tutorialReposition));
 }
+// CAS-1152: `zoom:var(--ui-scale)` (CAS-157) makes a position:fixed element's *written* style length
+// land pre-zoom while every *read-back* geometry query (getBoundingClientRect, offsetWidth/Height,
+// innerWidth/innerHeight) reports the post-zoom visual pixel it actually painted at — so a value copied
+// straight from a read into a write is off by the zoom factor. WebKit does not split the two this way,
+// which is why only Chromium shows the drift. Measured per call via a probe (not hard-coded 1.12) so it
+// tracks whatever --ui-scale is and keeps working if an engine changes how it reports either side.
+function tutZoomFactor(){
+  const probe=document.createElement("div");
+  probe.style.cssText="position:fixed;left:0;top:0;width:100px;height:100px;visibility:hidden;pointer-events:none";
+  document.body.appendChild(probe);
+  const w=probe.getBoundingClientRect().width;
+  probe.remove();
+  return w>0 ? w/100 : 1;
+}
 // Re-measures the current card's anchor and repositions the spotlight + caption. Bound to resize/scroll
 // while the tour is open (AC: the cut-out stays correct after either), and called once per card on top of
 // that. The closing card carries no anchor: collapsing the hole to a zero-size box at the viewport centre
 // (see the .tuthole comment in <style>) dims the whole screen evenly instead of needing a second layout
-// branch for "no spotlight".
+// branch for "no spotlight". r, vw and vh are all read-back (post-zoom, visual) units; offsetWidth/
+// offsetHeight are not — they report the card's pre-zoom authored size (CAS-1152: proven by measurement,
+// not assumed — a 260px-wide .tutcard's own offsetWidth stays 260 while its getBoundingClientRect() comes
+// back ~291px under a 1.12 --ui-scale), so cardW/cardH are converted to visual units with the same probed
+// factor before mixing them into arithmetic with r/vw/vh. Only the final top/left written to .style are
+// divided back down by z, since a style write is interpreted pre-zoom — see tutZoomFactor above.
 function tutorialReposition(){
   const scrim=$("tutScrim");
   if(!scrim || !scrim.classList.contains("open")) return;
   const c=tutCards[tutIdx];
   const hole=$("tutHole"), card=$("tutCard"), pad=8, vw=innerWidth, vh=innerHeight;
+  const z=tutZoomFactor();
   let r;
   if(c && c.el){
     r=c.el.getBoundingClientRect();
-    hole.style.left=(r.left-pad)+"px"; hole.style.top=(r.top-pad)+"px";
-    hole.style.width=(r.width+pad*2)+"px"; hole.style.height=(r.height+pad*2)+"px";
+    hole.style.left=(r.left-pad)/z+"px"; hole.style.top=(r.top-pad)/z+"px";
+    hole.style.width=(r.width+pad*2)/z+"px"; hole.style.height=(r.height+pad*2)/z+"px";
   } else {
     r={left:vw/2, top:vh/2, bottom:vh/2, width:0, height:0};
-    hole.style.left=r.left+"px"; hole.style.top=r.top+"px";
+    hole.style.left=r.left/z+"px"; hole.style.top=r.top/z+"px";
     hole.style.width="0px"; hole.style.height="0px";
   }
-  const cardH=card.offsetHeight||140, cardW=card.offsetWidth||260;
+  const cardH=(card.offsetHeight||140)*z, cardW=(card.offsetWidth||260)*z;
   let top, left;
   if(!c || !c.el){
     top=(vh-cardH)/2; left=(vw-cardW)/2;
@@ -18205,7 +18225,7 @@ function tutorialReposition(){
     top = spaceBelow>=cardH+12 ? r.bottom+pad*2+12 : Math.max(12, r.top-pad*2-12-cardH);
     left = Math.min(Math.max(12, r.left), vw-cardW-12);
   }
-  card.style.top=top+"px"; card.style.left=left+"px";
+  card.style.top=top/z+"px"; card.style.left=left/z+"px";
 }
 function tutorialNext(){
   if(tutIdx>=tutCards.length-1){ endTutorial(true); return; }
