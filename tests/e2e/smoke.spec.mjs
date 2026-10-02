@@ -55,7 +55,7 @@ test("the app loads and onboarding renders", async ({ page }) => {
   // gotoStep moves onto the incoming pane the instant it's created) is what makes this locator
   // resolve to exactly one element even mid-slide, instead of racing the 460ms slide against the
   // fixed 120ms wait below.
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about (CAS-953)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");   // v2_intro (CAS-911)
@@ -959,7 +959,7 @@ test("CAS-740 AC4: a signed-in user whose account already holds agents is never 
 
   await expect(page.locator("#splashCta")).toBeVisible();
   await page.locator("#splashCta").click();
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about (CAS-953)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   expect(await page.evaluate(() => flowOn)).toBe(true);   // genuinely inside the wizard before the race resolves
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
@@ -1123,7 +1123,7 @@ async function cas913GotoConfigured(page){
 async function cas913WalkToShortlist(page){
   await expect(page.locator("#splashCta")).toBeVisible();
   await page.locator("#splashCta").click();
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about (CAS-953)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");            // v2_intro
@@ -1147,9 +1147,20 @@ async function cas913WalkToShortlist(page){
   await page.waitForTimeout(120);
   await expect(page.locator("#obKidsOpts")).toBeVisible();                        // v2_kids — v2_date skipped
   await page.locator('#obKidsOpts .obopt[data-val="no"]').click();
+  await page.evaluate(() => { prefs.touched = true; prefs.on = false; });         // CAS-1167 AC4: must arm anyway
   await ctaLocator(page).click();
   await page.waitForTimeout(120);                                                 // v2_family skipped
   await expect(page.locator("#obSvcStores")).toBeVisible();                       // v2_services
+  await expect(page.locator("#obSvcOnly")).toHaveCount(0);                        // CAS-1167: toggle removed
+  for(const boxId of ["obSvcStores", "obSvcSubs"]){
+    const { chipWidth, boxWidth } = await page.evaluate(id => {
+      const box = document.getElementById(id);
+      const chip = box.querySelector(".chip.svcmore");
+      return { chipWidth: chip.getBoundingClientRect().width, boxWidth: box.getBoundingClientRect().width };
+    }, boxId);
+    expect(Math.abs(chipWidth - boxWidth)).toBeLessThanOrEqual(2);
+  }
+  expect(await page.evaluate(() => prefs.on)).toBe(true);                         // CAS-1167: armed regardless of touched
 }
 
 test("CAS-913: signing out from the Account screen returns to the splash and survives a reload", async ({ page }) => {

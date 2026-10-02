@@ -13,7 +13,7 @@ test("CAS-1157 AC9: cinema No + rent No leaves Upcoming/In cinema/Standard Rent 
   await freshApp(page);
   await page.locator("#splashCta").click();
 
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");   // v2_intro

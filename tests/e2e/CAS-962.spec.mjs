@@ -30,7 +30,7 @@ async function walkOnboarding(page, { kids = "no" } = {}){
   // CAS-1018: scoped to #onbStepInner, not a bare ".obhd" — gotoStep's dual-pane slide leaves the
   // outgoing step's .obhd in the DOM alongside the incoming one for the length of the transition, so a
   // bare ".obhd" is a strict-mode violation (resolves to 2 elements) for as long as that overlap lasts.
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");                       // v2_intro

@@ -221,7 +221,7 @@ export async function walkToServices(page, kind){
   // outgoing step's .obhd in the DOM alongside the incoming one for the length of the transition
   // (intentional, see gotoStep's own comment), and #onbStepInner is the id it moves onto the
   // incoming pane immediately, so this always resolves to exactly one element.
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about (CAS-953)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");   // v2_intro
@@ -367,7 +367,7 @@ export async function settleListing(page){
  * hand-set CascadeAuth object (which never fires it). This is the exact route CAS-740's own AC4 test
  * (smoke.spec.mjs) proves works: splashGo() always calls flowStart() with no idea yet whether the device is
  * signed in, so a fake getSession() that doesn't resolve until the test calls it explicitly reproduces that
- * ordering deterministically — landing on v2_about ("Cascade finds your movies for you.", #onbStepInner
+ * ordering deterministically — landing on v2_about ("Let's get you set up.", #onbStepInner
  * .obhd) first, then afterSignIn() exits the wizard once the (fake, resolved) session says the account
  * already has agents. Replaces three specs' former local bootSignedIn copies, each of which instead waited
  * on `#obWho` — a v1 "who's watching" onboarding screen the v2 rework deleted outright (zero hits left in
@@ -395,7 +395,7 @@ export async function bootAlreadySignedIn(page, { supabaseScript, resolveFnName,
   // splashGo() always starts the wizard (flowStart()) before the (deferred, async) auth module has had any
   // chance to answer whether this device is signed in — mirrors CAS-740 AC4's own first assertion after
   // this same click (smoke.spec.mjs).
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about (CAS-953)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await page.evaluate(name => window[name](), resolveFnName);
   // CAS-1159 requeue: 5000ms here (and below) was tight enough that e2e-full's heavier parallel-shard load
   // occasionally lost the race even though the mechanism itself is correct (CAS-886.spec.mjs:88 saw this) —

@@ -48,9 +48,9 @@ async function configuredApp(page){
 }
 
 async function openFromSplash(page){
-  await page.locator("#splashAbout").click();
-  await expect(page.locator("#aboutPage")).toHaveClass(/open/);
-  await page.locator("#aboutPageContact").click();
+  await page.locator("#splashLogin").click();
+  await expect(page.locator("#authModal")).toHaveClass(/open/);
+  await page.locator("#authContact").click();
   await expect(page.locator("#contact")).toHaveClass(/open/);
 }
 
