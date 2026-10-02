@@ -636,32 +636,35 @@ test("alerts: a sub-moment writes an alert only when its own bell is on", () => 
 
 test("alerts: a saved agent from before this screen is never armed on its behalf", () => {
   // migrateWatch is the only door an old agent comes through, and it must not invent a sub-moment: the
-  // person asked for one bell and would start receiving three.
+  // person asked for one bell and would start receiving three. CAS-1123 also drops the separate Notify
+  // flag itself — folded into `list` — so a pre-CAS-242 agent comes back carrying `list` alone.
   const old = E.migrateWatch({ upcoming: { list: true, notify: true } });
-  assert.deepEqual(Object.keys(old.upcoming).sort().join(","), "list,notify",
+  assert.deepEqual(Object.keys(old.upcoming).sort().join(","), "list",
     `an agent saved before CAS-242 came back carrying ${JSON.stringify(old.upcoming)}`);
-  // …and one saved since round-trips exactly.
+  // …and one saved since CAS-242 keeps its sub-moments; notify is folded away regardless.
   const now = E.migrateWatch({ upcoming: { list: true, notify: true, subs: { announced: true, opens_soon: false } } });
+  assert.ok(!("notify" in now.upcoming), "notify must not survive migration");
   assert.equal(now.upcoming.subs.announced, true);
   assert.equal(now.upcoming.subs.opens_soon, false);
 });
 
-// ---- 3c-i. CAS-843: alert_moments follows the ACCOUNT's own Where & when Notify switches ------------------
+// ---- 3c-i. CAS-843/CAS-1123: alert_moments follows the ACCOUNT's own Where & when Watch switches ----------
 // The per-agent alert set (autoSelectAlerts, c.alerts) and the global "Never alert me about" mute
 // (prefs.alertsOff) are both retired — My services and Where & when you'll watch are the only two things
-// that may influence alert_moments now (Lee's decision, 2026-09-08). watchPrefs is the account's single,
-// global copy of those Notify switches (CAS-532), so every test below drives it directly and restores it
-// afterwards — the same isolation shape tests/js/agents.test.mjs's withWatchPrefs uses.
+// that may influence alert_moments now (Lee's decision, 2026-09-08). CAS-1123 folded the separate Notify
+// switch into Watch itself — a window that's on is both listed and alerted — so watchPrefs' single `list`
+// flag per window (CAS-532) is what every test below drives, restoring it afterwards — the same isolation
+// shape tests/js/agents.test.mjs's withWatchPrefs uses.
 function withWatchPrefs(overrides, fn){
   const saved = E.watchPrefs;
   E.setWatchPrefs({ ...saved, ...overrides });
   try{ fn(); } finally{ E.setWatchPrefs(saved); }
 }
-test("alerts: Notify ON for Rent only produces hits_rent, and nothing else, for an agent watching the whole ladder", () => {
+test("alerts: Rent ON alone produces hits_rent, and nothing else, for an agent watching the whole ladder", () => {
   withWatchPrefs({
-    in_cinema: { list: true, notify: false }, premium: { list: false, notify: false },
-    rent: { list: true, notify: true }, stream: { list: true, notify: false },
-    upcoming: { list: true, notify: false },
+    in_cinema: { list: false }, premium: { list: false },
+    rent: { list: true }, stream: { list: false },
+    upcoming: { list: false },
   }, () => {
     const wholeLadder = E.normCascade({ status: [] });   // [] = every window, CAS-843's "whole ladder" case
     // Joined rather than deep-equalled: arrays built inside the vm realm fail a strict deep-equal against
@@ -681,29 +684,29 @@ test("alerts: Notify ON for Rent only produces hits_rent, and nothing else, for 
 // a moment the agent's scope has already let go of still produces nothing — with the one scope direction that
 // can actually demonstrate it: an agent narrowed to Upcoming has let go of Stream, the same relationship the
 // comment above documents for Rent/Stream.
-test("alerts: Notify ON for Stream produces nothing for an agent scoped to Upcoming only — the reachability guard survives", () => {
+test("alerts: Stream ON produces nothing for an agent scoped to Upcoming only — the reachability guard survives", () => {
   withWatchPrefs({
-    in_cinema: { list: true, notify: false }, premium: { list: false, notify: false },
-    rent: { list: true, notify: false }, stream: { list: true, notify: true },
-    upcoming: { list: true, notify: false },
+    in_cinema: { list: false }, premium: { list: false },
+    rent: { list: false }, stream: { list: true },
+    upcoming: { list: false },
   }, () => {
     const upcomingOnly = E.normCascade({ status: ["upcoming"] });
     assert.equal(E.CascadeShape.momentsOf(upcomingOnly).length, 0,
-      "Stream's Notify is on account-wide, but an Upcoming-only agent has already let Stream go");
+      "Stream is switched on account-wide, but an Upcoming-only agent has already let Stream go");
   });
 });
 test("alerts: Upcoming's two sub-switches produce announced and opens_soon independently", () => {
   withWatchPrefs({
-    in_cinema: { list: true, notify: false }, premium: { list: false, notify: false },
-    rent: { list: true, notify: false }, stream: { list: true, notify: false },
-    upcoming: { list: true, notify: true, subs: { announced: true, opens_soon: false } },
+    in_cinema: { list: false }, premium: { list: false },
+    rent: { list: false }, stream: { list: false },
+    upcoming: { list: true, subs: { announced: true, opens_soon: false } },
   }, () => {
     assert.equal(E.CascadeShape.momentsOf(E.normCascade({ status: [] })).join(","), "announced");
   });
   withWatchPrefs({
-    in_cinema: { list: true, notify: false }, premium: { list: false, notify: false },
-    rent: { list: true, notify: false }, stream: { list: true, notify: false },
-    upcoming: { list: true, notify: true, subs: { announced: false, opens_soon: true } },
+    in_cinema: { list: false }, premium: { list: false },
+    rent: { list: false }, stream: { list: false },
+    upcoming: { list: true, subs: { announced: false, opens_soon: true } },
   }, () => {
     assert.equal(E.CascadeShape.momentsOf(E.normCascade({ status: [] })).join(","), "opens_soon");
   });
@@ -733,20 +736,17 @@ test("windows: every agent is offered Premium, Standard Rent and Streaming, one 
   assert.equal([...seen].sort().join(","), "included_streaming,pvod,rental");
 });
 
-test("windows: a new agent lists Upcoming/In cinema/Rent/Streaming, alerts on none, and is never opted into $30", () => {
+test("windows: a new agent lists and is alerted on Upcoming/In cinema/Rent/Streaming, and is never opted into $30", () => {
   // CAS-532/CAS-723: watchPrefsDefaults() is the one seed now — there is no more per-kind (cinema vs
-  // streaming) lane split to seed separately.
+  // streaming) lane split to seed separately. CAS-1123 folded Notify into the one `list` switch (Lee's
+  // decision, 2026-10-01): a window that lists by default is now also alerted by default, so a new member
+  // hears about every window they're watching from the start.
   const seed = E.watchPrefsDefaults();
-  // CAS-427: a new agent Lists Upcoming but does not alert on it — no Notify option is ticked by
-  // default, sub-moments included, until the person turns the bell on for themselves.
-  assert.ok(seed.upcoming.list, "a new agent does not list Upcoming");
-  assert.ok(!seed.upcoming.notify, "a new agent starts with the Upcoming bell on, against CAS-427's default-off rule");
+  assert.ok(seed.upcoming.list, "a new agent does not list (and so does not alert on) Upcoming");
+  assert.ok(!("notify" in seed.upcoming), "notify is retired — it must not appear in a fresh default");
   assert.ok(!seed.upcoming.subs, "a new agent starts with pre-armed sub-moments, against CAS-427's default-off rule");
-  assert.ok(seed.rent && seed.rent.list, "Standard Rent is not listed for a new agent");
-  assert.ok(seed.stream && seed.stream.list, "Streaming is not listed for a new agent");
-  // CAS-427: List is still automatic; Notify is not — nothing is ticked until the person taps it themselves.
-  assert.ok(!seed.rent.notify, "Standard Rent's bell is on by default, against CAS-427's default-off rule");
-  assert.ok(!seed.stream.notify, "Streaming's bell is on by default, against CAS-427's default-off rule");
+  assert.ok(seed.rent && seed.rent.list, "Standard Rent is not listed (and so not alerted) for a new agent");
+  assert.ok(seed.stream && seed.stream.list, "Streaming is not listed (and so not alerted) for a new agent");
   assert.ok(!seed.premium, "a new agent is opted into Premium, which costs ~$30 a film");
   // …and the window is still OFFERED, or it could never be switched on.
   assert.ok(E.agentWindow("premium", "stream"), "Premium is not on the screen at all");
@@ -755,9 +755,9 @@ test("windows: a new agent lists Upcoming/In cinema/Rent/Streaming, alerts on no
 test("windows: an agent that asked for premium under the old model gets the premium window", () => {
   // `purchase` was the premium option and had nowhere of its own to land, so it was folded into rent.
   assert.equal(JSON.stringify(E.migrateWatch({ rent: ["purchase"] })),
-    JSON.stringify({ premium: { list: true, notify: true } }));
+    JSON.stringify({ premium: { list: true } }));
   assert.equal(JSON.stringify(E.migrateWatch({ rent: ["rent"] })),
-    JSON.stringify({ rent: { list: true, notify: true } }));
+    JSON.stringify({ rent: { list: true } }));
   // A bare lane tick meant the whole pay-per-film lane, so it opens both.
   assert.equal(Object.keys(E.migrateWatch({ rent: [] })).sort().join(","), "premium,rent");
 });

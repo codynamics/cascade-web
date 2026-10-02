@@ -165,18 +165,30 @@ if(typeof window.CascadeAuth === "undefined"){
   // CAS-255: the my-services scope and the stage dates are both places the app makes a claim about what you
   // can watch and when, so the QA gate needs to reach them the same way the listing does.
   prefs, servicesPicked, matchesServices, scopeOf, anyScope, HOME_KEYS,
+  // CAS-1095: onChipToggle is the real wire chokepoint a ⚙️ service-chip tap goes through — exported so a
+  // test can drive an actual service toggle through the real function and assert the acctOp update it
+  // issues, rather than poking prefs.sub by hand.
+  onChipToggle,
   // CAS-1053 AC4: watchMineOnlyOn (the "Show only available on my services" per-tab switch) and
   // watchMineOnlyEmptyKind (the pure loading-vs-dead-end decision behind the Watch list's mineOnly empty
   // state) — exported so a test can assert the loading state wins while user_prefs hasn't loaded, without
   // parsing the rendered HTML the DOM stub swallows.
   watchMineOnlyOn, watchMineOnlyEmptyKind,
   svcCanon, svcName, SVC_LEAD, myService,
+  // CAS-1124: serviceAdvice/svcAdviceFilms are the Service analysis screen's own arithmetic (headline
+  // total/coverage, "worth adding" ranking) — exported so a test can drive them against a controlled
+  // population rather than the DOM they normally render into.
+  serviceAdvice, svcAdviceFilms,
   SUB_SERVICES, STORE_SERVICES, stageDate, curSlot, cinemaState, EST_OFFSET, TODAY,
   inCinemaRun, CINEMA_RUN_DAYS, LISTING_ORDER, orderFor, listingOrder,
   // CAS-702: the one default-sort constant, and the raw comparator dispatch, so a test can assert the
   // rendered order against an independently-run comparator rather than re-deriving sortForKey's branches.
   DEFAULT_SORT, sortForKey,
   fmtDay, fmtDate, bandHTML, windowsLineHTML, savingsHTML,
+  // CAS-1119: cardTopHTML is the expanded card's whole "about this film" block (poster..director/cast),
+  // shared verbatim with filmPageHTML (the invite/share-link page) — exported together so a test can assert
+  // the invite page's rendered top literally contains the same cardTopHTML(m) output, not a re-derived copy.
+  cardTopHTML, filmPageHTML,
   inferredScale, inferScaleWhy, budgetCell, moneyRowHTML, SCALE_INFER_MIN_PEERS, popOf, scaleTier,
   // CAS-742: the two catalogue-derived compute-once caches, exposed by reference (Map, never reassigned) so
   // a test can assert their .size directly, plus the one function that clears both — the real invalidation
@@ -237,11 +249,20 @@ if(typeof window.CascadeAuth === "undefined"){
   // reveal-time cap they solve against — exported so a test can build a real onboarding roster
   // from a fixed answer set and assert watchCount() against the cap directly.
   onbAnswersV2Default, buildOnbAgentsV2, ONB_AGENT_CAP_V2,
-  // CAS-959: the v2 onboarding commit marker (set at v2_done, cleared by flowStart or a completed/dropped
-  // load) — exported so a test can seed "this device just built an unconfirmed onboarding draft" the same
-  // way v2_done itself does, without driving the whole wired flow through the DOM stub.
-  onbV2CommittedSave, onbV2CommittedLoad, onbV2CommittedClear,
-  tasteBase, cascades,
+  // CAS-1099: membCompleteNewMembership is the one complete_membership() RPC chokepoint a brand-new,
+  // signed-out signup drives — exported so a test can call it directly against a stubbed CascadeAuth.client,
+  // the same convention CascadePersistence's own write seams use. membNeedsEmail/membStart/membStartWork are
+  // window-assigned (or plain) wire code alongside it; onbDraftModeOn is reassigned wholesale by flowStart/
+  // flowStop/membCompleteNewMembership, so it's exposed through a getter/setter like flowKind elsewhere here.
+  membCompleteNewMembership, membNeedsEmail,
+  get onbDraftModeOn(){ return onbDraftModeOn; },
+  setOnbDraftModeOn(v){ onbDraftModeOn=!!v; },
+  get onbMembershipInFlight(){ return onbMembershipInFlight; },
+  // CAS-1099: tasteBase is reassigned wholesale in more places than loadUserPrefs/maybeSwitchAcctSuffix now
+  // (flowStart()'s own leftover-@guest-draft reset) — exposed through a getter, like watchPrefs/notifyPrefs
+  // below, so a test sees the CURRENT binding even across a reassignment, not a snapshot frozen at load time.
+  get tasteBase(){ return tasteBase; },
+  cascades,
   get onbFlow(){ return onbFlow; },
   get flowKind(){ return flowKind; },
   setFlowKind(k){ flowKind = k; },
@@ -278,6 +299,13 @@ if(typeof window.CascadeAuth === "undefined"){
   // not accountActive() — exposing the stub localStorage (already the engine's own global) lets a test drive
   // that key directly instead of only being able to flip the (now branch-irrelevant) CascadeAuth fields.
   localStorage,
+  // CAS-1119: the stub global itself (window === globalThis in this sandbox, same object as ctx in
+  // makeContext) — exposed the same way localStorage is above, so a test can stub window.open and assert a
+  // CTA like filmPageCta actually called it, rather than only checking it didn't throw.
+  window,
+  // CAS-1119: filmPageCta is the invite/film page's one action — exported directly (it's window.filmPageCta,
+  // a plain global function) so a test can call it and assert the window.open it makes.
+  filmPageCta: (...args) => window.filmPageCta(...args),
   // CAS-668: the badge/list agreement — movingWindowRows is the one recipe both renderMovingScreen and
   // movingUnseenCount filter through, movingBadgeWindow is which window applies right now (live if Moving
   // is open, predicted — always "2weeks", CAS-848 — if it's not), and openMovingScreen/closeMovingScreen/
@@ -343,10 +371,17 @@ if(typeof window.CascadeAuth === "undefined"){
   // decide whether an agent has changed and what its current floor is — exported so a test can compute the
   // exact signature/floor a seeded agent_films row should carry, rather than guessing at internal state.
   cascSigOf, agentFloor,
-  // CAS-743: setWatchMarker is the one real mutator a user-driven marker edit goes through (it also clears
-  // the *Defaulted provenance flag normCascade's own guess sets) — exported so a test can drive a genuine
-  // edit through the real function rather than poking c.watchMarkers by hand.
-  setWatchMarker,
+  // CAS-1097: earnedWindowForScore/autoPlacementFor/autoPlacementForAdmission are recomputeFound's own
+  // Watch-On placement arithmetic, extracted into standalone pure functions so the monitor's
+  // placement_shim.mjs can ask the exact same question (a frozen admission_score -> the window it earns,
+  // carried forward to the film's current standing) through this same harness, rather than a second,
+  // hand-ported copy — the CAS-825 lesson applied to placement, not just admission.
+  earnedWindowForScore, autoPlacementFor, autoPlacementForAdmission,
+  // CAS-1113: setAgentScore is the one real mutator a user-driven score edit goes through now (it also
+  // clears the *Defaulted provenance flag normCascade's own guess sets) — exported so a test can drive a
+  // genuine edit through the real function rather than poking c.watchMarkers by hand. Replaces the retired
+  // per-window setWatchMarker.
+  setAgentScore,
   // CAS-726: filmWatchSource is the provenance read the round-trip test asserts against directly;
   // toggleFilmOpt is wire code (window-assigned, like ymCascToggle above) — a test drives a manual
   // tick through the real function rather than poking notify[id].wins by hand.
@@ -369,6 +404,18 @@ if(typeof window.CascadeAuth === "undefined"){
   // at the bottom of the account-sync IIFE — a live reference, so a test can stub CascadeAuth.client with
   // a fake Supabase and call e.g. CascadePersistence.loadWatchlistAccount() directly.
   get CascadePersistence(){ return window.CascadePersistence; },
+  // CAS-1094: the server-first account store core (acctLoad/acctOp and the persisted op queue) lives on
+  // window.CascadeAccountStore, assigned once at the bottom of its own IIFE — the same live-reference
+  // reasoning as CascadePersistence above, so a test can stub CascadeAuth.client with a fake Supabase and
+  // call acctOp/acctLoad directly.
+  get CascadeAccountStore(){ return window.CascadeAccountStore; },
+  // CAS-1108: BUILD_INFO is a plain object, exposed by reference (mutated, never reassigned) like cascades
+  // elsewhere in this file — a test sets BUILD_INFO.build directly to simulate a client on a given build.
+  // buildGateBlocked/buildGateUpdateUrl are reassigned wholesale by checkBuildGate (CascadePersistence,
+  // exposed above), so both are exposed through getters, like catalogueHash below.
+  BUILD_INFO,
+  get buildGateBlocked(){ return buildGateBlocked; },
+  get buildGateUpdateUrl(){ return buildGateUpdateUrl; },
   // CAS-843: momentsOf (alert_moments derivation, now off the account's own Where & when Notify switches
   // rather than a per-agent field) lives on window.CascadeShape, the same live-reference reasoning as
   // CascadePersistence above.
@@ -415,18 +462,23 @@ if(typeof window.CascadeAuth === "undefined"){
   // test can assert the panel/copy-button text without a real DOM or the 5-tap gesture.
   diagReport, diagReportText, diagSyncStatusText,
   // CAS-789: rounding out the agent-behaviour suite's export surface — windowEnabled (the watchPrefs
-  // Where-and-when gate), restoreWatchMarker/msnTrackAreaHTML/msnValueLine (the Mission marker track's own
-  // mutator and render helpers) and notifyChipHTML (the Watch On chip's own render, alongside agentChipHTML
-  // above) — plain top-level functions, exported directly like the rest of this file.
-  windowEnabled, restoreWatchMarker, msnTrackAreaHTML, msnValueLine, notifyChipHTML,
-  // CAS-917: windowFollowed (the start-window model's own predicate) and msnChipsHTML (the "On this
-  // track" chip row, alongside msnValueLine/msnTrackAreaHTML above) — exported so a test can assert both
-  // the placement decision and its two render surfaces directly.
-  windowFollowed, msnChipsHTML,
-  // CAS-762: msnLastValue — the module-level "value a window carried before Never" map — exported by
-  // reference (like watched/blocked/found above) so a test can seed the exact Off-round-trip restoreWatchMarker
-  // now has to handle without driving the real click handlers.
-  msnLastValue,
+  // Where-and-when gate), msnTrackAreaHTML/msnValueLine (the Cascade score track's own render helpers)
+  // and notifyChipHTML (the Watch On chip's own render, alongside agentChipHTML above) — plain top-level
+  // functions, exported directly like the rest of this file.
+  windowEnabled, msnTrackAreaHTML, msnValueLine, notifyChipHTML,
+  // CAS-1128: windowFollowed (now a plain "enabled AND ON" predicate, the CAS-917 start-window-forward
+  // model retired) and msnPillsHTML (the independent per-window "Track in" pill row that replaces the
+  // retired start/follow chip row, msnChipsHTML) — exported so a test can assert both the placement
+  // decision and its render surfaces directly.
+  windowFollowed, msnPillsHTML,
+  // CAS-1128: msnOnWindows is the shared "which windows is this agent actually tracking" decision
+  // msnValueLine/msnPillsHTML/msnTrackAreaHTML all read — exported so a test can assert it directly.
+  // toggleAgentWindow is the pill-tap mutator, alongside setAgentScore (the drag mutator) above. msnLastScore
+  // (a single remembered value) is reassigned by both, so it's exposed through a getter/setter like
+  // flowKind/watchTab elsewhere in this file.
+  msnOnWindows, toggleAgentWindow,
+  get msnLastScore(){ return msnLastScore; },
+  setMsnLastScore(v){ msnLastScore=v; },
   // CAS-790/791: found — the live membership Set recomputeFound rebuilds every pass, by reference like
   // watched/blocked above — needed for the A-F and G/I checks' direct membership assertions.
   // (watchRows/applyWatchRows already reach a test through CascadePersistence, same as the rest of the
@@ -438,6 +490,45 @@ if(typeof window.CascadeAuth === "undefined"){
   // exercises the clipboard-fallback branch) — exported so a test can assert the fallback's payload really
   // carries the link, the same guarantee CAS-929 asked for on the now-removed navigator.share path.
   inviteUrlFor, shareTextFor, openNextInviteChannel, openNextRecommendChannel,
+  // CAS-1121: fpInviteAskHTML is the invite-landing ask panel's own pure render (the Suggested
+  // date/note lines, optional) — a plain top-level function, exported directly like inviteUrlFor
+  // above, so a test can assert the markup without a real DOM insert.
+  fpInviteAskHTML,
+  // CAS-1121: sendFilmInvite/openFilmInvite are window-assigned wire code (same wrap shape as
+  // sendRecommend/toggleFriendSelect above) — exported so a test can drive a real Invite send (with its
+  // name/date/note fields) through the actual function. inviteFriendSel is reassigned wholesale by
+  // openFilmInvite/sendFilmInvite, so it's exposed through a getter/setter like recommendFriendSel above.
+  // inviteNameVal/inviteDateVal/inviteNoteVal are the sheet's own per-open edit state (same shape as
+  // recommendMsgText) — exposed through getter/setters so a test can drive an edit without a real DOM
+  // oninput. displayName/loadUserPrefs let a test seed and read the account's own remembered name the
+  // same way the real sign-in load path does.
+  sendFilmInvite: (...args) => window.sendFilmInvite(...args),
+  openFilmInvite: (...args) => window.openFilmInvite(...args),
+  get inviteFriendSel(){ return inviteFriendSel; },
+  setInviteFriendSel(v){ inviteFriendSel = v; },
+  get inviteNameVal(){ return inviteNameVal; },
+  setInviteNameVal(v){ inviteNameVal = v; },
+  get inviteDateVal(){ return inviteDateVal; },
+  setInviteDateVal(v){ inviteDateVal = v; },
+  get inviteNoteVal(){ return inviteNoteVal; },
+  setInviteNoteVal(v){ inviteNoteVal = v; },
+  displayName, inviteDefaultName,
+  get displayNameCache(){ return displayNameCache; },
+  setDisplayNameCache(v){ displayNameCache = v; },
+  // CAS-1125: friendRowHTML is the shared recipient-row renderer (now a single tap target, not a separate
+  // circle) and recommendMessageFor is the Recommend sheet's own default-message text — both plain
+  // top-level functions, exported directly. toggleFriendSelect is window-assigned wire code (wrapped like
+  // toggleFilmOpt above). friends/recommendFriendSel are reassigned wholesale elsewhere (loadFriends,
+  // openRecommend/sendRecommend), so both are exposed through a getter/setter, like watchPrefs above.
+  friendRowHTML, recommendMessageFor,
+  toggleFriendSelect: (ctx, id) => window.toggleFriendSelect(ctx, id),
+  // CAS-1131: sendRecommend is window-assigned wire code (same reason as toggleFriendSelect above),
+  // exported so a test can drive the real de-dupe-by-email filter instead of re-deriving it.
+  sendRecommend: (...args) => window.sendRecommend(...args),
+  get friends(){ return friends; },
+  setFriends(v){ friends = v; },
+  get recommendFriendSel(){ return recommendFriendSel; },
+  setRecommendFriendSel(v){ recommendFriendSel = v; },
   // CAS-968: the unread-reply badge/pill decision surface. invites is reassigned wholesale by loadInvites
   // (like watchPrefs/notifyPrefs above), so it's exposed through a getter/setter rather than by reference;
   // invitesUnseenCount/invitesBadgeText are the pure count -> display-text decision every badge reads, and
@@ -465,6 +556,13 @@ if(typeof window.CascadeAuth === "undefined"){
   get usageQueue(){ return usageQueue; },
   clearUsageQueue(){ usageQueue = []; },
   get diagLog(){ return diagLog; },
+  // CAS-1103: pollCatalogue is a plain top-level function, exported directly like recomputeFound above.
+  // catalogueHash is reassigned wholesale on every successful swap (never mutated in place), so it's
+  // exposed through a getter/setter like watchPrefs/flowKind elsewhere in this file — a test resets it to
+  // null to simulate a fresh load, or reads it back to assert a swap actually landed.
+  pollCatalogue,
+  get catalogueHash(){ return catalogueHash; },
+  setCatalogueHash(v){ catalogueHash = v; },
 };
 `;
 

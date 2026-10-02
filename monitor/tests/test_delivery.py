@@ -14,14 +14,17 @@ from monitor.store import InMemoryStore
 from monitor.transitions import Transition
 
 # CAS-825: admission is asked of the real engine now, so every fixture cascade needs a usable
-# (0-floor) watchMarkers window and every fixture movie needs enough of a quality signal
-# (rt_critic here) to clear the score gate — see monitor/tests/test_matching.py's own header note.
+# watchMarkers window and every fixture movie needs enough of a quality signal (wm_user_rating/
+# wm_critic_score here) to clear the score gate — see monitor/tests/test_matching.py's own header
+# note. CAS-1128: a 0 marker is no longer a score-gate bypass — normCascade migrates it to
+# TRACK_MIN, a real floor an unscored or low-scored fixture film can fail same as any other.
 _OPEN_MARKERS = {"in_cinema": 0, "rent": 0, "stream": 0}
 
 
 def _movie(mid="9001", title="Fixture Film", **over):
     m = {"tmdb_id": int(mid), "title": title, "genres": ["Drama"], "language": "en",
-         "age_rating": "M", "status": ["rental"], "popularity": 10, "rt_critic": 70,
+         "age_rating": "M", "status": ["rental"], "popularity": 10,
+         "wm_user_rating": 7.5, "wm_critic_score": 70,
          "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}]}
     m.update(over)
     return m

@@ -6,7 +6,7 @@
 // keeps the account "already set up" so sign-in skips the onboarding wizard straight to the main app,
 // exactly as CAS-886's own spec proves.
 import { test, expect } from "@playwright/test";
-import { gotoFresh } from "./helpers.mjs";
+import { bootAlreadySignedIn } from "./helpers.mjs";
 
 const SEEDED_CASCADE = { id: "928aaaa1-0000-4000-8000-000000000001", user_id: "cas928-user",
   name: "Existing agent", criteria: {}, created_at: "2020-01-01T00:00:00.000Z" };
@@ -69,24 +69,14 @@ function fakeSupabaseScript(friendsFixture){
 }
 
 /** A real (faked) sign-in with the friends fixture loaded off the genuine 'cascade-auth-change' event —
- * same route as CAS-886's own bootSignedIn. */
+ * same route as CAS-886's own bootSignedIn. CAS-1084: thin adapter over helpers.mjs's shared
+ * bootAlreadySignedIn. */
 async function bootSignedIn(page, friendsFixture){
-  await page.route("**/config.js", route => route.fulfill({
-    contentType: "application/javascript",
-    body: `window.CASCADE_CONFIG = { SUPABASE_URL: "https://fake-project.supabase.test", SUPABASE_ANON_KEY: "fake-anon-key-not-a-real-secret" };`,
-  }));
-  await page.route("**/supabase-js.js", route => route.fulfill({
-    contentType: "application/javascript",
-    body: fakeSupabaseScript(friendsFixture),
-  }));
-  await gotoFresh(page);
-  await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
-  await page.locator("#splashCta").click();
-  await expect(page.locator("#obWho")).toBeVisible();
-  await page.evaluate(() => window.__cas928ResolveSession());
-  await page.waitForFunction(() => window.CascadeAuth.status === "signed-in", null, { timeout: 5000 });
-  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
-  await page.waitForFunction(() => typeof friendsReady !== "undefined" && friendsReady === true, null, { timeout: 5000 });
+  await bootAlreadySignedIn(page, {
+    supabaseScript: fakeSupabaseScript(friendsFixture),
+    resolveFnName: "__cas928ResolveSession",
+    readyFlagExpr: "typeof friendsReady !== 'undefined' && friendsReady === true",
+  });
 }
 
 async function openInviteSheet(page){
@@ -145,7 +135,7 @@ test("CAS-928 AC3g: deleting a friend asks for confirmation first, then removes 
   page.on("dialog", dialog => dialog.accept());
 
   await page.locator('#friendsRows .frow[data-fid="5"]').click();
-  await page.locator('#friendsBody button:has-text("Delete friend")').click();
+  await page.locator('#friendsBody button:has-text("Remove")').click();
 
   await expect(page.locator("#friendsScreen")).not.toContainText("Tom");
   const deletes = await page.evaluate(() => window.__friendDeletes);
@@ -175,7 +165,7 @@ test("CAS-928 AC3c: adding a friend with a name and an email inserts one row and
   expect(inserts[0].name).toBe("Jess");
   await expect(page.locator("#filmInviteSend")).toContainText("1");
   const jessId = inserts[0].id;
-  await expect(page.locator(`#filmInvitePicker .frow[data-fid="${jessId}"] .fcheck`)).toHaveClass(/on/);
+  await expect(page.locator(`#filmInvitePicker .frow[data-fid="${jessId}"]`)).toHaveClass(/fsel/);
 });
 
 // AC3e
@@ -184,11 +174,11 @@ test("CAS-928 AC3e: ticking three friends shows three selected, unticking one le
   await openInviteSheet(page);
 
   for(const id of [1, 2, 4]){
-    await page.locator(`#filmInvitePicker .frow[data-fid="${id}"] .fcheck`).click();
+    await page.locator(`#filmInvitePicker .frow[data-fid="${id}"]`).click();
   }
   await expect(page.locator("#filmInviteSend")).toContainText("3");
 
-  await page.locator('#filmInvitePicker .frow[data-fid="2"] .fcheck').click();
+  await page.locator('#filmInvitePicker .frow[data-fid="2"]').click();
   await expect(page.locator("#filmInviteSend")).toContainText("2");
 });
 
@@ -198,6 +188,7 @@ test("CAS-928 AC3f: tapping WhatsApp on a friend with a mobile marks that row's 
   await openInviteSheet(page);
 
   const row = page.locator('#filmInvitePicker .frow[data-fid="1"]');
+  await row.click();
   const mail = row.locator('.fchan[aria-label^="Email"]');
   const wa = row.locator('.fchan[aria-label^="WhatsApp"]');
   await expect(mail).toHaveClass(/on/);

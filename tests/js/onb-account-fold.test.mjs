@@ -1,24 +1,65 @@
-// CAS-959: onboarding used to be idempotent against the DEVICE (cascade_onboarded), not the ACCOUNT — a
-// device that walked the v2 wizard and committed a fresh roster, then signed in (the membership step's own
-// email gate, CAS-387) to an account that already had its own agents, had its draft folded straight into
-// the account by loadAccount()'s "genuinely new, fold it in" rule (CAS-393/733/734), duplicating the
-// roster. These tests drive the real seam (CascadePersistence.loadAccount, onbV2CommittedSave/Load/Clear)
-// with a stubbed Supabase client, the same convention acct-namespacing.test.mjs uses.
+// CAS-1099: onboarding's draft now reaches the server through exactly one complete_membership() RPC call
+// (membCompleteNewMembership), replacing CAS-959's own localOnly-fold carve-out in loadAccount() — removed
+// along with onbV2CommittedSave/Load/Clear, which no longer exist (the draft lives in memory only until
+// membership completes; see onbDraftModeOn). These tests drive the real seam with a stubbed Supabase
+// client, the same convention acct-namespacing.test.mjs uses.
+// CAS-1109: CAS-734/733's own organic-local-work fold-in (a hand-built agent the account has never
+// confirmed surviving a loadAccount() call) is retired along with the rest of the old diff sync —
+// acctLoad replaces whatever this device held for cascades wholesale now, the same "no merge, no carry-up"
+// rule every other acctOp-backed table already follows. In practice this never arises for a real user: the
+// one path that creates a cascade (commitDraft -> saveCascades) always enqueues its own acctOp insert in
+// the same synchronous turn, so acctOpPendingOverlay (not a loadAccount-side merge) is what survives a
+// reload racing an unconfirmed create now.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
 
-function fakeCascadesClient({ selectRows = [] } = {}){
-  const upserts = [];
+// A generic chainable query stub, same reasoning as cas1107-load-before-sync.test.mjs's own: any method
+// call just keeps chaining, and the object resolves to the fixed result it was built with.
+function chainable(resultPromise){
+  return new Proxy(function(){}, {
+    get(t, k){
+      if(k === "then") return (resolve, reject) => resultPromise.then(resolve, reject);
+      if(k === "catch") return (reject) => resultPromise.catch(reject);
+      if(k === "finally") return (fn) => resultPromise.finally(fn);
+      return () => chainable(resultPromise);
+    },
+  });
+}
+// user_prefs/notify_prefs default to an already-populated row (what complete_membership() itself just
+// inserted) so loadUserPrefs()/loadNotifyPrefs()'s own "no row yet" bootstrap upsert — unrelated to this
+// ticket — never fires and pollutes the "no direct insert" assertion below.
+function fakeMembershipClient({ rpcResult = { data: "created", error: null }, cascadesRows = [],
+  userPrefsRows, notifyPrefsRows } = {}){
+  const rpcCalls = [];
+  const writes = { cascades: [], user_prefs: [], notify_prefs: [] };
+  const rowsFor = {
+    // CAS-1099: a function, not a fixed array — evaluated at select() time, so a row's alert_moments (a
+    // function of whatever notifyPrefs/watchPrefs the account-switch inside loadAccount() has ALREADY reset
+    // by the time it actually reads cascades) is computed against that same real, post-switch state rather
+    // than a value guessed ahead of time and liable to go stale the instant the switch runs.
+    cascades: typeof cascadesRows === "function" ? cascadesRows : () => cascadesRows,
+    user_prefs: () => userPrefsRows || [{ user_id: "x", sub_services: [], store_services: [], services_only: false,
+      touched: false, taste: {}, watch_windows: {}, never_show: [], onb_depth: null, framing: false,
+      moving_seen: {}, occasions: [], ref_code: "CAS1099REF" }],
+    notify_prefs: () => notifyPrefsRows || [{ user_id: "x", in_app: true, email_on: false, email_address: null }],
+  };
   return {
-    upserts,
+    rpcCalls, writes,
+    rpc(name, params){
+      rpcCalls.push({ name, params });
+      return Promise.resolve(rpcResult);
+    },
     from(table){
-      assert.equal(table, "cascades", "this fake only serves the cascades table");
       return {
-        select(){ return { order(){ return Promise.resolve({ data: selectRows, error: null }); } }; },
+        select(){ return chainable(Promise.resolve({ data: (rowsFor[table] ? rowsFor[table]() : []), error: null })); },
         upsert(rows){
-          upserts.push(...rows);
+          if(writes[table]) writes[table].push(...rows);
           return { select(){ return Promise.resolve({ data: rows.map(r => ({ id: r.id, updated_at: new Date().toISOString() })), error: null }); } };
+        },
+        insert(rows){
+          if(writes[table]) writes[table].push(...(Array.isArray(rows) ? rows : [rows]));
+          return Promise.resolve({ data: null, error: null });
         },
         delete(){ return { eq(){ return { in(){ return Promise.resolve({ data: null, error: null }); } }; } }; },
       };
@@ -28,70 +69,93 @@ function fakeCascadesClient({ selectRows = [] } = {}){
 function signIn(E, userId, client){
   const auth = E.CascadeAuth;
   auth.enabled = true; auth.client = client; auth.session = { user: { id: userId } };
+  auth.status = "signed-in"; auth.user = { id: userId };
 }
 
-test("CAS-959 AC2/observation: an onboarding draft this device committed is dropped, not folded in, once the account it signs into already has its own agents — no insert/upsert of the draft's ids", async () => {
+test("CAS-1099 AC1: completing membership issues exactly one complete_membership call and no direct insert/upsert to cascades, user_prefs or notify_prefs", async () => {
   const E = loadEngine();
-
-  // The device walked v2_done before ever knowing the account's state — exactly what onboarding's own
-  // commit does: push the built agents into `cascades` and remember them as an unconfirmed draft.
-  const draft = [
-    E.normCascade({ id: "draft-massive", name: "Massive Movies", kind: "stream", status: [] }),
-    E.normCascade({ id: "draft-favs", name: "Personal Favs", kind: "stream", status: [] }),
+  // Real UUID shape (client-generated, exactly as cascadeNewId() would mint) — the shape complete_membership's
+  // real RPC payload always carries.
+  const MASSIVE_ID = "a0000000-0000-4000-8000-00000000a001";
+  const FAVS_ID = "a0000000-0000-4000-8000-00000000a002";
+  const draftAgents = [
+    E.normCascade({ id: MASSIVE_ID, name: "Massive Movies", kind: "stream", status: [] }),
+    E.normCascade({ id: FAVS_ID, name: "Personal Favs", kind: "stream", status: [] }),
   ];
-  E.cascades.push(...draft);
-  E.onbV2CommittedSave(draft);
+  draftAgents.forEach(a => E.cascades.push(a));
 
-  // The membership email gate now signs in — to an account that turns out to already have two agents of
-  // its own (a second device's earlier onboarding run, per the ticket's own observed shape).
+  // complete_membership() inserts these rows server-side, with the SAME client-generated ids AND the same
+  // criteria/alert_moments (built through the real cascadeToRow, like membCompleteNewMembership's own
+  // payload) this device already holds — the fan-out's own loadAccount() read-back must see them already
+  // confirmed with no drift, so it never schedules a second, duplicate push to reconcile an artificial
+  // mismatch. A function, not a fixed array: see fakeMembershipClient's own comment on why.
+  const cascadesRows = () => draftAgents.map(a => {
+    const row = E.CascadeShape.cascadeToRow(a);
+    return { id: row.id, user_id: "cas1099-new-acct", name: row.name, criteria: row.criteria,
+      alert_moments: row.alert_moments, active: row.active, created_at: "2026-01-01T00:00:00.000Z" };
+  });
+  const client = fakeMembershipClient({ rpcResult: { data: "created", error: null }, cascadesRows });
+  signIn(E, "cas1099-new-acct", client);
+
+  const outcome = await E.membCompleteNewMembership();
+
+  assert.equal(outcome, "created");
+  assert.deepEqual(client.rpcCalls.map(c => c.name), ["complete_membership"],
+    "exactly one complete_membership call — no other rpc");
+  assert.equal(client.writes.cascades.length, 0, "no direct insert/upsert to cascades");
+  assert.equal(client.writes.user_prefs.length, 0, "no direct insert/upsert to user_prefs");
+  assert.equal(client.writes.notify_prefs.length, 0, "no direct insert/upsert to notify_prefs");
+  const sentAgentIds = [...client.rpcCalls[0].params.p.agents].map(a => a.id).sort();
+  assert.equal(JSON.stringify(sentAgentIds), JSON.stringify([MASSIVE_ID, FAVS_ID].sort()),
+    "both draft agents, with their own client-generated ids, travel in the one RPC call");
+});
+
+test("CAS-1099 change 3: 'account_exists' discards the draft rather than merging it", async () => {
+  const E = loadEngine();
+  E.cascades.push(E.normCascade({ id: "draft-only", name: "Massive Movies", kind: "stream", status: [] }));
+
   const A_ID = "a0000000-0000-4000-8000-000000000001";
-  const B_ID = "b0000000-0000-4000-8000-000000000002";
-  const existingRows = [
-    { id: A_ID, user_id: "cas959-acct", name: "Massive Movies", criteria: {}, alert_moments: [], active: true, created_at: "2026-01-01T00:00:00.000Z" },
-    { id: B_ID, user_id: "cas959-acct", name: "Personal Favs", criteria: {}, alert_moments: [], active: true, created_at: "2026-01-01T00:00:01.000Z" },
-  ];
-  const client = fakeCascadesClient({ selectRows: existingRows });
-  signIn(E, "cas959-acct", client);
-  await E.CascadePersistence.loadAccount();
+  const client = fakeMembershipClient({
+    rpcResult: { data: "account_exists", error: null },
+    cascadesRows: [{ id: A_ID, user_id: "cas1099-existing-acct", name: "Already there", criteria: {}, alert_moments: [], active: true, created_at: "2026-01-01T00:00:00.000Z" }],
+  });
+  signIn(E, "cas1099-existing-acct", client);
 
-  assert.equal(JSON.stringify(E.cascades.map(c => c.id).sort()), JSON.stringify([A_ID, B_ID].sort()),
-    "the account's own two agents must be adopted exactly — the draft must not survive alongside them");
-  assert.equal(E.CascadePersistence.cascadeDirtyRows().length, 0,
-    "nothing should be dirty after dropping the draft — no upsert is warranted");
-  await E.CascadePersistence.syncNow();
-  assert.equal(client.upserts.length, 0, "no insert/upsert of the draft's ids must be attempted");
-  assert.equal(E.onbV2CommittedLoad(), null, "the discarded draft's marker must be cleared, not left to resurface");
+  const outcome = await E.membCompleteNewMembership();
+
+  assert.equal(outcome, "account_exists");
+  // CAS-969's own cross-realm note applies here too: E.cascades is a vm-sandboxed array, so its own .map()
+  // result can't directly assert.deepEqual against a host array literal — compare through JSON.stringify
+  // instead, the same convention the surviving fold-in test below already uses.
+  assert.equal(JSON.stringify(E.cascades.map(c => c.id)), JSON.stringify([A_ID]),
+    "the discarded draft must not survive alongside the account's own real roster");
 });
 
-test("CAS-959: a genuinely new account (no existing agents) still folds the onboarding draft in exactly as before", async () => {
+test("CAS-1099 change 3: an RPC error keeps the draft in memory for a retry", async () => {
   const E = loadEngine();
-  const draft = [E.normCascade({ id: "draft-only", name: "Massive Movies", kind: "stream", status: [] })];
-  E.cascades.push(...draft);
-  E.onbV2CommittedSave(draft);
+  E.cascades.push(E.normCascade({ id: "draft-retry", name: "Date Night", kind: "stream", status: [] }));
 
-  const client = fakeCascadesClient({ selectRows: [] });
-  signIn(E, "cas959-fresh-acct", client);
-  await E.CascadePersistence.loadAccount();
+  const client = fakeMembershipClient({ rpcResult: { data: null, error: { message: "network down" } } });
+  signIn(E, "cas1099-retry-acct", client);
 
-  assert.equal(JSON.stringify(E.cascades.map(c => c.id)), JSON.stringify(["draft-only"]),
-    "a first-run account with nothing of its own must still receive the freshly built roster");
-  await E.CascadePersistence.syncNow();
-  assert.deepEqual(client.upserts.map(r => r.id), ["draft-only"],
-    "the genuinely-new roster must still sync to a genuinely-empty account");
+  const outcome = await E.membCompleteNewMembership();
+
+  assert.equal(outcome, "error");
+  assert.equal(JSON.stringify(E.cascades.map(c => c.id)), JSON.stringify(["draft-retry"]),
+    "an error must not discard the draft");
 });
 
-test("CAS-959: a hand-built local agent that is NOT an onboarding draft still folds in even when the account already has agents (unrelated to this defect)", async () => {
+test("CAS-1109: a hand-built local agent the account has never confirmed does not survive a loadAccount() call", async () => {
   const E = loadEngine();
   E.cascades.push(E.normCascade({ id: "hand-built", name: "My own agent", kind: "stream", status: [] }));
-  // No onbV2CommittedSave call — this agent was never part of an onboarding draft.
 
   const A_ID = "a0000000-0000-4000-8000-000000000003";
   const existingRows = [
-    { id: A_ID, user_id: "cas959-acct-2", name: "Massive Movies", criteria: {}, alert_moments: [], active: true, created_at: "2026-01-01T00:00:00.000Z" },
+    { id: A_ID, user_id: "cas1099-acct-2", name: "Massive Movies", criteria: {}, alert_moments: [], active: true, created_at: "2026-01-01T00:00:00.000Z" },
   ];
-  signIn(E, "cas959-acct-2", fakeCascadesClient({ selectRows: existingRows }));
+  signIn(E, "cas1099-acct-2", fakeMembershipClient({ cascadesRows: existingRows }));
   await E.CascadePersistence.loadAccount();
 
-  assert.equal(JSON.stringify(E.cascades.map(c => c.id).sort()), JSON.stringify([A_ID, "hand-built"].sort()),
-    "CAS-393/733/734's own fold-in for organic local work must be untouched by this fix");
+  assert.equal(JSON.stringify(E.cascades.map(c => c.id)), JSON.stringify([A_ID]),
+    "acctLoad replaces whatever this device held wholesale — a never-queued local-only row is not carried forward");
 });

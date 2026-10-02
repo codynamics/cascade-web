@@ -97,9 +97,10 @@ jobs:
               echo "::error::git reset --soft onto origin/staging failed"
               exit 1
             fi
-            git checkout HEAD -- . ':!index.html' ':!movies.json' ':!state'
+            git checkout HEAD -- . ':!index.html' ':!movies.json' ':!state' ':!catalogue' ':!catalogue.json'
             python poc_pipeline.py --build-html
-            git add index.html movies.json state
+            git add index.html movies.json state catalogue.json
+            git add -A catalogue
             git commit -m "Daily refresh $(date -u +%F)" || echo "nothing to commit"
             if git push origin HEAD:staging; then
               pushed=1

@@ -2,9 +2,10 @@ name: deploy-scheduler
 
 # CAS-1000: deploys the Cloudflare Worker (cloudflare/scheduler) that dispatches uptime.yml,
 # daily.yml and alerts.yml on time via workflow_dispatch — GitHub's own `schedule` trigger runs
-# late/unreliably for this repo (see the ticket). Manual only: run it once to stand the Worker up,
-# and again any time cloudflare/scheduler changes. The Worker itself never needs a Cloudflare
-# credential — only this deploy step does.
+# late/unreliably for this repo (see the ticket). CAS-1130 added a fifth cron that dispatches
+# recommend.yml only when Supabase reports unsent mail. Manual only: run it once to stand the
+# Worker up, and again any time cloudflare/scheduler changes. The Worker itself never needs a
+# Cloudflare credential — only this deploy step does.
 
 on:
   workflow_dispatch:
@@ -30,11 +31,15 @@ jobs:
             RESEND_API_KEY
             ALERT_TO
             ALERT_FROM
+            SUPABASE_URL
+            SUPABASE_SERVICE_ROLE_KEY
         env:
           GH_DISPATCH_TOKEN: ${{ secrets.SCHEDULER_GH_TOKEN }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERT_TO: ${{ secrets.CASCADE_ALERT_TO }}
           ALERT_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   # CAS-973: email someone the moment this workflow breaks, instead of leaving it to be
   # noticed by whoever next opens the Actions tab.

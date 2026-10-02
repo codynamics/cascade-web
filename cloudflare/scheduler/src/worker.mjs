@@ -2,12 +2,17 @@
 // GitHub's workflow_dispatch API. GitHub's own `schedule` trigger is not dependable for this repo
 // (see the ticket) — workflow_dispatch events are not subject to the same delay.
 //
+// CAS-1130: a fifth cron checks Supabase every 5 minutes for unsent outgoing mail (recommendations,
+// invite emails, invite replies) and only dispatches recommend.yml when there is some to send, so it
+// doesn't cost Actions minutes running unconditionally every 5 minutes.
+//
 // Cron Triggers (UTC, declared in wrangler.toml):
 //   17 * * * *  -> uptime.yml every hour
 //   0 20 * * *  -> daily.yml once a day
 //   0 6 * * *   -> alerts.yml, ONLY if this instant is 17:00 in Australia/Sydney (AEDT)
 //   0 7 * * *   -> alerts.yml, ONLY if this instant is 17:00 in Australia/Sydney (AEST)
-// Exactly one of the last two fires per day across the daylight-saving switch, computed with
+//   */5 * * * * -> recommend.yml, ONLY if Supabase reports unsent mail (or can't be reached)
+// Exactly one of the alerts crons fires per day across the daylight-saving switch, computed with
 // Intl.DateTimeFormat rather than a fixed UTC offset.
 
 export const REPO = "codynamics/cascade-web";
@@ -21,12 +26,20 @@ export const CRON = {
   DAILY: "0 20 * * *",
   ALERTS_A: "0 6 * * *",
   ALERTS_B: "0 7 * * *",
+  RECOMMEND: "*/5 * * * *",
 };
 
 const WORKFLOW_FOR_CRON = {
   [CRON.UPTIME]: "uptime.yml",
   [CRON.DAILY]: "daily.yml",
 };
+
+// Tables/columns CAS-1130 checks for unsent outgoing mail before dispatching recommend.yml.
+export const UNSENT_MAIL_CHECKS = [
+  { table: "recommendations", column: "sent_at" },
+  { table: "invite_emails", column: "sent_at" },
+  { table: "invite_replies", column: "notified_at" },
+];
 
 // The Sydney local hour (0-23) at `epochMs`, DST-aware via the runtime's own tz database.
 export function sydneyHour(epochMs) {
@@ -119,8 +132,54 @@ export async function dispatchWorkflow(env, workflowFile, deps = {}) {
   return result;
 }
 
+// True if any of UNSENT_MAIL_CHECKS has an unsent row, or if a check can't be reached — in which
+// case CAS-1130 says to dispatch anyway rather than risk silently never sending.
+export async function hasUnsentMail(env, deps = {}) {
+  const fetchImpl = deps.fetch || fetch;
+
+  for (const { table, column } of UNSENT_MAIL_CHECKS) {
+    const url = `${env.SUPABASE_URL}/rest/v1/${table}?select=id&${column}=is.null&limit=1`;
+    try {
+      const res = await fetchImpl(url, {
+        headers: {
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      });
+      if (!res.ok) {
+        console.log(`scheduler: Supabase check for ${table} returned ${res.status}, dispatching anyway`);
+        return true;
+      }
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0) return true;
+    } catch (err) {
+      console.log(`scheduler: Supabase check for ${table} failed (${(err && err.message) || err}), dispatching anyway`);
+      return true;
+    }
+  }
+  return false;
+}
+
+async function handleRecommendCron(event, env) {
+  const shouldDispatch = await hasUnsentMail(env);
+  if (!shouldDispatch) {
+    console.log(`scheduler: cron "${event.cron}" fired, no unsent mail, no dispatch`);
+    return;
+  }
+  try {
+    await dispatchWorkflow(env, "recommend.yml");
+  } catch (err) {
+    console.log(`scheduler: unexpected error dispatching recommend.yml: ${(err && err.message) || err}`);
+  }
+}
+
 export default {
   async scheduled(event, env) {
+    if (event.cron === CRON.RECOMMEND) {
+      await handleRecommendCron(event, env);
+      return;
+    }
+
     const workflowFile = targetForCron(event.cron, event.scheduledTime ?? Date.now());
     if (!workflowFile) {
       console.log(`scheduler: cron "${event.cron}" fired, no dispatch (not 17:00 Sydney)`);

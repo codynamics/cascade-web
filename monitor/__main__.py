@@ -36,7 +36,8 @@ from . import (compute_transitions, DEFAULT_WEEKEND_N, MOMENTS, match, notificat
                render_digest, send_via_resend, excluded_moments,
                prefs_for, excludes_from_prefs, delivery_plan, send_via_apns, push_copy,
                match_film_watches, match_newly_qualified, match_new_to_agent, suppressed_pairs,
-               compute_admission, format_invite_reply)
+               compute_admission, compute_auto_placements, synthesize_auto_watch_rows,
+               format_invite_reply)
 from .catalogue import load_catalogue_file, load_today, load_yesterday_from_git
 from .store import FIXTURE_ID_MAX, FIXTURE_ID_MIN, InMemoryStore, store_from_env
 
@@ -73,6 +74,11 @@ def _parse_args(argv):
     p.add_argument("--watches", metavar="PATH",
                    help="Per-film Watch-it ticks JSON: [{user_id, movie_id, windows}] (CAS-484). "
                         "Overrides the `film_watch` table, which is the default source.")
+    p.add_argument("--agent-films", metavar="PATH",
+                   help="Agent admission history JSON: [{user_id, cascade_id, movie_id, "
+                        "admission_score, admission_status}] (CAS-726/CAS-1097), fed into an "
+                        "admitted-but-unwatched film's automatic Watch-On placement. Overrides the "
+                        "`agent_films` table, which is the default source.")
     p.add_argument("--user-prefs", metavar="PATH",
                    help="Account services/taste JSON: {user_id: {sub_services, store_services, "
                         "taste}} (CAS-825). Overrides the `user_prefs` table.")
@@ -148,6 +154,7 @@ def main(argv=None) -> int:
                               prefs=_load_json(args.prefs) if args.prefs else {},
                               picks=_load_json(args.picks) if args.picks else [],
                               watches=_load_json(args.watches) if args.watches else [],
+                              agent_films=_load_json(args.agent_films) if args.agent_films else [],
                               invite_replies=_load_json(args.replies) if args.replies else [])
         source = "fixtures"
     else:
@@ -165,6 +172,14 @@ def main(argv=None) -> int:
         purged = _store_call(store, "delete_old_usage_events", 0)
         if purged:
             print(f"[monitor] usage_events retention: purged {purged} row(s) older than 180 days.")
+
+    # CAS-1109: sweep the CAS-1092 account_deleted_rows archive once per day alongside the usage_events
+    # retention above — same service_role credential, same "skip on --dry-run" rule (a demo run must not
+    # delete real data).
+    if not args.dry_run:
+        archive_purged = _store_call(store, "purge_deleted_rows", 0)
+        if archive_purged:
+            print(f"[monitor] account_deleted_rows retention: purged {archive_purged} row(s) older than 30 days.")
 
     # CAS-986: the two-tier catalogue's demotion-safety net — every tmdb_id a user holds state on,
     # written once per real run so poc_pipeline.py can read it off disk without its own Supabase
@@ -230,6 +245,9 @@ def main(argv=None) -> int:
             # CAS-853: the "only show films on my services" switch — authoritative over every agent's
             # own myServices now, so it has to reach admission the same way langs/subServices do.
             "servicesOnly": bool(row.get("services_only")),
+            # CAS-1097: Where & when you'll watch — compute_auto_placements()'s own windowUsable/
+            # windowFollowed gate, read the same way every other account fact here is.
+            "watchWindows": row.get("watch_windows"),
         }
 
     # CAS-825: ONE call to the shipped engine for the whole run — never once per film, never once
@@ -245,6 +263,23 @@ def main(argv=None) -> int:
     watches = _load_json(args.watches) if args.watches else _store_call(store, "fetch_film_watches", [])
     if args.target_user:
         watches = [w for w in watches if str(w.get("user_id")) == args.target_user]
+
+    # CAS-1097: an admitted film with no film_watch row of its own (automatic placement stopped being
+    # client-pushed per CAS-1096) still needs a placement for match()'s own window-arrival gate to see
+    # it — synthesize one from agent_films' frozen admission_score, the same arithmetic
+    # recomputeFound's own placement block runs on the device. A real film_watch row (manual, or a
+    # legacy pre-CAS-1096 auto one) always wins; this only ever fills a gap.
+    agent_films_rows = _load_json(args.agent_films) if args.agent_films else _store_call(store, "fetch_agent_films", [])
+    if args.target_user:
+        agent_films_rows = [r for r in agent_films_rows if str(r.get("user_id")) == args.target_user]
+    auto_placements = compute_auto_placements(agent_films_rows, cascades, today_movies,
+                                              account_prefs=account_prefs)
+    placed_keys = {(str(w.get("user_id")), str(w.get("movie_id"))) for w in watches if (w.get("windows") or [])}
+    auto_watch_rows = synthesize_auto_watch_rows(auto_placements, placed_keys)
+    if auto_watch_rows:
+        print(f"[monitor] auto placement (CAS-1097): {len(auto_watch_rows)} admitted film(s) placed "
+              "from agent_films with no film_watch row of their own.")
+    watches = watches + auto_watch_rows
 
     # CAS-601: an agent's own Alert toggles are the control again (Lee's decision of 2026-08-24,
     # reversing CAS-502 AC1/widening CAS-506) — every moment a cascade's `alert_moments` names can

@@ -1,50 +1,38 @@
-// CAS-1045: signing in used to rewrite the account's real user_prefs row with whatever this device had in
-// memory a moment before loadUserPrefs ever ran — the previous account's (or a signed-out guest's) prefs,
-// or a stale local copy this device happened to be carrying for the account signing in. fireAccountFanout
-// awaits replayOutbox() BEFORE loadAccount()/loadUserPrefs() get a chance to load the account's real answer,
-// and runUserPrefsSync() (unlike the diff-based syncs replayOutbox also drives) is a whole-row "last write
-// wins" upsert with no dirty check at all — replaying it unconditionally echoed whatever was in memory back
-// onto the account on every single sign-in, wiping `touched` and any service another device had since added.
-// These tests drive the real seams (loadAccount/loadGuest/loadUserPrefs/replayOutbox/outboxPending, the same
-// convention outbox-durability.test.mjs and acct-namespacing.test.mjs use) with a stubbed Supabase client.
+// CAS-1045 (original incident): signing in used to rewrite the account's real user_prefs row with whatever
+// this device had in memory a moment before loadUserPrefs ever ran, because runUserPrefsSync was a
+// whole-row "last write wins" upsert with no dirty check replayOutbox could unconditionally replay.
+// CAS-1095 removed that push path entirely — user_prefs now loads through acctLoad (a pure read, wholesale
+// replace) and writes only through acctOp, one column at a time, only when a settings chokepoint actually
+// calls it. A sign-in/boot that only ever loads structurally cannot echo anything back any more, which is
+// what these tests now assert, alongside the CAS-1053 loading-state/diagnostics behaviour that still applies
+// unchanged under the new load path.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
 
-// Same permissive per-table fake as outbox-durability.test.mjs's fakeClient: whatever isn't explicitly
-// configured for a table succeeds with empty data, so every replay target replayOutbox also drives
-// (cascades, film_watch, notify_prefs, ...) is a harmless no-op alongside the user_prefs behaviour under test.
-function fakeClient({ upserts = {}, selects = {} } = {}){
-  const upsertCalls = [];
-  return {
-    upsertCalls,
-    from(table){
-      return {
-        upsert(rows){
-          upsertCalls.push({ table, rows });
-          const spec = upserts[table];
-          const err = typeof spec === "function" ? spec(rows) : spec;
-          const result = err ? { data: null, error: err } : { data: rows, error: null };
-          return { then(resolve, reject){ return Promise.resolve(result).then(resolve, reject); },
-                   select(){ return Promise.resolve(result); } };
-        },
-        select(){
-          const spec = selects[table];
-          const result = spec ? spec() : { data: [], error: null };
-          const thenable = { then(resolve, reject){ return Promise.resolve(result).then(resolve, reject); } };
-          thenable.order = () => thenable;
-          thenable.limit = () => thenable;
-          thenable.eq = () => thenable;
-          return thenable;
-        },
-        delete(){
-          const chain = { then(resolve){ return Promise.resolve({ data: [], error: null }).then(resolve); } };
-          chain.eq = () => chain; chain.in = () => chain;
-          return chain;
-        },
-      };
+// A generic chainable fake query builder covering both acctLoad's read chain
+// (select("*").order(pk,{ascending}).range(from,to)) and acctOp's update chain (update(fields).match(m)) —
+// same convention cas1094-account-store.test.mjs uses.
+function makeQueryBuilder(table, calls, script){
+  const state = { table, kind: "select" };
+  const b = {
+    select(cols){ state.selectCols = cols; return b; },
+    order(col, opts){ state.orderCol = col; state.orderOpts = opts; return b; },
+    range(from, to){ state.from = from; state.to = to; return b; },
+    upsert(rows, opts){ state.kind = "upsert"; state.rows = rows; state.opts = opts; return b; },
+    update(fields){ state.kind = "update"; state.fields = fields; return b; },
+    match(m){ state.match = m; return b; },
+    then(resolve, reject){
+      const snapshot = Object.assign({}, state);
+      calls.push(snapshot);
+      return Promise.resolve().then(() => script(snapshot)).then(resolve, reject);
     },
   };
+  return b;
+}
+function fakeClient(script){
+  const calls = [];
+  return { calls, from(table){ return makeQueryBuilder(table, calls, script); } };
 }
 function signIn(E, userId, client){
   const auth = E.CascadeAuth;
@@ -54,87 +42,92 @@ function signOut(E){
   const auth = E.CascadeAuth;
   auth.enabled = false; auth.client = null; auth.session = null;
 }
-// A full, self-consistent user_prefs row — every field loadUserPrefs reads, so no field ever falls into a
-// carry-up branch and schedules a second, unrelated push this test isn't about.
+// A full, self-consistent user_prefs row — every field loadUserPrefs reads, including ref_code, so the
+// ref_code bootstrap branch never fires either.
 function serverRow(userId, overrides){
   return { user_id: userId, sub_services: ["Netflix", "Stan"], store_services: [], services_only: false,
     touched: true, taste: { mood: 1 }, watch_windows: { cinema: true }, never_show: [], onb_depth: "shallow",
     framing: false, moving_seen: { x: 1 }, occasions: [], ref_code: "CAS1045REF", ...overrides };
 }
+const selectServerRow = row => state =>
+  (state.table === "user_prefs" && state.kind === "select") ? { data: [row], error: null } : { data: [], error: null };
 
-test("CAS-1045: a sign-in adopts the account's user_prefs row rather than echoing this device's stale local copy over it, and never writes when nothing is genuinely pending", async () => {
+test("CAS-1095: a sign-in adopts the account's real user_prefs row and never writes anything back", async () => {
   const E = loadEngine();
   const acctId = "cas1045-acct-x";
+  const client = fakeClient(selectServerRow(serverRow(acctId)));
+  signIn(E, acctId, client);
+  await E.CascadePersistence.loadAccount();
+  await E.CascadePersistence.loadUserPrefs();
 
-  // This device's earlier session as acctId: the account already has services + touched:true.
-  const client1 = fakeClient({ selects: { user_prefs: () => ({ data: [serverRow(acctId)], error: null }) } });
+  assert.deepEqual([...E.prefs.sub].sort(), ["Netflix", "Stan"], "the account's real services are adopted");
+  assert.equal(E.prefs.touched, true, "the account's real touched flag is adopted");
+  assert.equal(client.calls.filter(c => c.table === "user_prefs" && c.kind !== "select").length, 0,
+    "a clean load of a fully-populated row must never write anything back — there is no push path a load can trigger");
+
+  signOut(E);
+});
+
+test("CAS-1095: another device's newer services are adopted on the next sign-in, still with no write back", async () => {
+  const E = loadEngine();
+  const acctId = "cas1045-acct-x2";
+  const client1 = fakeClient(selectServerRow(serverRow(acctId)));
   signIn(E, acctId, client1);
   await E.CascadePersistence.loadAccount();
   await E.CascadePersistence.loadUserPrefs();
-  assert.deepEqual([...E.prefs.sub].sort(), ["Netflix", "Stan"], "sanity: this device adopted and locally cached the account's real services");
-  assert.equal(E.prefs.touched, true, "sanity: this device's local cache also carries touched:true");
-  assert.equal(client1.upsertCalls.filter(c => c.table === "user_prefs").length, 0, "sanity: a clean load of a fully-populated row must not push anything back");
 
-  // Sign out — CAS-957's loadGuest() switches this device's in-memory prefs to the guest's own (blank)
-  // local copy, exactly like a real sign-out. acctId's own local cache is untouched on disk.
   E.CascadePersistence.loadGuest();
   assert.equal(E.prefs.touched, false, "sanity: signed out, in-memory prefs are the guest's blank defaults");
 
-  // Another device adds a service while this one was signed out — touched is untouched by that edit.
-  const client2 = fakeClient({ selects: { user_prefs: () => ({ data: [serverRow(acctId, { sub_services: ["Netflix", "Stan", "Binge"] })], error: null }) } });
-
-  // Sign back in, in the exact order fireAccountFanout uses in production: replayOutbox() first, then
-  // loadAccount()/loadUserPrefs(). If replayOutbox ever echoes the in-memory prefs (still the guest's blank
-  // copy at this point) back to the account, this is where it would happen.
+  // Another device added a service while this one was signed out.
+  const client2 = fakeClient(selectServerRow(serverRow(acctId, { sub_services: ["Netflix", "Stan", "Binge"] })));
   signIn(E, acctId, client2);
   await E.CascadePersistence.replayOutbox();
-  assert.equal(client2.upsertCalls.filter(c => c.table === "user_prefs").length, 0,
-    "replayOutbox must never push user_prefs when this device holds no genuinely unsent edit for this account");
+  assert.equal(client2.calls.filter(c => c.kind !== "select").length, 0,
+    "replayOutbox must never write user_prefs when this device has nothing genuinely queued for it");
 
   await E.CascadePersistence.loadAccount();
   await E.CascadePersistence.loadUserPrefs();
 
-  assert.deepEqual([...E.prefs.sub].sort(), ["Binge", "Netflix", "Stan"], "device must show the account's real (newer) service list after sign-in");
-  assert.equal(E.prefs.touched, true, "touched must never be reset by a sign-in — the other device's edit never touched it");
-  assert.equal(client2.upsertCalls.filter(c => c.table === "user_prefs").length, 0,
-    "a sign-in that adopts the server row cleanly must never write user_prefs at all");
+  assert.deepEqual([...E.prefs.sub].sort(), ["Binge", "Netflix", "Stan"], "the other device's newer services are adopted");
+  assert.equal(E.prefs.touched, true, "touched is adopted from the account, never reset by a sign-in");
+  assert.equal(client2.calls.filter(c => c.table === "user_prefs" && c.kind !== "select").length, 0);
 
   signOut(E);
 });
 
-test("CAS-1045: replayOutbox still replays a user_prefs edit this device genuinely never got to push", async () => {
+test("CAS-1095: a user_prefs acctOp still queued (but unsent) from before this boot is still sent on replay", async () => {
   const E = loadEngine();
   const acctId = "cas1045-acct-y";
-  const client1 = fakeClient({ selects: { user_prefs: () => ({ data: [serverRow(acctId)], error: null }) } });
-  signIn(E, acctId, client1);
-  await E.CascadePersistence.loadAccount();
-  await E.CascadePersistence.loadUserPrefs();
+  let updateCalls = 0;
+  const client = fakeClient(state => {
+    if(state.kind === "update"){ updateCalls++; return { data: [{ user_id: acctId }], error: null, status: 200 }; }
+    return { data: [], error: null };   // every other replay target (cascades, film_watch, ...) — harmless no-ops
+  });
+  signIn(E, acctId, client);
+  E.CascadeAccountStore.ACCT_OP_RETRY_DELAYS = [0, 0, 0];
+  // Standing in for an edit whose acctOp never got to send before the tab died last session — the op queue
+  // is persisted at cascade_ops@<uid> (see CascadeAccountStore), seeded here exactly as it would have been
+  // left on disk.
+  E.localStorage.setItem("cascade_ops@" + acctId, JSON.stringify([
+    { id: "op-stranded", table: "user_prefs", kind: "update", match: { user_id: acctId },
+      fields: { sub_services: ["Binge"] } },
+  ]));
 
-  // A genuine edit on this device, arming the outbox exactly as scheduleUserPrefsSync does — standing in
-  // for a real edit whose debounce never got to fire before the tab died.
-  E.prefs.sub.add("Binge");
-  const userPrefsRow = E.CascadePersistence.userPrefsRow();
-  E.CascadePersistence.outbox.user_prefs = { _: userPrefsRow };
-  assert.ok(E.CascadePersistence.outboxPending("user_prefs")._, "sanity: the edit is armed as genuinely pending");
-
-  const client2 = fakeClient({ selects: { user_prefs: () => ({ data: [serverRow(acctId)], error: null }) } });
-  signIn(E, acctId, client2);
   await E.CascadePersistence.replayOutbox();
-  assert.ok(client2.upsertCalls.some(c => c.table === "user_prefs"),
-    "a genuinely pending edit must still be replayed on the next sign-in/boot");
+
+  assert.equal(updateCalls, 1, "a queued-but-unsent user_prefs op from a previous session must still be sent this boot");
 
   signOut(E);
 });
 
-// CAS-1053: production reported Rental/Streaming both showing "you haven't picked any services yet" for an
-// account that has had services for weeks — watchMineOnlyDeadEndHTML's own gate (mineOnly && !servicesPicked())
-// has no idea whether "no services" means the account genuinely has none, or user_prefs simply hasn't loaded
-// yet on this boot. A fresh device (or one whose local cache doesn't yet carry this account's prefs) reads as
-// the former until loadUserPrefs resolves, so it showed the dead end instead of waiting.
+// CAS-1053 AC1/AC4: production reported Rental/Streaming both showing "you haven't picked any services yet"
+// for an account that has had services for weeks — watchMineOnlyDeadEndHTML's own gate has no idea whether
+// "no services" means the account genuinely has none, or user_prefs simply hasn't loaded yet on this boot.
 test("CAS-1053 AC1/AC4: the loading state wins the race while user_prefs is unresolved, and the real services are adopted once it loads", async () => {
-  const E = loadEngine();   // a fresh engine == a fresh device's empty local storage, per CAS-1045's own tests
+  const E = loadEngine();
   const acctId = "cas1053-acct-fresh";
-  const client = fakeClient({ selects: { user_prefs: () => ({ data: [serverRow(acctId)], error: null }) } });
+  const client = fakeClient(selectServerRow(serverRow(acctId)));
   signIn(E, acctId, client);
   await E.CascadePersistence.loadAccount();
 
@@ -155,13 +148,13 @@ test("CAS-1053 AC1/AC4: the loading state wins the race while user_prefs is unre
   signOut(E);
 });
 
-// CAS-1053 AC3: syncOutcome (CAS-787) used to be written only by runUserPrefsSync (a push), so a device that
-// only ever reads a clean, fully-populated row — the common case — left the diagnostics panel reporting
-// user_prefs "not yet attempted" forever, indistinguishable from a load that never ran.
+// CAS-1053 AC3: syncOutcome (CAS-787) used to be written only by a push, so a device that only ever reads a
+// clean, fully-populated row (the common case) left the diagnostics panel reporting user_prefs "not yet
+// attempted" forever. Still true now that the read goes through acctLoad instead of a direct select.
 test("CAS-1053 AC3: a clean sign-in load records user_prefs OK in diagnostics", async () => {
   const E = loadEngine();
   const acctId = "cas1053-acct-diag";
-  const client = fakeClient({ selects: { user_prefs: () => ({ data: [serverRow(acctId)], error: null }) } });
+  const client = fakeClient(selectServerRow(serverRow(acctId)));
   signIn(E, acctId, client);
   await E.CascadePersistence.loadAccount();
   await E.CascadePersistence.loadUserPrefs();

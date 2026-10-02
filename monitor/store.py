@@ -25,21 +25,24 @@ Interface:
   fetch_user_prefs() -> {user_id: {sub_services, store_services, taste, services_only}}    # CAS-825/CAS-853
   fetch_user_films() -> [{user_id, movie_id, status}]                                      # CAS-825
   fetch_user_held_ids() -> set[str]  # every tmdb_id a user holds state on                  # CAS-986
+  fetch_agent_films() -> [{user_id, cascade_id, movie_id, admission_score, admission_status}]  # CAS-1097
   fetch_unsent_contact_messages() -> [contact_messages row, sent_at is null]                # CAS-836
   mark_contact_messages_sent(ids, sent_at) -> int                                           # CAS-836
   sign_attachment_url(path) -> signed URL string | None                                     # CAS-864
   fetch_unsent_recommendations() -> [recommendations row, sent_at is null]                  # CAS-884
   mark_recommendations_sent(ids, sent_at) -> int                                            # CAS-884
+  fetch_recent_sent_recommendations(since) -> [{sender_id, to_email, sent_at}, sent_at >= since]  # CAS-1131
   fetch_undigested_invite_replies() -> [{id, token, sender_id, to_name, film_title, tmdb_id,
                                           answer, created_at}, digested_at is null]          # CAS-887
   mark_invite_replies_digested(ids, digested_at) -> int                                      # CAS-887
   fetch_unsent_invite_emails() -> [{id, token, to_email, to_name, created_at, sender_name,
-                                     film_title, tmdb_id}, sent_at is null]                   # CAS-930
+                                     film_title, tmdb_id, suggested_date, note}, sent_at is null]  # CAS-930/1121
   mark_invite_emails_sent(ids, sent_at) -> int                                                # CAS-930
   fetch_unnotified_invite_replies() -> [{id, token, sender_id, to_name, film_title, tmdb_id,
                                           answer, created_at}, notified_at is null]           # CAS-967
   mark_invite_replies_notified(ids, notified_at) -> int                                       # CAS-967
   delete_old_usage_events(days=180) -> int              # CAS-942: usage_events retention purge
+  purge_deleted_rows(days=30) -> int        # CAS-1109: account_deleted_rows archive retention purge
   fetch_view(view_name) -> list                # every row, select=* (CAS-1021: metrics_report.py)
 """
 from __future__ import annotations
@@ -102,7 +105,9 @@ class InMemoryStore:
         self._agent_films = list(agent_films or [])
 
     def fetch_active_cascades(self) -> list:
-        return [c for c in self._cascades if c.get("active", True)]
+        # CAS-1109: a soft-deleted agent (deleted_at set) is gone, same as the live SupabaseStore query below —
+        # a fixture predating CAS-1092 carries no deleted_at key at all, which must read as "not deleted".
+        return [c for c in self._cascades if c.get("active", True) and not c.get("deleted_at")]
 
     def fetch_notification_keys(self) -> set:
         return {(n.get("cascade_id"), str(n.get("movie_id")), n.get("moment"))
@@ -186,15 +191,23 @@ class InMemoryStore:
         return list(self._user_films)
 
     def fetch_user_held_ids(self) -> set:
-        """CAS-986: every tmdb_id a user holds state on — a watched opinion (user_films), a
-        per-film Watch-it tick (film_watch), an agent's own admitted film (agent_films), or a
-        notification ever sent about it. The two-tier catalogue's demotion-safety net: the monitor
-        writes this union to state/user_held_ids.json at the end of every run so the nightly
-        pipeline can never orphan a film a user marked watched or pinned."""
+        """CAS-986/CAS-1097: every tmdb_id a user holds state on — a watched opinion (user_films), a
+        per-film Watch-it tick (film_watch), an agent's own admitted film (agent_films), a hand
+        pin/move/pick (film_picks), or a notification ever sent about it. The two-tier catalogue's
+        demotion-safety net: the monitor writes this union to state/user_held_ids.json at the end of
+        every run so the nightly pipeline can never orphan a film a user marked watched or pinned."""
         out: set = set()
-        for rows in (self._user_films, self._watches, self._agent_films, self._notifications):
+        for rows in (self._user_films, self._watches, self._agent_films, self._picks, self._notifications):
             out |= {str(r.get("movie_id")) for r in rows if r.get("movie_id") is not None}
         return out
+
+    def fetch_agent_films(self) -> list:
+        """CAS-726/CAS-1097: every agent's admitted-film history — [{user_id, cascade_id, movie_id,
+        admission_score, admission_status}], the frozen-at-admission record the client keeps
+        appending to (CAS-1097: never a whole-table diff any more). Fed to
+        matching.compute_auto_placements() for an admitted film's automatic Watch-On placement when
+        it carries no film_watch row of its own."""
+        return list(self._agent_films)
 
     def fetch_unsent_contact_messages(self) -> list:
         return [dict(r) for r in self._contact_messages if not r.get("sent_at")]
@@ -225,6 +238,12 @@ class InMemoryStore:
                 r["sent_at"] = sent_at
                 n += 1
         return n
+
+    def fetch_recent_sent_recommendations(self, since) -> list:
+        """Every recommendations row already emailed on/after `since` (CAS-1131) — lets a caller
+        fold a newly-queued duplicate (same sender/address) into a no-op stamp instead of a second
+        email within the cooldown window."""
+        return [dict(r) for r in self._recommendations if r.get("sent_at") and r["sent_at"] >= since]
 
     def fetch_undigested_invite_replies(self) -> list:
         return [dict(r) for r in self._invite_replies if not r.get("digested_at")]
@@ -274,6 +293,10 @@ class InMemoryStore:
 
     def delete_old_usage_events(self, days: int = 180) -> int:
         """CAS-942: fixtures/tests carry no usage_events data — nothing to purge, always 0."""
+        return 0
+
+    def purge_deleted_rows(self, days: int = 30) -> int:
+        """CAS-1109: fixtures/tests carry no account_deleted_rows archive — nothing to purge, always 0."""
         return 0
 
 
@@ -339,7 +362,9 @@ class SupabaseStore:
         return out
 
     def fetch_active_cascades(self) -> list:
-        return self._get("/cascades?active=eq.true&select=*&order=id.asc")
+        # CAS-1109: agents move onto the account store — a soft-deleted agent (migration 0001/CAS-1092's
+        # deleted_at, set by delete_agent()) must never reach matching, same as the client's own loadAccount.
+        return self._get("/cascades?active=eq.true&deleted_at=is.null&select=*&order=id.asc")
 
     def fetch_notification_keys(self) -> set:
         rows = self._get("/notifications?select=cascade_id,movie_id,moment&order=id.asc")
@@ -405,16 +430,17 @@ class SupabaseStore:
         return {(str(r.get("user_id")), str(r.get("movie_id")), r.get("moment")) for r in rows}
 
     def fetch_user_prefs(self) -> dict:
-        """user_id -> {sub_services, store_services, taste, services_only} (CAS-825/CAS-853): the
-        account facts the real engine's matchesCriteria reads beyond an agent's own criteria —
-        CAS-211's services (the my-services scope's own comparison set), CAS-146's taste baseline
-        (only `.langs` survives there today, see app_template.html's passesTasteBase), and CAS-853's
-        `services_only` (the "only show films on my services" switch, now authoritative over every
-        agent's own myServices). A user with no row here has never opened those screens, and
-        compute_admission() reads that as the engine's own permissive default, not as "answered
-        empty"."""
+        """user_id -> {sub_services, store_services, taste, services_only, watch_windows}
+        (CAS-825/CAS-853/CAS-1097): the account facts the real engine reads beyond an agent's own
+        criteria — CAS-211's services (the my-services scope's own comparison set), CAS-146's taste
+        baseline (only `.langs` survives there today, see app_template.html's passesTasteBase),
+        CAS-853's `services_only` (the "only show films on my services" switch, now authoritative
+        over every agent's own myServices), and CAS-1097's `watch_windows` (Where & when you'll
+        watch — compute_auto_placements()'s own windowUsable/windowFollowed gate). A user with no
+        row here has never opened those screens, and compute_admission()/compute_auto_placements()
+        both read that as the engine's own permissive default, not as "answered empty"."""
         rows = self._get(
-            "/user_prefs?select=user_id,sub_services,store_services,taste,services_only"
+            "/user_prefs?select=user_id,sub_services,store_services,taste,services_only,watch_windows"
             "&order=user_id.asc"
         )
         return {str(r.get("user_id")): r for r in rows if r.get("user_id")}
@@ -427,20 +453,32 @@ class SupabaseStore:
         return self._get("/user_films?select=user_id,movie_id,status&order=user_id.asc,movie_id.asc")
 
     def fetch_user_held_ids(self) -> set:
-        """CAS-986: every tmdb_id a user holds state on — a watched opinion (user_films), a
-        per-film Watch-it tick (film_watch), an agent's own admitted film (agent_films), or a
-        notification ever sent about it. The two-tier catalogue's demotion-safety net: written to
-        state/user_held_ids.json at the end of every monitor run so the nightly pipeline can never
-        orphan a film a user marked watched or pinned."""
+        """CAS-986/CAS-1097: every tmdb_id a user holds state on — a watched opinion (user_films), a
+        per-film Watch-it tick (film_watch), an agent's own admitted film (agent_films), a hand
+        pin/move/pick (film_picks), or a notification ever sent about it. The two-tier catalogue's
+        demotion-safety net: written to state/user_held_ids.json at the end of every monitor run so
+        the nightly pipeline can never orphan a film a user marked watched or pinned."""
         out: set = set()
         for path in (
             "/user_films?select=movie_id&order=user_id.asc,movie_id.asc",
             "/film_watch?select=movie_id&order=user_id.asc,movie_id.asc",
             "/agent_films?select=movie_id&order=user_id.asc,cascade_id.asc,movie_id.asc",
+            "/film_picks?select=movie_id&order=user_id.asc,movie_id.asc",
             "/notifications?select=movie_id&order=id.asc",
         ):
             out |= {str(r.get("movie_id")) for r in self._get(path) if r.get("movie_id") is not None}
         return out
+
+    def fetch_agent_films(self) -> list:
+        """CAS-726/CAS-1097: every agent's admitted-film history — [{user_id, cascade_id, movie_id,
+        admission_score, admission_status}], the frozen-at-admission record the client keeps
+        appending to (CAS-1097: never a whole-table diff any more). Fed to
+        matching.compute_auto_placements() for an admitted film's automatic Watch-On placement when
+        it carries no film_watch row of its own."""
+        return self._get(
+            "/agent_films?select=user_id,cascade_id,movie_id,admission_score,admission_status"
+            "&order=user_id.asc,cascade_id.asc,movie_id.asc"
+        )
 
     def fetch_unsent_contact_messages(self) -> list:
         """Every contact_messages row not yet emailed (CAS-836), oldest first — read with
@@ -501,6 +539,13 @@ class SupabaseStore:
         except (json.JSONDecodeError, TypeError):
             return 0
 
+    def fetch_recent_sent_recommendations(self, since) -> list:
+        """Every recommendations row emailed on/after `since` (CAS-1131), read with service_role —
+        same cross-user reason as fetch_unsent_recommendations above."""
+        return self._get(
+            f"/recommendations?sent_at=gte.{urllib.parse.quote(since)}&select=sender_id,to_email,sent_at"
+        )
+
     def fetch_undigested_invite_replies(self) -> list:
         """Every invite_replies row not yet folded into a digest (CAS-887), each flattened with the
         sender/film context it needs from its own invite via the FK resource-embed (invite_replies.
@@ -551,7 +596,8 @@ class SupabaseStore:
         owns, never every user's."""
         rows = self._get(
             "/invite_emails?sent_at=is.null&order=created_at.asc,id.asc&select="
-            "id,token,to_email,to_name,created_at,invites(sender_name,film_title,tmdb_id)"
+            "id,token,to_email,to_name,created_at,"
+            "invites(sender_name,film_title,tmdb_id,suggested_date,note)"
         )
         out = []
         for r in rows:
@@ -561,6 +607,9 @@ class SupabaseStore:
                 "to_name": r.get("to_name"), "created_at": r.get("created_at"),
                 "sender_name": inv.get("sender_name"), "film_title": inv.get("film_title"),
                 "tmdb_id": inv.get("tmdb_id"),
+                # CAS-1121: both optional (null unless the sender set them) — render_email only
+                # shows a line for either when it's actually present.
+                "suggested_date": inv.get("suggested_date"), "note": inv.get("note"),
             })
         return out
 
@@ -781,6 +830,25 @@ class SupabaseStore:
         try:
             return len(json.loads(body))
         except (json.JSONDecodeError, TypeError):
+            return 0
+
+    def purge_deleted_rows(self, days: int = 30) -> int:
+        """CAS-1109: sweep the CAS-1092 account_deleted_rows archive (every hard-delete the
+        archive_deleted_row() trigger has caught, across all 12 archived tables) with the same
+        service_role-only RPC the schema grants only to this role. Returns the number of archive
+        rows purged."""
+        data = json.dumps({"p_days": days}).encode("utf-8")
+        req = urllib.request.Request(
+            self._base + "/rpc/purge_deleted_rows",
+            data=data,
+            headers=self._headers(),
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+            body = resp.read().decode("utf-8")
+        try:
+            return int(json.loads(body))
+        except (json.JSONDecodeError, TypeError, ValueError):
             return 0
 
 

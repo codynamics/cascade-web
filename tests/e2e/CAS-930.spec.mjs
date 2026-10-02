@@ -157,7 +157,7 @@ test("CAS-930 AC2f: selecting a 21st recipient is refused and inserts nothing", 
   });
   await expect(page.locator("#filmInviteSend")).toContainText("Invite 20 people");
 
-  await page.locator('.frow[data-fid="21"] .fcheck').click();
+  await page.locator('.frow[data-fid="21"]').click();
 
   await expect(page.locator("#filmInviteErr")).toBeVisible();
   expect(await page.evaluate(() => inviteFriendSel.size)).toBe(20);

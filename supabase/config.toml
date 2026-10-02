@@ -1,0 +1,36 @@
+# CAS-1093: local Supabase CLI project config for `npm run test:integrity`
+# (scripts/test-integrity.mjs) — a throwaway, Docker-backed stack started fresh for every run, never the
+# live project. supabase/README.md's manual-apply-by-hand workflow for the live project is unaffected; this
+# stack loads supabase/schema.sql directly (the README's own "brand-new project" bootstrap path), for tests
+# only. Never real project keys — the CLI's own local demo keys are read at test time (via `supabase
+# status`) rather than copied in here. Deliberately minimal: every key below is one that's been stable
+# across Supabase CLI versions for a long time; anything not listed here keeps the CLI's own default.
+
+project_id = "cascade-web"
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:8974"
+additional_redirect_urls = ["http://127.0.0.1:8974"]
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+# CAS-1093 (decision, 2026-10-01 build chat): the CLI default email_sent = 2/hour throttles this suite
+# immediately — every S2/S3/S4/S7/S8/S9/S13 sign-in sends a fresh OTP to a disposable, never-reused test
+# user. Raised for this disposable local test stack only; the live project is untouched by this file.
+[auth.rate_limit]
+email_sent = 1000
+sign_in_sign_ups = 1000
+token_verifications = 1000

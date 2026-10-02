@@ -35,6 +35,8 @@ from .transitions import Transition, _STATUS_MOMENTS, _detail_for
 
 # CAS-825: admit_shim.mjs, invoked once per monitor run by compute_admission() below.
 _SHIM_PATH = Path(__file__).resolve().parent / "admit_shim.mjs"
+# CAS-1097: placement_shim.mjs, invoked once per monitor run by compute_auto_placements() below.
+_PLACEMENT_SHIM_PATH = Path(__file__).resolve().parent / "placement_shim.mjs"
 
 
 @dataclass
@@ -193,6 +195,99 @@ def compute_admission(cascades: list, catalogues: dict, account_prefs: dict = No
     except json.JSONDecodeError as err:
         raise RuntimeError(f"admit_shim.mjs produced invalid JSON: {err}\n{proc.stdout[:500]}") from err
     return {cid: {snap: set(ids) for snap, ids in snapshots.items()} for cid, snapshots in result.items()}
+
+
+def compute_auto_placements(agent_films: list, cascades: list, today_movies: list,
+                             account_prefs: dict = None) -> dict:
+    """CAS-1097: ask the shipped engine, ONCE, which window each (cascade, movie) admission in
+    `agent_films` earns right now — the same question recomputeFound's own placement block answers
+    on the device (earnedWindowForScore/autoPlacementFor/autoPlacementForAdmission,
+    app_template.html), via placement_shim.mjs. Same reasoning as compute_admission() above: a
+    second, hand-ported copy of that score-threshold/standing-ladder arithmetic in Python is exactly
+    the kind of drift CAS-825 fixed for admission itself.
+
+    Only the single admitting agent lowest-ranked for a given (user, movie) is asked — the same
+    _rank_key tie-break _resolve_owner (below) already uses to pick ONE owner for a film several of a
+    user's agents admit — since a placement is only ever attributed to one agent's own watchMarkers.
+
+    agent_films   : rows {user_id, cascade_id, movie_id, admission_score, ...} (store.fetch_agent_films()).
+    cascades      : rows {id, user_id, criteria, ...} — same shape compute_admission() takes.
+    today_movies  : the current catalogue (list of movie dicts) — placement reads the film's CURRENT
+                    standing, never yesterday's.
+    account_prefs : {user_id: {watchWindows, ...}} — only `watchWindows` (user_prefs.watch_windows,
+                    "Where & when you'll watch") is read here; every other key is compute_admission()'s own.
+
+    Returns {(user_id, movie_id): window_key} — one entry per admission that earns a placement (below
+    every marker at admission answers nothing, same as the device's own `earned==null`, and is simply
+    absent here). A cascade_id naming no cascade in `cascades` (an agent removed or soft-deleted
+    elsewhere) is skipped — nothing to place it against.
+    """
+    account_prefs = account_prefs or {}
+    cascade_by_id = {c["id"]: c for c in cascades}
+    movies_by_id = {str(m.get("tmdb_id")): m for m in today_movies}
+    rank_of = {c["id"]: _rank_key(c) for c in cascades}
+
+    # One admission per (user, movie): the lowest-ranked cascade among this user's own agent_films
+    # rows for that film, same tie-break _resolve_owner (below) uses for an ordinary admission.
+    best: dict = {}
+    for r in agent_films or ():
+        cid = r.get("cascade_id")
+        if cid not in cascade_by_id:
+            continue
+        key = (str(r.get("user_id")), str(r.get("movie_id")))
+        cur = best.get(key)
+        if cur is None or rank_of.get(cid, (float("inf"), "", "")) < rank_of.get(cur[0], (float("inf"), "", "")):
+            best[key] = (cid, r)
+    if not best:
+        return {}
+
+    by_user: dict = {}
+    for (user_id, movie_id), (cid, r) in best.items():
+        by_user.setdefault(user_id, []).append({
+            "cascadeId": cid, "criteria": cascade_by_id[cid].get("criteria") or {},
+            "movieId": movie_id, "admissionScore": r.get("admission_score"),
+        })
+    users = [{"userId": uid, "watchWindows": (account_prefs.get(uid) or {}).get("watchWindows"),
+              "placements": placements} for uid, placements in by_user.items()]
+
+    request = {"users": users, "movies": movies_by_id}
+    proc = subprocess.run(
+        ["node", str(_PLACEMENT_SHIM_PATH)], input=json.dumps(request), capture_output=True, text=True,
+        encoding="utf-8", timeout=120,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"placement_shim.mjs failed (exit {proc.returncode}): {proc.stderr.strip()}")
+    try:
+        result = json.loads(proc.stdout)
+    except json.JSONDecodeError as err:
+        raise RuntimeError(f"placement_shim.mjs produced invalid JSON: {err}\n{proc.stdout[:500]}") from err
+
+    out: dict = {}
+    for (user_id, movie_id), (cid, _r) in best.items():
+        window = result.get(cid + "::" + movie_id)
+        if window:
+            out[(user_id, movie_id)] = window
+    return out
+
+
+def synthesize_auto_watch_rows(auto_placements: dict, placed_keys: set) -> list:
+    """CAS-1097: turn compute_auto_placements()'s answer into rows shaped exactly like film_watch's
+    own — ready to merge straight into whatever `match()`'s film_watches argument already carries, so
+    nothing downstream (match()/_film_watch_placements/the CAS-918 forward-match) needs to know this
+    placement was synthesized rather than read off a real row.
+
+    placed_keys : {(user_id, movie_id), ...} already covered by a REAL film_watch row with at least
+    one window — manual always overrides (CAS-735), and a legacy pre-CAS-1096 auto row still wins
+    too, untouched by this ticket, so a (user, movie) already in here is skipped entirely.
+    """
+    out = []
+    for (user_id, movie_id), window in auto_placements.items():
+        if (user_id, movie_id) in placed_keys:
+            continue
+        out.append({"user_id": user_id, "movie_id": movie_id,
+                     "windows": [window], "sources": {window: "auto"}})
+    return out
 
 
 def matches_criteria(movie_id, cascade_id, snapshot: str, admission: dict) -> bool:

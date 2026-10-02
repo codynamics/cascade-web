@@ -33,7 +33,7 @@ to compare against. Output for the app front-end is written to movies.json.
 """
 
 from __future__ import annotations
-import os, sys, csv, io, re, json, time, shutil, calendar, datetime, subprocess, urllib.parse, urllib.request, urllib.error
+import os, sys, csv, io, re, json, time, shutil, hashlib, calendar, datetime, subprocess, urllib.parse, urllib.request, urllib.error
 from collections import Counter
 
 import runstats
@@ -95,10 +95,6 @@ API_BUDGET_FILE = os.path.join(STATE_DIR, "api_budget.json")    # CAS-384: today
 WM_MONTHLY_FILE = os.path.join(STATE_DIR, "watchmode_monthly.json")   # CAS-974: cumulative spend this month
 REFRESH_LOG_FILE = os.path.join(STATE_DIR, "refresh_log.json")   # CAS-1046: per-run history for the admin site
 REFRESH_LOG_CAP = 120
-# Watchmode's own quoted allowance (see the REVALIDATION_DAILY_BUDGET comment above) — reused here
-# rather than re-guessed, so monitor.health's remaining-credits check has a real number to compare
-# this month's cumulative on-demand spend against.
-WATCHMODE_MONTHLY_CREDITS = int(os.getenv("WATCHMODE_MONTHLY_CREDITS", "40000"))
 
 # CAS-987: the real plan this key is on, and how state/api_budget.json paces nightly spend
 # against it — a plan change (trial -> Startup -> Business) is one variable, not a code change.
@@ -120,6 +116,8 @@ VERSION_FILE  = os.path.join(os.path.dirname(__file__), "VERSION")        # hand
 VERSION_JSON  = os.path.join(os.path.dirname(__file__), "version.json")   # machine-readable build stamp
 BUILD_INFO_JS = os.path.join(os.path.dirname(__file__), "build-info.js")  # CAS-947: runtime-loadable twin of VERSION_JSON
 HEADERS_FILE  = os.path.join(os.path.dirname(__file__), "_headers")       # Cloudflare Pages response headers (CAS-946)
+CATALOGUE_DIR     = os.path.join(os.path.dirname(__file__), "catalogue")       # CAS-1101: hashed catalogue files
+CATALOGUE_POINTER = os.path.join(os.path.dirname(__file__), "catalogue.json")  # CAS-1101: points at the current one
 IOS_WWW_DIR   = os.path.join(os.path.dirname(__file__), "www")            # Capacitor webDir mirror (CAS-453)
 IOS_WWW_ASSETS = ("index.html", "config.js", "favicon.svg", "favicon.png",
                    "apple-touch-icon.png", "splash-logo.svg",
@@ -493,13 +491,20 @@ WATCHMODE_IDMAP_URL = "https://api.watchmode.com/datasets/title_id_map.csv"
 
 _WM_ID_COL_NAMES = ("wm_id", "id", "watchmode id", "watchmode_id")
 _TMDB_ID_COL_NAMES = ("tmdb_id", "tmdbid", "tmdb id")
+# CAS-1134: TMDB numbers films and TV shows separately, so the same TMDB ID often appears on both
+# a movie row and a TV row of this CSV — unfiltered, `_invert_watchmode_idmap`'s last-row-wins
+# join silently resolved a film to whichever medium's row came last (every TV row in the real file
+# sorts after every movie row), handing the film a TV show's ratings or hiding it behind a TV
+# show's empty ones.
+_TMDB_TYPE_COL_NAMES = ("tmdb type", "tmdb_type", "type")
 
 
 def _parse_watchmode_idmap_csv(text: str) -> dict:
-    """Watchmode id (str) -> tmdb_id (int) for every row that actually carries a tmdb_id. Column
-    names are matched case/spacing-insensitively (exact match on the stripped/lowered name, so
-    `TMDB Type` is never mistaken for `TMDB ID`). Pure and network-free so it's testable straight
-    off a sample CSV string."""
+    """Watchmode id (str) -> tmdb_id (int) for every MOVIE row that actually carries a tmdb_id — a
+    TV row sharing the same tmdb_id is dropped (CAS-1134). Column names are matched case/spacing-
+    insensitively (exact match on the stripped/lowered name, so `TMDB Type` is never mistaken for
+    `TMDB ID`). A CSV with no TMDB Type column keeps every row, same as before CAS-1134, with one
+    [warn] line. Pure and network-free so it's testable straight off a sample CSV string."""
     idmap = {}
     reader = csv.DictReader(io.StringIO(text))
     cols = reader.fieldnames or []
@@ -507,10 +512,16 @@ def _parse_watchmode_idmap_csv(text: str) -> dict:
     tmdb_col = next((c for c in cols if c.strip().lower() in _TMDB_ID_COL_NAMES), None)
     if not wm_col or not tmdb_col:
         return idmap
+    type_col = next((c for c in cols if c.strip().lower() in _TMDB_TYPE_COL_NAMES), None)
+    if not type_col:
+        print("[warn] Watchmode: ID map CSV has no TMDB Type column — keeping movie and TV rows "
+              "both, same as before CAS-1134.")
     for row in reader:
         wm_id = row.get(wm_col)
         tmdb_id = row.get(tmdb_col)
         if not wm_id or not tmdb_id:
+            continue
+        if type_col and (row.get(type_col) or "").strip().lower() != "movie":
             continue
         try:
             idmap[str(wm_id)] = int(tmdb_id)
@@ -519,9 +530,67 @@ def _parse_watchmode_idmap_csv(text: str) -> dict:
     return idmap
 
 
+def _parse_watchmode_tv_tmdb_ids_csv(text: str) -> set:
+    """CAS-1134: the TMDB ids that carry a TV row in the same id-map CSV `_parse_watchmode_idmap_
+    csv` reads — used to find films that were fetched under the pre-fix movie/TV collision (the
+    repair tier in `probe_candidates`/`enrich_watchmode_fields_nightly`). Empty if the CSV has no
+    TMDB Type column (nothing to distinguish TV rows with). Pure and network-free."""
+    ids = set()
+    reader = csv.DictReader(io.StringIO(text))
+    cols = reader.fieldnames or []
+    tmdb_col = next((c for c in cols if c.strip().lower() in _TMDB_ID_COL_NAMES), None)
+    type_col = next((c for c in cols if c.strip().lower() in _TMDB_TYPE_COL_NAMES), None)
+    if not tmdb_col or not type_col:
+        return ids
+    for row in reader:
+        if (row.get(type_col) or "").strip().lower() != "tv":
+            continue
+        try:
+            ids.add(int(row.get(tmdb_col)))
+        except (TypeError, ValueError):
+            continue
+    return ids
+
+
+# CAS-1134: the raw text of the last `_fetch_watchmode_idmap()` download this run, so a caller
+# that also needs `_watchmode_tv_tmdb_ids()` gets it from the SAME CSV download rather than a
+# second one — set only by the real fetch below, never by a test that replaces that function.
+_WATCHMODE_IDMAP_RAW_TEXT: str | None = None
+
+
 def _fetch_watchmode_idmap() -> dict:
     """The one network call for the whole run's ID map — see the module docstring above."""
-    return _parse_watchmode_idmap_csv(get_text(f"{WATCHMODE_IDMAP_URL}?apiKey={WATCHMODE_KEY}"))
+    global _WATCHMODE_IDMAP_RAW_TEXT
+    text = get_text(f"{WATCHMODE_IDMAP_URL}?apiKey={WATCHMODE_KEY}")
+    _WATCHMODE_IDMAP_RAW_TEXT = text
+    return _parse_watchmode_idmap_csv(text)
+
+
+def _watchmode_tv_tmdb_ids() -> set:
+    """The TV-row TMDB id set for this run's already-downloaded id map (see
+    `_WATCHMODE_IDMAP_RAW_TEXT`) — empty if `_fetch_watchmode_idmap` hasn't actually run yet."""
+    if _WATCHMODE_IDMAP_RAW_TEXT is None:
+        return set()
+    return _parse_watchmode_tv_tmdb_ids_csv(_WATCHMODE_IDMAP_RAW_TEXT)
+
+
+# CAS-1135: monitor.health's watchmode_remap_backlog check runs in its own process, after this
+# one has already exited, with no id map of its own — this is the one file that lets it measure
+# the CAS-1134 repair backlog without ever downloading the CSV a second time just to check it.
+WM_TV_TMDB_IDS_FILE = os.path.join(STATE_DIR, "wm_tv_tmdb_ids.json")
+
+
+def _save_watchmode_tv_tmdb_ids(today: datetime.date) -> None:
+    """Persists this run's already-downloaded TV-row id set (see `_watchmode_tv_tmdb_ids`) dated
+    today, so a later `monitor.health` process can tell whether the id map was actually downloaded
+    today at all. A no-op — leaves any existing file alone — when this run never fetched an id map
+    (WATCHMODE_API_KEY unset/rejected, or the fetch itself failed)."""
+    tv_ids = _watchmode_tv_tmdb_ids()
+    if not tv_ids:
+        return
+    os.makedirs(STATE_DIR, exist_ok=True)
+    json.dump({"date": today.isoformat(), "tv_tmdb_ids": sorted(tv_ids)},
+              open(WM_TV_TMDB_IDS_FILE, "w", encoding="utf-8"))
 
 
 def _fetch_watchmode_status() -> dict:
@@ -605,6 +674,14 @@ WM_NIGHTLY_MAX_CREDITS = int(os.getenv("WM_NIGHTLY_MAX_CREDITS", "400"))
 # DAYS: Watchmode popularity is the whole score for a title with no other window's data yet.
 WM_NIGHTLY_COHORT_TTL_DAYS = 7
 
+# CAS-1139: the free-plan refresh is ordered by how recently a title was released, not spent
+# blind in catalogue/popularity order. A released title within WM_RECENT_RELEASE_DAYS of its AU
+# release date gets the same weekly TTL as the ladder cohort (ratings still move early on); one
+# within WM_RECENT_YEAR_DAYS is spent before the long back-catalogue tail once the weekly cohort
+# and the never-fetched are already covered. See _is_wm_weekly_cohort/_release_date below.
+WM_RECENT_RELEASE_DAYS = 90
+WM_RECENT_YEAR_DAYS = 365
+
 # CAS-986: the two-tier catalogue. state/candidates.json is every title discovery has ever found —
 # never shipped, never read by the app, never pruned. movies.json is the strict subset that can
 # carry a Cascade score today, capped at CATALOGUE_TARGET (a ceiling now, not the mechanism — see
@@ -683,8 +760,9 @@ def enrich_watchmode_fields(movie: dict, wm_idmap: dict, budget: dict,
     WM_NIGHTLY_COHORT_TTL_DAYS so an upcoming/in_cinema title refreshes weekly, not monthly.
 
     Returns 'ok' (fetched and wrote fields), 'cached' (already fresh, no credit spent), 'no-id'
-    (no Watchmode id resolves for this title), 'skip' (budget exhausted), or an `_api_call`
-    outcome ('skip'/'stop') on a failed fetch.
+    (no Watchmode id resolves for this title), 'skip' (budget exhausted), 'mismatch' (CAS-1134 —
+    the detail response identifies a different tmdb_id or a non-movie type; nothing is written),
+    or an `_api_call` outcome ('skip'/'stop') on a failed fetch.
 
     CAS-1023: this is the one call every Watchmode-scoreable title must pass through (isScoreable
     needs at least one of these fields), but a title ingested via `_watchmode_record` or
@@ -706,6 +784,17 @@ def enrich_watchmode_fields(movie: dict, wm_idmap: dict, budget: dict,
     budget["remaining"] -= 1
     if outcome != "ok":
         return outcome
+    # CAS-1134: a defensive second check, independent of the id-map's own movie-only filter — if
+    # the details endpoint itself ever identifies a different title or a non-movie type, write
+    # nothing rather than trust an id that has already proven it can collide across media types.
+    resp_tmdb_id = detail.get("tmdb_id")
+    resp_tmdb_type = detail.get("tmdb_type")
+    resp_type = detail.get("type")
+    if ((resp_tmdb_id is not None and resp_tmdb_id != movie.get("tmdb_id"))
+            or (resp_tmdb_type is not None and resp_tmdb_type != "movie")
+            or (resp_type is not None and resp_type != "movie")):
+        return "mismatch"
+    movie["wm_id"] = wm_id
     movie["wm_user_rating"] = _num(detail.get("user_rating"))
     movie["wm_critic_score"] = _int(detail.get("critic_score"))
     percentile = _num(detail.get("popularity_percentile"))
@@ -724,17 +813,71 @@ def _is_ladder_cohort(movie: dict) -> bool:
     return bool({"upcoming", "in_cinema"} & set(movie.get("status") or []))
 
 
+def _release_date(movie: dict) -> "datetime.date | None":
+    """CAS-1139: the earliest Australian release date on record — `cinema_date`, else the
+    earliest `release_dates[].date`. None (counts as old) when neither is usable."""
+    raw = movie.get("cinema_date")
+    if not raw:
+        dates = [rd.get("date") for rd in (movie.get("release_dates") or []) if rd.get("date")]
+        raw = min(dates) if dates else None
+    if not raw:
+        return None
+    try:
+        return datetime.date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def _is_recent_release(movie: dict, today: datetime.date, within_days: int) -> bool:
+    """True when `movie` has a usable _release_date that falls on or within `within_days` before
+    `today` — a future (not-yet-released) date, or no usable date at all, is never recent."""
+    release = _release_date(movie)
+    if release is None:
+        return False
+    age = (today - release).days
+    return 0 <= age <= within_days
+
+
+def _is_wm_weekly_cohort(movie: dict, today: datetime.date) -> bool:
+    """CAS-1139: the weekly-refresh set for the nightly fields pass and the scoreability probe —
+    the existing ladder cohort (_is_ladder_cohort, unchanged — it also decides what counts as
+    `scored`, CAS-1134, and must keep meaning upcoming/in_cinema only) plus a released title
+    whose release date is within WM_RECENT_RELEASE_DAYS, whose rating is still likely to move."""
+    return _is_ladder_cohort(movie) or _is_recent_release(movie, today, WM_RECENT_RELEASE_DAYS)
+
+
+# CAS-1135: nightly fields and the CAS-986 scoreability probe each tally enrich_watchmode_fields'
+# outcomes the same way — adding this here so both also capture up to 5 tmdb_ids behind a
+# 'mismatch' outcome, for monitor.health's watchmode_identity check to name in its detail line.
+_MISMATCH_IDS_SAMPLE_CAP = 5
+
+
+def _bump_wm_outcome(outcomes: dict, result: str, tmdb_id) -> None:
+    outcomes[result] = outcomes.get(result, 0) + 1
+    if result == "mismatch":
+        ids = outcomes.setdefault("mismatch_ids", [])
+        if len(ids) < _MISMATCH_IDS_SAMPLE_CAP:
+            ids.append(tmdb_id)
+
+
 def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) -> dict:
     """CAS-921: the nightly poc_pipeline.py run's own Watchmode fields pass. The earlier CAS-830/
     850 backfill only ever fires from the manual watchmode-backfill.yml dispatch, so a title added
     to the catalogue since the last manual run carried no Cascade score at all, and an upcoming
     title's popularity went stale until someone remembered to dispatch it.
 
-    Spends one shared budget, WM_NIGHTLY_MAX_CREDITS by default, across three priority tiers,
+    Spends one shared budget, WM_NIGHTLY_MAX_CREDITS by default, across five priority tiers,
     highest first:
+      0. CAS-1134 repair — titles fetched under the pre-fix movie/TV id-map collision (a
+         wm_fields_fetched_at stamp but no wm_id, whose tmdb_id also carries a TV row in the id
+         map), forced stale regardless of how recently that bad fetch happened;
       1. titles with no wm_fields_fetched_at at all (never fetched);
-      2. upcoming/in_cinema titles stale past WM_NIGHTLY_COHORT_TTL_DAYS (7 days);
-      3. every other title stale past WATCHMODE_CACHE_TTL_DAYS (30 days).
+      2. CAS-1139: the weekly-refresh cohort (_is_wm_weekly_cohort — upcoming/in_cinema, or
+         released within WM_RECENT_RELEASE_DAYS) stale past WM_NIGHTLY_COHORT_TTL_DAYS (7 days);
+      3. CAS-1139: every other title stale past WATCHMODE_CACHE_TTL_DAYS (30 days), split and
+         ordered by recency so the small free-plan pot favours titles whose ratings still move:
+         3a. released within WM_RECENT_YEAR_DAYS, stalest wm_fields_fetched_at first;
+         3b. everything else, stalest wm_fields_fetched_at first.
     Each tier is spent in full before the next one starts, so an empty budget always favours the
     higher tier — the same discipline `enrich_watchmode_fields`'s own {"remaining", "skipped"}
     shape already gives every other bounded backfill in this module.
@@ -744,7 +887,9 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
     health` gives a throttled provider elsewhere in this module — `_api_call` already prints its
     own [warn]/[error] line and returns 'stop' for a rejected key encountered mid-run.
 
-    Returns an {'ok', 'cached', 'no-id', 'skip', 'stop'} outcome-count dict."""
+    Returns an {'ok', 'cached', 'no-id', 'skip', 'stop'} outcome-count dict (plus 'mismatch' if
+    CAS-1134's identity guard ever actually tripped this run — never pre-declared, so a run that
+    never trips it keeps the exact same dict shape as before)."""
     outcomes = {"ok": 0, "cached": 0, "no-id": 0, "skip": 0, "stop": 0}
     if not WATCHMODE_KEY:
         print("[warn] Watchmode: WATCHMODE_API_KEY not set — skipping the nightly Watchmode "
@@ -762,13 +907,23 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
               "fields step.")
         return outcomes
     wm_idmap = _invert_watchmode_idmap(idmap)
+    tv_tmdb_ids = _watchmode_tv_tmdb_ids()
+    today = datetime.date.fromisoformat(_RUN_DATE)
 
     if budget is None:
         budget = {"remaining": WM_NIGHTLY_MAX_CREDITS, "skipped": 0}
 
     seen = set()
+    repair = []
+    for m in movies:
+        if m.get("wm_fields_fetched_at") and not m.get("wm_id") and m.get("tmdb_id") in tv_tmdb_ids:
+            repair.append(m)
+            seen.add(id(m))
+
     unfetched = []
     for m in movies:
+        if id(m) in seen:
+            continue
         if not m.get("wm_fields_fetched_at"):
             unfetched.append(m)
             seen.add(id(m))
@@ -777,18 +932,34 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
     for m in movies:
         if id(m) in seen:
             continue
-        if _is_ladder_cohort(m) and _watchmode_fields_stale(m, WM_NIGHTLY_COHORT_TTL_DAYS):
+        if _is_wm_weekly_cohort(m, today) and _watchmode_fields_stale(m, WM_NIGHTLY_COHORT_TTL_DAYS):
             cohort.append(m)
             seen.add(id(m))
 
-    rest = [m for m in movies if id(m) not in seen and _watchmode_fields_stale(m)]
+    # CAS-1139: tier 3, split by recency and spent stalest-fetched-first within each half.
+    recent_year, rest = [], []
+    for m in movies:
+        if id(m) in seen or not _watchmode_fields_stale(m):
+            continue
+        (recent_year if _is_recent_release(m, today, WM_RECENT_YEAR_DAYS) else rest).append(m)
+    recent_year.sort(key=lambda m: m.get("wm_fields_fetched_at") or "")
+    rest.sort(key=lambda m: m.get("wm_fields_fetched_at") or "")
 
+    for m in repair:
+        result = enrich_watchmode_fields(m, wm_idmap, budget, ttl_days=0)
+        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
     for m in unfetched:
-        outcomes[enrich_watchmode_fields(m, wm_idmap, budget)] += 1
+        result = enrich_watchmode_fields(m, wm_idmap, budget)
+        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
     for m in cohort:
-        outcomes[enrich_watchmode_fields(m, wm_idmap, budget, WM_NIGHTLY_COHORT_TTL_DAYS)] += 1
+        result = enrich_watchmode_fields(m, wm_idmap, budget, WM_NIGHTLY_COHORT_TTL_DAYS)
+        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
+    for m in recent_year:
+        result = enrich_watchmode_fields(m, wm_idmap, budget)
+        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
     for m in rest:
-        outcomes[enrich_watchmode_fields(m, wm_idmap, budget)] += 1
+        result = enrich_watchmode_fields(m, wm_idmap, budget)
+        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
     return outcomes
 
 
@@ -919,9 +1090,28 @@ def refresh_enriched_candidates(candidates: dict, enriched: list, today_iso: str
         if m.get("wm_fields_fetched_at") == today_iso and prior.get("last_probed") != today_iso:
             candidates[key]["last_probed"] = today_iso
             candidates[key]["probe_count"] = (prior.get("probe_count") or 0) + 1
+            # CAS-1134: popularity_percentile alone only counts as a score for an upcoming/
+            # in_cinema title (_is_ladder_cohort) — a released title needs a real rating.
             has_score = (m.get("wm_user_rating") is not None or m.get("wm_critic_score") is not None
-                        or m.get("wm_popularity_percentile") is not None)
+                        or (m.get("wm_popularity_percentile") is not None and _is_ladder_cohort(m)))
             candidates[key]["outcome"] = "scored" if has_score else "no_score"
+
+
+def reclassify_stale_scored_candidates(candidates: dict) -> int:
+    """CAS-1134 Change #5, one-time in effect: before this fix, a non-ladder-cohort candidate with
+    only wm_popularity_percentile (no real rating) was wrongly marked 'scored', so tier 3's
+    no_score recovery never picked it up. Reclassifies every such candidate still in the pool to
+    'no_score' with last_probed cleared, so it is immediately due for tier 3. Self-limiting — a
+    candidate this already fixed no longer matches, so re-running this is a no-op. Returns the
+    count reclassified."""
+    fixed = 0
+    for c in candidates.values():
+        if (c.get("outcome") == "scored" and not _is_ladder_cohort(c)
+                and c.get("wm_user_rating") is None and c.get("wm_critic_score") is None):
+            c["outcome"] = "no_score"
+            c["last_probed"] = None
+            fixed += 1
+    return fixed
 
 
 def _scoreability_recovery_due(c: dict, today: datetime.date) -> bool:
@@ -938,40 +1128,64 @@ def _scoreability_recovery_due(c: dict, today: datetime.date) -> bool:
 
 
 def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idmap: dict,
-                      published_ids: set) -> dict:
-    """CAS-986's own nightly scoreability probe, spending `budget` Watchmode credits across three
+                      published_ids: set, tv_tmdb_ids: set = frozenset()) -> dict:
+    """CAS-986's own nightly scoreability probe, spending `budget` Watchmode credits across four
     priority tiers, highest first — the order matters and must not be rearranged:
+      0. CAS-1134 repair — candidates fetched under the pre-fix movie/TV id-map collision (a
+         wm_fields_fetched_at stamp but no wm_id, whose tmdb_id also carries a TV row in
+         `tv_tmdb_ids`), forced stale regardless of how recently that bad fetch happened.
       1. published titles (`published_ids` — yesterday's movies.json) whose Watchmode fields are
-         stale (30 days, or 7 for an upcoming/in_cinema ladder-cohort title) — first, because
-         letting a published title's fields expire silently removes it from the app.
+         stale (30 days, or 7 for the CAS-1139 weekly-refresh cohort — _is_wm_weekly_cohort) —
+         first, because letting a published title's fields expire silently removes it from the
+         app. CAS-1139: spent weekly-refresh titles first, then titles released within
+         WM_RECENT_YEAR_DAYS, then the rest — stalest wm_fields_fetched_at first within each
+         group, NOT by popularity (the ticket's own Change #3; tiers 0, 2 and 3 stay popularity-
+         ordered, unchanged).
       2. unprobed candidates, most popular first — this is what grows the catalogue.
       3. no_score candidates last probed more than SCOREABILITY_RECOVERY_DAYS ago — recovers the
          tail without re-asking every night.
     Reuses enrich_watchmode_fields for the actual per-title fetch (CAS-921) — never a second fetch/
     parse of Watchmode's response. Mutates each probed candidate's own last_probed/probe_count/
-    outcome in place. Returns the {'ok','cached','no-id','skip','stop'} tally plus 'probed', the
-    count of candidates that actually got a fresh answer (ok or no-id) this run."""
+    outcome in place. Returns the {'ok','cached','no-id','skip','stop'} tally (plus 'mismatch' if
+    CAS-1134's identity guard ever actually tripped this run) plus 'probed', the count of
+    candidates that actually got a fresh answer (ok or no-id) this run."""
     bd = {"remaining": budget, "skipped": 0}
     today_iso = today.isoformat()
 
     def _by_popularity(items):
         return sorted(items, key=lambda m: m.get("popularity") or 0, reverse=True)
 
-    tier1 = _by_popularity(
+    def _by_staleness(items):
+        return sorted(items, key=lambda m: m.get("wm_fields_fetched_at") or "")
+
+    repair_tier = _by_popularity(
+        c for c in candidates.values()
+        if c.get("wm_fields_fetched_at") and not c.get("wm_id") and c.get("tmdb_id") in tv_tmdb_ids)
+    tier1_pool = [
         c for c in candidates.values()
         if c["tmdb_id"] in published_ids
-        and _watchmode_fields_stale(c, SCOREABILITY_LADDER_STALE_DAYS if _is_ladder_cohort(c)
-                                    else SCOREABILITY_STALE_DAYS))
+        and _watchmode_fields_stale(c, SCOREABILITY_LADDER_STALE_DAYS if _is_wm_weekly_cohort(c, today)
+                                    else SCOREABILITY_STALE_DAYS)]
+    tier1_weekly = _by_staleness(c for c in tier1_pool if _is_wm_weekly_cohort(c, today))
+    tier1_year = _by_staleness(c for c in tier1_pool
+                               if not _is_wm_weekly_cohort(c, today)
+                               and _is_recent_release(c, today, WM_RECENT_YEAR_DAYS))
+    tier1_rest = _by_staleness(c for c in tier1_pool
+                               if not _is_wm_weekly_cohort(c, today)
+                               and not _is_recent_release(c, today, WM_RECENT_YEAR_DAYS))
+    tier1 = tier1_weekly + tier1_year + tier1_rest
     tier2 = _by_popularity(c for c in candidates.values() if c.get("outcome") == "unprobed")
     tier3 = _by_popularity(c for c in candidates.values() if c.get("outcome") == "no_score"
                            and _scoreability_recovery_due(c, today))
 
     outcomes = {"ok": 0, "cached": 0, "no-id": 0, "skip": 0, "stop": 0, "probed": 0}
-    for tier in (tier1, tier2, tier3):
+    for tier, forced_ttl in ((repair_tier, 0), (tier1, None), (tier2, None), (tier3, None)):
         for c in tier:
-            ttl = SCOREABILITY_LADDER_STALE_DAYS if _is_ladder_cohort(c) else SCOREABILITY_STALE_DAYS
+            ttl = forced_ttl
+            if ttl is None:
+                ttl = SCOREABILITY_LADDER_STALE_DAYS if _is_wm_weekly_cohort(c, today) else SCOREABILITY_STALE_DAYS
             result = enrich_watchmode_fields(c, wm_idmap, bd, ttl)
-            outcomes[result] = outcomes.get(result, 0) + 1
+            _bump_wm_outcome(outcomes, result, c.get("tmdb_id"))
             if result in ("ok", "no-id"):
                 outcomes["probed"] += 1
                 c["last_probed"] = today_iso
@@ -979,9 +1193,11 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
                 if result == "no-id":
                     c["outcome"] = "no_wm_id"
                 else:
+                    # CAS-1134: popularity_percentile alone only counts for a ladder-cohort title.
                     has_score = (c.get("wm_user_rating") is not None
                                 or c.get("wm_critic_score") is not None
-                                or c.get("wm_popularity_percentile") is not None)
+                                or (c.get("wm_popularity_percentile") is not None
+                                    and _is_ladder_cohort(c)))
                     c["outcome"] = "scored" if has_score else "no_score"
     outcomes["spent"] = budget - bd["remaining"]   # CAS-987: actual credits this pass drew from `budget`
     return outcomes
@@ -1043,9 +1259,11 @@ def run_backcatalogue_probe(candidates: dict, today: datetime.date, max_credits:
             if result == "no-id":
                 c["outcome"] = "no_wm_id"
             else:
+                # CAS-1134: popularity_percentile alone only counts for a ladder-cohort title.
                 has_score = (c.get("wm_user_rating") is not None
                             or c.get("wm_critic_score") is not None
-                            or c.get("wm_popularity_percentile") is not None)
+                            or (c.get("wm_popularity_percentile") is not None
+                                and _is_ladder_cohort(c)))
                 c["outcome"] = "scored" if has_score else "no_score"
                 if not has_score:
                     outcomes["no_score"] += 1
@@ -1060,6 +1278,7 @@ _CANDIDATE_STUB_KEYS = frozenset({
     "first_seen", "last_probed", "outcome", "popularity", "popularity_percentile",
     "probe_count", "status", "title", "tmdb_id", "year",
     "wm_user_rating", "wm_critic_score", "wm_popularity_percentile", "wm_fields_fetched_at",
+    "wm_id",
 })
 
 
@@ -1209,7 +1428,8 @@ def run_scoreability_probe(candidates: dict, today: datetime.date, budget: int,
         print("[warn] Watchmode: no usable ID map this run — skipping the CAS-986 scoreability probe.")
         return empty
     wm_idmap = _invert_watchmode_idmap(idmap)
-    return probe_candidates(candidates, today, budget, wm_idmap, published_ids)
+    tv_tmdb_ids = _watchmode_tv_tmdb_ids()
+    return probe_candidates(candidates, today, budget, wm_idmap, published_ids, tv_tmdb_ids)
 
 
 def scoreable_ids(movies: list, floor: int = 0) -> set:
@@ -1343,6 +1563,13 @@ def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery
         print(f"[info] CAS-997: dropped {not_found_dropped} candidate(s) TMDB reported not-found "
               f"on {TMDB_NOT_FOUND_DROP_STREAK} consecutive nightly runs.")
 
+    # CAS-1134: before the probe/engine pass, so a candidate this fixes is eligible for tier 3
+    # recovery the same run.
+    reclassified = reclassify_stale_scored_candidates(candidates)
+    if reclassified:
+        print(f"[info] CAS-1134: reclassified {reclassified} candidate(s) 'scored' on popularity "
+              f"alone (no real rating) to no_score.")
+
     probe_outcomes = run_scoreability_probe(candidates, today, probe_budget, previously_published_ids)
 
     try:
@@ -1378,6 +1605,8 @@ def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery
         "candidates": len(candidates), "unprobed": unprobed,
         "probed_today": probe_outcomes["probed"], "engine_ok": engine_ok,
         "wm_spent": probe_outcomes.get("spent", 0),   # CAS-987: this pass's actual draw on probe_budget
+        "mismatch": probe_outcomes.get("mismatch", 0),   # CAS-1135
+        "mismatch_ids": probe_outcomes.get("mismatch_ids", []),   # CAS-1135
         "not_found_dropped": not_found_dropped,
         "publish_guard_eligible": enrich_stats["eligible"],
         "publish_guard_enriched": enrich_stats["enriched"],
@@ -2283,13 +2512,20 @@ def _wm_cycle_bounds(today: datetime.date, reset_day: int = WM_QUOTA_RESET_DAY) 
 
 
 def _load_wm_cycle_budget(today: datetime.date) -> dict:
-    """Loads state/api_budget.json as the current cycle's {cycle_start, cycle_end, quota, spent,
-    updated_at, days} shape. A pre-CAS-987 {date, wm_spent} file, a file from a cycle that has
-    since rolled over (today has crossed WM_QUOTA_RESET_DAY), or a missing/unparseable file all
-    read the same honest way: a fresh cycle starting now, spent back to 0 — never a raised error."""
+    """Loads state/api_budget.json as the current cycle's {cycle_start, cycle_end, quota,
+    quota_live, spent, updated_at, days} shape. A pre-CAS-987 {date, wm_spent} file, a file from a
+    cycle that has since rolled over (today has crossed WM_QUOTA_RESET_DAY), or a missing/
+    unparseable file all read the same honest way: a fresh cycle starting now, spent back to 0 —
+    never a raised error.
+
+    CAS-1138: `quota_live` is False until a GET /status call has actually confirmed `quota` —
+    `quota` itself still defaults to WM_MONTHLY_QUOTA so the cycle-pacing math always has a number
+    to work with, but reporting code (monitor.health's watchmode_pace) must check `quota_live`
+    before treating that number as real, never silently trusting the fallback."""
     cycle_start, cycle_end = _wm_cycle_bounds(today)
     fresh = {"cycle_start": cycle_start.isoformat(), "cycle_end": cycle_end.isoformat(),
-             "quota": WM_MONTHLY_QUOTA, "spent": 0, "updated_at": today.isoformat(), "days": {}}
+             "quota": WM_MONTHLY_QUOTA, "quota_live": False, "spent": 0,
+             "updated_at": today.isoformat(), "days": {}}
     if not os.path.exists(API_BUDGET_FILE):
         return fresh
     try:
@@ -2300,7 +2536,8 @@ def _load_wm_cycle_budget(today: datetime.date) -> dict:
         return fresh
     days = data.get("days") or {}
     return {"cycle_start": data.get("cycle_start", fresh["cycle_start"]), "cycle_end": data["cycle_end"],
-            "quota": data.get("quota", WM_MONTHLY_QUOTA), "spent": sum(days.values()),
+            "quota": data.get("quota", WM_MONTHLY_QUOTA), "quota_live": data.get("quota_live", False),
+            "spent": sum(days.values()),
             "updated_at": data.get("updated_at", fresh["updated_at"]), "days": days}
 
 
@@ -2310,6 +2547,18 @@ def _save_wm_cycle_budget(cycle: dict, today: datetime.date) -> None:
     out["spent"] = sum(out.get("days", {}).values())
     out["updated_at"] = today.isoformat()
     json.dump(out, open(API_BUDGET_FILE, "w", encoding="utf-8"), indent=2, sort_keys=True)
+
+
+def _apply_live_wm_quota(cycle: dict, status_out: dict) -> dict:
+    """CAS-1138: folds wm_run_allowance's status_out (this run's live /status quota, or all-None
+    when /status wasn't called or failed) into the cycle record about to be saved to
+    state/api_budget.json — replacing the WM_MONTHLY_QUOTA default with the real figure once it's
+    known. A no-op when this run has no live quota: a prior cycle's already-live quota (or the
+    untouched default) carries forward unchanged rather than being overwritten with a guess."""
+    if status_out.get("quota") is not None:
+        cycle["quota"] = status_out["quota"]
+        cycle["quota_live"] = True
+    return cycle
 
 
 def compute_wm_today_allowance(quota: int, reserve_pct: float, spent_this_cycle: int,
@@ -2342,7 +2591,8 @@ def split_wm_pot(pot: int, nightly_weight: int, ondemand_weight: int,
     return ondemand_cap, nightly_cap, scoreability_cap
 
 
-def wm_run_allowance(today: datetime.date, run_max_credits: int | None = None) -> int:
+def wm_run_allowance(today: datetime.date, run_max_credits: int | None = None,
+                     status_out: dict | None = None) -> int:
     """CAS-994: this run's whole Watchmode credit pot — the single gate every credit-costing call
     path (the nightly fields pass, on-demand enrichment, the CAS-986 scoreability probe) is capped
     against, via split_wm_pot.
@@ -2359,7 +2609,14 @@ def wm_run_allowance(today: datetime.date, run_max_credits: int | None = None) -
     (this ticket's own Why). state/api_budget.json stays as a spend record (run() still writes to
     it) but no longer drives the allowance itself. A failed /status call spends nothing this run
     rather than falling back to any locally-tracked number — the honest answer when the one source
-    of truth this now relies on is unavailable."""
+    of truth this now relies on is unavailable.
+
+    CAS-1138: `status_out`, when given a dict, is filled in with this run's real
+    {quota, quota_used, remaining_monthly_credits} so the caller can record them in
+    state/run_stats.json and state/api_budget.json — never a constant. Left at all-None when
+    /status was never called (the ceiling is 0) or the call failed."""
+    if status_out is not None:
+        status_out.update({"quota": None, "quota_used": None, "remaining_monthly_credits": None})
     if run_max_credits is None:
         run_max_credits = WM_RUN_MAX_CREDITS
     if run_max_credits <= 0:
@@ -2371,6 +2628,9 @@ def wm_run_allowance(today: datetime.date, run_max_credits: int | None = None) -
         return 0
     quota = status.get("quota", 0)
     quota_used = status.get("quotaUsed", 0)
+    if status_out is not None:
+        status_out.update({"quota": quota, "quota_used": quota_used,
+                           "remaining_monthly_credits": max(0, quota - quota_used)})
     cycle_start, cycle_end = _wm_cycle_bounds(today)
     days_remaining = (cycle_end - today).days
     paced = compute_wm_today_allowance(quota, WM_CYCLE_RESERVE_PCT, quota_used, days_remaining)
@@ -2860,7 +3120,8 @@ def run(simulate_day: bool = False):
         # (cycle["days"]) but no longer drives the allowance itself — see wm_run_allowance.
         cycle = _load_wm_cycle_budget(today)
         today_iso = today.isoformat()
-        wm_pot = wm_run_allowance(today)
+        wm_status = {}
+        wm_pot = wm_run_allowance(today, status_out=wm_status)
 
         # WM_NIGHTLY_MAX_CREDITS/ONDEMAND_WM_CAP/SCOREABILITY_PROBE_BUDGET stop being independent
         # fixed pots and become weighted shares of `wm_pot` — their old fixed values are reused
@@ -2910,8 +3171,12 @@ def run(simulate_day: bool = False):
         prior_monthly = _load_monthly_wm_spend(today)
         monthly_spent = prior_monthly.get("wm_spent", 0) + counts["wm_calls"]
         _save_monthly_wm_spend(today, monthly_spent)
-        runstats.set_value("watchmode",
-                           remaining_monthly_credits=max(0, WATCHMODE_MONTHLY_CREDITS - monthly_spent))
+        # CAS-1138: quota/quota_used/remaining_monthly_credits come straight from this run's own
+        # wm_run_allowance /status call (wm_status) — None on every field when /status wasn't
+        # called or failed, never a constant standing in for an account figure it doesn't know.
+        runstats.set_value("watchmode", quota=wm_status.get("quota"),
+                           quota_used=wm_status.get("quota_used"),
+                           remaining_monthly_credits=wm_status.get("remaining_monthly_credits"))
     else:
         print("[sample] no API keys set — using bundled illustrative data.")
         records = json.load(open(SAMPLE_FILE, encoding="utf-8"))["movies"]
@@ -2982,9 +3247,16 @@ def run(simulate_day: bool = False):
         # Watchmode activity (on-demand + nightly fields + the CAS-986 scoreability probe), so
         # monitor.health's watchmode_fetch check (which reads run_stats.watchmode.calls) is
         # measuring what it claims to measure instead of only the on-demand slice.
-        runstats.bump("watchmode", calls=run_spent, errors=counts["wm_fails"])
+        # CAS-1135: same reasoning for 'mismatch' — the nightly-fields pass and the probe are the
+        # only two callers of enrich_watchmode_fields that can ever see that outcome.
+        mismatch_total = wm_outcomes.get("mismatch", 0) + cas986_report.get("mismatch", 0)
+        mismatch_ids = (wm_outcomes.get("mismatch_ids", []) + cas986_report.get("mismatch_ids", []))
+        runstats.bump("watchmode", calls=run_spent, errors=counts["wm_fails"], mismatch=mismatch_total)
+        runstats.set_value("watchmode", mismatch_ids=mismatch_ids[:5])
+        _save_watchmode_tv_tmdb_ids(today)
         today_total_spent = cycle["days"].get(today_iso, 0) + run_spent
         cycle["days"][today_iso] = today_total_spent
+        cycle = _apply_live_wm_quota(cycle, wm_status)
         _save_wm_cycle_budget(cycle, today)
         print(f"watchmode cycle {cycle['cycle_start']}..{cycle['cycle_end']} quota={cycle['quota']} "
               f"spent={sum(cycle['days'].values())} run_pot={wm_pot} "
@@ -3104,6 +3376,51 @@ def build_version_info(provider_status: dict | None = None) -> dict:
     return info
 
 
+# CAS-1101: fields index.html's inline MOVIES payload carries that app_template.html never reads
+# via `m.<field>` — pipeline/monitor-only bookkeeping. Dropped from the compact catalogue file
+# below; movies.json itself is untouched and stays the pipeline's and monitor's source of truth.
+CATALOGUE_DROPPED_FIELDS = (
+    "availability_source", "wm_fields_fetched_at", "cache_stamped_at", "last_polled",
+    "first_seen", "last_probed", "imdb_id", "popularity_percentile",
+    "tmdb_not_found_streak", "poll_tier", "settled_since", "probe_count",
+    "oscar_detail_checked",
+)
+
+
+def write_catalogue(records: list[dict], catalogue_date: str) -> None:
+    """CAS-1101: alongside the inlined MOVIES payload, publish a compact content-hashed catalogue
+    file (client-read fields only, no indentation) plus a small pointer file at the site root, so
+    a data-only refresh doesn't have to re-ship all of index.html. Old hashed files are pruned,
+    keeping only the one just written and whatever the pointer named before this call."""
+    os.makedirs(CATALOGUE_DIR, exist_ok=True)
+    prev_name = None
+    if os.path.exists(CATALOGUE_POINTER):
+        try:
+            prev_file = json.load(open(CATALOGUE_POINTER, encoding="utf-8")).get("file")
+            prev_name = os.path.basename(prev_file) if prev_file else None
+        except (json.JSONDecodeError, OSError):
+            prev_name = None
+
+    trimmed = [{k: v for k, v in m.items() if k not in CATALOGUE_DROPPED_FIELDS} for m in records]
+    payload = json.dumps(trimmed, separators=(",", ":")).encode("utf-8")
+    file_hash = hashlib.sha256(payload).hexdigest()[:12]
+    file_name = f"catalogue.{file_hash}.json"
+    with open(os.path.join(CATALOGUE_DIR, file_name), "wb") as f:
+        f.write(payload)
+
+    with open(CATALOGUE_POINTER, "w", encoding="utf-8") as f:
+        json.dump({"file": f"catalogue/{file_name}", "hash": file_hash,
+                    "generated": catalogue_date, "count": len(records)}, f, separators=(",", ":"))
+        f.write("\n")
+
+    keep = {file_name}
+    if prev_name:
+        keep.add(prev_name)
+    for name in os.listdir(CATALOGUE_DIR):
+        if name not in keep:
+            os.remove(os.path.join(CATALOGUE_DIR, name))
+
+
 def build_html(records: list[dict] | None = None, provider_status: dict | None = None):
     """Inject the latest movies + date into app_template.html -> index.html.
     Keeps the app a single double-clickable file (no server, no CORS).
@@ -3134,6 +3451,7 @@ def build_html(records: list[dict] | None = None, provider_status: dict | None =
     with open(BUILD_INFO_JS, "w", encoding="utf-8") as f:
         f.write("window.BUILD_INFO = " + json.dumps(info) + ";\n")
     print(f"stamped v{info['version']} · build {info['build']} · {info['commit']}")
+    write_catalogue(records, catalogue_date)
     write_csp_headers()
     _sync_ios_www()
 

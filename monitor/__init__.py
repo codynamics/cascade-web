@@ -36,6 +36,8 @@ from .matching import (  # noqa: E402
     match,
     matches_criteria,
     compute_admission,
+    compute_auto_placements,
+    synthesize_auto_watch_rows,
     service_ok,
     notification_rows,
     suppressed_pairs,
@@ -65,7 +67,8 @@ from .pusher import (  # noqa: E402
 
 __all__ = [
     "Transition", "compute_transitions", "DEFAULT_WEEKEND_N", "MOMENTS",
-    "Hit", "match", "matches_criteria", "compute_admission", "service_ok", "notification_rows",
+    "Hit", "match", "matches_criteria", "compute_admission", "compute_auto_placements",
+    "synthesize_auto_watch_rows", "service_ok", "notification_rows",
     "suppressed_pairs", "pick_overrides", "excluded_moments", "prefs_for", "excludes_from_prefs", "delivery_plan",
     "PREFS_DEFAULT", "match_film_watches", "WINDOW_TO_MOMENT", "match_newly_qualified",
     "match_new_to_agent",

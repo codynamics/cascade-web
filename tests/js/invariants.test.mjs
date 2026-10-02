@@ -19,6 +19,15 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 // CAS-764: acctRead's real backoff (~400ms/~1.2s) is a UX choice for a live device, not something this
 // suite should sit through on every retry-to-failure test below — zero it once, for every test in this file.
 E.CascadePersistence.ACCT_READ_DELAYS = [0, 0];
+// CAS-1097: acctOp's own backoff (~400ms/~1.2s/~3.6s) is the same kind of live-device UX delay, not
+// something to sit through either — zero it once, same reasoning as ACCT_READ_DELAYS above. agent_films
+// joining acctOp means an admission churned by one test's own recomputeFound() pass can land a retry here.
+E.CascadeAccountStore.ACCT_OP_RETRY_DELAYS = [0, 0, 0];
+// CAS-1097: pushAgentFilmAdmission's own cascade-confirmation defer (~500ms, up to 10 rounds) is the same
+// class of delay — zero it so a deferred retry armed by one test's recomputeFound() pass resolves on the
+// very next tick rather than landing mid-way through a LATER, unrelated test (every test in this file
+// shares one fake uid, so the defer's own owner check can't tell two different tests' sessions apart).
+E.CascadePersistence.AGENT_FILM_DEFER_MS = 0;
 
 // Every preset in every lane it is offered in — the real matrix a person can walk into.
 const LANES = ["cinema", "stream"];
@@ -674,13 +683,14 @@ test("CAS-854 AC3: a released film is unaffected by the Cinema-Never gate, on bo
 // AC2: for every agent and film, listedBy(m,c) implies cascadeScore(m) >= c.scoreFloor. No exceptions —
 // checked both across the real preset/lane matrix (CASES) and directly against matchesCriteria with a custom
 // floor, since listedBy narrows further (window/pin state) and must not be the only place this holds.
-test("CAS-724 AC2: no listed film's Cascade score is below its own agent's scoreFloor — no exceptions but Off (CAS-762)", () => {
+test("CAS-724 AC2: no listed film's Cascade score is below its own agent's scoreFloor", () => {
   for(const { kind, s, label } of CASES){
     pickInLane(E, kind, s.key);
     const d = E.onbApply();
     const listed = E.MOVIES.filter(m => E.listedBy(m, d));
-    // CAS-762: a floor of 0 is Off — no score requirement, so an unscored film (-1) legitimately lists there.
-    for(const m of listed) assert.ok(d.scoreFloor === 0 || E.cascadeScore(m) >= d.scoreFloor,
+    // CAS-1128: a literal scoreFloor of 0 no longer survives normCascade (it migrates to TRACK_MIN), so the
+    // >= check below holds unconditionally now — the old "0 is Off" escape (CAS-762, retired) is dead here.
+    for(const m of listed) assert.ok(E.cascadeScore(m) >= d.scoreFloor,
       `${label}: ${m.title} lists at Cascade score ${E.cascadeScore(m)}, below its own agent's floor ${d.scoreFloor}`);
   }
   const floored = missionCase({ scoreFloor: 70 });
@@ -688,13 +698,13 @@ test("CAS-724 AC2: no listed film's Cascade score is below its own agent's score
   assert.ok(scoredBelow.length > 0, "no film scored below 70 in the fixture catalogue — this test would prove nothing");
   for(const m of scoredBelow) assert.equal(E.matchesCriteria(m, floored), false,
     `${m.title} scores ${E.cascadeScore(m)}, below the agent's floor of 70, but still matched`);
-  // CAS-762 supersedes rule 4 at a floor of 0 (Off): that floor is now no score requirement at all, so an
-  // unscored film DOES clear it — a floor of 0 is exactly the case AC2's own >= check above can never see,
-  // since cascadeScore(m) >= d.scoreFloor is -1 >= 0 (false) for a film this rule now legitimately admits.
+  // CAS-1128 retires CAS-762's "a floor of 0 is Off, no score requirement" reading: normCascade now migrates
+  // any literal 0 marker (however it arrives — a legacy watchMarkers value or, as here, the legacy scoreFloor
+  // seed) up to TRACK_MIN (50) and keeps it ON, so missionCase({scoreFloor:0}) is an ordinary 50-floor agent
+  // now, not an Off one — rule 4 holds there exactly as it does at any other real floor.
   const unscored = E.MOVIES.find(m => E.cascadeScore(m) === -1 && E.matchesCriteria(m, missionCase(), undefined, true));
-  if(unscored) assert.equal(E.matchesCriteria(unscored, missionCase({ scoreFloor: 0 })), true,
-    `${unscored.title} has no Cascade score and its agent's floor is Off (0) — CAS-762 says that admits it`);
-  // and rule 4 still holds wherever there IS a real floor: any positive floor keeps denying a scoreless film.
+  if(unscored) assert.equal(E.matchesCriteria(unscored, missionCase({ scoreFloor: 0 })), false,
+    `${unscored.title} has no Cascade score but was admitted at scoreFloor:0 — CAS-1128 migrates that to a real floor (TRACK_MIN), not Off`);
   if(unscored) assert.equal(E.matchesCriteria(unscored, missionCase({ scoreFloor: 50 })), false,
     `${unscored.title} has no Cascade score but was admitted at a real floor of 50`);
 });
@@ -751,10 +761,15 @@ test("CAS-724: scoreHeldBackCount agrees with its own set, at a real floor", () 
     E.invalidateComputeCaches();
   }
 });
-// CAS-762: at a floor of 0 (Off) scoreHeldBackCount must read 0 — nothing is excluded by score any more.
-test("CAS-762: scoreHeldBackCount is 0 for an agent whose floor is Off", () => {
+// CAS-1128 retires CAS-762's "scoreFloor 0 means Off" reading — a literal 0 now migrates to TRACK_MIN (50)
+// through normCascade, so this is an ordinary 50-floor agent, and scoreHeldBackCount must count exactly the
+// unscored films that floor excludes, the same as any other real floor.
+test("CAS-1128: scoreHeldBackCount at scoreFloor:0 counts against the migrated TRACK_MIN floor, not zero", () => {
   const d = missionCase({ status: ["included_streaming", "pvod", "rental"], scoreFloor: 0 });
-  assert.equal(E.scoreHeldBackCount(d), 0, "an Off-floor agent must hold nothing back for having no score");
+  assert.equal(E.agentFloor(d), 50, "setup: scoreFloor:0 must migrate to TRACK_MIN, never stay Off");
+  const held = E.scoreHeldBackCount(d);
+  const heldFilms = E.MOVIES.filter(m => E.cascadeScore(m) === -1 && !E.taggedOut(m) && !E.listedBy(m, d) && E.listedBy(m, d, true));
+  assert.equal(held, heldFilms.length, "scoreHeldBackCount must agree with its own unscored-and-would-list set");
 });
 
 // ---- 10b. THE CHOSEN SORT'S OWN COMPARATOR DECIDES THE ORDER (CAS-702) ------------------------------------
@@ -1280,7 +1295,7 @@ test("CAS-727 AC2(b): in cinemas, a score between the Rental and Cinema markers 
   }
 });
 
-test("CAS-727 AC2(c)/(d)/AC3-in-miniature: earned is fixed at admission — a film travels forward with its status, and a marker-less window after the start still follows", () => {
+test("CAS-727 AC2(c)/(d)/AC3-in-miniature: earned is fixed at admission — a film travels forward with its status, and a window dropped to Off (CAS-1128) is skipped, not followed", () => {
   const film = scoredUnwatchedFilm(["upcoming"]);
   const id = film.tmdb_id;
   const savedStatus = film.status;
@@ -1300,17 +1315,16 @@ test("CAS-727 AC2(c)/(d)/AC3-in-miniature: earned is fixed at admission — a fi
       assert.equal(E.notify[id].wins.rent, true, "AC2(c): standing overtakes earned once the film reaches rental");
       assert.equal(E.notify[id].wins.in_cinema, false);
 
-      // (d), CAS-917 start-window model: this agent's start window is Cinema (its earliest marker-carrying
-      // window), so Rental — later than the start — is a FOLLOWED window regardless of whether it carries
-      // its own marker. Setting it to Never (no marker) no longer skips it forward to the next real marker
-      // (Streaming) the way it did before CAS-917 — a null marker on a window after the start now means
-      // "follows", not "excluded". Removing Rental's marker must still land the film at Rental.
+      // (d), CAS-1128: windows are independent on/off now (CAS-917's start-window-forward model retired) —
+      // dropping Rental's own marker to Never switches that window OFF for this agent, so placement must
+      // skip it, not land on it. Streaming still carries its own marker (never nulled by this test), so the
+      // film moves on to it, the next window it reaches that this agent still has ON.
       const c = E.cascades.find(x => x.id === cId);
       c.watchMarkers.rent = null;
       E.recomputeFound();
-      assert.equal(E.notify[id].wins.rent, true, "AC2(d): a marker-less Rental after the start window still follows");
+      assert.equal(E.notify[id].wins.rent, false, "AC2(d), CAS-1128: an OFF Rental must never be placed in");
       assert.equal(E.notify[id].wins.in_cinema, false);
-      assert.equal(E.notify[id].wins.stream, false);
+      assert.equal(E.notify[id].wins.stream, true, "AC2(d), CAS-1128: placement must move on to the next ON window (Streaming)");
     });
   } finally {
     delete E.notify[id];
@@ -2087,6 +2101,9 @@ function fakeCas726Supabase(seed){
     const builder = { then(resolve, reject){
       return Promise.resolve({ data: rows.map(r => ({ ...r })), error: null }).then(resolve, reject);
     } };
+    // CAS-1096: acctLoad chains .select("*").order(pk,...).range(from,to) before its own .then() — both
+    // are no-ops here, one page already covers every fixture this file seeds.
+    builder.order = () => builder;
     builder.range = () => builder;   // CAS-1049: loadAgentFilms pages with .range(); one page covers this fixture
     return builder;
   }
@@ -2094,6 +2111,8 @@ function fakeCas726Supabase(seed){
     const conds = [];
     const builder = {
       eq(col, val){ conds.push([col, val]); return builder; },
+      // CAS-1096: acctOp's "delete" kind calls .match(op.match) — one call, every column at once.
+      match(obj){ Object.entries(obj).forEach(([col, val]) => conds.push([col, val])); return builder; },
       then(resolve, reject){
         state[table] = state[table].filter(r => !conds.every(([c, v]) => r[c] === v));
         return Promise.resolve({ error: null }).then(resolve, reject);
@@ -2106,7 +2125,10 @@ function fakeCas726Supabase(seed){
       return {
         select(){ return selectBuilder(state[table]); },
         upsert(rows){
-          rows.forEach(row => {
+          // CAS-1096: film_watch now pushes through acctOp's "upsert" kind — a single row object, not an
+          // array — alongside agent_films' own array-based chunked upsert, which still calls this the old way.
+          const list = Array.isArray(rows) ? rows : [rows];
+          list.forEach(row => {
             const i = state[table].findIndex(x => keyOf[table](x) === keyOf[table](row));
             if(i >= 0) state[table][i] = { ...state[table][i], ...row }; else state[table].push({ ...row });
           });
@@ -2138,7 +2160,7 @@ test("CAS-726 AC2: a manual Watch On tick round-trips through film_watch.sources
   signInWithClient(client);
 
   E.toggleFilmOpt(m.tmdb_id, level.key);          // the real manual-tick wire code, not a direct field poke
-  await E.CascadePersistence.syncWatchesNow();
+  await new Promise(r => setTimeout(r, 0));       // CAS-1096: let pushFilmWatch's own acctOp call resolve
   await E.CascadePersistence.loadFilmWatches();    // simulate a reload: refetch the account from scratch
 
   assert.equal(E.filmWatchSource(m.tmdb_id), "manual",
@@ -2207,7 +2229,7 @@ test("CAS-726: a locally-written agent_films row (setAgentFilm) survives a push-
 
   E.CascadePersistence.setAgentFilm(cascadeId, m.tmdb_id,
     { admission_score: 91, admission_status: "upcoming", agent_sig: "sig-c" });
-  await E.CascadePersistence.syncAgentFilmsNow();
+  await new Promise(r => setTimeout(r, 0));   // CAS-1097: let pushAgentFilmAdmission's own acctOp call resolve
   await E.CascadePersistence.loadAgentFilms();   // simulate a reload
 
   const rows = E.CascadePersistence.agentFilmsFor(cascadeId);
@@ -2456,90 +2478,12 @@ test("CAS-736 AC4: recomputeFound writes no placement value before this device's
   });
 }));
 
-// ---- CASCADES ACCOUNT CONVERGENCE (CAS-734) --------------------------------------------------------------
-// Two devices signed in to the same account held permanently different agent sets: loadAccount resolved
-// every conflict in favour of the local cache unconditionally (no comparison of anything), reconcileCascades
-// resolved every conflict the OPPOSITE way (remote always wins), and a single edit upserted the whole array
-// instead of just the changed row. These tests exercise the real seam (window.CascadePersistence) against a
-// minimal fake Supabase client, same style as the CAS-681/CAS-726 harnesses above.
-const uuidFor = n => `00000734-0000-4000-8000-${String(n).padStart(12, "0")}`;
-function fakeCascadesSupabase(seed){
-  const state = { rows: (seed || []).map(r => ({ ...r })), upsertCalls: [] };
-  function selectBuilder(){
-    const builder = {
-      order(){ return builder; },   // the real query's ORDER BY — the fake does its own client-side sort
-      then(resolve, reject){
-        return Promise.resolve({ data: state.rows.map(r => ({ ...r })), error: null }).then(resolve, reject);
-      },
-    };
-    return builder;
-  }
-  function deleteBuilder(){
-    const conds = [];
-    const builder = {
-      eq(col, val){ conds.push([col, v => v === val]); return builder; },
-      in(col, vals){ const set = new Set(vals); conds.push([col, v => set.has(v)]); return builder; },
-      then(resolve, reject){
-        state.rows = state.rows.filter(r => !conds.every(([c, test]) => test(r[c])));
-        return Promise.resolve({ error: null }).then(resolve, reject);
-      },
-    };
-    return builder;
-  }
-  const client = {
-    from(table){
-      assert.equal(table, "cascades", "the cascades persistence seam must only ever touch the cascades table");
-      return {
-        select: () => selectBuilder(),
-        upsert(rows){
-          state.upsertCalls.push(rows);
-          const nowIso = new Date().toISOString();
-          const written = rows.map(r => {
-            const i = state.rows.findIndex(x => x.id === r.id);
-            const createdAt = (i >= 0 && state.rows[i].created_at) || r.created_at || nowIso;
-            const stored = { ...r, created_at: createdAt, updated_at: nowIso };
-            if(i >= 0) state.rows[i] = stored; else state.rows.push(stored);
-            return stored;
-          });
-          const result = { data: written.map(r => ({ id: r.id, updated_at: r.updated_at })), error: null };
-          return { select: async () => result, then(resolve, reject){ return Promise.resolve(result).then(resolve, reject); } };
-        },
-        delete: () => deleteBuilder(),
-      };
-    },
-  };
-  return { client, state };
-}
-function withCas734State(fn){
-  const savedCascades = E.cascades.slice();
-  const savedKnown = new Map(E.CascadePersistence.cascadeKnown);
-  const savedEdited = new Map(E.CascadePersistence.cascadeEditedAt);
-  E.CascadePersistence.cascadeKnown.clear();
-  E.CascadePersistence.cascadeEditedAt.clear();
-  return (async () => {
-    try { await fn(); }
-    finally {
-      E.cascades.length = 0; savedCascades.forEach(c => E.cascades.push(c));
-      E.CascadePersistence.cascadeKnown.clear();
-      savedKnown.forEach((v, k) => E.CascadePersistence.cascadeKnown.set(k, v));
-      E.CascadePersistence.cascadeEditedAt.clear();
-      savedEdited.forEach((v, k) => E.CascadePersistence.cascadeEditedAt.set(k, v));
-      signOut();
-    }
-  })();
-}
-
-test("CAS-734 AC2: app_template.html no longer justifies any rule with \"the local copy is the newer state\"", () => {
-  const src = fs.readFileSync(path.join(ROOT, "app_template.html"), "utf8");
-  assert.equal((src.match(/the local copy is the newer state/g) || []).length, 0);
-});
-
-test("CAS-734 AC5: both cascades account reads carry an explicit ORDER BY", () => {
-  const src = fs.readFileSync(path.join(ROOT, "app_template.html"), "utf8");
-  const matches = src.match(/\.order\("(created_at|updated_at)"/g) || [];
-  assert.ok(matches.length >= 2, `expected at least 2 explicit ORDER BY clauses on the cascades reads, found ${matches.length}`);
-});
-
+// ---- CASCADES: the order comparator (CAS-734 AC4) ------------------------------------------------------
+// CAS-1109 removed the rest of this old CAS-734/CAS-743/CAS-1132 conflict-resolution suite below (loadAccount/
+// reconcileCascades per-row conflict resolution, cascadeKnown/cascadeEditedAt, cascadeDirtyRows) along with the
+// functions it tested, which no longer exist now that agents move onto the account store (acctLoad/acctOp) —
+// see tests/js/cas1109-agents-account-store.test.mjs for the new architecture's own equivalent coverage.
+// cascadeOrderCmp itself is unchanged and still used to sort the agent list, so its own test survives here.
 test("CAS-734 AC4: the order comparator is a total order — a tie on .order resolves via created_at then id, never 0", () => {
   const cmp = E.CascadePersistence.cascadeOrderCmp;
   const a = { id: "aaaaaaaa-0000-4000-8000-000000000001", order: 5, created_at: "2026-01-01T00:00:00.000Z" };
@@ -2555,183 +2499,6 @@ test("CAS-734 AC4: the order comparator is a total order — a tie on .order res
   assert.equal(Math.sign(cmp(c, d)), -Math.sign(cmp(d, c)), "the comparator must be stable/antisymmetric on id too");
 });
 
-test("CAS-734 AC6: a single-agent rename upserts exactly one row, not the whole array", () => withCas734State(async () => {
-  const idA = uuidFor(1), idB = uuidFor(2);
-  // CAS-743: real (user-set-shaped) watchMarkers, not normCascade's own guess — this test is about the rename
-  // dirty-row derivation, and a still-defaulted watchMarkers would itself hold the row out of every push.
-  const markers = { in_cinema: 90, premium: null, rent: 80, stream: 70 };
-  const a = E.normCascade({ id: idA, name: "Agent A", order: 0, watchMarkers: { ...markers } });
-  const b = E.normCascade({ id: idB, name: "Agent B", order: 1, watchMarkers: { ...markers } });
-  E.cascades.length = 0; E.cascades.push(a, b);
-  const { client, state } = fakeCascadesSupabase([]);
-  signInWithClient(client);
-
-  // Establish both as already-confirmed by the account (this first push isn't what the AC is about).
-  await E.CascadePersistence.syncNow();
-  state.upsertCalls.length = 0;
-
-  a.name = "Agent A renamed";
-  E.CascadePersistence.saveCascades();
-  await E.CascadePersistence.syncNow();
-
-  const lastUpsert = state.upsertCalls[state.upsertCalls.length - 1] || [];
-  assert.equal(lastUpsert.length, 1, "a one-agent rename must upsert exactly one row");
-  assert.equal(lastUpsert[0].id, idA, "the one row upserted must be the agent that actually changed");
-}));
-
-test("CAS-734 AC3(a): a local edit older than the account's own row loses — the account row is what ends up in cascades", () => withCas734State(async () => {
-  const id = uuidFor(3);
-  const remoteRow = { id, user_id: "cas681-test-user", name: "Account version",
-    criteria: { order: 0 }, alert_moments: [], active: true,
-    created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-06-01T00:00:00.000Z" };
-  const { client } = fakeCascadesSupabase([remoteRow]);
-  signInWithClient(client);
-
-  const local = E.normCascade({ id, name: "Local version (stale)", order: 0 });
-  E.cascades.length = 0; E.cascades.push(local);
-  // This device's own record of when IT last changed this agent — BEFORE the account row's own updated_at
-  // above, so the account is the newer copy even though the content genuinely differs.
-  E.CascadePersistence.cascadeEditedAt.set(id, "2026-03-01T00:00:00.000Z");
-
-  await E.CascadePersistence.loadAccount();
-
-  const kept = E.cascades.find(c => c.id === id);
-  assert.ok(kept, "the agent must still be present");
-  assert.equal(kept.name, "Account version", "the account's newer row must win when the local edit is older");
-}));
-
-test("CAS-734 AC3(b): a local edit newer than the account's own row wins and is pushed", () => withCas734State(async () => {
-  const id = uuidFor(4);
-  const remoteRow = { id, user_id: "cas681-test-user", name: "Account version",
-    criteria: { order: 0 }, alert_moments: [], active: true,
-    created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-05T00:00:00.000Z" };
-  const { client, state } = fakeCascadesSupabase([remoteRow]);
-  signInWithClient(client);
-
-  // CAS-743: real (user-set-shaped) watchMarkers — this test is about a genuine local edit winning and
-  // pushing, and a still-defaulted watchMarkers would itself hold the row out of every push.
-  const local = E.normCascade({ id, name: "Local version (newer)", order: 0,
-    watchMarkers: { in_cinema: 90, premium: null, rent: 80, stream: 70 } });
-  E.cascades.length = 0; E.cascades.push(local);
-  // This device changed it AFTER the account row's own updated_at above.
-  E.CascadePersistence.cascadeEditedAt.set(id, "2026-06-01T00:00:00.000Z");
-
-  await E.CascadePersistence.loadAccount();
-  const kept = E.cascades.find(c => c.id === id);
-  assert.equal(kept.name, "Local version (newer)", "the newer local edit must win");
-
-  await E.CascadePersistence.syncNow();
-  const lastUpsert = state.upsertCalls[state.upsertCalls.length - 1] || [];
-  assert.ok(lastUpsert.some(r => r.id === id && r.name === "Local version (newer)"),
-    "the winning local edit must actually be pushed back to the account");
-}));
-
-test("CAS-734 AC3(c): loadAccount and reconcileCascades resolve conflicts through the SAME function", () => withCas734State(async () => {
-  // Structural: one definition, exactly two call sites (loadAccount, reconcileCascades) — not two inline
-  // rules that happen to agree, which is exactly the shape that let them silently disagree before this fix.
-  const src = fs.readFileSync(path.join(ROOT, "app_template.html"), "utf8");
-  const iifeSrc = src.slice(src.indexOf("function cascadeToRow("), src.indexOf("window.CascadePersistence = {"));
-  const defCount = (iifeSrc.match(/function resolveCascadeConflict\(/g) || []).length;
-  const totalCount = (iifeSrc.match(/resolveCascadeConflict\(/g) || []).length;
-  assert.equal(defCount, 1, "resolveCascadeConflict must be defined exactly once");
-  assert.equal(totalCount, 3, "resolveCascadeConflict's one definition plus exactly two call sites (loadAccount, reconcileCascades)");
-
-  // Behavioural: the identical conflict resolves identically whichever path is called.
-  const id = uuidFor(5);
-  const remoteRow = { id, user_id: "cas681-test-user", name: "Account version",
-    criteria: { order: 0 }, alert_moments: [], active: true,
-    created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-06-01T00:00:00.000Z" };
-  const { client } = fakeCascadesSupabase([remoteRow]);
-  signInWithClient(client);
-  const local = E.normCascade({ id, name: "Local version (stale)", order: 0 });
-  E.cascades.length = 0; E.cascades.push(local);
-  E.CascadePersistence.cascadeEditedAt.set(id, "2026-03-01T00:00:00.000Z");
-
-  await E.CascadePersistence.reconcileCascades();
-  const kept = E.cascades.find(c => c.id === id);
-  assert.equal(kept.name, "Account version", "reconcileCascades must resolve this exactly as loadAccount's own AC3(a) test does");
-}));
-
-test("CAS-734 AC3(d): an agent present only on this device, with an id the account has never confirmed, is left alone", () => withCas734State(async () => {
-  const otherId = uuidFor(6), localOnlyId = uuidFor(7);
-  const remoteRow = { id: otherId, user_id: "cas681-test-user", name: "Some other agent",
-    criteria: { order: 0 }, alert_moments: [], active: true,
-    created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" };
-  const { client } = fakeCascadesSupabase([remoteRow]);
-  signInWithClient(client);
-
-  const localOnly = E.normCascade({ id: localOnlyId, name: "Brand new, unsynced", order: 1 });
-  E.cascades.length = 0; E.cascades.push(localOnly);
-  // Never confirmed by the account: withCas734State starts cascadeKnown empty, and this id isn't in it.
-
-  await E.CascadePersistence.loadAccount();
-
-  const kept = E.cascades.find(c => c.id === localOnlyId);
-  assert.ok(kept, "a genuinely new, never-synced local agent must survive a loadAccount call");
-  assert.equal(kept.name, "Brand new, unsynced");
-}));
-
-// ---- A PRE-v0.9.3 CACHED AGENT MUST NEVER FLATTEN AN ACCOUNT'S REAL watchMarkers (CAS-743) ----------------
-// CAS-734's per-row resolver compared timestamps alone, which assumed a local copy differing from the account
-// only because someone actually edited it. A device whose cache predates CAS-727/729 (v0.9.3) has no
-// watchMarkers at all; normCascade's own load-time fill then GUESSES one (every window flattened to the old
-// scoreFloor) rather than leaving the field unset. That guess can carry a plausible, even newer, local edit
-// timestamp while being structurally older than an account row some other device already gave real per-window
-// values — resolveCascadeConflict's timestamp-only rule let the guess win and destroyed the real values.
-
-test("CAS-743 AC2: a local agent with no watchMarkers key never overwrites an account row that has one, even when the local edit timestamp is the newer of the two", () => withCas734State(async () => {
-  const id = uuidFor(8);
-  const remoteRow = { id, user_id: "cas681-test-user", name: "Account version",
-    criteria: { order: 0, watchMarkers: { in_cinema: 90, premium: 75, rent: 60, stream: 50 } },
-    alert_moments: [], active: true,
-    created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-05T00:00:00.000Z" };
-  const { client } = fakeCascadesSupabase([remoteRow]);
-  signInWithClient(client);
-
-  // The pre-v0.9.3 cache shape: no watchMarkers key at all. normCascade fills one in and flags it as a guess.
-  const local = E.normCascade({ id, name: "Local version (stale, pre-v0.9.3 cache)", order: 0 });
-  assert.ok(local._watchMarkersDefaulted, "harness check: normCascade must flag a filled-in watchMarkers as defaulted");
-  E.cascades.length = 0; E.cascades.push(local);
-  // This device's own edit time is NEWER than the account row's updated_at — under a plain timestamp rule
-  // this would win. It must not: the local value is a guess, not something the user actually set.
-  E.CascadePersistence.cascadeEditedAt.set(id, "2026-06-01T00:00:00.000Z");
-
-  await E.CascadePersistence.loadAccount();
-
-  const kept = E.cascades.find(c => c.id === id);
-  assert.ok(kept, "the agent must still be present");
-  assert.equal(kept.name, "Account version",
-    "the account's real watchMarkers must win over a defaulted local guess, whatever the timestamps say");
-  assert.deepEqual(kept.watchMarkers, { in_cinema: 90, premium: 75, rent: 60, stream: 50 });
-}));
-
-test("CAS-743 AC3: an agent whose watchMarkers is still normCascade's default guess is excluded from the rows handed to the upsert; an agent with a real, user-set marker is included", () => withCas734State(async () => {
-  const idA = uuidFor(9), idB = uuidFor(10);
-  const a = E.normCascade({ id: idA, name: "Agent A (never touched)", order: 0 });
-  const b = E.normCascade({ id: idB, name: "Agent B", order: 1 });
-  assert.ok(a._watchMarkersDefaulted, "harness check: A's watchMarkers must be normCascade's own guess");
-  E.cascades.length = 0; E.cascades.push(a, b);
-  const { client } = fakeCascadesSupabase([]);
-  signInWithClient(client);
-
-  // Confirm both to the account once — the normal first sync of a brand new agent, defaulted or not.
-  await E.CascadePersistence.syncNow();
-
-  // Reproduce the ticket's own root cause directly: a cascadeKnown record that predates the field (or is
-  // simply stale) makes A's CURRENT, still-untouched content look dirty for a reason the user never caused.
-  const knownA = E.CascadePersistence.cascadeKnown.get(idA);
-  E.CascadePersistence.cascadeKnown.set(idA, { ...knownA, sig: "pre-v0.9.3-stale-sig" });
-
-  // B gets a real, user-driven edit through the actual mutator — genuinely dirty for a real reason.
-  E.setWatchMarker(b, "in_cinema", 88);
-  assert.ok(!b._watchMarkersDefaulted, "harness check: setWatchMarker must clear B's defaulted flag");
-
-  const dirty = E.CascadePersistence.cascadeDirtyRows();
-  assert.ok(!dirty.some(c => c.id === idA),
-    "an agent whose watchMarkers is still the normCascade default guess must never reach the rows handed to the upsert");
-  assert.ok(dirty.some(c => c.id === idB),
-    "an agent with a real, user-set marker change must still reach the rows handed to the upsert");
-}));
 
 // ---- MANUAL WATCH ON NEVER OVERWRITTEN, EVEN ACROSS DEVICES (CAS-735) -----------------------------------
 // Two independent gaps let an explicit manual Watch On pick get silently reverted to auto: applyWatchRows
@@ -2950,15 +2717,22 @@ function fakeCas739Supabase(seed){
                   notify_prefs: (seed.notify_prefs || []).map(r => ({ ...r })) };
   const keyOf = { film_picks: r => `${r.user_id}:${r.movie_id}`, notify_prefs: r => r.user_id };
   function selectBuilder(rows){
-    return { then(resolve, reject){
+    const builder = { then(resolve, reject){
       return Promise.resolve({ data: rows.map(r => ({ ...r })), error: null }).then(resolve, reject);
     } };
+    // CAS-1096: acctLoad chains .select("*").order(pk,...).range(from,to) before its own .then() — both
+    // are no-ops here, one page already covers every fixture this file seeds.
+    builder.order = () => builder;
+    builder.range = () => builder;
+    return builder;
   }
   function deleteBuilder(table){
     const conds = [];
     const builder = {
       eq(col, val){ conds.push([col, v => v === val]); return builder; },
       in(col, vals){ const set = new Set(vals); conds.push([col, v => set.has(v)]); return builder; },
+      // CAS-1096: acctOp's "delete" kind calls .match(op.match) — one call, every column at once.
+      match(obj){ Object.entries(obj).forEach(([col, val]) => conds.push([col, v => v === val])); return builder; },
       then(resolve, reject){
         state[table] = state[table].filter(r => !conds.every(([c, test]) => test(r[c])));
         return Promise.resolve({ error: null }).then(resolve, reject);
@@ -2971,7 +2745,10 @@ function fakeCas739Supabase(seed){
       return {
         select(){ return selectBuilder(state[table]); },
         upsert(rows){
-          rows.forEach(row => {
+          // CAS-1096: film_picks now pushes through acctOp's "upsert" kind — a single row object, not an
+          // array.
+          const list = Array.isArray(rows) ? rows : [rows];
+          list.forEach(row => {
             const i = state[table].findIndex(x => keyOf[table](x) === keyOf[table](row));
             if(i >= 0) state[table][i] = { ...state[table][i], ...row }; else state[table].push({ ...row });
           });
@@ -3012,7 +2789,11 @@ test("CAS-739 AC3: pinnedTo and notIn survive a save/load round-trip through the
   const { client } = fakeCas739Supabase({});
   signInWithClient(client);
 
-  await E.CascadePersistence.syncNotifyNow();     // push, through pickRows()
+  // CAS-1096: pushFilmPick is the real per-row acctOp write seam pinFilmToCascadeAndRepaint/deleteAgentAsk
+  // call — drive it directly for both ids, the same way syncNotifyNow used to push everything at once.
+  E.CascadePersistence.pushFilmPick(pinnedId);
+  E.CascadePersistence.pushFilmPick(movedId);
+  await new Promise(r => setTimeout(r, 0));   // let both acctOp calls resolve against the fake client
   delete E.notify[pinnedId]; delete E.notify[movedId];   // simulate a fresh device: nothing local yet
   await E.CascadePersistence.loadFilmPicks();      // load, back into notify
 
@@ -3059,23 +2840,35 @@ test("CAS-844 AC3: a loaded film_picks row with state \"off\" does not remove th
 // device loaded without it, read the scope as unanswered, silently re-enabled services-only, and pushed that
 // back over the account — so a setting the user had turned off returned and stuck. touched now rides the
 // same row/merge rule taste and watch_windows already do.
-function fakeCas740Supabase(row){
-  const state = { row: row ? { ...row } : null, upsertCalls: [] };
-  const client = {
-    from(table){
-      assert.equal(table, "user_prefs", "this fake only serves user_prefs");
-      return {
-        select(){ return { limit: async () => ({ data: state.row ? [{ ...state.row }] : [], error: null }) }; },
-        upsert(rows){
-          state.upsertCalls.push(rows.map(r => ({ ...r })));
-          rows.forEach(r => { state.row = { ...r }; });
-          return Promise.resolve({ data: rows, error: null });
-        },
-      };
+// CAS-1095: user_prefs moved off the whole-row upsert onto acctLoad (a pure read) / acctOp's per-column
+// update — this single-row fake serves both chains (acctLoad's select().order().range(), acctOp's
+// update().match(), and the one-time-missing-row upsert()) for whichever table it's built for. Reused by
+// every user_prefs/notify_prefs test below (CAS-740/741/742/775).
+function fakeSingleRowTable(table, row){
+  const state = { row: row ? { ...row } : null, pushCalls: [] };
+  const b = {
+    select(){ return b; },
+    order(){ return b; },
+    range(){ return b; },
+    update(fields){ b._fields = fields; return b; },
+    match(){ return b; },
+    upsert(rows){ b._fields = rows[0]; return b; },
+    then(resolve, reject){
+      let result;
+      if(b._fields){
+        state.pushCalls.push({ ...b._fields });
+        state.row = { ...(state.row || {}), ...b._fields };
+        result = { data: [{ ...b._fields }], error: null, status: 200 };
+        b._fields = null;   // one-shot per chain — the next from(table) call starts a fresh write, if any
+      } else {
+        result = { data: state.row ? [{ ...state.row }] : [], error: null, status: 200 };
+      }
+      return Promise.resolve(result).then(resolve, reject);
     },
   };
-  return { client, state };
+  return { client: { from(t){ assert.equal(t, table, `this fake only serves ${table}`); return b; } }, state };
 }
+function fakeCas740Supabase(row){ return fakeSingleRowTable("user_prefs", row); }
 function withCas740State(fn){
   // CAS-957: both keys are namespaced by account now (acctKey) — signInWithClient never changes acctSuffix
   // (it pokes CascadeAuth directly, bypassing the real sign-in chokepoint), so every test in this file reads
@@ -3096,14 +2889,14 @@ function withCas740State(fn){
   })();
 }
 
-test("CAS-740 AC2: userPrefsRow() carries touched, and a save/load round trip preserves false", () => withCas740State(async () => {
+test("CAS-740 AC2: userPrefsRow() carries touched, and a push/load round trip preserves false", () => withCas740State(async () => {
   E.prefs.touched = false;
   assert.equal(E.CascadePersistence.userPrefsRow().touched, false, "userPrefsRow() must include touched");
 
-  const { client, state } = fakeCas740Supabase(null);
+  const { client, state } = fakeCas740Supabase({ user_id: "cas740-test-user", touched: false });
   signInWithClient(client);
-  await E.CascadePersistence.syncUserPrefsNow();
-  assert.equal(state.row.touched, false, "a freshly-seeded row must carry touched:false, not drop it");
+  await E.CascadePersistence.pushUserPrefsCols(["touched"]);
+  assert.equal(state.row.touched, false, "the pushed row must carry touched:false, not drop it");
 
   E.prefs.touched = true;   // corrupt local memory so the next assertion proves the LOAD, not a no-op
   await E.CascadePersistence.loadUserPrefs();
@@ -3115,45 +2908,23 @@ test("CAS-740 AC3: an account that already answered touched=true is adopted on l
   const remoteRow = {
     user_id: "cas740-test-user", sub_services: [], store_services: [], services_only: false,
     taste: JSON.parse(JSON.stringify(E.tasteBase)), watch_windows: JSON.parse(JSON.stringify(E.watchPrefs)),
-    touched: true, never_show: [], onb_depth: "best", framing: true,
+    touched: true, never_show: [], onb_depth: "best", framing: true, ref_code: "cas740ac3",
   };
   const { client, state } = fakeCas740Supabase(remoteRow);
   signInWithClient(client);
 
   await E.CascadePersistence.loadUserPrefs();
   assert.equal(E.prefs.touched, true, "the account's real touched:true must win over this device's stale local false");
-  assert.equal(state.upsertCalls.length, 0, "a row that already answers everything must not trigger any write");
+  assert.equal(state.pushCalls.length, 0, "a row that already answers everything must not trigger any write");
 }));
 
-// ---- WHOLE-ROW UPSERTS DON'T OVERWRITE ANOTHER DEVICE (CAS-741) --------------------------------------------
-// notify_prefs pushed unconditionally, with no gate on whether this device's own load had resolved or even
-// succeeded — a failed load still let the next edit push this device's local defaults over a real account
-// row (muting email alerts, erasing a real address).
-function fakeCas741NotifySupabase({ row = null, loadError = null } = {}){
-  const state = { row: row ? { ...row } : null, upsertCalls: [] };
-  const client = {
-    from(table){
-      if(table === "notify_prefs"){
-        return {
-          select(){ return { limit: async () => (loadError ? { data: null, error: loadError }
-            : { data: state.row ? [{ ...state.row }] : [], error: null }) }; },
-          upsert(rows){
-            state.upsertCalls.push(rows.map(r => ({ ...r })));
-            rows.forEach(r => { state.row = { ...r }; });
-            return Promise.resolve({ data: rows, error: null });
-          },
-        };
-      }
-      // film_picks — runNotifySync always touches it too; accepted and discarded, not what these tests are about.
-      return {
-        select(){ return { limit: async () => ({ data: [], error: null }) }; },
-        upsert: async () => ({ data: [], error: null }),
-        delete(){ return { eq(){ return this; }, in: async () => ({ error: null }) }; },
-      };
-    },
-  };
-  return { client, state };
-}
+// ---- LOADS NEVER WRITE (CAS-741, restated under CAS-1095) --------------------------------------------------
+// Originally: notify_prefs pushed unconditionally, with no gate on whether this device's own load had
+// resolved or even succeeded, so the next edit could push this device's local defaults over a real account
+// row (muting email alerts, erasing a real address). CAS-1095 removed the whole-row push (and therefore the
+// race) entirely: notify_prefs now only loads through acctLoad (a pure read) and only writes through
+// pushNotifyPrefs, which a load path never calls — there is no longer a "load in flight/failed" gate to
+// test, because a load can no longer trigger a write of any kind, clean or stale.
 function withCas741NotifyState(fn){
   const savedReady = E.CascadePersistence.notifyPrefsReady;
   const savedPrefs = { ...E.notifyPrefs };
@@ -3167,32 +2938,24 @@ function withCas741NotifyState(fn){
   })();
 }
 
-test("CAS-741 AC2(a): notify_prefs is never pushed while this device's own load has not resolved", () => withCas741NotifyState(async () => {
-  E.CascadePersistence.notifyPrefsReady = false;   // simulates loadNotifyPrefs still being in flight
-  const { client, state } = fakeCas741NotifySupabase({});
-  signInWithClient(client);
-
-  E.notifyPrefs.emailOn = true; E.notifyPrefs.email = "test@example.com";
-  await E.CascadePersistence.syncNotifyNow();
-
-  assert.equal(state.upsertCalls.length, 0,
-    "no notify_prefs write may be issued before this device's own load has resolved — fails on current code");
-}));
-
-test("CAS-741 AC2(b): a failed notify_prefs load suppresses the write rather than pushing this device's defaults", () => withCas741NotifyState(async () => {
-  const remoteRow = { user_id: "cas681-test-user", in_app: true, email_on: true,
-    email_address: "real@account.com", excluded_moments: [] };
-  const { client, state } = fakeCas741NotifySupabase({ row: remoteRow, loadError: { message: "network down" } });
+test("CAS-741 (CAS-1095): loadNotifyPrefs never writes notify_prefs, whether the load succeeds or fails", () => withCas741NotifyState(async () => {
+  const remoteRow = { user_id: "cas681-test-user", in_app: true, email_on: true, email_address: "real@account.com" };
+  const { client, state } = fakeSingleRowTable("notify_prefs", remoteRow);
   signInWithClient(client);
 
   E.CascadePersistence.notifyPrefsReady = false;   // fireAccountFanout's own step, before kicking off the load
-  await E.CascadePersistence.loadNotifyPrefs();   // simulated load failure
-  E.notifyPrefs.emailOn = false; E.notifyPrefs.email = "";   // this device's own (unrelated) local default
-  await E.CascadePersistence.syncNotifyNow();
+  await E.CascadePersistence.loadNotifyPrefs();
+  assert.equal(state.pushCalls.length, 0, "a clean load must never write notify_prefs back");
+  assert.equal(E.notifyPrefs.email, "real@account.com", "the account's real row is adopted");
 
-  assert.equal(state.upsertCalls.length, 0,
-    "a failed load must suppress the notify_prefs write, not fall through to pushing this device's defaults over the real row — fails on current code");
-  assert.equal(state.row.email_address, "real@account.com", "the account's real row must be untouched");
+  // A failed load (client throws/returns an error) must also never fall through to a write.
+  const throwingClient = { from(t){ assert.equal(t, "notify_prefs"); return { select(){ return this; },
+    order(){ return this; }, range(){ return this; },
+    then(resolve){ return Promise.resolve({ data: null, error: { message: "network down" } }).then(resolve); } }; } };
+  signInWithClient(throwingClient);
+  E.CascadePersistence.notifyPrefsReady = false;
+  await E.CascadePersistence.loadNotifyPrefs();
+  assert.equal(E.CascadePersistence.notifyPrefsReady, false, "a failed load must not flip notifyPrefsReady true");
 }));
 
 // ---- PER-DEVICE CACHES AND STAMPS MADE TWO DEVICES DISAGREE (CAS-742) --------------------------------------
@@ -3370,7 +3133,7 @@ test("CAS-715 AC7: the New filter is registered in the filt registry and clearin
 // device left it lit on every other. It now rides the same user_prefs row/merge rule as taste and
 // watch_windows (CAS-561), reusing the CAS-740 fake (that double serves "user_prefs" generically, not just
 // the touched/never_show/onb_depth/framing fields it was written for).
-test("CAS-742: movingSeen persists through user_prefs — save/load round trip, same carry-up rule as taste", () => withCas740State(async () => {
+test("CAS-742: movingSeen persists through user_prefs — push/load round trip", () => withCas740State(async () => {
   const fid = String(E.MOVIES[0].tmdb_id);
   const saved = E.movingSeen[fid];
   try {
@@ -3378,10 +3141,10 @@ test("CAS-742: movingSeen persists through user_prefs — save/load round trip, 
     assert.deepEqual(E.CascadePersistence.userPrefsRow().moving_seen, E.movingSeen,
       "userPrefsRow() must include the live movingSeen object");
 
-    const { client, state } = fakeCas740Supabase(null);
+    const { client, state } = fakeCas740Supabase({ user_id: "cas740-test-user" });
     signInWithClient(client);
-    await E.CascadePersistence.syncUserPrefsNow();
-    assert.deepEqual(state.row.moving_seen, E.movingSeen, "a freshly-seeded row must carry moving_seen");
+    await E.CascadePersistence.pushUserPrefsCols(["moving_seen"]);
+    assert.deepEqual(state.row.moving_seen, E.movingSeen, "the pushed row must carry moving_seen");
 
     delete E.movingSeen[fid];   // corrupt local memory so the next assertion proves the LOAD, not a no-op
     await E.CascadePersistence.loadUserPrefs();
@@ -3610,15 +3373,15 @@ function withCas775RegState(fn){
 // userPrefsRow()'s return both live inside the vm sandbox; the plain `[o]`/`[]` literal on the other side is
 // constructed in THIS file's realm. Comparing the two arrays directly fails on that prototype check alone,
 // independent of their contents (the same gotcha this suite has hit for chained .map()/.flatMap() results).
-test("CAS-775: userPrefsRow() carries the register, and a save/load round trip preserves it, including an empty array", () => withCas775RegState(async () => {
+test("CAS-775: userPrefsRow() carries the register, and a push/load round trip preserves it, including an empty array", () => withCas775RegState(async () => {
   E.occasionReg.length = 0;
   const o = E.createOccasion("CAS775-roundtrip");
   assert.deepEqual([...E.CascadePersistence.userPrefsRow().occasions], [o], "userPrefsRow() must include the live register");
 
-  const { client, state } = fakeCas740Supabase(null);
+  const { client, state } = fakeCas740Supabase({ user_id: "cas740-test-user" });
   signInWithClient(client);
-  await E.CascadePersistence.syncUserPrefsNow();
-  assert.deepEqual([...state.row.occasions], [o], "a freshly-seeded row must carry the register, not drop it");
+  await E.CascadePersistence.pushUserPrefsCols(["occasions"]);
+  assert.deepEqual([...state.row.occasions], [o], "the pushed row must carry the register, not drop it");
 
   E.occasionReg.length = 0;   // corrupt local memory so the next assertion proves the LOAD, not a no-op
   await E.CascadePersistence.loadUserPrefs();
@@ -3631,35 +3394,37 @@ test("CAS-775: userPrefsRow() carries the register, and a save/load round trip p
   assert.deepEqual([...E.occasionReg], [], "an account row with occasions:[] must overwrite this device's local register — an empty array is a real answer");
 }));
 
-test("CAS-775 AC9: a user_prefs row with no occasions column at all must not throw, and carries this device's register up", () => withCas775RegState(async () => {
+// CAS-1095: carry-up (self-heal a missing/NULL column by pushing this device's own value back up) is
+// removed entirely — a field the account has no answer for is now simply left alone: not overwritten, and
+// never pushed either. AC9/AC10 restated under that rule.
+test("CAS-775 AC9 (CAS-1095): a user_prefs row with no occasions column at all leaves this device's register untouched, and pushes nothing", () => withCas775RegState(async () => {
   const o = E.createOccasion("CAS775-ac9-local-only");
   const remoteRow = {   // no `occasions` key — simulates the column not existing on the live project yet
     user_id: "cas740-test-user", sub_services: [], store_services: [], services_only: false,
     taste: JSON.parse(JSON.stringify(E.tasteBase)), watch_windows: JSON.parse(JSON.stringify(E.watchPrefs)),
-    touched: true, never_show: [], onb_depth: "best", framing: true, moving_seen: {},
+    touched: true, never_show: [], onb_depth: "best", framing: true, moving_seen: {}, ref_code: "cas775ac9",
   };
   const { client, state } = fakeCas740Supabase(remoteRow);
   signInWithClient(client);
   await assert.doesNotReject(() => E.CascadePersistence.loadUserPrefs(),
     "a missing occasions column must read exactly like NULL, never throw");
   assert.deepEqual([...E.occasionReg], [o], "this device's local register must survive untouched when the column doesn't exist yet");
+  assert.equal(state.pushCalls.length, 0, "a load must never push this device's register back, missing column or not");
 }));
 
-test("CAS-775 AC10: a user_prefs row with occasions:NULL carries this device's local register up, not an empty one", () => withCas775RegState(async () => {
+test("CAS-775 AC10 (CAS-1095): a user_prefs row with occasions:NULL leaves this device's local register untouched, and pushes nothing", () => withCas775RegState(async () => {
   const o = E.createOccasion("CAS775-ac10-local-only");
   const remoteRow = {
     user_id: "cas740-test-user", sub_services: [], store_services: [], services_only: false,
     taste: JSON.parse(JSON.stringify(E.tasteBase)), watch_windows: JSON.parse(JSON.stringify(E.watchPrefs)),
     touched: true, never_show: [], onb_depth: "best", framing: true, moving_seen: {}, occasions: null,
+    ref_code: "cas775ac10",
   };
   const { client, state } = fakeCas740Supabase(remoteRow);
   signInWithClient(client);
   await E.CascadePersistence.loadUserPrefs();
-  assert.deepEqual([...E.occasionReg], [o], "a NULL occasions column must carry this device's local register up, not overwrite it with an empty one");
-  // loadUserPrefs schedules the carry-up push on a debounce timer rather than firing it inline — force it
-  // via the same real sync function the timer would eventually call, and check what it actually pushes.
-  await E.CascadePersistence.syncUserPrefsNow();
-  assert.deepEqual([...state.row.occasions], [o], "the carried-up local register, not an empty one, must be what gets pushed back to the account");
+  assert.deepEqual([...E.occasionReg], [o], "a NULL occasions column must leave this device's local register exactly as it was");
+  assert.equal(state.pushCalls.length, 0, "a load must never push this device's register back, NULL column or not");
 }));
 
 test("CAS-775 AC11: an occasion id matching no register entry is ignored on read and gone after the agent's next save", () => {

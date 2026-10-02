@@ -7,8 +7,10 @@
 -- Twenty-three tables:
 --   schema_migrations — the migration ledger (CAS-1092): one row per applied migration file.
 --   cascades      — one row per saved agent, per user (the user owns their rows via RLS).
---                   Soft-deletable since CAS-1092 (deleted_at) via the delete_agent() RPC; a hard
---                   DELETE is archived into account_deleted_rows (below) rather than lost for good.
+--                   Soft-deletable since CAS-1092 (deleted_at) via the delete_agent() RPC; a client
+--                   hard DELETE is no longer permitted at all (CAS-1102) — only service_role/a
+--                   security-definer function can, and that is still archived into
+--                   account_deleted_rows (below) rather than lost for good.
 --   user_prefs    — the account-level defaults a NEW agent starts from, plus the services the
 --                   user actually pays for. CAS-211.
 --   user_films    — one row per (user, film) the user has said something about: liked, so-so,
@@ -127,8 +129,6 @@ create index if not exists cascades_user_id_idx on public.cascades (user_id);
 create index if not exists cascades_active_idx  on public.cascades (active) where active;
 
 -- CAS-1092: soft delete for agents, independent of the archive-on-hard-delete safety net below.
--- Hard deletes remain permitted for now (a later ticket removes them) — delete_agent() is an
--- additional, softer path, not a replacement for cascades_owner's own DELETE grant.
 alter table public.cascades add column if not exists deleted_at timestamptz;
 create index if not exists cascades_not_deleted_idx on public.cascades (user_id) where deleted_at is null;
 
@@ -154,6 +154,10 @@ $$;
 
 revoke all on function public.delete_agent(uuid) from public;
 grant execute on function public.delete_agent(uuid) to authenticated;
+
+-- CAS-1102: agents are removed only via delete_agent() above, which soft-deletes — a client hard
+-- delete is no longer permitted at all.
+revoke delete on public.cascades from authenticated, anon;
 
 -- ---------------------------------------------------------------------------
 -- user_films — what the user has said about a film (CAS-183)
@@ -258,6 +262,14 @@ alter table public.user_prefs add column if not exists occasions jsonb;
 alter table public.user_prefs add column if not exists ref_code text;
 create unique index if not exists user_prefs_ref_code_idx
   on public.user_prefs (ref_code) where ref_code is not null;
+
+-- CAS-1120: an account-level name a member can set, so the invite email can say who invited you
+-- by name rather than the sender's email local part (accounts have no name otherwise).
+alter table public.user_prefs add column if not exists display_name text;
+
+alter table public.user_prefs drop constraint if exists user_prefs_display_name_check;
+alter table public.user_prefs add constraint user_prefs_display_name_check
+  check (display_name is null or char_length(display_name) between 1 and 60);
 
 alter table public.user_prefs enable row level security;
 
@@ -584,13 +596,22 @@ create index if not exists usage_events_client_created_idx on public.usage_event
 
 alter table public.usage_events enable row level security;
 
+-- CAS-1137: the original with check below rejected every row with data is null — pg_column_size(null)
+-- is null, and a with check that evaluates to null (rather than true) fails the row, not just a row that
+-- is actually oversized. logEvent() call sites with no data argument (splash_shown, flow_start, etc.) hit
+-- this on every signed-in boot once their batch flushed, which is also why the whole flush (one multi-row
+-- insert) came back 42501: one bad row in a batch fails the entire statement. Guarded with `data is null
+-- or ...`, the same way `coalesce(session,'')` already guards the null session case just above it. Also
+-- adds the owner check the original policy never had: `user_id` is nullable (an anon/pre-login event), so
+-- the only enforceable rule is that a row may not be attributed to someone else's auth.uid().
 drop policy if exists usage_events_insert on public.usage_events;
 create policy usage_events_insert on public.usage_events
   for insert to anon, authenticated with check (
     length(type) <= 64
     and length(client_key) <= 200
     and length(coalesce(session,'')) <= 200
-    and pg_column_size(data) <= 4096
+    and (data is null or pg_column_size(data) <= 4096)
+    and (user_id is null or user_id = auth.uid())
   );
 
 -- security definer: counts every client_key's own rows to enforce the rate limit, the same
@@ -735,6 +756,15 @@ create table if not exists public.invites (
 );
 create index if not exists invites_sender_idx on public.invites (sender_id, created_at desc);
 
+-- CAS-1120: an invite carries an optional suggested date and an optional note, shown in the invite
+-- email and on the invite page.
+alter table public.invites add column if not exists suggested_date date;
+alter table public.invites add column if not exists note text;
+
+alter table public.invites drop constraint if exists invites_note_check;
+alter table public.invites add constraint invites_note_check
+  check (note is null or char_length(note) <= 500);
+
 alter table public.invites enable row level security;
 
 drop policy if exists invites_owner on public.invites;
@@ -766,6 +796,8 @@ as $$
     'tmdb_id', tmdb_id,
     'film_title', film_title,
     'to_name', to_name,
+    'suggested_date', suggested_date,
+    'note', note,
     'created_at', created_at
   )
   from public.invites
@@ -1044,6 +1076,69 @@ drop trigger if exists archive_deleted_row on public.push_tokens;
 create trigger archive_deleted_row after delete on public.push_tokens
   for each row execute function public.archive_deleted_row();
 
+-- ---------------------------------------------------------------------------
+-- block_bulk_delete — clients may delete at most one account row per statement (CAS-1102)
+-- ---------------------------------------------------------------------------
+-- A statement-level AFTER DELETE trigger with a transition table, so it sees every row a single
+-- statement removed at once rather than once per row. current_user (not auth.role()) is the guard:
+-- for a plain client call it is 'authenticated'/'anon', but inside a SECURITY DEFINER function it
+-- is the function's OWNER (archive_deleted_row() above notes the same thing), so this never fires
+-- for the service role or for the security-definer delete_my_account() below — confirmed:
+-- delete_my_account() is declared `security definer` with no explicit owner change, so it runs as
+-- whichever role owns the function (the migration-applying role, e.g. postgres/supabase_admin),
+-- which is neither 'authenticated' nor 'anon'.
+create or replace function public.block_bulk_delete()
+returns trigger
+language plpgsql
+as $$
+begin
+  if current_user in ('authenticated', 'anon') and (select count(*) from old_rows) > 1 then
+    raise exception 'bulk_delete_blocked';
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists block_bulk_delete on public.user_films;
+create trigger block_bulk_delete after delete on public.user_films
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.film_watch;
+create trigger block_bulk_delete after delete on public.film_watch
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.film_picks;
+create trigger block_bulk_delete after delete on public.film_picks
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.list_films;
+create trigger block_bulk_delete after delete on public.list_films
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.lists;
+create trigger block_bulk_delete after delete on public.lists
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.friends;
+create trigger block_bulk_delete after delete on public.friends
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.push_tokens;
+create trigger block_bulk_delete after delete on public.push_tokens
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
+drop trigger if exists block_bulk_delete on public.agent_films;
+create trigger block_bulk_delete after delete on public.agent_films
+  referencing old table as old_rows
+  for each statement execute function public.block_bulk_delete();
+
 -- security definer, service_role only: the archive is designed to grow forever until swept.
 create or replace function public.purge_deleted_rows(p_days int)
 returns int
@@ -1151,8 +1246,13 @@ create table if not exists public.analytics_admins (
 alter table public.analytics_admins enable row level security;
 
 -- Lee's auth.users id on project ypccfyatejejslzlfrbf, read from the live database 2026-09-12.
-insert into public.analytics_admins (user_id) values ('c7e9b361-368f-4488-84b5-baf0ac7a0751')
-  on conflict (user_id) do nothing;
+-- Guarded by an existence check: on a brand-new database (e.g. npm run test:integrity's local
+-- Supabase stack, CAS-1093) that user doesn't exist yet, and an unconditional insert violates
+-- analytics_admins_user_id_fkey.
+insert into public.analytics_admins (user_id)
+select 'c7e9b361-368f-4488-84b5-baf0ac7a0751'
+where exists (select 1 from auth.users where id = 'c7e9b361-368f-4488-84b5-baf0ac7a0751')
+on conflict (user_id) do nothing;
 
 -- CAS-1074: repo drift — this policy was applied live but never recorded here. Lets an admin
 -- confirm their own admin-ness (e.g. to decide whether to show admin UI) without needing
@@ -1506,3 +1606,132 @@ $$;
 
 revoke all on function public.delete_my_account() from public;
 grant execute on function public.delete_my_account() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- complete_membership / email_has_account — server-first onboarding (CAS-1098)
+-- ---------------------------------------------------------------------------
+-- There is no partly-signed-up state (product rule, Lee, 2026-09-30): agents built in onboarding
+-- exist only if membership completes; otherwise they are lost. The onboarding draft used to reach
+-- the server through the generic sync before the account was loaded, which duplicated agents on
+-- existing accounts and dropped onboarding's services and occasions. complete_membership() is now
+-- the ONLY way that draft reaches the server: one transaction, all of it or none of it, and an
+-- existing account keeps what it has — the draft is discarded, never merged.
+alter table public.user_prefs add column if not exists membership_completed_at timestamptz;
+
+update public.user_prefs
+set membership_completed_at = coalesce(membership_completed_at, updated_at, now())
+where membership_completed_at is null;
+
+-- security invoker: each table's own RLS (cascades_owner, user_prefs_owner, notify_prefs_owner)
+-- already confines every write below to auth.uid(), so this runs as the calling user rather than
+-- needing elevated rights.
+create or replace function public.complete_membership(p jsonb)
+returns text
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  -- An existing account (in ANY of the six tables an onboarding draft could touch) keeps what
+  -- it has; the draft is discarded, never merged. Deleted cascades rows still count — a soft
+  -- delete is still "this account already exists".
+  if exists (select 1 from public.cascades     where user_id = auth.uid())
+     or exists (select 1 from public.user_prefs   where user_id = auth.uid())
+     or exists (select 1 from public.notify_prefs where user_id = auth.uid())
+     or exists (select 1 from public.user_films   where user_id = auth.uid())
+     or exists (select 1 from public.film_picks   where user_id = auth.uid())
+     or exists (select 1 from public.film_watch   where user_id = auth.uid())
+  then
+    return 'account_exists';
+  end if;
+
+  insert into public.cascades (id, user_id, name, criteria, alert_moments, active)
+  select
+    (elem->>'id')::uuid,
+    auth.uid(),
+    coalesce(elem->>'name', 'My agent'),
+    coalesce(elem->'criteria', '{}'::jsonb),
+    coalesce((select array_agg(v) from jsonb_array_elements_text(elem->'alert_moments') as v),
+             '{hits_rent,hits_stream}'::text[]),
+    coalesce((elem->>'active')::boolean, true)
+  from jsonb_array_elements(coalesce(p->'agents', '[]'::jsonb)) as elem;
+
+  insert into public.user_prefs (
+    user_id, sub_services, store_services, services_only, taste, watch_windows,
+    occasions, touched, never_show, onb_depth, framing, membership_completed_at
+  ) values (
+    auth.uid(),
+    coalesce((select array_agg(v) from jsonb_array_elements_text(p->'prefs'->'sub_services') as v),
+             '{}'::text[]),
+    coalesce((select array_agg(v) from jsonb_array_elements_text(p->'prefs'->'store_services') as v),
+             '{}'::text[]),
+    coalesce((p->'prefs'->>'services_only')::boolean, false),
+    coalesce(p->'prefs'->'taste', '{}'::jsonb),
+    coalesce(p->'prefs'->'watch_windows', '{}'::jsonb),
+    p->'prefs'->'occasions',
+    (p->'prefs'->>'touched')::boolean,
+    (select array_agg(v) from jsonb_array_elements_text(p->'prefs'->'never_show') as v),
+    p->'prefs'->>'onb_depth',
+    (p->'prefs'->>'framing')::boolean,
+    now()
+  )
+  on conflict (user_id) do update set
+    sub_services             = excluded.sub_services,
+    store_services            = excluded.store_services,
+    services_only             = excluded.services_only,
+    taste                     = excluded.taste,
+    watch_windows             = excluded.watch_windows,
+    occasions                 = excluded.occasions,
+    touched                   = excluded.touched,
+    never_show                = excluded.never_show,
+    onb_depth                 = excluded.onb_depth,
+    framing                   = excluded.framing,
+    membership_completed_at   = excluded.membership_completed_at;
+
+  insert into public.notify_prefs (user_id, in_app, email_on, email_address, excluded_moments)
+  values (
+    auth.uid(),
+    coalesce((p->'notify'->>'in_app')::boolean, true),
+    coalesce((p->'notify'->>'email_on')::boolean, false),
+    p->'notify'->>'email_address',
+    coalesce((select array_agg(v) from jsonb_array_elements_text(p->'notify'->'excluded_moments') as v),
+             '{}'::text[])
+  )
+  on conflict (user_id) do update set
+    in_app            = excluded.in_app,
+    email_on          = excluded.email_on,
+    email_address     = excluded.email_address,
+    excluded_moments  = excluded.excluded_moments;
+
+  return 'created';
+end;
+$$;
+
+revoke all on function public.complete_membership(jsonb) from public;
+grant execute on function public.complete_membership(jsonb) to authenticated;
+
+-- security definer so it can read auth.users (an authenticated/anon caller's own role has no
+-- privilege over that table); the boolean it reveals is a deliberate, Lee-accepted narrowing for
+-- Sign in (CAS-1088), not a leak.
+create or replace function public.email_has_account(p_email text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  uid uuid;
+begin
+  select id into uid from auth.users where lower(email) = lower(p_email);
+  if uid is null then
+    return false;
+  end if;
+
+  return exists (select 1 from public.user_prefs
+                 where user_id = uid and membership_completed_at is not null)
+      or exists (select 1 from public.cascades where user_id = uid);
+end;
+$$;
+
+revoke all on function public.email_has_account(text) from public;
+grant execute on function public.email_has_account(text) to anon, authenticated;

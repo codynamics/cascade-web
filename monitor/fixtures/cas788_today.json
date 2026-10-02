@@ -29,6 +29,7 @@
       "wm_user_rating": 7.9,
       "wm_critic_score": 70,
       "popularity": 50,
+      "wm_popularity_percentile": 70,
       "offers": []
     },
     {

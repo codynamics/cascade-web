@@ -1,7 +1,7 @@
 """Nightly health assertions (CAS-974, CAS-985).
 
 Every silent failure Cascade has actually had passed CI: a green `daily.yml` run is not
-evidence the night's work actually happened. This module asserts fourteen concrete things about
+evidence the night's work actually happened. This module asserts nineteen concrete things about
 the run that just finished and writes the answer to ``state/health.json`` as
 ``{checked_at, checks: [{name, ok, value, threshold, detail}], ok}`` — exiting non-zero on any
 real failure so `alert.yml` (CAS-973) fires.
@@ -93,6 +93,31 @@ USAGE_WINDOW_MIN_APP_OPEN = 50
 CLIENT_ERROR_RATE_MAX_PCT = 0.05
 CLIENT_ERROR_RATE_MAX_ABS = 20
 EMPTY_ACCOUNT_RATE_MAX_PCT = 0.10
+
+# CAS-1139: the two cohorts CAS-1139's nightly refresh re-orders for — weekly-TTL (pp._is_wm_
+# weekly_cohort) and within-a-year (pp.WM_RECENT_YEAR_DAYS) — must not go stale even on the free
+# plan's small credit pot. 5% tolerance; older films carry no threshold at all (see the ticket's
+# own Do-not-re-raise), so the check's detail reports their oldest stamp without failing on it.
+WM_FRESHNESS_MAX_PCT = 0.05
+WM_FRESHNESS_WEEKLY_MAX_AGE_DAYS = 14
+WM_FRESHNESS_YEAR_MAX_AGE_DAYS = 45
+
+# CAS-1135: a short, fixed list of films certain to be in Australian distribution and highly
+# rated — never an attempt to cover the whole catalogue, just a tripwire for the CAS-1134 class of
+# defect (a published film silently carrying a TV show's ratings, or hidden behind its empty ones).
+LANDMARK_FILMS = {
+    286217: "The Martian",
+    105: "Back to the Future",
+    578: "Jaws",
+    240: "The Godfather Part II",
+    324857: "Spider-Man: Into the Spider-Verse",
+    330457: "Frozen II",
+    271110: "Captain America: Civil War",
+}
+
+# CAS-1135: written once a run by poc_pipeline._save_watchmode_tv_tmdb_ids — this process has no
+# id map of its own and must never download one just to run watchmode_remap_backlog.
+WM_TV_TMDB_IDS_FILE = os.path.join(_REPO_ROOT, "state", "wm_tv_tmdb_ids.json")
 
 
 # ---------------------------------------------------------------------------
@@ -210,10 +235,12 @@ def check_oscarbase_fetch(stats: dict | None) -> dict:
     return _check_fetch("oscarbase_fetch", stats)
 
 
-def check_watchmode_fetch(stats: dict | None, quota: int, run_max_credits_raw: str | None = None,
+def check_watchmode_fetch(stats: dict | None, run_max_credits_raw: str | None = None,
                           unfilled_count: int = 0) -> dict:
-    """CAS-988: the floor is 15% of `quota` — the real state/api_budget.json cycle quota (CAS-987),
-    passed in by the caller rather than assumed here, so a plan change moves the floor with it.
+    """CAS-988: the floor is 15% of the quota. CAS-1138: that quota is read from `stats['quota']`
+    — this run's own live Watchmode /status figure (poc_pipeline.wm_run_allowance via
+    state/run_stats.json), never a passed-in cycle number or a hard-coded plan size, so a plan
+    change (the account has moved plans before) moves the floor with it automatically.
 
     CAS-994: an explicit WM_RUN_MAX_CREDITS of 0 means the run is DELIBERATELY spending nothing
     on Watchmode this run — 0 calls is then the expected, correct outcome, not the failure
@@ -243,18 +270,19 @@ def check_watchmode_fetch(stats: dict | None, quota: int, run_max_credits_raw: s
     base = _check_fetch("watchmode_fetch", stats)
     if base["ok"] is not True:
         return base
-    floor = round(quota * WATCHMODE_FLOOR_PCT)
+    quota = (stats or {}).get("quota")
     remaining = (stats or {}).get("remaining_monthly_credits")
-    if remaining is None:
-        return _check("watchmode_fetch", None, base["value"], floor,
-                      "calls/errors OK but remaining_monthly_credits unavailable.")
+    if quota is None or remaining is None:
+        return _check("watchmode_fetch", None, base["value"], None,
+                      "calls/errors OK but the live Watchmode quota is unavailable this run.")
+    floor = round(quota * WATCHMODE_FLOOR_PCT)
     if remaining < floor:
         return _check("watchmode_fetch", False, remaining, floor,
-                      f"only {remaining} Watchmode credit(s) left this month "
-                      f"(floor {floor}, 15% of the {quota}-credit quota).")
+                      f"only {remaining} of {quota} Watchmode credit(s) remaining this month "
+                      f"(floor {floor}, 15% of quota).")
     return _check("watchmode_fetch", True, base["value"], floor,
-                  f"{base['value']} call(s), 0 errors, {remaining} credit(s) remaining this month "
-                  f"(floor {floor}).")
+                  f"{base['value']} call(s), 0 errors, {remaining} of {quota} credit(s) "
+                  f"remaining this month (floor {floor}).")
 
 
 # ---------------------------------------------------------------------------
@@ -269,10 +297,17 @@ def check_watchmode_pace(cycle: dict | None, today: _dt.date) -> dict:
     """CAS-988: a floor only tells you after the quota's half gone. This projects the last (up to)
     seven days of state/api_budget.json's `days` map forward to the cycle's reset date, and fires
     red when that projection would exceed the quota — in time to act, not after the fact. Too few
-    days of cycle data (a fresh cycle) reports unknown rather than false-alarming."""
+    days of cycle data (a fresh cycle) reports unknown rather than false-alarming.
+
+    CAS-1138: `cycle['quota']` defaults to WM_MONTHLY_QUOTA (poc_pipeline._load_wm_cycle_budget)
+    until a live /status call has actually confirmed it — `quota_live` is that confirmation, and
+    this reports unavailable rather than pacing against a plan size nobody has verified."""
     if not cycle:
         return _check("watchmode_pace", None, None, None,
                       "no state/api_budget.json — unavailable.")
+    if not cycle.get("quota_live"):
+        return _check("watchmode_pace", None, None, None,
+                      "the live Watchmode quota hasn't been confirmed this cycle — unavailable.")
     days_map = cycle.get("days") or {}
     if len(days_map) < WATCHMODE_PACE_MIN_DAYS:
         return _check("watchmode_pace", None, len(days_map), WATCHMODE_PACE_MIN_DAYS,
@@ -583,12 +618,159 @@ def check_activity_floor(window: dict | None) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# watchmode_identity / watchmode_remap_backlog / released_scored_without_rating / landmark_films
+# — CAS-1135: none of CAS-974's original fourteen checks measure identity (only volume/coverage),
+# so CAS-1134's movie/TV id-map collision tripped none of them. See each check's own docstring.
+# ---------------------------------------------------------------------------
+def check_watchmode_identity(stats: dict | None) -> dict:
+    """CAS-1134's details-response identity guard (poc_pipeline.enrich_watchmode_fields) returns
+    'mismatch' — writing nothing — whenever a Watchmode id it was about to trust turns out to
+    identify a different tmdb_id or a non-movie type. Zero is the only acceptable count; this is
+    exactly the check that would have caught CAS-1134's own defect before Lee found it by hand."""
+    if not stats:
+        return _check("watchmode_identity", None, None, None,
+                      "no run_stats.json entry this run — unavailable.")
+    mismatches = stats.get("mismatch", 0)
+    if not mismatches:
+        return _check("watchmode_identity", True, 0, 0, "0 identity mismatch(es) this run.")
+    names = ", ".join(str(i) for i in (stats.get("mismatch_ids") or [])[:5])
+    detail = f"{mismatches} identity mismatch(es) this run."
+    if names:
+        detail += f" TMDB id(s): {names}."
+    return _check("watchmode_identity", False, mismatches, 0, detail)
+
+
+def _load_watchmode_tv_tmdb_ids(today: _dt.date):
+    """None when the id map wasn't downloaded by today's poc_pipeline.py run (the file is absent,
+    unreadable, or stamped an earlier date) — never re-fetched here; a second Watchmode download
+    just so this check can run is not worth the credit (CAS-1135)."""
+    if not os.path.exists(WM_TV_TMDB_IDS_FILE):
+        return None
+    try:
+        data = json.load(open(WM_TV_TMDB_IDS_FILE, encoding="utf-8"))
+    except Exception:
+        return None
+    if data.get("date") != today.isoformat():
+        return None
+    return set(data.get("tv_tmdb_ids") or [])
+
+
+def check_watchmode_remap_backlog(records: list, tv_tmdb_ids, prev_value) -> dict:
+    """The count of records still carrying a wm_fields_fetched_at stamp but no wm_id, whose
+    tmdb_id also carries a TV row in the id map — exactly the shape CAS-1134's repair tier
+    (poc_pipeline.enrich_watchmode_fields_nightly/probe_candidates tier 0) re-fetches, a few at a
+    time, every night. `tv_tmdb_ids` is None when this run's id map was never downloaded —
+    reported skipped rather than claiming a count that can't be measured. `prev_value` is last
+    night's own count (read back from state/health.json): a shrinking backlog warns rather than
+    fails, since the repair tier is visibly working; a stalled or growing one fails."""
+    if tv_tmdb_ids is None:
+        return _check("watchmode_remap_backlog", None, None, None,
+                      "the id map wasn't downloaded this run — unavailable.", status="skipped")
+    backlog = sum(1 for r in records
+                 if r.get("wm_fields_fetched_at") and not r.get("wm_id")
+                 and r.get("tmdb_id") in tv_tmdb_ids)
+    if backlog == 0:
+        return _check("watchmode_remap_backlog", True, 0, 0, "0 record(s) awaiting repair.")
+    if isinstance(prev_value, (int, float)) and backlog < prev_value:
+        return _check("watchmode_remap_backlog", None, backlog, prev_value,
+                      f"{backlog} record(s) awaiting repair, down from {prev_value} last night.",
+                      status="warn")
+    prev_text = f"{prev_value} last night" if isinstance(prev_value, (int, float)) else "no previous count"
+    return _check("watchmode_remap_backlog", False, backlog, prev_value,
+                  f"{backlog} record(s) awaiting repair, not down from {prev_text}.")
+
+
+def check_released_scored_without_rating(candidates: list) -> dict:
+    """CAS-1134 tightened 'scored' to require a real rating outside the upcoming/in_cinema ladder
+    cohort (wm_popularity_percentile alone no longer counts) and swept the backlog once via
+    reclassify_stale_scored_candidates — this asserts the rule actually holds every night, not
+    just the one run it shipped in."""
+    bad = [c.get("title", c.get("tmdb_id")) for c in candidates
+          if c.get("outcome") == "scored" and not pp._is_ladder_cohort(c)
+          and c.get("wm_user_rating") is None and c.get("wm_critic_score") is None]
+    if bad:
+        return _check("released_scored_without_rating", False, len(bad), 0,
+                      f"{len(bad)} 'scored' candidate(s) outside the ladder cohort carry no "
+                      f"rating: {bad[:5]}")
+    return _check("released_scored_without_rating", True, 0, 0,
+                  "every 'scored' candidate outside the ladder cohort carries a real rating.")
+
+
+def _wm_fields_age_days(movie: dict, today: _dt.date) -> int | None:
+    stamp = movie.get("wm_fields_fetched_at")
+    if not stamp:
+        return None
+    try:
+        return (today - _dt.date.fromisoformat(stamp)).days
+    except ValueError:
+        return None
+
+
+def check_watchmode_freshness(movies: list, today: _dt.date) -> dict:
+    """CAS-1139: the nightly fields pass and the scoreability probe now spend the free plan's
+    small Watchmode pot on the titles whose ratings still move — this is the check that would
+    catch that ordering silently failing (e.g. the repair/never-fetched tiers starving tier 2/3
+    every night), never a volume check (catalogue_size/score_coverage) and never specific to one
+    title (landmark_films).
+
+    Fails once more than WM_FRESHNESS_MAX_PCT of the weekly-TTL cohort (pp._is_wm_weekly_cohort —
+    upcoming/in_cinema, or released within pp.WM_RECENT_RELEASE_DAYS) carries a
+    wm_fields_fetched_at older than WM_FRESHNESS_WEEKLY_MAX_AGE_DAYS, or more than
+    WM_FRESHNESS_MAX_PCT of films released within pp.WM_RECENT_YEAR_DAYS carry one older than
+    WM_FRESHNESS_YEAR_MAX_AGE_DAYS. A missing stamp counts as stale in both. Older films carry no
+    threshold — the detail only ever reports their oldest stamp."""
+    ages = [_wm_fields_age_days(m, today) for m in movies]
+    known_ages = [a for a in ages if a is not None]
+    oldest = max(known_ages) if known_ages else None
+
+    weekly = [m for m in movies if pp._is_wm_weekly_cohort(m, today)]
+    weekly_stale = sum(1 for m in weekly
+                       if (_wm_fields_age_days(m, today) or 0) > WM_FRESHNESS_WEEKLY_MAX_AGE_DAYS
+                       or m.get("wm_fields_fetched_at") is None)
+    weekly_pct = (weekly_stale / len(weekly)) if weekly else 0.0
+
+    within_year = [m for m in movies if pp._is_recent_release(m, today, pp.WM_RECENT_YEAR_DAYS)]
+    year_stale = sum(1 for m in within_year
+                     if (_wm_fields_age_days(m, today) or 0) > WM_FRESHNESS_YEAR_MAX_AGE_DAYS
+                     or m.get("wm_fields_fetched_at") is None)
+    year_pct = (year_stale / len(within_year)) if within_year else 0.0
+
+    detail = (f"{weekly_pct:.1%} of weekly-TTL film(s) stale past "
+             f"{WM_FRESHNESS_WEEKLY_MAX_AGE_DAYS}d, {year_pct:.1%} of film(s) released within "
+             f"{pp.WM_RECENT_YEAR_DAYS}d stale past {WM_FRESHNESS_YEAR_MAX_AGE_DAYS}d, oldest "
+             f"stamp in the catalogue is {oldest if oldest is not None else 'unknown'} day(s) old.")
+    ok = weekly_pct <= WM_FRESHNESS_MAX_PCT and year_pct <= WM_FRESHNESS_MAX_PCT
+    return _check("watchmode_freshness", ok, round(max(weekly_pct, year_pct) * 100, 1),
+                 round(WM_FRESHNESS_MAX_PCT * 100, 1), detail)
+
+
+def check_landmark_films(movies: list) -> dict:
+    """Asks the shipped engine (poc_pipeline.scoreable_ids -> scripts/scoreable_shim.mjs ->
+    isScoreable — the same route tests/test_data_quality.py's own publication-floor test uses,
+    never a Python re-implementation of the score) whether each of LANDMARK_FILMS is published
+    and clears WM_PUBLISH_FLOOR today. These are certain to be in Australian distribution and
+    highly rated, so a failure here means something broke upstream in a way that moves neither
+    the catalogue's volume nor its score-coverage checks (CAS-1134's own defect, exactly)."""
+    by_id = {m.get("tmdb_id"): m for m in movies}
+    scoreable = pp.scoreable_ids(movies, floor=pp.WM_PUBLISH_FLOOR)
+    missing = [name for tmdb_id, name in LANDMARK_FILMS.items()
+              if tmdb_id not in by_id or tmdb_id not in scoreable]
+    if missing:
+        return _check("landmark_films", False, len(missing), 0,
+                      f"missing or below WM_PUBLISH_FLOOR: {', '.join(missing)}")
+    return _check("landmark_films", True, len(LANDMARK_FILMS), len(LANDMARK_FILMS),
+                  f"all {len(LANDMARK_FILMS)} landmark film(s) published and scoreable.")
+
+
+# ---------------------------------------------------------------------------
 # assemble + report
 # ---------------------------------------------------------------------------
 CHECK_NAMES = ("catalogue_size", "catalogue_integrity", "tmdb_fetch", "watchmode_fetch",
               "watchmode_pace", "oscarbase_fetch", "score_coverage", "email_send", "push_send",
               "usage_events_insert", "auth_signin",
-              "client_error_rate", "empty_account_rate", "activity_floor")
+              "client_error_rate", "empty_account_rate", "activity_floor",
+              "watchmode_identity", "watchmode_remap_backlog", "released_scored_without_rating",
+              "landmark_films", "watchmode_freshness")
 
 # CAS-993: the monitor only runs in alerts.yml now, so email_send/push_send — the two checks that
 # read THIS run's delivery stats — can only be asserted there. Every other check still runs in
@@ -598,7 +780,8 @@ DAILY_CHECK_NAMES = tuple(n for n in CHECK_NAMES if n not in ALERT_CHECK_NAMES)
 
 
 def run_checks(*, today_movies=None, prev_movies=None, stats=None, usage_probe=None, auth_probe=None,
-              apns_configured=None, wm_cycle=None, today=None, usage_window=None, names=None) -> list:
+              apns_configured=None, wm_cycle=None, today=None, usage_window=None, names=None,
+              candidates=None, tv_tmdb_ids=None, remap_backlog_prev=None) -> list:
     """Compute only the checks named in `names` (default: every check in CHECK_NAMES, unchanged
     legacy behaviour). Each check is a lazy thunk, so a scoped caller (daily.yml's
     DAILY_CHECK_NAMES or alerts.yml's ALERT_CHECK_NAMES) never pays for — or needs to supply
@@ -610,7 +793,7 @@ def run_checks(*, today_movies=None, prev_movies=None, stats=None, usage_probe=N
         "catalogue_integrity": lambda: check_catalogue_integrity(today_movies),
         "tmdb_fetch": lambda: check_tmdb_fetch(stats.get("tmdb")),
         "watchmode_fetch": lambda: check_watchmode_fetch(
-            stats.get("watchmode"), wm_cycle["quota"],
+            stats.get("watchmode"),
             run_max_credits_raw=os.environ.get("WM_RUN_MAX_CREDITS"),
             unfilled_count=sum(1 for m in today_movies if not m.get("wm_fields_fetched_at"))),
         "watchmode_pace": lambda: check_watchmode_pace(wm_cycle, today),
@@ -623,6 +806,12 @@ def run_checks(*, today_movies=None, prev_movies=None, stats=None, usage_probe=N
         "client_error_rate": lambda: check_client_error_rate(usage_window),
         "empty_account_rate": lambda: check_empty_account_rate(usage_window),
         "activity_floor": lambda: check_activity_floor(usage_window),
+        "watchmode_identity": lambda: check_watchmode_identity(stats.get("watchmode")),
+        "watchmode_remap_backlog": lambda: check_watchmode_remap_backlog(
+            (today_movies or []) + (candidates or []), tv_tmdb_ids, remap_backlog_prev),
+        "released_scored_without_rating": lambda: check_released_scored_without_rating(candidates or []),
+        "landmark_films": lambda: check_landmark_films(today_movies or []),
+        "watchmode_freshness": lambda: check_watchmode_freshness(today_movies or [], today),
     }
     return [thunks[n]() for n in CHECK_NAMES if n in names]
 
@@ -684,9 +873,21 @@ def _dry_run_inputs():
     today = _dt.date(2026, 9, 15)
     today_movies = _synthetic_catalogue(5600, scored_pct=1.0)
     prev_movies = _synthetic_catalogue(5580, scored_pct=1.0)
+    # CAS-1135: landmark_films needs each of LANDMARK_FILMS actually present and clearing
+    # WM_PUBLISH_FLOOR — a real rating well above the floor, a non-ladder-cohort status so
+    # isScoreable() scores it on wmQScore alone.
+    for tmdb_id, name in LANDMARK_FILMS.items():
+        today_movies.append({
+            "tmdb_id": tmdb_id, "title": name, "cinema_date": "2020-01-01",
+            "status": ["included_streaming"], "wm_user_rating": 8.5, "wm_critic_score": 85,
+            "wm_fields_fetched_at": "2026-09-14", "wm_id": f"fixture-{tmdb_id}",
+        })
+    candidates = []   # CAS-1135: empty — released_scored_without_rating has nothing to flag.
+    tv_tmdb_ids = set()   # CAS-1135: empty but not None — watchmode_remap_backlog runs at 0.
     stats = {
         "tmdb": {"calls": 5600, "errors": 0},
-        "watchmode": {"calls": 40, "errors": 0, "remaining_monthly_credits": 30000},
+        "watchmode": {"calls": 40, "errors": 0, "quota": 40000, "quota_used": 10000,
+                     "remaining_monthly_credits": 30000, "mismatch": 0},
         "oscarbase": {"calls": 20, "errors": 0},
         "email": {"attempted": 3, "delivered": 3, "errors": 0},
         "push": {"attempted": 2, "delivered": 2, "errors": 0},
@@ -695,8 +896,8 @@ def _dry_run_inputs():
     auth_probe = {"ok": True, "detail": "fixture — offline demo."}
     # a well-paced cycle: 250 credit(s)/day over 3 days of a 40000-credit quota, nowhere near
     # exhausting before the reset — keeps the --dry-run fixture all-green.
-    wm_cycle = {"cycle_start": "2026-09-12", "cycle_end": "2026-10-12", "quota": 40000, "spent": 750,
-               "updated_at": today.isoformat(),
+    wm_cycle = {"cycle_start": "2026-09-12", "cycle_end": "2026-10-12", "quota": 40000,
+               "quota_live": True, "spent": 750, "updated_at": today.isoformat(),
                "days": {"2026-09-12": 250, "2026-09-13": 250, "2026-09-14": 250}}
     # CAS-985: 200 app_open rows across 50 devices (well above the 50-row floor), 3 error rows (1.5%,
     # under both the 5%/20-row ceilings), 5 empty-account sign-ins of 155 (3.2%, under the 10% ceiling),
@@ -709,7 +910,8 @@ def _dry_run_inputs():
               for i in range(5)]
     rows_prev = [{"type": "app_open", "client_key": f"fixture-device-{i % 50}", "data": None} for i in range(180)]
     usage_window = {"rows24": rows24, "rows_prev": rows_prev}
-    return today_movies, prev_movies, stats, usage_probe, auth_probe, True, wm_cycle, today, usage_window
+    return (today_movies, prev_movies, stats, usage_probe, auth_probe, True, wm_cycle, today,
+           usage_window, candidates, tv_tmdb_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -737,24 +939,42 @@ def main(argv=None) -> int:
 
     names = {"daily": DAILY_CHECK_NAMES, "alerts": ALERT_CHECK_NAMES}.get(args.scope)
 
+    out_path = args.out or HEALTH_FILE
+    existing = None
+    if os.path.exists(out_path):
+        try:
+            existing = json.load(open(out_path, encoding="utf-8"))
+        except Exception:
+            existing = None
+
+    def _prev_check_value(name):
+        return next((c.get("value") for c in (existing.get("checks", []) if existing else [])
+                    if c.get("name") == name), None)
+
     if args.dry_run:
         (today_movies, prev_movies, stats, usage_probe, auth_probe, apns_configured,
-         wm_cycle, today, usage_window) = _dry_run_inputs()
+         wm_cycle, today, usage_window, candidates, tv_tmdb_ids) = _dry_run_inputs()
+        remap_backlog_prev = None
     elif args.scope == "alerts":
         # The only inputs email_send/push_send read are state/run_stats.json's email/push
         # sections (just written by this same job's monitor step) and the APNS_* env vars — skip
         # the rest of the live gather entirely, including probe_usage_events_insert's real INSERT,
         # which this scope must not repeat a second time in the same day.
         today = _dt.date.today()
-        today_movies, prev_movies = [], []
+        today_movies, prev_movies, candidates = [], [], []
         stats = runstats.load()
         usage_probe = auth_probe = usage_window = None
         apns_configured = all(os.environ.get(v) for v in APNS_ENV_VARS)
         wm_cycle = {}
+        tv_tmdb_ids = None
+        remap_backlog_prev = None
     else:
         today = _dt.date.today()
         today_movies = movies_of(load_today())
         prev_movies = movies_of(load_yesterday_from_git())
+        candidates = list(pp.load_candidates().values())
+        tv_tmdb_ids = _load_watchmode_tv_tmdb_ids(today)
+        remap_backlog_prev = _prev_check_value("watchmode_remap_backlog")
         stats = runstats.load()
         supabase_url = os.environ.get(SUPABASE_URL_ENV)
         anon_key = os.environ.get(SUPABASE_ANON_KEY_ENV)
@@ -768,21 +988,17 @@ def main(argv=None) -> int:
 
     checks = run_checks(today_movies=today_movies, prev_movies=prev_movies, stats=stats,
                         usage_probe=usage_probe, auth_probe=auth_probe, apns_configured=apns_configured,
-                        wm_cycle=wm_cycle, today=today, usage_window=usage_window, names=names)
+                        wm_cycle=wm_cycle, today=today, usage_window=usage_window, names=names,
+                        candidates=candidates, tv_tmdb_ids=tv_tmdb_ids,
+                        remap_backlog_prev=remap_backlog_prev)
 
     for c in checks:
-        marker = {"ok": "OK", "fail": "FAIL", "unknown": "unknown", "skipped": "skipped"}[c["status"]]
+        marker = {"ok": "OK", "fail": "FAIL", "unknown": "unknown", "skipped": "skipped",
+                  "warn": "WARN"}[c["status"]]
         print(f"[health] {c['name']}: {marker} — {c['detail']}")
 
-    out_path = args.out or HEALTH_FILE
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     if args.scope in ("daily", "alerts"):
-        existing = None
-        if os.path.exists(out_path):
-            try:
-                existing = json.load(open(out_path, encoding="utf-8"))
-            except Exception:
-                existing = None
         report = merge_report(existing, checks, checked_at)
     else:
         report = build_report(checks, checked_at)

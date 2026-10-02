@@ -3,28 +3,34 @@
 // wrong for the SHOW question (a listed card claims the film meets the agent's standard TODAY). These tests
 // drive listedBy/watchesFilm directly against a synthetic film, isolating the Awards rung from the unrelated
 // Cascade-score floor via listedBy's own ignoreScoreGate escape hatch (the same trick scoreHeldBackCount
-// already uses) — watchesFilm carries no such escape hatch, so its film is instead given a real popularity
-// figure and an open score floor, exercising the actual score gate rather than dodging it.
+// already uses) — watchesFilm carries no such escape hatch, so its film is instead given a real buzz figure
+// it comfortably clears, exercising the actual score gate rather than dodging it.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
 
 const E = loadEngine();
 
-// Cinema/Rental/Streaming usable, all markers at 0 — the lowest floor every window can clear (agentFloor
-// reads the minimum of the ENABLED windows' markers; Premium stays off/null exactly like the real default).
-const OPEN_MARKERS = { in_cinema: 0, premium: null, rent: 0, stream: 0 };
+// Cinema/Rental/Streaming usable, all markers at TRACK_MIN — the lowest real score the track allows
+// (agentFloor reads the minimum of the ENABLED windows' markers; Premium stays off/null exactly like the
+// real default). CAS-1128 retires CAS-762's "a marker of 0 is Off, no score requirement" reading for the
+// Cascade score control — normCascade now migrates any literal 0 up to TRACK_MIN — so this agent carries an
+// ordinary 50+ requirement, same as any other agent; UPCOMING_NO_AWARD's own buzz figure below is chosen to
+// clear it easily, keeping this suite's isolation of the Awards rung intact.
+const OPEN_MARKERS = { in_cinema: 50, premium: null, rent: 50, stream: 50 };
 
 function awardsAgent(selAwards){
   return E.normCascade({ kind: "stream", status: [], selAwards, watchMarkers: { ...OPEN_MARKERS } });
 }
 
 // The CAS-780 Observation film, shaped like Practical Magic 2: upcoming, no awards record at all, and no
-// IMDb/Metacritic/RT figure either — popularity is the only signal a pre-release film can carry.
+// IMDb/Metacritic/RT figure either — wm_popularity_percentile (the field cascadeScore's upcoming branch
+// actually reads, via wmCinemaScore/wmBuzzPctlOf) is the only signal a pre-release film can carry, set high
+// enough here to clear OPEN_MARKERS' own TRACK_MIN floor regardless of the fixture catalogue's own spread.
 const UPCOMING_NO_AWARD = {
   tmdb_id: 780001, title: "CAS-780 upcoming, no awards",
   status: ["upcoming"], award: null, award_text: null,
-  language: "en", popularity: 42,
+  language: "en", popularity: 42, wm_popularity_percentile: 90,
 };
 
 // A released film with a qualifying awardRank — a real nomination, no Oscar wording, so parseAwards has

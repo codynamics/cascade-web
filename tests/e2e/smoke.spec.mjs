@@ -10,7 +10,15 @@
 import { test, expect } from "@playwright/test";
 import {
   freshApp, gotoFresh, toShortlist, shortlistCards, finishFlow, toListing, settleListing, ctaLocator, sectionCounts,
+  openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen, dumpSignedInDiagnostics,
 } from "./helpers.mjs";
+
+// CAS-1136 decision 2: on a failed or timed-out test, show the in-flight requests and buffered console
+// lines helpers.mjs recorded for whichever signed-in boot this test used — a no-op for guest-mode tests
+// and for passing ones. Playwright still runs afterEach hooks on a timeout, which is the whole point.
+test.afterEach(async ({ page }, testInfo) => {
+  dumpSignedInDiagnostics(page, testInfo);
+});
 
 // Mirrors cas565.spec.mjs's addSecondAgent — a second agent made from "+ Add" stops at the Briefing hub
 // instead of walking the splash flow, so it needs its own exit.
@@ -307,20 +315,23 @@ test("a cold load with onboarding seen shows the header, not Moving", async ({ p
 // a fixed three — this walks that path directly (enable Premium, place a film there, disable it again)
 // rather than asserting the derivation's internals.
 test("the Watch screen's tab strip follows the enabled watch windows", async ({ page }) => {
+  // Lee's decision, 2026-10-02: quarantine this spec's signed-in run only — the Premium listing renders
+  // empty signed in ([ios]/WebKit, CAS-1133's open diagnostic), but the same spec passes signed out.
+  // CASCADE_E2E_SUPABASE_URL is the flag scripts/test-e2e.mjs's signed-in step already sets (see
+  // helpers.mjs's signedInEnv), so this stays a no-op the moment a signed-out run exercises this spec again.
+  test.fixme(!!process.env.CASCADE_E2E_SUPABASE_URL, "CAS-1133: Premium listing empty when signed in — quarantined by Lee's decision 2026-10-02");
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
 
   await expect(page.locator(".wtabbtn", { hasText: "Premium" })).toHaveCount(0);
 
-  await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "Where & when you'll watch" }).click();
-  await expect(page.locator(".osh", { hasText: "Where & when you'll watch" })).toBeVisible();
+  await openWhereWhenScreen(page);
+  await expect(page.locator(".osh", { hasText: "Service tracking" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
-  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).toHaveClass(/on/);
-  await page.locator("#wwScreen .osback").click();
-  await expect(page.locator("#wwScreen")).not.toHaveClass(/open/);
+  await closeWhereWhenScreen(page);
 
   const premiumTab = page.locator(".wtabbtn", { hasText: "Premium" });
   await expect(premiumTab).toBeVisible();
@@ -338,7 +349,12 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   // pick. prefs.on off is the account-wide twin of the per-tab mineOnly switch already turned off just below —
   // both are "a different feature's default doing its job, not this test's own concern", the same reasoning
   // CAS-897's own comment already gives for the per-tab one.
-  await page.evaluate(() => {
+  // CAS-1133 (release-chat decision, 2026-10-02): temporary diagnostic — the [ios]/WebKit-only
+  // failure below is a deterministic 0-match, not a timing flake, and there's no way to see real
+  // WebKit console/DOM state from a CC session. This pins down which of the two live hypotheses
+  // (no admissible donor found vs. a genuine WebKit render bug) is actually happening before any
+  // fix is attempted. Remove once the next qa run's [ios] log line has been read.
+  const cas1133Diag = await page.evaluate(() => {
     const donor = MOVIES.find(m => primaryStatus(m) === "pvod" && showable(m));
     if(donor){
       Object.assign(donor, { wm_user_rating: 10, wm_critic_score: 100, language: "en", age_rating: "M", cinema_date: TODAY });
@@ -346,7 +362,17 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
       recomputeFound();
       render();
     }
+    const entry = donor ? notify[donor.tmdb_id] : null;
+    return {
+      donorId: donor ? donor.tmdb_id : null,
+      status: donor ? primaryStatus(donor) : null,
+      showable: donor ? showable(donor) : null,
+      admitted: donor ? !!(entry && entry.cascadeIds && entry.cascadeIds.length > 0) : null,
+      cards: document.querySelectorAll("#groups .card").length,
+      premiumTab: Array.from(document.querySelectorAll(".wtabbtn")).some(el => el.textContent.includes("Premium")),
+    };
   });
+  console.log(`CAS-1133 donor=${cas1133Diag.donorId ?? "NONE"} status=${cas1133Diag.status} showable=${cas1133Diag.showable} admitted=${cas1133Diag.admitted} cards=${cas1133Diag.cards} premiumTab=${cas1133Diag.premiumTab}`);
 
   await premiumTab.click();
   // CAS-897: "Show only available on my services" (CAS-753) defaults ON per tab, and this guest session
@@ -363,16 +389,22 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   // Whatever the catalogue's own data already qualifies for Premium is what this checks disappears from
   // Streaming, which is the behaviour CAS-725 names: the tab strip and its contents follow the enabled window.
   const premiumCard = page.locator('#groups .card').first();
-  await expect(premiumCard).toBeVisible();
+  try{
+    await expect(premiumCard).toBeVisible();
+  }catch(e){
+    // CAS-1133 diagnostic (see above): the step 1 decision asks for #groups' innerHTML on failure too.
+    const groupsHtml = await page.evaluate(() => (document.querySelector("#groups") || {}).innerHTML || "");
+    console.log(`CAS-1133 #groups innerHTML (first 500 chars): ${groupsHtml.slice(0, 500)}`);
+    throw e;
+  }
   const cardId = await premiumCard.getAttribute("id");
   await page.locator(".wtabbtn", { hasText: "Streaming" }).click();
   await expect(page.locator(`#${cardId}`)).toHaveCount(0);
 
-  await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "Where & when you'll watch" }).click();
-  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
+  await openWhereWhenScreen(page);
+  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).not.toHaveClass(/on/);
-  await page.locator("#wwScreen .osback").click();
+  await closeWhereWhenScreen(page);
   await expect(page.locator(".wtabbtn", { hasText: "Premium" })).toHaveCount(0);
 });
 
@@ -385,14 +417,12 @@ test("an agent created with every window enabled lists films at rental or stream
   await finishFlow(page);
   await toListing(page);
 
-  await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "Where & when you'll watch" }).click();
-  await expect(page.locator(".osh", { hasText: "Where & when you'll watch" })).toBeVisible();
+  await openWhereWhenScreen(page);
+  await expect(page.locator(".osh", { hasText: "Service tracking" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
-  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).toHaveClass(/on/);
-  await page.locator("#wwScreen .osback").click();
-  await expect(page.locator("#wwScreen")).not.toHaveClass(/open/);
+  await closeWhereWhenScreen(page);
 
   // CAS-897: this used to read the rendered Watch listing (settleListing + sectionCounts), but that listing
   // is gated by CAS-713/823's per-tab Watch On tracking (filmMatchesWatchTab requires a film's own notify
@@ -448,17 +478,14 @@ async function openFirstAgentMission(page){
   await expect(page.locator(".msntrackwrap")).toBeVisible();
 }
 
-test("Mission screen: one score track, one marker per enabled window, Premium adds a fourth (CAS-729 AC2)", async ({ page }) => {
+test("Mission screen: one score track, exactly one handle; a newly account-enabled window starts as an OFF pill, not auto-armed (CAS-1128)", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
 
   await openFirstAgentMission(page);
   await expect(page.locator(".msntrackwrap")).toHaveCount(1);
-  // CAS-911: the v2 roster's rank-0 agent (Massive Movies, onbMassiveCritV2) marks only its ONE active/big
-  // window (Cinema, from this test's toShortlist(page,"cinema")) — Rent and Stream are enabled but seeded
-  // with no marker of their own, so the baseline is one real marker, not three. (Premium also starts off,
-  // CAS-243/watchPrefsDefaults.)
+  // CAS-1128: one score for the whole agent — exactly one handle, whatever windows it lists.
   await expect(page.locator(".msnmark")).toHaveCount(1);
 
   // Back out (nothing was actually changed on this visit), then switch Premium on for real through the
@@ -470,55 +497,53 @@ test("Mission screen: one score track, one marker per enabled window, Premium ad
   await page.locator("#onbStep .osback").click();
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
 
-  await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "Where & when you'll watch" }).click();
+  await openWhereWhenScreen(page);
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
-  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
   await expect(premiumLane).toHaveClass(/on/);
-  await page.locator("#wwScreen .osback").click();
-  await expect(page.locator("#wwScreen")).not.toHaveClass(/open/);
+  await closeWhereWhenScreen(page);
 
   await openFirstAgentMission(page);
-  // CAS-917: Premium now ranks after Cinema (this agent's start window) with no marker of its own, so
-  // enabling it makes it a FOLLOWED window — msnChipsHTML's own "follows" chip, not a fourth track marker —
-  // exactly the case this ticket's start-window model added. The marker count is unchanged until the chip's
-  // own + (restoreWatchMarker) actually gives it a value, which is when it becomes the track's real fourth
-  // marker (a real one here, since Cinema is already marked).
+  // CAS-1128: windows are independent per-agent toggles now (the CAS-917 start-window-forward model this
+  // retires would have auto-armed Premium at the agent's existing score) — enabling Premium for the account
+  // adds its pill, but it starts OFF/unticked, never a second handle.
   await expect(page.locator(".msnmark")).toHaveCount(1);
-  const premiumChip = page.locator(".msnchip", { hasText: "Premium" });
-  await expect(premiumChip).toContainText("follows Cinema");
-  await premiumChip.locator('[data-act="restore"]').click();
-  await expect(page.locator(".msnmark")).toHaveCount(2);
+  const premiumPill = page.locator(".msnpill", { hasText: "Premium" });
+  await expect(premiumPill).toBeVisible();
+  await expect(premiumPill).toHaveClass(/off/);
 });
 
-test("Mission screen: dragging Cinema below Rental pushes Rental down, never crossing or stacking (CAS-729 AC3)", async ({ page }) => {
+test("Mission screen: dragging the single handle moves every listed window's score together, never independently (CAS-1113)", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openFirstAgentMission(page);
 
-  // Arrange a known, staggered starting point. CAS-911: Massive Movies (this roster's rank-0 agent) seeds
-  // only its one active/big window with a real marker — Rent and Stream start null (CAS-917's start-window
-  // model follows them off Cinema instead), so only one .msnmark exists in the DOM at this point. Give all
-  // three a real value here and rebuild through msnRebuild() — paintMsnTrack() is an in-place repaint that
-  // only updates marks that already exist in the DOM, so it can move Cinema's own handle but can never
-  // conjure the Rent/Stream handles this test then drags into being; msnRebuild() re-renders #msnTrackArea
-  // (and rewires it) the same way the real Never/restore chips do whenever the marker set itself changes.
+  // Arrange a known starting point — Cinema, Rent and Stream all listed at the same real score, through the
+  // real mutator (setAgentScore) rather than poking watchMarkers by hand. The Massive Movies agent this
+  // onboarding path creates starts with only its BIG window (in_cinema) armed and the rest null by design
+  // (onbMassiveCritV2) — setAgentScore's own "ticked set unchanged" rule (CAS-1128) means calling it once
+  // from that state would only move in_cinema. Dropping to Off first makes every account-enabled window
+  // null, so the next call lands on the "Off to a score" rule instead, which arms all of them. msnRebuild()
+  // re-renders #msnTrackArea and rewires it, the same way a real pill tap does whenever the ON set or its
+  // score changes.
   await page.evaluate(() => {
     const c = onbFlow.draft;
-    c.watchMarkers.in_cinema = 90; c.watchMarkers.rent = 75; c.watchMarkers.stream = 60;
+    setAgentScore(c, 0);
+    setAgentScore(c, 90);
     msnRebuild();
   });
   const before = await page.evaluate(() => ({ ...onbFlow.draft.watchMarkers }));
+  expect(before.in_cinema).toBe(before.rent);
+  expect(before.rent).toBe(before.stream);
 
   // CAS-897: CAS-816 put this track partway down the single-page "Edit Agent" screen, behind the occasions
-  // and styles cards above it — the dedicated Mission screen this test was written against put it first
-  // thing on screen, needing no scroll. Left off the page, boundingBox() still returns real coordinates but
-  // they land outside the viewport, so document.elementFromPoint (what a real mouse click hit-tests against)
+  // and styles cards above it. Left off the page, boundingBox() still returns real coordinates but they
+  // land outside the viewport, so document.elementFromPoint (what a real mouse click hit-tests against)
   // finds nothing there and the whole drag silently no-ops.
   await page.locator(".msntrackwrap").scrollIntoViewIfNeeded();
   const trackBox = await page.locator(".msntrackwrap").boundingBox();
-  const handle = page.locator('.msnhandle[data-key="in_cinema"]');
+  const handle = page.locator(".msnhandle");
   const handleBox = await handle.boundingBox();
   await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
   await page.mouse.down();
@@ -527,12 +552,11 @@ test("Mission screen: dragging Cinema below Rental pushes Rental down, never cro
 
   const after = await page.evaluate(() => ({ ...onbFlow.draft.watchMarkers }));
   expect(after.in_cinema, JSON.stringify({ before, after })).toBeLessThan(before.in_cinema);
-  expect(after.rent, JSON.stringify({ before, after })).toBeLessThan(before.rent);        // Rental pushed down
-  expect(after.in_cinema).toBeGreaterThan(after.rent);                                    // never crossed
-  expect(after.rent).toBeGreaterThan(after.stream);                                       // never crossed
-  expect(after.in_cinema).not.toBe(after.rent);                                           // never stacked
-  expect(after.rent).not.toBe(after.stream);                                              // never stacked
-  await expect(page.locator(".msnmark")).toHaveCount(3);   // still three distinct markers, none merged away
+  // CAS-1113/CAS-1128: one score for the whole agent — every ON window must move together, never
+  // independently (the old MARKER_MIN_GAP push/never-cross/never-stack guarantees retired by CAS-1113).
+  expect(after.rent).toBe(after.in_cinema);
+  expect(after.stream).toBe(after.in_cinema);
+  await expect(page.locator(".msnmark")).toHaveCount(1);
 });
 
 test("Mission/hub: no Watch On door, marker values in the Mission card, requirement scope chips, no overflow (CAS-729 AC4/AC5/AC6)", async ({ page }) => {
@@ -584,77 +608,13 @@ test("Mission/hub: no Watch On door, marker values in the Mission card, requirem
   await expect(page.locator("#onbStep", { hasText: "Watch On" })).toHaveCount(0);
 });
 
-// CAS-732: paintMsnTrack() (the in-place drag repaint) updated each segment's left/width from the sorted
-// marker order but never its background, so a segment kept whatever colour msnTrackAreaHTML() gave it at
-// build time even once dragging re-sorted it to a different window. The trigger is a tie with no
-// deterministic tie-break — exactly how CAS-727 migrated every pre-existing agent (watchMarkers[k] all
-// equal) — which built the segments in WATCH_LEVEL_KEYS order rather than ascending-score order.
-test("Mission screen: dragging repaints segment colours to match their windows; ties break stream-first (CAS-732 AC2/AC3)", async ({ page }) => {
-  await toShortlist(page, "cinema");
-  await finishFlow(page);
-  await toListing(page);
-  await openFirstAgentMission(page);
-
-  // Flatten every window to the exact tie CAS-732 traces the bug to. Premium is switched on too so all
-  // four windows sit on the track (it's off by default, CAS-243).
-  await page.evaluate(() => {
-    watchPrefs.premium = { list: true, notify: false };
-    const c = onbFlow.draft;
-    WATCH_LEVEL_KEYS.forEach(k => { c.watchMarkers[k] = 75; });
-    msnRebuild();
-  });
-  await expect(page.locator(".msnmark")).toHaveCount(4);
-
-  // AC3: with all four markers tied, the leftmost coloured segment carries Stream's colour — the tie-break
-  // orders low-window-first, matching the direction the track is drawn in.
-  const leftmostBg = await page.locator(".msnseg").nth(1).evaluate(el => getComputedStyle(el).backgroundColor);
-  const streamBg = await page.evaluate(() => {
-    const d = document.createElement("div");
-    d.style.background = WINDOW_COLOR.stream;
-    document.body.appendChild(d);
-    const rgb = getComputedStyle(d).backgroundColor;
-    d.remove();
-    return rgb;
-  });
-  expect(leftmostBg).toBe(streamBg);
-
-  // AC2: drag Stream's own marker away from the still-tied trio above it via the real handle path (last in
-  // DOM among the overlapping tied handles, so it's the one that actually receives the pointer), then every
-  // .msnseg's computed background-color must match WINDOW_COLOR for the window whose marker begins that
-  // segment. Fails on the current code, which only repaints position/width on drag, never colour.
-  const trackBox = await page.locator(".msntrackwrap").boundingBox();
-  const handle = page.locator('.msnhandle[data-key="stream"]');
-  const handleBox = await handle.boundingBox();
-  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(trackBox.x + 2, handleBox.y + handleBox.height / 2, { steps: 8 });
-  await page.mouse.up();
-
-  const mismatches = await page.evaluate(() => {
-    const c = onbFlow.draft;
-    const usable = WATCH_LEVEL_KEYS.filter(k => windowUsable(c, k));
-    const byScore = [...usable].sort((a, b) => (c.watchMarkers[a] - c.watchMarkers[b])
-      || (WATCH_LEVEL_KEYS.indexOf(b) - WATCH_LEVEL_KEYS.indexOf(a)));
-    const segEls = document.querySelectorAll(".msnseg");
-    const resolve = v => {
-      const d = document.createElement("div");
-      d.style.background = v;
-      document.body.appendChild(d);
-      const rgb = getComputedStyle(d).backgroundColor;
-      d.remove();
-      return rgb;
-    };
-    const bad = [];
-    byScore.forEach((k, i) => {
-      const el = segEls[i + 1]; if(!el) return;
-      const got = getComputedStyle(el).backgroundColor;
-      const want = resolve(WINDOW_COLOR[k]);
-      if(got !== want) bad.push({ i, k, got, want });
-    });
-    return bad;
-  });
-  expect(mismatches, JSON.stringify(mismatches)).toEqual([]);
-});
+// "Mission screen: dragging repaints segment colours to match their windows; ties break stream-first
+// (CAS-732 AC2/AC3)" deleted, CAS-1113: the bug class this pinned (a segment keeping a stale PER-WINDOW
+// colour after a drag re-sorted which window it belonged to) cannot recur — there is only ever one handle
+// and one neutral fill colour (#c9ced8) now, never multiple simultaneously-coloured segments to mis-sort.
+// A window's own colour survives only on its 7px dot in the label stack under the handle, which is keyed
+// off the listed-windows array directly on every repaint (paintMsnTrack does not touch it at all — the
+// dots are static per render, not part of the in-place drag repaint this bug was in).
 
 test("'Only show films on my services' changes what a new agent finds", async ({ page }) => {
   // Every window a streaming agent lists (Premium/Rent/Streaming) is service-scoped, so switching the
@@ -706,8 +666,7 @@ test("'Only show films on my services' changes what a new agent finds", async ({
   await addSecondAgent(page);
   const agentId = await page.evaluate(ids => cascades.map(c => c.id).find(id => !ids.includes(id)), idsSeed);
 
-  await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "My services" }).click();
+  await openMyServicesScreen(page);
   await expect(page.locator(".osh", { hasText: "My services" })).toBeVisible();
 
   if(await page.evaluate(() => prefs.on)) await page.locator("#onbSvcOnly").click();
@@ -718,8 +677,7 @@ test("'Only show films on my services' changes what a new agent finds", async ({
 
   await page.locator("#onbSvcOnly").click();
   await expect(page.locator("#onbSvcOnly")).toHaveClass(/\bon\b/);
-  await page.locator("#onbStep .osback").click();   // CAS-934: no Done button any more — back to the listing
-  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+  await closeMyServicesScreen(page);   // CAS-934: no Done button any more — back to the listing
 
   const after = await listedCountFor(agentId);
   expect(after, `before=${before} after=${after}`).toBeLessThan(before);
@@ -743,6 +701,9 @@ test("'Only show films on my services' changes what a new agent finds", async ({
 // bundle's own path instead of the retired esm.sh URL. A vendored ~200KB classic script blocking parse in
 // <head> also lengthened page-load time enough that a FIXED delay (the original 600ms) sometimes resolved
 // during gotoFresh()'s own navigation, before the test ever got to race it — hence the explicit trigger.
+// CAS-1109/CAS-1142: acctLoad() now pages with .select().order().range(), not .select().order() alone — the
+// "cascades" mock below must return its row from .range(), not .order(), or acctLoad's own .range() call
+// throws on a resolved value with no such method and the account's agent never loads.
 const CAS740_FAKE_SUPABASE_GLOBAL = `
   const SEEDED_CASCADE = { id: "740aaaa1-0000-4000-8000-000000000001", user_id: "cas740-user",
     name: "Existing agent", criteria: {}, created_at: "2020-01-01T00:00:00.000Z" };
@@ -763,7 +724,7 @@ const CAS740_FAKE_SUPABASE_GLOBAL = `
         signOut: async () => ({ error: null }),
       },
       from: (table) => table === "cascades"
-        ? { select: () => ({ order: () => Promise.resolve({ data: [SEEDED_CASCADE], error: null }) }),
+        ? { select: () => ({ order: () => ({ range: () => Promise.resolve({ data: [SEEDED_CASCADE], error: null }) }) }),
             upsert: () => chain(), delete: () => chain() }
         : chain(),
     };
@@ -1064,6 +1025,26 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
       apply: () => chain(),
     });
   }
+  // CAS-1109/CAS-1142: this test's own onboarding walk creates an agent in guest mode, then signs in —
+  // syncCascadesToAccount() uploads that agent via an acctOp "insert" (c.from("cascades").upsert(fields,
+  // {onConflict:"id", ignoreDuplicates:true})), and toListing()'s settleListing() wait needs that same agent
+  // back from acctLoad's own .select().order().range() round trip before #groups ever has anything to show.
+  // The old catch-all chain() resolved every call (including .range()) to a static empty array, so the
+  // upload vanished into the void and settleListing() timed out with no agent to build a group from — this
+  // tracks whatever was actually "inserted" instead, the same fixture-vs-acctLoad gap CAS740's fixture hit.
+  let cascadeRows = [];
+  function cascadesTable(){
+    return {
+      select: () => ({ order: () => ({ range: () => Promise.resolve({ data: cascadeRows.slice(), error: null }) }) }),
+      upsert: (fields) => {
+        const row = Array.isArray(fields) ? fields[0] : fields;
+        const i = cascadeRows.findIndex(r => r.id === row.id);
+        if(i >= 0) Object.assign(cascadeRows[i], row); else cascadeRows.push(Object.assign({}, row));
+        return { then: (resolve) => resolve({ data: [row], error: null }) };
+      },
+      delete: () => chain(),
+    };
+  }
   window.supabase = { createClient(){
     return {
       auth: {
@@ -1088,7 +1069,30 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
           return { error: null };
         },
       },
-      from: () => chain(),
+      from: (table) => table === "cascades" ? cascadesTable() : chain(),
+      // CAS-1099: membStart() now calls rpc("email_has_account") before requesting a code, and
+      // rpc("complete_membership") once the code verifies — neither existed when this fixture was written,
+      // so an un-stubbed client.rpc(...) threw synchronously (client.rpc is not a function) the instant the
+      // membership button was pressed, hanging every caller of toListing() against this fixture. This test
+      // only exercises the ordinary brand-new-signup path, so both resolve as a fresh success: no existing
+      // account, membership created.
+      // CAS-1109: complete_membership is the ONLY place this test's onboarding-built agent ever reaches the
+      // server (membCompleteNewMembership sends it as p.agents) — acctLoad's subsequent round trip is now
+      // the sole way it comes back (CAS-1109 removed loadAccount's old local-only merge), so the mock must
+      // actually create it here, the same as a real complete_membership would, or settleListing() never
+      // sees a group.
+      rpc: async (fn, params) => {
+        if(fn === "email_has_account") return { data: false, error: null };
+        if(fn === "complete_membership"){
+          const agents = (params && params.p && params.p.agents) || [];
+          agents.forEach(a => {
+            const row = Object.assign({ user_id: "cas913-user", created_at: new Date().toISOString() }, a);
+            const i = cascadeRows.findIndex(r => r.id === row.id);
+            if(i >= 0) Object.assign(cascadeRows[i], row); else cascadeRows.push(row);
+          });
+        }
+        return { data: "created", error: null };
+      },
     };
   } };
 `;
@@ -1267,8 +1271,10 @@ test("Delete account opens above the Account screen, not behind it (CAS-1077)", 
 // reopen). Same session-persists-across-a-real-reload technique as CAS913_FAKE_SUPABASE_GLOBAL above (a
 // fresh window.supabase per navigation, backed by one real localStorage session key), but film_watch's own
 // upsert ALWAYS fails here — the push this device makes never reaches the account, on this reload or the
-// next, so the only thing that can be keeping the tick alive across the reload below is the durable outbox
-// (CascadePersistence's outboxOverlay, applied inside loadFilmWatches ahead of clearAccountNotify's wipe).
+// next, so the only thing that can be keeping the tick alive across the reload below is acctOp's own
+// persisted queue (CAS-1096: film_watch moved onto acctOp — persistQueue() writes it to localStorage
+// synchronously, before this reload; CascadePersistence's acctOpPendingOverlay is what loadFilmWatches
+// applies it back through, ahead of clearAccountNotify's wipe).
 const CAS1035_FAKE_SUPABASE_GLOBAL = `
   const SESSION_KEY = "cas1035-fake-session";
   const readSession = () => {
@@ -1286,8 +1292,27 @@ const CAS1035_FAKE_SUPABASE_GLOBAL = `
   }
   function filmWatchTable(){
     return {
-      select: () => ({ then: (resolve) => resolve({ data: [], error: null }) }),
+      select: () => chain(),   // CAS-1096: acctLoad chains .select().order().range() before its own .then()
       upsert: () => ({ then: (resolve) => resolve({ data: null, error: { message: "network down" } }) }),
+      delete: () => chain(),
+    };
+  }
+  // CAS-1109/CAS-1142: same gap as CAS913_FAKE_SUPABASE_GLOBAL above — this test's onboarding walk creates
+  // an agent in guest mode, then signs in, and toListing()'s settleListing() wait needs that agent back from
+  // acctLoad's own .select().order().range() round trip (via the acctOp "insert" upload) before #groups has
+  // anything to build a group from. The catch-all chain() below resolves .range() to a static empty array,
+  // so the upload vanished and settleListing() timed out before this test ever reached the Watch On tick it
+  // is actually about.
+  let cascadeRows = [];
+  function cascadesTable(){
+    return {
+      select: () => ({ order: () => ({ range: () => Promise.resolve({ data: cascadeRows.slice(), error: null }) }) }),
+      upsert: (fields) => {
+        const row = Array.isArray(fields) ? fields[0] : fields;
+        const i = cascadeRows.findIndex(r => r.id === row.id);
+        if(i >= 0) Object.assign(cascadeRows[i], row); else cascadeRows.push(Object.assign({}, row));
+        return { then: (resolve) => resolve({ data: [row], error: null }) };
+      },
       delete: () => chain(),
     };
   }
@@ -1309,7 +1334,23 @@ const CAS1035_FAKE_SUPABASE_GLOBAL = `
         },
         signOut: async () => { writeSession(null); return { error: null }; },
       },
-      from: (table) => table === "film_watch" ? filmWatchTable() : chain(),
+      from: (table) => table === "film_watch" ? filmWatchTable() : table === "cascades" ? cascadesTable() : chain(),
+      // CAS-1099: see CAS913_FAKE_SUPABASE_GLOBAL's identical stub above — this test also walks finishFlow
+      // + toListing() through membStart(), which now needs both RPCs to resolve rather than throw.
+      // CAS-1109: see CAS913_FAKE_SUPABASE_GLOBAL's identical complete_membership handling above — this
+      // test's onboarding-built agent only exists once this mock creates it from p.agents.
+      rpc: async (fn, params) => {
+        if(fn === "email_has_account") return { data: false, error: null };
+        if(fn === "complete_membership"){
+          const agents = (params && params.p && params.p.agents) || [];
+          agents.forEach(a => {
+            const row = Object.assign({ user_id: "cas1035-user", created_at: new Date().toISOString() }, a);
+            const i = cascadeRows.findIndex(r => r.id === row.id);
+            if(i >= 0) Object.assign(cascadeRows[i], row); else cascadeRows.push(row);
+          });
+        }
+        return { data: "created", error: null };
+      },
     };
   } };
 `;

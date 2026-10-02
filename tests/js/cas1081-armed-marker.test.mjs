@@ -47,16 +47,20 @@ test("CAS-1081: agentCascadeSumHTML (onboarding reveal/done step/Agents list) dr
   });
 });
 
-test("CAS-1081: msnValueLine/msnChipsHTML (the agent editor) also treat the >100 marker as never", () => {
+test("CAS-1081: msnValueLine/msnPillsHTML (the agent editor) also treat the >100 marker as never", () => {
   withFamilyWatchPrefs(() => {
     const c = familyLikeCascade();
     const line = E.msnValueLine(c);
     assert.ok(!line.includes("101"), `value line must never show "101+": ${line}`);
     assert.ok(!/cinema/i.test(line), `cinema must be left out of the value line: ${line}`);
-    assert.ok(line.startsWith("91+, rent it"), `rent must lead the sentence: ${line}`);
+    assert.ok(line.startsWith("Lists films scoring 91+"), `rent's real marker must lead the sentence: ${line}`);
+    assert.ok(line.includes("to rent or streaming"), `rent and stream must both be named as listed windows: ${line}`);
 
-    const chips = E.msnChipsHTML(c);
-    assert.ok(!chips.includes("101"), `chips must never show "101+": ${chips}`);
-    assert.ok(chips.includes("Cinema — never"), `cinema's chip must read Never, like any other Never window: ${chips}`);
+    const pills = E.msnPillsHTML(c);
+    assert.ok(!pills.includes("101"), `pills must never show "101+": ${pills}`);
+    // CAS-1128: pills are independent per-window toggles now — cinema (not armed, since its marker is >100)
+    // must read as an OFF pill, same as any other window this agent isn't tracking.
+    assert.match(pills, /class="msnpill off" data-act="msn-pill-toggle" data-key="in_cinema"/,
+      `cinema must render as an OFF pill, not an ON one, while its marker reads above 100: ${pills}`);
   });
 });

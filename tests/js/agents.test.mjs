@@ -12,7 +12,7 @@ const REQUIRED_EXPORTS = [
   "recomputeFound", "notify", "entryFor", "cascades", "cascSigOf", "agentFloor",
   "windowEnabled", "windowUsable", "WATCH_LEVEL_KEYS", "firstFound", "admitDrift",
   "filmIsNew", "isNewFound", "admittedAtFor", "watched", "blocked", "movingData",
-  "movingWindowRows", "setWatchMarker", "restoreWatchMarker", "msnTrackAreaHTML",
+  "movingWindowRows", "setAgentScore", "msnTrackAreaHTML",
   "msnValueLine", "toggleFilmOpt", "pinFilmToCascadeAndRepaint", "filmWatchSource",
   "filmNotifyState", "listingGroups", "listedBy", "watchesFilm", "agentChipHTML",
   "notifyChipHTML", "agentMetricsCompute", "cascadeScore", "primaryStatus",
@@ -44,10 +44,11 @@ test("CAS-789: every required export resolves from tests/js/engine.mjs", () => {
 
 // Cinema/Rental/Streaming usable, Premium off — watchPrefsDefaults()'s own shape, made explicit
 // so this file never depends on whatever an earlier test (in this file or another) left the
-// global watchPrefs pointing at.
+// global watchPrefs pointing at. CAS-1123 dropped the separate Notify flag — a window carries
+// just `list` now — so this fixture no longer carries one either.
 const WATCH_PREFS = {
-  in_cinema: { list: true, notify: false }, premium: { list: false, notify: false },
-  rent: { list: true, notify: false }, stream: { list: true, notify: false },
+  in_cinema: { list: true }, premium: { list: false },
+  rent: { list: true }, stream: { list: true },
 };
 function withWatchPrefs(overrides, fn){
   const saved = E.watchPrefs;
@@ -64,7 +65,7 @@ function withState(fn){
   const savedAdmitDrift = { ...E.admitDrift };
   const savedWatched = new Set(E.watched), savedBlocked = new Set(E.blocked);
   const savedFWR = E.CascadePersistence.filmWatchReady, savedAFR = E.CascadePersistence.agentFilmsReady;
-  const savedMsnLastValue = { ...E.msnLastValue };
+  const savedMsnLastScore = E.msnLastScore;
   try{ fn(); }
   finally{
     Object.keys(E.notify).forEach(k => delete E.notify[k]);
@@ -76,10 +77,9 @@ function withState(fn){
     Object.assign(E.admitDrift, savedAdmitDrift);
     E.watched.clear(); savedWatched.forEach(id => E.watched.add(id));
     E.blocked.clear(); savedBlocked.forEach(id => E.blocked.add(id));
-    // CAS-762: msnLastValue is the module-level "value before Never" map restoreWatchMarker reads —
-    // isolate it the same way as everything else here, so a test that seeds an Off history never leaks it.
-    Object.keys(E.msnLastValue).forEach(k => delete E.msnLastValue[k]);
-    Object.assign(E.msnLastValue, savedMsnLastValue);
+    // CAS-1113: msnLastScore is the module-level "last real score" scalar a chip's ＋ reads (replacing
+    // the retired per-window msnLastValue map) — isolate it the same way as everything else here.
+    E.setMsnLastScore(savedMsnLastScore);
     // `found` is entirely derived — recomputeFound() clears and rebuilds it from cascades/notify on
     // every call — so there is no prior value worth restoring, only a leftover one worth not leaking:
     // without this, a film left admitted by whichever test ran last is still sitting in `found` when
@@ -394,158 +394,46 @@ test("B9: raising a marker above a film's admission score skips to the next usab
     "B9: a score below every marker must never get a Watch On value written at all");
 }));
 
-test("B10: setWatchMarker pushes neighbours to hold MARKER_MIN_GAP and ladder order, and clears the *Defaulted flag", () => withAgentState(() => {
-  const c = E.normCascade({ kind: "stream", status: [] });
-  c.watchMarkers = { in_cinema: 40, premium: 35, rent: 30, stream: 25 };   // valid ladder order, gap 5 throughout
-  delete c._watchMarkersDefaulted;   // pretend this agent already had a real value
-
-  E.setWatchMarker(c, "rent", 38);   // 38 crowds premium(35) and, transitively, in_cinema(40)
-
-  assert.equal(c.watchMarkers.rent, 38);
-  assert.equal(c.watchMarkers.premium, 41, "B10: an earlier window must be pushed up to hold MARKER_MIN_GAP");
-  assert.equal(c.watchMarkers.in_cinema, 44, "B10: the push must cascade outward through every earlier window");
-  assert.equal(c.watchMarkers.stream, 25, "B10: a later window already clear of the gap must be left alone");
-
+// B10 ("setWatchMarker pushes neighbours to hold MARKER_MIN_GAP and ladder order") deleted, CAS-1113:
+// there is one score per agent now, not one marker per window, so there is nothing left to push apart.
+// CAS-1128 then retired the "start window at or after" delivery shape itself — setAgentScore(c, value)
+// now has no key argument, and arms every account-enabled window once the agent has at least one ON (see
+// tests/js/cas1128-track-in.test.mjs's own AC4, which covers this directly). The *Defaulted-clearing half
+// survives here too.
+test("B10: setAgentScore applies the same value to every account-enabled window, and clears the *Defaulted flag", () => withAgentState(() => {
   const fresh = E.normCascade({ kind: "stream", status: [] });
   assert.equal(fresh._watchMarkersDefaulted, true, "setup: a freshly-normalised agent's markers start flagged as a guess");
-  E.setWatchMarker(fresh, "stream", 60);
+  E.setAgentScore(fresh, 60);
   assert.ok(!fresh._watchMarkersDefaulted, "B10: the first real edit must clear the *Defaulted provenance flag");
+  assert.equal(fresh.watchMarkers.in_cinema, 60);
+  assert.equal(fresh.watchMarkers.rent, 60, "B10: every account-enabled window must share the same score");
+  assert.equal(fresh.watchMarkers.stream, 60, "B10: every account-enabled window must share the same score");
 }));
 
-// ---- CAS-762: Off — a third watchMarkers state (0), no score requirement, any score including unscored -----
+// ---- CAS-762/CAS-833's "Off — a third watchMarkers state (0), no score requirement" retired by CAS-1128 ---
+// CAS-1128 (Lee, 2026-10-01) supersedes this reading outright for the Cascade score control: there is no
+// per-window Off state any more, only ON (a real 50-100 score, shared by every ON window) or OFF (null).
+// normCascade now migrates any literal 0 it finds up to TRACK_MIN and leaves it ON (see
+// tests/js/cas1128-track-in.test.mjs's AC1), so every item below that built its fixture around a literal
+// `0` staying 0 — "usable at Off", "admits an unscored film", "scoreHeldBackCount is 0 because there's no
+// requirement" — tests a state that can no longer exist. Deleted rather than reworked: there is no
+// replacement behaviour to pin, since the whole point of this control's Off stop now is the opposite
+// (nothing tracked, not "tracks anything"). The genuinely new per-window-off behaviour (AC2: an OFF window
+// is skipped, not admitted) is covered by tests/js/cas1128-track-in.test.mjs's own AC2.
 
-test("CAS-762 items 1/2: a marker of 0 (Off) stays usable, and floors the agent at 0 exactly like agentFloor's own min-of-usable rule", () => withAgentState(() => {
-  const c = E.normCascade({ kind: "stream", status: [],
-    watchMarkers: { in_cinema: null, premium: null, rent: null, stream: 0 } });
-  assert.equal(E.windowUsable(c, "stream"), true, "CAS-762: 0 is not null — an Off window stays usable");
-  assert.equal(E.agentFloor(c), 0, "CAS-762: the lowest usable marker is 0, so the agent's floor is Off");
-}));
+// CAS-762 item 9's two restoreWatchMarker tests, and the later CAS-1113 msn-start-add test that replaced
+// them, deleted by CAS-1128: there is no more "start" window to re-arm via a chip's ＋ — toggleAgentWindow
+// is the one per-window mutator now, and its own "resume the agent's last real score" behaviour is covered
+// directly by tests/js/cas1128-track-in.test.mjs's AC4.
 
-test("CAS-762 item 3: matchesCriteria admits an unscored film once the agent's floor is Off, and still excludes it at any real floor", () => withAgentState(() => {
-  const cOff = broadCascade("cas762-item3-off", 0, { in_cinema: null, premium: null, rent: null, stream: 0 });
-  withUnscoredMatch(cOff, unscored => {
-    assert.equal(E.matchesCriteria(unscored, cOff), true, "CAS-762: an unscored film must be admitted once the floor is Off");
-    const cFloor = broadCascade("cas762-item3-floor", 1, { in_cinema: null, premium: null, rent: null, stream: 50 });
-    assert.equal(E.matchesCriteria(unscored, cFloor), false,
-      "CAS-762: a real floor (50) must still exclude an unscored film — rule 4 survives everywhere but Off");
-    // and a scored film below 50 is denied by the real floor exactly as before — this ticket touches only -1.
-    const scoredBelow = E.MOVIES.find(m => { const s = E.cascadeScore(m); return s >= 0 && s < 50; });
-    if(scoredBelow) assert.equal(E.matchesCriteria(scoredBelow, cFloor), false,
-      "CAS-762: a scored-but-below-floor film must still be excluded by a real floor");
-  });
-}));
+// CAS-762 AC6 retired by CAS-1128: msnValueLine's Off branch is track-wide now ("Off — this agent isn't
+// tracking anything."), not a per-window "every film, no floor" sentence — pinned directly by
+// tests/js/cas1128-track-in.test.mjs's AC3.
 
-test("CAS-762 item 4/AC7: setWatchMarker never pushes a neighbour at Off, never pushes INTO an Off neighbour, and two windows may both sit at Off", () => withAgentState(() => {
-  const c = E.normCascade({ kind: "stream", status: [] });
-  c.watchMarkers = { in_cinema: 0, premium: 55, rent: 0, stream: null };
-  E.setWatchMarker(c, "premium", 52);   // would ordinarily push a numeric in_cinema neighbour up by MARKER_MIN_GAP
-  assert.equal(c.watchMarkers.premium, 52);
-  assert.equal(c.watchMarkers.in_cinema, 0, "CAS-762: an Off neighbour must never be pushed");
-  assert.equal(c.watchMarkers.rent, 0, "CAS-762: an Off neighbour on the other side must never be pushed either");
-
-  E.setWatchMarker(c, "rent", 0);   // setting a marker TO Off must push nothing
-  assert.equal(c.watchMarkers.rent, 0);
-  assert.equal(c.watchMarkers.premium, 52, "CAS-762: moving a window TO Off must not push its neighbours");
-
-  E.setWatchMarker(c, "in_cinema", 0);   // two windows at Off simultaneously — neither collides, neither moves
-  assert.equal(c.watchMarkers.in_cinema, 0);
-  assert.equal(c.watchMarkers.rent, 0, "CAS-762 AC7: two windows may both sit at Off without one silently moving the other");
-}));
-
-test("CAS-762 item 5: sticky re-admission accepts a stored unscored admission (-1) once the agent's floor is Off", () => withAgentState(() => {
-  const c = broadCascade("cas762-item5", 0, { in_cinema: null, premium: null, rent: null, stream: 0 });
-  E.cascades.push(c);
-  // Must be strictly past CASCADE[0] ("upcoming") so movedPast (STATUS_RUNG[now] > STATUS_RUNG[admission_status])
-  // is genuinely true — that is what routes recomputeFound into the r.admission_score>=agentFloor(c) branch below.
-  const film = E.MOVIES.find(m => E.matchesCriteria(m, c) && E.CASCADE.indexOf(E.primaryStatus(m)) > 0);
-  assert.ok(film, "CAS-762 setup: need a film past its earliest window, so it can move past its admission point");
-  const id = film.tmdb_id;
-  // Seed the stored admission as unscored (-1) and already past — movedPast is what routes into the
-  // r.admission_score>=agentFloor(c) branch this item changes.
-  E.CascadePersistence.setAgentFilm(c.id, id,
-    { admission_score: -1, admission_status: E.CASCADE[0], agent_sig: E.cascSigOf(c) });
-  E.recomputeFound();
-  assert.ok(E.WATCH_LEVEL_KEYS.some(k => E.notify[id].wins[k]),
-    "CAS-762: an unscored admission must survive re-review once the agent's floor is Off, not just at the moment of first admission");
-}));
-
-test("CAS-762 item 6/AC5: an unscored film admitted by an Off-floor agent still earns a Watch On value, in the Off window's own tab", () => withAgentState(() => {
-  const cOff = broadCascade("cas762-item6", 0, { in_cinema: null, premium: null, rent: null, stream: 0 });
-  E.cascades.push(cOff);
-  withUnscoredMatch(cOff, unscored => {
-    const id = unscored.tmdb_id;
-    E.recomputeFound();
-    assert.equal(E.notify[id].wins.stream, true,
-      "CAS-762 AC5: an unscored film admitted at Off must receive a Watch On value, not land in no tab");
-  });
-}));
-
-test("CAS-762 item 7: scoreHeldBackCount is 0 once the agent's floor is Off — no score requirement, nothing held back", () => withAgentState(() => {
-  const cOff = broadCascade("cas762-item7", 0, { in_cinema: null, premium: null, rent: null, stream: 0 });
-  assert.equal(E.scoreHeldBackCount(cOff), 0, "CAS-762: an Off floor must never hold anything back for having no score");
-}));
-
-test("CAS-762 items 11/12: an Off marker's value and aria-label read \"Off\", never the literal number 0", () => withAgentState(() => {
-  const c = broadCascade("cas762-ui", 0, { in_cinema: null, premium: null, rent: 60, stream: 0 });
-  const html = E.msnTrackAreaHTML(c);
-  assert.match(html, /<span class="msnval">Off<\/span>/, "CAS-762: an Off marker's value must read \"Off\", never \"0\"");
-  assert.match(html, /aria-label="Stream score, currently Off"/, "CAS-762: an Off handle's aria-label must say Off, not a number");
-  assert.doesNotMatch(html, />0</, "CAS-762: the literal number 0 must never be drawn on the track");
-}));
-
-test("CAS-762 item 9: restoreWatchMarker returns a window to Off when that is what it last carried before Never, never squeezed up to 50", () => withAgentState(() => {
-  const c = E.normCascade({ kind: "stream", status: [],
-    watchMarkers: { in_cinema: null, premium: null, rent: 60, stream: 0 } });
-  // Mirror the app's own "Never" click handler exactly: it stashes the marker in msnLastValue, then nulls it.
-  E.msnLastValue.stream = c.watchMarkers.stream;
-  E.setWatchMarker(c, "stream", null);
-  assert.equal(c.watchMarkers.stream, null, "setup: stream must be Never before the restore");
-
-  E.restoreWatchMarker(c, "stream");
-  assert.equal(c.watchMarkers.stream, 0,
-    "CAS-762: a window that was Off before Never must restore straight back to Off, not be clamped up to 50");
-}));
-
-test("CAS-762 item 9: restoreWatchMarker still falls back to the ordinary ladder default when Never had no Off history", () => withAgentState(() => {
-  const c = E.normCascade({ kind: "stream", status: [],
-    watchMarkers: { in_cinema: null, premium: null, rent: 60, stream: null } });
-  delete E.msnLastValue.stream;   // never been set this session — no remembered value at all
-  E.restoreWatchMarker(c, "stream");
-  assert.ok(c.watchMarkers.stream >= 50 && c.watchMarkers.stream <= 100,
-    "CAS-762: with no Off history, restoring must still land in the ordinary 50-100 range, never Off");
-}));
-
-test("CAS-762 AC6: msnValueLine drops the floor clause and prints no numeric floor once every usable window is Off", () => withAgentState(() => {
-  const c = E.normCascade({ kind: "stream", status: [],
-    watchMarkers: { in_cinema: null, premium: null, rent: 0, stream: 0 } });
-  const line = E.msnValueLine(c);
-  assert.doesNotMatch(line, /not listed/, "CAS-762 AC6: the summary must not contain \"not listed\" once every window is Off");
-  assert.doesNotMatch(line, /don't list/, "CAS-762 AC6: the summary must not print a floor-exclusion clause once every window is Off");
-  assert.match(line, /Off — any score/, "CAS-762: each Off window must still read its own Off clause");
-}));
-
-test("CAS-762 item 11: the leading grey \"below the floor\" segment is zero-width once the agent's floor is Off, non-zero otherwise", () => withAgentState(() => {
-  const cOff = E.normCascade({ kind: "stream", status: [],
-    watchMarkers: { in_cinema: null, premium: null, rent: 0, stream: 60 } });
-  const htmlOff = E.msnTrackAreaHTML(cOff);
-  assert.match(htmlOff, /class="msnseg grey" style="left:0%;width:0%"/,
-    "CAS-762: an Off floor must draw no grey exclusion segment at all");
-
-  const cReal = E.normCascade({ kind: "stream", status: [],
-    watchMarkers: { in_cinema: null, premium: null, rent: 55, stream: 60 } });
-  const htmlReal = E.msnTrackAreaHTML(cReal);
-  assert.doesNotMatch(htmlReal, /class="msnseg grey" style="left:0%;width:0%"/,
-    "CAS-762 AC8: a real floor must still draw its grey exclusion segment exactly as before");
-
-  // AC8 regression pin: agentFloor(c) is Infinity (not 0) when NO window is usable at all — that is a
-  // completely different case from an Off floor (something IS usable, at 0) and must keep its pre-CAS-762
-  // full-width grey line, not fall into the new zero-width branch.
-  const cNone = E.normCascade({ kind: "stream", status: [],
-    watchMarkers: { in_cinema: null, premium: null, rent: null, stream: null } });
-  const htmlNone = E.msnTrackAreaHTML(cNone);
-  assert.match(htmlNone, /class="msnseg grey" style="left:0%;width:100%"/,
-    "CAS-762 AC8: an agent with no usable window at all must still draw a full-width grey line, unchanged");
-}));
+// CAS-762 item 11 retired by CAS-1128: the track's two segments are always both present now (never a
+// single full-width grey div), and Off is "no ON window" rather than "a marker literally at 0" — there is
+// no more "zero-width exclusion segment" distinction to pin for a per-window Off. msnTrackAreaHTML's own
+// segment maths are exercised directly by tests/js/cas1128-track-in.test.mjs's AC5.
 
 test("CAS-762 AC8: an agent whose windows all carry numeric markers is byte-identical to its pre-CAS-762 behaviour", () => withAgentState(() => {
   const c = broadCascade("cas762-ac8", 0, { in_cinema: 90, premium: 80, rent: 70, stream: 60 });
@@ -569,7 +457,7 @@ test("C1: switching a window off clears windowEnabled, drops it from msnTrackAre
   E.recomputeFound();
   assert.equal(E.notify[id].wins.in_cinema, true, "setup: the film must earn Cinema, the first usable rung");
 
-  withWatchPrefs({ in_cinema: { list: false, notify: false } }, () => {
+  withWatchPrefs({ in_cinema: { list: false } }, () => {
     assert.equal(E.windowEnabled("in_cinema"), false, "C1: windowEnabled must read false once switched off");
     const html = E.msnTrackAreaHTML(c);
     assert.doesNotMatch(html, /data-key="in_cinema"/, "C1: a switched-off window must render no marker");
@@ -583,9 +471,11 @@ test("C1: switching a window off clears windowEnabled, drops it from msnTrackAre
 
 // C2 ("switching on a window the agent has no marker for shows a restore chip, not a marker")
 // deleted, CAS-860: it asserted `msnTrackAreaHTML` rendering an inline "+ Premium" restore chip.
-// CAS-817 replaced that mechanism outright — an enabled Never window now gets a chip in the
-// separate "On this track" row (msnChipsHTML, a dashed chip with a "＋" button, not "+ Premium"
-// text inside the track itself) — so the control C2 checked for is gone, not merely renamed.
+// CAS-817 replaced that mechanism outright — an enabled Never window got a chip in the separate "On this
+// track" row (msnChipsHTML, a dashed chip with a "＋" button, not "+ Premium" text inside the track itself)
+// — so the control C2 checked for was gone, not merely renamed. CAS-1128 has since retired msnChipsHTML
+// itself too, in favour of independent per-window pills (msnPillsHTML) — see tests/js/cas1128-track-in.
+// test.mjs's AC5 for that row's own current coverage.
 // C1 above still passes only because its own assertion (doesNotMatch "+ Cinema") is now vacuous.
 
 test("C3: disabling a film's own current window (and anything later) resolves standing to null — placement falls back to earned", () => withAgentState(() => {
@@ -601,7 +491,7 @@ test("C3: disabling a film's own current window (and anything later) resolves st
   // WATCH_LEVEL_KEYS' standing scan starts AT the film's own current rung, not strictly after it —
   // for a film already at Stream (the ladder's last rung), "every window later than its own" has
   // no members, so its own window has to go too for the scan to actually run dry.
-  withWatchPrefs({ stream: { list: false, notify: false } }, () => {
+  withWatchPrefs({ stream: { list: false } }, () => {
     E.recomputeFound();
     assert.equal(E.notify[id].wins.stream, false, "C3: standing must no longer be able to claim Stream");
     assert.equal(E.notify[id].wins.in_cinema, true, "C3: placement must fall back to earned (Cinema) — the film keeps a Watch On");
@@ -627,7 +517,7 @@ test("C5: a marker (Where and when) change moves cascSigOf, the signature the fu
   const c = E.normCascade({ kind: "stream", status: [] });
   const sigBefore = E.cascSigOf(c);
 
-  E.setWatchMarker(c, "rent", (c.watchMarkers.rent || 0) + 10);
+  E.setAgentScore(c, (c.watchMarkers.rent || 50) + 10);
 
   assert.notEqual(E.cascSigOf(c), sigBefore,
     "C5: a marker edit must move cascSigOf — this is the load-bearing signature; if this fails, half of topic B is silently untrue");
@@ -1374,74 +1264,15 @@ test("K7: a refresh that changes a film's score but not its window leaves admiss
 }));
 
 // ---- L: the score track Off stop (CAS-833) ---------------------------------------------------
-// CAS-762 built the Off stop; these checks drive the same real exported functions to confirm it
-// from the agent-behaviour plan's own angle, alongside (not instead of) CAS-762's own tests above.
-
-test("L1: a marker set to Off (0) is usable while the same window set to Never (null) is not — they never collapse into one state", () => withAgentState(() => {
-  const cOff = E.normCascade({ kind: "stream", status: [],
-    watchMarkers: { in_cinema: null, premium: null, rent: null, stream: 0 } });
-  assert.equal(E.windowUsable(cOff, "stream"), true, "L1: Off (0) must keep the window on the track");
-  const cNever = E.normCascade({ kind: "stream", status: [],
-    watchMarkers: { in_cinema: null, premium: null, rent: null, stream: null } });
-  assert.equal(E.windowUsable(cNever, "stream"), false, "L1: Never (null) must remove the window to a restore chip");
-}));
-
-test("L2: agentFloor(c) returns 0 when the lowest usable marker is Off — not Infinity, and not TRACK_MIN", () => withAgentState(() => {
-  const c = E.normCascade({ kind: "stream", status: [],
-    watchMarkers: { in_cinema: null, premium: 60, rent: null, stream: 0 } });
-  assert.equal(E.agentFloor(c), 0, "L2: the lowest usable marker (Off) must be the agent's floor");
-  assert.notEqual(E.agentFloor(c), Infinity, "L2: an agent with a usable window must never floor at Infinity");
-  assert.notEqual(E.agentFloor(c), 50, "L2: must not fall back to TRACK_MIN (50) — Off means no requirement, not the lowest real one");
-}));
-
-test("L3: an unscored film is admitted once the agent's floor is Off, and rejected at every numeric floor", () => withAgentState(() => {
-  const cOff = broadCascade("cas833-l3-off", 0, { in_cinema: null, premium: null, rent: null, stream: 0 });
-  withUnscoredMatch(cOff, unscored => {
-    assert.equal(E.matchesCriteria(unscored, cOff), true, "L3: an unscored film must be admitted once the floor is Off");
-    for(let floor = 50; floor <= 100; floor += 10){
-      const cNum = broadCascade("cas833-l3-" + floor, 1, { in_cinema: null, premium: null, rent: null, stream: floor });
-      assert.equal(E.matchesCriteria(unscored, cNum), false,
-        `L3: an unscored film must be rejected at every numeric floor (got in at ${floor})`);
-    }
-  });
-}));
-
-test("L4: a stored agent_films row with admission_score -1, re-reviewed after an agent edit at floor Off, stays admitted", () => withAgentState(() => {
-  const c = broadCascade("cas833-l4", 0, { in_cinema: null, premium: null, rent: null, stream: 0 });
-  E.cascades.push(c);
-  // Must be strictly past CASCADE[0] ("upcoming") so movedPast is genuinely true — that is what routes
-  // recomputeFound's sticky re-review into the agentFloor(c)===0 branch this ticket is about, rather than
-  // the plain live re-test an unmoved film would get instead.
-  const film = E.MOVIES.find(m => E.matchesCriteria(m, c) && E.CASCADE.indexOf(E.primaryStatus(m)) > 0);
-  assert.ok(film, "L4 setup: need a film past its earliest window, so it can move past its admission point");
-  const id = film.tmdb_id;
-  E.CascadePersistence.setAgentFilm(c.id, id,
-    { admission_score: -1, admission_status: E.CASCADE[0], agent_sig: E.cascSigOf(c) });
-  c.name = (c.name || "") + " (edited)";   // moves cascSigOf — "after an agent edit", per the ticket
-  E.recomputeFound();
-  const row = E.CascadePersistence.agentFilmsFor(c.id).find(r => r.movie_id === String(id));
-  assert.ok(row, "L4: sticky re-admission must pass — the unscored film must not fall out at a floor of Off");
-}));
-
-test("L5: Watch On for an unscored film on an Off window resolves to that window — Off admits but does not skip alerting", () => withAgentState(() => {
-  const cOff = broadCascade("cas833-l5", 0, { in_cinema: null, premium: null, rent: null, stream: 0 });
-  E.cascades.push(cOff);
-  withUnscoredMatch(cOff, unscored => {
-    const id = unscored.tmdb_id;
-    E.recomputeFound();
-    assert.equal(E.notify[id].wins.stream, true,
-      "L5: an unscored film admitted at Off must earn a Watch On value in the Off window's own tab, not go unarmed");
-  });
-}));
-
-test("L6: two windows both set to Off — calling setWatchMarker on one leaves both at Off, neither pushes the other", () => withAgentState(() => {
-  const c = E.normCascade({ kind: "stream", status: [] });
-  c.watchMarkers = { in_cinema: null, premium: 55, rent: 0, stream: null };
-  E.setWatchMarker(c, "in_cinema", 0);   // a second window arrives at Off, next to the already-Off rent window
-  assert.equal(c.watchMarkers.in_cinema, 0);
-  assert.equal(c.watchMarkers.rent, 0, "L6: an already-Off neighbour must stay at Off, not be pushed by the other reaching Off");
-  assert.equal(c.watchMarkers.premium, 55, "L6: Off sits outside the MARKER_MIN_GAP ladder — a numeric neighbour must not be pushed either");
-}));
+// CAS-762/CAS-833 built the Off stop as a per-window state (marker 0, distinct from Never); CAS-1128
+// (Lee, 2026-10-01) retires that reading for this control entirely — Off is track-wide now (every window
+// null, nothing tracked), and a literal per-window 0 can no longer exist past normCascade (it migrates to
+// TRACK_MIN and stays ON — tests/js/cas1128-track-in.test.mjs's AC1). L1-L6 below all built their fixture
+// around a marker staying exactly 0 — "usable at Off", "agentFloor reads 0", "an unscored film is admitted
+// at Off" — so none of them can be reworked into the new shape; they're deleted rather than kept failing.
+// L6 itself already carried a similar note from CAS-1113's own earlier retirement of L6's original premise.
+// The new per-window-off admission behaviour (an OFF window is skipped, never admitted into) is covered by
+// tests/js/cas1128-track-in.test.mjs's own AC2; L7 (a purely numeric agent is unaffected) still holds below.
 
 test("L7: an agent whose markers are all numeric lists an identical count before and after — the Off stop moves nobody who never uses it", () => withAgentState(() => {
   const c = broadCascade("cas833-l7", 0, { in_cinema: 90, premium: 80, rent: 70, stream: 60 });

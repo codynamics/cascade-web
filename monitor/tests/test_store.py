@@ -16,14 +16,30 @@ from monitor.store import InMemoryStore, SupabaseStore
 
 
 class FetchUserHeldIds(unittest.TestCase):
-    def test_the_union_covers_all_four_tables(self):
+    def test_the_union_covers_all_five_tables(self):
         store = InMemoryStore(
             user_films=[{"user_id": "u1", "movie_id": 111, "status": "liked"}],
             watches=[{"user_id": "u1", "movie_id": 222, "windows": ["rental"]}],
             agent_films=[{"user_id": "u1", "cascade_id": "c1", "movie_id": 333}],
+            picks=[{"user_id": "u1", "movie_id": 555, "pinned_to": ["c1"]}],
             notifications=[{"user_id": "u1", "cascade_id": "c1", "movie_id": 444, "moment": "arrived"}],
         )
-        self.assertEqual(store.fetch_user_held_ids(), {"111", "222", "333", "444"})
+        self.assertEqual(store.fetch_user_held_ids(), {"111", "222", "333", "444", "555"})
+
+    def test_an_admitted_a_pinned_and_a_verdict_film_are_all_held(self):
+        """CAS-1097: agent_films stays append-only history now — user_held_ids must still carry an
+        agent's own admitted film, a hand-pinned film (film_picks), and a watched/disliked verdict
+        (user_films), the three cases this ticket's own AC names explicitly."""
+        store = InMemoryStore(
+            user_films=[{"user_id": "u1", "movie_id": 111, "status": "disliked"}],
+            agent_films=[{"user_id": "u1", "cascade_id": "c1", "movie_id": 222,
+                          "admission_score": 80, "admission_status": "stream"}],
+            picks=[{"user_id": "u1", "movie_id": 333, "pinned_to": ["c1"], "not_in": []}],
+        )
+        held = store.fetch_user_held_ids()
+        self.assertIn("111", held, "a verdict film must be held")
+        self.assertIn("222", held, "an admitted film must be held")
+        self.assertIn("333", held, "a pinned film must be held")
 
     def test_a_shared_id_across_tables_is_not_duplicated(self):
         store = InMemoryStore(
