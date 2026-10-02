@@ -1529,7 +1529,7 @@
   .svcsec{margin-top:14px}
   .svcsech{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);
     margin:0 2px 7px}
-  .chip.svcmore{border-style:dashed;color:var(--accenttext)}
+  .chip.svcmore{flex:0 0 100%;text-align:center;border-style:solid;border-color:var(--accent);background:rgba(124,92,255,.12);color:var(--accenttext);font-size:14px;font-weight:700;padding:10px 12px;margin-top:3px}
   /* CAS-252: the switch was sitting on the list above it. It is a different question from "which do you
      have", so it gets the gap that says so. */
   .bigtoggle.svconly{margin-top:20px}
@@ -15754,15 +15754,13 @@ const SHARP_STEPS = {
         <div class="svcsec"><div class="svcsech">My Rental Services</div>
           <div class="chips" id="obSvcStores"></div></div>
         <div class="svcsec"><div class="svcsech">My Streaming Services</div>
-          <div class="chips" id="obSvcSubs"></div></div>
-        <button type="button" class="bigtoggle svconly${prefs.on?" on":""}" id="obSvcOnly">
-          <span class="btmain">Only show films on my services</span><span class="btcheck">✓</span></button>`;
+          <div class="chips" id="obSvcSubs"></div></div>`;
     },
     wire(){
       onbFlow.answersV2=onbAnswersV2Load();
-      // CAS-915: reuse onChipToggle('svc')'s own auto-arm condition (minus its servicesPicked() gate —
-      // this screen arms on entry, not only once a service is picked) rather than a second copy of the rule.
-      if(!prefs.touched && !prefs.on){ prefs.on=true; savePrefs(); pushPrefsCols(["services_only"]); }
+      // CAS-915/CAS-1167: this screen always arms "services only" on entry, whatever prefs.touched is —
+      // the toggle itself was removed from this screen, so the setting is simply always on after it.
+      if(!prefs.on){ prefs.on=true; savePrefs(); pushPrefsCols(["services_only"]); }
       const draw=(boxId, list, set, primary)=>{
         const box=$(boxId); if(!box) return;
         const open = !!svcMore[boxId];
@@ -15801,16 +15799,6 @@ const SHARP_STEPS = {
       };
       draw("obSvcStores", STORE_SERVICES, prefs.store);
       draw("obSvcSubs",   SUB_SERVICES,   prefs.sub, PRIMARY_SUB_SERVICES);
-      const tog=$("obSvcOnly");
-      if(tog){
-        tog.classList.toggle("on", prefs.on);
-        tog.onclick=()=>{
-          prefs.on=!prefs.on; prefs.touched=true; savePrefs(); pushPrefsCols(["services_only","touched"]);
-          tog.classList.toggle("on", prefs.on);
-          updatePrefSwitch(); updatePrefBtn();
-          render();
-        };
-      }
     },
   },
   // ---- CAS-909: onboarding v2's agent reveal — four preview-only steps, reachable via ?step=<key> only.

@@ -1147,9 +1147,20 @@ async function cas913WalkToShortlist(page){
   await page.waitForTimeout(120);
   await expect(page.locator("#obKidsOpts")).toBeVisible();                        // v2_kids — v2_date skipped
   await page.locator('#obKidsOpts .obopt[data-val="no"]').click();
+  await page.evaluate(() => { prefs.touched = true; prefs.on = false; });         // CAS-1167 AC4: must arm anyway
   await ctaLocator(page).click();
   await page.waitForTimeout(120);                                                 // v2_family skipped
   await expect(page.locator("#obSvcStores")).toBeVisible();                       // v2_services
+  await expect(page.locator("#obSvcOnly")).toHaveCount(0);                        // CAS-1167: toggle removed
+  for(const boxId of ["obSvcStores", "obSvcSubs"]){
+    const { chipWidth, boxWidth } = await page.evaluate(id => {
+      const box = document.getElementById(id);
+      const chip = box.querySelector(".chip.svcmore");
+      return { chipWidth: chip.getBoundingClientRect().width, boxWidth: box.getBoundingClientRect().width };
+    }, boxId);
+    expect(Math.abs(chipWidth - boxWidth)).toBeLessThanOrEqual(2);
+  }
+  expect(await page.evaluate(() => prefs.on)).toBe(true);                         // CAS-1167: armed regardless of touched
 }
 
 test("CAS-913: signing out from the Account screen returns to the splash and survives a reload", async ({ page }) => {
