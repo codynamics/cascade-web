@@ -4,7 +4,7 @@
 // folded straight into the account, duplicating the roster; (2) a device signs out and back in on the
 // SAME account — the agent count and ids must not move. Same direct-CascadeAuth-mutation technique as
 // CAS-884/CAS-930 (a card-create-time or membership-time fake client, no config.js/supabase-js network
-// route), extended here to drive window.CascadePersistence.loadAccount()/loadGuest() directly, the way
+// route), extended here to drive window.CascadePersistence.loadAccount()/signOutReset() directly, the way
 // the real sign-in/sign-out chokepoints do.
 import { test, expect } from "@playwright/test";
 import { toShortlist, finishFlow } from "./helpers.mjs";
@@ -71,7 +71,7 @@ test("CAS-959 AC4: sign in, sign out, sign back in on the same device — the ag
   // Sign out — the real chokepoint, per CAS-957's own test convention.
   await page.evaluate(() => {
     window.CascadeAuth.enabled = false; window.CascadeAuth.client = null; window.CascadeAuth.session = null;
-    window.CascadePersistence.loadGuest();
+    window.CascadePersistence.signOutReset();
   });
   expect(await page.evaluate(() => cascades.length)).toBe(0);
 

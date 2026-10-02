@@ -137,9 +137,9 @@ test("CAS-1035 AC2 (CAS-1096 shape): a failed film_watch push survives a simulat
   signIn(E2, bootClient, "cas1035-test-user");
   zeroBackoff(E2);
   try{
-    await E2.CascadePersistence.replayOutbox();   // AC2: replayed BEFORE the load below
+    await E2.CascadeAccountStore.sendQueue();   // AC2: replayed BEFORE the load below
     assert.ok(bootClient.upsertCalls.some(c => c.table === "film_watch"),
-      "replayOutbox must have attempted the film_watch push again on this boot");
+      "the queued op must have attempted the film_watch push again on this boot");
 
     await E2.CascadePersistence.loadFilmWatches();   // the exact call fireAccountFanout makes next
     assert.equal(E2.notify[film.tmdb_id].wins.stream, true,
