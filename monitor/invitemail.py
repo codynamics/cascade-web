@@ -32,6 +32,19 @@ from .emailer import DEFAULT_SITE_URL, SITE_URL_ENV, send_via_resend
 from .store import InMemoryStore, store_from_env
 
 
+def _fmt_day(value) -> str:
+    """'2 Oct 26' — the same day-month-2-digit-year shape app_template.html's own fmtDay renders on
+    the invite page, so the email and the page never say a suggested date differently. "" for
+    anything not a real date (honesty guardrail), never a placeholder."""
+    if not value:
+        return ""
+    try:
+        d = _dt.date.fromisoformat(str(value)[:10])
+    except (ValueError, TypeError):
+        return ""
+    return f"{d.day} {d.strftime('%b')} {d.strftime('%y')}"
+
+
 def invite_url(row) -> str:
     site_url = os.environ.get(SITE_URL_ENV) or DEFAULT_SITE_URL
     return f"{site_url}?inv={row.get('token')}#/film/{row.get('tmdb_id')}"
@@ -54,9 +67,29 @@ def render_email(row, movie=None) -> dict:
     film = row.get("film_title") or "a film"
     url = invite_url(row)
     poster = (movie or {}).get("poster")
+    suggested_date = row.get("suggested_date")
+    note = row.get("note")
+
+    # CAS-1121: both optional, shown under the lead line only when the sender actually set them.
+    extra_text = ""
+    if suggested_date:
+        extra_text += f"\nSuggested: {_fmt_day(suggested_date)}"
+    if note:
+        extra_text += f"\n“{note}”"
+    extra_html = ""
+    if suggested_date:
+        extra_html += (
+            f'<div style="font-size:13px;color:#8b95a5;margin-top:6px;">'
+            f'Suggested: {esc(_fmt_day(suggested_date))}</div>'
+        )
+    if note:
+        extra_html += (
+            f'<div style="font-size:13px;color:#8b95a5;margin-top:6px;">'
+            f'“{esc(note).replace(chr(10), "<br>")}”</div>'
+        )
 
     text = (
-        f"{sender} has invited you to watch {film}.\n\n"
+        f"{sender} has invited you to watch {film}.{extra_text}\n\n"
         f"View invite: {url}"
     )
     poster_img = (
@@ -79,6 +112,7 @@ def render_email(row, movie=None) -> dict:
         f'{poster_img}'
         f'<div style="font-size:15px;color:#141A2A;margin-top:14px;">'
         f'{esc(sender)} has invited you to watch <b>{esc(film)}</b>.</div>'
+        f'{extra_html}'
         '</td></tr>'
         '<tr><td style="padding-top:20px;">'
         f'<a href="{esc(url)}" style="display:inline-block;background:#6b48f2;color:#ffffff;'

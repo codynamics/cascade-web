@@ -11,10 +11,11 @@ from monitor.store import InMemoryStore
 
 def _row(id=1, token="abc1234567", to_email="priya@example.test", to_name="Priya",
          created_at="2026-09-08T09:00:00+00:00", sent_at=None, sender_name="lee",
-         film_title="Test Film", tmdb_id=12345):
+         film_title="Test Film", tmdb_id=12345, suggested_date=None, note=None):
     return {"id": id, "token": token, "to_email": to_email, "to_name": to_name,
             "created_at": created_at, "sent_at": sent_at, "sender_name": sender_name,
-            "film_title": film_title, "tmdb_id": tmdb_id}
+            "film_title": film_title, "tmdb_id": tmdb_id,
+            "suggested_date": suggested_date, "note": note}
 
 
 def _movie(tmdb_id=12345, poster="/poster.jpg"):
@@ -89,6 +90,40 @@ class PosterTests(unittest.TestCase):
     def test_no_matching_movie_renders_no_image(self):
         email = render_email(_row(tmdb_id=12345), movie=None)
         self.assertNotIn("<img", email["html"])
+
+
+class SuggestedDateAndNoteTests(unittest.TestCase):
+    """CAS-1121 AC2: a row with a date and note renders both lines; a row without either renders
+    neither."""
+
+    def test_both_set_render_both_lines_in_html_and_text(self):
+        email = render_email(_row(suggested_date="2026-10-20", note="Bring popcorn"))
+        self.assertIn("Suggested: 20 Oct 26", email["html"])
+        self.assertIn("Suggested: 20 Oct 26", email["text"])
+        self.assertIn("“Bring popcorn”", email["html"])
+        self.assertIn("“Bring popcorn”", email["text"])
+
+    def test_neither_set_renders_neither_line(self):
+        email = render_email(_row(suggested_date=None, note=None))
+        self.assertNotIn("Suggested:", email["html"])
+        self.assertNotIn("Suggested:", email["text"])
+        self.assertNotIn("“", email["html"])
+        self.assertNotIn("“", email["text"])
+
+    def test_date_only_renders_only_the_date_line(self):
+        email = render_email(_row(suggested_date="2026-10-20", note=None))
+        self.assertIn("Suggested: 20 Oct 26", email["html"])
+        self.assertNotIn("“", email["html"])
+
+    def test_note_only_renders_only_the_note_line(self):
+        email = render_email(_row(suggested_date=None, note="Bring popcorn"))
+        self.assertNotIn("Suggested:", email["html"])
+        self.assertIn("“Bring popcorn”", email["html"])
+
+    def test_note_html_escapes_content_and_keeps_line_breaks(self):
+        email = render_email(_row(note="Line one\n<script>alert(1)</script>"))
+        self.assertIn("Line one<br>&lt;script&gt;alert(1)&lt;/script&gt;", email["html"])
+        self.assertNotIn("<script>alert(1)</script>", email["html"])
 
 
 class MainDryRunTests(unittest.TestCase):

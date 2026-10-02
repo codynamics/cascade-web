@@ -461,7 +461,7 @@
   .fpinvite-yes:disabled,.fpinvite-no:disabled{opacity:.5;cursor:default}
   .fpinvite-confirm{font-size:16px;font-weight:800;color:var(--green);margin:0 0 8px}
   .fpinvite-confirm.no{color:var(--ink)}
-  .fpinvite-note{font-size:13px;color:var(--dim);line-height:1.5}
+  .fpinvite-note{font-size:13px;color:var(--dim);line-height:1.5;margin:0 0 10px}
   .fphr{border:none;border-top:1px solid var(--line);margin:18px 0}
   /* CAS-509: same env(safe-area-inset-top) clearance as the header — every .modal (New Cascade, Filters,
      Prefs, Account, Save As, Log, Video) is sticky from the viewport's true top:0. */
@@ -6879,6 +6879,14 @@ function refCode(){
   const a=window.CascadeAuth;
   return (a && a.enabled && a.status==="signed-in") ? refCodeCache : null;
 }
+// CAS-1121: this device's cached copy of the signed-in account's own display name (user_prefs.display_name) —
+// set by loadUserPrefs() below, and by sendFilmInvite() itself the moment a send writes a fresh one, so the
+// very next sheet to prefill (recommend, or another invite) never waits on a round-trip to see it.
+let displayNameCache = null;
+function displayName(){
+  const a=window.CascadeAuth;
+  return (a && a.enabled && a.status==="signed-in") ? displayNameCache : null;
+}
 // CAS-883: 10 chars from crypto.getRandomValues over [a-z0-9] — this is the per-send INVITE token (distinct
 // from genRefCode's account-level referral code above), minted fresh on every Invite send.
 function genInviteToken(){
@@ -7123,6 +7131,12 @@ let inviteFriendAdding = false;
 const INVITE_MAX_RECIPIENTS = 20;
 let inviteCapMsg = null;
 let inviteSentInfo = null;   // {count, line} once a send has actually gone through; null otherwise
+// CAS-1121: the sheet's own Your name/Suggested date/Note fields. null means "not edited this open" — the
+// name input still shows a real prefill (inviteDefaultName()) despite that, same not-yet-touched convention
+// recommendMsgText uses for the Recommend message. Reset fresh on every open, below.
+let inviteNameVal = null;
+let inviteDateVal = null;
+let inviteNoteVal = null;
 // CAS-931: routes a picker action to whichever host (ctx) owns it — Invite's own selMap/cap/rerender,
 // or Recommend's — so the two pickers stay fully independent despite sharing friendRowHTML's markup.
 function pickerCtx(ctx){
@@ -7250,6 +7264,8 @@ function renderFilmInviteSheet(m){
   const selFriend=selCount===1 ? friends.find(f=>String(f.id)===selIds[0]) : null;
   const ctaLabel = selCount===0 ? "Invite"
     : (selFriend ? `Invite ${selFriend.name}` : `Invite ${selCount} people`);
+  const nameVal = inviteNameVal!==null ? inviteNameVal : inviteDefaultName();
+  const canSend = selCount>0 && nameVal.trim().length>0;
   $("filmInviteBody").innerHTML = `
     <div class="filminvrow">${poster}<div><div class="filminvtitle">${esc(m.title)}</div>
       <div class="filminvwin">${windowsLineHTML(m)}</div></div></div>
@@ -7259,9 +7275,28 @@ function renderFilmInviteSheet(m){
     <button type="button" class="fnewbtn" onclick="openFriendAddForm()">+ Add someone new</button>
     <div id="filmInvitePicker">${rows}</div>
     <div class="pnote" id="filmInviteErr" style="color:#ffb9a6" ${inviteCapMsg?"":"hidden"}>${esc(inviteCapMsg||"")}</div>
-    <button type="button" class="filminvcta" id="filmInviteSend" onclick="sendFilmInvite()" ${selCount?"":"disabled"}>${esc(ctaLabel)}</button>
+    <div class="flabel">Your name</div>
+    <input type="text" class="namein" id="filmInviteName" maxlength="60" autocomplete="off"
+      value="${escA(nameVal)}" oninput="onInviteNameInput(this.value)">
+    <div class="flabel">Suggested date (optional)</div>
+    <input type="date" class="namein" id="filmInviteDate" min="${escA(TODAY)}" value="${escA(inviteDateVal||"")}"
+      oninput="onInviteDateInput(this.value)">
+    <div class="flabel">Note</div>
+    <textarea class="cmsg" id="filmInviteNote" maxlength="500" rows="3" placeholder="Add a note (optional)"
+      oninput="onInviteNoteInput(this.value)">${esc(inviteNoteVal||"")}</textarea>
+    <button type="button" class="filminvcta" id="filmInviteSend" onclick="sendFilmInvite()" ${canSend?"":"disabled"}>${esc(ctaLabel)}</button>
     <div class="pnote" style="text-align:center">Email sends straight from Cascade. WhatsApp or SMS opens your messaging app to finish sending.</div>`;
 }
+// CAS-1121: "Your name" prefills from the account's own remembered display name, else the email local
+// part — the only identity a brand-new account has today.
+function inviteDefaultName(){
+  const dn=displayName(); if(dn) return dn;
+  const a=window.CascadeAuth;
+  return (a && a.user && a.user.email) ? a.user.email.split("@")[0] : "";
+}
+window.onInviteNameInput=(val)=>{ inviteNameVal=val; const btn=$("filmInviteSend"); if(btn) btn.disabled = !(inviteFriendSel.size>0 && val.trim().length>0); };
+window.onInviteDateInput=(val)=>{ inviteDateVal=val; };
+window.onInviteNoteInput=(val)=>{ inviteNoteVal=val; };
 window.openFilmInvite = id => {
   const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
   filmInviteId = id;
@@ -7269,6 +7304,9 @@ window.openFilmInvite = id => {
   inviteFriendAdding = false;
   inviteCapMsg = null;
   inviteSentInfo = null;
+  inviteNameVal = null;
+  inviteDateVal = null;
+  inviteNoteVal = null;
   renderFilmInviteSheet(m);
   openModal($("filmInvite"));
   logEvent("invite_opened",{id});
@@ -7300,9 +7338,15 @@ window.sendFilmInvite = async()=>{
     errEl.hidden=false;
     return;
   }
+  const nameVal=(inviteNameVal!==null ? inviteNameVal : inviteDefaultName()).trim().slice(0,60);
+  if(!nameVal){ errEl.textContent="Enter your name."; errEl.hidden=false; return; }
   if(!c || !uid){ errEl.textContent="Couldn't create that invite — try again in a moment."; errEl.hidden=false; return; }
   btn.disabled=true;
-  const sender_name=(a.user && a.user.email) ? a.user.email.split("@")[0] : null;
+  const sender_name=nameVal;
+  // CAS-1121: "today or later" — a hand-typed value that slips past the <input min> guard is dropped
+  // rather than sent, the same silent-ignore the native picker itself would give for an out-of-range pick.
+  const suggested_date=(inviteDateVal && inviteDateVal>=TODAY) ? inviteDateVal : null;
+  const note=(inviteNoteVal||"").trim().slice(0,500) || null;
   const sent=[];
   const newInvites=[];
   try{
@@ -7311,6 +7355,7 @@ window.sendFilmInvite = async()=>{
       const created_at=new Date().toISOString();
       const {error}=await c.from("invites").insert([{
         token, sender_id:uid, sender_name, tmdb_id:m.tmdb_id, film_title:m.title, to_name:r.friend.name,
+        suggested_date, note,
       }]);
       if(error) throw error;
       const usedAt=new Date().toISOString();
@@ -7337,6 +7382,9 @@ window.sendFilmInvite = async()=>{
   invites=[...newInvites, ...invites];
   updateInvitesBadge();
   if(typeof renderInvitesScreen==="function" && $("invitesScreen") && $("invitesScreen").classList.contains("open")) renderInvitesScreen();
+  // CAS-1121: remembered immediately (not just on the next loadUserPrefs round-trip) so the very next
+  // sheet — another invite, or Recommend Cascade — prefills with it straight away.
+  if(displayNameCache!==nameVal){ displayNameCache=nameVal; pushPrefsCols(["display_name"]); }
   inviteFriendSel=new Map();
   inviteSentInfo={count:sent.length, line:inviteSentLineFor(sent)};
   renderFilmInviteSheet(m);
@@ -7451,13 +7499,24 @@ async function resolveFilmInvite(token, id, c){
   if(close && !el.querySelector(".fpword")) close.insertAdjacentHTML("afterend", `<div class="fpword">CASCADE</div>`);
   const sender=esc(rows[0].sender_name || "Someone");
   recvInviteSender=sender;
-  cta.insertAdjacentHTML("beforebegin", `<div class="fpinvite" id="fpInvite">
+  cta.insertAdjacentHTML("beforebegin", fpInviteAskHTML(rows[0]));
+  logEvent("invite_opened",{token});
+}
+// CAS-1121: pure so a test can assert the suggested-date/note lines directly rather than parsing a real
+// DOM insert — same reasoning as filmInviteSentHTML above. Both lines are optional, shown only when the
+// sender actually set them; the note's line breaks are kept (escaped first, so a <br> can never come from
+// the sender's own text).
+function fpInviteAskHTML(row){
+  const sender=esc(row.sender_name || "Someone");
+  const suggestedHTML=row.suggested_date ? `<div class="fpinvite-note">Suggested: ${esc(fmtDay(row.suggested_date))}</div>` : "";
+  const noteHTML=row.note ? `<div class="fpinvite-note">“${esc(row.note).replace(/\n/g,"<br>")}”</div>` : "";
+  return `<div class="fpinvite" id="fpInvite">
       <div class="fpinvite-ask"><b>${sender}</b> would like to<br>watch this with you</div>
+      ${suggestedHTML}${noteHTML}
       <div class="fpinvite-btns">
         <button type="button" class="fpinvite-yes" onclick="replyFilmInvite('yes')">Yes, I&#8217;m in</button>
         <button type="button" class="fpinvite-no" onclick="replyFilmInvite('no')">No thanks</button>
-      </div></div><hr class="fphr">`);
-  logEvent("invite_opened",{token});
+      </div></div><hr class="fphr">`;
 }
 // One upsert per tap, keyed on (token, client_key) — a recipient who reloads and answers differently
 // overwrites their own row rather than creating a second one (Change 4). replier_id is set only when this
@@ -12578,7 +12637,9 @@ function renderRecommendForm(){
   }
   if(h3) h3.textContent="Recommend Cascade";
   const a=window.CascadeAuth;
-  const senderName=(a && a.user && a.user.email) ? a.user.email.split("@")[0] : null;
+  // CAS-1121: the invite sheet's own remembered name, when the account has one — else the same
+  // email-local-part fallback this already used.
+  const senderName=displayName() || ((a && a.user && a.user.email) ? a.user.email.split("@")[0] : null);
   window._recommendSender=senderName;
   const list=friendsSorted();
   const rows = list.length
@@ -19874,6 +19935,7 @@ else if(dedupedN)
       userPrefsReady=true;   // CAS-740: a guest has nothing to wait on
       notifyPrefsReady=true;   // CAS-741: a guest has nothing to wait on
       refCodeCache=null;   // CAS-837: a guest's shared links must not carry the previous account's code
+      displayNameCache=null;   // CAS-1121: same reasoning — a guest must not prefill the previous account's name
       // CAS-656: a guest has no account to be disconnected from — clear any failure this device carried
       // from its last signed-in session, or the banner would wrongly survive a sign-out.
       Object.keys(acctTableFail).forEach(t=>setAcctTableFail(t, false));
@@ -20569,7 +20631,11 @@ else if(dedupedN)
              // CAS-775: the Occasions register — same whole-object jsonb shape, but unlike taste/watch_windows/
              // moving_seen above, an EMPTY array here is a real, distinct answer ("the account genuinely has
              // no occasions") rather than "unanswered" — see loadUserPrefs' own carry-up check below.
-             occasions:JSON.parse(JSON.stringify(occasionReg)) };
+             occasions:JSON.parse(JSON.stringify(occasionReg)),
+             // CAS-1121: the invite sheet's "Your name" — an account-level fact like ref_code, but (unlike
+             // ref_code) travels through the normal pushUserPrefsCols(["display_name"]) seam below, since it
+             // changes through an ordinary user edit (sending an invite) rather than a one-time mint.
+             display_name:displayNameCache||null };
   }
   // CAS-1095: user_prefs' own per-column push — the only path any of its eleven columns is written.
   // Each caller names exactly the column(s) its own settings change actually touched; no other field of
@@ -20657,6 +20723,9 @@ else if(dedupedN)
       row.occasions.filter(o=>o && typeof o.id==="string" && typeof o.name==="string").forEach(o=>occasionReg.push(o));
       saveOccasionRegLocal();
     }
+    // CAS-1121: adopt the account's own name once it has one — never overwritten by a device that hasn't
+    // sent a name yet, same "leave alone, don't carry up" rule as every other field above.
+    if(typeof row.display_name==="string" && row.display_name) displayNameCache = row.display_name;
     savePrefsLocal();
     syncServiceChips(); updatePrefSwitch(); updatePrefBtn();
     if(typeof render==="function") render();

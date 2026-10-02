@@ -36,7 +36,7 @@ Interface:
                                           answer, created_at}, digested_at is null]          # CAS-887
   mark_invite_replies_digested(ids, digested_at) -> int                                      # CAS-887
   fetch_unsent_invite_emails() -> [{id, token, to_email, to_name, created_at, sender_name,
-                                     film_title, tmdb_id}, sent_at is null]                   # CAS-930
+                                     film_title, tmdb_id, suggested_date, note}, sent_at is null]  # CAS-930/1121
   mark_invite_emails_sent(ids, sent_at) -> int                                                # CAS-930
   fetch_unnotified_invite_replies() -> [{id, token, sender_id, to_name, film_title, tmdb_id,
                                           answer, created_at}, notified_at is null]           # CAS-967
@@ -596,7 +596,8 @@ class SupabaseStore:
         owns, never every user's."""
         rows = self._get(
             "/invite_emails?sent_at=is.null&order=created_at.asc,id.asc&select="
-            "id,token,to_email,to_name,created_at,invites(sender_name,film_title,tmdb_id)"
+            "id,token,to_email,to_name,created_at,"
+            "invites(sender_name,film_title,tmdb_id,suggested_date,note)"
         )
         out = []
         for r in rows:
@@ -606,6 +607,9 @@ class SupabaseStore:
                 "to_name": r.get("to_name"), "created_at": r.get("created_at"),
                 "sender_name": inv.get("sender_name"), "film_title": inv.get("film_title"),
                 "tmdb_id": inv.get("tmdb_id"),
+                # CAS-1121: both optional (null unless the sender set them) — render_email only
+                # shows a line for either when it's actually present.
+                "suggested_date": inv.get("suggested_date"), "note": inv.get("note"),
             })
         return out
 

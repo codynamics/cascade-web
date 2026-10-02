@@ -490,6 +490,31 @@ if(typeof window.CascadeAuth === "undefined"){
   // exercises the clipboard-fallback branch) — exported so a test can assert the fallback's payload really
   // carries the link, the same guarantee CAS-929 asked for on the now-removed navigator.share path.
   inviteUrlFor, shareTextFor, openNextInviteChannel, openNextRecommendChannel,
+  // CAS-1121: fpInviteAskHTML is the invite-landing ask panel's own pure render (the Suggested
+  // date/note lines, optional) — a plain top-level function, exported directly like inviteUrlFor
+  // above, so a test can assert the markup without a real DOM insert.
+  fpInviteAskHTML,
+  // CAS-1121: sendFilmInvite/openFilmInvite are window-assigned wire code (same wrap shape as
+  // sendRecommend/toggleFriendSelect above) — exported so a test can drive a real Invite send (with its
+  // name/date/note fields) through the actual function. inviteFriendSel is reassigned wholesale by
+  // openFilmInvite/sendFilmInvite, so it's exposed through a getter/setter like recommendFriendSel above.
+  // inviteNameVal/inviteDateVal/inviteNoteVal are the sheet's own per-open edit state (same shape as
+  // recommendMsgText) — exposed through getter/setters so a test can drive an edit without a real DOM
+  // oninput. displayName/loadUserPrefs let a test seed and read the account's own remembered name the
+  // same way the real sign-in load path does.
+  sendFilmInvite: (...args) => window.sendFilmInvite(...args),
+  openFilmInvite: (...args) => window.openFilmInvite(...args),
+  get inviteFriendSel(){ return inviteFriendSel; },
+  setInviteFriendSel(v){ inviteFriendSel = v; },
+  get inviteNameVal(){ return inviteNameVal; },
+  setInviteNameVal(v){ inviteNameVal = v; },
+  get inviteDateVal(){ return inviteDateVal; },
+  setInviteDateVal(v){ inviteDateVal = v; },
+  get inviteNoteVal(){ return inviteNoteVal; },
+  setInviteNoteVal(v){ inviteNoteVal = v; },
+  displayName, inviteDefaultName,
+  get displayNameCache(){ return displayNameCache; },
+  setDisplayNameCache(v){ displayNameCache = v; },
   // CAS-1125: friendRowHTML is the shared recipient-row renderer (now a single tap target, not a separate
   // circle) and recommendMessageFor is the Recommend sheet's own default-message text — both plain
   // top-level functions, exported directly. toggleFriendSelect is window-assigned wire code (wrapped like
