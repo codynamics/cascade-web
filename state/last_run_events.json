@@ -1,266 +1,188 @@
 [
   {
-    "tmdb_id": 370172,
-    "title": "No Time to Die",
+    "tmdb_id": 1368337,
+    "title": "The Odyssey",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-10-02"
+  },
+  {
+    "tmdb_id": 882598,
+    "title": "Smile",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
-      "Amazon Prime Video",
-      "Amazon Prime Video with Ads"
+      "Disney Plus"
     ],
-    "detected": "2026-10-01"
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 370172,
-    "title": "No Time to Die",
+    "tmdb_id": 882598,
+    "title": "Smile",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-10-01"
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 206647,
-    "title": "Spectre",
+    "tmdb_id": 1408208,
+    "title": "Exit 8",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
-      "Amazon Prime Video",
-      "Amazon Prime Video with Ads"
+      "Paramount Plus",
+      "Paramount+ Amazon Channel",
+      "Paramount Plus Premium"
     ],
-    "detected": "2026-10-01"
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 206647,
-    "title": "Spectre",
+    "tmdb_id": 1408208,
+    "title": "Exit 8",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-10-01"
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 332562,
-    "title": "A Star Is Born",
-    "kind": "left",
-    "lost_window": "included_streaming",
-    "label": "Included Streaming",
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 458723,
-    "title": "Us",
+    "tmdb_id": 1240889,
+    "title": "Teenage Sex and Death at Camp Miasma",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
-      "Amazon Prime Video",
-      "Amazon Prime Video with Ads"
+      "MUBI Amazon Channel"
     ],
-    "detected": "2026-10-01"
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 458723,
-    "title": "Us",
-    "kind": "left",
-    "lost_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 1248832,
-    "title": "Digger",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 1248832,
-    "title": "Digger",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 1168719,
-    "title": "Silent Friend",
+    "tmdb_id": 1240889,
+    "title": "Teenage Sex and Death at Camp Miasma",
     "kind": "left",
     "lost_window": "in_cinema",
     "label": "In Cinema",
-    "detected": "2026-10-01"
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 1283515,
-    "title": "Verity",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 1283515,
-    "title": "Verity",
+    "tmdb_id": 840326,
+    "title": "Sisu",
     "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-10-01"
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 1422011,
-    "title": "It Ends",
-    "kind": "arrived",
-    "new_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "services": [
-      "Amazon Video"
-    ],
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 1422011,
-    "title": "It Ends",
+    "tmdb_id": 516729,
+    "title": "Paddington in Peru",
     "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-10-01"
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 1244523,
-    "title": "Beware Boi\u00fana",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 1244523,
-    "title": "Beware Boi\u00fana",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 399360,
-    "title": "Alpha",
+    "tmdb_id": 551804,
+    "title": "Freaky",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
-      "Sony Pictures Core Amazon Channel"
+      "Tubi TV"
     ],
-    "detected": "2026-10-01"
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 399360,
-    "title": "Alpha",
+    "tmdb_id": 551804,
+    "title": "Freaky",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-10-01"
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 596161,
-    "title": "Let Him Go",
+    "tmdb_id": 501907,
+    "title": "A Beautiful Day in the Neighborhood",
     "kind": "left",
     "lost_window": "included_streaming",
     "label": "Included Streaming",
-    "detected": "2026-10-01"
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 1290424,
-    "title": "The Great Arch",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 1290424,
-    "title": "The Great Arch",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 1472668,
-    "title": "Wick Is Pain",
-    "kind": "left",
-    "lost_window": "included_streaming",
-    "label": "Included Streaming",
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 541724,
-    "title": "Nostalgia",
-    "kind": "left",
-    "lost_window": "included_streaming",
-    "label": "Included Streaming",
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 392982,
-    "title": "Marshall",
+    "tmdb_id": 1154538,
+    "title": "Nirvanna the Band the Show the Movie",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
-      "Sony Pictures Core Amazon Channel"
+      "Netflix",
+      "Netflix Standard with Ads"
     ],
-    "detected": "2026-10-01"
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 392982,
-    "title": "Marshall",
+    "tmdb_id": 1154538,
+    "title": "Nirvanna the Band the Show the Movie",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-10-01"
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 364220,
-    "title": "The Keeping Hours",
-    "kind": "arrived",
-    "new_window": "included_streaming",
+    "tmdb_id": 335778,
+    "title": "Risen",
+    "kind": "left",
+    "lost_window": "included_streaming",
     "label": "Included Streaming",
-    "services": [
-      "Amazon Prime Video",
-      "Amazon Prime Video with Ads"
-    ],
-    "detected": "2026-10-01"
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 364220,
-    "title": "The Keeping Hours",
+    "tmdb_id": 483983,
+    "title": "Balloon",
     "kind": "left",
-    "lost_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "detected": "2026-10-01"
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-02"
   },
   {
-    "tmdb_id": 1715914,
-    "title": "Wham! 10 Days in China",
-    "kind": "arrived",
-    "new_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "services": [
-      "Amazon Video"
-    ],
-    "detected": "2026-10-01"
-  },
-  {
-    "tmdb_id": 1715914,
-    "title": "Wham! 10 Days in China",
+    "tmdb_id": 579245,
+    "title": "The Specials",
     "kind": "left",
-    "lost_window": "pvod",
-    "label": "Premium Buy/Rent (~$30)",
-    "detected": "2026-10-01"
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-02"
+  },
+  {
+    "tmdb_id": 1120911,
+    "title": "Saturday Night",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-02"
+  },
+  {
+    "tmdb_id": 669401,
+    "title": "Ballad of a White Cow",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-02"
+  },
+  {
+    "tmdb_id": 400387,
+    "title": "Riphagen the Untouchable",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-02"
+  },
+  {
+    "tmdb_id": 958147,
+    "title": "Under the Fig Trees",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-02"
   }
 ]
