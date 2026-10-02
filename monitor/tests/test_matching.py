@@ -432,6 +432,49 @@ class AutoPlacementTests(unittest.TestCase):
         self.assertEqual(compute_auto_placements(agent_films, [], [movie], account_prefs={}), {})
 
 
+class TrackMigrationPlacementTests(unittest.TestCase):
+    """CAS-1143: an agent row stored under CAS-917's old start-window-forward model (cinema-only,
+    no `trackV`) must still follow its admission onto Stream once the film itself arrives there —
+    placement_shim.mjs reaches the same trackV-guarded normCascade migration admit_shim.mjs does
+    (both call E.normCascade), so this is the placement side of the same fix. The control — the
+    identical row carrying trackV:2, meaning a person has explicitly left Stream off since CAS-1128
+    shipped — must NOT be migrated, and so stays pinned at Cinema (the one window it actually tracks)
+    rather than advancing onto a window it was never told to follow."""
+
+    def _streaming_movie(self):
+        # showable() needs a CONFIRMED offer (a "sub" offer maps to included_streaming, CAS-1097's
+        # own _movie() fixture note above).
+        return {"tmdb_id": 9002, "title": "CAS-1143 Track Migration Film", "genres": ["Drama"],
+                "status": ["included_streaming"], "cinema_date": "2026-01-01", "language": "en",
+                "wm_critic_score": 70, "popularity": 50, "wm_popularity_percentile": 70,
+                "wm_user_rating": 7.5, "offers": [{"service": "Netflix", "type": "sub"}]}
+
+    def _cascade(self, extra_criteria):
+        markers = {"in_cinema": 50, "premium": None, "rent": None, "stream": None}
+        criteria = {"genre": ["Drama"], "imdb": 7.0, "watchMarkers": markers}
+        criteria.update(extra_criteria)
+        return [{"id": "c1", "user_id": "u1", "name": "Legacy Agent", "active": True,
+                 "criteria": criteria}]
+
+    def test_cinema_only_agent_without_trackv_is_migrated_onto_stream(self):
+        movie = self._streaming_movie()
+        cascades = self._cascade({})
+        agent_films = [{"user_id": "u1", "cascade_id": "c1", "movie_id": "9002", "admission_score": 80}]
+        auto_placements = compute_auto_placements(agent_films, cascades, [movie], account_prefs={})
+        self.assertEqual(auto_placements, {("u1", "9002"): "stream"},
+            "an agent stored cinema-only (no trackV) must follow its admission onto Stream once the "
+            "film itself is streaming — the start-window migration did not reach placement")
+
+    def test_cinema_only_agent_with_trackv2_stays_pinned_at_cinema(self):
+        movie = self._streaming_movie()
+        cascades = self._cascade({"trackV": 2})
+        agent_films = [{"user_id": "u1", "cascade_id": "c1", "movie_id": "9002", "admission_score": 80}]
+        auto_placements = compute_auto_placements(agent_films, cascades, [movie], account_prefs={})
+        self.assertEqual(auto_placements, {("u1", "9002"): "in_cinema"},
+            "an agent explicitly carrying trackV:2 (Stream deliberately off) must stay pinned at "
+            "Cinema, the one window it actually tracks, not be migrated onto Stream")
+
+
 class ForwardWindowMatchTests(unittest.TestCase):
     """CAS-918: an auto placement forward-matches a moment for the film's NEXT window even
     though film_watch.windows hasn't caught up yet — the overnight Rent -> Stream rollover this
