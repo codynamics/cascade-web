@@ -543,7 +543,8 @@ class SupabaseStore:
         """Every recommendations row emailed on/after `since` (CAS-1131), read with service_role —
         same cross-user reason as fetch_unsent_recommendations above."""
         return self._get(
-            f"/recommendations?sent_at=gte.{urllib.parse.quote(since)}&select=sender_id,to_email,sent_at"
+            f"/recommendations?sent_at=gte.{urllib.parse.quote(since)}"
+            "&select=sender_id,to_email,sent_at&order=sent_at.asc,id.asc"
         )
 
     def fetch_undigested_invite_replies(self) -> list:
