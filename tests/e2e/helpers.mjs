@@ -208,6 +208,15 @@ export async function toShortlist(page, kind){
     try{ await page.locator("#splashCta").click({ timeout: 5000 }); }
     catch(e){ if(!(await page.evaluate(() => flowOn === true))) throw e; }
   }
+  await walkToServices(page, kind);
+}
+
+/** The v2_about -> v2_services walk alone, split out of toShortlist() so a caller that boots its own
+ * (signed-out, real-config) fresh app — the account-integrity suite's S1/S6/S10, which need a genuine guest
+ * device to drive a real email signup rather than toShortlist()'s own freshAppSignedIn() boot — can still
+ * answer the flow's two gated opening questions (cinema, rent) instead of finishFlow()'s blind Continue loop
+ * hanging on them for 90s (CAS-1099 requeue: that is exactly what S1/S6/S10 did before this split existed). */
+export async function walkToServices(page, kind){
   // CAS-1018: scoped to #onbStepInner, not a bare ".obhd" — gotoStep's dual-pane slide leaves the
   // outgoing step's .obhd in the DOM alongside the incoming one for the length of the transition
   // (intentional, see gotoStep's own comment), and #onbStepInner is the id it moves onto the

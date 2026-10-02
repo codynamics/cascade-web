@@ -25,7 +25,7 @@ import {
   admin, createTestUser, seedCascades, liveCascades, testEmail,
   gotoIntegrityFresh, signInFromSplash, signOutFromAccount, signInDirect, fetchOtp, emailHasAccount,
 } from "./helpers.mjs";
-import { settleListing, finishFlow } from "../e2e/helpers.mjs";
+import { settleListing, finishFlow, walkToServices } from "../e2e/helpers.mjs";
 
 function idsOf(rows){ return rows.map(r => r.id).slice().sort(); }
 
@@ -161,6 +161,7 @@ test("S1: a new member's onboarded roster exists on the server", async ({ page }
 
   await gotoIntegrityFresh(page);
   await page.locator("#splashCta").click();
+  await walkToServices(page, "cinema");
   await finishFlow(page);
 
   await page.locator("#membEmail").fill(email);
@@ -210,6 +211,7 @@ test("S6: onboarding into a previously-held account by email keeps that account'
 
   await gotoIntegrityFresh(page);
   await page.locator("#splashCta").click();
+  await walkToServices(page, "cinema");
   await finishFlow(page);   // builds a fresh draft roster in memory, never reaching the server
 
   await page.locator("#membEmail").fill(email);
@@ -246,6 +248,7 @@ test("S10: abandoning onboarding before membership completes leaves no server-si
 
   await gotoIntegrityFresh(page);
   await page.locator("#splashCta").click();
+  await walkToServices(page, "cinema");
   await finishFlow(page);
   await page.locator("#membEmail").fill(email);
 
