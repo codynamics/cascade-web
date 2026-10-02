@@ -301,7 +301,10 @@ jobs:
     # checkout/npm ci/playwright+apt install/psql setup ahead of them — this job's own timeout used to be
     # exactly that sum, so a cold cache on either setup phase could starve the step that runs last. 55m
     # leaves real headroom instead of relying on every setup step hitting a warm cache.
-    timeout-minutes: 55
+    #
+    # CAS-1129: the e2e step's own budget below grew from 20m to 30m (30m/25m = 55m), so this job timeout
+    # grew by the same 10m to 65m to preserve that original setup headroom rather than erase it.
+    timeout-minutes: 65
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -359,7 +362,7 @@ jobs:
       - name: End to end (smoke gate, signed in)
         id: e2e_run
         continue-on-error: true
-        timeout-minutes: 20
+        timeout-minutes: 30
         # CAS-1110: tells scripts/lib/local-supabase.mjs's withLocalSupabase() to leave the stack it starts
         # running for the integrity step below, instead of stopping it — the runner is destroyed right
         # after this job ends either way, so nothing is left running beyond this job's own lifetime.
