@@ -55,7 +55,7 @@ test("the app loads and onboarding renders", async ({ page }) => {
   // gotoStep moves onto the incoming pane the instant it's created) is what makes this locator
   // resolve to exactly one element even mid-slide, instead of racing the 460ms slide against the
   // fixed 120ms wait below.
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about (CAS-953)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");   // v2_intro (CAS-911)
@@ -959,7 +959,7 @@ test("CAS-740 AC4: a signed-in user whose account already holds agents is never 
 
   await expect(page.locator("#splashCta")).toBeVisible();
   await page.locator("#splashCta").click();
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about (CAS-953)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   expect(await page.evaluate(() => flowOn)).toBe(true);   // genuinely inside the wizard before the race resolves
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
@@ -1123,7 +1123,7 @@ async function cas913GotoConfigured(page){
 async function cas913WalkToShortlist(page){
   await expect(page.locator("#splashCta")).toBeVisible();
   await page.locator("#splashCta").click();
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about (CAS-953)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");            // v2_intro

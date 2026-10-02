@@ -55,7 +55,7 @@ test.describe("CAS-960 axe scan — zero serious/critical on the five named surf
   test("onboarding — first step", async ({ page }) => {
     await freshApp(page);
     await page.locator("#splashCta").click();
-    await expect(page.locator(".obhd")).toContainText("Cascade finds your movies for you.");
+    await expect(page.locator(".obhd")).toContainText("Let's get you set up.");
     const { serious } = await scanSurface(page, "onboarding — v2_about step");
     expect(serious.map(v => v.id)).toEqual([]);
   });
@@ -173,7 +173,7 @@ test("Dynamic Type: onboarding does not clip and the CTA stays reachable (CAS-96
   await assertNoOverflow(page, "onboarding — splash");
 
   await page.locator("#splashCta").click();
-  await expect(page.locator(".obhd")).toContainText("Cascade finds your movies for you.");
+  await expect(page.locator(".obhd")).toContainText("Let's get you set up.");
   await expect(page.locator("#onbStepCta:visible, #flowCta:visible").first()).toBeInViewport();
   await assertNoOverflow(page, "onboarding — v2_about step");
 });
@@ -229,7 +229,7 @@ test.describe("reduced motion (CAS-960 AC7)", () => {
     await expect(page.locator("#splashCta")).toBeVisible();
     await assertNoAnimation(page, "onboarding — splash");
     await page.locator("#splashCta").click();
-    await expect(page.locator(".obhd")).toContainText("Cascade finds your movies for you.");
+    await expect(page.locator(".obhd")).toContainText("Let's get you set up.");
     await assertNoAnimation(page, "onboarding — v2_about step");
   });
 

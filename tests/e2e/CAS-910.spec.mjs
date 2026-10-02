@@ -56,7 +56,7 @@ test("CAS-910 AC: v2_cinema's Continue is disabled on load and enabled after pic
 test("CAS-1047 AC: v2_cinema's Continue is disabled on arrival via the wired flow (slide transition), not only via a ?step= preview", async ({ page }) => {
   await freshApp(page);
   await page.locator("#splashCta").click();
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about
   await page.locator("#onbStepInner #onbStepCta").click();
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");   // v2_intro
   await page.locator("#onbStepInner #onbStepCta").click();   // slides into v2_cinema
@@ -78,7 +78,7 @@ test("CAS-1047 AC: flowStart() resets a previous person's saved v2 answers for a
     });
   });
   await page.locator("#splashCta").click();
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about
   const stored = await page.evaluate(() => onbAnswersV2Load());
   expect(stored.cinema).toBeNull();
   expect(stored.partner).toBeNull();

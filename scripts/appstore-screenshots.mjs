@@ -135,7 +135,7 @@ const SLIDE_SETTLE = 500;
 async function walkOnboarding(page, onFrame){
   await freshApp(page);
   await page.locator("#splashCta").click();
-  await expect(page.locator(".obhd")).toContainText("Cascade finds your movies for you.");
+  await expect(page.locator(".obhd")).toContainText("Let's get you set up.");
   await ctaLocator(page).click();
   await page.waitForTimeout(SLIDE_SETTLE);
   await expect(page.locator(".obhd")).toContainText("Massive Movies");
