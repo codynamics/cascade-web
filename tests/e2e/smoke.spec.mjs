@@ -479,7 +479,15 @@ async function openFirstAgentMission(page){
 }
 
 test("Mission screen: one score track, exactly one handle; a newly account-enabled window starts as an OFF pill, not auto-armed (CAS-1128)", async ({ page }) => {
-  await toShortlist(page, "cinema");
+  // CAS-1143: "stream" here, not "cinema" — onbMassiveCritV2 now marks the BIG window and every LATER
+  // window in ladder order (in_cinema, premium, rent, stream), same shape onbFavsMarkersV2 already used,
+  // so the Watch -> Streaming empty bug this ticket fixes can't recur. With cinema="yes" BIG is in_cinema,
+  // the ladder's own first rung, so Premium would already be a later window and get marked at creation —
+  // this test would never see an OFF pill at all. With rent="yes"/cinema="no" (toShortlist's own "stream"
+  // kind) BIG is "rent", and Premium sits EARLIER on the ladder, so onbMassiveCritV2 leaves it null —
+  // genuinely untouched by onboarding, same as before CAS-1143 — which is what lets this test exercise a
+  // window that only becomes followed once a person switches it on for the account, never auto-armed.
+  await toShortlist(page, "stream");
   await finishFlow(page);
   await toListing(page);
 
