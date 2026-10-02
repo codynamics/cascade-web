@@ -46,6 +46,11 @@ class RenderTests(unittest.TestCase):
         self.assertIn("inv=abc1234567", url)
         self.assertIn("#/film/12345", url)
 
+    @mock.patch.dict("os.environ", {}, clear=True)
+    def test_invite_link_defaults_to_the_live_site(self):
+        url = invite_url(_row(token="abc1234567", tmdb_id=12345))
+        self.assertTrue(url.startswith("https://cascademovies.com/?inv="))
+
     def test_html_escapes_film_title(self):
         email = render_email(_row(film_title="<script>alert(1)</script>"))
         self.assertNotIn("<script>alert(1)</script>", email["html"])
