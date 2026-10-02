@@ -146,9 +146,12 @@ test("CAS-1073 AC2/AC3: any other address still uses signInWithOtp then verifyOt
   await page.locator("#authVerifyBtn").click();
   await expect(page.locator("#authModal.open")).toBeHidden();
 
+  // CAS-1088: the Sign in panel's own #authContinue handler (app_template.html) passes createUser:false
+  // so a typo'd/unregistered email is told so rather than silently signing one up — true is only
+  // onboarding's membership-email gate (a different call site, not this one).
   const calls = await page.evaluate(() => window.__cas1073Calls);
   expect(calls).toEqual([
-    { method: "signInWithOtp", args: { email: NORMAL_EMAIL, options: { shouldCreateUser: true } } },
+    { method: "signInWithOtp", args: { email: NORMAL_EMAIL, options: { shouldCreateUser: false } } },
     { method: "verifyOtp", args: { email: NORMAL_EMAIL, token: "123456", type: "email" } },
   ]);
 });

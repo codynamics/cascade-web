@@ -49,7 +49,9 @@ function fakeSupabaseScript(invitesFixture){
           signOut: async () => ({ error: null }),
         },
         from: (table) => {
-          if(table === "cascades") return { select: () => ({ order: () => Promise.resolve({ data: [SEEDED_CASCADE], error: null }) }),
+          // CAS-1109/CAS-1142: acctLoad() now pages with .select().order().range(), not .select().order()
+          // alone — see CAS740_FAKE_SUPABASE_GLOBAL in smoke.spec.mjs for the same fix on the same bug class.
+          if(table === "cascades") return { select: () => ({ order: () => ({ range: () => Promise.resolve({ data: [SEEDED_CASCADE], error: null }) }) }),
             upsert: () => chain(), delete: () => chain() };
           if(table === "invites") return { select: () => ({ order: () => Promise.resolve({ data: FIXTURE_INVITES, error: null }) }) };
           if(table === "invite_replies") return { update: (fields) => ({ in: (col, ids) => {
@@ -88,8 +90,10 @@ test("CAS-886 AC2b/2c: the three groups render in order, each fixture row in the
   await page.evaluate(() => openInvitesScreen());
   await expect(page.locator("#invitesScreen")).toHaveClass(/open/);
 
+  // .flabel is text-transform:uppercase (app_template.html) — allInnerTexts() reads the rendered text, not
+  // the "New replies"/"Earlier"/"Waiting" literal case from the source (renderInvitesScreen's own `label`s).
   const headings = await page.locator("#invitesBody .flabel").allInnerTexts();
-  expect(headings).toEqual(["New replies", "Earlier", "Waiting"]);
+  expect(headings).toEqual(["NEW REPLIES", "EARLIER", "WAITING"]);
 
   const rows = page.locator("#invitesBody .invrow");
   await expect(rows).toHaveCount(4);
@@ -110,6 +114,9 @@ test("CAS-886 AC2d: opening Invites stamps seen_at on exactly the two unread rep
   expect(updates[0].ids.slice().sort()).toEqual([101, 102]);
   expect(updates[0].fields.seen_at).toBeTruthy();
 
+  // #invitesScreen is still open and intercepts the nav button underneath it — close it first, the same
+  // way AC2e's own test (below) already does before clicking anything else.
+  await page.evaluate(() => closeInvitesScreen());
   await page.locator("#navMenuBtn").click();
   await expect(page.locator("#invitesNavBadge")).toBeHidden();
   await expect(page.locator("#navMenuDot")).toBeHidden();

@@ -9,9 +9,13 @@ import { freshApp } from "./helpers.mjs";
 
 // A page.route registered later always wins over one registered earlier (helpers.mjs), so gotoInvite can
 // freely override freshApp's own config.js block once it needs a configured, invite-resolving boot.
+// CAS-1120/CAS-944: invites lost its anon SELECT policy and invite_replies its client-driven upsert — both
+// reads and replies now go through a pair of security-definer RPCs, invite_by_token(p_token) and
+// answer_invite(p_token, p_client_key, p_answer) (supabase/schema.sql), which is what
+// resolveFilmInvite/replyFilmInvite (app_template.html) actually call now. Mocks .rpc(), not .from().
 function fakeSupabaseScript(invitesByToken){
   return `
-    window.__replyUpserts = [];
+    window.__replyRpcCalls = [];
     const INVITES_BY_TOKEN = ${JSON.stringify(invitesByToken)};
     window.supabase = { createClient(){
       return {
@@ -19,17 +23,20 @@ function fakeSupabaseScript(invitesByToken){
           getSession: () => Promise.resolve({ data: { session: null } }),
           onAuthStateChange: () => ({ data: { subscription: { unsubscribe(){} } } }),
         },
-        from: (table) => {
-          if(table === "invites") return { select: () => ({ eq: (col, val) =>
-            Promise.resolve({ data: INVITES_BY_TOKEN[val] ? [INVITES_BY_TOKEN[val]] : [], error: null }) }) };
-          if(table === "invite_replies") return { upsert: (rows, opts) => {
-            window.__replyUpserts.push({ rows, opts });
-            return Promise.resolve({ error: null });
-          } };
-          return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }),
-                                      order: () => Promise.resolve({ data: [], error: null }) }),
-                    upsert: () => Promise.resolve({ data: [], error: null }) };
+        rpc: (fn, args) => {
+          if(fn === "invite_by_token"){
+            const row = INVITES_BY_TOKEN[args.p_token];
+            return Promise.resolve({ data: row || null, error: null });
+          }
+          if(fn === "answer_invite"){
+            window.__replyRpcCalls.push(args);
+            return Promise.resolve({ data: null, error: null });
+          }
+          return Promise.resolve({ data: null, error: null });
         },
+        from: () => ({ select: () => ({ eq: () => Promise.resolve({ data: [], error: null }),
+                                          order: () => Promise.resolve({ data: [], error: null }) }),
+                        upsert: () => Promise.resolve({ data: [], error: null }) }),
       };
     } };
   `;
@@ -90,8 +97,8 @@ test("CAS-885 AC2b: the invite page never contains invites.to_name", async ({ pa
   expect(await page.locator("#filmPage").innerText()).not.toContain("Definitely Not Shown");
 });
 
-// AC2c: tapping Yes performs exactly one upsert (answer "yes", this page's own client_key), and the panel
-// is replaced by the confirmation state.
+// AC2c: tapping Yes calls answer_invite exactly once (answer "yes", this page's own client_key), and the
+// panel is replaced by the confirmation state.
 test("CAS-885 AC2c: tapping Yes upserts once with answer yes and confirms in place", async ({ page }) => {
   const id = await firstMovieId(page);
   await gotoInvite(page, { token: "cas885-tok-3", id, invitesByToken: { "cas885-tok-3": { sender_name: "Lee" } } });
@@ -99,13 +106,11 @@ test("CAS-885 AC2c: tapping Yes upserts once with answer yes and confirms in pla
 
   const clientKey = await page.evaluate(() => CLIENT_KEY);
   await page.locator("#fpInvite .fpinvite-yes").click();
-  await page.waitForFunction(() => window.__replyUpserts.length > 0, null, { timeout: 5000 });
+  await page.waitForFunction(() => window.__replyRpcCalls.length > 0, null, { timeout: 5000 });
 
-  const upserts = await page.evaluate(() => window.__replyUpserts);
-  expect(upserts.length).toBe(1);
-  expect(upserts[0].rows.length).toBe(1);
-  expect(upserts[0].rows[0]).toMatchObject({ token: "cas885-tok-3", client_key: clientKey, answer: "yes" });
-  expect(upserts[0].opts).toMatchObject({ onConflict: "token,client_key" });
+  const calls = await page.evaluate(() => window.__replyRpcCalls);
+  expect(calls.length).toBe(1);
+  expect(calls[0]).toMatchObject({ p_token: "cas885-tok-3", p_client_key: clientKey, p_answer: "yes" });
 
   await expect(page.locator("#fpInvite .fpinvite-confirm")).toBeVisible();
   await expect(page.locator("#fpInvite .fpinvite-yes")).toHaveCount(0);
@@ -113,15 +118,15 @@ test("CAS-885 AC2c: tapping Yes upserts once with answer yes and confirms in pla
 });
 
 // AC2d: reloading the same invite URL on the same client (same localStorage, so the same client_key) and
-// tapping No upserts onto that same (token, client_key) pair — the onConflict clause is what keeps a real
-// database down to exactly one row; this checks the client sends the same key both times.
+// tapping No calls answer_invite with that same (token, client_key) pair — the RPC's own onConflict upsert
+// is what keeps a real database down to exactly one row; this checks the client sends the same key both times.
 test("CAS-885 AC2d: reloading and tapping No upserts onto the same (token, client_key) pair", async ({ page }) => {
   const id = await firstMovieId(page);
   const url = await gotoInvite(page, { token: "cas885-tok-4", id, invitesByToken: { "cas885-tok-4": { sender_name: "Lee" } } });
   await expect(page.locator("#fpInvite .fpinvite-yes")).toBeVisible();
   const clientKey1 = await page.evaluate(() => CLIENT_KEY);
   await page.locator("#fpInvite .fpinvite-yes").click();
-  await page.waitForFunction(() => window.__replyUpserts.length > 0, null, { timeout: 5000 });
+  await page.waitForFunction(() => window.__replyRpcCalls.length > 0, null, { timeout: 5000 });
 
   // A genuine reload, not gotoInvite's clear-localStorage boot — CLIENT_KEY must survive it.
   await page.goto(url);
@@ -131,11 +136,10 @@ test("CAS-885 AC2d: reloading and tapping No upserts onto the same (token, clien
   expect(clientKey2).toBe(clientKey1);
 
   await page.locator("#fpInvite .fpinvite-no").click();
-  await page.waitForFunction(() => window.__replyUpserts.length > 0, null, { timeout: 5000 });
-  const upserts = await page.evaluate(() => window.__replyUpserts);
-  expect(upserts.length).toBe(1);
-  expect(upserts[0].rows[0]).toMatchObject({ token: "cas885-tok-4", client_key: clientKey1, answer: "no" });
-  expect(upserts[0].opts).toMatchObject({ onConflict: "token,client_key" });
+  await page.waitForFunction(() => window.__replyRpcCalls.length > 0, null, { timeout: 5000 });
+  const calls = await page.evaluate(() => window.__replyRpcCalls);
+  expect(calls.length).toBe(1);
+  expect(calls[0]).toMatchObject({ p_token: "cas885-tok-4", p_client_key: clientKey1, p_answer: "no" });
 });
 
 // AC2e: a token that doesn't resolve renders the ordinary film page — no ask panel, no invmode, no throw.

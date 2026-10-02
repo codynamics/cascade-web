@@ -100,7 +100,12 @@ test("CAS-864 b: sending with no image performs no upload and inserts a row with
   await configuredApp(page);
   await openFromSplash(page);
   await fillMessage(page);
-
+  // CAS-1149: WebKit swallows the very next real tap after a .fill() leaves a text field focused — the
+  // tap lands on #contactSend (confirmed via elementFromPoint) but never fires its onclick, while a
+  // programmatic .click() on the same element does. Blurring first, the same fix CAS-927's spec already
+  // uses around this exact button, avoids it; test (a) above never hit this because setInputFiles()
+  // already moves focus off #contactMsg before its own Send click.
+  await page.locator("#contactMsg").blur();
   await page.locator("#contactSend").click();
   await page.waitForFunction(() => window.__contactInserts.length > 0, null, { timeout: 5000 });
 

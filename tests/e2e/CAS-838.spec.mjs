@@ -77,6 +77,9 @@ test("CAS-838 AC4b: choosing Bug and sending inserts one row with a non-empty di
   await page.locator("#contactCatChips .chip", { hasText: "Bug" }).click();
   await page.locator("#contactEmail").fill("cas838@example.com");
   await page.locator("#contactMsg").fill("Something looks broken.");
+  // CAS-1149: WebKit swallows the very next real tap after a .fill() leaves a text field focused (see
+  // CAS-864's spec and CAS-927's existing .blur() convention around this same button) — blur it first.
+  await page.locator("#contactMsg").blur();
   await page.locator("#contactSend").click();
   await page.waitForFunction(() => window.__contactInserts.length > 0, null, { timeout: 5000 });
 
@@ -96,6 +99,8 @@ test("CAS-838 AC4c: choosing Suggestion and sending inserts a row whose diagnost
   await page.locator("#contactCatChips .chip", { hasText: "Suggestion" }).click();
   await page.locator("#contactEmail").fill("cas838@example.com");
   await page.locator("#contactMsg").fill("It would be nice if...");
+  // CAS-1149: see AC4b's comment above — blur the just-filled field before the Send tap.
+  await page.locator("#contactMsg").blur();
   await page.locator("#contactSend").click();
   await page.waitForFunction(() => window.__contactInserts.length > 0, null, { timeout: 5000 });
 
@@ -137,6 +142,8 @@ test("CAS-838 AC4f: when the insert rejects, the typed message stays in the text
   await page.locator("#contactCatChips .chip", { hasText: "Bug" }).click();
   await page.locator("#contactEmail").fill("cas838@example.com");
   await page.locator("#contactMsg").fill("This should fail to send.");
+  // CAS-1149: see AC4b's comment above — blur the just-filled field before the Send tap.
+  await page.locator("#contactMsg").blur();
   await page.locator("#contactSend").click();
 
   await expect(page.locator("#contactErr")).toBeVisible();
