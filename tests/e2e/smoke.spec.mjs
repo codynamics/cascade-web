@@ -701,6 +701,9 @@ test("'Only show films on my services' changes what a new agent finds", async ({
 // bundle's own path instead of the retired esm.sh URL. A vendored ~200KB classic script blocking parse in
 // <head> also lengthened page-load time enough that a FIXED delay (the original 600ms) sometimes resolved
 // during gotoFresh()'s own navigation, before the test ever got to race it — hence the explicit trigger.
+// CAS-1109/CAS-1142: acctLoad() now pages with .select().order().range(), not .select().order() alone — the
+// "cascades" mock below must return its row from .range(), not .order(), or acctLoad's own .range() call
+// throws on a resolved value with no such method and the account's agent never loads.
 const CAS740_FAKE_SUPABASE_GLOBAL = `
   const SEEDED_CASCADE = { id: "740aaaa1-0000-4000-8000-000000000001", user_id: "cas740-user",
     name: "Existing agent", criteria: {}, created_at: "2020-01-01T00:00:00.000Z" };
@@ -721,7 +724,7 @@ const CAS740_FAKE_SUPABASE_GLOBAL = `
         signOut: async () => ({ error: null }),
       },
       from: (table) => table === "cascades"
-        ? { select: () => ({ order: () => Promise.resolve({ data: [SEEDED_CASCADE], error: null }) }),
+        ? { select: () => ({ order: () => ({ range: () => Promise.resolve({ data: [SEEDED_CASCADE], error: null }) }) }),
             upsert: () => chain(), delete: () => chain() }
         : chain(),
     };
@@ -1022,6 +1025,26 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
       apply: () => chain(),
     });
   }
+  // CAS-1109/CAS-1142: this test's own onboarding walk creates an agent in guest mode, then signs in —
+  // syncCascadesToAccount() uploads that agent via an acctOp "insert" (c.from("cascades").upsert(fields,
+  // {onConflict:"id", ignoreDuplicates:true})), and toListing()'s settleListing() wait needs that same agent
+  // back from acctLoad's own .select().order().range() round trip before #groups ever has anything to show.
+  // The old catch-all chain() resolved every call (including .range()) to a static empty array, so the
+  // upload vanished into the void and settleListing() timed out with no agent to build a group from — this
+  // tracks whatever was actually "inserted" instead, the same fixture-vs-acctLoad gap CAS740's fixture hit.
+  let cascadeRows = [];
+  function cascadesTable(){
+    return {
+      select: () => ({ order: () => ({ range: () => Promise.resolve({ data: cascadeRows.slice(), error: null }) }) }),
+      upsert: (fields) => {
+        const row = Array.isArray(fields) ? fields[0] : fields;
+        const i = cascadeRows.findIndex(r => r.id === row.id);
+        if(i >= 0) Object.assign(cascadeRows[i], row); else cascadeRows.push(Object.assign({}, row));
+        return { then: (resolve) => resolve({ data: [row], error: null }) };
+      },
+      delete: () => chain(),
+    };
+  }
   window.supabase = { createClient(){
     return {
       auth: {
@@ -1046,7 +1069,7 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
           return { error: null };
         },
       },
-      from: () => chain(),
+      from: (table) => table === "cascades" ? cascadesTable() : chain(),
       // CAS-1099: membStart() now calls rpc("email_has_account") before requesting a code, and
       // rpc("complete_membership") once the code verifies — neither existed when this fixture was written,
       // so an un-stubbed client.rpc(...) threw synchronously (client.rpc is not a function) the instant the
@@ -1258,6 +1281,25 @@ const CAS1035_FAKE_SUPABASE_GLOBAL = `
       delete: () => chain(),
     };
   }
+  // CAS-1109/CAS-1142: same gap as CAS913_FAKE_SUPABASE_GLOBAL above — this test's onboarding walk creates
+  // an agent in guest mode, then signs in, and toListing()'s settleListing() wait needs that agent back from
+  // acctLoad's own .select().order().range() round trip (via the acctOp "insert" upload) before #groups has
+  // anything to build a group from. The catch-all chain() below resolves .range() to a static empty array,
+  // so the upload vanished and settleListing() timed out before this test ever reached the Watch On tick it
+  // is actually about.
+  let cascadeRows = [];
+  function cascadesTable(){
+    return {
+      select: () => ({ order: () => ({ range: () => Promise.resolve({ data: cascadeRows.slice(), error: null }) }) }),
+      upsert: (fields) => {
+        const row = Array.isArray(fields) ? fields[0] : fields;
+        const i = cascadeRows.findIndex(r => r.id === row.id);
+        if(i >= 0) Object.assign(cascadeRows[i], row); else cascadeRows.push(Object.assign({}, row));
+        return { then: (resolve) => resolve({ data: [row], error: null }) };
+      },
+      delete: () => chain(),
+    };
+  }
   window.supabase = { createClient(){
     return {
       auth: {
@@ -1276,7 +1318,7 @@ const CAS1035_FAKE_SUPABASE_GLOBAL = `
         },
         signOut: async () => { writeSession(null); return { error: null }; },
       },
-      from: (table) => table === "film_watch" ? filmWatchTable() : chain(),
+      from: (table) => table === "film_watch" ? filmWatchTable() : table === "cascades" ? cascadesTable() : chain(),
       // CAS-1099: see CAS913_FAKE_SUPABASE_GLOBAL's identical stub above — this test also walks finishFlow
       // + toListing() through membStart(), which now needs both RPCs to resolve rather than throw.
       rpc: async (fn) => fn === "email_has_account" ? { data: false, error: null } : { data: "created", error: null },
