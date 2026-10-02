@@ -1544,8 +1544,9 @@ test("CAS-765 AC7: a forced client-construction failure shows a visible banner, 
 // with a fixed-size dot that only ever toggles CSS visibility, never display, so the listing's top offset
 // must stay put through the whole lifecycle — before a save starts, while it's outstanding (dot hidden,
 // still under the 2s delay), once the dot is actually shown, and after the save drains. Drives the real
-// CascadePersistence seam (the same one CAS-1035's outbox tests use) directly rather than standing up a
-// full signed-in account — the concern here is the header's own layout math, which is real regardless of
+// CascadePersistence seam (acctTablePending, the CAS-691 write-pending map acctSavePending() itself reads —
+// CAS-1100 retired the CAS-1035 outbox this test used to drive directly) rather than standing up a full
+// signed-in account — the concern here is the header's own layout math, which is real regardless of
 // whether the row ever actually reaches a live account.
 test("CAS-1063 AC2: the saving indicator never moves the listing, before, during or after a save", async ({ page }) => {
   await toShortlist(page, "cinema");
@@ -1557,7 +1558,7 @@ test("CAS-1063 AC2: the saving indicator never moves the listing, before, during
 
   await page.evaluate(() => {
     window.CascadePersistence.SAVING_INDICATOR_DELAY_MS = 30;
-    window.CascadePersistence.outbox.cas1063e2e = { row1: { id: 1 } };
+    window.CascadePersistence.acctTablePending.cascades = true;
     window.CascadePersistence.renderAcctBanner();
   });
   expect((await groups.boundingBox()).y).toBe(topBefore);   // outstanding, but still under the delay
@@ -1566,7 +1567,7 @@ test("CAS-1063 AC2: the saving indicator never moves the listing, before, during
   expect((await groups.boundingBox()).y).toBe(topBefore);   // dot now visible
 
   await page.evaluate(() => {
-    delete window.CascadePersistence.outbox.cas1063e2e;
+    window.CascadePersistence.acctTablePending.cascades = false;
     window.CascadePersistence.renderAcctBanner();
   });
   await page.waitForFunction(() => !document.getElementById("savingDot").classList.contains("show"));
