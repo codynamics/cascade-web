@@ -1076,7 +1076,23 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
       // membership button was pressed, hanging every caller of toListing() against this fixture. This test
       // only exercises the ordinary brand-new-signup path, so both resolve as a fresh success: no existing
       // account, membership created.
-      rpc: async (fn) => fn === "email_has_account" ? { data: false, error: null } : { data: "created", error: null },
+      // CAS-1109: complete_membership is the ONLY place this test's onboarding-built agent ever reaches the
+      // server (membCompleteNewMembership sends it as p.agents) — acctLoad's subsequent round trip is now
+      // the sole way it comes back (CAS-1109 removed loadAccount's old local-only merge), so the mock must
+      // actually create it here, the same as a real complete_membership would, or settleListing() never
+      // sees a group.
+      rpc: async (fn, params) => {
+        if(fn === "email_has_account") return { data: false, error: null };
+        if(fn === "complete_membership"){
+          const agents = (params && params.p && params.p.agents) || [];
+          agents.forEach(a => {
+            const row = Object.assign({ user_id: "cas913-user", created_at: new Date().toISOString() }, a);
+            const i = cascadeRows.findIndex(r => r.id === row.id);
+            if(i >= 0) Object.assign(cascadeRows[i], row); else cascadeRows.push(row);
+          });
+        }
+        return { data: "created", error: null };
+      },
     };
   } };
 `;
@@ -1321,7 +1337,20 @@ const CAS1035_FAKE_SUPABASE_GLOBAL = `
       from: (table) => table === "film_watch" ? filmWatchTable() : table === "cascades" ? cascadesTable() : chain(),
       // CAS-1099: see CAS913_FAKE_SUPABASE_GLOBAL's identical stub above — this test also walks finishFlow
       // + toListing() through membStart(), which now needs both RPCs to resolve rather than throw.
-      rpc: async (fn) => fn === "email_has_account" ? { data: false, error: null } : { data: "created", error: null },
+      // CAS-1109: see CAS913_FAKE_SUPABASE_GLOBAL's identical complete_membership handling above — this
+      // test's onboarding-built agent only exists once this mock creates it from p.agents.
+      rpc: async (fn, params) => {
+        if(fn === "email_has_account") return { data: false, error: null };
+        if(fn === "complete_membership"){
+          const agents = (params && params.p && params.p.agents) || [];
+          agents.forEach(a => {
+            const row = Object.assign({ user_id: "cas1035-user", created_at: new Date().toISOString() }, a);
+            const i = cascadeRows.findIndex(r => r.id === row.id);
+            if(i >= 0) Object.assign(cascadeRows[i], row); else cascadeRows.push(row);
+          });
+        }
+        return { data: "created", error: null };
+      },
     };
   } };
 `;
