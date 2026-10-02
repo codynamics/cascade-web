@@ -20573,6 +20573,19 @@ else if(dedupedN)
   // device's own in-memory values — CAS-1095's "never seed the server from a device" rule.
   async function loadUserPrefs(){
     const c=client(); if(!c||!accountActive()) return;
+    // CAS-1174: the cascade-auth-change listener already stands its own fan-out down for the span
+    // between a membership email's code being confirmed and complete_membership() resolving
+    // (onbMembershipInFlight — see that flag's own CAS-1099 comment), because a brand-new sign-in's
+    // SIGNED_IN event otherwise races ahead of the one RPC that is supposed to be this draft's only
+    // path to the server. reconcileOnReturn's focus/visibilitychange/heartbeat call to this function
+    // is a second, unguarded way to run that exact same race — a session is live for the whole wait
+    // (an onboarding email step signs in before the code is even entered), so a reconcile landing in
+    // that window finds no user_prefs row yet, bootstrap-inserts an empty one, and a later reconcile
+    // then adopts that empty row straight over the in-memory draft, before membCompleteNewMembership()
+    // ever builds its payload from it. onbDraftModeOn itself is too broad a guard here — CAS-1082's
+    // "an already signed-in account with zero agents re-runs onboarding" case sets it too, with no
+    // RPC race to protect against — so this reuses the listener's own, narrower flag instead.
+    if(onbMembershipInFlight) return;
     const ok = await window.CascadeAccountStore.acctLoad([{ table:"user_prefs", pk:"user_id" }]);
     if(!ok){ recordSyncOutcome("user_prefs", false, { message:"load failed" }); return; }
     recordSyncOutcome("user_prefs", true);
