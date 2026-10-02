@@ -67,17 +67,19 @@ test("CAS-1047 AC: v2_cinema's Continue is disabled on arrival via the wired flo
 // CAS-1047: flowStart() previously left a prior run's saved answers in place, so a second person onboarding
 // on the same device (after sign-out) found every blocked question already answered from the first person's
 // run — the opposite of ONB-04's fresh flow.
+// CAS-1099: the v2 answers draft moved off localStorage onto onbAnswersV2Mem (memory only, until
+// membership completes) — seed/read that directly rather than the retired "cascade_onb_answers_v2" key.
 test("CAS-1047 AC: flowStart() resets a previous person's saved v2 answers for a genuinely new run", async ({ page }) => {
   await freshApp(page);
   await page.evaluate(() => {
-    localStorage.setItem("cascade_onb_answers_v2", JSON.stringify({
+    onbAnswersV2Save({
       cinema: "yes", rent: "yes", styles: ["Comedy"], selScale: 15000000, ages: ["M"],
       partner: "yes", partnerDiff: "no", partnerStyles: [], kids: "yes", kidAges: ["G"], services: ["Netflix"],
-    }));
+    });
   });
   await page.locator("#splashCta").click();
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about
-  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("cascade_onb_answers_v2")));
+  const stored = await page.evaluate(() => onbAnswersV2Load());
   expect(stored.cinema).toBeNull();
   expect(stored.partner).toBeNull();
   expect(stored.services).toEqual([]);
@@ -126,20 +128,6 @@ test("CAS-910 AC: dragging the budget dial to position 200 reads Studio · $15M+
   await expect(page.locator("#reqBudgetVal")).toHaveText("Studio · $15M+");
   const selScale = await page.evaluate(() => onbFlow.answersV2.selScale);
   expect(selScale).toBe(15000000);
-});
-
-test("CAS-910 AC: v2_styles answers survive a reload via onbAnswersV2Load()", async ({ page }) => {
-  await openStep(page, "v2_styles");
-  const chips = page.locator("#obStylesChips .chip.gen");
-  const firstLabel = await chips.first().innerText();
-  await chips.first().click();
-  await expect(chips.first()).toHaveClass(/on/);
-
-  await page.reload();
-  await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
-  const reloadedFirst = page.locator("#obStylesChips .chip.gen").first();
-  await expect(reloadedFirst).toHaveText(firstLabel);
-  await expect(reloadedFirst).toHaveClass(/on/);
 });
 
 // CAS-910 Change 4: the step counter text is gone from the FIXED chrome (a live, wired flow only — these

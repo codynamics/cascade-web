@@ -1,27 +1,24 @@
 // CAS-909: the onboarding v2 agent reveal — the app's own Agents-screen row (renderAgentsScreen's .agrow),
 // minus the reorder grip and Edit button, shown for each of the four ONB_AGENTS_V2 recipes. Preview-only,
 // reached via ?step=v2_massive/v2_favs/v2_date/v2_family — none of this is wired into FLOWS yet (CAS-911).
-// Follows CAS-885's own goto-twice technique (config.js 404'd for guest/network-free mode, then a real
-// navigation to the target URL after localStorage is seeded) since the answers this ticket reads
-// (onbAnswersV2Load(), keyed "cascade_onb_answers_v2") are read at BOOT, synchronously, before any test
-// code could reach in and set them post-navigation.
+// CAS-1099 retired the localStorage draft key this helper used to seed (cascade_onb_answers_v2 is now
+// removed on every boot, and onbAnswersV2Load() just returns the in-memory onbAnswersV2Mem) — v2
+// onboarding answers live in memory only until membership completes, so this sets onbFlow.answersV2
+// directly, post-boot, and re-opens the step to repaint off it, rather than racing boot's own read of a
+// key that no longer exists.
 import { test, expect } from "@playwright/test";
 
-const ANSWERS_V2_KEY = "cascade_onb_answers_v2";
-
-/** A guest, network-free boot landed directly on a v2 reveal step, with `answers` already seeded under
- * the v2 answers key so the step's own wire() (onbAnswersV2Load()) picks them up on this exact boot. */
+/** A guest, network-free boot landed on a v2 reveal step, then `answers` is applied directly to the
+ * step's in-memory draft and the step is re-opened so body()/afterFoot() repaint against it. */
 async function openReveal(page, stepKey, answers){
   await page.route("**/config.js", route => route.fulfill({ status: 404, body: "" }));
-  const url = `/index.html?step=${stepKey}`;
-  await page.goto(url);
-  await page.evaluate(a => {
-    try{ localStorage.clear(); }catch(e){}
-    try{ localStorage.setItem("cascade_onb_answers_v2", JSON.stringify(a)); }catch(e){}
-  }, answers);
-  await page.goto(url);
+  await page.goto(`/index.html?step=${stepKey}`);
   await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
   await expect(page.locator("#onbStep")).toHaveClass(/open/);
+  await page.evaluate(({ stepKey, answers }) => {
+    onbFlow.answersV2 = { ...onbAnswersV2Default(), ...answers };
+    openOnbStep(stepKey);
+  }, { stepKey, answers });
   return page.locator("#onbStep .agrow");
 }
 
@@ -47,20 +44,22 @@ test("CAS-909 AC2: v2_massive renders exactly one .agrow, ranked 1, with no grip
   await expect(page.locator(".ag-edit")).toHaveCount(0);
 });
 
-test("CAS-909 AC3: v2_massive's settings grid is exactly SCORE/AUDIENCE/NOTIFY, and SCORE reads a dotted 90+ in cinema", async ({ page }) => {
+// CAS-1123 removed the separate Notify switch (every trailing window the agent watches rings now, no
+// extra row needed to say so) — onbAgentRevealHTML never emits a NOTIFY row any more.
+test("CAS-909 AC3: v2_massive's settings grid is exactly SCORE/AUDIENCE, and SCORE reads a dotted 90+ in cinema", async ({ page }) => {
   const row = await openReveal(page, "v2_massive", MASSIVE_ANSWERS);
   const labels = await row.locator(".agslbl").allInnerTexts();
-  expect(labels).toEqual(["SCORE", "AUDIENCE", "NOTIFY"]);
+  expect(labels).toEqual(["SCORE", "AUDIENCE"]);
 
   const scoreVal = row.locator(".agsrow", { has: page.locator(".agslbl", { hasText: "SCORE" }) }).locator(".agsval");
   await expect(scoreVal.locator(".agdot")).toHaveCount(1);
   await expect(scoreVal).toContainText("90+ in cinema");
 });
 
-test("CAS-909 AC4: v2_favs' settings grid is exactly STYLES/SCORE/BUDGET/AUDIENCE/NOTIFY", async ({ page }) => {
+test("CAS-909 AC4: v2_favs' settings grid is exactly STYLES/SCORE/BUDGET/AUDIENCE", async ({ page }) => {
   const row = await openReveal(page, "v2_favs", FAVS_ANSWERS);
   const labels = await row.locator(".agslbl").allInnerTexts();
-  expect(labels).toEqual(["STYLES", "SCORE", "BUDGET", "AUDIENCE", "NOTIFY"]);
+  expect(labels).toEqual(["STYLES", "SCORE", "BUDGET", "AUDIENCE"]);
 });
 
 test("CAS-909 AC5: no .agsval reads bare Any or Any style, in any of the four reveals", async ({ page }) => {
