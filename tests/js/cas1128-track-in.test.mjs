@@ -35,7 +35,10 @@ function withAgentState(fn){
   }
 }
 function broadCascade(id, watchMarkers){
-  const c = E.normCascade({ kind: "stream", status: [], watchMarkers });
+  // CAS-1143: trackV:2 — these fixtures represent an agent already on CAS-1128's independent-toggle
+  // model (an OFF window here is a deliberate choice, not a pre-CAS-1128 hole), so normCascade's
+  // start-window migration must leave them exactly as given.
+  const c = E.normCascade({ kind: "stream", status: [], trackV: 2, watchMarkers });
   c.id = id; c.paused = false; c.order = 0;
   return c;
 }
@@ -84,7 +87,7 @@ test("AC2: windowFollowed is false for an OFF window even once a later window is
 }));
 
 test("AC3: msnValueLine names the ON windows at the shared score, and reads Off once every window is OFF", () => {
-  const c = E.normCascade({ kind: "stream", status: [], watchMarkers: { in_cinema: 67, rent: null, stream: 67 } });
+  const c = E.normCascade({ kind: "stream", status: [], trackV: 2, watchMarkers: { in_cinema: 67, rent: null, stream: 67 } });
   assert.equal(E.msnValueLine(c),
     "Lists films scoring 67+ at the cinema or streaming — and follows each one from window to window. Under 67, not listed.");
 
@@ -93,7 +96,7 @@ test("AC3: msnValueLine names the ON windows at the shared score, and reads Off 
 });
 
 test("AC4: the slider/pill mutators — drag to Off nulls every marker, drag from Off arms every enabled window, unticking the last ON pill drops to Off", () => withWatchPrefs(WATCH_PREFS, () => {
-  const c = E.normCascade({ kind: "stream", status: [], watchMarkers: { in_cinema: 80, premium: null, rent: 80, stream: 80 } });
+  const c = E.normCascade({ kind: "stream", status: [], trackV: 2, watchMarkers: { in_cinema: 80, premium: null, rent: 80, stream: 80 } });
 
   E.setAgentScore(c, 0);
   assert.deepEqual(c.watchMarkers, { in_cinema: null, premium: null, rent: null, stream: null },
@@ -114,7 +117,7 @@ test("AC4: the slider/pill mutators — drag to Off nulls every marker, drag fro
 }));
 
 test("AC5: msnTrackAreaHTML draws exactly one .msnhandle and one pill per enabled window, ON matching the markers", () => withWatchPrefs(WATCH_PREFS, () => {
-  const c = E.normCascade({ kind: "stream", status: [], watchMarkers: { in_cinema: 70, rent: null, stream: 70 } });
+  const c = E.normCascade({ kind: "stream", status: [], trackV: 2, watchMarkers: { in_cinema: 70, rent: null, stream: 70 } });
   const html = E.msnTrackAreaHTML(c);
 
   const handleCount = (html.match(/class="msnhandle"/g) || []).length;

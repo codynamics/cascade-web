@@ -9399,12 +9399,17 @@ window.toggleWatchWatched = key => {
 };
 window.clearAllWatchWatched = () => { watchWatchedSel[watchTab].clear(); render(); scrollWatchListingToTop(); };   // CAS-857
 window.clearAllWatchFilters = () => {
+  watchSearchRaw[watchTab]=""; watchSearch[watchTab]="";
   watchPickedBy[watchTab]="all";
   watchWatchedSel[watchTab].clear();
   watchGenreOff[watchTab].clear();
   watchAlsoShow[watchTab].clear();
   watchAgentOff[watchTab].clear();
-  setWatchMineOnly(true);   // CAS-753: back to the default (on), same as every other field here
+  // CAS-1144: "cleared" means the narrowing no longer applies, not reset-to-default — mineOnly's own
+  // default is ON (CAS-753), which still narrows, so clearing it here means OFF.
+  setWatchMineOnly(false);
+  watchOccasion=null;
+  try{ localStorage.setItem("cascade_watch_occasion", ""); }catch(e){}
   render();
   scrollWatchListingToTop();   // CAS-857
 };
@@ -10257,6 +10262,29 @@ function normCascade(c, opts){
       const floor=Math.min(...marked.map(k=>c.watchMarkers[k]));
       marked.forEach(k=>{ c.watchMarkers[k]=floor; });
     } }
+  // CAS-1143: one-time migration for an agent saved before CAS-1128's independent-toggle model. Under
+  // CAS-917's old chain, a window followed automatically once it was later than wherever the agent
+  // "started" — CAS-1128 retired that in favour of plain on/off per window, which left every later
+  // window on an un-migrated agent reading as Off (null) even though it used to be followed. Migrate it
+  // ONCE, guarded by trackV: find the first key in WATCH_LEVEL_KEYS whose marker is non-null (its old
+  // start window) and set every LATER null key to that same value; a key earlier than the start window,
+  // or a window left at Never (null) throughout, is left alone. An agent already carrying trackV:2 is
+  // never touched here again, so a window a member unticks afterward stays unticked. Every agent-creation
+  // path (onboarding recipes, Add agent, Save as / duplicate, templates) sets trackV:2 itself, so a
+  // freshly built agent's deliberate choices never go through this guess.
+  if(c.trackV!==2){
+    const startIdx=WATCH_LEVEL_KEYS.findIndex(k=>c.watchMarkers[k]!=null);
+    if(startIdx>=0){
+      const startVal=c.watchMarkers[WATCH_LEVEL_KEYS[startIdx]];
+      for(let j=startIdx+1; j<WATCH_LEVEL_KEYS.length; j++){
+        const k=WATCH_LEVEL_KEYS[j];
+        // Only an EXPLICIT null is a hole to fill — a key missing from the object entirely (a partial
+        // fixture, never the shape a real saved agent carries) is left exactly as absent.
+        if(Object.prototype.hasOwnProperty.call(c.watchMarkers,k) && c.watchMarkers[k]===null) c.watchMarkers[k]=startVal;
+      }
+    }
+    c.trackV=2;
+  }
   // CAS-261: a lane only carries the dials it uses, and that has to be true of agents SAVED before the rule
   // as well as agents built after it — otherwise a cinema agent from last week goes on quietly filtering on
   // a People's-vote floor its Mission screen does not show and its auto-relax cannot loosen. laneCrit is the
@@ -11014,25 +11042,6 @@ const RELAXERS = [
   {key:"search",   label:()=>`the search “${filt.search}”`, on:()=>!!filt.search, clear:()=>{ filt.search=""; }},
   {key:"foundOnly", label:()=>"Found-list-only",   on:()=>filt.foundOnly,      clear:()=>{ filt.foundOnly=false; }},
 ];
-function countIf(fn){
-  const snap=filtSnapshot(), scope=ignoreScope;
-  fn();
-  const n=MOVIES.filter(passes).length;
-  filtRestore(snap); ignoreScope=scope;
-  return n;
-}
-const relaxOptions = () => RELAXERS.filter(r=>r.on())
-  .map(r=>({key:r.key, label:r.label(), n:countIf(r.clear)}))
-  .filter(o=>o.n>0).sort((a,b)=>b.n-a.n).slice(0,3);
-window.relaxFilter=key=>{
-  const r=RELAXERS.find(x=>x.key===key); if(!r) return;
-  logEvent("relax_used",{key});
-  r.clear();
-  if(key==="search") setSearchTerm("");   // CAS-150: the per-cascade box is the only search box now
-  syncFilterUI(); render();
-  const n=MOVIES.filter(passes).length;
-  // CAS-287: the count on the card and the list itself both move — no banner needed to say so.
-};
 // CAS-753 AC4: the honest-dead-end pattern (CAS-252) for the Watch list's own "my services" filter — same
 // tone as prefSwitch's own note, said as a full empty state rather than a note under a switch.
 function watchMineOnlyDeadEndHTML(){
@@ -11070,31 +11079,76 @@ function scopeEmptyHTML(){
     <div class="ebtns"><button class="ebtn" onclick="editCascade()"><span>Edit this agent's preferences</span></button></div>
   </div>`;
 }
+// CAS-1144: whether any of the Watch tab's OWN narrowings (as opposed to an agent's criteria, which this
+// listing never filters by) is touched right now — the guard for offering a "Clear filters" way out at all.
+function watchFiltersActive(){
+  return !!watchSearch[watchTab] || watchPickedBy[watchTab]!=="all" || watchGenreOff[watchTab].size>0
+    || watchWatchedSel[watchTab].size>0 || watchMineOnlyOn() || watchOccasion!=null;
+}
+// CAS-1144: re-runs render()'s own Watch pipeline (watchScopeRows → search → Picked by → hidden styles →
+// Watched filter → mine-only) with every one of the tab's own narrowings cleared, so the count on "Clear
+// filters" is the number of cards clicking it will actually leave on screen, not a guess. State is
+// snapshotted and restored — this never leaves the tab's filters changed.
+function watchRowsWithFiltersCleared(){
+  const tab=watchTab;
+  const snap={search:watchSearch[tab], raw:watchSearchRaw[tab], pickedBy:watchPickedBy[tab],
+    genreOff:new Set(watchGenreOff[tab]), watchedSel:new Set(watchWatchedSel[tab]),
+    mineOnly:watchMineOnly[tab], occasion:watchOccasion};
+  watchSearch[tab]=""; watchSearchRaw[tab]="";
+  watchPickedBy[tab]="all";
+  watchGenreOff[tab].clear();
+  watchWatchedSel[tab].clear();
+  watchMineOnly[tab]=false;
+  watchOccasion=null;
+  let rows=watchScopeRows();
+  if(watchPickedBy[tab]!=="all") rows=rows.filter(filmMatchesPickedBy);
+  const genreOff=watchGenreOff[tab];
+  if(genreOff.size) rows=rows.filter(m=>!(m.genres||[]).some(g=>genreOff.has(g)));
+  const heldThisTab=watchHeldOpen[tab];
+  rows=rows.filter(m=>filmMatchesWatchedFilter(m) || heldThisTab.has(m.tmdb_id));
+  const n=rows.filter(m=>!taggedOut(m)).length;
+  watchSearch[tab]=snap.search; watchSearchRaw[tab]=snap.raw;
+  watchPickedBy[tab]=snap.pickedBy;
+  watchGenreOff[tab].clear(); snap.genreOff.forEach(g=>watchGenreOff[tab].add(g));
+  watchWatchedSel[tab].clear(); snap.watchedSel.forEach(v=>watchWatchedSel[tab].add(v));
+  watchMineOnly[tab]=snap.mineOnly;
+  watchOccasion=snap.occasion;
+  return n;
+}
 function emptyResultsHTML(){
   // CAS-566: zero agents is not "this agent's filters matched nothing" — there is no agent, and nothing to
-  // relax or reset.
+  // price a way out of.
   if(!cascades.length) return "";
-  // CAS-718: every agent is always in scope now — the deck's per-list picker that used to justify naming a
-  // multi-agent watch list is gone, so only the single-agent case still names anyone; two or more falls
-  // through to the generic line rather than naming a list nobody picked any more.
-  const c = cascades.length===1 ? cascades[0] : null;
-  const opts=relaxOptions();
-  // The my-services scope isn't a filt field — it comes from the open Cascade or the ⚙️ switch — so it
-  // gets counted separately, and pointed at the control that actually owns it.
-  const scopeHides = prefsActive() ? countIf(()=>{ ignoreScope=true; }) : 0;
-  let html=`<div class="empty">
-    <div class="emoji">🔍</div>
-    <div class="eh">No titles match the current selections</div>`;
-  if(opts.length){
-    html+=`<div class="ebtns">`+opts.map(o=>
-      `<button class="ebtn" onclick="relaxFilter('${o.key}')"><span>Drop ${o.label}</span>
-        <b>→ ${o.n} film${o.n===1?"":"s"}</b></button>`).join("");
-    if(scopeHides>0)
-      html+=`<button class="ebtn" onclick="${c?"editCascade()":"openServices()"}"><span>Look beyond my services</span>
-        <b>→ ${scopeHides} film${scopeHides===1?"":"s"}</b></button>`;
-    html+=`</div>`;
+  const tabLabel=esc(WATCH_TAB_LABEL[watchTab]);
+  // CAS-1144: this tab's own empty state used to price RELAXERS/filt — the last-opened agent's builder
+  // criteria, which plays no part in what the Watch tab actually lists (see the ticket). Derive the reason
+  // only from the Watch pipeline itself, in the order a person would actually hit them.
+  const agentOff=watchAgentOff[watchTab];
+  const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
+  if(!acs.some(c=>windowUsable(c, watchTab))){
+    return `<div class="empty">
+      <div class="emoji">🔍</div>
+      <div class="eh">None of your agents track ${tabLabel}.</div>
+      <div class="ep">Turn on ${tabLabel} in an agent's Cascade score to see films here.</div>
+      <div class="ebtns"><button class="ebtn" onclick="openAgentsScreen()"><span>Open Agents</span></button></div>
+    </div>`;
   }
-  return html+`</div>`;
+  if(watchFiltersActive()){
+    const n=watchRowsWithFiltersCleared();
+    if(n>0){
+      return `<div class="empty">
+        <div class="emoji">🔍</div>
+        <div class="eh">No titles match the current selections</div>
+        <div class="ebtns"><button class="ebtn" onclick="clearAllWatchFilters()"><span>Clear filters</span>
+          <b>→ ${n} film${n===1?"":"s"}</b></button></div>
+      </div>`;
+    }
+  }
+  return `<div class="empty">
+    <div class="emoji">🔍</div>
+    <div class="eh">Nothing in ${tabLabel} yet.</div>
+    <div class="ep">Films your agents find appear here when they arrive.</div>
+  </div>`;
 }
 
 // ---- CAS-254: dismissing the services banner ---------------------------------------------------------
@@ -11217,7 +11271,11 @@ function commitDraft(){
     // CAS-729: watchMarkers, left out here since CAS-727 first added the field — there was no UI yet that
     // could edit it, so the gap cost nothing. The Mission score track is that UI: without this the whole
     // screen would silently discard every drag the moment Save is pressed.
-    watchMarkers:{...draft.watchMarkers}});
+    watchMarkers:{...draft.watchMarkers},
+    // CAS-1143: this screen's Mission score track is the UI where a person's per-window choice is made
+    // explicit — every save through it (new agent or edit) means trackV:2, so normCascade's start-window
+    // migration (for an agent that predates it) never runs again once a person has actually looked at it.
+    trackV:2});
   // CAS-743: draft's own *Defaulted flag (set by normCascade's fill, cleared the moment setWatchMarker runs
   // against the draft) is not one of the fields Object.assign above copies, and c can be the SAME object as
   // an existing agent carrying a stale flag from before this edit — so it has to be synced explicitly rather
@@ -12990,12 +13048,13 @@ function onbAgentCapSolveV2(critFn, ans, floor, leverValues){
 // YEARS_STOPS ladder the how-far-back dial offers a person, loosest to tightest, minus its leading 0
 // ("any year"), which is the plain sweep's own starting value and so is tried first regardless.
 const FAVS_YEARSBACK_LEVER = YEARS_STOPS.slice(1);
-// Massive Movies' criteria at a trial score `s` for its one active window (the BIG window) — used
-// both by the recipe (at the solved score) and onbAgentCapSolveV2 (at each candidate).
+// Massive Movies' criteria at a trial score `s` — the BIG window and every window later than it
+// (CAS-1143: the same shape onbFavsMarkersV2 already produces, not the BIG window alone) — used both
+// by the recipe (at the solved score) and onbAgentCapSolveV2 (at each candidate).
 function onbMassiveCritV2(ans, s){
   const big = onbBigWindowV2(ans);
-  const marks={}; WATCH_LEVEL_KEYS.forEach(k=>{ marks[k] = (k===big) ? s : null; });
-  const ww={ [big]:{list:true} };
+  const marks = onbFavsMarkersV2(big, s);
+  const ww={}; WATCH_LEVEL_KEYS.forEach(k=>{ if(marks[k]!=null) ww[k]={list:true}; });
   // CAS-854: matchesCriteria denies any "upcoming" film to an agent whose in_cinema marker is
   // null — arming the announcement bell there would promise something the engine will never do.
   ww.upcoming = (big==="in_cinema")
@@ -13069,6 +13128,10 @@ function buildOnbAgentsV2(a){
     c.template = r.key; c.icon = r.icon; c.name = r.name; c.who = r.who;
     c.sort = DEFAULT_SORT; c.budget = 0;
     c.order = order++;
+    // CAS-1143: every onboarding recipe already builds its deliberate window shape (BIG-window-onward
+    // markers, or stream-only, or cinema/rent/stream together) — trackV:2 up front stops normCascade's
+    // start-window migration from re-guessing it.
+    c.trackV = 2;
     normCascade(c);
     laneCrit(c, c.kind);
     return c;
