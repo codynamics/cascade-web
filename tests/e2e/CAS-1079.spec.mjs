@@ -15,7 +15,7 @@ const CARD_TEXT = [
   "You're set. Nothing more to do today — your agents report at 5pm.",
 ];
 
-test("CAS-1079: replaying the tour from Moving (via Account) uncovers the listing first, no card left anchorless", async ({ page }) => {
+test("CAS-1079: replaying the tour from Moving (via Help) uncovers the listing first, no card left anchorless", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);   // default skipTutorial:true — the automatic first-run tour is not what's under test
@@ -23,16 +23,19 @@ test("CAS-1079: replaying the tour from Moving (via Account) uncovers the listin
   await page.locator("#movingBtn").click();
   await expect(page.locator("#movingScreen")).toHaveClass(/open/);
 
+  // CAS-1159 requeue: CAS-1126 moved "Replay the tour" off the Account screen onto Help — the nesting
+  // this test is about (opened on top of Moving, closing both before the tour starts) still applies, just
+  // one menu item over.
   await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "Account" }).click();
-  await expect(page.locator("#accountScreen")).toHaveClass(/open/);
+  await page.locator("#navMenu .navitem", { hasText: "Help" }).click();
+  await expect(page.locator("#helpScreen")).toHaveClass(/open/);
   await expect(page.locator("#movingScreen")).toHaveClass(/open/);   // still nested underneath
 
-  await page.locator("#accountScreen .urow", { hasText: "Replay the tour" }).click();
+  await page.locator("#helpScreen .urow", { hasText: "Replay the tour" }).click();
 
   // Both screens it was nested under are gone — "no scrim may be left on screen" — and the tour is the only
   // thing showing.
-  await expect(page.locator("#accountScreen")).not.toHaveClass(/open/);
+  await expect(page.locator("#helpScreen")).not.toHaveClass(/open/);
   await expect(page.locator("#movingScreen")).not.toHaveClass(/open/);
   await expect(page.locator("#tutScrim")).toHaveClass(/open/);
 

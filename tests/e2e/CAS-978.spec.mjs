@@ -33,13 +33,33 @@ const CAS978_FAKE_SUPABASE_GLOBAL = `
         },
         signOut: async () => ({ error: null }),
       },
+      // CAS-1159 requeue: CAS-1099 added both of these RPC calls ahead of a new signup — this fixture
+      // predates them and had no .rpc() at all. email_has_account() missing crashed membStart() synchronously
+      // (client.rpc is not a function), leaving the button stuck on "Setting up your account…" forever
+      // (idle() never ran); complete_membership() missing then surfaced as "Could not save your account" once
+      // that was fixed, since an unhandled rpc() call resolved to {data:null}, which membCompleteNewMembership()
+      // treats as neither 'created' nor 'account_exists'. Every caller here is a brand-new signup. Recording
+      // the agents it was sent (window.__cas978Agents) is what let "cascades" below serve them straight back
+      // out — fireAccountFanout()'s post-membership acctLoad() otherwise replaces the local, just-built
+      // roster with whatever "cascades" answers, which was an empty table before this, wiping the roster the
+      // listing needs to render anything at all.
+      rpc: (fn, args) => {
+        if(fn === "email_has_account") return Promise.resolve({ data: false, error: null });
+        if(fn === "complete_membership"){
+          window.__cas978Agents = (args && args.p && args.p.agents) || [];
+          return Promise.resolve({ data: "created", error: null });
+        }
+        return Promise.resolve({ data: null, error: null });
+      },
       from: (table) => {
-        if(table !== "contact_messages") return chain();
-        return { insert: (rows) => {
+        if(table === "contact_messages") return { insert: (rows) => {
           if(window.__contactShouldFail) return Promise.resolve({ data: null, error: { message: "insert failed" } });
           window.__contactInserts.push(...rows);
           return Promise.resolve({ data: rows, error: null });
         } };
+        if(table === "cascades") return { select: () => ({ order: () => ({ range: () =>
+          Promise.resolve({ data: window.__cas978Agents || [], error: null }) }) }) };
+        return chain();
       },
     };
   } };
@@ -71,16 +91,21 @@ async function toConfiguredShortlist(page, kind){
   await walkToServices(page, kind);
 }
 
+// CAS-1159: CAS-1126 moved Feedback off the Account screen entirely — Account no longer carries any
+// "Feedback form" row, so this shared setup (used by every AC below this point) now opens it the one way
+// the app actually offers, via the Help screen's "Send feedback" row (the same route the test below this
+// one already covers directly).
 async function openFromAccount(page){
   await page.locator("#navMenuBtn").click();
-  await page.locator(".navitem", { hasText: "Account" }).click();
-  await expect(page.locator("#accountScreen")).toHaveClass(/open/);
-  await page.locator(".urow", { hasText: "Feedback form" }).click();
+  await page.locator(".navitem", { hasText: "Help" }).click();
+  await expect(page.locator("#helpScreen")).toHaveClass(/open/);
+  await page.locator(".urow", { hasText: "Send feedback" }).click();
   await expect(page.locator("#feedback")).toHaveClass(/open/);
 }
 
-// AC — reachable from the Account row.
-test("CAS-978: the Account 'Feedback form' row opens the sheet", async ({ page }) => {
+// AC — reachable from the Help screen's "Send feedback" row (CAS-1126 retired the old Account row; this
+// used to prove a second, independent entry point from Account, which no longer exists).
+test("CAS-978: the Help screen 'Send feedback' row opens the sheet", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
@@ -197,6 +222,9 @@ test("CAS-978: a non-broken category sends no diagnostics at all", async ({ page
   await expect(page.locator("#feedbackDiagWrap")).toBeHidden();
   await page.locator("#feedbackEmail").fill("cas978@example.com");
   await page.locator("#feedbackMsg").fill("Wrong poster on this title.");
+  // CAS-1159 requeue: same WebKit fill-then-click-swallow as #contact's Send (CAS-838/864/927's own .blur()
+  // convention) — without the diagnostics switch block, the layout change leaves nothing to absorb it.
+  await page.locator("#feedbackMsg").blur();
   await page.locator("#feedbackSend").click();
   await page.waitForFunction(() => window.__contactInserts.length > 0, null, { timeout: 5000 });
 
@@ -215,6 +243,9 @@ test("CAS-978: a successful send shows the receipt", async ({ page }) => {
   await page.locator("#feedbackCatChips .chip", { hasText: "Membership and billing" }).click();
   await page.locator("#feedbackEmail").fill("cas978@example.com");
   await page.locator("#feedbackMsg").fill("A billing question.");
+  // CAS-1159 requeue: same WebKit fill-then-click-swallow as #contact's Send (CAS-838/864/927's own .blur()
+  // convention) — without the diagnostics switch block, the layout change leaves nothing to absorb it.
+  await page.locator("#feedbackMsg").blur();
   await page.locator("#feedbackSend").click();
   await expect(page.locator("#feedbackBody")).toContainText("Thanks — we read every one of these.");
 });
@@ -230,6 +261,9 @@ test("CAS-978: when the insert rejects, the typed message stays and an error is 
   await page.locator("#feedbackCatChips .chip", { hasText: "An idea" }).click();
   await page.locator("#feedbackEmail").fill("cas978@example.com");
   await page.locator("#feedbackMsg").fill("This should fail to send.");
+  // CAS-1159 requeue: same WebKit fill-then-click-swallow as #contact's Send (CAS-838/864/927's own .blur()
+  // convention) — without the diagnostics switch block, the layout change leaves nothing to absorb it.
+  await page.locator("#feedbackMsg").blur();
   await page.locator("#feedbackSend").click();
 
   await expect(page.locator("#feedbackErr")).toBeVisible();

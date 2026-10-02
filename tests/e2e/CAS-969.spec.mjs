@@ -7,19 +7,24 @@
 import { test, expect } from "@playwright/test";
 import { toShortlist, finishFlow, toListing } from "./helpers.mjs";
 
-/** A fake native Capacitor + a counting InAppReview.requestReview stub, present before any app script
- * runs. The count is kept in localStorage (not a plain window var) because a `page.reload()` gives every
- * window variable a clean slate but leaves localStorage — the same device-persistence gap AC4 is about. */
+/** CAS-1159 requeue: a fake native Capacitor + a counting InAppReview.requestReview stub, applied AFTER
+ * the real (vendored) capacitor-core.js/capacitor-in-app-review.js have already run — an addInitScript,
+ * which runs BEFORE any page script, used to set window.Capacitor instead, but the real capacitor-core.js
+ * unconditionally recomputes isNativePlatform from actual bridge detection every time it loads (always
+ * "web" in a Playwright browser), clobbering whatever an addInitScript had set; capacitor-in-app-review.js
+ * then registers the real, bridge-backed InAppReview plugin over whatever Plugins.InAppReview held, too.
+ * Calling this once the app has already booted — and again after any reload, since a fresh navigation
+ * reruns both real vendor scripts and resets window.Capacitor right back — is what actually makes the
+ * stub stick. The count is kept in localStorage (not a plain window var) because a `page.reload()` gives
+ * every window variable a clean slate but leaves localStorage — the same device-persistence gap AC4 is about. */
 async function primeNativeReviewStub(page){
-  await page.addInitScript(() => {
-    window.Capacitor = {
-      isNativePlatform: () => true,
-      Plugins: { InAppReview: { requestReview: () => {
-        const n = Number(localStorage.getItem("__cas969_review_requests") || 0) + 1;
-        localStorage.setItem("__cas969_review_requests", String(n));
-        return Promise.resolve();
-      } } },
-    };
+  await page.evaluate(() => {
+    window.Capacitor.isNativePlatform = () => true;
+    window.Capacitor.Plugins.InAppReview = { requestReview: () => {
+      const n = Number(localStorage.getItem("__cas969_review_requests") || 0) + 1;
+      localStorage.setItem("__cas969_review_requests", String(n));
+      return Promise.resolve();
+    } };
   });
 }
 
@@ -61,20 +66,22 @@ test("CAS-969 AC2: driving the trigger on the web surface shows nothing, throws 
 });
 
 test("CAS-969 AC4: the native plugin is asked at most once per version, even across a reload", async ({ page }) => {
-  await primeNativeReviewStub(page);
   const id1 = await buildRealListingFilm(page);
+  await primeNativeReviewStub(page);
   await windUpSessions(page);
   await page.evaluate((filmId) => setOpinion(filmId, "enjoyed"), id1);
   await page.waitForFunction(() => Number(localStorage.getItem("__cas969_review_requests") || 0) > 0, null, { timeout: 5000 });
   expect(await page.evaluate(() => Number(localStorage.getItem("__cas969_review_requests")))).toBe(1);
 
   // Reload (not a fresh onboarding run) — the point is the SAME device storage surviving into a new load.
-  // The init script re-primes the same native stub; the listing itself streams back in from local state.
+  // Re-prime after the reload too: it's a real navigation, so the real vendor scripts reset window.Capacitor
+  // right back, same as the very first load. The listing itself streams back in from local state.
   await page.reload();
   await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
   await page.waitForFunction(() => document.querySelectorAll("#groups .card").length > 0, null, { timeout: 30_000 });
   const card2 = page.locator("#groups .card").first();
   const id2 = await card2.evaluate(el => Number(el.id.replace("card-", "")));
+  await primeNativeReviewStub(page);
   await windUpSessions(page);
   await page.evaluate((filmId) => setOpinion(filmId, "wow"), id2);
   await page.waitForTimeout(300);

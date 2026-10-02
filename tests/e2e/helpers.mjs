@@ -397,9 +397,12 @@ export async function bootAlreadySignedIn(page, { supabaseScript, resolveFnName,
   // this same click (smoke.spec.mjs).
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Cascade finds your movies for you.");   // v2_about (CAS-953)
   await page.evaluate(name => window[name](), resolveFnName);
-  await page.waitForFunction(() => window.CascadeAuth.status === "signed-in", null, { timeout: 5000 });
+  // CAS-1159 requeue: 5000ms here (and below) was tight enough that e2e-full's heavier parallel-shard load
+  // occasionally lost the race even though the mechanism itself is correct (CAS-886.spec.mjs:88 saw this) —
+  // every sibling wait in this file for an account-sync/signed-in condition already uses 30_000ms.
+  await page.waitForFunction(() => window.CascadeAuth.status === "signed-in", null, { timeout: 30_000 });
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
-  if(readyFlagExpr) await page.waitForFunction(readyFlagExpr, null, { timeout: 5000 });
+  if(readyFlagExpr) await page.waitForFunction(readyFlagExpr, null, { timeout: 30_000 });
 }
 
 /** CAS-1126: "Where & when you'll watch" left the top menu for the new Settings screen — reach it via
