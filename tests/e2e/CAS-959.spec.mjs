@@ -16,7 +16,10 @@ async function gotoReset(page){
 }
 
 /** Signs the page in with a fake Supabase-shaped client serving exactly `existingRows` from the
- * cascades table, recording every upsert into window.__cas959Upserts (reset each call). */
+ * cascades table, recording every upsert TO THE cascades TABLE into window.__cas959Upserts (reset each
+ * call) — CAS-1097 widened acctOp/acctLoad sync to every account table (agent_films, user_films, ...), so
+ * an ordinary signed-in session now legitimately upserts far more than cascades; only a re-upserted
+ * cascade row is this ticket's own concern. */
 async function signInWithRows(page, userId, existingRows){
   await page.evaluate(({ userId, existingRows }) => {
     window.__cas959Upserts = [];
@@ -27,9 +30,11 @@ async function signInWithRows(page, userId, existingRows){
     window.CascadeAuth.client = {
       from(table){
         return {
-          select(){ return { order(){ return Promise.resolve({ data: existingRows, error: null }); } }; },
+          // CAS-1109/CAS-1142: acctLoad() pages with .select().order().range(), not .select().order() alone
+          // — see CAS740_FAKE_SUPABASE_GLOBAL in smoke.spec.mjs for the same fix on the same bug class.
+          select(){ return { order(){ return { range(){ return Promise.resolve({ data: table === "cascades" ? existingRows : [], error: null }); } }; } }; },
           upsert(rows){
-            window.__cas959Upserts.push(...rows);
+            if(table === "cascades") window.__cas959Upserts.push(...rows);
             return { select(){ return Promise.resolve({ data: rows.map(r => ({ id: r.id, updated_at: new Date().toISOString() })), error: null }); } };
           },
           delete(){ return { eq(){ return { in(){ return Promise.resolve({ data: null, error: null }); } }; } }; },
