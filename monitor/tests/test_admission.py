@@ -95,12 +95,13 @@ class RetiredLanguageFilter(unittest.TestCase):
                       "criteria.lang narrowed admission, but CAS-560 retired that field")
 
 
-class PrimaryGenreOnly(unittest.TestCase):
-    """(c) genre matching is against the film's PRIMARY genre (genres[0]) only — the app tests
-    `(m.genres||[])[0]`, but the old Python matcher tested ANY genre in the list (one of the named
-    CAS-825 divergences). A film carrying the wanted genre only as a SECONDARY one must not admit."""
+class AnyGenreMatches(unittest.TestCase):
+    """(c) CAS-1147: genre matching is against ANY of the film's genres, not only the first — the app
+    now tests `(m.genres||[]).some(g=>c.genre.includes(g))` (Lee's decision, 2026-10-02, replacing the
+    old `(m.genres||[])[0]`-only rule this class used to pin). A film carrying the wanted genre only as
+    a SECONDARY one must admit; a film not carrying it at all must not."""
 
-    def test_secondary_genre_does_not_admit(self):
+    def test_secondary_genre_does_admit(self):
         movie = {"tmdb_id": "999900001", "title": "Secondary Horror", "genres": ["Drama", "Horror"],
                  "age_rating": "M", "language": "en", "status": ["rental"],
                  "imdb_rating": 7.0, "imdb_votes": 5000, "wm_user_rating": 7.5, "wm_critic_score": 70,
@@ -108,11 +109,11 @@ class PrimaryGenreOnly(unittest.TestCase):
         cascade = {"id": "c-genre", "user_id": "u-genre",
                   "criteria": {"genre": ["Horror"], "watchMarkers": dict(_OPEN)}}
         admission = compute_admission([cascade], {"today": [movie]})
-        self.assertNotIn("999900001", admission["c-genre"]["today"])
+        self.assertIn("999900001", admission["c-genre"]["today"])
 
-    def test_primary_genre_does_admit(self):
-        # Control: the same film, Horror moved to primary — proves the exclusion above is really
-        # about genre ORDER and not some other field on the fixture.
+    def test_primary_genre_still_admits(self):
+        # Control: the same shape, Horror moved to primary — proves admission isn't accidentally
+        # keyed to genre ORDER in the other direction either.
         movie = {"tmdb_id": "999900003", "title": "Primary Horror", "genres": ["Horror", "Drama"],
                  "age_rating": "M", "language": "en", "status": ["rental"],
                  "imdb_rating": 7.0, "imdb_votes": 5000, "wm_user_rating": 7.5, "wm_critic_score": 70,
@@ -121,6 +122,16 @@ class PrimaryGenreOnly(unittest.TestCase):
                   "criteria": {"genre": ["Horror"], "watchMarkers": dict(_OPEN)}}
         admission = compute_admission([cascade], {"today": [movie]})
         self.assertIn("999900003", admission["c-genre2"]["today"])
+
+    def test_genre_absent_entirely_does_not_admit(self):
+        movie = {"tmdb_id": "999900004", "title": "No Horror Here", "genres": ["Drama", "Comedy"],
+                 "age_rating": "M", "language": "en", "status": ["rental"],
+                 "imdb_rating": 7.0, "imdb_votes": 5000, "wm_user_rating": 7.5, "wm_critic_score": 70,
+                 "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}]}
+        cascade = {"id": "c-genre3", "user_id": "u-genre",
+                  "criteria": {"genre": ["Horror"], "watchMarkers": dict(_OPEN)}}
+        admission = compute_admission([cascade], {"today": [movie]})
+        self.assertNotIn("999900004", admission["c-genre3"]["today"])
 
 
 class ServiceScopeAuthority(unittest.TestCase):

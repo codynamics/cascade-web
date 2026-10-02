@@ -6312,7 +6312,8 @@ function passes(m){
   // Exclude beats include. "Horror, but never gore-comedy" has to mean it: a film carrying an excluded genre is
   // out even if another of its genres is one you asked for — otherwise the skip list is advisory, not a rule.
   if(filt.exclude.size && (m.genres||[]).some(g=>filt.exclude.has(g))) return false;
-  if(filt.genre.size && !filt.genre.has((m.genres||[])[0])) return false;
+  // CAS-1147: ANY of the film's styles counts, not only the first — mirrors matchesCriteria above.
+  if(filt.genre.size && !(m.genres||[]).some(g=>filt.genre.has(g))) return false;
   if(filt.awards && !m.award) return false;
   if(filt.recent && !isRecent(m)) return false;
   if(filt.newOnly && !filmIsNew(m.tmdb_id)) return false;   // CAS-715
@@ -10402,9 +10403,15 @@ const cascadeOrderCmp = (a,b) => (a.order??1e9)-(b.order??1e9)
 // criteria, the windows, the scope and the alert moments. Nothing about a second copy can ever find a film the
 // first didn't, so keeping it is noise with no upside.
 // Only EXACT twins collapse. Two Cascades that differ anywhere — even one genre chip — are two real radars.
+// CAS-1147: bumped when the genre-matching RULE itself changes (first-style-only -> any-style) rather than
+// any agent's own criteria — folded into cascSigOf below so every stored agent_films row reads as drifted
+// on the first pass after this ships, the same "news about the agent, not the film" treatment CAS-715's
+// admitDrift already gives a hand-edited agent (see recomputeFound's own cascadeDrift comment).
+const GENRE_RULE_V = 2;
 const cascSigOf = c => JSON.stringify([c.name, c.status, c.genre, c.exclude, c.age, c.culture, c.year,
   c.imdb, c.rt, c.awards, c.budget, c.includeUnbudgeted, c.includeUnrated, c.tentpole,
   c.selCrowd||0, c.selCritScore||0, c.selAwards||0, c.selScale||0, c.selBuzz||0, !!c.selOr, c.yearsBack||0,
+  GENRE_RULE_V,
   !!c.cinemaReleaseOnly, c.scoreFloor||0, c.watchMarkers||{},
   c.myServices, c.sort||DEFAULT_SORT, c.excludeWatched, c.excludeBlocked,
   // CAS-160: the viewing windows are part of "the alert moments" too. Three of them (announced / 1 month /
@@ -10628,7 +10635,8 @@ function matchesCriteria(m,c,ignoreBlocked,ignoreScoreGate){
   // CAS-182: cleared means cleared. A dimension holding null admits nothing, so the count says 0 rather
   // than quietly reverting to the whole catalogue behind a screen of switched-off chips.
   if(c.genre===null || c.age===null) return false;
-  if(c.genre.length && !c.genre.includes((m.genres||[])[0])) return false;
+  // CAS-1147: ANY of the film's styles counts, not only the first — Lee's decision, 2026-10-02.
+  if(c.genre.length && !(m.genres||[]).some(g=>c.genre.includes(g))) return false;
   // CAS-744: includeUnrated was wired to ratingOK (the IMDb bar) only — this gate never read it, so the
   // escape hatch did nothing for a film with no age_rating at all (m.age_rating null/""), which is the
   // norm for an unreleased film rather than the exception. Same shape as ratingOK just above: below/outside

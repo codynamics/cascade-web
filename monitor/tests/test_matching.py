@@ -976,6 +976,18 @@ class NewlyQualifiedTests(unittest.TestCase):
         cascades[0]["active"] = False
         self.assertEqual(self._match(cascades, prev, today), {})
 
+    def test_secondary_style_match_in_both_snapshots_never_fires(self):
+        # CAS-1147 AC4: a film admitted only because the agent's wanted style sits SECOND in its
+        # genre list, present unchanged in both catalogues — the any-style rule admits it both days
+        # (same engine, same criteria, Lee's rule from 2026-08-24 above), so it must never read as
+        # "newly" qualifying.
+        movie = self._movie(7.5, genres=["Drama", "Thriller"])
+        cascades = [{"id": "c1", "user_id": "u1", "name": "Thriller radar", "active": True,
+                     "alert_moments": ["hits_rent"],
+                     "criteria": _criteria(genre=["Thriller"], imdb=7.0)}]
+        hits = self._match(cascades, [movie], [movie])
+        self.assertEqual(hits, {})
+
     def test_two_agents_newly_qualifying_for_one_film_collapse_to_the_lower_order(self):
         # CAS-784: same one-film-one-agent rule applies here as in match().
         prev = [self._movie(6.5)]
