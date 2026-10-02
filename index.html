@@ -9573,6 +9573,15 @@ function watchScopeRows(){
     });
   }
   if(!acs.length) return [];
+  // CAS-1146: once at least one agent is unticked for this tab, a film's single CAS-709 owner
+  // (filmOwnerCascade) must also be ticked — "some ticked agent lists it" alone let an unticked
+  // agent's film ride in under a ticked co-lister. All-ticked (agentOff empty) is untouched.
+  if(agentOff.size){
+    return MOVIES.filter(m=>{
+      const owner=filmOwnerCascade(m);
+      return owner && acs.some(c=>c.id===owner.id) && filmMatchesWatchTab(m, watchTab);
+    });
+  }
   return MOVIES.filter(m=>acs.some(c=>listedBy(m,c)) && filmMatchesWatchTab(m, watchTab));
 }
 // CAS-933: the one landing-tab decision, shared by boot and the end of onboarding. Cinema only when it
