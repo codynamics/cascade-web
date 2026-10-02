@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repo (carries yesterday's state for change-detection)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: staging           # the repo's default branch is main; refresh must land on staging, never main
           fetch-depth: 0         # full history: the health step's catalogue_size/score_coverage checks anchor "yesterday" to the last refresh on an EARLIER day, not HEAD~1

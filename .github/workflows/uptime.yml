@@ -30,12 +30,12 @@ jobs:
     timeout-minutes: 2
     steps:
       - name: Check out staging (the probe script lives here)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: staging
 
       - name: Check out main (VERSION is the live deploy's source of truth)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
           path: main-ref
