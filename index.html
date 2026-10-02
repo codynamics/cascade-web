@@ -17810,7 +17810,7 @@ function openMembership(agentKey, nameOverride, cascade){
     <span class="cascpill">CASCADE</span>
     <h2 class="membh">Cascade Membership</h2>
     ${haul}
-    <p class="memfine">Save your agents to an account so they keep working for you and sync across your devices.</p>
+    <p class="memfine">Free for your first month · then <b>$4.99/month</b> · cancel any time. No card needed — we'll always ask before anything is ever charged.</p>
     <div class="membenefits">
       ${MEMB_BENEFITS.map(b=>`<div class="mbrow"><span class="mbic">${b.ic}</span>
         <span class="mbtx"><span class="mbt">${esc(b.name)}</span><span class="mbd">${esc(b.sub)}</span></span>
@@ -17826,7 +17826,7 @@ function openMembership(agentKey, nameOverride, cascade){
               style="vertical-align:baseline">Sign in</button></p>
     <p class="pnote">By continuing you agree to our
       <a href="https://www.codynamics.com.au/privacy" target="_blank" rel="noopener">Privacy policy</a>.</p>` : ""}
-    <button class="membcta" type="button" onclick="membStart()">Save my agents</button>
+    <button class="membcta" type="button" onclick="membStart()">Start my free month</button>
     ${posters?`<div class="rvgrid membgrid">${posters}</div>`:""}`;
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
@@ -17883,7 +17883,7 @@ function openOnbMembership(){
       ${OB_MEMB_BENEFITS.map(b=>`<div class="mbrow"><span class="mbic">✓</span>
         <span class="mbtx"><span class="mbt">${esc(b)}</span></span></div>`).join("")}
     </div>
-    <p class="memfine">Save your agents to an account so they keep working for you and sync across your devices.</p>
+    <p class="memfine">Free for your first month · then <b>$4.99/month</b> · cancel any time. No card needed — we'll always ask before anything is ever charged.</p>
     ${needsEmail ? `
     <div class="flabel">Email</div>
     <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
@@ -17894,7 +17894,7 @@ function openOnbMembership(){
               style="vertical-align:baseline">Sign in</button></p>
     <p class="pnote">By continuing you agree to our
       <a href="https://www.codynamics.com.au/privacy" target="_blank" rel="noopener">Privacy policy</a>.</p>` : ""}
-    <button class="membcta" type="button" onclick="membStart()">Save my agents</button>
+    <button class="membcta" type="button" onclick="membStart()">Start my free month</button>
     ${posters?`<div class="rvgrid membgrid">${posters}</div>`:""}`;
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
@@ -17995,12 +17995,12 @@ window.membStart=()=>{
     // than leaving a spinner that can never resolve.
     if($("membScreen").classList.contains("open") && btn){
       btn.disabled=false; btn.classList.remove("busy"); btn.removeAttribute("aria-busy");
-      btn.textContent="Save my agents";
+      btn.textContent="Start my free month";
     }
   };
   if(btn){
     btn.disabled=true; btn.classList.add("busy"); btn.setAttribute("aria-busy","true");
-    btn.innerHTML=`<span class="btnspin"></span>${needsEmail?"Setting up your account…":"Saving your agents…"}`;
+    btn.innerHTML=`<span class="btnspin"></span>${needsEmail?"Setting up your account…":"Starting your free month…"}`;
   }
   logEvent("membership_start");
   // The membership screen stays up until the listing is ready, so the spinner is what the user watches
