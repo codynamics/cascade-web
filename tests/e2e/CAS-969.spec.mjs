@@ -47,6 +47,10 @@ test("CAS-969 AC2: driving the trigger on the web surface shows nothing, throws 
 
   const id = await buildRealListingFilm(page);
   await windUpSessions(page);
+  // CAS-1150 requeue: AC2 is about driving the trigger, not about the real listing built to drive it —
+  // clear whatever boot/poster-load noise (e.g. a catalogue poster 404) landed in `errors` while building
+  // that listing above, so only console/page activity from the actual setOpinion tap below is asserted on.
+  errors.length = 0;
   await page.evaluate((filmId) => setOpinion(filmId, "enjoyed"), id);
   await page.waitForTimeout(200);
 

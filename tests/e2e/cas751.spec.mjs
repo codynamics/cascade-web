@@ -70,8 +70,13 @@ test("Watch On: a human re-tap claims an agent-armed level; a manual level still
   expect(claimed.src[key]).toBe("manual");
 
   // AC4: with the level now "manual", tapping the still-ticked row clears it — the existing toggle-off.
-  await expect(row).toHaveClass(/on/);
-  await row.click();
+  // toggleFilmOpt (app_template.html) always calls closeWatchPanel() on every tap, including the claim tap
+  // above (CAS-1037: "dismiss on pick"), so the panel is already gone here — reopen it before reaching
+  // for the row again instead of assuming it stayed open.
+  await chip.click();
+  const rowAgain = page.locator(`.nopt[data-wk="${key}"]`);
+  await expect(rowAgain).toHaveClass(/on/);
+  await rowAgain.click();
   const cleared = await page.evaluate(id => !!notify[id].wins, filmId);
   expect(cleared).toBe(true);
   const clearedOn = await page.evaluate((id) => notify[id].wins, filmId);

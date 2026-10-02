@@ -4,11 +4,16 @@
 // without touching a live project — signed-out-but-configured throughout, since contact_messages' own
 // RLS policy grants insert to anon.
 import { test, expect } from "@playwright/test";
-import { freshApp, gotoFresh, toShortlist, finishFlow, toListing } from "./helpers.mjs";
+import { freshApp, gotoFresh, toShortlist, walkToServices, finishFlow, toListing } from "./helpers.mjs";
 
+// CAS-1150 requeue: this fake client predates CAS-1056 (email OTP replaced the derived-password scheme)
+// — signInWithPassword/signUp are no longer called by the app at all, and onAuthStateChange never stored
+// or invoked its callback, so nothing here ever told the app a session had landed and #authModal.open
+// could never clear (same fake-Supabase gap CAS-1073 found and fixed in its own copy; mirrored here).
 const CAS978_FAKE_SUPABASE_GLOBAL = `
   window.__contactInserts = [];
   window.__contactShouldFail = false;
+  let __cas978AuthChangeCb = null;
   function chain(){
     return new Proxy(() => {}, {
       get: (_t, prop) => prop === "then" ? (resolve) => resolve({ data: [], error: null }) : () => chain(),
@@ -19,9 +24,13 @@ const CAS978_FAKE_SUPABASE_GLOBAL = `
     return {
       auth: {
         getSession: () => Promise.resolve({ data: { session: null } }),
-        onAuthStateChange: () => ({ data: { subscription: { unsubscribe(){} } } }),
-        signInWithPassword: async () => ({ data: {}, error: null }),
-        signUp: async () => ({ data: {}, error: null }),
+        onAuthStateChange: (cb) => { __cas978AuthChangeCb = cb; return { data: { subscription: { unsubscribe(){} } } }; },
+        signInWithOtp: async () => ({ data: {}, error: null }),
+        verifyOtp: async ({ email }) => {
+          const session = { user: { id: "cas978-user", email }, access_token: "fake" };
+          if(__cas978AuthChangeCb) __cas978AuthChangeCb("SIGNED_IN", session);
+          return { data: { session }, error: null };
+        },
         signOut: async () => ({ error: null }),
       },
       from: (table) => {
@@ -47,6 +56,19 @@ async function configuredApp(page){
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.enabled === true, null, { timeout: 5000 });
+}
+
+// CAS-1150 requeue: configuredApp above routes both config.js (a fake-but-real-looking URL) AND
+// supabase-js.js (the fake client itself) BEFORE this runs — toShortlist()/freshAppSignedIn() (CAS-1110)
+// would re-route config.js to a REAL local-stack URL (last-registered route wins) while leaving the fake
+// supabase-js.js in place, so the page ends up pairing a real URL with a client that never talks to it.
+// This is the signed-out, fake-client walk toShortlist() used to be before CAS-1110 made it always sign
+// in for real — walkToServices() (helpers.mjs) is the same onboarding walk, written to work with whatever
+// client is already on the page, which is exactly what these configuredApp() tests need.
+async function toConfiguredShortlist(page, kind){
+  await page.waitForFunction(() => flowOn === true || document.querySelector("#splashCta"));
+  if(!(await page.evaluate(() => flowOn === true))) await page.locator("#splashCta").click();
+  await walkToServices(page, kind);
 }
 
 async function openFromAccount(page){
@@ -126,7 +148,7 @@ test("CAS-978: a message over 2000 characters turns the counter red and blocks S
 // carrying a non-empty diagnostics string.
 test("CAS-978: choosing Something's broken sends diagnostics by default", async ({ page }) => {
   await configuredApp(page);
-  await toShortlist(page, "cinema");
+  await toConfiguredShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openFromAccount(page);
@@ -147,7 +169,7 @@ test("CAS-978: choosing Something's broken sends diagnostics by default", async 
 // AC4 — switching the diagnostics switch off means no diagnostics text reaches the row.
 test("CAS-978: turning off Include diagnostics sends a null diagnostics field", async ({ page }) => {
   await configuredApp(page);
-  await toShortlist(page, "cinema");
+  await toConfiguredShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openFromAccount(page);
@@ -167,7 +189,7 @@ test("CAS-978: turning off Include diagnostics sends a null diagnostics field", 
 // AC — a category outside "Something's broken" never carries diagnostics, switch or not.
 test("CAS-978: a non-broken category sends no diagnostics at all", async ({ page }) => {
   await configuredApp(page);
-  await toShortlist(page, "cinema");
+  await toConfiguredShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openFromAccount(page);
@@ -186,7 +208,7 @@ test("CAS-978: a non-broken category sends no diagnostics at all", async ({ page
 // AC — success shows the receipt.
 test("CAS-978: a successful send shows the receipt", async ({ page }) => {
   await configuredApp(page);
-  await toShortlist(page, "cinema");
+  await toConfiguredShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openFromAccount(page);
@@ -201,7 +223,7 @@ test("CAS-978: a successful send shows the receipt", async ({ page }) => {
 test("CAS-978: when the insert rejects, the typed message stays and an error is visible", async ({ page }) => {
   await configuredApp(page);
   await page.evaluate(() => { window.__contactShouldFail = true; });
-  await toShortlist(page, "cinema");
+  await toConfiguredShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openFromAccount(page);
@@ -219,7 +241,7 @@ test("CAS-978: when the insert rejects, the typed message stays and an error is 
 // AC — the honeypot silently drops the submission, same convention as #contact's.
 test("CAS-978: filling the honeypot and sending performs no insert at all", async ({ page }) => {
   await configuredApp(page);
-  await toShortlist(page, "cinema");
+  await toConfiguredShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openFromAccount(page);
