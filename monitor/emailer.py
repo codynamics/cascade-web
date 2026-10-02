@@ -30,7 +30,7 @@ RESEND_API_KEY_ENV = "RESEND_API_KEY"
 RESEND_ENDPOINT = "https://api.resend.com/emails"
 
 # Overridable via env so nothing site-specific is baked in.
-DEFAULT_SITE_URL = "https://codynamics.github.io/cascade-web/"
+DEFAULT_SITE_URL = "https://cascademovies.com/"
 # Resend's shared test sender works without domain verification (delivers to your own account
 # email). Lee swaps this for a verified sender once his domain is set up.
 DEFAULT_FROM = "Cascade <onboarding@resend.dev>"
