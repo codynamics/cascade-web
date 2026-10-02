@@ -4852,11 +4852,14 @@ function saveSet(k,set){ try{ localStorage.setItem(k, JSON.stringify([...set]));
 // cascade_cascade_known(@Y) are retired features' own leftovers (CAS-1035's outbox, and an older on-device
 // known-set tracker that predates this file's history); the live, still-written "cascade_watch_known" bare
 // key is deliberately excluded from its own pattern below — only a namespaced (`@`-suffixed) leftover of it
-// is legacy.
+// is legacy. "cascade_ops@<uid>" (acctOp's own live, still-written queue — predates this ticket) is excluded
+// from the `@`-suffixed pattern for the same reason: it is current data, not a CAS-957 leftover, and must
+// survive a plain reload so an unsent write isn't silently dropped (CAS-1035 AC3). A real sign-out already
+// wipes it outright via wipeAccountLocalState, below.
 (function purgeLegacyAccountKeys(){
   try{
     Object.keys(localStorage).forEach(k=>{
-      if(/^cascade_[^@]*@/.test(k)
+      if((/^cascade_[^@]*@/.test(k) && k.indexOf("cascade_ops@")!==0)
          || k.indexOf("cascade_cascade_known")===0
          || k.indexOf("cascade_outbox")===0
          || (k.indexOf("cascade_watch_known")===0 && k!=="cascade_watch_known")){
