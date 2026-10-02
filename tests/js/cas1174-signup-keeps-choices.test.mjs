@@ -112,6 +112,11 @@ test("CAS-1174: a reconcile mid-wait must not discard the draft before membershi
   const occ = E.createOccasion("Me");
   agent.occasions = [occ.id];
   E.cascades.push(agent);
+  // The services step: at least two streaming services and one rental service, "only my services" armed.
+  const CHOSEN_SUB = E.SUB_SERVICES.slice(0, 2);
+  const CHOSEN_STORE = E.STORE_SERVICES.slice(0, 1);
+  CHOSEN_SUB.forEach(s => E.prefs.sub.add(s));
+  CHOSEN_STORE.forEach(s => E.prefs.store.add(s));
   E.prefs.on = true; E.prefs.touched = true;
 
   // The email step's own flag (membStart sets this before continueWithEmail ever runs) — true for
@@ -129,6 +134,8 @@ test("CAS-1174: a reconcile mid-wait must not discard the draft before membershi
   const before = {
     occasionReg: JSON.stringify(E.occasionReg),
     prefsOn: E.prefs.on,
+    prefsSub: JSON.stringify([...E.prefs.sub].sort()),
+    prefsStore: JSON.stringify([...E.prefs.store].sort()),
     cascadesLength: E.cascades.length,
     notifyPrefs: JSON.stringify(E.notifyPrefs),
   };
@@ -145,6 +152,10 @@ test("CAS-1174: a reconcile mid-wait must not discard the draft before membershi
     "a reconcile mid-wait must not touch the in-memory occasion register");
   assert.equal(E.prefs.on, before.prefsOn,
     "a reconcile mid-wait must not touch the in-memory services-only answer");
+  assert.equal(JSON.stringify([...E.prefs.sub].sort()), before.prefsSub,
+    "a reconcile mid-wait must not touch the in-memory chosen streaming services");
+  assert.equal(JSON.stringify([...E.prefs.store].sort()), before.prefsStore,
+    "a reconcile mid-wait must not touch the in-memory chosen rental services");
   assert.equal(E.cascades.length, before.cascadesLength,
     "a reconcile mid-wait must not touch the in-memory agent roster");
   assert.equal(JSON.stringify(E.notifyPrefs), before.notifyPrefs,
@@ -169,6 +180,10 @@ test("CAS-1174: a reconcile mid-wait must not discard the draft before membershi
     }
   }
   assert.equal(p.prefs.services_only, true, "the payload must still carry services_only: true");
+  assert.deepEqual([...p.prefs.sub_services].sort(), [...CHOSEN_SUB].sort(),
+    "the payload's sub_services must equal the services step's own choice");
+  assert.deepEqual([...p.prefs.store_services].sort(), [...CHOSEN_STORE].sort(),
+    "the payload's store_services must equal the services step's own choice");
   assert.equal(p.notify.email_on, true, "the payload must carry email_on: true");
   assert.equal(p.notify.email_address, SIGNUP_EMAIL, "the payload's email must be the sign-up address");
 
@@ -178,4 +193,9 @@ test("CAS-1174: a reconcile mid-wait must not discard the draft before membershi
   const landedOccId = (landedAgent.occasions || [])[0];
   assert.equal(E.occasionName(landedOccId), "Me",
     "the first agent's occasion id must resolve to 'Me' after landing");
+  assert.deepEqual([...E.prefs.sub].sort(), [...CHOSEN_SUB].sort(),
+    "prefs.sub must still hold the chosen streaming services after landing");
+  assert.deepEqual([...E.prefs.store].sort(), [...CHOSEN_STORE].sort(),
+    "prefs.store must still hold the chosen rental service after landing");
+  assert.equal(E.prefs.on, true, "prefs.on must still be true after landing");
 });
