@@ -431,6 +431,51 @@ class AutoPlacementTests(unittest.TestCase):
         agent_films = [{"user_id": "u1", "cascade_id": "gone", "movie_id": "9001", "admission_score": 80}]
         self.assertEqual(compute_auto_placements(agent_films, [], [movie], account_prefs={}), {})
 
+    def test_an_explicit_watch_windows_list_false_blocks_the_rent_placement(self):
+        """CAS-1156: watch_windows.rent={"list":false} (a window a member has explicitly switched
+        off in Where & when) must read as off here the same way it does on the device — an explicit
+        {list:false} must never earn a placement, the same as the window being absent entirely."""
+        movie = {"tmdb_id": 9003, "title": "Rent Only Film", "genres": ["Drama"],
+                 "status": ["rental"], "cinema_date": "2026-01-01", "language": "en",
+                 "wm_critic_score": 70, "popularity": 50, "wm_popularity_percentile": 70,
+                 "wm_user_rating": 7.5, "offers": [{"service": "Netflix", "type": "rent", "price": 5.99}]}
+        # Only `rent` is a usable window at the agent level — in_cinema/premium/stream are off
+        # (Never), so the account's own Where & when switch is the only thing left to decide this.
+        # trackV:2 (CAS-1128) opts out of the legacy no-trackV forward migration (CAS-1143) that would
+        # otherwise carry an open rent marker forward onto the null stream one.
+        markers = {"in_cinema": None, "premium": None, "rent": 50, "stream": None}
+        criteria = {"genre": ["Drama"], "imdb": 7.0, "watchMarkers": markers, "trackV": 2}
+        cascade_on = {"id": "c-on", "user_id": "u-on", "name": "Everything", "active": True,
+                      "alert_moments": ["hits_rent"], "criteria": criteria}
+        cascade_off = {"id": "c-off", "user_id": "u-off", "name": "Everything", "active": True,
+                       "alert_moments": ["hits_rent"], "criteria": criteria}
+        agent_films = [
+            {"user_id": "u-on", "cascade_id": "c-on", "movie_id": "9003", "admission_score": 80},
+            {"user_id": "u-off", "cascade_id": "c-off", "movie_id": "9003", "admission_score": 80},
+        ]
+        account_prefs = {
+            "u-on": {"watchWindows": {"rent": {"list": True}}},
+            "u-off": {"watchWindows": {"rent": {"list": False}}},
+        }
+
+        auto_placements = compute_auto_placements(agent_films, [cascade_on, cascade_off], [movie],
+                                                    account_prefs=account_prefs)
+        self.assertEqual(auto_placements.get(("u-on", "9003")), "rent",
+            "a user whose watch_windows.rent is {list:true} must still earn the Rent placement")
+        self.assertNotIn(("u-off", "9003"), auto_placements,
+            "a user whose watch_windows.rent is {list:false} must earn no placement at all — the "
+            "window is explicitly off, not merely unanswered")
+
+        auto_rows = synthesize_auto_watch_rows(auto_placements, placed_keys=set())
+        admission = _admit([cascade_on, cascade_off], today=[movie])
+        rent_t = Transition("9003", movie["title"], "hits_rent", movie=movie)
+        hits = match([cascade_on, cascade_off], [rent_t], admission=admission, film_watches=auto_rows)
+        self.assertEqual(len(hits.get("u-on", [])), 1,
+            "the account with Rent switched on must still get its rental-window alert")
+        self.assertEqual(len(hits.get("u-off", [])), 0,
+            "the account with Rent explicitly switched off must produce no rental-window alert for "
+            "an otherwise identical admission")
+
 
 class TrackMigrationPlacementTests(unittest.TestCase):
     """CAS-1143: an agent row stored under CAS-917's old start-window-forward model (cinema-only,

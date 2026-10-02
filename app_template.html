@@ -13674,7 +13674,10 @@ window.wwToggleWin=(key)=>{
   // activeWatch() picks the same store winOn/winFlags already read, so a toggle can never write one object
   // while the switch's own lit state reads another.
   const store = prefsWatchMode ? watchPrefs : (onbFlow.watch = onbFlow.watch||{});
-  if(cur.list) store[key]=cur; else delete store[key];
+  // CAS-1156: a window switched off is stored explicitly as {list:false}, not deleted — an absent key
+  // reads back as its default (watchPrefsDefaults()/migrateWatch), so deleting an off window silently
+  // turned it back on for upcoming/in_cinema/rent/stream, the four windows that default to on.
+  store[key]=cur;
   wwChanged(key);
 };
 // One moment, one switch. Turning every sub-moment off does NOT turn the window's own bell off: "tell me
