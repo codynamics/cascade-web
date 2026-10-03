@@ -2658,20 +2658,15 @@
   /* CAS-419: the sort control is a .ca-btn.x, exactly like the adjacent search/filter icon buttons, so the
      row reads as one set of icons at every width instead of a wide text pill that could spill past the
      card's edge. The active-dot still marks "off the default"; the current choice is a tooltip (title on
-     the wrapper, set by syncSortCtl) plus the selected option inside the native picker itself. */
+     the button, set by syncSortCtl).
+     CAS-1181: #sortCtl is now the real button (togglePickerFor opens the shared listbox popover, same as
+     the Occasion/Picked by pills) — the invisible <select>-stretched-over-the-icon device is gone; #sort
+     itself survives only as inert state (hidden, tabindex="-1") for syncSortCtl's own option lookup. */
   .sortctl{position:relative}
-  /* The icon is decorative (aria-hidden) and position:relative so it can anchor .sortdot — which puts
-     it in front of the invisible <select> stretched over the button, and it swallowed the tap. It must
-     never take pointer events; the select underneath is the real control. */
+  /* The icon is decorative (aria-hidden) and position:relative so it can anchor .sortdot. */
   .sortic{font-size:13px;line-height:1;position:relative;pointer-events:none}
   .sortdot{position:absolute;top:-3px;right:-3px;width:7px;height:7px;border-radius:50%;
     background:var(--cyan);border:1.5px solid var(--panel2)}
-  /* The real control: a native select, invisible and stretched over the whole button, so a tap anywhere on
-     the icon opens the OS's own picker — which already shows the current sort selected and lets it be
-     changed, satisfying the "menu" acceptance criterion without a hand-rolled dropdown. */
-  .sortctl select{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;
-    opacity:0;cursor:pointer;-webkit-appearance:none;appearance:none}
-  .sortctl select:focus-visible ~ .sortic{outline:2px solid var(--cyan);outline-offset:2px}
 
   .fglabel .n{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:1px 7px;
     font-size:10.5px;color:var(--dim);font-weight:700}
@@ -3603,22 +3598,24 @@
              stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.2 5.4h15.6l-6 7.2v6l-3.6 1.8v-7.8z"/></svg>
         <span class="wfbadge" id="watchFilterBadge" hidden>0</span>
       </button>
-      <!-- CAS-371: the live <select> keeps its value/listeners by staying one persistent node — it used to
-           be reparented into the deck's active card (deckSync()); the deck is gone, so this is now simply
-           its permanent home. -->
-      <div class="sortctl ca-btn x" id="sortCtl">
-        <select id="sort" aria-label="Order">
-          <option value="availability">Availability</option>
-          <option value="imdb">People rating</option>
-          <option value="cascade">Cascade score</option>
-          <option value="rt">Critics</option>
-          <option value="gross">Box office</option>
-          <option value="popularity">Most anticipated</option>
-          <option value="cinema">Newest cinema</option>
-          <option value="title">Title A–Z</option>
-        </select>
+      <!-- CAS-1181: a real button opening the shared listbox popover (togglePickerFor, same device as the
+           Occasion/Picked by pills), replacing the invisible-<select>-stretched-over-the-icon device that
+           opened the browser's own unstyled list. The select stays only as inert state (tabindex="-1",
+           hidden — never clicked or focused) so syncSortCtl's own option lookup is untouched. -->
+      <button type="button" class="sortctl ca-btn x" id="sortCtl" aria-haspopup="listbox" aria-expanded="false"
+              aria-label="Order" onclick="togglePickerFor('sort',this)">
         <span class="sortic" aria-hidden="true">⇅<span class="sortdot" id="sortDot" hidden></span></span>
-      </div>
+      </button>
+      <select id="sort" tabindex="-1" aria-hidden="true" hidden>
+        <option value="availability">Availability</option>
+        <option value="imdb">People rating</option>
+        <option value="cascade">Cascade score</option>
+        <option value="rt">Critics</option>
+        <option value="gross">Box office</option>
+        <option value="popularity">Most anticipated</option>
+        <option value="cinema">Newest cinema</option>
+        <option value="title">Title A–Z</option>
+      </select>
     </div>
     <!-- CAS-718: one chip per active (non-default) sheet section, each clearing just that section. -->
     <div class="chips watchactivefilters" id="watchActiveFilters" role="group" aria-label="Active filters" hidden></div>
@@ -6071,8 +6068,9 @@ function showFoundList(){ settleFoundView(); }
 // own onchange below, cleared wherever filt.sort is assigned from a stored cascade (applyCascade) — never
 // persisted, so a reload starts false same as filt.sort itself starts at DEFAULT_SORT.
 let sortPicked=false;
-// CAS-419: the invisible <select> is the only thing that changes filt.sort; this just repaints the icon
-// button around it — a tooltip naming the current order, and the active-dot for "you're off the default".
+// CAS-1181: PICKER_KINDS.sort's pick() is what changes filt.sort now (the popover replaced the invisible
+// <select>); this just repaints the icon button around it — a tooltip naming the current order, and the
+// active-dot for "you're off the default". The select itself stays only as inert state for the lookup below.
 function syncSortCtl(){
   // CAS-566: sortCtl only lives inside whichever card is .is-active (deckSync's reparenting) — with zero
   // agents there is no such card, so it sits detached (not in the document) until one exists again, and
@@ -6082,9 +6080,6 @@ function syncSortCtl(){
   $("sortCtl").title="Order: "+(opt?opt.textContent:"");
   $("sortDot").hidden=!sortPicked;   // CAS-819: dot reflects an explicit pick, not just "off DEFAULT_SORT"
 }
-// CAS-819: choosing "Cascade score" (DEFAULT_SORT's own option) is choosing the default back — anything
-// else is a genuine pick.
-$("sort").onchange=e=>{filt.sort=e.target.value;sortPicked=(filt.sort!==DEFAULT_SORT);syncSortCtl();render();};
 $("imdbMin").oninput=e=>{filt.imdb=+e.target.value;$("imdbVal").textContent=filt.imdb?filt.imdb.toFixed(1)+"+":"Any";render();};
 $("rtMin").oninput=e=>{filt.rt=+e.target.value;$("rtVal").textContent=filt.rt?filt.rt+"%+":"Any";render();};
 $("grossMin").onchange=e=>{filt.gross=+e.target.value;render();};
@@ -9243,7 +9238,27 @@ const PICKER_KINDS = {
     current: () => movingWindow,
     pick: key => setMovingWindow(key),
   },
+  // CAS-1181: the Watch listing's sort control, moved off the native <select> (CAS-856 built this same
+  // popover for the retired Your Movies screen; .ordpop below is that ticket's own leftover CSS, reused
+  // rather than duplicated). SORT_OPTS mirrors the hidden #sort select's own option order exactly.
+  sort: {
+    items: () => SORT_OPTS,
+    current: () => filt.sort,
+    // CAS-819: choosing "Cascade score" (DEFAULT_SORT's own option) is choosing the default back — anything
+    // else is a genuine pick, which is what sortPicked (the active-dot's own flag) tracks.
+    pick: key => { filt.sort=key; sortPicked=(filt.sort!==DEFAULT_SORT); syncSortCtl(); render(); },
+  },
 };
+const SORT_OPTS = [
+  {key:"availability", label:"Availability"},
+  {key:"imdb",          label:"People rating"},
+  {key:"cascade",       label:"Cascade score"},
+  {key:"rt",             label:"Critics"},
+  {key:"gross",          label:"Box office"},
+  {key:"popularity",    label:"Most anticipated"},
+  {key:"cinema",         label:"Newest cinema"},
+  {key:"title",          label:"Title A–Z"},
+];
 function closePickerPop(){
   const pop=document.querySelector(".cpop.pickpop"); if(!pop) return null;
   const btn=document.getElementById(pop.dataset.forBtn);
@@ -9262,10 +9277,12 @@ window.togglePickerFor = (kind, btn) => {
   // CAS-374 precedent: edge-aligned under the pill that opens it — .al-l for Occasion (leftmost, so the
   // content-width panel grows rightward, clear of the screen edge), .al-r for Picked by (grows leftward,
   // clear of the RIGHT screen edge instead, since it sits further along the row).
-  pop.className=`cpop pickpop ${kind==="occ"?"al-l":"al-r"} pop-down`;
+  pop.className=`cpop pickpop ${kind==="occ"?"al-l":"al-r"}${kind==="sort"?" ordpop":""} pop-down`;
   pop.dataset.forBtn=btn.id;
   pop.setAttribute("role","listbox");
-  const lbl=btn.querySelector(".pblbl"); if(lbl) pop.setAttribute("aria-label", lbl.textContent);
+  // CAS-1181: sortCtl carries its own aria-label (no .pblbl child — it's an icon button, not a text pill).
+  const lbl=btn.querySelector(".pblbl"), label=lbl?lbl.textContent:btn.getAttribute("aria-label");
+  if(label) pop.setAttribute("aria-label", label);
   pop.innerHTML=`<div class="nopts">${items.map(o=>{
     const on=o.key===curKey;
     return `<button type="button" class="popt${on?" on":""}" role="option" aria-selected="${on}"
@@ -9468,6 +9485,13 @@ function renderWatchSheet(rows, shownCount){
     return `<button type="button" class="chip${on?" on":""}" style="--wwc:${v.cd}" aria-pressed="${on}"
       onclick="toggleWatchWatched('${v.key}')">${esc(v.lbl)}</button>`;
   }).join("");
+  // CAS-1181: single-select, same chip markup as the other sheet rows — setWatchPickedBy(key) assigns
+  // outright rather than toggling, so this and the search-bar pill (PICKER_KINDS.pickedby) always agree.
+  const pickedByHTML=PICKED_BY_OPTS.map(o=>{
+    const on=o.key===pickedBy;
+    return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
+      onclick="setWatchPickedBy('${o.key}')">${esc(o.label)}</button>`;
+  }).join("");
   const stylesHTML=genres.length ? genres.map(g=>{
     const on=!genreOff.has(g);
     return `<button type="button" class="chip gen${on?" on":""}" aria-pressed="${on}"
@@ -9513,6 +9537,10 @@ function renderWatchSheet(rows, shownCount){
         aria-checked="${mineOnly}" onclick="toggleWatchMineOnly()">
         <span>Show only available on my services</span><span class="knob"></span>
       </div>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Picked by</span></div>
+      <div class="chips">${pickedByHTML}</div>
     </div>
     <div class="wsheetsec">
       <div class="wsheethd"><span>Watched</span></div>
