@@ -773,14 +773,14 @@
     background:var(--panel2) center/cover no-repeat;display:grid;place-items:center;padding:0;cursor:pointer;font:inherit}
   .vidthumb.active{border-color:var(--accent)}
   .vidthumb .play{width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;font-size:11px;border:1px solid rgba(255,255,255,.45)}
-  /* CAS-284: share, in the opened card. Quiet — it is an offer, not one of the decisions the card is asking
-     you to make — and a full-height target rather than a bare glyph. */
-  .exshare{margin-top:12px}
-  .exsharebtn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 13px;border-radius:10px;
-    border:1px solid var(--line);background:var(--panel2);color:var(--dim);
-    font-family:inherit;font-size:12.5px;font-weight:650;cursor:pointer;line-height:1}
+  /* CAS-1182: share, in the opened card. Full-width and accent-coloured so it reads clearly against the
+     card, without the weight of a primary CTA — a full-height target rather than a bare glyph. */
+  .exshare{margin-top:14px}
+  .exsharebtn{display:flex;width:100%;justify-content:center;align-items:center;gap:7px;height:44px;padding:0 14px;border-radius:12px;
+    border:1px solid var(--accent);background:rgba(124,92,255,.12);color:var(--accenttext);
+    font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;line-height:1}
   .exsharebtn svg{width:16px;height:16px;display:block}
-  .exsharebtn:hover{color:var(--ink);border-color:#3a4150}
+  .exsharebtn:hover{color:#fff;border-color:var(--accent);background:rgba(124,92,255,.2)}
   .exsharebtn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   .exsharebtn.done{color:var(--green);border-color:rgba(72,199,142,.55)}
   /* CAS-883 naming note: the film-page Invite feature below is unrelated to the older "agent invite"
@@ -6799,7 +6799,7 @@ function inviteFilmHTML(m, big){
       ＋ Invite someone to watch</button>
     <div class="pnote" style="text-align:center">They'll see this film and a Yes / No — no app needed.</div>`;
   return `<div class="exshare"><button type="button" class="exsharebtn" onclick="event.stopPropagation();openFilmInvite(${m.tmdb_id})"
-      title="${escA("Invite someone to "+m.title)}" aria-label="${escA("Invite someone to "+m.title)}">${ICON.share}<span class="sl">Invite</span></button></div>`;
+      title="${escA("Invite someone to "+m.title)}" aria-label="${escA("Invite someone to "+m.title)}">${ICON.share}<span class="sl">Invite a friend to watch this</span></button></div>`;
 }
 // What we can say about the film without inventing anything: its title, its year, and the window we have
 // actually CONFIRMED it is in. An estimated window says nothing at all — the whole point of the estimate is
