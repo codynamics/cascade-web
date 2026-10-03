@@ -7,7 +7,7 @@ import { test, expect } from "@playwright/test";
 import { toShortlist, finishFlow, toListing } from "./helpers.mjs";
 
 const CARD_TEXT = [
-  "These are your agents. Each one watches for a different kind of film, all the time, so you don't have to.",
+  "Your agents live in this menu. Each one watches for a different kind of film, all the time, so you don't have to.",
   "Two numbers: what people thought, and what critics thought. Your agent only speaks up when a film clears the bar you set.",
   "Films move — cinema, then rent, then streaming. Your agent follows each one and tells you when it reaches a window you actually use.",
   "Moving shows what's changed recently — Today, Week, 2 weeks or Month. It opens on 2 weeks, so that's the page to come back to.",
@@ -56,7 +56,7 @@ test("CAS-976: the spotlight sits over the current card's own anchor, and follow
   await expect(page.locator("#tutScrim")).toHaveClass(/open/);
 
   // Card 2's anchor (a card's score row, inside the scrollable listing) actually moves when the page
-  // scrolls — card 1's (#agentsBtn, in the sticky header) wouldn't, which would prove nothing either way.
+  // scrolls — card 1's (#navMenuBtn, in the sticky header) wouldn't, which would prove nothing either way.
   await page.locator("#tutNextBtn").click();
   await expect(page.locator("#tutText")).toHaveText(CARD_TEXT[1]);
   await page.waitForTimeout(150);

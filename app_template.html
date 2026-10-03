@@ -191,7 +191,7 @@
      pushed the icons past the right edge on a 360px phone (CAS-183 added a fourth). Now the freshness line
      ellipsises instead, which is the right thing to lose. */
   .brandrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .brandrow>div:first-child{min-width:0}
+  .brandrow .brand-ident{min-width:0}
   .brandrow .updated{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* CAS-1063: the freshness line's own row, now sharing it with the saving dot. min-width:0 so the
      ellipsis above still works with a flex sibling in the row. */
@@ -222,7 +222,7 @@
   /* CAS-616 (v0.9.5): a 2-column grid, not a flex row — `1fr 1fr` makes the two chips resolve to the SAME
      width whatever their labels say, so "same importance, same size" is structural rather than a magic
      number that rots the next time a label changes. */
-  .hdr-actions{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;align-items:center}
+  .hdr-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:center}
   /* CAS-183 added a fourth header icon (Your Movies), which at 360px pushed the row past the edge — the
      brand block on the left is ~168px. CAS-530 dropped the bell (moved into the Menu) and widened the
      remaining two into labelled chips, so the same narrow-phone squeeze gets a step of its own below.
@@ -258,15 +258,12 @@
   .mcicon .f{fill:var(--mcf)}
   .mcicon .s{stroke:var(--mcf);fill:none}
   .mcicon .g{fill:var(--mcf);opacity:.20}
-  #agentsBtn{--mcf:url(#mcFindGrad)}
   /* CAS-640: Watch takes --brand-blue, the blue it wore when it was Find — not a new gradient token. */
   #moviesBtn{--mcf:var(--brand-blue)}
-  #agentsBtn.active,#moviesBtn.active{--mcf:#fff}
+  #moviesBtn.active{--mcf:#fff}
   /* Concept parity: in the redesign's nav-bar demo the destination tile carries its own tint, not a neutral
      grey. :not(.active) is required — an unqualified id rule would beat .modechip.active's background. */
-  #agentsBtn:not(.active){background:rgba(76,125,255,.09);border-color:rgba(76,125,255,.26)}
   #moviesBtn:not(.active){background:rgba(76,125,255,.09);border-color:rgba(76,125,255,.26)}
-  #agentsBtn.active{box-shadow:0 5px 16px -5px rgba(76,125,255,.7)}
   #moviesBtn.active{box-shadow:0 5px 16px -5px rgba(76,125,255,.7)}
   .modechip.active{background:var(--grad);border-color:transparent;color:#fff}
   /* CAS-640: Watch's selected state is solid --brand-blue (the listing scope bar's own blue), not the
@@ -288,7 +285,7 @@
      whichever is later in the stylesheet wins regardless of the media query. */
   @media (max-width:460px){
     .hdr-actions{gap:6px}
-    .hdr-actions .iconbtn{width:36px;height:36px;font-size:17px;border-radius:11px}
+    .navmenu-wrap .iconbtn{width:36px;height:36px;font-size:17px;border-radius:11px}
     .modechip{padding:0 7px;gap:4px}
     .modechip .mclabel-full{display:none}
     .modechip .mclabel-short{display:inline}
@@ -326,7 +323,7 @@
      against the header's other children, never against anything outside it. The menu stayed unreachable
      over both screens until CAS-568, which fixed it from the other end by dropping those two screens to
      z-index:29. The 95 is kept: it still orders this above the header's own children. */
-  .navmenu{position:absolute;top:calc(100% + 8px);right:0;z-index:95;display:none;flex-direction:column;
+  .navmenu{position:absolute;top:calc(100% + 8px);left:0;z-index:95;display:none;flex-direction:column;
     min-width:180px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
     box-shadow:0 12px 28px rgba(0,0,0,.4);overflow:hidden}
   .navmenu.open{display:flex}
@@ -3418,7 +3415,33 @@
 <div class="phone">
   <header>
     <div class="brandrow">
-      <div>
+      <!-- CAS-1185: the hamburger menu leads the header row now — far left, ahead of the logo — instead of
+           trailing the nav chips. Agents moved out of the chip row into the menu's own first item, so this
+           wrap now opens the menu directly off the row's leading edge (see .navmenu's left:0, below). -->
+      <div class="navmenu-wrap">
+        <div class="iconbtn" id="navMenuBtn" title="Menu" role="button" tabindex="0" aria-haspopup="true"
+             aria-expanded="false" aria-controls="navMenu" aria-label="Menu" onclick="toggleNavMenu(event)">☰
+          <span class="navcountbadge" id="navMenuDot" style="display:none" aria-hidden="true"></span>
+        </div>
+        <div class="navmenu" id="navMenu" role="menu" aria-label="Menu">
+          <!-- CAS-1185: Agents leads the menu, in a group of its own — it's a main nav destination (it used
+               to be the header's own first chip), not one of the day-to-day items below the divider. -->
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('agents')">Agents</button>
+          <!-- CAS-886: Invites leads the day-to-day group — the top-of-list slot Notifications held before
+               CAS-636 folded that surface into Moving, and the position the design image gives Invites now. -->
+          <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('invites')">Invites
+            <span class="navitem-badge" id="invitesNavBadge" style="display:none">0</span></button>
+          <!-- CAS-928: Friends sits directly below Invites, the slot the design image gives it. -->
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('friends')">Friends</button>
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('recommend')">Recommend Cascade</button>
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('svcAnalysis')">Service analysis</button>
+          <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('settings')">Settings</button>
+          <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('help')">Help</button>
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('about')">About</button>
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('account')">Account</button>
+        </div>
+      </div>
+      <div class="brand-ident">
         <span class="brandlockup">
           <svg class="brandmark" viewBox="0 0 586 382" role="img" aria-label="Cascade"><defs><linearGradient id="bmg0" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".34" stop-color="#F0A63C" stop-opacity=".92"/><stop offset="1" stop-color="#F0A63C" stop-opacity=".62"/></linearGradient><linearGradient id="bmg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".34" stop-color="#C24DF0" stop-opacity=".92"/><stop offset="1" stop-color="#C24DF0" stop-opacity=".62"/></linearGradient><linearGradient id="bmg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".34" stop-color="#7C5CFF" stop-opacity=".92"/><stop offset="1" stop-color="#7C5CFF" stop-opacity=".62"/></linearGradient><linearGradient id="bmg3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".34" stop-color="#4C7DFF" stop-opacity=".92"/><stop offset="1" stop-color="#4C7DFF" stop-opacity=".62"/></linearGradient><linearGradient id="bmg4" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".34" stop-color="#22D3EE" stop-opacity=".92"/><stop offset="1" stop-color="#22D3EE" stop-opacity=".62"/></linearGradient><linearGradient id="bmg5" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".34" stop-color="#31D67D" stop-opacity=".92"/><stop offset="1" stop-color="#31D67D" stop-opacity=".62"/></linearGradient></defs><g><rect x="52" y="46" width="218" height="123" rx="14" fill="url(#bmg0)" stroke="#F0A63C" stroke-width="3" style="filter:drop-shadow(0 0 7px #F0A63Cbb) drop-shadow(0 3px 10px #F0A63C55)"/><rect x="54" y="48" width="214" height="119" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".30" stroke-width="1.2"/></g><g><rect x="106" y="83" width="218" height="123" rx="14" fill="url(#bmg1)" stroke="#C24DF0" stroke-width="3" style="filter:drop-shadow(0 0 7px #C24DF0bb) drop-shadow(0 3px 10px #C24DF055)"/><rect x="108" y="85" width="214" height="119" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".30" stroke-width="1.2"/></g><g><rect x="160" y="120" width="218" height="123" rx="14" fill="url(#bmg2)" stroke="#7C5CFF" stroke-width="3" style="filter:drop-shadow(0 0 7px #7C5CFFbb) drop-shadow(0 3px 10px #7C5CFF55)"/><rect x="162" y="122" width="214" height="119" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".30" stroke-width="1.2"/></g><g><rect x="214" y="157" width="218" height="123" rx="14" fill="url(#bmg3)" stroke="#4C7DFF" stroke-width="3" style="filter:drop-shadow(0 0 7px #4C7DFFbb) drop-shadow(0 3px 10px #4C7DFF55)"/><rect x="216" y="159" width="214" height="119" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".30" stroke-width="1.2"/></g><g><rect x="268" y="194" width="218" height="123" rx="14" fill="url(#bmg4)" stroke="#22D3EE" stroke-width="3" style="filter:drop-shadow(0 0 7px #22D3EEbb) drop-shadow(0 3px 10px #22D3EE55)"/><rect x="270" y="196" width="214" height="119" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".30" stroke-width="1.2"/></g><g><rect x="322" y="231" width="218" height="123" rx="14" fill="url(#bmg5)" stroke="#31D67D" stroke-width="3" style="filter:drop-shadow(0 0 7px #31D67Dbb) drop-shadow(0 3px 10px #31D67D55)"/><rect x="324" y="233" width="214" height="119" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".30" stroke-width="1.2"/><path d="M 411.0 265.5 L 411.0 319.5 L 461.0 292.5 Z" fill="#ffffff" style="filter:drop-shadow(0 0 6px #ffffffaa)"/></g></svg>
         </span>
@@ -3437,23 +3460,28 @@
         </div>
       </div>
       <div class="hdr-actions">
-        <!-- Agents (was the Find chip; repurposed CAS-616, v0.9.5). The id stays #agentsBtn because six CSS
-             rules and the open/close pair below already key off it, and the name is now literally right: this
-             chip opens the Agents management/reorder screen, which used to live in the menu. It is NOT lit by
-             default any more — nothing in the bar is, while the Find listing is showing, because Find is no
-             longer one of the bar's destinations. The mark is a deck of agent cards.
-             CAS-638: Agents is now the FIRST chip in the row — it's a main nav destination, not a screen you
-             arrive at from somewhere else. -->
-        <div class="modechip" id="agentsBtn" title="Agents" role="button" tabindex="0"
-             aria-pressed="false" aria-label="Agents" onclick="openAgentsScreen()">
+        <!-- Watch (CAS-183, resized/reiconed CAS-530, relabelled CAS-564, redrawn CAS-571): everything you've
+             said about a film, and how your services cover it. A SOLID bookmark with the play triangle masked
+             OUT of it — rose-gradient at rest, flat white on the selected chip, and the notch transparent in
+             both so the chip's own background shows through.
+             CAS-616 (v0.9.5): Watch is now the FIRST chip in the row. Find left the bar for the top-right menu
+             and Manage Agents took its place, so the two chips are the app's two destinations and Find is the
+             thing underneath them.
+             CAS-633 (v0.9.5): Find IS Watch now — Your Movies is retired, so this chip opens the Find listing
+             itself (showAgentsHome()) rather than a dialog, and is no longer a dialog opener. Lit whenever the
+             Find listing is what's showing — see syncWatchChip().
+             CAS-640 (v0.9.5): Watch moves to the end of the row — it's the destination you land on and return
+             to — and takes --brand-blue, the blue it wore when it was Find, instead of the rose it inherited
+             from the retired Your Movies screen.
+             CAS-1185: Watch is the FIRST chip again — Agents left the row for the menu, so Watch and Moving
+             are the only two chips left and the row reads left to right as Watch then Moving. -->
+        <div class="modechip active" id="moviesBtn" title="Watch" role="button" tabindex="0"
+             aria-label="Watch" onclick="showAgentsHome()">
           <svg class="mcicon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <rect class="s" x="3.2" y="6.6" width="12" height="12.8" rx="2.6" stroke-width="1.8"/>
-            <rect class="g" x="7.6" y="4.6" width="12" height="12.8" rx="2.6"/>
-            <rect class="s" x="7.6" y="4.6" width="12" height="12.8" rx="2.6" stroke-width="1.8"/>
-            <circle class="f" cx="13.6" cy="11" r="2"/>
+            <path class="f" d="M6 3.6h12a1 1 0 0 1 1 1V20.8l-7-3.95-7 3.95V4.6a1 1 0 0 1 1-1Z" mask="url(#mcWatchMask)"/>
           </svg>
-          <span class="mclabel mclabel-full">Agents</span>
-          <span class="mclabel mclabel-short">Agents</span>
+          <span class="mclabel mclabel-full">Watch</span>
+          <span class="mclabel mclabel-short">Watch</span>
         </div>
         <!-- Moving (CAS-636): the alert feed made visible — every row corresponds to an in-app/email
              notification, so this is the one place Cascade shows "what changed" rather than "what matches".
@@ -3467,62 +3495,6 @@
           <span class="mclabel mclabel-full">Moving</span>
           <span class="mclabel mclabel-short">Moving</span>
           <span class="mcbadge" id="movingBadge" style="display:none">0</span>
-        </div>
-        <!-- Watch (CAS-183, resized/reiconed CAS-530, relabelled CAS-564, redrawn CAS-571): everything you've
-             said about a film, and how your services cover it. A SOLID bookmark with the play triangle masked
-             OUT of it — rose-gradient at rest, flat white on the selected chip, and the notch transparent in
-             both so the chip's own background shows through.
-             CAS-616 (v0.9.5): Watch is now the FIRST chip in the row. Find left the bar for the top-right menu
-             and Manage Agents took its place, so the two chips are the app's two destinations and Find is the
-             thing underneath them.
-             CAS-633 (v0.9.5): Find IS Watch now — Your Movies is retired, so this chip opens the Find listing
-             itself (showAgentsHome()) rather than a dialog, and is no longer a dialog opener. Lit whenever the
-             Find listing is what's showing — see syncWatchChip().
-             CAS-640 (v0.9.5): Watch moves to the end of the row — it's the destination you land on and return
-             to — and takes --brand-blue, the blue it wore when it was Find, instead of the rose it inherited
-             from the retired Your Movies screen. -->
-        <div class="modechip active" id="moviesBtn" title="Watch" role="button" tabindex="0"
-             aria-label="Watch" onclick="showAgentsHome()">
-          <svg class="mcicon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path class="f" d="M6 3.6h12a1 1 0 0 1 1 1V20.8l-7-3.95-7 3.95V4.6a1 1 0 0 1 1-1Z" mask="url(#mcWatchMask)"/>
-          </svg>
-          <span class="mclabel mclabel-full">Watch</span>
-          <span class="mclabel mclabel-short">Watch</span>
-        </div>
-        <!-- Top menu (CAS-345, +Notifications CAS-530, +Manage Agents CAS-534, reordered CAS-551, Agent
-             Preferences split CAS-562): the account/about surfaces — Languages, Where & when you'll watch,
-             My services, Service analysis, Lists, Account, About — that used to be scattered across
-             separate header icons now live in one anchored dropdown. Notifications joins as its top entry
-             (CAS-530): the bell icon is gone from the bar entirely, freeing the row for Agents/Your Movies'
-             wider labelled chips. Manage Agents (CAS-534) joins next: the Agents management/reorder screen
-             moved here since the header's Agents chip now means the deck+movie-list home view instead.
-             CAS-551 shipped first and seated a single "Agent Preferences" row (renamed from Preferences)
-             right under Manage Agents; CAS-562 lands second and splits that one row into Languages + Where
-             & when you'll watch in the same slot — see the CAS-562 fix comment for how the two reconcile.
-             Account drops to second-last since it's reached for rarely.
-             CAS-1126: regrouped into three divider-separated groups — day-to-day (Invites/Friends/Recommend
-             Cascade/Service analysis), Settings, and sign-in/info (Help/About/Account). Languages, Where &
-             when you'll watch, My services and Occasions leave the menu for the new Settings screen; their
-             navMenuGo keys stay wired for deep links and other callers. -->
-        <div class="navmenu-wrap">
-          <div class="iconbtn" id="navMenuBtn" title="Menu" role="button" tabindex="0" aria-haspopup="true"
-               aria-expanded="false" aria-controls="navMenu" aria-label="Menu" onclick="toggleNavMenu(event)">☰
-            <span class="navcountbadge" id="navMenuDot" style="display:none" aria-hidden="true"></span>
-          </div>
-          <div class="navmenu" id="navMenu" role="menu" aria-label="Menu">
-            <!-- CAS-886: Invites leads the menu — the top-of-list slot Notifications held before CAS-636
-                 folded that surface into Moving, and the position the design image gives Invites now. -->
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('invites')">Invites
-              <span class="navitem-badge" id="invitesNavBadge" style="display:none">0</span></button>
-            <!-- CAS-928: Friends sits directly below Invites, the slot the design image gives it. -->
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('friends')">Friends</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('recommend')">Recommend Cascade</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('svcAnalysis')">Service analysis</button>
-            <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('settings')">Settings</button>
-            <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('help')">Help</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('about')">About</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('account')">Account</button>
-          </div>
         </div>
       </div>
     </div>
@@ -12341,6 +12313,7 @@ window.navMenuGo=key=>{
   closeNavMenu();
   logEvent("nav_menu_item",{item:key});
   if(key==="find") showAgentsHome();
+  else if(key==="agents") openAgentsScreen();
   else if(key==="invites") openInvitesScreen();
   else if(key==="friends") openFriendsScreen();
   else if(key==="account") openAccount();
@@ -17105,20 +17078,17 @@ window.setMovingWindow=(key)=>{
   renderMovingScreen();
 };
 window.openAgentsScreen=()=>{
-  // CAS-534: reached from the top-right menu's "Manage Agents" now, not the header's Agents chip — that chip
-  // is the deck+movie-list home view's mode switch and stays lit throughout (this screen is a layer on top of
-  // home, not a different mode).
+  // CAS-1185: reached from the menu's "Agents" item now, not a header chip — there is no chip of its own to
+  // light any more (this screen is a layer on top of the Watch listing, not a different mode of the bar).
   if($("movingScreen").classList.contains("open")) closeMovingScreen();
   renderAgentsScreen();
   $("agentsScreen").scrollTop=0;
   $("agentsScreen").classList.add("open"); lockBodyScroll(true);
-  $("agentsBtn").classList.add("active"); $("agentsBtn").setAttribute("aria-pressed","true");
   syncWatchChip();
   logEvent("agents_screen_opened",{count:cascades.length});
 };
 window.closeAgentsScreen=()=>{
   $("agentsScreen").classList.remove("open"); lockBodyScroll(false);
-  $("agentsBtn").classList.remove("active"); $("agentsBtn").setAttribute("aria-pressed","false");
   syncWatchChip();
 };
 // CAS-636: Moving — the alert feed made visible. Same open/close shape as Agents (mutually exclusive with
@@ -17153,7 +17123,7 @@ window.showAgentsHome=()=>{
   syncWatchChip();
 };
 // CAS-633: #moviesBtn (Watch) now opens the Find listing itself rather than a dialog, so it can't be lit by
-// one open/close pair the way #agentsBtn is — it tracks whatever else is covering that listing instead.
+// one open/close pair the way #movingBtn is — it tracks whatever else is covering that listing instead.
 // Lit whenever no .uscreen (Agents, Moving, Manage Lists, Review, Account, Service analysis, Languages,
 // Where & when, Tags, About — and Your Movies itself, in the unlikely event it's ever reopened) is open.
 // Called from every .uscreen's own open/close pair.
@@ -18422,11 +18392,12 @@ function markTutorialSeen(){ try{ localStorage.setItem(TUTORIAL_SEEN_KEY,"1"); }
 // Copy was originally verbatim per the CAS-976 ticket; CAS-1013 corrected the Moving card and the closing
 // card below, which had drifted from shipped behaviour (Moving's rolling window, the 5pm Sydney alert
 // time). Anchors are real listing controls: the agent rail the ticket names doesn't exist in this build
-// (agents are a vertical reorderable list, not a rail) — #agentsBtn is the one real element that stands
-// for "your agents" on the listing itself, the nav chip that opens them.
+// (agents are a vertical reorderable list, not a rail).
+// CAS-1185: Agents left the header for the menu's first item, so the opening card now anchors to the
+// hamburger (#navMenuBtn) that holds it, not a chip that no longer exists.
 function tutorialCardDefs(){
   return [
-    {sel:"#agentsBtn", text:"These are your agents. Each one watches for a different kind of film, all the time, so you don't have to."},
+    {sel:"#navMenuBtn", text:"Your agents live in this menu. Each one watches for a different kind of film, all the time, so you don't have to."},
     {sel:"#groups .card .r-scores", text:"Two numbers: what people thought, and what critics thought. Your agent only speaks up when a film clears the bar you set."},
     {sel:"#groups .card .ctl.notify", text:"Films move — cinema, then rent, then streaming. Your agent follows each one and tells you when it reaches a window you actually use."},
     {sel:"#movingBtn", text:"Moving shows what's changed recently — Today, Week, 2 weeks or Month. It opens on 2 weeks, so that's the page to come back to."},

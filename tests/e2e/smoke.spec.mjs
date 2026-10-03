@@ -11,7 +11,7 @@ import { test, expect } from "@playwright/test";
 import {
   freshApp, gotoFresh, toShortlist, shortlistCards, finishFlow, toListing, settleListing, ctaLocator, sectionCounts,
   openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen, openNotifyScreen,
-  closeNotifyScreen, dumpSignedInDiagnostics,
+  closeNotifyScreen, dumpSignedInDiagnostics, openAgentsScreenFromMenu,
 } from "./helpers.mjs";
 
 // CAS-1136 decision 2: on a failed or timed-out test, show the in-flight requests and buffered console
@@ -31,7 +31,7 @@ test.afterEach(async ({ page }, testInfo) => {
 // CAS-934: there is no Save button on the hub any more — reaching it by picking a card is itself the
 // decision (the same as using a preset unedited anywhere else in the app), so Back commits it.
 async function addSecondAgent(page){
-  await page.locator("#agentsBtn").click();
+  await openAgentsScreenFromMenu(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
   await page.locator(".ag-add").click();
   await expect(page.locator(".scard").first()).toBeVisible();
@@ -223,7 +223,7 @@ test("Watch listing scroll position survives a long scroll to the bottom and bac
   // Broadening with a few more real presets, the same "+ Add" flow a person uses from the Agents screen,
   // gives an actually-scrollable list.
   for(const name of ["Date Night", "Family Movies", "Totally Custom"]){
-    await page.locator("#agentsBtn").click();
+    await openAgentsScreenFromMenu(page);
     await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
     await page.locator(".ag-add").click();
     await expect(page.locator(".scard").first()).toBeVisible();
@@ -295,20 +295,21 @@ test("a cold load with onboarding seen shows the header, not Moving", async ({ p
   await expect(page.locator("#movingScreen")).not.toHaveClass(/open/);
   await expect(page.locator("#groups .card").first()).toBeVisible();
   await expect(page.locator("header")).toBeVisible();
-  await expect(page.locator("#agentsBtn")).toBeVisible();
+  await expect(page.locator("#navMenuBtn")).toBeVisible();
   await expect(page.locator("#moviesBtn")).toBeVisible();
   await expect(page.locator("#movingBtn")).toBeVisible();
 
   await page.locator("#movingBtn").click();
   await expect(page.locator("#movingScreen")).toHaveClass(/open/);
   await expect(page.locator("header")).toBeVisible();
-  await expect(page.locator("#agentsBtn")).toBeVisible();
+  await expect(page.locator("#navMenuBtn")).toBeVisible();
 
   await page.locator("#moviesBtn").click();
   await expect(page.locator("#movingScreen")).not.toHaveClass(/open/);
   await expect(page.locator("#groups .card").first()).toBeVisible();
 
-  await page.locator("#agentsBtn").click();
+  await page.locator("#navMenuBtn").click();
+  await page.locator("#navMenu .navitem", { hasText: "Agents" }).click();
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
 });
 
@@ -473,7 +474,7 @@ test("an agent created with every window enabled lists films at rental or stream
 // screen -> Edit, on the FIRST agent onboarding's own roster already created (no extra "new agent" detour
 // needed for a screen that only reads/edits an existing one).
 async function openFirstAgentMission(page){
-  await page.locator("#agentsBtn").click();
+  await openAgentsScreenFromMenu(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
   await page.locator(".ag-edit").first().click();
   await expect(page.locator(".msntrackwrap")).toBeVisible();
@@ -838,7 +839,7 @@ test("agent card summary names its Style restriction when set, and reads 'Any st
   await finishFlow(page);
   await toListing(page);
 
-  await page.locator("#agentsBtn").click();
+  await openAgentsScreenFromMenu(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
   const targetId = await page.evaluate(() => cascades[0].id);
   const stylesVal = page.locator(`.agrow[data-id="${targetId}"] .agsrow`,

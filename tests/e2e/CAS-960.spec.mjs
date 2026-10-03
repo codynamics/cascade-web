@@ -9,7 +9,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { appendFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { freshApp, toShortlist, finishFlow, toListing } from "./helpers.mjs";
+import { freshApp, toShortlist, finishFlow, toListing, openAgentsScreenFromMenu } from "./helpers.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPORT_PATH = path.join(__dirname, "..", "..", "qa-a11y-report.txt");
@@ -78,7 +78,7 @@ test.describe("CAS-960 axe scan — zero serious/critical on the five named surf
 
   test("Agents", async ({ page }) => {
     await reachListing(page);
-    await page.locator("#agentsBtn").click();
+    await openAgentsScreenFromMenu(page);
     await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
     // Scoped to #agentsScreen: it's a full-screen overlay (display:flex) sitting on top of the Watch
     // listing, which stays in the DOM underneath (covered, not display:none) — an unscoped scan would
@@ -188,13 +188,13 @@ test("Dynamic Type: Watch, the film card, Agents and Moving do not clip (CAS-960
   await expect(card).toHaveClass(/expanded/);
   await assertNoOverflow(page, "the film card (expanded)");
 
-  await page.locator("#agentsBtn").click();
+  await openAgentsScreenFromMenu(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
   await expect(page.locator(".ag-add")).toBeInViewport();
   await assertNoOverflow(page, "Agents");
 
-  // openMovingScreen() closes Agents itself (see its own closeAgentsScreen() call) — #agentsBtn has no
-  // toggle-off click of its own, it always (re-)opens.
+  // openMovingScreen() closes Agents itself (see its own closeAgentsScreen() call) — opening Agents again
+  // has no toggle-off click of its own, it always (re-)opens.
   await page.locator("#movingBtn").click();
   await expect(page.locator("#movingScreen")).toHaveClass(/open/);
   await assertNoOverflow(page, "Moving");
@@ -242,7 +242,7 @@ test.describe("reduced motion (CAS-960 AC7)", () => {
     await expect(card).toHaveClass(/expanded/);
     await assertNoAnimation(page, "the film card (expanded)");
 
-    await page.locator("#agentsBtn").click();
+    await openAgentsScreenFromMenu(page);
     await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
     await assertNoAnimation(page, "Agents");
 
