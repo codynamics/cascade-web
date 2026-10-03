@@ -17819,15 +17819,26 @@ function openMembership(agentKey, nameOverride, cascade){
     ${needsEmail ? `
     <div class="flabel">Email</div>
     <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
-           placeholder="you@example.com">
+           placeholder="you@example.com" oninput="membEmailInput()">
     <p class="fielderr" id="membEmailErr" role="alert" hidden></p>
     <p class="fielderr" id="membAcctExists" hidden>There's already a Cascade account for that email.
       <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
               style="vertical-align:baseline">Sign in</button></p>
+    <div id="membCodeState" hidden>
+      <p class="pnote" id="membCodeMsg"></p>
+      <div class="flabel">Code</div>
+      <input id="membCode" class="namein" type="text" inputmode="numeric" autocomplete="one-time-code"
+             placeholder="123456" onkeydown="if(event.key==='Enter'){event.preventDefault();membStart();}">
+      <p class="fielderr" id="membCodeErr" role="alert" hidden></p>
+      <p class="pnote">Didn't get it?
+        <button type="button" class="linkbtn" id="membResend" onclick="membResendCode()"
+                style="vertical-align:baseline">Resend code</button></p>
+    </div>
     <p class="pnote">By continuing you agree to our
       <a href="https://www.codynamics.com.au/privacy" target="_blank" rel="noopener">Privacy policy</a>.</p>` : ""}
     <button class="membcta" type="button" onclick="membStart()">Start my free month</button>
     ${posters?`<div class="rvgrid membgrid">${posters}</div>`:""}`;
+  membResetCodeState();   // B10: always opens in State A
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
   logEvent("membership_shown",{agent:agentKey||null, haul:n});
@@ -17887,15 +17898,26 @@ function openOnbMembership(){
     ${needsEmail ? `
     <div class="flabel">Email</div>
     <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
-           placeholder="you@example.com">
+           placeholder="you@example.com" oninput="membEmailInput()">
     <p class="fielderr" id="membEmailErr" role="alert" hidden></p>
     <p class="fielderr" id="membAcctExists" hidden>There's already a Cascade account for that email.
       <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
               style="vertical-align:baseline">Sign in</button></p>
+    <div id="membCodeState" hidden>
+      <p class="pnote" id="membCodeMsg"></p>
+      <div class="flabel">Code</div>
+      <input id="membCode" class="namein" type="text" inputmode="numeric" autocomplete="one-time-code"
+             placeholder="123456" onkeydown="if(event.key==='Enter'){event.preventDefault();membStart();}">
+      <p class="fielderr" id="membCodeErr" role="alert" hidden></p>
+      <p class="pnote">Didn't get it?
+        <button type="button" class="linkbtn" id="membResend" onclick="membResendCode()"
+                style="vertical-align:baseline">Resend code</button></p>
+    </div>
     <p class="pnote">By continuing you agree to our
       <a href="https://www.codynamics.com.au/privacy" target="_blank" rel="noopener">Privacy policy</a>.</p>` : ""}
     <button class="membcta" type="button" onclick="membStart()">Start my free month</button>
     ${posters?`<div class="rvgrid membgrid">${posters}</div>`:""}`;
+  membResetCodeState();   // B10: always opens in State A
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
   logEvent("membership_shown",{onboarding:true, agents:n});
@@ -17939,6 +17961,14 @@ function membEmailError(msg){
   const err=$("membEmailErr"); if(!err) return;
   err.hidden=!msg; err.textContent=msg||"";
 }
+// CAS-1169 A1: the error used to clear only on the next button press — a corrected, valid email still
+// showed the stale message. Hides membEmailErr the moment the value passes emailValid, and membAcctExists
+// on any edit at all (a changed email may no longer be the one that already has an account).
+window.membEmailInput=()=>{
+  const el=$("membEmail"); if(!el) return;
+  membAcctExistsHide();
+  if(emailValid((el.value||"").trim())) membEmailError(null);
+};
 // CAS-1099: shown under the email field instead of requesting a code, when email_has_account(email) says
 // this email already has an account — paired with membAcctExistsHide, called whenever the field is
 // resubmitted or the screen is reopened fresh.
@@ -17949,6 +17979,131 @@ function membAcctExistsShow(email){
 function membAcctExistsHide(){
   membAcctExistsEmail=null;
   const el=$("membAcctExists"); if(el) el.hidden=true;
+}
+// ---- CAS-1169: the email code is entered on #membScreen itself (State B) — #authModal is never opened
+// for this flow (Sign in from the splash is unaffected and keeps using it as-is). membInCodeState is which
+// of the two states membStart()'s one button currently acts on; membCodeEmail is the address a requested
+// code belongs to, for Resend and for the message under the field. -----------------------------------
+let membInCodeState=false;
+let membCodeEmail=null;
+let membResendTimer=null, membResendDeadline=0;
+function membStopResendTimer(){ if(membResendTimer){ clearInterval(membResendTimer); membResendTimer=null; } }
+// CAS-1089's own 60s throttle, mirrored here for the inline code step — driven off a deadline timestamp
+// rather than a tick count, same reason #authResend's version is (stays correct under a test clock jump).
+function membRenderResendTimer(){
+  const btn=$("membResend"); if(!btn) return;
+  const remaining=Math.min(59, Math.ceil((membResendDeadline-Date.now())/1000));
+  if(remaining<=0){ membStopResendTimer(); btn.disabled=false; btn.textContent="Resend code"; return; }
+  btn.disabled=true;
+  btn.textContent="Resend code in 0:"+String(remaining).padStart(2,"0");
+}
+function membStartResendTimer(){
+  membStopResendTimer();
+  membResendDeadline=Date.now()+60000;
+  membRenderResendTimer();
+  membResendTimer=setInterval(membRenderResendTimer,1000);
+}
+function membCodeErrorShow(msg){
+  const err=$("membCodeErr"); if(!err) return;
+  err.hidden=!msg; err.textContent=msg||"";
+}
+// B2: the App Review address never gets a real emailed code, so it keeps the same generic copy the
+// sign-in sheet's own verifyMsgFor shows it — reused via window.CascadeAuth rather than re-deriving the
+// review address here too.
+function membCodeMsgText(email){
+  const a=window.CascadeAuth;
+  return (a && typeof a.verifyMsgFor==="function") ? a.verifyMsgFor(email) : ("Enter the code we sent to "+email+".");
+}
+// B10: called every time #membScreen opens fresh, so a previous attempt never leaks into a new one.
+function membResetCodeState(){
+  membInCodeState=false;
+  membCodeEmail=null;
+  membStopResendTimer();
+}
+// B1-B6: moves the screen from the email step to the code step, in place — no separate sheet.
+function membShowCodeState(email){
+  membInCodeState=true;
+  membCodeEmail=email;
+  const emailEl=$("membEmail");
+  if(emailEl){ emailEl.readOnly=true; emailEl.style.opacity=".6"; }
+  const msg=$("membCodeMsg");
+  if(msg) msg.innerHTML=esc(membCodeMsgText(email))+
+    ' <button type="button" class="linkbtn" id="membChangeEmail" onclick="membBackToEmail()" style="vertical-align:baseline">Change email</button>';
+  membCodeErrorShow(null);
+  const code=$("membCode"); if(code) code.value="";
+  const state=$("membCodeState"); if(state) state.hidden=false;
+  membStartResendTimer();
+  if(code) code.focus();
+  // B6: #membCode and .membcta both fully in view — the button is the lower of the two, so bringing IT
+  // fully into view is what actually needs the scroll; the code field sits in the same unbroken block
+  // directly above it, so the same scroll reveals both.
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const scr=$("membScreen"), btn=document.querySelector(".membcta");
+    if(scr && btn && typeof btn.scrollIntoView==="function") btn.scrollIntoView({block:"end"});
+  }));
+}
+// B9: back to State A — email editable and focused, code step gone, countdown stopped, both errors clear.
+// Also stands down onbMembershipInFlight: the code just abandoned can no longer land a session for this
+// screen to be in the middle of.
+window.membBackToEmail=()=>{
+  onbMembershipInFlight=false;
+  membInCodeState=false;
+  membCodeEmail=null;
+  membStopResendTimer();
+  const emailEl=$("membEmail");
+  if(emailEl){ emailEl.readOnly=false; emailEl.style.opacity=""; emailEl.focus(); }
+  const state=$("membCodeState"); if(state) state.hidden=true;
+  membEmailError(null);
+  membCodeErrorShow(null);
+};
+// B4: resends to the email State B is currently showing, and restarts the countdown.
+window.membResendCode=()=>{
+  if(!membCodeEmail) return;
+  membStartResendTimer();
+  membCodeErrorShow(null);
+  const msg=$("membCodeMsg");
+  window.CascadeAuth.continueWithEmail(membCodeEmail).then(result=>{
+    if(!result.ok) membCodeErrorShow("Could not resend: "+(result.error||""));
+  });
+  if(msg) msg.innerHTML=esc(membCodeMsgText(membCodeEmail))+
+    ' <button type="button" class="linkbtn" id="membChangeEmail" onclick="membBackToEmail()" style="vertical-align:baseline">Change email</button>';
+};
+// B7/B8: verifies the code entered in State B. Its own busy/idle, separate from membStart()'s email-step
+// one below, since the button's label differs once a code is on screen ("Setting up your account…" either
+// way here, unlike A2's "Sending your code…").
+function membSubmitCode(){
+  const code=($("membCode").value||"").trim();
+  if(!code){ membCodeErrorShow("Enter the code first."); return; }
+  if(membStarting) return;
+  membCodeErrorShow(null);
+  membStarting=true;
+  const btn=document.querySelector(".membcta");
+  const idle=()=>{
+    membStarting=false;
+    if($("membScreen").classList.contains("open") && btn){
+      btn.disabled=false; btn.classList.remove("busy"); btn.removeAttribute("aria-busy");
+      btn.textContent="Start my free month";
+    }
+  };
+  if(btn){
+    btn.disabled=true; btn.classList.add("busy"); btn.setAttribute("aria-busy","true");
+    btn.innerHTML=`<span class="btnspin"></span>Setting up your account…`;
+  }
+  const email=membCodeEmail;
+  window.CascadeAuth.verifyEmailCode(email, code).then(result=>{
+    if(result.ok){
+      // Exactly what the #authVerify step's onVerified callback used to do — proceed(true), the
+      // brand-new-signup path through membStartWork/membCompleteNewMembership, unchanged.
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        membStartWork(true).finally(idle);
+      }));
+    } else {
+      // Not cleared here: onbMembershipInFlight stays true across a wrong-code retry (only Change email
+      // or a confirmed code end this attempt) — see membBackToEmail's own comment.
+      membCodeErrorShow("Wrong or expired code — check it and try again, or resend.");
+      idle();
+    }
+  });
 }
 // CAS-1099: discards the whole onboarding draft in memory — shared by membSignInFromAcctExists below and
 // membCompleteNewMembership's own 'account_exists' outcome. An existing account is never merged with a
@@ -17976,6 +18131,9 @@ window.membSignInFromAcctExists=()=>{
 window.membStart=()=>{
   if(membStarting) return;              // second tap while the listing builds — ignore, don't queue
   const needsEmail=membNeedsEmail();
+  // CAS-1169: the same button does State B's job (verify the code) once a code has been sent — the email
+  // step below never runs in that case.
+  if(needsEmail && membInCodeState){ membSubmitCode(); return; }
   let email=null;
   if(needsEmail){
     email=($("membEmail").value||"").trim();
@@ -18000,7 +18158,7 @@ window.membStart=()=>{
   };
   if(btn){
     btn.disabled=true; btn.classList.add("busy"); btn.setAttribute("aria-busy","true");
-    btn.innerHTML=`<span class="btnspin"></span>${needsEmail?"Setting up your account…":"Starting your free month…"}`;
+    btn.innerHTML=`<span class="btnspin"></span>${needsEmail?"Sending your code…":"Starting your free month…"}`;
   }
   logEvent("membership_start");
   // The membership screen stays up until the listing is ready, so the spinner is what the user watches
@@ -18027,11 +18185,10 @@ window.membStart=()=>{
         idle();
         return;
       }
-      // CAS-1056: continueWithEmail only requests a code now — it never signs in on its own. The code is
-      // entered in the account modal's own verify step (this screen carries no code-entry UI of its own),
-      // which runs proceed(true) itself once that code confirms; idle() just hands this button back meanwhile.
+      // CAS-1169: continueWithEmail only requests a code — the code is confirmed right here on
+      // #membScreen (State B, membSubmitCode), never on #authModal's own verify step.
       window.CascadeAuth.continueWithEmail(email, { createUser: true }).then(result=>{
-        if(result.ok){ window.CascadeAuth.openVerify(email, ()=>proceed(true)); idle(); }
+        if(result.ok){ membShowCodeState(email); idle(); }
         else{ onbMembershipInFlight=false; membEmailError(result.error||"Could not send a sign-in code — try again."); idle(); }
       });
     });
@@ -20573,6 +20730,19 @@ else if(dedupedN)
   // device's own in-memory values — CAS-1095's "never seed the server from a device" rule.
   async function loadUserPrefs(){
     const c=client(); if(!c||!accountActive()) return;
+    // CAS-1174: the cascade-auth-change listener already stands its own fan-out down for the span
+    // between a membership email's code being confirmed and complete_membership() resolving
+    // (onbMembershipInFlight — see that flag's own CAS-1099 comment), because a brand-new sign-in's
+    // SIGNED_IN event otherwise races ahead of the one RPC that is supposed to be this draft's only
+    // path to the server. reconcileOnReturn's focus/visibilitychange/heartbeat call to this function
+    // is a second, unguarded way to run that exact same race — a session is live for the whole wait
+    // (an onboarding email step signs in before the code is even entered), so a reconcile landing in
+    // that window finds no user_prefs row yet, bootstrap-inserts an empty one, and a later reconcile
+    // then adopts that empty row straight over the in-memory draft, before membCompleteNewMembership()
+    // ever builds its payload from it. onbDraftModeOn itself is too broad a guard here — CAS-1082's
+    // "an already signed-in account with zero agents re-runs onboarding" case sets it too, with no
+    // RPC race to protect against — so this reuses the listener's own, narrower flag instead.
+    if(onbMembershipInFlight) return;
     const ok = await window.CascadeAccountStore.acctLoad([{ table:"user_prefs", pk:"user_id" }]);
     if(!ok){ recordSyncOutcome("user_prefs", false, { message:"load failed" }); return; }
     recordSyncOutcome("user_prefs", true);
@@ -21220,6 +21390,9 @@ else if(dedupedN)
   // CAS-1073 AC3: the review address must never render as UI text — the review code screen shows
   // the same generic copy as every other state on this panel.
   const verifyMsgFor = email => isReviewEmail(email) ? 'Enter your code.' : 'Enter the code we sent to ' + email + '.';
+  // CAS-1169: exposed so the membership screen's own inline code step (classic script, no shared scope
+  // with this module) can show the review address the same generic copy, without re-deriving it here too.
+  api.verifyMsgFor = verifyMsgFor;
 
   // CAS-1089: Resend is locked for 60s after every code send (Continue, openVerify or Resend itself),
   // matching Supabase's own per-address OTP rate limit so a user never presses an enabled Resend into a

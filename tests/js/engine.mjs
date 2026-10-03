@@ -262,6 +262,10 @@ if(typeof window.CascadeAuth === "undefined"){
   get onbDraftModeOn(){ return onbDraftModeOn; },
   setOnbDraftModeOn(v){ onbDraftModeOn=!!v; },
   get onbMembershipInFlight(){ return onbMembershipInFlight; },
+  // CAS-1174: a test drives the email-submitted-but-code-not-yet-verified window directly (the same
+  // flag membStart() sets before continueWithEmail() and membCompleteNewMembership() clears once
+  // complete_membership() resolves), rather than only being able to read it.
+  setOnbMembershipInFlight(v){ onbMembershipInFlight=!!v; },
   // CAS-1099: tasteBase is reassigned wholesale in more places than loadUserPrefs now (flowStart()'s own
   // leftover-draft reset) — exposed through a getter, like watchPrefs/notifyPrefs below, so a test sees
   // the CURRENT binding even across a reassignment, not a snapshot frozen at load time.

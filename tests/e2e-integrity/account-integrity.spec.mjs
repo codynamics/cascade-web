@@ -220,10 +220,11 @@ test("S1: a new member's onboarded roster exists on the server", async ({ page }
 
   await page.locator("#membEmail").fill(email);
   await page.locator(".membcta").click();
-  await expect(page.locator("#authVerify")).toBeVisible({ timeout: 30_000 });
+  // CAS-1169: the code is confirmed on #membScreen itself (State B), never on #authModal.
+  await expect(page.locator("#membCode")).toBeVisible({ timeout: 30_000 });
   const code = await fetchOtp(email);
-  await page.locator("#authCode").fill(code);
-  await page.locator("#authVerifyBtn").click();
+  await page.locator("#membCode").fill(code);
+  await page.locator(".membcta").click();
   await expect(page.locator("#membScreen.open")).toBeHidden({ timeout: 30_000 });
   await settleListing(page);
 
@@ -576,10 +577,11 @@ test("CAS-1155 S1: a new sign-up's notify_prefs row has email alerts on, address
 
   await page.locator("#membEmail").fill(email);
   await page.locator(".membcta").click();
-  await expect(page.locator("#authVerify")).toBeVisible({ timeout: 30_000 });
+  // CAS-1169: the code is confirmed on #membScreen itself (State B), never on #authModal.
+  await expect(page.locator("#membCode")).toBeVisible({ timeout: 30_000 });
   const code = await fetchOtp(email);
-  await page.locator("#authCode").fill(code);
-  await page.locator("#authVerifyBtn").click();
+  await page.locator("#membCode").fill(code);
+  await page.locator(".membcta").click();
   await expect(page.locator("#membScreen.open")).toBeHidden({ timeout: 30_000 });
   await settleListing(page);
 
