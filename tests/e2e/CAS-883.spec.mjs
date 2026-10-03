@@ -87,8 +87,11 @@ async function expandFirstCard(page){
   return id;
 }
 
-// AC4a: the expanded card and the film page each show an Invite control and no control labelled Share.
-test("CAS-883 AC4a: the expanded card and the film page each show Invite, never Share", async ({ page }) => {
+// AC4a, superseded by CAS-1119: the film page (filmPageHTML) dropped every account-gated control,
+// including Invite — it's the account-agnostic "door" a share link opens for a visitor who may not have
+// one yet (see filmPageHTML's own comment), so it never carries Invite now regardless of sign-in state.
+// The card keeps its own Invite control; neither surface ever says Share.
+test("CAS-883 AC4a: the expanded card shows Invite, never Share; the film page (CAS-1119) shows neither", async ({ page }) => {
   await signedInListing(page);
   const id = await expandFirstCard(page);
 
@@ -98,9 +101,7 @@ test("CAS-883 AC4a: the expanded card and the film page each show Invite, never 
   await expect(cardBtn).not.toContainText("Share");
 
   await page.evaluate(fid => openFilmPage(fid), id);
-  const fpBtn = page.locator("#filmPage .filminvcta");
-  await expect(fpBtn).toBeVisible();
-  await expect(fpBtn).toContainText("Invite");
+  await expect(page.locator("#filmPage .filminvcta")).toHaveCount(0);
   expect(await page.locator("#filmPage").innerText()).not.toContain("Share");
 });
 

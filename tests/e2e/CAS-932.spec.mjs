@@ -53,14 +53,16 @@ function fakeSupabaseScript(){
   `;
 }
 
-/** Injects a fake Capacitor global before any app script runs — `native` picks isNativePlatform(), and
- * `pickResult` is what Plugins.ContactPicker.pickContact() resolves with (undefined when not asserted). */
+/** CAS-1160: an addInitScript-set window.Capacitor runs before any page script, but the real (vendored)
+ * capacitor-core.js loads straight after it and unconditionally recomputes isNativePlatform from actual
+ * bridge detection — always "web" in a Playwright browser — clobbering whatever addInitScript had set, the
+ * same gap CAS-969's own primeNativeReviewStub was written to dodge for Capacitor.Plugins.InAppReview.
+ * Setting isNativePlatform/Plugins.ContactPicker via page.evaluate AFTER boot (capacitor-core.js and
+ * capacitor-contact-picker.js have already run by then) is what actually makes `native` stick. */
 async function primeCapacitor(page, native, pickResult){
-  await page.addInitScript(({ native, pickResult }) => {
-    window.Capacitor = {
-      isNativePlatform: () => native,
-      Plugins: { ContactPicker: { pickContact: () => Promise.resolve(pickResult) } },
-    };
+  await page.evaluate(({ native, pickResult }) => {
+    window.Capacitor.isNativePlatform = () => native;
+    if(native) window.Capacitor.Plugins.ContactPicker = { pickContact: () => Promise.resolve(pickResult) };
   }, { native, pickResult });
 }
 
@@ -80,8 +82,8 @@ async function openAddForm(page){
 }
 
 test("CAS-932: on the web surface (isNativePlatform false) the form shows no contacts control, unchanged from CAS-928", async ({ page }) => {
-  await primeCapacitor(page, false, undefined);
   await bootSignedIn(page);
+  await primeCapacitor(page, false, undefined);
   await openAddForm(page);
 
   await expect(page.locator("#ffContactsPick")).toHaveCount(0);
@@ -91,8 +93,8 @@ test("CAS-932: on the web surface (isNativePlatform false) the form shows no con
 });
 
 test("CAS-932: picking a contact with two emails and one number fills the form with the first of each, and saves only on Save", async ({ page }) => {
-  await primeCapacitor(page, true, { name: "Jamie Fox", emails: ["jamie@work.example.com", "jamie@personal.example.com"], phones: ["0455123456"] });
   await bootSignedIn(page);
+  await primeCapacitor(page, true, { name: "Jamie Fox", emails: ["jamie@work.example.com", "jamie@personal.example.com"], phones: ["0455123456"] });
   await openAddForm(page);
 
   await expect(page.locator("#ffContactsPick")).toBeVisible();
@@ -112,8 +114,8 @@ test("CAS-932: picking a contact with two emails and one number fills the form w
 });
 
 test("CAS-932: a cancelled pick leaves the form untouched and shows no error", async ({ page }) => {
-  await primeCapacitor(page, true, { cancelled: true });
   await bootSignedIn(page);
+  await primeCapacitor(page, true, { cancelled: true });
   await openAddForm(page);
 
   await page.locator("#ffContactsPick").click();
