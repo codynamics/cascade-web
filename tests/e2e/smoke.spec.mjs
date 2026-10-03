@@ -11,7 +11,7 @@ import { test, expect } from "@playwright/test";
 import {
   freshApp, gotoFresh, toShortlist, shortlistCards, finishFlow, toListing, settleListing, ctaLocator, sectionCounts,
   openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen, openNotifyScreen,
-  closeNotifyScreen, dumpSignedInDiagnostics, openAgentsScreenFromMenu,
+  dumpSignedInDiagnostics, openAgentsScreenFromMenu,
 } from "./helpers.mjs";
 
 // CAS-1136 decision 2: on a failed or timed-out test, show the in-flight requests and buffered console
@@ -730,27 +730,25 @@ test("'Only show films on my services' changes what a new agent finds", async ({
   expect(after, `before=${before} after=${after}`).toBeLessThan(before);
 });
 
-// CAS-1178 AC1: the switch's own tick/aria-pressed flip is synchronous, so it must be visible well inside
-// one frame of the tap — regardless of how long the deferred onbRefresh()/render() behind it takes on a
-// populated listing. Measured inside the page (performance.now() either side of the click) rather than
+// CAS-1178 AC1: the switch's own tick/aria-pressed flip is synchronous, so it must be visible in the same
+// task as the tap — regardless of how long the deferred onbRefresh()/render() behind it takes on a
+// populated listing. Measured inside the page (class read, click, class read again, same task) rather than
 // through Playwright's own round-trip timing, which would add its own noise on top of whatever this is
 // trying to measure.
-test("CAS-1178: the My services toggle's tick flips within 100ms of a tap", async ({ page }) => {
+test("CAS-1178: the My services toggle's tick flips synchronously on a tap", async ({ page }) => {
   await toShortlist(page, "stream");
   await finishFlow(page);
   await toListing(page);
   await settleListing(page);
   await openMyServicesScreen(page);
 
-  const elapsedMs = await page.evaluate(() => new Promise(resolve => {
+  const flipped = await page.evaluate(() => {
     const tog = document.querySelector("#onbSvcOnly");
     const wasOn = tog.classList.contains("on");
-    const t0 = performance.now();
     tog.click();
-    requestAnimationFrame(() => resolve(tog.classList.contains("on") !== wasOn ? performance.now() - t0 : -1));
-  }));
-  expect(elapsedMs, "the 'on' class never flipped at all").toBeGreaterThanOrEqual(0);
-  expect(elapsedMs).toBeLessThan(100);
+    return tog.classList.contains("on") !== wasOn;
+  });
+  expect(flipped).toBe(true);
 });
 
 // CAS-1178 AC2: five taps fired 250ms apart (comfortably past the double-rAF the fix defers the heavy
@@ -937,6 +935,8 @@ test("Watch listing: every group shows its agent divider, even a single-agent se
 // shape as CAS-723/CAS-725's fix above. Finds a real donor already carrying the included_streaming window
 // (so the window itself is genuine, untouched), then pins the fields Massive Movies' onboarding recipe
 // gates on so the donor's own identity can't matter.
+// CAS-1189: CAS-1179 turned on cinemaReleaseOnly in the Massive Movies recipe, so the clone also pins
+// cinema_release: true — a streaming donor's own value is false and matchesCriteria rejects it otherwise.
 async function trackAStreamingFilm(page){
   await page.evaluate(() => {
     let film = MOVIES.find(m => primaryStatus(m) === "included_streaming" && cascades.some(c => listedBy(m, c)));
@@ -945,7 +945,7 @@ async function trackAStreamingFilm(page){
       if(donor){
         film = {
           ...donor, tmdb_id: -750001, wm_user_rating: 10, wm_critic_score: 100,
-          language: "en", age_rating: "M", cinema_date: TODAY,
+          language: "en", age_rating: "M", cinema_date: TODAY, cinema_release: true,
         };
         MOVIES.push(film);
         prefs.on = false;
@@ -1669,9 +1669,11 @@ test("CAS-1176 AC3-AC6: Settings' How you're told has no onboarding chrome, emai
   await expect(page.locator("#onbInAppDenied")).not.toBeVisible();
 
   // AC6: back closes this screen and returns to Settings, open underneath it.
-  await closeNotifyScreen(page);
+  await page.locator("#notifyScreen .osback").click();
   await expect(page.locator("#notifyScreen")).not.toHaveClass(/open/);
   await expect(page.locator("#settingsScreen")).toHaveClass(/open/);
+  await page.locator("#settingsScreen .osback").click();
+  await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
 });
 
 // CAS-1035 AC3: a Watch On tick made just before the tab closes must survive a reload even though it never
