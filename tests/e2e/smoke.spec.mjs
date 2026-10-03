@@ -989,6 +989,94 @@ test("Watch jump bar entries follow the groups' own order, on both the Cinema an
   }
 });
 
+// CAS-1180: setOpinion() clears every Watch On rung the moment a verdict is given, so a watched film's
+// filmNotifyState(id).key is always empty — filmMatchesWatchTab used to key off that same (now-empty)
+// value, so a verdict film could never again pass a non-Cinema tab's scope test, however its own Watched
+// chip was set. AC1 and AC3 check it is back, as the existing stub, in the sort's own place, once its chip
+// is on. AC4-6 check the search box (Part D) widens to every tab/window, ignores the other filters while it
+// holds text, and that clearing it restores exactly what was showing right before.
+test("CAS-1180: a watched film shows as a stub when its own chip is on, and search finds it across tabs (AC1, AC3-6)", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await trackAStreamingFilm(page);
+  await page.locator(".wtabbtn", { hasText: "Streaming" }).click();
+  await disableMineOnlyOnCurrentTab(page);
+  await settleListing(page);
+
+  const filmId = await page.evaluate(() => {
+    const film = MOVIES.find(m => primaryStatus(m) === "included_streaming" && cascades.some(c => listedBy(m, c)));
+    setOpinion(film.tmdb_id, "enjoyed");
+    watchHeldOpen[watchTab].clear();   // AC1: the held-this-visit hold is cleared — not what keeps it visible
+    render();
+    return film.tmdb_id;
+  });
+
+  // AC1: no Watched chip on -> not on screen at all.
+  await expect(page.locator(`#card-${filmId}`)).toHaveCount(0);
+
+  // Switch the Enjoyed chip on for this tab.
+  await page.locator("#watchFilterBtn").click();
+  await page.locator("#watchSheetBody .chip", { hasText: "Enjoyed" }).click();
+  await page.locator(".wsheetclose").click();
+  await settleListing(page);
+
+  // AC3: it renders as the existing stub, in the sort's own place.
+  const stub = page.locator(`#card-${filmId}`);
+  await expect(stub).toBeVisible();
+  await expect(stub).toHaveClass(/stub/);
+  const order = await page.evaluate((id) => {
+    const rendered = [...document.querySelectorAll("#groups .card, #groups .stub")].map(el => el.id.replace("card-", ""));
+    const rows = watchScopeRows().filter(m => filmMatchesWatchedFilter(m) || watchHeldOpen[watchTab].has(m.tmdb_id));
+    const expected = listingGroups(rows, activeCascade()).flatMap(s => s.items.map(m => String(m.tmdb_id)));
+    return { renderedIdx: rendered.indexOf(String(id)), expectedIdx: expected.indexOf(String(id)) };
+  }, filmId);
+  expect(order.renderedIdx).toBeGreaterThanOrEqual(0);
+  expect(order.renderedIdx).toBe(order.expectedIdx);
+
+  // Switch the chip back off (AC4 needs search, not the chip, to be what's finding the film) and pick a
+  // second film from a different tab whose style gets switched off here — proving search reaches past both.
+  await page.locator("#watchFilterBtn").click();
+  await page.locator("#watchSheetBody .chip", { hasText: "Enjoyed" }).click();
+  const setup = await page.evaluate((id) => {
+    const film = MOVIES.find(m => m.tmdb_id === id);
+    const donor = MOVIES.find(m => primaryStatus(m) === "rental" && cascades.some(c => listedBy(m, c)));
+    if(donor) watchGenreOff[watchTab].add((donor.genres || [])[0] || "Action");
+    return {
+      term: film.title.slice(0, Math.min(5, film.title.length)).toLowerCase(),
+      donorId: donor ? donor.tmdb_id : null,
+      donorTerm: donor ? donor.title.slice(0, Math.min(5, donor.title.length)).toLowerCase() : null,
+    };
+  }, filmId);
+  await page.locator(".wsheetclose").click();
+  await settleListing(page);
+  await expect(page.locator(`#card-${filmId}`)).toHaveCount(0);
+
+  const beforeSearchIds = await page.locator("#groups .card, #groups .stub").evaluateAll(els => els.map(el => el.id));
+
+  const input = page.locator("#watchSearchInput");
+  await expect(input).toHaveAttribute("placeholder", "Search all your films");
+
+  // AC4: typing part of its title finds the watched film, as a stub, with no Watched chip on.
+  await input.fill(setup.term);
+  await page.waitForTimeout(250);   // CAS-514's own 150ms debounce
+  await expect(page.locator(`#card-${filmId}`)).toBeVisible();
+  await expect(page.locator(`#card-${filmId}`)).toHaveClass(/stub/);
+
+  // AC5: search also finds a film belonging to a different tab, with a style switched off here.
+  if(setup.donorId){
+    await input.fill(setup.donorTerm);
+    await page.waitForTimeout(250);
+    await expect(page.locator(`#card-${setup.donorId}`)).toBeVisible();
+  }
+
+  // AC6: clearing the search box restores exactly the rows that were showing right before it.
+  await page.locator("#watchSearchClear").click();
+  await page.waitForTimeout(250);
+  const afterIds = await page.locator("#groups .card, #groups .stub").evaluateAll(els => els.map(el => el.id));
+  expect(afterIds.sort()).toEqual(beforeSearchIds.sort());
+});
+
 test("CAS-740 AC4: a signed-in user whose account already holds agents is never left in the onboarding flow", async ({ page }) => {
   await page.route("**/config.js", route => route.fulfill({
     contentType: "application/javascript",

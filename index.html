@@ -3587,10 +3587,10 @@
       </div>
       <div class="watchsearchwrap" id="watchSearchWrap">
         <input id="watchSearchInput" class="search" type="text" inputmode="search" autocomplete="off"
-               placeholder="Search" aria-label="Search this tab">
+               placeholder="Search all your films" aria-label="Search all your films">
         <button class="searchclear" id="watchSearchClear" aria-label="Clear search" type="button" hidden>×</button>
       </div>
-      <button type="button" class="watchiconbtn" id="watchSearchBtn" aria-label="Search this tab" hidden
+      <button type="button" class="watchiconbtn" id="watchSearchBtn" aria-label="Search all your films" hidden
               onclick="openWatchSearch()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
           stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.4"/><path d="M15.8 15.8 20 20"/></svg>
@@ -4408,6 +4408,16 @@ function watchTabsNow(){
 // Filters sheet) has widened that tab to include the film's current standing too. Cinema's own branch above
 // is untouched by this — it never consults a standing test or watchAlsoShow at all.
 function filmMatchesWatchTab(m, tab){
+  // CAS-1180: setOpinion() clears every Watch On rung the moment a verdict is given, so a watched film
+  // never again carries a key — read its tab off primaryStatus (the window it stands in NOW) instead, the
+  // only way such a film can ever reach the Watched filter/search below rather than being invisible on
+  // every non-Cinema tab forever. It still needs no standing test beyond this: Also-show and
+  // WATCH_TAB_OWN_STANDING are both about a Watch On level widening a tab, which a verdict film has none of.
+  if(taggedOut(m)){
+    const ps=primaryStatus(m);
+    if(tab==="in_cinema") return ps==="upcoming" || ps==="opening_week" || ps==="in_cinema";
+    return ps===WATCH_TAB_OWN_STANDING[tab];
+  }
   const key = filmNotifyState(m.tmdb_id).key;
   if(tab==="in_cinema"){
     if(key==="in_cinema") return true;
@@ -9127,10 +9137,12 @@ function closeWatchSearchIfEmpty(){
   if(watchSearchOpen && inp && !inp.value){ watchSearchOpen=false; renderWatchCtl(); }
 }
 function renderWatchCtl(){
-  const tab=watchTabsNow().find(t=>t.key===watchTab);
   const inp=$("watchSearchInput");
   if(inp){
-    inp.placeholder = tab ? `Search ${tab.label}` : "Search";
+    // CAS-1180 Part D: the placeholder once named the current tab ("Search Streaming") because that's all
+    // the box ever searched; it now reaches every tab/window, so the one fixed placeholder says that
+    // honestly rather than naming whichever tab happens to be open.
+    inp.placeholder = "Search all your films";
     const raw=watchSearchRaw[watchTab];
     if(inp.value!==raw) inp.value=raw;
   }
@@ -9640,6 +9652,14 @@ function watchAlsoShowPool(){
   }
   const wsearch=watchSearch[watchTab];
   return wsearch ? pool.filter(m=>m.title.toLowerCase().includes(wsearch)) : pool;
+}
+// CAS-1180 Part D: while the search box holds text, the listing stops being "this tab, filtered" and becomes
+// "every film any of the account's agents lists, anywhere" — render() swaps its own tab/Picked by/Watched/
+// Styles/Also show/Agents-to-include/mineOnly-narrowed `rows` for this set instead. `cascades.some` (not
+// watchAgentOff's included set) is deliberate: Agents to include is one of the filters search ignores. A
+// verdict film is still listedBy's own ordinary call (CAS-718's excludeWatched:false), so it's included too.
+function watchSearchRows(wsearch){
+  return MOVIES.filter(m => m.title.toLowerCase().includes(wsearch) && cascades.some(c=>listedBy(m,c)));
 }
 // ---- "Finish your agent" (CAS-71) — removed by CAS-273 --------------------------
 // The services question used to be asked a second time here, on top of the listing, once the agent had found
@@ -18859,6 +18879,10 @@ function render(){
   const preMineOnlyRows=rows;
   const mineOnly=watchMineOnlyOn();
   if(mineOnly) rows=rows.filter(m=>!HOME_KEYS.includes(primaryStatus(m)) || matchesServices(m, primaryStatus(m)));
+  // CAS-1180 Part D: a non-empty search box replaces every narrowing above with watchSearchRows' own wider
+  // set — everything upstream of this line (tab scope, Picked by, Styles, Watched, mineOnly) stays exactly
+  // as it was for when the box is cleared again; it just stops being what gets drawn while it holds text.
+  if(wsearch) rows=watchSearchRows(wsearch);
   const shown=rows.filter(m=>!taggedOut(m));
   const stubbed=rows.length-shown.length;
   renderWatchTabs();
