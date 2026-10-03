@@ -27,10 +27,16 @@ const ALL_STEPS = [
   "v2_budget", "v2_ages", "v2_partner", "v2_kids", "v2_services",
 ];
 
+// CAS-1161: openStep()'s own guest-mode routing 404s config.js on every goto (by design — the same
+// route freshApp() uses, see helpers.mjs), and the browser always reports that as a "Failed to load
+// resource" console error — the harness's own expected noise, not a signal from the step under test.
+// Filtered by its fixed, generic text (it carries no URL to match on instead): only this exact message
+// is suppressed, so a genuinely different failure of the app's own still fails the test.
+const CONFIG_404_TEXT = "Failed to load resource: the server responded with a status of 404 (Not Found)";
 test("CAS-910 AC: every one of the ten v2 question screens renders with no console error", async ({ page }) => {
   for(const key of ALL_STEPS){
     const errors = [];
-    page.on("console", msg => { if(msg.type() === "error") errors.push(msg.text()); });
+    page.on("console", msg => { if(msg.type() === "error" && msg.text() !== CONFIG_404_TEXT) errors.push(msg.text()); });
     page.on("pageerror", e => errors.push(String(e)));
     await openStep(page, key);
     expect(errors, `${key} logged a console error`).toEqual([]);
@@ -130,13 +136,18 @@ test("CAS-910 AC: dragging the budget dial to position 200 reads Studio · $15M+
   expect(selScale).toBe(15000000);
 });
 
-// CAS-910 Change 4: the step counter text is gone from the FIXED chrome (a live, wired flow only — these
-// v2 screens aren't listed in FLOWS yet). briefing1 is already wired and chromed, so it's what exercises
-// paintFlowChrome's own stepLbl line here.
-test("CAS-910 AC: paintFlowChrome leaves #stepLbl empty and hidden on a live, chromed step", async ({ page }) => {
+// CAS-910 Change 4 named a live, chromed step as the one that exercises paintFlowChrome's own stepLbl
+// line. CAS-953 Change 1 (shipped after this ticket) retired chrome from the v2 sequence outright —
+// flowChromed() now returns false unconditionally (app_template.html), so #onbStep never carries
+// "chromed" and paintFlowChrome's on-branch (the stepLbl line this test meant to exercise) never runs
+// for any live step any more. The surviving intent — #stepLbl stays empty and hidden — still holds, just
+// via paintFlowChrome's early-return-when-not-chromed path and #stepHdr's own default `hidden` markup,
+// not the on-branch; this now asserts that directly instead of a "chromed" live step that no longer exists.
+test("CAS-910 AC: no v2 step is ever chromed (CAS-953), and #stepLbl stays empty and hidden", async ({ page }) => {
   await freshApp(page);
   await page.evaluate(() => { flowStart(); });
-  await expect(page.locator("#onbStep")).toHaveClass(/chromed/);
+  await expect(page.locator("#onbStep")).not.toHaveClass(/chromed/);
+  await expect(page.locator("#stepHdr")).toBeHidden();
   const label = page.locator("#stepLbl");
   await expect(label).toHaveText("");
   await expect(label).toHaveCSS("display", "none");

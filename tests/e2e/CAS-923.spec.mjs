@@ -31,8 +31,10 @@ for(const kind of ["cinema", "stream"]){
     await page.locator("#onbCinemaRelease").click();
     expect(await cinemaReleaseSwitchOn(page)).toBe(true);
 
-    await page.locator(".oscta", { hasText: "Save agent" }).click();
-    await expect(page.locator("#onbStep")).not.toHaveClass(/open/);   // briefSave closes back to Agents
+    // CAS-934 retired the Briefing's own Save button — Back (#onbStep .osback) is the only exit now, and
+    // commits the draft on its way out (briefClose -> briefCommit), same as every other Briefing edit.
+    await page.locator("#onbStep .osback").click();
+    await expect(page.locator("#onbStep")).not.toHaveClass(/open/);   // briefClose closes back to Agents
 
     const saved = await page.evaluate(id => cascades.find(c => c.id === id).cinemaReleaseOnly, agentId);
     expect(saved).toBe(true);

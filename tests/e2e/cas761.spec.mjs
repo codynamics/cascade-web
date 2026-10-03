@@ -166,6 +166,15 @@ test("CAS-761 AC5: --stickyh equals the measured header+cascbar chrome height, a
   await rankCascades(page, cascadeIds);
   await seedFilm(page, { id: 900761401, title: "CAS-761 target", status: "opening_week", cascadeId: cascadeIds[0] });
   await seedFilm(page, { id: 900761402, title: "CAS-761 other", status: "upcoming", cascadeId: cascadeIds[0] });
+  // CAS-1161: with only these two rows the document is shorter than the viewport once the sticky chrome
+  // is accounted for, so jumpToSection's scroll clamps at the document's own bottom edge well short of
+  // its aim — verified directly (scrollY === scrollHeight-innerHeight at the old failure). Not a timing
+  // issue (the settle loop already waits out its full ~3.6s worst case below); the page simply has no
+  // more room to scroll into. Pad with a few more same-status clones (same technique cas760.spec.mjs's
+  // own padded-clone helper uses) so there is enough scrollable height below the fold.
+  for(let i = 0; i < 5; i++){
+    await seedFilm(page, { id: 900761410 + i, title: `CAS-761 pad-${i}`, status: "opening_week", cascadeId: cascadeIds[0] });
+  }
   await page.evaluate(() => { watchAlsoShow.stream.add("upcoming"); watchAlsoShow.stream.add("opening_week"); render(); });
   await toStreamTab(page);
 

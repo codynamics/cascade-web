@@ -56,8 +56,17 @@ test("CAS-940: first-touch acquisition capture, utm stripping, and one app_open 
   expect(opens[1].s).not.toBe(firstSession);
 });
 
+// CAS-753/CAS-1113: a "stream"-kind roster's two onboarding agents carry watchMarkers on rent/stream
+// only — a HOME_KEYS tab gated by "Show only available on my services" (default ON), which a fresh
+// guest/test account never picks. Worse, since CAS-1113 shares one solved score across every window
+// from the BIG window onward, the agents' real catalogue matches here skew to still-upcoming/in-cinema
+// titles, so even disabling that switch can land on a tab with nothing released into it yet — not a
+// mineOnly gap alone. "cinema" kind lands on the Cinema tab instead, whose own standing (upcoming/
+// opening_week/in_cinema) is never gated by "my services" and is exactly what Massive Movies always
+// has plenty of (confirmed via CAS-909's own watchCount checks) — the same reliably-populated tab
+// smoke.spec.mjs's own Cinema-tab assertions lean on, with no extra toggle needed.
 test("CAS-941: expanding and collapsing a card on the Watch listing logs card_expand", async ({ page }) => {
-  await toShortlist(page, "stream");
+  await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
 
