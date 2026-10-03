@@ -191,7 +191,7 @@
      pushed the icons past the right edge on a 360px phone (CAS-183 added a fourth). Now the freshness line
      ellipsises instead, which is the right thing to lose. */
   .brandrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .brandrow>div:first-child{min-width:0}
+  .brandrow .brand-ident{min-width:0}
   .brandrow .updated{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* CAS-1063: the freshness line's own row, now sharing it with the saving dot. min-width:0 so the
      ellipsis above still works with a flex sibling in the row. */
@@ -222,7 +222,7 @@
   /* CAS-616 (v0.9.5): a 2-column grid, not a flex row — `1fr 1fr` makes the two chips resolve to the SAME
      width whatever their labels say, so "same importance, same size" is structural rather than a magic
      number that rots the next time a label changes. */
-  .hdr-actions{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;align-items:center}
+  .hdr-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:center}
   /* CAS-183 added a fourth header icon (Your Movies), which at 360px pushed the row past the edge — the
      brand block on the left is ~168px. CAS-530 dropped the bell (moved into the Menu) and widened the
      remaining two into labelled chips, so the same narrow-phone squeeze gets a step of its own below.
@@ -258,15 +258,12 @@
   .mcicon .f{fill:var(--mcf)}
   .mcicon .s{stroke:var(--mcf);fill:none}
   .mcicon .g{fill:var(--mcf);opacity:.20}
-  #agentsBtn{--mcf:url(#mcFindGrad)}
   /* CAS-640: Watch takes --brand-blue, the blue it wore when it was Find — not a new gradient token. */
   #moviesBtn{--mcf:var(--brand-blue)}
-  #agentsBtn.active,#moviesBtn.active{--mcf:#fff}
+  #moviesBtn.active{--mcf:#fff}
   /* Concept parity: in the redesign's nav-bar demo the destination tile carries its own tint, not a neutral
      grey. :not(.active) is required — an unqualified id rule would beat .modechip.active's background. */
-  #agentsBtn:not(.active){background:rgba(76,125,255,.09);border-color:rgba(76,125,255,.26)}
   #moviesBtn:not(.active){background:rgba(76,125,255,.09);border-color:rgba(76,125,255,.26)}
-  #agentsBtn.active{box-shadow:0 5px 16px -5px rgba(76,125,255,.7)}
   #moviesBtn.active{box-shadow:0 5px 16px -5px rgba(76,125,255,.7)}
   .modechip.active{background:var(--grad);border-color:transparent;color:#fff}
   /* CAS-640: Watch's selected state is solid --brand-blue (the listing scope bar's own blue), not the
@@ -279,6 +276,13 @@
   #movingBtn:not(.active){background:rgba(255,213,74,.09);border-color:rgba(255,213,74,.32)}
   #movingBtn.active{box-shadow:0 5px 16px -5px rgba(255,213,74,.7)}
   .modechip.mv.active{background:linear-gradient(135deg,#ffd54a 0%,#f0a336 100%);border-color:#ffd54a;color:#161000}
+  /* CAS-1186: Find takes --cyan — distinct from Watch's blue and Moving's amber, and already the colour the
+     app's own search affordances (focus rings, the Watch search icon) use. */
+  #findBtn{--mcf:var(--cyan)}
+  #findBtn.active{--mcf:#001a1f}
+  #findBtn:not(.active){background:rgba(34,211,238,.09);border-color:rgba(34,211,238,.32)}
+  #findBtn.active{box-shadow:0 5px 16px -5px rgba(34,211,238,.7)}
+  .modechip.fd.active{background:linear-gradient(135deg,#22d3ee 0%,#0891b2 100%);border-color:#22d3ee;color:#001a1f}
   .mcbadge{position:absolute;top:-6px;right:-4px;background:var(--rt);color:#fff;font-size:10px;font-weight:800;
     min-width:16px;height:16px;border-radius:9px;display:grid;place-items:center;padding:0 4px;line-height:1}
   /* CAS-538: two label strings per chip, one shown at a time — .mclabel-short only appears below the
@@ -288,7 +292,7 @@
      whichever is later in the stylesheet wins regardless of the media query. */
   @media (max-width:460px){
     .hdr-actions{gap:6px}
-    .hdr-actions .iconbtn{width:36px;height:36px;font-size:17px;border-radius:11px}
+    .navmenu-wrap .iconbtn{width:36px;height:36px;font-size:17px;border-radius:11px}
     .modechip{padding:0 7px;gap:4px}
     .modechip .mclabel-full{display:none}
     .modechip .mclabel-short{display:inline}
@@ -326,7 +330,7 @@
      against the header's other children, never against anything outside it. The menu stayed unreachable
      over both screens until CAS-568, which fixed it from the other end by dropping those two screens to
      z-index:29. The 95 is kept: it still orders this above the header's own children. */
-  .navmenu{position:absolute;top:calc(100% + 8px);right:0;z-index:95;display:none;flex-direction:column;
+  .navmenu{position:absolute;top:calc(100% + 8px);left:0;z-index:95;display:none;flex-direction:column;
     min-width:180px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
     box-shadow:0 12px 28px rgba(0,0,0,.4);overflow:hidden}
   .navmenu.open{display:flex}
@@ -773,14 +777,14 @@
     background:var(--panel2) center/cover no-repeat;display:grid;place-items:center;padding:0;cursor:pointer;font:inherit}
   .vidthumb.active{border-color:var(--accent)}
   .vidthumb .play{width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;font-size:11px;border:1px solid rgba(255,255,255,.45)}
-  /* CAS-284: share, in the opened card. Quiet — it is an offer, not one of the decisions the card is asking
-     you to make — and a full-height target rather than a bare glyph. */
-  .exshare{margin-top:12px}
-  .exsharebtn{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 13px;border-radius:10px;
-    border:1px solid var(--line);background:var(--panel2);color:var(--dim);
-    font-family:inherit;font-size:12.5px;font-weight:650;cursor:pointer;line-height:1}
+  /* CAS-1182: share, in the opened card. Full-width and accent-coloured so it reads clearly against the
+     card, without the weight of a primary CTA — a full-height target rather than a bare glyph. */
+  .exshare{margin-top:14px}
+  .exsharebtn{display:flex;width:100%;justify-content:center;align-items:center;gap:7px;height:44px;padding:0 14px;border-radius:12px;
+    border:1px solid var(--accent);background:rgba(124,92,255,.12);color:var(--accenttext);
+    font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;line-height:1}
   .exsharebtn svg{width:16px;height:16px;display:block}
-  .exsharebtn:hover{color:var(--ink);border-color:#3a4150}
+  .exsharebtn:hover{color:#fff;border-color:var(--accent);background:rgba(124,92,255,.2)}
   .exsharebtn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   .exsharebtn.done{color:var(--green);border-color:rgba(72,199,142,.55)}
   /* CAS-883 naming note: the film-page Invite feature below is unrelated to the older "agent invite"
@@ -1555,6 +1559,17 @@
   /* builder editor */
   .namein{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
     border-radius:10px;padding:11px 12px;font-size:16px;font-weight:600}
+  /* CAS-1175: the Invite sheet's calendar-only date field — a real <input type="date"> sits over the
+     whole box, invisible, so a tap/click lands on it and opens the platform's own picker (showPicker()
+     where the browser has it; already native on the iPhone); the shown text sits on top, pointer-events
+     none so clicks pass through to the input beneath it. */
+  .invdaterow{display:flex;align-items:center;gap:10px}
+  .invdatebox{position:relative;padding:0;flex:1;min-width:0}
+  .invdatebox .invdateinput{position:absolute;inset:0;width:100%;height:100%;margin:0;border:0;padding:0;
+    opacity:0;cursor:pointer}
+  .invdatebox .invdatetext{display:block;padding:11px 12px;pointer-events:none;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .invdatebox .invdatetext.ph{color:var(--faint);font-weight:500}
   /* CAS-554: .cascfoot sticks to .modal's true bottom:0 (the screen's own edge), so its own bottom padding
      needs the home-indicator clearance directly — nothing else in .modal owns it. */
   .cascfoot{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);
@@ -2647,20 +2662,15 @@
   /* CAS-419: the sort control is a .ca-btn.x, exactly like the adjacent search/filter icon buttons, so the
      row reads as one set of icons at every width instead of a wide text pill that could spill past the
      card's edge. The active-dot still marks "off the default"; the current choice is a tooltip (title on
-     the wrapper, set by syncSortCtl) plus the selected option inside the native picker itself. */
+     the button, set by syncSortCtl).
+     CAS-1181: #sortCtl is now the real button (togglePickerFor opens the shared listbox popover, same as
+     the Occasion/Picked by pills) — the invisible <select>-stretched-over-the-icon device is gone; #sort
+     itself survives only as inert state (hidden, tabindex="-1") for syncSortCtl's own option lookup. */
   .sortctl{position:relative}
-  /* The icon is decorative (aria-hidden) and position:relative so it can anchor .sortdot — which puts
-     it in front of the invisible <select> stretched over the button, and it swallowed the tap. It must
-     never take pointer events; the select underneath is the real control. */
+  /* The icon is decorative (aria-hidden) and position:relative so it can anchor .sortdot. */
   .sortic{font-size:13px;line-height:1;position:relative;pointer-events:none}
   .sortdot{position:absolute;top:-3px;right:-3px;width:7px;height:7px;border-radius:50%;
     background:var(--cyan);border:1.5px solid var(--panel2)}
-  /* The real control: a native select, invisible and stretched over the whole button, so a tap anywhere on
-     the icon opens the OS's own picker — which already shows the current sort selected and lets it be
-     changed, satisfying the "menu" acceptance criterion without a hand-rolled dropdown. */
-  .sortctl select{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;
-    opacity:0;cursor:pointer;-webkit-appearance:none;appearance:none}
-  .sortctl select:focus-visible ~ .sortic{outline:2px solid var(--cyan);outline-offset:2px}
 
   .fglabel .n{background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:1px 7px;
     font-size:10.5px;color:var(--dim);font-weight:700}
@@ -2899,7 +2909,9 @@
   /* CAS-H1: #movingScreen joins them. It is a main nav destination that opens at boot and has no
      back control, so it must sit BELOW the header like the other two rather than covering it —
      otherwise the app opens with no navigation and no way out. */
-  #agentsScreen, #movingScreen{top:var(--hdrh,0px); z-index:29}
+  /* CAS-1186: #findScreen joins them — it's a main nav destination reachable with no sign-in and no back
+     control, same reasoning as #movingScreen above. */
+  #agentsScreen, #movingScreen, #findScreen{top:var(--hdrh,0px); z-index:29}
   /* CAS-A1: Agents is a main destination and its list is short — a track down the right edge is
      chrome the screen does not earn. It still scrolls; only the indicator goes. */
   #agentsScreen{scrollbar-width:none;-ms-overflow-style:none}
@@ -2907,6 +2919,9 @@
   /* CAS-655: Moving is a main destination, like Agents — it scrolls, it does not need a track. */
   #movingScreen{scrollbar-width:none;-ms-overflow-style:none}
   #movingScreen::-webkit-scrollbar{width:0;height:0;display:none}
+  /* CAS-1186: Find is the same shape — a main destination with a long scroll, no track. */
+  #findScreen{scrollbar-width:none;-ms-overflow-style:none}
+  #findScreen::-webkit-scrollbar{width:0;height:0;display:none}
   /* CAS-567: .uwrap's calc(22px + env(safe-area-inset-top)) clearance is written for the .uscreens that
      cover the header at top:0. #yourMovies is not one of them — it starts at var(--hdrh), so the header has
      already spent the notch inset and this padding double-counts it: 22px in a desktop harness, 22px + the
@@ -2915,6 +2930,8 @@
      CAS-649: #movingScreen now starts at var(--hdrh) too, same double-count, same fix. It has no sticky
      content of its own, so this is the only Your-Movies treatment it needs — see CAS-636's shell above. */
   #movingScreen .uwrap{padding-top:0}
+  /* CAS-1186: #findScreen starts at var(--hdrh) too, same double-count, same fix. */
+  #findScreen .uwrap{padding-top:0}
   /* CAS-509: same env(safe-area-inset-top) clearance as the header — .uscreen (Your Movies, Agents,
      Review, Account, Service analysis, Lists, About) is fixed from the viewport's true top:0, so its
      .ostop back button was sitting under the notch/status bar with none of the header's allowance. */
@@ -3156,10 +3173,6 @@
   .bigtoggle.on{border-color:var(--accent);background:rgba(124,92,255,.12)}
   .bigtoggle.on .btcheck{background:var(--accent);border-color:var(--accent);color:#fff}
   .bigtoggle:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-  .emailwrap{display:none;margin-top:4px}
-  .emailwrap.show{display:block}
-  .nlbl{display:block;font-size:12px;font-weight:700;color:var(--dim);margin:10px 2px 6px;
-    text-transform:uppercase;letter-spacing:.03em}
 
   /* ---- Brand: primary CTAs carry the signature gradient (CAS-73 / spec 26640386 §1) ----
      Each selector re-states its own primary button so it overrides that button's solid
@@ -3416,7 +3429,33 @@
 <div class="phone">
   <header>
     <div class="brandrow">
-      <div>
+      <!-- CAS-1185: the hamburger menu leads the header row now — far left, ahead of the logo — instead of
+           trailing the nav chips. Agents moved out of the chip row into the menu's own first item, so this
+           wrap now opens the menu directly off the row's leading edge (see .navmenu's left:0, below). -->
+      <div class="navmenu-wrap">
+        <div class="iconbtn" id="navMenuBtn" title="Menu" role="button" tabindex="0" aria-haspopup="true"
+             aria-expanded="false" aria-controls="navMenu" aria-label="Menu" onclick="toggleNavMenu(event)">☰
+          <span class="navcountbadge" id="navMenuDot" style="display:none" aria-hidden="true"></span>
+        </div>
+        <div class="navmenu" id="navMenu" role="menu" aria-label="Menu">
+          <!-- CAS-1185: Agents leads the menu, in a group of its own — it's a main nav destination (it used
+               to be the header's own first chip), not one of the day-to-day items below the divider. -->
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('agents')">Agents</button>
+          <!-- CAS-886: Invites leads the day-to-day group — the top-of-list slot Notifications held before
+               CAS-636 folded that surface into Moving, and the position the design image gives Invites now. -->
+          <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('invites')">Invites
+            <span class="navitem-badge" id="invitesNavBadge" style="display:none">0</span></button>
+          <!-- CAS-928: Friends sits directly below Invites, the slot the design image gives it. -->
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('friends')">Friends</button>
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('recommend')">Recommend Cascade</button>
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('svcAnalysis')">Service analysis</button>
+          <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('settings')">Settings</button>
+          <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('help')">Help</button>
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('about')">About</button>
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('account')">Account</button>
+        </div>
+      </div>
+      <div class="brand-ident">
         <span class="brandlockup">
           <svg class="brandmark" viewBox="0 0 586 382" role="img" aria-label="Cascade"><defs><linearGradient id="bmg0" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".34" stop-color="#F0A63C" stop-opacity=".92"/><stop offset="1" stop-color="#F0A63C" stop-opacity=".62"/></linearGradient><linearGradient id="bmg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".34" stop-color="#C24DF0" stop-opacity=".92"/><stop offset="1" stop-color="#C24DF0" stop-opacity=".62"/></linearGradient><linearGradient id="bmg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".34" stop-color="#7C5CFF" stop-opacity=".92"/><stop offset="1" stop-color="#7C5CFF" stop-opacity=".62"/></linearGradient><linearGradient id="bmg3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".34" stop-color="#4C7DFF" stop-opacity=".92"/><stop offset="1" stop-color="#4C7DFF" stop-opacity=".62"/></linearGradient><linearGradient id="bmg4" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".34" stop-color="#22D3EE" stop-opacity=".92"/><stop offset="1" stop-color="#22D3EE" stop-opacity=".62"/></linearGradient><linearGradient id="bmg5" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".55"/><stop offset=".34" stop-color="#31D67D" stop-opacity=".92"/><stop offset="1" stop-color="#31D67D" stop-opacity=".62"/></linearGradient></defs><g><rect x="52" y="46" width="218" height="123" rx="14" fill="url(#bmg0)" stroke="#F0A63C" stroke-width="3" style="filter:drop-shadow(0 0 7px #F0A63Cbb) drop-shadow(0 3px 10px #F0A63C55)"/><rect x="54" y="48" width="214" height="119" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".30" stroke-width="1.2"/></g><g><rect x="106" y="83" width="218" height="123" rx="14" fill="url(#bmg1)" stroke="#C24DF0" stroke-width="3" style="filter:drop-shadow(0 0 7px #C24DF0bb) drop-shadow(0 3px 10px #C24DF055)"/><rect x="108" y="85" width="214" height="119" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".30" stroke-width="1.2"/></g><g><rect x="160" y="120" width="218" height="123" rx="14" fill="url(#bmg2)" stroke="#7C5CFF" stroke-width="3" style="filter:drop-shadow(0 0 7px #7C5CFFbb) drop-shadow(0 3px 10px #7C5CFF55)"/><rect x="162" y="122" width="214" height="119" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".30" stroke-width="1.2"/></g><g><rect x="214" y="157" width="218" height="123" rx="14" fill="url(#bmg3)" stroke="#4C7DFF" stroke-width="3" style="filter:drop-shadow(0 0 7px #4C7DFFbb) drop-shadow(0 3px 10px #4C7DFF55)"/><rect x="216" y="159" width="214" height="119" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".30" stroke-width="1.2"/></g><g><rect x="268" y="194" width="218" height="123" rx="14" fill="url(#bmg4)" stroke="#22D3EE" stroke-width="3" style="filter:drop-shadow(0 0 7px #22D3EEbb) drop-shadow(0 3px 10px #22D3EE55)"/><rect x="270" y="196" width="214" height="119" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".30" stroke-width="1.2"/></g><g><rect x="322" y="231" width="218" height="123" rx="14" fill="url(#bmg5)" stroke="#31D67D" stroke-width="3" style="filter:drop-shadow(0 0 7px #31D67Dbb) drop-shadow(0 3px 10px #31D67D55)"/><rect x="324" y="233" width="214" height="119" rx="12" fill="none" stroke="#ffffff" stroke-opacity=".30" stroke-width="1.2"/><path d="M 411.0 265.5 L 411.0 319.5 L 461.0 292.5 Z" fill="#ffffff" style="filter:drop-shadow(0 0 6px #ffffffaa)"/></g></svg>
         </span>
@@ -3435,23 +3474,28 @@
         </div>
       </div>
       <div class="hdr-actions">
-        <!-- Agents (was the Find chip; repurposed CAS-616, v0.9.5). The id stays #agentsBtn because six CSS
-             rules and the open/close pair below already key off it, and the name is now literally right: this
-             chip opens the Agents management/reorder screen, which used to live in the menu. It is NOT lit by
-             default any more — nothing in the bar is, while the Find listing is showing, because Find is no
-             longer one of the bar's destinations. The mark is a deck of agent cards.
-             CAS-638: Agents is now the FIRST chip in the row — it's a main nav destination, not a screen you
-             arrive at from somewhere else. -->
-        <div class="modechip" id="agentsBtn" title="Agents" role="button" tabindex="0"
-             aria-pressed="false" aria-label="Agents" onclick="openAgentsScreen()">
+        <!-- Watch (CAS-183, resized/reiconed CAS-530, relabelled CAS-564, redrawn CAS-571): everything you've
+             said about a film, and how your services cover it. A SOLID bookmark with the play triangle masked
+             OUT of it — rose-gradient at rest, flat white on the selected chip, and the notch transparent in
+             both so the chip's own background shows through.
+             CAS-616 (v0.9.5): Watch is now the FIRST chip in the row. Find left the bar for the top-right menu
+             and Manage Agents took its place, so the two chips are the app's two destinations and Find is the
+             thing underneath them.
+             CAS-633 (v0.9.5): Find IS Watch now — Your Movies is retired, so this chip opens the Find listing
+             itself (showAgentsHome()) rather than a dialog, and is no longer a dialog opener. Lit whenever the
+             Find listing is what's showing — see syncWatchChip().
+             CAS-640 (v0.9.5): Watch moves to the end of the row — it's the destination you land on and return
+             to — and takes --brand-blue, the blue it wore when it was Find, instead of the rose it inherited
+             from the retired Your Movies screen.
+             CAS-1185: Watch is the FIRST chip again — Agents left the row for the menu, so Watch and Moving
+             are the only two chips left and the row reads left to right as Watch then Moving. -->
+        <div class="modechip active" id="moviesBtn" title="Watch" role="button" tabindex="0"
+             aria-label="Watch" onclick="showAgentsHome()">
           <svg class="mcicon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <rect class="s" x="3.2" y="6.6" width="12" height="12.8" rx="2.6" stroke-width="1.8"/>
-            <rect class="g" x="7.6" y="4.6" width="12" height="12.8" rx="2.6"/>
-            <rect class="s" x="7.6" y="4.6" width="12" height="12.8" rx="2.6" stroke-width="1.8"/>
-            <circle class="f" cx="13.6" cy="11" r="2"/>
+            <path class="f" d="M6 3.6h12a1 1 0 0 1 1 1V20.8l-7-3.95-7 3.95V4.6a1 1 0 0 1 1-1Z" mask="url(#mcWatchMask)"/>
           </svg>
-          <span class="mclabel mclabel-full">Agents</span>
-          <span class="mclabel mclabel-short">Agents</span>
+          <span class="mclabel mclabel-full">Watch</span>
+          <span class="mclabel mclabel-short">Watch</span>
         </div>
         <!-- Moving (CAS-636): the alert feed made visible — every row corresponds to an in-app/email
              notification, so this is the one place Cascade shows "what changed" rather than "what matches".
@@ -3466,61 +3510,18 @@
           <span class="mclabel mclabel-short">Moving</span>
           <span class="mcbadge" id="movingBadge" style="display:none">0</span>
         </div>
-        <!-- Watch (CAS-183, resized/reiconed CAS-530, relabelled CAS-564, redrawn CAS-571): everything you've
-             said about a film, and how your services cover it. A SOLID bookmark with the play triangle masked
-             OUT of it — rose-gradient at rest, flat white on the selected chip, and the notch transparent in
-             both so the chip's own background shows through.
-             CAS-616 (v0.9.5): Watch is now the FIRST chip in the row. Find left the bar for the top-right menu
-             and Manage Agents took its place, so the two chips are the app's two destinations and Find is the
-             thing underneath them.
-             CAS-633 (v0.9.5): Find IS Watch now — Your Movies is retired, so this chip opens the Find listing
-             itself (showAgentsHome()) rather than a dialog, and is no longer a dialog opener. Lit whenever the
-             Find listing is what's showing — see syncWatchChip().
-             CAS-640 (v0.9.5): Watch moves to the end of the row — it's the destination you land on and return
-             to — and takes --brand-blue, the blue it wore when it was Find, instead of the rose it inherited
-             from the retired Your Movies screen. -->
-        <div class="modechip active" id="moviesBtn" title="Watch" role="button" tabindex="0"
-             aria-label="Watch" onclick="showAgentsHome()">
+        <!-- Find (CAS-1186): the third nav destination — every film in MOVIES, searchable by name, with no
+             agent/tab/service/watched/style/Picked-by narrowing of any kind. Same modechip construction as
+             Moving; the magnifying-glass icon is the Watch search box's own glyph (CAS-150), drawn in the
+             same stroke style as the other chip icons. -->
+        <div class="modechip fd" id="findBtn" title="Find" role="button" tabindex="0"
+             aria-pressed="false" aria-label="Find" onclick="openFindScreen()">
           <svg class="mcicon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path class="f" d="M6 3.6h12a1 1 0 0 1 1 1V20.8l-7-3.95-7 3.95V4.6a1 1 0 0 1 1-1Z" mask="url(#mcWatchMask)"/>
+            <circle class="s" cx="11" cy="11" r="6.4" stroke-width="2" fill="none"/>
+            <path class="s" d="M15.8 15.8 20 20" stroke-width="2" stroke-linecap="round" fill="none"/>
           </svg>
-          <span class="mclabel mclabel-full">Watch</span>
-          <span class="mclabel mclabel-short">Watch</span>
-        </div>
-        <!-- Top menu (CAS-345, +Notifications CAS-530, +Manage Agents CAS-534, reordered CAS-551, Agent
-             Preferences split CAS-562): the account/about surfaces — Languages, Where & when you'll watch,
-             My services, Service analysis, Lists, Account, About — that used to be scattered across
-             separate header icons now live in one anchored dropdown. Notifications joins as its top entry
-             (CAS-530): the bell icon is gone from the bar entirely, freeing the row for Agents/Your Movies'
-             wider labelled chips. Manage Agents (CAS-534) joins next: the Agents management/reorder screen
-             moved here since the header's Agents chip now means the deck+movie-list home view instead.
-             CAS-551 shipped first and seated a single "Agent Preferences" row (renamed from Preferences)
-             right under Manage Agents; CAS-562 lands second and splits that one row into Languages + Where
-             & when you'll watch in the same slot — see the CAS-562 fix comment for how the two reconcile.
-             Account drops to second-last since it's reached for rarely.
-             CAS-1126: regrouped into three divider-separated groups — day-to-day (Invites/Friends/Recommend
-             Cascade/Service analysis), Settings, and sign-in/info (Help/About/Account). Languages, Where &
-             when you'll watch, My services and Occasions leave the menu for the new Settings screen; their
-             navMenuGo keys stay wired for deep links and other callers. -->
-        <div class="navmenu-wrap">
-          <div class="iconbtn" id="navMenuBtn" title="Menu" role="button" tabindex="0" aria-haspopup="true"
-               aria-expanded="false" aria-controls="navMenu" aria-label="Menu" onclick="toggleNavMenu(event)">☰
-            <span class="navcountbadge" id="navMenuDot" style="display:none" aria-hidden="true"></span>
-          </div>
-          <div class="navmenu" id="navMenu" role="menu" aria-label="Menu">
-            <!-- CAS-886: Invites leads the menu — the top-of-list slot Notifications held before CAS-636
-                 folded that surface into Moving, and the position the design image gives Invites now. -->
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('invites')">Invites
-              <span class="navitem-badge" id="invitesNavBadge" style="display:none">0</span></button>
-            <!-- CAS-928: Friends sits directly below Invites, the slot the design image gives it. -->
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('friends')">Friends</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('recommend')">Recommend Cascade</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('svcAnalysis')">Service analysis</button>
-            <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('settings')">Settings</button>
-            <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('help')">Help</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('about')">About</button>
-            <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('account')">Account</button>
-          </div>
+          <span class="mclabel mclabel-full">Find</span>
+          <span class="mclabel mclabel-short">Find</span>
         </div>
       </div>
     </div>
@@ -3580,10 +3581,10 @@
       </div>
       <div class="watchsearchwrap" id="watchSearchWrap">
         <input id="watchSearchInput" class="search" type="text" inputmode="search" autocomplete="off"
-               placeholder="Search" aria-label="Search this tab">
+               placeholder="Search all your films" aria-label="Search all your films">
         <button class="searchclear" id="watchSearchClear" aria-label="Clear search" type="button" hidden>×</button>
       </div>
-      <button type="button" class="watchiconbtn" id="watchSearchBtn" aria-label="Search this tab" hidden
+      <button type="button" class="watchiconbtn" id="watchSearchBtn" aria-label="Search all your films" hidden
               onclick="openWatchSearch()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
           stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.4"/><path d="M15.8 15.8 20 20"/></svg>
@@ -3596,22 +3597,24 @@
              stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.2 5.4h15.6l-6 7.2v6l-3.6 1.8v-7.8z"/></svg>
         <span class="wfbadge" id="watchFilterBadge" hidden>0</span>
       </button>
-      <!-- CAS-371: the live <select> keeps its value/listeners by staying one persistent node — it used to
-           be reparented into the deck's active card (deckSync()); the deck is gone, so this is now simply
-           its permanent home. -->
-      <div class="sortctl ca-btn x" id="sortCtl">
-        <select id="sort" aria-label="Order">
-          <option value="availability">Availability</option>
-          <option value="imdb">People rating</option>
-          <option value="cascade">Cascade score</option>
-          <option value="rt">Critics</option>
-          <option value="gross">Box office</option>
-          <option value="popularity">Most anticipated</option>
-          <option value="cinema">Newest cinema</option>
-          <option value="title">Title A–Z</option>
-        </select>
+      <!-- CAS-1181: a real button opening the shared listbox popover (togglePickerFor, same device as the
+           Occasion/Picked by pills), replacing the invisible-<select>-stretched-over-the-icon device that
+           opened the browser's own unstyled list. The select stays only as inert state (tabindex="-1",
+           hidden — never clicked or focused) so syncSortCtl's own option lookup is untouched. -->
+      <button type="button" class="sortctl ca-btn x" id="sortCtl" aria-haspopup="listbox" aria-expanded="false"
+              aria-label="Order" onclick="togglePickerFor('sort',this)">
         <span class="sortic" aria-hidden="true">⇅<span class="sortdot" id="sortDot" hidden></span></span>
-      </div>
+      </button>
+      <select id="sort" tabindex="-1" aria-hidden="true" hidden>
+        <option value="availability">Availability</option>
+        <option value="imdb">People rating</option>
+        <option value="cascade">Cascade score</option>
+        <option value="rt">Critics</option>
+        <option value="gross">Box office</option>
+        <option value="popularity">Most anticipated</option>
+        <option value="cinema">Newest cinema</option>
+        <option value="title">Title A–Z</option>
+      </select>
     </div>
     <!-- CAS-718: one chip per active (non-default) sheet section, each clearing just that section. -->
     <div class="chips watchactivefilters" id="watchActiveFilters" role="group" aria-label="Active filters" hidden></div>
@@ -4005,6 +4008,15 @@
   <div class="uwrap" id="movingBody"></div>
 </div>
 
+<!-- FIND (CAS-1186): the third main nav destination — every film in MOVIES, searchable by name, no agent/
+     tab/service narrowing of any kind. Same shape as #movingScreen just above: opens with no back control,
+     so it sits BELOW the header (top:var(--hdrh), z-index:29) rather than covering it at top:0. Body
+     rendered by renderFindScreen(); the list itself is paged in by findRenderMore() as the user scrolls
+     near the bottom — the whole catalogue (~5,800 films) is never rendered at once. -->
+<div class="uscreen" id="findScreen" role="dialog" aria-modal="true" aria-label="Find">
+  <div class="uwrap" id="findBody"></div>
+</div>
+
 <!-- ACCOUNT (CAS-206 / CAS-210) — what every new agent starts from, how you are told by default, and the
      membership. Body rendered by renderAccount(). Signing in itself still happens in the email+password
      panel (CAS-82 / CAS-317), which this screen opens rather than duplicates. Reached from the top menu
@@ -4054,6 +4066,13 @@
      top menu's Settings screen (CAS-1126). -->
 <div class="uscreen" id="wwScreen" role="dialog" aria-modal="true" aria-label="Service tracking">
   <div class="uwrap" id="wwBody"></div>
+</div>
+
+<!-- HOW YOU'RE TOLD (CAS-1176) — Settings' own copy of the notify controls, a plain back-arrow-and-title
+     screen like #wwScreen above rather than the onboarding step frame. Body rendered by renderNotifyScreen().
+     Reached from the top menu's Settings screen. -->
+<div class="uscreen" id="notifyScreen" role="dialog" aria-modal="true" aria-label="How you're told">
+  <div class="uwrap" id="notifyBody"></div>
 </div>
 
 <!-- OCCASIONS (CAS-775) — manage the user's Occasions register: create, rename, delete. Replaces CAS-768's
@@ -4394,6 +4413,16 @@ function watchTabsNow(){
 // Filters sheet) has widened that tab to include the film's current standing too. Cinema's own branch above
 // is untouched by this — it never consults a standing test or watchAlsoShow at all.
 function filmMatchesWatchTab(m, tab){
+  // CAS-1180: setOpinion() clears every Watch On rung the moment a verdict is given, so a watched film
+  // never again carries a key — read its tab off primaryStatus (the window it stands in NOW) instead, the
+  // only way such a film can ever reach the Watched filter/search below rather than being invisible on
+  // every non-Cinema tab forever. It still needs no standing test beyond this: Also-show and
+  // WATCH_TAB_OWN_STANDING are both about a Watch On level widening a tab, which a verdict film has none of.
+  if(taggedOut(m)){
+    const ps=primaryStatus(m);
+    if(tab==="in_cinema") return ps==="upcoming" || ps==="opening_week" || ps==="in_cinema";
+    return ps===WATCH_TAB_OWN_STANDING[tab];
+  }
   const key = filmNotifyState(m.tmdb_id).key;
   if(tab==="in_cinema"){
     if(key==="in_cinema") return true;
@@ -6047,8 +6076,9 @@ function showFoundList(){ settleFoundView(); }
 // own onchange below, cleared wherever filt.sort is assigned from a stored cascade (applyCascade) — never
 // persisted, so a reload starts false same as filt.sort itself starts at DEFAULT_SORT.
 let sortPicked=false;
-// CAS-419: the invisible <select> is the only thing that changes filt.sort; this just repaints the icon
-// button around it — a tooltip naming the current order, and the active-dot for "you're off the default".
+// CAS-1181: PICKER_KINDS.sort's pick() is what changes filt.sort now (the popover replaced the invisible
+// <select>); this just repaints the icon button around it — a tooltip naming the current order, and the
+// active-dot for "you're off the default". The select itself stays only as inert state for the lookup below.
 function syncSortCtl(){
   // CAS-566: sortCtl only lives inside whichever card is .is-active (deckSync's reparenting) — with zero
   // agents there is no such card, so it sits detached (not in the document) until one exists again, and
@@ -6058,9 +6088,6 @@ function syncSortCtl(){
   $("sortCtl").title="Order: "+(opt?opt.textContent:"");
   $("sortDot").hidden=!sortPicked;   // CAS-819: dot reflects an explicit pick, not just "off DEFAULT_SORT"
 }
-// CAS-819: choosing "Cascade score" (DEFAULT_SORT's own option) is choosing the default back — anything
-// else is a genuine pick.
-$("sort").onchange=e=>{filt.sort=e.target.value;sortPicked=(filt.sort!==DEFAULT_SORT);syncSortCtl();render();};
 $("imdbMin").oninput=e=>{filt.imdb=+e.target.value;$("imdbVal").textContent=filt.imdb?filt.imdb.toFixed(1)+"+":"Any";render();};
 $("rtMin").oninput=e=>{filt.rt=+e.target.value;$("rtVal").textContent=filt.rt?filt.rt+"%+":"Any";render();};
 $("grossMin").onchange=e=>{filt.gross=+e.target.value;render();};
@@ -6780,7 +6807,7 @@ function inviteFilmHTML(m, big){
       ＋ Invite someone to watch</button>
     <div class="pnote" style="text-align:center">They'll see this film and a Yes / No — no app needed.</div>`;
   return `<div class="exshare"><button type="button" class="exsharebtn" onclick="event.stopPropagation();openFilmInvite(${m.tmdb_id})"
-      title="${escA("Invite someone to "+m.title)}" aria-label="${escA("Invite someone to "+m.title)}">${ICON.share}<span class="sl">Invite</span></button></div>`;
+      title="${escA("Invite someone to "+m.title)}" aria-label="${escA("Invite someone to "+m.title)}">${ICON.share}<span class="sl">Invite a friend to watch this</span></button></div>`;
 }
 // What we can say about the film without inventing anything: its title, its year, and the window we have
 // actually CONFIRMED it is in. An estimated window says nothing at all — the whole point of the estimate is
@@ -6828,7 +6855,40 @@ function genInviteToken(){
 // real and permanent without a build-time page per title. #/film/<id> is read at boot by openFilmPage().
 // CAS-883: the one function in the file that builds an invite URL, replacing the CAS-837 link builder.
 // tmdb_id stays the title key, never a Watchmode id or a row id, same as every other #/film/<id> link.
-const inviteUrlFor = (token, m) => `${location.origin}${location.pathname}?inv=${token}#/film/${m.tmdb_id}`;
+// CAS-1175: the iPhone app's own origin is capacitor://localhost, which is not an address anyone outside
+// the app can open — whenever the page isn't served over http or https, fall back to the real
+// cascademovies.com host instead. A preview host (or local tests) is served over http/https and keeps
+// linking to itself, exactly as before.
+const inviteUrlFor = (token, m) => {
+  const q = `?inv=${token}#/film/${m.tmdb_id}`;
+  return /^https?:$/.test(location.protocol) ? `${location.origin}${location.pathname}${q}` : `https://cascademovies.com/${q}`;
+};
+// CAS-1175: the one date formatter shared by the Invite sheet's own calendar field (what it shows once a
+// date is picked) and inviteMessageFor below (its "suggests DATE" line) — so the two can never disagree.
+// Day of week, two-digit day, short month, no year: nobody needs the year for a date that's always within
+// the next cinema window (Lee's decision).
+const INVITE_DATE_WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+function fmtInviteDate(iso){
+  if(!iso) return "";
+  const d = new Date(iso+"T00:00:00Z");
+  return `${INVITE_DATE_WEEKDAYS[d.getUTCDay()]} ${String(d.getUTCDate()).padStart(2,"0")} ${MONTHS[d.getUTCMonth()]}`;
+}
+// CAS-1175: the one function that builds the WhatsApp/SMS invite text — openNextInviteChannel (below)
+// calls this instead of inlining shareTextFor()+link, so the message actually says who is inviting, to
+// which film, and carries the suggested date and/or note the sender added (previously neither reached
+// this text at all). Exported directly, like inviteUrlFor, so a test can assert the exact wording.
+function inviteMessageFor({name, title, date, note, url}){
+  const dateTxt = date ? fmtInviteDate(date) : "";
+  const lines = [
+    dateTxt
+      ? `${name} has invited you to watch ${title} with them, and suggests ${dateTxt}.`
+      : `${name} has invited you to watch ${title} with them.`,
+  ];
+  const noteTxt = (note||"").trim().replace(/\s+/g," ");
+  if(noteTxt) lines.push(`${name} says: “${noteTxt}”`);
+  lines.push(url);
+  return lines.join("\n");
+}
 // ---- CAS-928: Friends — the shared recipient picker + the standalone Friends screen --------------------
 // Supersedes CAS-883's single free-text name field (the Invite sheet, below) with a real remembered
 // person: a friend is a name plus an email and/or a mobile (one of the two is enough), saved automatically
@@ -7123,7 +7183,9 @@ function normalizeAuMobile(raw){
 function openNextInviteChannel(queue, m){
   if(!queue.length) return;
   const next=queue[0], rest=queue.slice(1);
-  const text=`${shareTextFor(m)}\n${inviteUrlFor(next.token, m)}`;
+  // CAS-1175: inviteMessageFor, not shareTextFor()+link — this text must say who is inviting and carry
+  // the suggested date/note the sender added, same as the one message every recipient in this queue reads.
+  const text=inviteMessageFor({name:next.name, title:m.title, date:next.date, note:next.note, url:inviteUrlFor(next.token, m)});
   const digits=normalizeAuMobile(next.friend.mobile);
   const url = next.channel==="whatsapp"
     ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
@@ -7207,13 +7269,19 @@ function renderFilmInviteSheet(m){
     <input type="text" class="namein" id="filmInviteName" maxlength="60" autocomplete="off"
       value="${escA(nameVal)}" oninput="onInviteNameInput(this.value)">
     <div class="flabel">Suggested date (optional)</div>
-    <input type="date" class="namein" id="filmInviteDate" min="${escA(TODAY)}" value="${escA(inviteDateVal||"")}"
-      oninput="onInviteDateInput(this.value)">
-    <div class="flabel">Note</div>
-    <textarea class="cmsg" id="filmInviteNote" maxlength="500" rows="3" placeholder="Add a note (optional)"
+    <div class="invdaterow">
+      <div class="namein invdatebox">
+        <input type="date" class="invdateinput" id="filmInviteDate" min="${escA(TODAY)}" value="${escA(inviteDateVal||"")}"
+          oninput="onInviteDateInput(this.value)" onkeydown="event.preventDefault()"
+          onclick="this.showPicker && this.showPicker()">
+        <span class="invdatetext${inviteDateVal?"":" ph"}" id="filmInviteDateLabel">${inviteDateVal?esc(fmtInviteDate(inviteDateVal)):"Pick a date"}</span>
+      </div>
+      <button type="button" class="linkbtn" id="filmInviteDateClear" onclick="onInviteDateClear()" ${inviteDateVal?"":"hidden"}>Clear</button>
+    </div>
+    <div class="flabel">Note (optional)</div>
+    <textarea class="cmsg" id="filmInviteNote" maxlength="500" rows="3" placeholder="Add a note"
       oninput="onInviteNoteInput(this.value)">${esc(inviteNoteVal||"")}</textarea>
-    <button type="button" class="filminvcta" id="filmInviteSend" onclick="sendFilmInvite()" ${canSend?"":"disabled"}>${esc(ctaLabel)}</button>
-    <div class="pnote" style="text-align:center">Email sends straight from Cascade. WhatsApp or SMS opens your messaging app to finish sending.</div>`;
+    <button type="button" class="filminvcta" id="filmInviteSend" onclick="sendFilmInvite()" ${canSend?"":"disabled"}>${esc(ctaLabel)}</button>`;
 }
 // CAS-1121: "Your name" prefills from the account's own remembered display name, else the email local
 // part — the only identity a brand-new account has today.
@@ -7223,7 +7291,20 @@ function inviteDefaultName(){
   return (a && a.user && a.user.email) ? a.user.email.split("@")[0] : "";
 }
 window.onInviteNameInput=(val)=>{ inviteNameVal=val; const btn=$("filmInviteSend"); if(btn) btn.disabled = !(inviteFriendSel.size>0 && val.trim().length>0); };
-window.onInviteDateInput=(val)=>{ inviteDateVal=val; };
+// CAS-1175: the real <input type="date"> stays the thing that's saved and sent (unchanged) — this just
+// keeps the shown text and the Clear control in step with it, using the one shared formatter.
+window.onInviteDateInput=(val)=>{
+  inviteDateVal=val;
+  const label=$("filmInviteDateLabel");
+  if(label){ label.textContent = val ? fmtInviteDate(val) : "Pick a date"; label.classList.toggle("ph", !val); }
+  const clearBtn=$("filmInviteDateClear");
+  if(clearBtn) clearBtn.hidden = !val;
+};
+window.onInviteDateClear=()=>{
+  const input=$("filmInviteDate");
+  if(input) input.value="";
+  onInviteDateInput("");
+};
 window.onInviteNoteInput=(val)=>{ inviteNoteVal=val; };
 window.openFilmInvite = id => {
   const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
@@ -7295,7 +7376,9 @@ window.sendFilmInvite = async()=>{
         }]);
         if(emErr) throw emErr;
       }
-      sent.push({friend:r.friend, channel:r.channel, token});
+      // CAS-1175: name/date/note ride along so openNextInviteChannel's WhatsApp/SMS text can carry them —
+      // the same sender_name/suggested_date/note the invites row above just got.
+      sent.push({friend:r.friend, channel:r.channel, token, name:sender_name, date:suggested_date, note});
       newInvites.push({token, tmdb_id:m.tmdb_id, film_title:m.title, to_name:r.friend.name, created_at, invite_replies:[]});
       logEvent("invite_created",{n:recipients.length, channel:r.channel});
     }
@@ -9057,10 +9140,12 @@ function closeWatchSearchIfEmpty(){
   if(watchSearchOpen && inp && !inp.value){ watchSearchOpen=false; renderWatchCtl(); }
 }
 function renderWatchCtl(){
-  const tab=watchTabsNow().find(t=>t.key===watchTab);
   const inp=$("watchSearchInput");
   if(inp){
-    inp.placeholder = tab ? `Search ${tab.label}` : "Search";
+    // CAS-1180 Part D: the placeholder once named the current tab ("Search Streaming") because that's all
+    // the box ever searched; it now reaches every tab/window, so the one fixed placeholder says that
+    // honestly rather than naming whichever tab happens to be open.
+    inp.placeholder = "Search all your films";
     const raw=watchSearchRaw[watchTab];
     if(inp.value!==raw) inp.value=raw;
   }
@@ -9161,7 +9246,27 @@ const PICKER_KINDS = {
     current: () => movingWindow,
     pick: key => setMovingWindow(key),
   },
+  // CAS-1181: the Watch listing's sort control, moved off the native <select> (CAS-856 built this same
+  // popover for the retired Your Movies screen; .ordpop below is that ticket's own leftover CSS, reused
+  // rather than duplicated). SORT_OPTS mirrors the hidden #sort select's own option order exactly.
+  sort: {
+    items: () => SORT_OPTS,
+    current: () => filt.sort,
+    // CAS-819: choosing "Cascade score" (DEFAULT_SORT's own option) is choosing the default back — anything
+    // else is a genuine pick, which is what sortPicked (the active-dot's own flag) tracks.
+    pick: key => { filt.sort=key; sortPicked=(filt.sort!==DEFAULT_SORT); syncSortCtl(); render(); },
+  },
 };
+const SORT_OPTS = [
+  {key:"availability", label:"Availability"},
+  {key:"imdb",          label:"People rating"},
+  {key:"cascade",       label:"Cascade score"},
+  {key:"rt",             label:"Critics"},
+  {key:"gross",          label:"Box office"},
+  {key:"popularity",    label:"Most anticipated"},
+  {key:"cinema",         label:"Newest cinema"},
+  {key:"title",          label:"Title A–Z"},
+];
 function closePickerPop(){
   const pop=document.querySelector(".cpop.pickpop"); if(!pop) return null;
   const btn=document.getElementById(pop.dataset.forBtn);
@@ -9180,10 +9285,12 @@ window.togglePickerFor = (kind, btn) => {
   // CAS-374 precedent: edge-aligned under the pill that opens it — .al-l for Occasion (leftmost, so the
   // content-width panel grows rightward, clear of the screen edge), .al-r for Picked by (grows leftward,
   // clear of the RIGHT screen edge instead, since it sits further along the row).
-  pop.className=`cpop pickpop ${kind==="occ"?"al-l":"al-r"} pop-down`;
+  pop.className=`cpop pickpop ${kind==="occ"?"al-l":"al-r"}${kind==="sort"?" ordpop":""} pop-down`;
   pop.dataset.forBtn=btn.id;
   pop.setAttribute("role","listbox");
-  const lbl=btn.querySelector(".pblbl"); if(lbl) pop.setAttribute("aria-label", lbl.textContent);
+  // CAS-1181: sortCtl carries its own aria-label (no .pblbl child — it's an icon button, not a text pill).
+  const lbl=btn.querySelector(".pblbl"), label=lbl?lbl.textContent:btn.getAttribute("aria-label");
+  if(label) pop.setAttribute("aria-label", label);
   pop.innerHTML=`<div class="nopts">${items.map(o=>{
     const on=o.key===curKey;
     return `<button type="button" class="popt${on?" on":""}" role="option" aria-selected="${on}"
@@ -9386,6 +9493,13 @@ function renderWatchSheet(rows, shownCount){
     return `<button type="button" class="chip${on?" on":""}" style="--wwc:${v.cd}" aria-pressed="${on}"
       onclick="toggleWatchWatched('${v.key}')">${esc(v.lbl)}</button>`;
   }).join("");
+  // CAS-1181: single-select, same chip markup as the other sheet rows — setWatchPickedBy(key) assigns
+  // outright rather than toggling, so this and the search-bar pill (PICKER_KINDS.pickedby) always agree.
+  const pickedByHTML=PICKED_BY_OPTS.map(o=>{
+    const on=o.key===pickedBy;
+    return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
+      onclick="setWatchPickedBy('${o.key}')">${esc(o.label)}</button>`;
+  }).join("");
   const stylesHTML=genres.length ? genres.map(g=>{
     const on=!genreOff.has(g);
     return `<button type="button" class="chip gen${on?" on":""}" aria-pressed="${on}"
@@ -9431,6 +9545,10 @@ function renderWatchSheet(rows, shownCount){
         aria-checked="${mineOnly}" onclick="toggleWatchMineOnly()">
         <span>Show only available on my services</span><span class="knob"></span>
       </div>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Picked by</span></div>
+      <div class="chips">${pickedByHTML}</div>
     </div>
     <div class="wsheetsec">
       <div class="wsheethd"><span>Watched</span></div>
@@ -9570,6 +9688,14 @@ function watchAlsoShowPool(){
   }
   const wsearch=watchSearch[watchTab];
   return wsearch ? pool.filter(m=>m.title.toLowerCase().includes(wsearch)) : pool;
+}
+// CAS-1180 Part D: while the search box holds text, the listing stops being "this tab, filtered" and becomes
+// "every film any of the account's agents lists, anywhere" — render() swaps its own tab/Picked by/Watched/
+// Styles/Also show/Agents-to-include/mineOnly-narrowed `rows` for this set instead. `cascades.some` (not
+// watchAgentOff's included set) is deliberate: Agents to include is one of the filters search ignores. A
+// verdict film is still listedBy's own ordinary call (CAS-718's excludeWatched:false), so it's included too.
+function watchSearchRows(wsearch){
+  return MOVIES.filter(m => m.title.toLowerCase().includes(wsearch) && cascades.some(c=>listedBy(m,c)));
 }
 // ---- "Finish your agent" (CAS-71) — removed by CAS-273 --------------------------
 // The services question used to be asked a second time here, on top of the listing, once the agent had found
@@ -11971,6 +12097,33 @@ window.closeWhereWhen=()=>{
   fireScreenResume();   // CAS-1126: back to Settings if that's where this was opened from
 };
 
+// ================= HOW YOU'RE TOLD (CAS-1176) =================
+// Settings' own copy of the notify controls, as a plain back-arrow-and-title screen like Service tracking
+// (CAS-532) rather than the onboarding step frame openSettingsStep used to reopen (progress bar, LAST ONE,
+// Continue, Skip) — none of which make sense once there's no flow left to walk. Shares notifyControlsHTML()/
+// wireNotifyControls() with the onboarding `notifysettings` step's own ?step= preview; every tap here saves
+// straight through saveNotifyPrefs(), same as it always has.
+function renderNotifyScreen(){
+  $("notifyBody").innerHTML=`
+    <div class="ostop"><button class="osback" type="button" onclick="closeNotifyScreen()" aria-label="Back">←</button>
+      <h2 class="osh">How you're told</h2></div>
+    <p class="ossub">As new movies come along that meet your brief, this agent will ping you. How would you like to be notified?</p>
+    ${notifyControlsHTML()}`;
+  wireNotifyControls();
+}
+window.openNotifyScreen=()=>{
+  renderNotifyScreen();
+  $("notifyScreen").scrollTop=0;
+  $("notifyScreen").classList.add("open"); lockBodyScroll(true);
+  syncWatchChip();
+  logEvent("notify_screen_opened",{});
+};
+window.closeNotifyScreen=()=>{
+  $("notifyScreen").classList.remove("open"); lockBodyScroll(false);
+  syncWatchChip();
+  fireScreenResume();   // CAS-1126: back to Settings if that's where this was opened from
+};
+
 // ================= Top menu (CAS-345) =================
 // One anchored dropdown for the account/about surfaces that used to be separate header icons (Account,
 // Service analysis) or buried inside My streaming services (About). Dismiss on an outside tap or on
@@ -12195,7 +12348,8 @@ window.closeNavMenu=()=>{
 window.navMenuGo=key=>{
   closeNavMenu();
   logEvent("nav_menu_item",{item:key});
-  if(key==="find") showAgentsHome();
+  if(key==="find") openFindScreen();
+  else if(key==="agents") openAgentsScreen();
   else if(key==="invites") openInvitesScreen();
   else if(key==="friends") openFriendsScreen();
   else if(key==="account") openAccount();
@@ -13046,7 +13200,7 @@ function onbMassiveCritV2(ans, s){
     watchMarkers: marks,
     status: ["upcoming","opening_week","in_cinema","pvod","rental","included_streaming"],
     genre: [], exclude: [], age: ["M","MA 15+","R 18+"], includeUnrated: true, yearsBack: 3, selBuzz: 1,
-    selCrowd: 0, selCritScore: 0, selAwards: 0, selScale: 0,
+    selCrowd: 0, selCritScore: 0, selAwards: 0, selScale: 0, cinemaReleaseOnly: true,
     myServices: {pvod:false, rental:false, included_streaming:false},
     watchWindows: ww,
   };
@@ -13580,8 +13734,10 @@ function saveWatch(){
 const WATCH_PREFS_KEY="cascade_watch_prefs";
 // CAS-1123: every default window carries just `list` now — a window that's on both lists and alerts, so
 // a new member is alerted in every window they watch instead of hearing about nothing (Lee's report).
+// CAS-1177: Upcoming also defaults its two extra moments, "When announced" and "Opening next week", on —
+// a new member hears about an upcoming film the moment it's announced, not only once it opens.
 const watchPrefsDefaults = () => ({
-  upcoming:{list:true}, in_cinema:{list:true},
+  upcoming:{list:true, subs:{announced:true, opens_soon:true}}, in_cinema:{list:true},
   rent:{list:true},     stream:{list:true},
   // premium starts fully off, same as it always has (CAS-243) — the one window nobody should be opted
   // into by default.
@@ -13624,16 +13780,17 @@ function onbApplyWatchPrefsV2(ans){
   syncWatchPrefsToCascades();
 }
 // CAS-532: hubWatchSummary retired with the hub's "watch" door — there is no remaining caller.
-// CAS-1123 (Lee, 2026-10-01): one card per window, one switch on the face of it — Watch. A window that's
+// CAS-1123 (Lee, 2026-10-01): one card per window, one switch on the face of it. A window that's
 // on both lists matching films AND tells you when one arrives there; the old Track/Notify pair (CAS-228)
 // is gone, because a window you watch in is a window you want to hear from.
+// CAS-1177: the switch itself reads "Track" on every window's button.
 function drawWatchLanes(){
   const box=$("wwLanes"); if(!box) return;
   box.innerHTML = agentWindows().map(w=>{
     const on=winOn(w.key,"list");
     const sw=`<button type="button" class="agwt${on?" on":""}" aria-pressed="${on}"
         title="${escA(`Watch ${w.label.toLowerCase()} — list matching films and tell you ${w.notifySay}`)}"
-        onclick="wwToggleWin('${w.key}')"><span class="wwb">✓</span>Watch here</button>`;
+        onclick="wwToggleWin('${w.key}')"><span class="wwb">✓</span>Track</button>`;
     // CAS-242: the finer moments appear only once the window itself is on, because until then there is no
     // bell for them to choose between. They are a nested list rather than a second switch on the row: they
     // are not a separate job the agent does, they are which moments the one bell rings on.
@@ -14471,24 +14628,29 @@ function msnScoreCardHTML(){
     <div id="msnTrackArea">${msnTrackAreaHTML(c)}</div>
   </div>`;
 }
-// CAS-1128: the drag mutator. Off (value 0) nulls every account-enabled window outright; dragging up from
-// Off arms every account-enabled window at the new value (the person then unticks whichever pills they
-// don't want); dragging between two real scores updates only the windows already ON, leaving the ticked set
-// untouched — ticking/unticking one window by itself is toggleAgentWindow's job, not this one's. msnLastScore
-// (a single remembered value) lets a pill re-arm the agent's last real score once it was dropped to fully
-// Off, rather than always snapping back to the same hardcoded default.
+// CAS-1128: the drag mutator. Off (value 0) nulls every marker outright; dragging up from Off arms every
+// account-enabled window at the new value (the person then unticks whichever pills they don't want);
+// dragging between two real scores updates every window that CARRIES a marker, including one that's off
+// in Service tracking — CAS-1184: a window switched off there still keeps its marker, and normCascade's
+// floor collapse (below) pulls every marker, on or off, down to the lowest one it finds, so an off-window
+// marker left behind by an earlier drag silently ratchets the whole agent back down on every later load. One
+// score means every marker, always. msnLastScore (a single remembered value) lets a pill re-arm the agent's
+// last real score once it was dropped to fully Off, rather than always snapping back to the same hardcoded
+// default.
 let msnLastScore = null;
 function setAgentScore(c, value){
   c.watchMarkers=c.watchMarkers||{};
   delete c._watchMarkersDefaulted;   // CAS-743: this IS the user setting a real value — the guess is gone
   if(value===0){
-    // CAS-1128: Off is track-wide now — every account-enabled window drops to Never, not just the one
-    // this control used to call its "start" window.
-    WATCH_LEVEL_KEYS.forEach(k=>{ if(windowEnabled(k)) c.watchMarkers[k]=null; });
+    // CAS-1184: every marker, not just the account-enabled ones — a marker left behind on an off window
+    // is exactly the stale state that ratchets the score down again later.
+    WATCH_LEVEL_KEYS.forEach(k=>{ c.watchMarkers[k]=null; });
     return;
   }
   value = Math.max(TRACK_MIN, Math.min(TRACK_MAX, Math.round(value)));
-  const onKeys=WATCH_LEVEL_KEYS.filter(k=>windowEnabled(k) && c.watchMarkers[k]!=null);
+  // CAS-1184: every window that already carries a marker moves with the drag, on or off in Service
+  // tracking — only when NONE do (freshly Off) does arming fall back to the account-enabled set.
+  const onKeys=WATCH_LEVEL_KEYS.filter(k=>c.watchMarkers[k]!=null);
   const keys = onKeys.length ? onKeys : WATCH_LEVEL_KEYS.filter(k=>windowEnabled(k));
   keys.forEach(k=>{ c.watchMarkers[k]=value; });
   msnLastScore=value;
@@ -14502,12 +14664,18 @@ function toggleAgentWindow(c, key){
   delete c._watchMarkersDefaulted;
   const onKeys=WATCH_LEVEL_KEYS.filter(k=>windowEnabled(k) && c.watchMarkers[k]!=null);
   if(onKeys.includes(key)){
-    if(onKeys.length===1) WATCH_LEVEL_KEYS.forEach(k=>{ if(windowEnabled(k)) c.watchMarkers[k]=null; });
+    // CAS-1184: dropping the last ON pill nulls every marker, not just the account-enabled ones, so no
+    // stale off-window marker is left behind to ratchet a future score back down.
+    if(onKeys.length===1) WATCH_LEVEL_KEYS.forEach(k=>{ c.watchMarkers[k]=null; });
     else c.watchMarkers[key]=null;
     return;
   }
   const value = onKeys.length ? c.watchMarkers[onKeys[0]] : (msnLastScore!=null ? msnLastScore : 70);
   c.watchMarkers[key]=value;
+  // CAS-1184: switching a window on also catches up any OTHER window that's off in Service tracking but
+  // still carrying a stale marker from an earlier drag/recipe — otherwise that leftover keeps acting as
+  // the floor normCascade collapses everything to, on every load.
+  WATCH_LEVEL_KEYS.forEach(k=>{ if(!windowEnabled(k) && c.watchMarkers[k]!=null) c.watchMarkers[k]=value; });
   msnLastScore=value;
 }
 // Repaints the handle/segments/value text in place — used on every drag pointermove, where tearing the track
@@ -15437,16 +15605,34 @@ const SHARP_STEPS = {
       draw("onbStepStores", STORE_SERVICES, prefs.store);
       draw("onbStepSvcs",   SUB_SERVICES,   prefs.sub, PRIMARY_SUB_SERVICES);
       const tog=$("onbSvcOnly");
+      tog?.setAttribute("aria-pressed", String(prefs.on));
+      // CAS-1178: render() alone measured 94-116ms on production (two agents, no account film data) — long
+      // enough that running it inline, in the same synchronous task as the tap, blocked the browser from
+      // painting the tick above until the whole handler returned, which is what made the tap look ignored.
+      // The tick/aria-pressed flip stays synchronous (CAS-480's straight-through write, prefs.on itself,
+      // stays synchronous too — only the repaint is heavy); onbRefresh()/render() move behind a pair of
+      // rAFs, since a single rAF still fires BEFORE the browser's next paint and would just move the same
+      // block there. A tap landing before the pair fires cancels it and starts a fresh one, so a burst of
+      // taps repaints once, for whichever state they end on, rather than once per tap (never lost, never
+      // double-applied).
+      let svcOnlyRaf=null;
       if(tog) tog.onclick=()=>{
         prefs.on=!prefs.on; savePrefs(); pushPrefsCols(["services_only"]);
         tog.classList.toggle("on", prefs.on);
+        tog.setAttribute("aria-pressed", String(prefs.on));
         updatePrefSwitch(); updatePrefBtn();
-        onbRefresh();
-        // CAS-480: this spoke sits over the listing and writes straight through, not into a draft that only
-        // commits when the Briefing closes (unlike the rest of SHARP_STEPS) — without this the switch
-        // visibly flips but the list behind it is stale until some unrelated action re-renders, same bug
-        // $("prefSwitch").onclick already avoids below.
-        render();
+        if(svcOnlyRaf!=null) cancelAnimationFrame(svcOnlyRaf);
+        svcOnlyRaf=requestAnimationFrame(()=>{
+          svcOnlyRaf=requestAnimationFrame(()=>{
+            svcOnlyRaf=null;
+            onbRefresh();
+            // CAS-480: this spoke sits over the listing and writes straight through, not into a draft that
+            // only commits when the Briefing closes (unlike the rest of SHARP_STEPS) — without this the
+            // switch visibly flips but the list behind it is stale until some unrelated action re-renders,
+            // same bug $("prefSwitch").onclick already avoids below.
+            render();
+          });
+        });
       };
     },
   },
@@ -16928,20 +17114,18 @@ window.setMovingWindow=(key)=>{
   renderMovingScreen();
 };
 window.openAgentsScreen=()=>{
-  // CAS-534: reached from the top-right menu's "Manage Agents" now, not the header's Agents chip — that chip
-  // is the deck+movie-list home view's mode switch and stays lit throughout (this screen is a layer on top of
-  // home, not a different mode).
+  // CAS-1185: reached from the menu's "Agents" item now, not a header chip — there is no chip of its own to
+  // light any more (this screen is a layer on top of the Watch listing, not a different mode of the bar).
   if($("movingScreen").classList.contains("open")) closeMovingScreen();
+  if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186: mutually exclusive with Find too
   renderAgentsScreen();
   $("agentsScreen").scrollTop=0;
   $("agentsScreen").classList.add("open"); lockBodyScroll(true);
-  $("agentsBtn").classList.add("active"); $("agentsBtn").setAttribute("aria-pressed","true");
   syncWatchChip();
   logEvent("agents_screen_opened",{count:cascades.length});
 };
 window.closeAgentsScreen=()=>{
   $("agentsScreen").classList.remove("open"); lockBodyScroll(false);
-  $("agentsBtn").classList.remove("active"); $("agentsBtn").setAttribute("aria-pressed","false");
   syncWatchChip();
 };
 // CAS-636: Moving — the alert feed made visible. Same open/close shape as Agents (mutually exclusive with
@@ -16951,6 +17135,7 @@ window.closeAgentsScreen=()=>{
 // auto-pick is gone). Never persisted; the user's own tap (setMovingWindow) always overrides it.
 window.openMovingScreen=()=>{
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
+  if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186: mutually exclusive with Find too
   movingIsOpen=true;
   movingWindow="2weeks";   // CAS-848: always opens pinned to 2 weeks; a tap (setMovingWindow) still overrides it
   renderMovingScreen();
@@ -16966,6 +17151,104 @@ window.closeMovingScreen=()=>{
   $("movingBtn").classList.remove("active"); $("movingBtn").setAttribute("aria-pressed","false");
   syncWatchChip();
 };
+// ================= CAS-1186: Find — the whole catalogue, searchable by name =============================
+// Every film in MOVIES, no agent/tab/service/watched/style/Picked-by narrowing — the one listing in the app
+// a film reaches even when no agent lists it. Cascade score desc (no score last), ties by title A-Z; no
+// sort control and no filters here (out of scope for this ticket). Paged in 50s as the user nears the
+// bottom (findRenderMore) rather than rendered whole — fillListChunked (the Watch listing's own streamer)
+// is the wrong tool here because it eventually renders its WHOLE input, just non-blockingly; Find's input
+// is the full ~5,800-film catalogue, which must never be fully in the DOM at once.
+const FIND_BATCH = 50;
+let findSearchRaw = "";   // exactly what the user typed, for the empty-state message
+let findSearch = "";      // trimmed + lowercased, for matching
+let findRowsCache = [];   // the current search's sorted result set
+let findShown = 0;        // how many of findRowsCache are in the DOM right now
+function findSortedRows(){
+  const q = findSearch;
+  const rows = q ? MOVIES.filter(m=>m.title.toLowerCase().includes(q)) : MOVIES.slice();
+  // Cascade score, highest first; no score (cascadeScore's -1 sentinel) sorts last; ties by title A-Z.
+  return rows.sort((a,b)=>{
+    const sa=cascadeScore(a), sb=cascadeScore(b);
+    const na=sa<0, nb=sb<0;
+    if(na!==nb) return na ? 1 : -1;
+    if(sa!==sb) return sb-sa;
+    return a.title.localeCompare(b.title);
+  });
+}
+// Renders just the list portion (count line + rows), leaving the head/input alone so a keystroke never
+// steals focus from the box that caused it. Called on open and on every search change.
+function findRenderList(){
+  findRowsCache = findSortedRows();
+  const n = findRowsCache.length;
+  const countEl=$("findCount"); if(countEl) countEl.textContent = `${n} movie${n===1?"":"s"}`;
+  const clr=$("findSearchClear"); if(clr){ clr.hidden=!findSearchRaw; clr.classList.toggle("show", !!findSearchRaw); }
+  const wrap=$("findListWrap"); if(!wrap) return;
+  findShown=0;
+  if(!n){
+    wrap.innerHTML = `<div class="mvempty"><p class="mvemptymain">No movies match "${esc(findSearchRaw)}"</p></div>`;
+    return;
+  }
+  wrap.innerHTML = `<div class="list" id="findList"></div>`;
+  findRenderMore();
+}
+// Appends the next batch of up to FIND_BATCH rows. Called once by findRenderList and again every time the
+// scroll listener below reports the user is nearing the bottom of what's rendered so far.
+function findRenderMore(){
+  const listEl=$("findList"); if(!listEl || findShown>=findRowsCache.length) return;
+  const end=Math.min(findRowsCache.length, findShown+FIND_BATCH);
+  let buf="";
+  for(let i=findShown; i<end; i++){ const m=findRowsCache[i]; buf += taggedOut(m) ? stubHTML(m) : cardHTML(m, isFresh(m)); }
+  listEl.insertAdjacentHTML("beforeend", buf);
+  observeLazyPosters(listEl);
+  findShown=end;
+}
+window.setFindSearch=raw=>{
+  findSearchRaw=raw;
+  findSearch=raw.trim().toLowerCase();
+  findRenderList();
+};
+window.clearFindSearch=()=>{
+  $("findSearchInput").value="";
+  findSearchRaw=""; findSearch="";
+  findRenderList();
+  $("findSearchInput").focus();
+};
+// Builds the head (title, search box, count) once per open and fills the list below it.
+function renderFindScreen(){
+  $("findBody").innerHTML = `
+    <h2 class="osh">Find</h2>
+    <div class="watchsearchwrap" id="findSearchWrap">
+      <input id="findSearchInput" class="search" type="text" inputmode="search" autocomplete="off"
+             placeholder="Search all movies" aria-label="Search all movies" oninput="setFindSearch(this.value)">
+      <button class="searchclear" id="findSearchClear" aria-label="Clear search" type="button" hidden
+              onclick="clearFindSearch()">×</button>
+    </div>
+    <div class="flabel" id="findCount"></div>
+    <div id="findListWrap"></div>`;
+  findRenderList();
+}
+window.openFindScreen=()=>{
+  if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
+  if($("movingScreen").classList.contains("open")) closeMovingScreen();
+  findSearchRaw=""; findSearch="";   // AC9: always reopens with an empty box and the list at the top
+  renderFindScreen();
+  $("findScreen").scrollTop=0;
+  $("findScreen").classList.add("open"); lockBodyScroll(true);
+  $("findBtn").classList.add("active"); $("findBtn").setAttribute("aria-pressed","true");
+  syncWatchChip();
+  logEvent("find_screen_opened",{});
+};
+window.closeFindScreen=()=>{
+  $("findScreen").classList.remove("open"); lockBodyScroll(false);
+  $("findBtn").classList.remove("active"); $("findBtn").setAttribute("aria-pressed","false");
+  syncWatchChip();
+};
+// Appends the next batch once the user has scrolled within one screenful of the bottom of what's rendered.
+$("findScreen").addEventListener("scroll", ()=>{
+  const el=$("findScreen");
+  if(el.scrollTop + el.clientHeight < el.scrollHeight - el.clientHeight) return;
+  findRenderMore();
+}, {passive:true});
 // CAS-534: the header's Agents chip — closes whichever screen currently covers the deck+movie-list home view
 // (Manage Agents, if reached via the menu) to reveal it.
 // CAS-633: also the Watch chip's own onclick now — Watch and Agents both land here whenever they need the
@@ -16973,10 +17256,11 @@ window.closeMovingScreen=()=>{
 window.showAgentsHome=()=>{
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
   if($("movingScreen").classList.contains("open")) closeMovingScreen();
+  if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186
   syncWatchChip();
 };
 // CAS-633: #moviesBtn (Watch) now opens the Find listing itself rather than a dialog, so it can't be lit by
-// one open/close pair the way #agentsBtn is — it tracks whatever else is covering that listing instead.
+// one open/close pair the way #movingBtn is — it tracks whatever else is covering that listing instead.
 // Lit whenever no .uscreen (Agents, Moving, Manage Lists, Review, Account, Service analysis, Languages,
 // Where & when, Tags, About — and Your Movies itself, in the unlikely event it's ever reopened) is open.
 // Called from every .uscreen's own open/close pair.
@@ -17252,7 +17536,7 @@ function renderSettings(){
     <div class="ucard">
       ${acctRow("🕒","Service tracking", null, "settingsOpenWhereWhen()")}
       ${acctRow("🔔","How you're told", esc(notif) + (notifyPrefs.emailOn && notifyPrefs.email
-                ? ` · ${esc(notifyPrefs.email)}` : ""), "openSettingsStep('notifysettings')")}
+                ? ` · ${esc(notifyPrefs.email)}` : ""), "settingsOpenNotify()")}
       ${acctRow("📺","My services", null, "settingsOpenServices()")}
       ${acctRow("🌐","Languages", null, "settingsOpenLanguages()")}
       ${acctRow("🎉","Occasions", null, "settingsOpenOccasions()")}
@@ -17267,6 +17551,7 @@ window.openSettings=()=>{
 };
 window.closeSettings=()=>{ $("settingsScreen").classList.remove("open"); lockBodyScroll(false); syncWatchChip(); };
 window.settingsOpenWhereWhen=()=>{ screenResume="settings"; closeSettings(); openWhereWhen(); };
+window.settingsOpenNotify=()=>{ screenResume="settings"; closeSettings(); openNotifyScreen(); };
 window.settingsOpenServices=()=>{ screenResume="settings"; closeSettings(); openMenuServices(); };
 window.settingsOpenLanguages=()=>{ screenResume="settings"; closeSettings(); openLanguages(); };
 window.settingsOpenOccasions=()=>{ screenResume="settings"; closeSettings(); openManageOccasionsScreen(); };
@@ -17355,63 +17640,32 @@ function fireScreenResume(){
   if(target==="account") openAccount();
   else if(target==="settings") openSettings();
 }
-// ---- CAS-253: an email alert needs somewhere to send it ----------------------------------------------
-// Switching "Send me alerts by email" on and walking past the empty field left an agent whose email bell was
-// armed and undeliverable — the monitor's delivery_plan calls that state "wait" and quietly retries it
-// every night, forever, saying nothing. So the switch and the address are one answer: turn it on and the
-// address is required, turn it off and the field stops mattering.
+// ---- CAS-253/CAS-1176: an email alert needs somewhere to send it --------------------------------------
+// There is no email field any more — "Send me alerts by email" sends to the signed-in account's own
+// address (flowNotify below), so there is nothing left for a gate to validate. EMAIL_RE/emailValid stay:
+// the sign-up/sign-in flow still needs a real email-shape check and reuses this one.
 //
 // Deliberately not a full RFC check. The test is that there is a name, an @, and a dotted domain — enough to
 // catch the mistakes people actually make (a blank field, "me", a missing dot) without rejecting the valid
 // oddities that a stricter pattern always seems to. The real proof of an address is a mail that arrives.
 const EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
 const emailValid = v => EMAIL_RE.test(String(v||"").trim());
-// Is the notify step answerable as it stands? Off = yes, always. On = only with an address.
-const notifyReady = () => !notifyPrefs.emailOn || emailValid(notifyPrefs.email);
-// CAS-629: the notify controls now render on two steps — the standalone notifysettings preview and S6
-// "report", which asks the same question once for the whole roster — so the gate has to hold the CTA on
-// either one, not just the old key.
-const NOTIFY_GATED_STEPS = new Set(["notifysettings","report"]);
-function notifyGate(){
-  const on=!!notifyPrefs.emailOn, val=(notifyPrefs.email||"").trim(), ok=notifyReady();
-  const err=$("onbEmailErr");
-  if(err){
-    // Nothing is said until there is something to say: an empty field on a switch just turned on is not a
-    // mistake yet, it is a question that has not been answered. The message appears once it has been
-    // answered WRONGLY, and the blocked button carries the rest.
-    const show = on && val && !ok;
-    err.hidden=!show;
-    err.textContent= show ? "That doesn't look like an email address — check it and we'll send your alerts there." : "";
-  }
-  const field=$("onbEmail"); if(field) field.classList.toggle("bad", on && !!val && !ok);
-  const b=$("onbStepCta")||$("flowCta");
-  if(b && NOTIFY_GATED_STEPS.has(onbStepKey)){
-    b.disabled=!ok;
-    b.classList.toggle("blocked", !ok);
-    b.title = ok ? "" : "Add the email address your alerts should go to, or switch email alerts off";
-  }
-}
-// ---- CAS-629: the two notify controls, shared verbatim by notifysettings (its own ?step= preview) and
-// S6 "report" (the wired flow's own copy, asked once for the whole roster instead of once per agent).
+// ---- CAS-629/CAS-1176: the two notify controls, shared verbatim by the Settings screen and notifysettings'
+// own ?step= preview.
 function notifyControlsHTML(){
   const on=k=>notifyPrefs[k]?" on":"";
+  const native=typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform();
   return `<button type="button" class="bigtoggle${on("inApp")}" onclick="flowNotify('inApp',this)">
       <span class="btmain">Allow in-app notifications</span><span class="btcheck">✓</span></button>
-    <p class="ossub" id="onbInAppHint">Tapping this will ask iOS for permission to notify you — you can change your mind any time.</p>
-    <p class="fielderr" id="onbInAppDenied" role="alert" hidden>You said no to notifications — you can turn them on later in iOS Settings → Cascade.</p>
+    <p class="ossub" id="onbInAppHint">${native
+        ? "Tapping this will ask iOS for permission to notify you — you can change your mind any time."
+        : "Notifications arrive on your iPhone through the Cascade app."}</p>
+    ${native ? `<p class="fielderr" id="onbInAppDenied" role="alert" hidden>You said no to notifications — you can turn them on later in iOS Settings → Cascade.</p>` : ""}
     <button type="button" class="bigtoggle${on("emailOn")}" onclick="flowNotify('emailOn',this)">
       <span class="btmain">Send me alerts by email</span><span class="btcheck">✓</span></button>
-    <div class="emailwrap${notifyPrefs.emailOn?" show":""}" id="onbEmailWrap">
-      <label class="nlbl" for="onbEmail">Your email</label>
-      <input class="osfield" id="onbEmail" type="email" autocomplete="email" inputmode="email"
-             aria-describedby="onbEmailErr" placeholder="you@email.com"
-             value="${escA(notifyPrefs.email||"")}">
-      <p class="fielderr" id="onbEmailErr" role="alert" hidden></p></div>`;
+    ${notifyPrefs.emailOn ? `<p class="ossub notifysentto">Sent to ${esc(notifyPrefs.email||"")}.</p>` : ""}`;
 }
 function wireNotifyControls(){
-  const el=$("onbEmail");
-  if(el) el.oninput=()=>{ notifyPrefs.email=el.value.trim(); saveNotifyPrefs(); notifyGate(); };
-  notifyGate();
   paintInAppDenied();   // CAS-463: fresh entry to the step always starts from the neutral hint
 }
 // CAS-463: "Allow in-app notifications" used to just flip a local flag. Now it asks for a real OS-level
@@ -17463,6 +17717,13 @@ function registerPush(){
 }
 window.flowNotify=(key,el)=>{
   if(key==="inApp"){
+    // CAS-1176: only the native app asks iOS for permission (and only there can it be refused) — in a
+    // browser the toggle is just the account's own in_app setting, flipped straight away.
+    if(!(typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform())){
+      notifyPrefs.inApp=!notifyPrefs.inApp; saveNotifyPrefs(); el.classList.toggle("on", notifyPrefs.inApp);
+      onbRefresh(); logEvent("flow_notify",{key, on:notifyPrefs.inApp});
+      return;
+    }
     if(notifyPrefs.inApp){   // turning off never needs a permission round-trip
       notifyPrefs.inApp=false; saveNotifyPrefs(); el.classList.toggle("on", false);
       onbRefresh(); logEvent("flow_notify",{key,on:false});
@@ -17482,15 +17743,27 @@ window.flowNotify=(key,el)=>{
     return;
   }
   notifyPrefs[key]=!notifyPrefs[key];
+  // CAS-1176: email alerts always go to the signed-in account's own address — there is no separate field
+  // to set it from any more.
+  if(key==="emailOn") notifyPrefs.email = notifyPrefs.emailOn
+    ? ((window.CascadeAuth && window.CascadeAuth.user && window.CascadeAuth.user.email) || "")
+    : notifyPrefs.email;
   saveNotifyPrefs();
   el.classList.toggle("on", notifyPrefs[key]);
-  if(key==="emailOn"){
-    const w=$("onbEmailWrap"); if(w) w.classList.toggle("show", notifyPrefs.emailOn);
-    const f=$("onbEmail"); if(f && notifyPrefs.emailOn && !(notifyPrefs.email||"").trim()) f.focus();
-  }
+  if(key==="emailOn") syncNotifySentTo(el);
   onbRefresh();   // CAS-308: also repaints the trail's Notify row, not just the CTA gate
   logEvent("flow_notify",{key, on:notifyPrefs[key]});
 };
+// CAS-1176: the "Sent to EMAIL." line is part of notifyControlsHTML()'s own render only — neither this
+// screen (Settings) nor the onboarding step frame's onbRefresh() does a full repaint on a toggle tap — so
+// it has to be patched into the DOM directly rather than waiting on a re-render that never comes.
+function syncNotifySentTo(emailToggleEl){
+  const existing = emailToggleEl.parentElement.querySelector(".notifysentto");
+  if(!notifyPrefs.emailOn){ if(existing) existing.remove(); return; }
+  const html = `<p class="ossub notifysentto">Sent to ${esc(notifyPrefs.email||"")}.</p>`;
+  if(existing) existing.outerHTML = html;
+  else emailToggleEl.insertAdjacentHTML("afterend", html);
+}
 // ---- the dual-pane slide ---------------------------------------------------------------------------
 // Both panes are real .osinner elements in the stage at the same time: the outgoing one keeps the content
 // it was already painted with and walks off to the left, the incoming one is built beside it and walks on
@@ -17648,9 +17921,6 @@ function onbRefresh(){
   // the summary on the screen that sets it.
   const trail=$("onbTrail");
   if(trail) trail.outerHTML = onbTrailHTML(onbStepKey) || "";
-  // CAS-253: onbRefresh rewrites the button, so the gate is reapplied after it — otherwise any repaint
-  // (a toggle, a count moving) would hand back a Continue the screen is not ready for.
-  if(NOTIFY_GATED_STEPS.has(onbStepKey)) notifyGate();
 }
 // #4 selectivity refresh (CAS-114): update the "What this does" line + count, and let onbRefresh update the
 // CTA count from the same live figure.
@@ -17725,15 +17995,6 @@ window.onbStepSkip=()=>{
   closeOnbStep();
 };
 window.onbStepContinue=()=>{
-  // CAS-253: the disabled button is the visible half; this is the half a keyboard or a stale handler cannot
-  // get round. An armed email bell with no address is not a state the flow may leave this screen in.
-  if(NOTIFY_GATED_STEPS.has(onbStepKey) && !notifyReady()){
-    notifyGate();
-    const f=$("onbEmail"); if(f) f.focus();
-    const err=$("onbEmailErr");
-    if(err){ err.hidden=false; err.textContent="Add the email address your alerts should go to, or switch email alerts off."; }
-    return;
-  }
   logEvent("onbstep_continue",{step:onbStepKey, matches:onbFlow.draft?onbCount():null});
   if(flowOn) return flowNext();
   // CAS-934: a Briefing spoke has no footer button any more (Back is the only exit — see onbStepBack), so
@@ -18268,11 +18529,12 @@ function markTutorialSeen(){ try{ localStorage.setItem(TUTORIAL_SEEN_KEY,"1"); }
 // Copy was originally verbatim per the CAS-976 ticket; CAS-1013 corrected the Moving card and the closing
 // card below, which had drifted from shipped behaviour (Moving's rolling window, the 5pm Sydney alert
 // time). Anchors are real listing controls: the agent rail the ticket names doesn't exist in this build
-// (agents are a vertical reorderable list, not a rail) — #agentsBtn is the one real element that stands
-// for "your agents" on the listing itself, the nav chip that opens them.
+// (agents are a vertical reorderable list, not a rail).
+// CAS-1185: Agents left the header for the menu's first item, so the opening card now anchors to the
+// hamburger (#navMenuBtn) that holds it, not a chip that no longer exists.
 function tutorialCardDefs(){
   return [
-    {sel:"#agentsBtn", text:"These are your agents. Each one watches for a different kind of film, all the time, so you don't have to."},
+    {sel:"#navMenuBtn", text:"Your agents live in this menu. Each one watches for a different kind of film, all the time, so you don't have to."},
     {sel:"#groups .card .r-scores", text:"Two numbers: what people thought, and what critics thought. Your agent only speaks up when a film clears the bar you set."},
     {sel:"#groups .card .ctl.notify", text:"Films move — cinema, then rent, then streaming. Your agent follows each one and tells you when it reaches a window you actually use."},
     {sel:"#movingBtn", text:"Moving shows what's changed recently — Today, Week, 2 weeks or Month. It opens on 2 weeks, so that's the page to come back to."},
@@ -18451,8 +18713,10 @@ async function membCompleteNewMembership(){
   }
   const prefsFields=CP.userPrefsRow(); delete prefsFields.user_id;
   const notifyFields=CP.prefsRow(); delete notifyFields.user_id;
-  // CAS-1155: a new account starts with email alerts on, sent to the address it just confirmed with
-  // its sign-up code — not notifyPrefsDefault()'s signed-out device default that CP.prefsRow() read.
+  // CAS-1155/CAS-1176: a new account starts with both in-app and email alerts on, the latter sent to the
+  // address it just confirmed with its sign-up code — not notifyPrefsDefault()'s signed-out device default
+  // that CP.prefsRow() read.
+  notifyFields.in_app = true;
   notifyFields.email_on = true;
   notifyFields.email_address = ((auth.user && auth.user.email) || "").trim() || null;
   const agents=cascades.map(c=>{
@@ -18762,6 +19026,10 @@ function render(){
   const preMineOnlyRows=rows;
   const mineOnly=watchMineOnlyOn();
   if(mineOnly) rows=rows.filter(m=>!HOME_KEYS.includes(primaryStatus(m)) || matchesServices(m, primaryStatus(m)));
+  // CAS-1180 Part D: a non-empty search box replaces every narrowing above with watchSearchRows' own wider
+  // set — everything upstream of this line (tab scope, Picked by, Styles, Watched, mineOnly) stays exactly
+  // as it was for when the box is cleared again; it just stops being what gets drawn while it holds text.
+  if(wsearch) rows=watchSearchRows(wsearch);
   const shown=rows.filter(m=>!taggedOut(m));
   const stubbed=rows.length-shown.length;
   renderWatchTabs();
@@ -20281,11 +20549,13 @@ else if(dedupedN)
     const owner=uid();
     const row=(window.CascadeAccountStore.acctStore.notify_prefs||[])[0];
     if(!row){
-      // CAS-1155: a genuinely missing row starts email alerts on, sent to the signed-in account's own
-      // email — not a device default, since a fixed default written at row creation is not device state.
+      // CAS-1155/CAS-1176: a genuinely missing row starts both in-app and email alerts on, the latter sent
+      // to the signed-in account's own email — not a device default, since a fixed default written at row
+      // creation is not device state.
       const bootEmail = ((acct().user && acct().user.email) || "").trim() || null;
-      c.from("notify_prefs").upsert([{ user_id:owner, email_on:true, email_address:bootEmail }], { onConflict:"user_id" }).then(({error})=>{
+      c.from("notify_prefs").upsert([{ user_id:owner, in_app:true, email_on:true, email_address:bootEmail }], { onConflict:"user_id" }).then(({error})=>{
         if(error){ console.warn("notify_prefs bootstrap insert", error); return; }
+        notifyPrefs.inApp = true;
         notifyPrefs.emailOn = true;
         notifyPrefs.email = bootEmail || "";
         saveNotifyPrefsLocal();

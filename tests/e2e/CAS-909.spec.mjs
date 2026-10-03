@@ -23,12 +23,19 @@ async function openReveal(page, stepKey, answers){
 }
 
 /** The same watchCount() the app itself reads, called fresh against the same recipe the reveal is
- * currently showing — an independent read, not a scrape of what the DOM already printed. */
-async function expectedWatchCount(page, template){
-  return page.evaluate(t => {
-    const c = buildOnbAgentsV2(onbFlow.answersV2).find(a => a.template === t);
+ * currently showing — an independent read, not a scrape of what the DOM already printed.
+ * Takes `answers` directly rather than reading onbFlow.answersV2 off the page: openReveal's own
+ * post-render openOnbStep() call runs the step's wire() synchronously (renderOnbStep draws body()
+ * BEFORE calling wire() — see renderOnbStep's own order), and wire() resets onbFlow.answersV2 to
+ * onbAnswersV2Load()'s default right after body() has already rendered off the real fixture answers.
+ * By the time any test code runs after openReveal() returns, the global has already been reset to
+ * defaults — reading it back here recomputed a DIFFERENT agent (cinema null, not "yes") than the one
+ * actually on screen, which is the whole reason this read ever disagreed with the DOM. */
+async function expectedWatchCount(page, template, answers){
+  return page.evaluate(({ t, answers }) => {
+    const c = buildOnbAgentsV2({ ...onbAnswersV2Default(), ...answers }).find(a => a.template === t);
     return c ? watchCount(c) : null;
-  }, template);
+  }, { t: template, answers });
 }
 
 const MASSIVE_ANSWERS = { cinema: "yes", rent: "no" };
@@ -46,14 +53,25 @@ test("CAS-909 AC2: v2_massive renders exactly one .agrow, ranked 1, with no grip
 
 // CAS-1123 removed the separate Notify switch (every trailing window the agent watches rings now, no
 // extra row needed to say so) — onbAgentRevealHTML never emits a NOTIFY row any more.
-test("CAS-909 AC3: v2_massive's settings grid is exactly SCORE/AUDIENCE, and SCORE reads a dotted 90+ in cinema", async ({ page }) => {
+// CAS-1113 ("one score per agent, not a stepped ladder") made every window from the BIG window onward
+// (onbFavsMarkersV2) share the identical solved score — cinema answered Yes puts the BIG window at
+// in_cinema, so SCORE now carries all three trailing windows (cinema, rent, streaming) at that one score,
+// not cinema alone.
+test("CAS-909 AC3: v2_massive's settings grid is exactly SCORE/AUDIENCE, and SCORE reads the one solved score across cinema, rent and streaming (CAS-1113)", async ({ page }) => {
   const row = await openReveal(page, "v2_massive", MASSIVE_ANSWERS);
   const labels = await row.locator(".agslbl").allInnerTexts();
   expect(labels).toEqual(["SCORE", "AUDIENCE"]);
 
+  // Computed off MASSIVE_ANSWERS directly, not onbFlow.answersV2 — see expectedWatchCount's own comment
+  // above for why the global can't be trusted here once openReveal() has returned.
+  const score = await page.evaluate(answers =>
+    buildOnbAgentsV2({ ...onbAnswersV2Default(), ...answers })
+      .find(a => a.template === "onb_massive").watchMarkers.in_cinema, MASSIVE_ANSWERS);
+  expect(score).not.toBeNull();
+
   const scoreVal = row.locator(".agsrow", { has: page.locator(".agslbl", { hasText: "SCORE" }) }).locator(".agsval");
-  await expect(scoreVal.locator(".agdot")).toHaveCount(1);
-  await expect(scoreVal).toContainText("90+ in cinema");
+  await expect(scoreVal.locator(".agdot")).toHaveCount(3);
+  await expect(scoreVal).toContainText(`${score}+ in cinema · ${score}+ rent · ${score}+ streaming`);
 });
 
 test("CAS-909 AC4: v2_favs' settings grid is exactly STYLES/SCORE/BUDGET/AUDIENCE", async ({ page }) => {
@@ -84,7 +102,7 @@ test("CAS-909 AC6: .agmstat.total reads N movies, matching watchCount() computed
   const totalText = (await row.locator(".agmstat.total").innerText()).trim();
   expect(totalText).toMatch(/^\d+ movies$/);
   const shown = Number(totalText.match(/^(\d+) movies$/)[1]);
-  const expected = await expectedWatchCount(page, "onb_massive");
+  const expected = await expectedWatchCount(page, "onb_massive", MASSIVE_ANSWERS);
   expect(expected).not.toBeNull();
   expect(shown).toBe(expected);
 });

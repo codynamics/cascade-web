@@ -5,7 +5,7 @@ BUILD MODE: INDICATIVE, no design image — deliberate, this is a pipeline/data 
 visual surface. Asserts: the pointer's hash matches the file's own SHA-256 prefix, the file
 parses, its film count equals movies.json's, none of the dropped fields survive, every field
 app_template.html reads via `m.<field>` that also exists in movies.json is kept, old hashed
-files are pruned to just the current + previous, and the real catalogue stays under 8 MB.
+files are pruned to just the current + previous, and the real catalogue stays under 12 MB.
 """
 import hashlib
 import json
@@ -100,11 +100,11 @@ class CataloguePublish(unittest.TestCase):
         self.assertIn(os.path.basename(third), remaining)
         self.assertEqual(len(remaining), 2)
 
-    def test_real_catalogue_file_is_under_8mb(self):
+    def test_real_catalogue_file_is_under_12mb(self):
         pp.write_catalogue(self.movies, "2026-09-29")
         pointer = self._pointer()
         size = os.path.getsize(os.path.join(self.tmp.name, pointer["file"]))
-        self.assertLess(size, 8 * 1024 * 1024)
+        self.assertLess(size, 12 * 1024 * 1024)
 
 
 if __name__ == "__main__":

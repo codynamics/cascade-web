@@ -14,6 +14,14 @@
 // on catalogue-derived taste matching, same technique cas753.spec.mjs uses) and armed on the same Watch On
 // level by hand (winsSource "manual", same technique cas751.spec.mjs uses) — contiguous, same-owner rows, so
 // there is no per-agent divider between them to confound the position math in the AC2 checks below.
+//
+// CAS-1161: every test below was reported failing in e2e-full run #6, which ran against main at 0b31f36 —
+// before CAS-1180 (commit ad7e1da) landed. filmMatchesWatchTab's non-cinema branch used to key off the
+// film's own Watch On rung (filmNotifyState().key), which setOpinion() unconditionally clears the instant a
+// verdict is given — so the verdicted film failed filmMatchesWatchTab, dropped out of watchScopeRows()
+// entirely, and never reached stubHTML() at all (not folded, just gone). CAS-1180 switched that branch to
+// read a taggedOut film's tab off primaryStatus instead, which is exactly what these tests already assumed.
+// Verified by diffing filmMatchesWatchTab across ad7e1da~1 and HEAD: no assertion below needed to change.
 import { test, expect } from "@playwright/test";
 import { toShortlist, finishFlow, toListing, settleListing } from "./helpers.mjs";
 

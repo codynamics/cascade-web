@@ -26,6 +26,12 @@ test("CAS-1123: migrateWatch folds a stored notify flag into list and drops noti
   assert.ok(!("notify" in migrated.rent), "notify must not merely be false — it must be gone entirely");
 });
 
+test("CAS-1177: watchPrefsDefaults ticks Upcoming's announced and opens_soon moments for a new account", () => {
+  const defaults = E.watchPrefsDefaults();
+  assert.equal(defaults.upcoming.subs.announced, true, "announced must default on");
+  assert.equal(defaults.upcoming.subs.opens_soon, true, "opens_soon must default on");
+});
+
 test("CAS-1123: momentsOf includes hits_rent only while Rent is switched on", () => {
   // status:[] reads as "watching the whole ladder" (reachableRows), so this isolates the Rent window's
   // own switch rather than any scope/reachability gating.

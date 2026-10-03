@@ -13,10 +13,10 @@ async function gotoReset(page){
 }
 
 async function readCascadeNames(page){
-  // CAS-957: the agent-list cache is namespaced by account now — this walk never signs in, so it's always
-  // the "@guest" key.
+  // The account-namespaced "@guest" suffix CAS-957 once gave this key is gone — commitDraft()/render()
+  // (app_template.html) read and write a bare "cascade_cascades", no suffix, guest or signed in alike.
   return page.evaluate(() => {
-    try{ return JSON.parse(localStorage.getItem("cascade_cascades@guest") || "[]").map(c => c.name); }
+    try{ return JSON.parse(localStorage.getItem("cascade_cascades") || "[]").map(c => c.name); }
     catch(e){ return null; }
   });
 }
@@ -28,7 +28,12 @@ async function readCascadeNames(page){
  * toggling an already-picked chip back off. */
 async function walkToFavs(page){
   await page.locator("#splashCta").click();
-  await expect(page.locator(".obhd")).toContainText("Massive Movies");            // v2_intro
+  // CAS-1018: scoped to #onbStepInner, not a bare ".obhd" — gotoStep's dual-pane slide leaves the
+  // outgoing step's .obhd in the DOM alongside the incoming one for the length of the transition.
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
+  await ctaLocator(page).click();
+  await page.waitForTimeout(120);
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");          // v2_intro
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
 
@@ -96,9 +101,15 @@ async function completeFourAgentRun(page){
   await page.waitForTimeout(120);
 }
 
+// gotoReset()'s own guest-mode routing 404s config.js (same route freshApp() uses, helpers.mjs) — the
+// browser always reports that as a "Failed to load resource" console error, the harness's own expected
+// noise rather than a signal from the walk under test (same noise CAS-910.spec.mjs's console-error test
+// hits for the same reason). Filtered by its fixed, generic text, same as there.
+const CONFIG_404_TEXT = "Failed to load resource: the server responded with a status of 404 (Not Found)";
+
 test("first run, partner Yes + kids Yes: reaches a 4-agent 'set to work' screen and commits the full roster (CAS-911 AC2/AC4)", async ({ page }) => {
   const errors = [];
-  page.on("console", msg => { if(msg.type() === "error") errors.push(msg.text()); });
+  page.on("console", msg => { if(msg.type() === "error" && msg.text() !== CONFIG_404_TEXT) errors.push(msg.text()); });
   page.on("pageerror", e => errors.push(String(e)));
 
   await gotoReset(page);
@@ -108,7 +119,9 @@ test("first run, partner Yes + kids Yes: reaches a 4-agent 'set to work' screen 
   expect(await readCascadeNames(page)).toEqual([]);   // AC7: still nothing committed this late, pre-v2_done
 
   await completeFourAgentRun(page);
-  await expect(page.locator(".obhd")).toContainText("4 agents, set to work.");   // AC2
+  // CAS-1018: scoped to #onbStepInner — gotoStep's dual-pane slide leaves the outgoing step's .obhd in
+  // the DOM alongside the incoming one for the length of the transition.
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("4 agents, set to work.");   // AC2
 
   await ctaLocator(page).click();   // v2_done's own CTA — "Open my lists"
   await expect(page.locator("#membScreen.open")).toBeVisible();
@@ -141,7 +154,7 @@ test("first run, partner No + kids No: reaches a 2-agent 'set to work' screen, v
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
 
-  await expect(page.locator(".obhd")).toContainText("2 agents, set to work.");   // AC3
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("2 agents, set to work.");   // AC3
   const names = await readCascadeNames(page);
   expect(names).toEqual(["Massive Movies", "Personal Favs"]);
 });
@@ -158,7 +171,7 @@ test("reloading mid-flow at v2_favs then completing a fresh run leaves exactly 4
 
   await walkToFavs(page);
   await completeFourAgentRun(page);
-  await expect(page.locator(".obhd")).toContainText("4 agents, set to work.");
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("4 agents, set to work.");
   await ctaLocator(page).click();
   await expect(page.locator("#membScreen.open")).toBeVisible();
 

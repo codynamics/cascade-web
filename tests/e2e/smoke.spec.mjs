@@ -10,7 +10,8 @@
 import { test, expect } from "@playwright/test";
 import {
   freshApp, gotoFresh, toShortlist, shortlistCards, finishFlow, toListing, settleListing, ctaLocator, sectionCounts,
-  openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen, dumpSignedInDiagnostics,
+  openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen, openNotifyScreen,
+  dumpSignedInDiagnostics, openAgentsScreenFromMenu,
 } from "./helpers.mjs";
 
 // CAS-1136 decision 2: on a failed or timed-out test, show the in-flight requests and buffered console
@@ -30,7 +31,7 @@ test.afterEach(async ({ page }, testInfo) => {
 // CAS-934: there is no Save button on the hub any more — reaching it by picking a card is itself the
 // decision (the same as using a preset unedited anywhere else in the app), so Back commits it.
 async function addSecondAgent(page){
-  await page.locator("#agentsBtn").click();
+  await openAgentsScreenFromMenu(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
   await page.locator(".ag-add").click();
   await expect(page.locator(".scard").first()).toBeVisible();
@@ -222,7 +223,7 @@ test("Watch listing scroll position survives a long scroll to the bottom and bac
   // Broadening with a few more real presets, the same "+ Add" flow a person uses from the Agents screen,
   // gives an actually-scrollable list.
   for(const name of ["Date Night", "Family Movies", "Totally Custom"]){
-    await page.locator("#agentsBtn").click();
+    await openAgentsScreenFromMenu(page);
     await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
     await page.locator(".ag-add").click();
     await expect(page.locator(".scard").first()).toBeVisible();
@@ -294,20 +295,21 @@ test("a cold load with onboarding seen shows the header, not Moving", async ({ p
   await expect(page.locator("#movingScreen")).not.toHaveClass(/open/);
   await expect(page.locator("#groups .card").first()).toBeVisible();
   await expect(page.locator("header")).toBeVisible();
-  await expect(page.locator("#agentsBtn")).toBeVisible();
+  await expect(page.locator("#navMenuBtn")).toBeVisible();
   await expect(page.locator("#moviesBtn")).toBeVisible();
   await expect(page.locator("#movingBtn")).toBeVisible();
 
   await page.locator("#movingBtn").click();
   await expect(page.locator("#movingScreen")).toHaveClass(/open/);
   await expect(page.locator("header")).toBeVisible();
-  await expect(page.locator("#agentsBtn")).toBeVisible();
+  await expect(page.locator("#navMenuBtn")).toBeVisible();
 
   await page.locator("#moviesBtn").click();
   await expect(page.locator("#movingScreen")).not.toHaveClass(/open/);
   await expect(page.locator("#groups .card").first()).toBeVisible();
 
-  await page.locator("#agentsBtn").click();
+  await page.locator("#navMenuBtn").click();
+  await page.locator("#navMenu .navitem", { hasText: "Agents" }).click();
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
 });
 
@@ -329,7 +331,7 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   await openWhereWhenScreen(page);
   await expect(page.locator(".osh", { hasText: "Service tracking" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
-  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
   await expect(premiumLane).toHaveClass(/on/);
   await closeWhereWhenScreen(page);
 
@@ -402,7 +404,7 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   await expect(page.locator(`#${cardId}`)).toHaveCount(0);
 
   await openWhereWhenScreen(page);
-  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
   await expect(premiumLane).not.toHaveClass(/on/);
   await closeWhereWhenScreen(page);
   await expect(page.locator(".wtabbtn", { hasText: "Premium" })).toHaveCount(0);
@@ -420,7 +422,7 @@ test("an agent created with every window enabled lists films at rental or stream
   await openWhereWhenScreen(page);
   await expect(page.locator(".osh", { hasText: "Service tracking" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
-  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
   await expect(premiumLane).toHaveClass(/on/);
   await closeWhereWhenScreen(page);
 
@@ -472,7 +474,7 @@ test("an agent created with every window enabled lists films at rental or stream
 // screen -> Edit, on the FIRST agent onboarding's own roster already created (no extra "new agent" detour
 // needed for a screen that only reads/edits an existing one).
 async function openFirstAgentMission(page){
-  await page.locator("#agentsBtn").click();
+  await openAgentsScreenFromMenu(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
   await page.locator(".ag-edit").first().click();
   await expect(page.locator(".msntrackwrap")).toBeVisible();
@@ -507,7 +509,7 @@ test("Mission screen: one score track, exactly one handle; a newly account-enabl
 
   await openWhereWhenScreen(page);
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
-  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
   await expect(premiumLane).toHaveClass(/on/);
   await closeWhereWhenScreen(page);
 
@@ -565,6 +567,43 @@ test("Mission screen: dragging the single handle moves every listed window's sco
   expect(after.rent).toBe(after.in_cinema);
   expect(after.stream).toBe(after.in_cinema);
   await expect(page.locator(".msnmark")).toHaveCount(1);
+});
+
+test("Mission screen: the score can be dragged UP again even with a stale marker on a window off in Service tracking (CAS-1184)", async ({ page }) => {
+  // CAS-1184: Premium is off in Service tracking by default for every new account, and never visited by
+  // this onboarding path (toShortlist never opens Where & when) — so this agent's own Premium marker is
+  // exactly the "off-window but still carrying a marker" shape the ticket's observation describes.
+  // onbMassiveCritV2 ladder-marks BIG and every later window — with "cinema" as BIG (the ladder's own
+  // first rung), Premium (a later rung) gets marked too, at the same starting score as the rest.
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  const agentId = await page.evaluate(() => cascades[0].id);
+
+  await openFirstAgentMission(page);
+  const premiumStale = await page.evaluate(() => !windowEnabled("premium") && onbFlow.draft.watchMarkers.premium != null);
+  expect(premiumStale, "fixture assumption: Premium must carry a marker while off in Service tracking").toBe(true);
+
+  const before = Number(await page.locator(".msnval").textContent());
+
+  await page.locator(".msntrackwrap").scrollIntoViewIfNeeded();
+  const trackBox = await page.locator(".msntrackwrap").boundingBox();
+  const handle = page.locator(".msnhandle");
+  const handleBox = await handle.boundingBox();
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(trackBox.x + trackBox.width - 2, handleBox.y + handleBox.height / 2, { steps: 8 });
+  const dragged = Number(await page.locator(".msnval").textContent());
+  expect(dragged, "dragging right must move the score UP, not get stuck at the stale Premium floor").toBeGreaterThan(before);
+
+  await page.mouse.up();
+  const released = Number(await page.locator(".msnval").textContent());
+  expect(released).toBe(dragged);
+
+  await page.locator("#onbStep .osback").click();
+  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+  const saved = await page.evaluate(id => cascades.find(c => c.id === id).watchMarkers.in_cinema, agentId);
+  expect(saved, "the higher score must still be the saved score after Back, not ratcheted back down").toBe(dragged);
 });
 
 test("Mission/hub: no Watch On door, marker values in the Mission card, requirement scope chips, no overflow (CAS-729 AC4/AC5/AC6)", async ({ page }) => {
@@ -691,6 +730,49 @@ test("'Only show films on my services' changes what a new agent finds", async ({
   expect(after, `before=${before} after=${after}`).toBeLessThan(before);
 });
 
+// CAS-1178 AC1: the switch's own tick/aria-pressed flip is synchronous, so it must be visible in the same
+// task as the tap — regardless of how long the deferred onbRefresh()/render() behind it takes on a
+// populated listing. Measured inside the page (class read, click, class read again, same task) rather than
+// through Playwright's own round-trip timing, which would add its own noise on top of whatever this is
+// trying to measure.
+test("CAS-1178: the My services toggle's tick flips synchronously on a tap", async ({ page }) => {
+  await toShortlist(page, "stream");
+  await finishFlow(page);
+  await toListing(page);
+  await settleListing(page);
+  await openMyServicesScreen(page);
+
+  const flipped = await page.evaluate(() => {
+    const tog = document.querySelector("#onbSvcOnly");
+    const wasOn = tog.classList.contains("on");
+    tog.click();
+    return tog.classList.contains("on") !== wasOn;
+  });
+  expect(flipped).toBe(true);
+});
+
+// CAS-1178 AC2: five taps fired 250ms apart (comfortably past the double-rAF the fix defers the heavy
+// repaint behind) must land on the opposite state from where they started, with prefs.on — the saved value
+// — equal to what the control itself shows. An odd number of taps means "never lost, never double-applied"
+// is exactly "ends up flipped".
+test("CAS-1178 AC2: five taps on the My services toggle, 250ms apart, land on the opposite state", async ({ page }) => {
+  await toShortlist(page, "stream");
+  await finishFlow(page);
+  await toListing(page);
+  await settleListing(page);
+  await openMyServicesScreen(page);
+
+  const startOn = await page.evaluate(() => prefs.on);
+  for(let i = 0; i < 5; i++){
+    await page.locator("#onbSvcOnly").click();
+    await page.waitForTimeout(250);
+  }
+  const finalOn = await page.evaluate(() => prefs.on);
+  const controlOn = await page.locator("#onbSvcOnly").evaluate(el => el.classList.contains("on"));
+  expect(finalOn, `started ${startOn}, ended ${finalOn} after 5 taps`).toBe(!startOn);
+  expect(controlOn).toBe(finalOn);
+});
+
 // CAS-740 AC4: a signed-in user's account is the authority on whether they've onboarded, not whatever
 // screen this device happened to have open when the account answered. Mirrors the fake-config/fake-
 // supabase-js technique the retired cas317.spec.mjs used (CAS-317/CAS-385) — freshApp()/every other test
@@ -755,7 +837,7 @@ test("agent card summary names its Style restriction when set, and reads 'Any st
   await finishFlow(page);
   await toListing(page);
 
-  await page.locator("#agentsBtn").click();
+  await openAgentsScreenFromMenu(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
   const targetId = await page.evaluate(() => cascades[0].id);
   const stylesVal = page.locator(`.agrow[data-id="${targetId}"] .agsrow`,
@@ -853,6 +935,8 @@ test("Watch listing: every group shows its agent divider, even a single-agent se
 // shape as CAS-723/CAS-725's fix above. Finds a real donor already carrying the included_streaming window
 // (so the window itself is genuine, untouched), then pins the fields Massive Movies' onboarding recipe
 // gates on so the donor's own identity can't matter.
+// CAS-1189: CAS-1179 turned on cinemaReleaseOnly in the Massive Movies recipe, so the clone also pins
+// cinema_release: true — a streaming donor's own value is false and matchesCriteria rejects it otherwise.
 async function trackAStreamingFilm(page){
   await page.evaluate(() => {
     let film = MOVIES.find(m => primaryStatus(m) === "included_streaming" && cascades.some(c => listedBy(m, c)));
@@ -861,7 +945,7 @@ async function trackAStreamingFilm(page){
       if(donor){
         film = {
           ...donor, tmdb_id: -750001, wm_user_rating: 10, wm_critic_score: 100,
-          language: "en", age_rating: "M", cinema_date: TODAY,
+          language: "en", age_rating: "M", cinema_date: TODAY, cinema_release: true,
         };
         MOVIES.push(film);
         prefs.on = false;
@@ -941,6 +1025,100 @@ test("Watch jump bar entries follow the groups' own order, on both the Cinema an
   }else{
     expect(stream.jumpOrder).toEqual([]);
   }
+});
+
+// CAS-1180: setOpinion() clears every Watch On rung the moment a verdict is given, so a watched film's
+// filmNotifyState(id).key is always empty — filmMatchesWatchTab used to key off that same (now-empty)
+// value, so a verdict film could never again pass a non-Cinema tab's scope test, however its own Watched
+// chip was set. AC1 and AC3 check it is back, as the existing stub, in the sort's own place, once its chip
+// is on. AC4-6 check the search box (Part D) widens to every tab/window, ignores the other filters while it
+// holds text, and that clearing it restores exactly what was showing right before.
+test("CAS-1180: a watched film shows as a stub when its own chip is on, and search finds it across tabs (AC1, AC3-6)", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await trackAStreamingFilm(page);
+  await page.locator(".wtabbtn", { hasText: "Streaming" }).click();
+  await disableMineOnlyOnCurrentTab(page);
+  await settleListing(page);
+
+  const filmId = await page.evaluate(() => {
+    const film = MOVIES.find(m => primaryStatus(m) === "included_streaming" && cascades.some(c => listedBy(m, c)));
+    setOpinion(film.tmdb_id, "enjoyed");
+    watchHeldOpen[watchTab].clear();   // AC1: the held-this-visit hold is cleared — not what keeps it visible
+    render();
+    return film.tmdb_id;
+  });
+
+  // AC1: no Watched chip on -> not on screen at all.
+  await expect(page.locator(`#card-${filmId}`)).toHaveCount(0);
+
+  // Switch the Enjoyed chip on for this tab.
+  await page.locator("#watchFilterBtn").click();
+  await page.locator("#watchSheetBody .chip", { hasText: "Enjoyed" }).click();
+  await page.locator(".wsheetclose").click();
+  await settleListing(page);
+
+  // AC3: it renders as the existing stub, in the sort's own place.
+  const stub = page.locator(`#card-${filmId}`);
+  await expect(stub).toBeVisible();
+  await expect(stub).toHaveClass(/stub/);
+  const order = await page.evaluate((id) => {
+    const rendered = [...document.querySelectorAll("#groups .card, #groups .stub")].map(el => el.id.replace("card-", ""));
+    const rows = watchScopeRows().filter(m => filmMatchesWatchedFilter(m) || watchHeldOpen[watchTab].has(m.tmdb_id));
+    const expected = listingGroups(rows, activeCascade()).flatMap(s => s.items.map(m => String(m.tmdb_id)));
+    return { renderedIdx: rendered.indexOf(String(id)), expectedIdx: expected.indexOf(String(id)) };
+  }, filmId);
+  expect(order.renderedIdx).toBeGreaterThanOrEqual(0);
+  expect(order.renderedIdx).toBe(order.expectedIdx);
+
+  // Switch the chip back off (AC4 needs search, not the chip, to be what's finding the film) and pick a
+  // second film from a different tab whose style gets switched off here — proving search reaches past both.
+  await page.locator("#watchFilterBtn").click();
+  await page.locator("#watchSheetBody .chip", { hasText: "Enjoyed" }).click();
+  const setup = await page.evaluate((id) => {
+    const film = MOVIES.find(m => m.tmdb_id === id);
+    const donor = MOVIES.find(m => primaryStatus(m) === "rental" && cascades.some(c => listedBy(m, c)));
+    // Setting watchGenreOff directly, unlike the chip taps above, doesn't go through a UI handler that
+    // calls render() itself — without this, beforeSearchIds below gets captured from the stale render that
+    // predates the exclusion, so AC6's later (correctly-filtered) snapshot looks like it lost two films.
+    if(donor){ watchGenreOff[watchTab].add((donor.genres || [])[0] || "Action"); render(); }
+    return {
+      term: film.title.slice(0, Math.min(5, film.title.length)).toLowerCase(),
+      donorId: donor ? donor.tmdb_id : null,
+      donorTerm: donor ? donor.title.slice(0, Math.min(5, donor.title.length)).toLowerCase() : null,
+    };
+  }, filmId);
+  await page.locator(".wsheetclose").click();
+  await settleListing(page);
+  await expect(page.locator(`#card-${filmId}`)).toHaveCount(0);
+
+  const beforeSearchIds = await page.locator("#groups .card, #groups .stub").evaluateAll(els => els.map(el => el.id));
+
+  const input = page.locator("#watchSearchInput");
+  await expect(input).toHaveAttribute("placeholder", "Search all your films");
+
+  // AC4: typing part of its title finds the watched film, as a stub, with no Watched chip on.
+  await input.fill(setup.term);
+  await page.waitForTimeout(250);   // CAS-514's own 150ms debounce
+  await expect(page.locator(`#card-${filmId}`)).toBeVisible();
+  await expect(page.locator(`#card-${filmId}`)).toHaveClass(/stub/);
+
+  // AC5: search also finds a film belonging to a different tab, with a style switched off here.
+  if(setup.donorId){
+    await input.fill(setup.donorTerm);
+    await page.waitForTimeout(250);
+    await expect(page.locator(`#card-${setup.donorId}`)).toBeVisible();
+  }
+
+  // AC6: clearing the search box restores exactly the rows that were showing right before it.
+  // clearWatchSearch() renders immediately and then again off its own already-scheduled debounce, which
+  // restarts the listing's chunked card fill — a bare timeout can catch that mid-stream, so wait for the
+  // count to settle the same way every earlier step in this test already does.
+  await page.locator("#watchSearchClear").click();
+  await settleListing(page);
+  const afterIds = await page.locator("#groups .card, #groups .stub").evaluateAll(els => els.map(el => el.id));
+  expect(afterIds.sort()).toEqual(beforeSearchIds.sort());
 });
 
 test("CAS-740 AC4: a signed-in user whose account already holds agents is never left in the onboarding flow", async ({ page }) => {
@@ -1092,6 +1270,11 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
       rpc: async (fn, params) => {
         if(fn === "email_has_account") return { data: false, error: null };
         if(fn === "complete_membership"){
+          // CAS-1176 AC7: recorded so a test can inspect what membCompleteNewMembership actually sent,
+          // without this fixture needing its own notify_prefs table (every other table here falls through
+          // to chain()'s empty-array default, which is exactly what drives loadNotifyPrefs' own
+          // genuinely-missing-row bootstrap branch instead).
+          window.__cas1176CompleteMembershipNotify = params && params.p && params.p.notify;
           const agents = (params && params.p && params.p.agents) || [];
           agents.forEach(a => {
             const row = Object.assign({ user_id: "cas913-user", created_at: new Date().toISOString() }, a);
@@ -1213,6 +1396,25 @@ test("CAS-913: a device that has onboarded but never signed in boots into the ap
 
   await expect(page.locator("#splash")).not.toHaveClass(/open/);
   await expect(page.locator("#authModal")).not.toHaveClass(/open/);
+});
+
+// CAS-1176 AC7: a new account must start with both in-app and email alerts on — membCompleteNewMembership's
+// own RPC argument is the direct check; notifyPrefs.inApp/emailOn being true straight after is the in-memory
+// one, read back through this fixture's loadNotifyPrefs bootstrap-insert branch (see that mock's own
+// comment above — there is no notify_prefs table here to seed a different answer from).
+test("CAS-1176 AC7: a new account's complete_membership call and in-memory notifyPrefs both start with in-app and email alerts on", async ({ page }) => {
+  await cas913GotoConfigured(page);
+  await cas913WalkToShortlist(page);
+  await finishFlow(page);
+  await toListing(page);
+
+  const notify = await page.evaluate(() => window.__cas1176CompleteMembershipNotify);
+  expect(notify.in_app).toBe(true);
+  expect(notify.email_on).toBe(true);
+
+  const prefs = await page.evaluate(() => ({ inApp: notifyPrefs.inApp, emailOn: notifyPrefs.emailOn }));
+  expect(prefs.inApp).toBe(true);
+  expect(prefs.emailOn).toBe(true);
 });
 
 // ---- CAS-1169: membership sign-up enters its code on #membScreen itself, never on #authModal -----------
@@ -1431,6 +1633,53 @@ test("Delete account opens above the Account screen, not behind it (CAS-1077)", 
   await expect(page.locator("#deleteAcctGo")).toHaveText("Delete my account");
   // AC4: the gating stays — the button is disabled until the confirm word is typed. Never clicked here.
   await expect(page.locator("#deleteAcctGo")).toBeDisabled();
+});
+
+// CAS-1176 AC3-AC6: "How you're told" left the onboarding step frame for its own plain Settings screen —
+// no progress bar, LAST ONE or Continue/Skip; email alerts go straight to the signed-in address, with no
+// second email field; a browser's in-app toggle is a plain on/off with no OS permission round-trip; the
+// back arrow returns to Settings. Starts both toggles off itself (page.evaluate, no re-render needed since
+// openNotifyScreen renders fresh off the live notifyPrefs) rather than relying on CAS-1176's own signed-up-
+// account defaults, so this test demonstrates the turning-ON behaviour the AC text describes either way.
+test("CAS-1176 AC3-AC6: Settings' How you're told has no onboarding chrome, email goes to the signed-in address, in-app is a plain toggle in the browser, and back returns to Settings", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  const email = await page.evaluate(() => window.CascadeAuth.user && window.CascadeAuth.user.email);
+  await page.evaluate(() => {
+    notifyPrefs.emailOn = false; notifyPrefs.email = ""; notifyPrefs.inApp = false;
+    saveNotifyPrefs();
+  });
+
+  await openNotifyScreen(page);
+  await expect(page.locator("#notifyScreen")).toHaveClass(/open/);
+
+  // AC3: the title, and none of the onboarding step frame's chrome.
+  await expect(page.locator("#notifyScreen .osh")).toHaveText("How you're told");
+  await expect(page.locator("#notifyScreen .oslast")).toHaveCount(0);
+  await expect(page.locator("#notifyScreen .osskip")).toHaveCount(0);
+  await expect(page.locator("#notifyScreen button", { hasText: "Continue" })).toHaveCount(0);
+
+  // AC4: turning email alerts on, from off, sets the signed-in account's own address — never a typed one.
+  await page.locator("#notifyScreen .bigtoggle", { hasText: "Send me alerts by email" }).click();
+  expect(await page.evaluate(() => notifyPrefs.emailOn)).toBe(true);
+  expect(await page.evaluate(() => notifyPrefs.email)).toBe(email);
+  const sentTo = page.locator("#notifyScreen .ossub", { hasText: "Sent to" });
+  await expect(sentTo).toBeVisible();
+  await expect(sentTo).toContainText(email);
+
+  // AC5: in the browser, turning in-app notifications on never touches the OS permission prompt.
+  await page.locator("#notifyScreen .bigtoggle", { hasText: "Allow in-app notifications" }).click();
+  expect(await page.evaluate(() => notifyPrefs.inApp)).toBe(true);
+  await expect(page.locator("#onbInAppDenied")).not.toBeVisible();
+
+  // AC6: back closes this screen and returns to Settings, open underneath it.
+  await page.locator("#notifyScreen .osback").click();
+  await expect(page.locator("#notifyScreen")).not.toHaveClass(/open/);
+  await expect(page.locator("#settingsScreen")).toHaveClass(/open/);
+  await page.locator("#settingsScreen .osback").click();
+  await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
 });
 
 // CAS-1035 AC3: a Watch On tick made just before the tab closes must survive a reload even though it never

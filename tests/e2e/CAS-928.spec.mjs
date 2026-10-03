@@ -153,8 +153,10 @@ test("CAS-928 AC4: the empty-friends state renders without error", async ({ page
   await expect(page.locator("#friendsBody .fempty")).toBeVisible();
 });
 
-// AC3c — the selectable picker inside Invite
-test("CAS-928 AC3c: adding a friend with a name and an email inserts one row and leaves them selected", async ({ page }) => {
+// AC3c, superseded by CAS-1121: Send's label is the selected friend's own name for exactly one selection
+// ("Invite Jess"), not a bare count — "Your name" (the sender's own) is what moved into the sheet, and a
+// count only shows once two or more people are picked (see AC3e just below).
+test("CAS-928 AC3c: adding a friend with a name and an email inserts one row, selects them and names them on Send", async ({ page }) => {
   await bootSignedIn(page, FIXTURE_FRIENDS);
   await openInviteSheet(page);
 
@@ -167,7 +169,7 @@ test("CAS-928 AC3c: adding a friend with a name and an email inserts one row and
   const inserts = await page.evaluate(() => window.__friendInserts);
   expect(inserts.length).toBe(1);
   expect(inserts[0].name).toBe("Jess");
-  await expect(page.locator("#filmInviteSend")).toContainText("1");
+  await expect(page.locator("#filmInviteSend")).toContainText("Jess");
   const jessId = inserts[0].id;
   await expect(page.locator(`#filmInvitePicker .frow[data-fid="${jessId}"]`)).toHaveClass(/fsel/);
 });

@@ -403,6 +403,12 @@ export async function bootAlreadySignedIn(page, { supabaseScript, resolveFnName,
   if(readyFlagExpr) await page.waitForFunction(readyFlagExpr, null, { timeout: 30_000 });
 }
 
+/** CAS-1185: Agents left the header's own chip for the menu's first item — reach it via Menu -> Agents,
+ * matching how a person actually gets there now. */
+export async function openAgentsScreenFromMenu(page){
+  await page.locator("#navMenuBtn").click();
+  await page.locator("#navMenu .navitem", { hasText: "Agents" }).click();
+}
 /** CAS-1126: "Where & when you'll watch" left the top menu for the new Settings screen — reach it via
  * Menu -> Settings -> the row, matching how a person actually gets there now. */
 export async function openWhereWhenScreen(page){
@@ -429,6 +435,20 @@ export async function openMyServicesScreen(page){
 export async function closeMyServicesScreen(page){
   await page.locator("#onbStep .osback").click();
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+  await page.locator("#settingsScreen .osback").click();
+  await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
+}
+/** CAS-1176: "How you're told" left the onboarding step frame for its own plain back-arrow-and-title
+ * Settings screen — reach it via Menu -> Settings -> the row, same as Service tracking/My services. */
+export async function openNotifyScreen(page){
+  await page.locator("#navMenuBtn").click();
+  await page.locator("#navMenu .navitem", { hasText: "Settings" }).click();
+  await page.locator("#settingsScreen .urow", { hasText: "How you're told" }).click();
+}
+/** Back out of How you're told then out of the Settings screen it resumes to (CAS-1126's screenResume). */
+export async function closeNotifyScreen(page){
+  await page.locator("#notifyScreen .osback").click();
+  await expect(page.locator("#notifyScreen")).not.toHaveClass(/open/);
   await page.locator("#settingsScreen .osback").click();
   await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
 }
