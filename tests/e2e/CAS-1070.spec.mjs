@@ -1,13 +1,14 @@
-// CAS-1070: App Store requires a privacy policy link reachable inside the app, and a support link.
-// Covers two surfaces: the About screen (Menu → About) and the account sign-up email step on #membScreen
-// (shown when membNeedsEmail() is true — a configured, signed-out build).
+// CAS-1070 / CAS-1170: App Store requires a privacy policy link reachable inside the app, and a support
+// link. CAS-1170 moved the policy itself in-app (#privacyScreen, in Cascade's own look) instead of linking
+// out to the company site — these specs cover both surfaces: the About screen (Menu → About) and the
+// account sign-up email step on #membScreen (shown when membNeedsEmail() is true — a configured,
+// signed-out build).
 import { test, expect } from "@playwright/test";
 import { toShortlist, finishFlow, toListing } from "./helpers.mjs";
 
-const PRIVACY_URL = "https://www.codynamics.com.au/privacy";
 const SUPPORT_URL = "https://www.codynamics.com.au/support";
 
-test("About screen (Menu → About) links to Privacy policy and Support (CAS-1070 AC1)", async ({ page }) => {
+test("About screen (Menu → About): Privacy policy opens #privacyScreen in-app, Back returns to About (CAS-1170 AC5)", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
@@ -16,13 +17,22 @@ test("About screen (Menu → About) links to Privacy policy and Support (CAS-107
   await page.locator("#navMenu .navitem", { hasText: "About" }).click();
   await expect(page.locator("#aboutScreen.open")).toBeVisible();
 
-  const privacy = page.locator("#aboutScreen a", { hasText: "Privacy policy" });
-  await expect(privacy).toBeVisible();
-  await expect(privacy).toHaveAttribute("href", PRIVACY_URL);
-
   const support = page.locator("#aboutScreen a", { hasText: "Support" });
   await expect(support).toBeVisible();
   await expect(support).toHaveAttribute("href", SUPPORT_URL);
+
+  await page.locator("#aboutScreen button", { hasText: "Privacy policy" }).click();
+  await expect(page.locator("#privacyScreen.open")).toBeVisible();
+  const onTop = await page.evaluate(() => {
+    const r = document.getElementById("privacyScreen").getBoundingClientRect();
+    const el = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+    return !!(el && el.closest("#privacyScreen"));
+  });
+  expect(onTop).toBe(true);
+
+  await page.locator("#privacyScreen .osback").click();
+  await expect(page.locator("#privacyScreen.open")).toHaveCount(0);
+  await expect(page.locator("#aboutScreen.open")).toBeVisible();
 });
 
 // Reuses the CAS-913/smoke.spec.mjs technique for a configured-but-signed-out device: a REAL (fake)
@@ -60,8 +70,10 @@ const CAS1070_FAKE_SUPABASE_GLOBAL = `
 // ever re-renders the membership screen once the module finishes and CascadeAuth becomes real — unlike the
 // equivalent races this file documents already having a fix for (e.g. tryResolveFilmInvite's own
 // 'cascade-auth-change' "second chance" listener), this call site has no such retry. Reproduced locally
-// (no Docker needed — this test never calls toShortlist): #membEmail is confirmed absent every run.
-test.fixme("membScreen email step links to Privacy policy when membNeedsEmail() is true (CAS-1070 AC2)", async ({ page }) => {
+// (no Docker needed — this test never calls toShortlist): #membEmail is confirmed absent every run. CAS-1170
+// inherits this same block: the Privacy policy control it added only exists inside the `needsEmail` branch,
+// so it can't be exercised here either until CAS-1159's underlying race is fixed.
+test.fixme("membScreen email step: Privacy policy opens #privacyScreen in-app and keeps the typed email (CAS-1170 AC4)", async ({ page }) => {
   await page.route("**/config.js", route => route.fulfill({
     contentType: "application/javascript",
     body: `window.CASCADE_CONFIG = { SUPABASE_URL: "https://fake-project.supabase.test", SUPABASE_ANON_KEY: "fake-anon-key-not-a-real-secret" };`,
@@ -77,8 +89,19 @@ test.fixme("membScreen email step links to Privacy policy when membNeedsEmail() 
 
   await expect(page.locator("#membScreen.open")).toBeVisible();
   await expect(page.locator("#membEmail")).toBeVisible();
+  await page.locator("#membEmail").fill("person@example.com");
 
-  const privacy = page.locator("#membBody a", { hasText: "Privacy policy" });
-  await expect(privacy).toBeVisible();
-  await expect(privacy).toHaveAttribute("href", PRIVACY_URL);
+  await page.locator("#membBody button", { hasText: "Privacy policy" }).click();
+  await expect(page.locator("#privacyScreen.open")).toBeVisible();
+  const onTop = await page.evaluate(() => {
+    const r = document.getElementById("privacyScreen").getBoundingClientRect();
+    const el = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+    return !!(el && el.closest("#privacyScreen"));
+  });
+  expect(onTop).toBe(true);
+
+  await page.locator("#privacyScreen .osback").click();
+  await expect(page.locator("#privacyScreen.open")).toHaveCount(0);
+  await expect(page.locator("#membScreen.open")).toBeVisible();
+  await expect(page.locator("#membEmail")).toHaveValue("person@example.com");
 });
