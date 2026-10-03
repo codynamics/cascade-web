@@ -330,7 +330,7 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   await openWhereWhenScreen(page);
   await expect(page.locator(".osh", { hasText: "Service tracking" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
-  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
   await expect(premiumLane).toHaveClass(/on/);
   await closeWhereWhenScreen(page);
 
@@ -403,7 +403,7 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   await expect(page.locator(`#${cardId}`)).toHaveCount(0);
 
   await openWhereWhenScreen(page);
-  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
   await expect(premiumLane).not.toHaveClass(/on/);
   await closeWhereWhenScreen(page);
   await expect(page.locator(".wtabbtn", { hasText: "Premium" })).toHaveCount(0);
@@ -421,7 +421,7 @@ test("an agent created with every window enabled lists films at rental or stream
   await openWhereWhenScreen(page);
   await expect(page.locator(".osh", { hasText: "Service tracking" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
-  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
   await expect(premiumLane).toHaveClass(/on/);
   await closeWhereWhenScreen(page);
 
@@ -508,7 +508,7 @@ test("Mission screen: one score track, exactly one handle; a newly account-enabl
 
   await openWhereWhenScreen(page);
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
-  await premiumLane.locator(".agwt", { hasText: "Watch here" }).click();
+  await premiumLane.locator(".agwt", { hasText: "Track" }).click();
   await expect(premiumLane).toHaveClass(/on/);
   await closeWhereWhenScreen(page);
 

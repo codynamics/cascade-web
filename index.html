@@ -13677,8 +13677,10 @@ function saveWatch(){
 const WATCH_PREFS_KEY="cascade_watch_prefs";
 // CAS-1123: every default window carries just `list` now — a window that's on both lists and alerts, so
 // a new member is alerted in every window they watch instead of hearing about nothing (Lee's report).
+// CAS-1177: Upcoming also defaults its two extra moments, "When announced" and "Opening next week", on —
+// a new member hears about an upcoming film the moment it's announced, not only once it opens.
 const watchPrefsDefaults = () => ({
-  upcoming:{list:true}, in_cinema:{list:true},
+  upcoming:{list:true, subs:{announced:true, opens_soon:true}}, in_cinema:{list:true},
   rent:{list:true},     stream:{list:true},
   // premium starts fully off, same as it always has (CAS-243) — the one window nobody should be opted
   // into by default.
@@ -13721,16 +13723,17 @@ function onbApplyWatchPrefsV2(ans){
   syncWatchPrefsToCascades();
 }
 // CAS-532: hubWatchSummary retired with the hub's "watch" door — there is no remaining caller.
-// CAS-1123 (Lee, 2026-10-01): one card per window, one switch on the face of it — Watch. A window that's
+// CAS-1123 (Lee, 2026-10-01): one card per window, one switch on the face of it. A window that's
 // on both lists matching films AND tells you when one arrives there; the old Track/Notify pair (CAS-228)
 // is gone, because a window you watch in is a window you want to hear from.
+// CAS-1177: the switch itself reads "Track" on every window's button.
 function drawWatchLanes(){
   const box=$("wwLanes"); if(!box) return;
   box.innerHTML = agentWindows().map(w=>{
     const on=winOn(w.key,"list");
     const sw=`<button type="button" class="agwt${on?" on":""}" aria-pressed="${on}"
         title="${escA(`Watch ${w.label.toLowerCase()} — list matching films and tell you ${w.notifySay}`)}"
-        onclick="wwToggleWin('${w.key}')"><span class="wwb">✓</span>Watch here</button>`;
+        onclick="wwToggleWin('${w.key}')"><span class="wwb">✓</span>Track</button>`;
     // CAS-242: the finer moments appear only once the window itself is on, because until then there is no
     // bell for them to choose between. They are a nested list rather than a second switch on the row: they
     // are not a separate job the agent does, they are which moments the one bell rings on.

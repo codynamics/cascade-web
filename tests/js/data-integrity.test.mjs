@@ -740,11 +740,14 @@ test("windows: a new agent lists and is alerted on Upcoming/In cinema/Rent/Strea
   // CAS-532/CAS-723: watchPrefsDefaults() is the one seed now — there is no more per-kind (cinema vs
   // streaming) lane split to seed separately. CAS-1123 folded Notify into the one `list` switch (Lee's
   // decision, 2026-10-01): a window that lists by default is now also alerted by default, so a new member
-  // hears about every window they're watching from the start.
+  // hears about every window they're watching from the start. CAS-1177 (Lee, 2026-10-03) reverses CAS-427
+  // for Upcoming's two sub-moments specifically: a new member hears about an upcoming film the moment it's
+  // announced, not only once it opens.
   const seed = E.watchPrefsDefaults();
   assert.ok(seed.upcoming.list, "a new agent does not list (and so does not alert on) Upcoming");
   assert.ok(!("notify" in seed.upcoming), "notify is retired — it must not appear in a fresh default");
-  assert.ok(!seed.upcoming.subs, "a new agent starts with pre-armed sub-moments, against CAS-427's default-off rule");
+  assert.equal(seed.upcoming.subs.announced, true, "a new agent must start with Upcoming's announced moment on (CAS-1177)");
+  assert.equal(seed.upcoming.subs.opens_soon, true, "a new agent must start with Upcoming's opens_soon moment on (CAS-1177)");
   assert.ok(seed.rent && seed.rent.list, "Standard Rent is not listed (and so not alerted) for a new agent");
   assert.ok(seed.stream && seed.stream.list, "Streaming is not listed (and so not alerted) for a new agent");
   assert.ok(!seed.premium, "a new agent is opted into Premium, which costs ~$30 a film");
