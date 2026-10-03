@@ -1109,8 +1109,11 @@ test("CAS-1180: a watched film shows as a stub when its own chip is on, and sear
   }
 
   // AC6: clearing the search box restores exactly the rows that were showing right before it.
+  // clearWatchSearch() renders immediately and then again off its own already-scheduled debounce, which
+  // restarts the listing's chunked card fill — a bare timeout can catch that mid-stream, so wait for the
+  // count to settle the same way every earlier step in this test already does.
   await page.locator("#watchSearchClear").click();
-  await page.waitForTimeout(250);
+  await settleListing(page);
   const afterIds = await page.locator("#groups .card, #groups .stub").evaluateAll(els => els.map(el => el.id));
   expect(afterIds.sort()).toEqual(beforeSearchIds.sort());
 });
