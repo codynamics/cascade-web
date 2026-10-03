@@ -432,6 +432,20 @@ export async function closeMyServicesScreen(page){
   await page.locator("#settingsScreen .osback").click();
   await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
 }
+/** CAS-1176: "How you're told" left the onboarding step frame for its own plain back-arrow-and-title
+ * Settings screen — reach it via Menu -> Settings -> the row, same as Service tracking/My services. */
+export async function openNotifyScreen(page){
+  await page.locator("#navMenuBtn").click();
+  await page.locator("#navMenu .navitem", { hasText: "Settings" }).click();
+  await page.locator("#settingsScreen .urow", { hasText: "How you're told" }).click();
+}
+/** Back out of How you're told then out of the Settings screen it resumes to (CAS-1126's screenResume). */
+export async function closeNotifyScreen(page){
+  await page.locator("#notifyScreen .osback").click();
+  await expect(page.locator("#notifyScreen")).not.toHaveClass(/open/);
+  await page.locator("#settingsScreen .osback").click();
+  await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
+}
 
 /** The listing's section headers, as {window, count}. */
 export function sectionCounts(page){

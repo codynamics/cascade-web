@@ -3167,10 +3167,6 @@
   .bigtoggle.on{border-color:var(--accent);background:rgba(124,92,255,.12)}
   .bigtoggle.on .btcheck{background:var(--accent);border-color:var(--accent);color:#fff}
   .bigtoggle:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-  .emailwrap{display:none;margin-top:4px}
-  .emailwrap.show{display:block}
-  .nlbl{display:block;font-size:12px;font-weight:700;color:var(--dim);margin:10px 2px 6px;
-    text-transform:uppercase;letter-spacing:.03em}
 
   /* ---- Brand: primary CTAs carry the signature gradient (CAS-73 / spec 26640386 §1) ----
      Each selector re-states its own primary button so it overrides that button's solid
@@ -4065,6 +4061,13 @@
      top menu's Settings screen (CAS-1126). -->
 <div class="uscreen" id="wwScreen" role="dialog" aria-modal="true" aria-label="Service tracking">
   <div class="uwrap" id="wwBody"></div>
+</div>
+
+<!-- HOW YOU'RE TOLD (CAS-1176) — Settings' own copy of the notify controls, a plain back-arrow-and-title
+     screen like #wwScreen above rather than the onboarding step frame. Body rendered by renderNotifyScreen().
+     Reached from the top menu's Settings screen. -->
+<div class="uscreen" id="notifyScreen" role="dialog" aria-modal="true" aria-label="How you're told">
+  <div class="uwrap" id="notifyBody"></div>
 </div>
 
 <!-- OCCASIONS (CAS-775) — manage the user's Occasions register: create, rename, delete. Replaces CAS-768's
@@ -12038,6 +12041,33 @@ window.closeWhereWhen=()=>{
   fireScreenResume();   // CAS-1126: back to Settings if that's where this was opened from
 };
 
+// ================= HOW YOU'RE TOLD (CAS-1176) =================
+// Settings' own copy of the notify controls, as a plain back-arrow-and-title screen like Service tracking
+// (CAS-532) rather than the onboarding step frame openSettingsStep used to reopen (progress bar, LAST ONE,
+// Continue, Skip) — none of which make sense once there's no flow left to walk. Shares notifyControlsHTML()/
+// wireNotifyControls() with the onboarding `notifysettings` step's own ?step= preview; every tap here saves
+// straight through saveNotifyPrefs(), same as it always has.
+function renderNotifyScreen(){
+  $("notifyBody").innerHTML=`
+    <div class="ostop"><button class="osback" type="button" onclick="closeNotifyScreen()" aria-label="Back">←</button>
+      <h2 class="osh">How you're told</h2></div>
+    <p class="ossub">As new movies come along that meet your brief, this agent will ping you. How would you like to be notified?</p>
+    ${notifyControlsHTML()}`;
+  wireNotifyControls();
+}
+window.openNotifyScreen=()=>{
+  renderNotifyScreen();
+  $("notifyScreen").scrollTop=0;
+  $("notifyScreen").classList.add("open"); lockBodyScroll(true);
+  syncWatchChip();
+  logEvent("notify_screen_opened",{});
+};
+window.closeNotifyScreen=()=>{
+  $("notifyScreen").classList.remove("open"); lockBodyScroll(false);
+  syncWatchChip();
+  fireScreenResume();   // CAS-1126: back to Settings if that's where this was opened from
+};
+
 // ================= Top menu (CAS-345) =================
 // One anchored dropdown for the account/about surfaces that used to be separate header icons (Account,
 // Service analysis) or buried inside My streaming services (About). Dismiss on an outside tap or on
@@ -17319,7 +17349,7 @@ function renderSettings(){
     <div class="ucard">
       ${acctRow("🕒","Service tracking", null, "settingsOpenWhereWhen()")}
       ${acctRow("🔔","How you're told", esc(notif) + (notifyPrefs.emailOn && notifyPrefs.email
-                ? ` · ${esc(notifyPrefs.email)}` : ""), "openSettingsStep('notifysettings')")}
+                ? ` · ${esc(notifyPrefs.email)}` : ""), "settingsOpenNotify()")}
       ${acctRow("📺","My services", null, "settingsOpenServices()")}
       ${acctRow("🌐","Languages", null, "settingsOpenLanguages()")}
       ${acctRow("🎉","Occasions", null, "settingsOpenOccasions()")}
@@ -17334,6 +17364,7 @@ window.openSettings=()=>{
 };
 window.closeSettings=()=>{ $("settingsScreen").classList.remove("open"); lockBodyScroll(false); syncWatchChip(); };
 window.settingsOpenWhereWhen=()=>{ screenResume="settings"; closeSettings(); openWhereWhen(); };
+window.settingsOpenNotify=()=>{ screenResume="settings"; closeSettings(); openNotifyScreen(); };
 window.settingsOpenServices=()=>{ screenResume="settings"; closeSettings(); openMenuServices(); };
 window.settingsOpenLanguages=()=>{ screenResume="settings"; closeSettings(); openLanguages(); };
 window.settingsOpenOccasions=()=>{ screenResume="settings"; closeSettings(); openManageOccasionsScreen(); };
@@ -17422,63 +17453,32 @@ function fireScreenResume(){
   if(target==="account") openAccount();
   else if(target==="settings") openSettings();
 }
-// ---- CAS-253: an email alert needs somewhere to send it ----------------------------------------------
-// Switching "Send me alerts by email" on and walking past the empty field left an agent whose email bell was
-// armed and undeliverable — the monitor's delivery_plan calls that state "wait" and quietly retries it
-// every night, forever, saying nothing. So the switch and the address are one answer: turn it on and the
-// address is required, turn it off and the field stops mattering.
+// ---- CAS-253/CAS-1176: an email alert needs somewhere to send it --------------------------------------
+// There is no email field any more — "Send me alerts by email" sends to the signed-in account's own
+// address (flowNotify below), so there is nothing left for a gate to validate. EMAIL_RE/emailValid stay:
+// the sign-up/sign-in flow still needs a real email-shape check and reuses this one.
 //
 // Deliberately not a full RFC check. The test is that there is a name, an @, and a dotted domain — enough to
 // catch the mistakes people actually make (a blank field, "me", a missing dot) without rejecting the valid
 // oddities that a stricter pattern always seems to. The real proof of an address is a mail that arrives.
 const EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
 const emailValid = v => EMAIL_RE.test(String(v||"").trim());
-// Is the notify step answerable as it stands? Off = yes, always. On = only with an address.
-const notifyReady = () => !notifyPrefs.emailOn || emailValid(notifyPrefs.email);
-// CAS-629: the notify controls now render on two steps — the standalone notifysettings preview and S6
-// "report", which asks the same question once for the whole roster — so the gate has to hold the CTA on
-// either one, not just the old key.
-const NOTIFY_GATED_STEPS = new Set(["notifysettings","report"]);
-function notifyGate(){
-  const on=!!notifyPrefs.emailOn, val=(notifyPrefs.email||"").trim(), ok=notifyReady();
-  const err=$("onbEmailErr");
-  if(err){
-    // Nothing is said until there is something to say: an empty field on a switch just turned on is not a
-    // mistake yet, it is a question that has not been answered. The message appears once it has been
-    // answered WRONGLY, and the blocked button carries the rest.
-    const show = on && val && !ok;
-    err.hidden=!show;
-    err.textContent= show ? "That doesn't look like an email address — check it and we'll send your alerts there." : "";
-  }
-  const field=$("onbEmail"); if(field) field.classList.toggle("bad", on && !!val && !ok);
-  const b=$("onbStepCta")||$("flowCta");
-  if(b && NOTIFY_GATED_STEPS.has(onbStepKey)){
-    b.disabled=!ok;
-    b.classList.toggle("blocked", !ok);
-    b.title = ok ? "" : "Add the email address your alerts should go to, or switch email alerts off";
-  }
-}
-// ---- CAS-629: the two notify controls, shared verbatim by notifysettings (its own ?step= preview) and
-// S6 "report" (the wired flow's own copy, asked once for the whole roster instead of once per agent).
+// ---- CAS-629/CAS-1176: the two notify controls, shared verbatim by the Settings screen and notifysettings'
+// own ?step= preview.
 function notifyControlsHTML(){
   const on=k=>notifyPrefs[k]?" on":"";
+  const native=typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform();
   return `<button type="button" class="bigtoggle${on("inApp")}" onclick="flowNotify('inApp',this)">
       <span class="btmain">Allow in-app notifications</span><span class="btcheck">✓</span></button>
-    <p class="ossub" id="onbInAppHint">Tapping this will ask iOS for permission to notify you — you can change your mind any time.</p>
-    <p class="fielderr" id="onbInAppDenied" role="alert" hidden>You said no to notifications — you can turn them on later in iOS Settings → Cascade.</p>
+    <p class="ossub" id="onbInAppHint">${native
+        ? "Tapping this will ask iOS for permission to notify you — you can change your mind any time."
+        : "Notifications arrive on your iPhone through the Cascade app."}</p>
+    ${native ? `<p class="fielderr" id="onbInAppDenied" role="alert" hidden>You said no to notifications — you can turn them on later in iOS Settings → Cascade.</p>` : ""}
     <button type="button" class="bigtoggle${on("emailOn")}" onclick="flowNotify('emailOn',this)">
       <span class="btmain">Send me alerts by email</span><span class="btcheck">✓</span></button>
-    <div class="emailwrap${notifyPrefs.emailOn?" show":""}" id="onbEmailWrap">
-      <label class="nlbl" for="onbEmail">Your email</label>
-      <input class="osfield" id="onbEmail" type="email" autocomplete="email" inputmode="email"
-             aria-describedby="onbEmailErr" placeholder="you@email.com"
-             value="${escA(notifyPrefs.email||"")}">
-      <p class="fielderr" id="onbEmailErr" role="alert" hidden></p></div>`;
+    ${notifyPrefs.emailOn ? `<p class="ossub">Sent to ${esc(notifyPrefs.email||"")}.</p>` : ""}`;
 }
 function wireNotifyControls(){
-  const el=$("onbEmail");
-  if(el) el.oninput=()=>{ notifyPrefs.email=el.value.trim(); saveNotifyPrefs(); notifyGate(); };
-  notifyGate();
   paintInAppDenied();   // CAS-463: fresh entry to the step always starts from the neutral hint
 }
 // CAS-463: "Allow in-app notifications" used to just flip a local flag. Now it asks for a real OS-level
@@ -17530,6 +17530,13 @@ function registerPush(){
 }
 window.flowNotify=(key,el)=>{
   if(key==="inApp"){
+    // CAS-1176: only the native app asks iOS for permission (and only there can it be refused) — in a
+    // browser the toggle is just the account's own in_app setting, flipped straight away.
+    if(!(typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform())){
+      notifyPrefs.inApp=!notifyPrefs.inApp; saveNotifyPrefs(); el.classList.toggle("on", notifyPrefs.inApp);
+      onbRefresh(); logEvent("flow_notify",{key, on:notifyPrefs.inApp});
+      return;
+    }
     if(notifyPrefs.inApp){   // turning off never needs a permission round-trip
       notifyPrefs.inApp=false; saveNotifyPrefs(); el.classList.toggle("on", false);
       onbRefresh(); logEvent("flow_notify",{key,on:false});
@@ -17549,12 +17556,13 @@ window.flowNotify=(key,el)=>{
     return;
   }
   notifyPrefs[key]=!notifyPrefs[key];
+  // CAS-1176: email alerts always go to the signed-in account's own address — there is no separate field
+  // to set it from any more.
+  if(key==="emailOn") notifyPrefs.email = notifyPrefs.emailOn
+    ? ((window.CascadeAuth && window.CascadeAuth.user && window.CascadeAuth.user.email) || "")
+    : notifyPrefs.email;
   saveNotifyPrefs();
   el.classList.toggle("on", notifyPrefs[key]);
-  if(key==="emailOn"){
-    const w=$("onbEmailWrap"); if(w) w.classList.toggle("show", notifyPrefs.emailOn);
-    const f=$("onbEmail"); if(f && notifyPrefs.emailOn && !(notifyPrefs.email||"").trim()) f.focus();
-  }
   onbRefresh();   // CAS-308: also repaints the trail's Notify row, not just the CTA gate
   logEvent("flow_notify",{key, on:notifyPrefs[key]});
 };
@@ -17715,9 +17723,6 @@ function onbRefresh(){
   // the summary on the screen that sets it.
   const trail=$("onbTrail");
   if(trail) trail.outerHTML = onbTrailHTML(onbStepKey) || "";
-  // CAS-253: onbRefresh rewrites the button, so the gate is reapplied after it — otherwise any repaint
-  // (a toggle, a count moving) would hand back a Continue the screen is not ready for.
-  if(NOTIFY_GATED_STEPS.has(onbStepKey)) notifyGate();
 }
 // #4 selectivity refresh (CAS-114): update the "What this does" line + count, and let onbRefresh update the
 // CTA count from the same live figure.
@@ -17792,15 +17797,6 @@ window.onbStepSkip=()=>{
   closeOnbStep();
 };
 window.onbStepContinue=()=>{
-  // CAS-253: the disabled button is the visible half; this is the half a keyboard or a stale handler cannot
-  // get round. An armed email bell with no address is not a state the flow may leave this screen in.
-  if(NOTIFY_GATED_STEPS.has(onbStepKey) && !notifyReady()){
-    notifyGate();
-    const f=$("onbEmail"); if(f) f.focus();
-    const err=$("onbEmailErr");
-    if(err){ err.hidden=false; err.textContent="Add the email address your alerts should go to, or switch email alerts off."; }
-    return;
-  }
   logEvent("onbstep_continue",{step:onbStepKey, matches:onbFlow.draft?onbCount():null});
   if(flowOn) return flowNext();
   // CAS-934: a Briefing spoke has no footer button any more (Back is the only exit — see onbStepBack), so
@@ -18518,8 +18514,10 @@ async function membCompleteNewMembership(){
   }
   const prefsFields=CP.userPrefsRow(); delete prefsFields.user_id;
   const notifyFields=CP.prefsRow(); delete notifyFields.user_id;
-  // CAS-1155: a new account starts with email alerts on, sent to the address it just confirmed with
-  // its sign-up code — not notifyPrefsDefault()'s signed-out device default that CP.prefsRow() read.
+  // CAS-1155/CAS-1176: a new account starts with both in-app and email alerts on, the latter sent to the
+  // address it just confirmed with its sign-up code — not notifyPrefsDefault()'s signed-out device default
+  // that CP.prefsRow() read.
+  notifyFields.in_app = true;
   notifyFields.email_on = true;
   notifyFields.email_address = ((auth.user && auth.user.email) || "").trim() || null;
   const agents=cascades.map(c=>{
@@ -20348,11 +20346,13 @@ else if(dedupedN)
     const owner=uid();
     const row=(window.CascadeAccountStore.acctStore.notify_prefs||[])[0];
     if(!row){
-      // CAS-1155: a genuinely missing row starts email alerts on, sent to the signed-in account's own
-      // email — not a device default, since a fixed default written at row creation is not device state.
+      // CAS-1155/CAS-1176: a genuinely missing row starts both in-app and email alerts on, the latter sent
+      // to the signed-in account's own email — not a device default, since a fixed default written at row
+      // creation is not device state.
       const bootEmail = ((acct().user && acct().user.email) || "").trim() || null;
-      c.from("notify_prefs").upsert([{ user_id:owner, email_on:true, email_address:bootEmail }], { onConflict:"user_id" }).then(({error})=>{
+      c.from("notify_prefs").upsert([{ user_id:owner, in_app:true, email_on:true, email_address:bootEmail }], { onConflict:"user_id" }).then(({error})=>{
         if(error){ console.warn("notify_prefs bootstrap insert", error); return; }
+        notifyPrefs.inApp = true;
         notifyPrefs.emailOn = true;
         notifyPrefs.email = bootEmail || "";
         saveNotifyPrefsLocal();

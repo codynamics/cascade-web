@@ -10,7 +10,8 @@
 import { test, expect } from "@playwright/test";
 import {
   freshApp, gotoFresh, toShortlist, shortlistCards, finishFlow, toListing, settleListing, ctaLocator, sectionCounts,
-  openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen, dumpSignedInDiagnostics,
+  openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen, openNotifyScreen,
+  closeNotifyScreen, dumpSignedInDiagnostics,
 } from "./helpers.mjs";
 
 // CAS-1136 decision 2: on a failed or timed-out test, show the in-flight requests and buffered console
@@ -1092,6 +1093,11 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
       rpc: async (fn, params) => {
         if(fn === "email_has_account") return { data: false, error: null };
         if(fn === "complete_membership"){
+          // CAS-1176 AC7: recorded so a test can inspect what membCompleteNewMembership actually sent,
+          // without this fixture needing its own notify_prefs table (every other table here falls through
+          // to chain()'s empty-array default, which is exactly what drives loadNotifyPrefs' own
+          // genuinely-missing-row bootstrap branch instead).
+          window.__cas1176CompleteMembershipNotify = params && params.p && params.p.notify;
           const agents = (params && params.p && params.p.agents) || [];
           agents.forEach(a => {
             const row = Object.assign({ user_id: "cas913-user", created_at: new Date().toISOString() }, a);
@@ -1213,6 +1219,25 @@ test("CAS-913: a device that has onboarded but never signed in boots into the ap
 
   await expect(page.locator("#splash")).not.toHaveClass(/open/);
   await expect(page.locator("#authModal")).not.toHaveClass(/open/);
+});
+
+// CAS-1176 AC7: a new account must start with both in-app and email alerts on — membCompleteNewMembership's
+// own RPC argument is the direct check; notifyPrefs.inApp/emailOn being true straight after is the in-memory
+// one, read back through this fixture's loadNotifyPrefs bootstrap-insert branch (see that mock's own
+// comment above — there is no notify_prefs table here to seed a different answer from).
+test("CAS-1176 AC7: a new account's complete_membership call and in-memory notifyPrefs both start with in-app and email alerts on", async ({ page }) => {
+  await cas913GotoConfigured(page);
+  await cas913WalkToShortlist(page);
+  await finishFlow(page);
+  await toListing(page);
+
+  const notify = await page.evaluate(() => window.__cas1176CompleteMembershipNotify);
+  expect(notify.in_app).toBe(true);
+  expect(notify.email_on).toBe(true);
+
+  const prefs = await page.evaluate(() => ({ inApp: notifyPrefs.inApp, emailOn: notifyPrefs.emailOn }));
+  expect(prefs.inApp).toBe(true);
+  expect(prefs.emailOn).toBe(true);
 });
 
 // ---- CAS-1169: membership sign-up enters its code on #membScreen itself, never on #authModal -----------
@@ -1431,6 +1456,51 @@ test("Delete account opens above the Account screen, not behind it (CAS-1077)", 
   await expect(page.locator("#deleteAcctGo")).toHaveText("Delete my account");
   // AC4: the gating stays — the button is disabled until the confirm word is typed. Never clicked here.
   await expect(page.locator("#deleteAcctGo")).toBeDisabled();
+});
+
+// CAS-1176 AC3-AC6: "How you're told" left the onboarding step frame for its own plain Settings screen —
+// no progress bar, LAST ONE or Continue/Skip; email alerts go straight to the signed-in address, with no
+// second email field; a browser's in-app toggle is a plain on/off with no OS permission round-trip; the
+// back arrow returns to Settings. Starts both toggles off itself (page.evaluate, no re-render needed since
+// openNotifyScreen renders fresh off the live notifyPrefs) rather than relying on CAS-1176's own signed-up-
+// account defaults, so this test demonstrates the turning-ON behaviour the AC text describes either way.
+test("CAS-1176 AC3-AC6: Settings' How you're told has no onboarding chrome, email goes to the signed-in address, in-app is a plain toggle in the browser, and back returns to Settings", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  const email = await page.evaluate(() => window.CascadeAuth.user && window.CascadeAuth.user.email);
+  await page.evaluate(() => {
+    notifyPrefs.emailOn = false; notifyPrefs.email = ""; notifyPrefs.inApp = false;
+    saveNotifyPrefs();
+  });
+
+  await openNotifyScreen(page);
+  await expect(page.locator("#notifyScreen")).toHaveClass(/open/);
+
+  // AC3: the title, and none of the onboarding step frame's chrome.
+  await expect(page.locator("#notifyScreen .osh")).toHaveText("How you're told");
+  await expect(page.locator("#notifyScreen .oslast")).toHaveCount(0);
+  await expect(page.locator("#notifyScreen .osskip")).toHaveCount(0);
+  await expect(page.locator("#notifyScreen button", { hasText: "Continue" })).toHaveCount(0);
+
+  // AC4: turning email alerts on, from off, sets the signed-in account's own address — never a typed one.
+  await page.locator("#notifyScreen .bigtoggle", { hasText: "Send me alerts by email" }).click();
+  expect(await page.evaluate(() => notifyPrefs.emailOn)).toBe(true);
+  expect(await page.evaluate(() => notifyPrefs.email)).toBe(email);
+  const sentTo = page.locator("#notifyScreen .ossub", { hasText: "Sent to" });
+  await expect(sentTo).toBeVisible();
+  await expect(sentTo).toContainText(email);
+
+  // AC5: in the browser, turning in-app notifications on never touches the OS permission prompt.
+  await page.locator("#notifyScreen .bigtoggle", { hasText: "Allow in-app notifications" }).click();
+  expect(await page.evaluate(() => notifyPrefs.inApp)).toBe(true);
+  await expect(page.locator("#onbInAppDenied")).not.toBeVisible();
+
+  // AC6: back closes this screen and returns to Settings, open underneath it.
+  await closeNotifyScreen(page);
+  await expect(page.locator("#notifyScreen")).not.toHaveClass(/open/);
+  await expect(page.locator("#settingsScreen")).toHaveClass(/open/);
 });
 
 // CAS-1035 AC3: a Watch On tick made just before the tab closes must survive a reload even though it never
