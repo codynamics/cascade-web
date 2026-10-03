@@ -81,7 +81,9 @@ function makeContext(localStorageStore){
     // CAS-787: diagReport() (the on-device diagnostics panel) reads screen.orientation for its geometry
     // section — not needed by any decision under test before now, so nothing stubbed it.
     screen: { orientation: { type: "portrait-primary" } },
-    location: { href: "http://localhost/", search: "", hash: "", pathname: "/", origin: "http://localhost" },
+    // CAS-1175: protocol defaults to matching href/origin (http:) — a test flips it to "capacitor:" to
+    // simulate the iPhone app's own location.protocol and assert inviteUrlFor's fallback.
+    location: { href: "http://localhost/", search: "", hash: "", pathname: "/", origin: "http://localhost", protocol: "http:" },
     history: { replaceState(){}, pushState(){} },
     matchMedia: () => ({ matches: false, addEventListener(){}, removeEventListener(){}, addListener(){} }),
     getComputedStyle: () => node(),
@@ -498,6 +500,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // exercises the clipboard-fallback branch) — exported so a test can assert the fallback's payload really
   // carries the link, the same guarantee CAS-929 asked for on the now-removed navigator.share path.
   inviteUrlFor, shareTextFor, openNextInviteChannel, openNextRecommendChannel,
+  // CAS-1175: inviteMessageFor is the pure WhatsApp/SMS text builder openNextInviteChannel now calls, and
+  // fmtInviteDate is the one date formatter it shares with the Invite sheet's own calendar field — both
+  // exported directly, like inviteUrlFor above, so a test can assert each independently.
+  inviteMessageFor, fmtInviteDate,
   // CAS-1121: fpInviteAskHTML is the invite-landing ask panel's own pure render (the Suggested
   // date/note lines, optional) — a plain top-level function, exported directly like inviteUrlFor
   // above, so a test can assert the markup without a real DOM insert.

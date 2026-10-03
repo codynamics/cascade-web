@@ -1555,6 +1555,17 @@
   /* builder editor */
   .namein{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
     border-radius:10px;padding:11px 12px;font-size:16px;font-weight:600}
+  /* CAS-1175: the Invite sheet's calendar-only date field — a real <input type="date"> sits over the
+     whole box, invisible, so a tap/click lands on it and opens the platform's own picker (showPicker()
+     where the browser has it; already native on the iPhone); the shown text sits on top, pointer-events
+     none so clicks pass through to the input beneath it. */
+  .invdaterow{display:flex;align-items:center;gap:10px}
+  .invdatebox{position:relative;padding:0;flex:1;min-width:0}
+  .invdatebox .invdateinput{position:absolute;inset:0;width:100%;height:100%;margin:0;border:0;padding:0;
+    opacity:0;cursor:pointer}
+  .invdatebox .invdatetext{display:block;padding:11px 12px;pointer-events:none;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .invdatebox .invdatetext.ph{color:var(--faint);font-weight:500}
   /* CAS-554: .cascfoot sticks to .modal's true bottom:0 (the screen's own edge), so its own bottom padding
      needs the home-indicator clearance directly — nothing else in .modal owns it. */
   .cascfoot{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--line);
@@ -6828,7 +6839,40 @@ function genInviteToken(){
 // real and permanent without a build-time page per title. #/film/<id> is read at boot by openFilmPage().
 // CAS-883: the one function in the file that builds an invite URL, replacing the CAS-837 link builder.
 // tmdb_id stays the title key, never a Watchmode id or a row id, same as every other #/film/<id> link.
-const inviteUrlFor = (token, m) => `${location.origin}${location.pathname}?inv=${token}#/film/${m.tmdb_id}`;
+// CAS-1175: the iPhone app's own origin is capacitor://localhost, which is not an address anyone outside
+// the app can open — whenever the page isn't served over http or https, fall back to the real
+// cascademovies.com host instead. A preview host (or local tests) is served over http/https and keeps
+// linking to itself, exactly as before.
+const inviteUrlFor = (token, m) => {
+  const q = `?inv=${token}#/film/${m.tmdb_id}`;
+  return /^https?:$/.test(location.protocol) ? `${location.origin}${location.pathname}${q}` : `https://cascademovies.com/${q}`;
+};
+// CAS-1175: the one date formatter shared by the Invite sheet's own calendar field (what it shows once a
+// date is picked) and inviteMessageFor below (its "suggests DATE" line) — so the two can never disagree.
+// Day of week, two-digit day, short month, no year: nobody needs the year for a date that's always within
+// the next cinema window (Lee's decision).
+const INVITE_DATE_WEEKDAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+function fmtInviteDate(iso){
+  if(!iso) return "";
+  const d = new Date(iso+"T00:00:00Z");
+  return `${INVITE_DATE_WEEKDAYS[d.getUTCDay()]} ${String(d.getUTCDate()).padStart(2,"0")} ${MONTHS[d.getUTCMonth()]}`;
+}
+// CAS-1175: the one function that builds the WhatsApp/SMS invite text — openNextInviteChannel (below)
+// calls this instead of inlining shareTextFor()+link, so the message actually says who is inviting, to
+// which film, and carries the suggested date and/or note the sender added (previously neither reached
+// this text at all). Exported directly, like inviteUrlFor, so a test can assert the exact wording.
+function inviteMessageFor({name, title, date, note, url}){
+  const dateTxt = date ? fmtInviteDate(date) : "";
+  const lines = [
+    dateTxt
+      ? `${name} has invited you to watch ${title} with them, and suggests ${dateTxt}.`
+      : `${name} has invited you to watch ${title} with them.`,
+  ];
+  const noteTxt = (note||"").trim().replace(/\s+/g," ");
+  if(noteTxt) lines.push(`${name} says: “${noteTxt}”`);
+  lines.push(url);
+  return lines.join("\n");
+}
 // ---- CAS-928: Friends — the shared recipient picker + the standalone Friends screen --------------------
 // Supersedes CAS-883's single free-text name field (the Invite sheet, below) with a real remembered
 // person: a friend is a name plus an email and/or a mobile (one of the two is enough), saved automatically
@@ -7123,7 +7167,9 @@ function normalizeAuMobile(raw){
 function openNextInviteChannel(queue, m){
   if(!queue.length) return;
   const next=queue[0], rest=queue.slice(1);
-  const text=`${shareTextFor(m)}\n${inviteUrlFor(next.token, m)}`;
+  // CAS-1175: inviteMessageFor, not shareTextFor()+link — this text must say who is inviting and carry
+  // the suggested date/note the sender added, same as the one message every recipient in this queue reads.
+  const text=inviteMessageFor({name:next.name, title:m.title, date:next.date, note:next.note, url:inviteUrlFor(next.token, m)});
   const digits=normalizeAuMobile(next.friend.mobile);
   const url = next.channel==="whatsapp"
     ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
@@ -7207,13 +7253,19 @@ function renderFilmInviteSheet(m){
     <input type="text" class="namein" id="filmInviteName" maxlength="60" autocomplete="off"
       value="${escA(nameVal)}" oninput="onInviteNameInput(this.value)">
     <div class="flabel">Suggested date (optional)</div>
-    <input type="date" class="namein" id="filmInviteDate" min="${escA(TODAY)}" value="${escA(inviteDateVal||"")}"
-      oninput="onInviteDateInput(this.value)">
-    <div class="flabel">Note</div>
-    <textarea class="cmsg" id="filmInviteNote" maxlength="500" rows="3" placeholder="Add a note (optional)"
+    <div class="invdaterow">
+      <div class="namein invdatebox">
+        <input type="date" class="invdateinput" id="filmInviteDate" min="${escA(TODAY)}" value="${escA(inviteDateVal||"")}"
+          oninput="onInviteDateInput(this.value)" onkeydown="event.preventDefault()"
+          onclick="this.showPicker && this.showPicker()">
+        <span class="invdatetext${inviteDateVal?"":" ph"}" id="filmInviteDateLabel">${inviteDateVal?esc(fmtInviteDate(inviteDateVal)):"Pick a date"}</span>
+      </div>
+      <button type="button" class="linkbtn" id="filmInviteDateClear" onclick="onInviteDateClear()" ${inviteDateVal?"":"hidden"}>Clear</button>
+    </div>
+    <div class="flabel">Note (optional)</div>
+    <textarea class="cmsg" id="filmInviteNote" maxlength="500" rows="3" placeholder="Add a note"
       oninput="onInviteNoteInput(this.value)">${esc(inviteNoteVal||"")}</textarea>
-    <button type="button" class="filminvcta" id="filmInviteSend" onclick="sendFilmInvite()" ${canSend?"":"disabled"}>${esc(ctaLabel)}</button>
-    <div class="pnote" style="text-align:center">Email sends straight from Cascade. WhatsApp or SMS opens your messaging app to finish sending.</div>`;
+    <button type="button" class="filminvcta" id="filmInviteSend" onclick="sendFilmInvite()" ${canSend?"":"disabled"}>${esc(ctaLabel)}</button>`;
 }
 // CAS-1121: "Your name" prefills from the account's own remembered display name, else the email local
 // part — the only identity a brand-new account has today.
@@ -7223,7 +7275,20 @@ function inviteDefaultName(){
   return (a && a.user && a.user.email) ? a.user.email.split("@")[0] : "";
 }
 window.onInviteNameInput=(val)=>{ inviteNameVal=val; const btn=$("filmInviteSend"); if(btn) btn.disabled = !(inviteFriendSel.size>0 && val.trim().length>0); };
-window.onInviteDateInput=(val)=>{ inviteDateVal=val; };
+// CAS-1175: the real <input type="date"> stays the thing that's saved and sent (unchanged) — this just
+// keeps the shown text and the Clear control in step with it, using the one shared formatter.
+window.onInviteDateInput=(val)=>{
+  inviteDateVal=val;
+  const label=$("filmInviteDateLabel");
+  if(label){ label.textContent = val ? fmtInviteDate(val) : "Pick a date"; label.classList.toggle("ph", !val); }
+  const clearBtn=$("filmInviteDateClear");
+  if(clearBtn) clearBtn.hidden = !val;
+};
+window.onInviteDateClear=()=>{
+  const input=$("filmInviteDate");
+  if(input) input.value="";
+  onInviteDateInput("");
+};
 window.onInviteNoteInput=(val)=>{ inviteNoteVal=val; };
 window.openFilmInvite = id => {
   const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
@@ -7295,7 +7360,9 @@ window.sendFilmInvite = async()=>{
         }]);
         if(emErr) throw emErr;
       }
-      sent.push({friend:r.friend, channel:r.channel, token});
+      // CAS-1175: name/date/note ride along so openNextInviteChannel's WhatsApp/SMS text can carry them —
+      // the same sender_name/suggested_date/note the invites row above just got.
+      sent.push({friend:r.friend, channel:r.channel, token, name:sender_name, date:suggested_date, note});
       newInvites.push({token, tmdb_id:m.tmdb_id, film_title:m.title, to_name:r.friend.name, created_at, invite_replies:[]});
       logEvent("invite_created",{n:recipients.length, channel:r.channel});
     }

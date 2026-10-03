@@ -163,3 +163,32 @@ test("CAS-930 AC2f: selecting a 21st recipient is refused and inserts nothing", 
   expect(await page.evaluate(() => inviteFriendSel.size)).toBe(20);
   expect(await page.evaluate(() => window.__inviteInserts.length)).toBe(0);
 });
+
+// CAS-1175 AC7: the Suggested date field is calendar-only — no date chosen shows "Pick a date"; setting
+// the real underlying input's value and firing its input event shows "Mon 05 Oct", shows Clear, and
+// passes the ISO value on; Clear resets it; keys typed while it's focused never change its value.
+test("CAS-1175 AC7: the date field is pick-only (shows Pick a date / Mon 05 Oct / Clear, ignores typed keys)", async ({ page }) => {
+  await signedInListing(page);
+  await openInviteSheet(page);
+
+  await expect(page.locator("#filmInviteDateLabel")).toHaveText("Pick a date");
+  await expect(page.locator("#filmInviteDateClear")).toBeHidden();
+
+  await page.evaluate(() => {
+    const input = document.getElementById("filmInviteDate");
+    input.value = "2026-10-05";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(page.locator("#filmInviteDateLabel")).toHaveText("Mon 05 Oct");
+  await expect(page.locator("#filmInviteDateClear")).toBeVisible();
+  expect(await page.evaluate(() => inviteDateVal)).toBe("2026-10-05");
+
+  await page.locator("#filmInviteDate").focus();
+  await page.keyboard.press("5");
+  expect(await page.evaluate(() => document.getElementById("filmInviteDate").value)).toBe("2026-10-05");
+
+  await page.locator("#filmInviteDateClear").click();
+  await expect(page.locator("#filmInviteDateLabel")).toHaveText("Pick a date");
+  await expect(page.locator("#filmInviteDateClear")).toBeHidden();
+  expect(await page.evaluate(() => inviteDateVal)).toBe("");
+});
