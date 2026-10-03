@@ -251,6 +251,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // reveal-time cap they solve against — exported so a test can build a real onboarding roster
   // from a fixed answer set and assert watchCount() against the cap directly.
   onbAnswersV2Default, buildOnbAgentsV2, ONB_AGENT_CAP_V2,
+  // CAS-1179: onbAgentRevealHTML is the onboarding reveal step's own render — exported so a test can
+  // assert the Massive Movies agent's cinemaReleaseOnly flag never surfaces there as text, rather than
+  // only asserting the flag's value on the built agent.
+  onbAgentRevealHTML,
   // CAS-1157: the cinema/rent-to-Where&when mapping the v2_cinema/v2_rent/v2_done wire code calls, and the
   // draft-discard reset that also carries the derived windows away with the rest of the draft — exported
   // directly so a test can drive the same function the flow itself calls.
