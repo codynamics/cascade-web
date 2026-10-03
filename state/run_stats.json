@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-02",
+  "date": "2026-10-03",
   "tmdb": {
     "calls": 5904,
     "errors": 0,
@@ -8,8 +8,8 @@
   },
   "watchmode": {
     "quota": 2500,
-    "quota_used": 1047,
-    "remaining_monthly_credits": 1453,
+    "quota_used": 1164,
+    "remaining_monthly_credits": 1336,
     "calls": 117,
     "errors": 0,
     "mismatch": 2,
