@@ -692,6 +692,51 @@ test("'Only show films on my services' changes what a new agent finds", async ({
   expect(after, `before=${before} after=${after}`).toBeLessThan(before);
 });
 
+// CAS-1178 AC1: the switch's own tick/aria-pressed flip is synchronous, so it must be visible well inside
+// one frame of the tap — regardless of how long the deferred onbRefresh()/render() behind it takes on a
+// populated listing. Measured inside the page (performance.now() either side of the click) rather than
+// through Playwright's own round-trip timing, which would add its own noise on top of whatever this is
+// trying to measure.
+test("CAS-1178: the My services toggle's tick flips within 100ms of a tap", async ({ page }) => {
+  await toShortlist(page, "stream");
+  await finishFlow(page);
+  await toListing(page);
+  await settleListing(page);
+  await openMyServicesScreen(page);
+
+  const elapsedMs = await page.evaluate(() => new Promise(resolve => {
+    const tog = document.querySelector("#onbSvcOnly");
+    const wasOn = tog.classList.contains("on");
+    const t0 = performance.now();
+    tog.click();
+    requestAnimationFrame(() => resolve(tog.classList.contains("on") !== wasOn ? performance.now() - t0 : -1));
+  }));
+  expect(elapsedMs, "the 'on' class never flipped at all").toBeGreaterThanOrEqual(0);
+  expect(elapsedMs).toBeLessThan(100);
+});
+
+// CAS-1178 AC2: five taps fired 250ms apart (comfortably past the double-rAF the fix defers the heavy
+// repaint behind) must land on the opposite state from where they started, with prefs.on — the saved value
+// — equal to what the control itself shows. An odd number of taps means "never lost, never double-applied"
+// is exactly "ends up flipped".
+test("CAS-1178 AC2: five taps on the My services toggle, 250ms apart, land on the opposite state", async ({ page }) => {
+  await toShortlist(page, "stream");
+  await finishFlow(page);
+  await toListing(page);
+  await settleListing(page);
+  await openMyServicesScreen(page);
+
+  const startOn = await page.evaluate(() => prefs.on);
+  for(let i = 0; i < 5; i++){
+    await page.locator("#onbSvcOnly").click();
+    await page.waitForTimeout(250);
+  }
+  const finalOn = await page.evaluate(() => prefs.on);
+  const controlOn = await page.locator("#onbSvcOnly").evaluate(el => el.classList.contains("on"));
+  expect(finalOn, `started ${startOn}, ended ${finalOn} after 5 taps`).toBe(!startOn);
+  expect(controlOn).toBe(finalOn);
+});
+
 // CAS-740 AC4: a signed-in user's account is the authority on whether they've onboarded, not whatever
 // screen this device happened to have open when the account answered. Mirrors the fake-config/fake-
 // supabase-js technique the retired cas317.spec.mjs used (CAS-317/CAS-385) — freshApp()/every other test

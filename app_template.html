@@ -15537,16 +15537,34 @@ const SHARP_STEPS = {
       draw("onbStepStores", STORE_SERVICES, prefs.store);
       draw("onbStepSvcs",   SUB_SERVICES,   prefs.sub, PRIMARY_SUB_SERVICES);
       const tog=$("onbSvcOnly");
+      tog?.setAttribute("aria-pressed", String(prefs.on));
+      // CAS-1178: render() alone measured 94-116ms on production (two agents, no account film data) — long
+      // enough that running it inline, in the same synchronous task as the tap, blocked the browser from
+      // painting the tick above until the whole handler returned, which is what made the tap look ignored.
+      // The tick/aria-pressed flip stays synchronous (CAS-480's straight-through write, prefs.on itself,
+      // stays synchronous too — only the repaint is heavy); onbRefresh()/render() move behind a pair of
+      // rAFs, since a single rAF still fires BEFORE the browser's next paint and would just move the same
+      // block there. A tap landing before the pair fires cancels it and starts a fresh one, so a burst of
+      // taps repaints once, for whichever state they end on, rather than once per tap (never lost, never
+      // double-applied).
+      let svcOnlyRaf=null;
       if(tog) tog.onclick=()=>{
         prefs.on=!prefs.on; savePrefs(); pushPrefsCols(["services_only"]);
         tog.classList.toggle("on", prefs.on);
+        tog.setAttribute("aria-pressed", String(prefs.on));
         updatePrefSwitch(); updatePrefBtn();
-        onbRefresh();
-        // CAS-480: this spoke sits over the listing and writes straight through, not into a draft that only
-        // commits when the Briefing closes (unlike the rest of SHARP_STEPS) — without this the switch
-        // visibly flips but the list behind it is stale until some unrelated action re-renders, same bug
-        // $("prefSwitch").onclick already avoids below.
-        render();
+        if(svcOnlyRaf!=null) cancelAnimationFrame(svcOnlyRaf);
+        svcOnlyRaf=requestAnimationFrame(()=>{
+          svcOnlyRaf=requestAnimationFrame(()=>{
+            svcOnlyRaf=null;
+            onbRefresh();
+            // CAS-480: this spoke sits over the listing and writes straight through, not into a draft that
+            // only commits when the Briefing closes (unlike the rest of SHARP_STEPS) — without this the
+            // switch visibly flips but the list behind it is stale until some unrelated action re-renders,
+            // same bug $("prefSwitch").onclick already avoids below.
+            render();
+          });
+        });
       };
     },
   },
