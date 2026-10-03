@@ -17497,7 +17497,7 @@ function notifyControlsHTML(){
     ${native ? `<p class="fielderr" id="onbInAppDenied" role="alert" hidden>You said no to notifications — you can turn them on later in iOS Settings → Cascade.</p>` : ""}
     <button type="button" class="bigtoggle${on("emailOn")}" onclick="flowNotify('emailOn',this)">
       <span class="btmain">Send me alerts by email</span><span class="btcheck">✓</span></button>
-    ${notifyPrefs.emailOn ? `<p class="ossub">Sent to ${esc(notifyPrefs.email||"")}.</p>` : ""}`;
+    ${notifyPrefs.emailOn ? `<p class="ossub notifysentto">Sent to ${esc(notifyPrefs.email||"")}.</p>` : ""}`;
 }
 function wireNotifyControls(){
   paintInAppDenied();   // CAS-463: fresh entry to the step always starts from the neutral hint
@@ -17584,9 +17584,20 @@ window.flowNotify=(key,el)=>{
     : notifyPrefs.email;
   saveNotifyPrefs();
   el.classList.toggle("on", notifyPrefs[key]);
+  if(key==="emailOn") syncNotifySentTo(el);
   onbRefresh();   // CAS-308: also repaints the trail's Notify row, not just the CTA gate
   logEvent("flow_notify",{key, on:notifyPrefs[key]});
 };
+// CAS-1176: the "Sent to EMAIL." line is part of notifyControlsHTML()'s own render only — neither this
+// screen (Settings) nor the onboarding step frame's onbRefresh() does a full repaint on a toggle tap — so
+// it has to be patched into the DOM directly rather than waiting on a re-render that never comes.
+function syncNotifySentTo(emailToggleEl){
+  const existing = emailToggleEl.parentElement.querySelector(".notifysentto");
+  if(!notifyPrefs.emailOn){ if(existing) existing.remove(); return; }
+  const html = `<p class="ossub notifysentto">Sent to ${esc(notifyPrefs.email||"")}.</p>`;
+  if(existing) existing.outerHTML = html;
+  else emailToggleEl.insertAdjacentHTML("afterend", html);
+}
 // ---- the dual-pane slide ---------------------------------------------------------------------------
 // Both panes are real .osinner elements in the stage at the same time: the outgoing one keeps the content
 // it was already painted with and walks off to the left, the incoming one is built beside it and walks on
