@@ -276,6 +276,13 @@
   #movingBtn:not(.active){background:rgba(255,213,74,.09);border-color:rgba(255,213,74,.32)}
   #movingBtn.active{box-shadow:0 5px 16px -5px rgba(255,213,74,.7)}
   .modechip.mv.active{background:linear-gradient(135deg,#ffd54a 0%,#f0a336 100%);border-color:#ffd54a;color:#161000}
+  /* CAS-1186: Find takes --cyan — distinct from Watch's blue and Moving's amber, and already the colour the
+     app's own search affordances (focus rings, the Watch search icon) use. */
+  #findBtn{--mcf:var(--cyan)}
+  #findBtn.active{--mcf:#001a1f}
+  #findBtn:not(.active){background:rgba(34,211,238,.09);border-color:rgba(34,211,238,.32)}
+  #findBtn.active{box-shadow:0 5px 16px -5px rgba(34,211,238,.7)}
+  .modechip.fd.active{background:linear-gradient(135deg,#22d3ee 0%,#0891b2 100%);border-color:#22d3ee;color:#001a1f}
   .mcbadge{position:absolute;top:-6px;right:-4px;background:var(--rt);color:#fff;font-size:10px;font-weight:800;
     min-width:16px;height:16px;border-radius:9px;display:grid;place-items:center;padding:0 4px;line-height:1}
   /* CAS-538: two label strings per chip, one shown at a time — .mclabel-short only appears below the
@@ -2902,7 +2909,9 @@
   /* CAS-H1: #movingScreen joins them. It is a main nav destination that opens at boot and has no
      back control, so it must sit BELOW the header like the other two rather than covering it —
      otherwise the app opens with no navigation and no way out. */
-  #agentsScreen, #movingScreen{top:var(--hdrh,0px); z-index:29}
+  /* CAS-1186: #findScreen joins them — it's a main nav destination reachable with no sign-in and no back
+     control, same reasoning as #movingScreen above. */
+  #agentsScreen, #movingScreen, #findScreen{top:var(--hdrh,0px); z-index:29}
   /* CAS-A1: Agents is a main destination and its list is short — a track down the right edge is
      chrome the screen does not earn. It still scrolls; only the indicator goes. */
   #agentsScreen{scrollbar-width:none;-ms-overflow-style:none}
@@ -2910,6 +2919,9 @@
   /* CAS-655: Moving is a main destination, like Agents — it scrolls, it does not need a track. */
   #movingScreen{scrollbar-width:none;-ms-overflow-style:none}
   #movingScreen::-webkit-scrollbar{width:0;height:0;display:none}
+  /* CAS-1186: Find is the same shape — a main destination with a long scroll, no track. */
+  #findScreen{scrollbar-width:none;-ms-overflow-style:none}
+  #findScreen::-webkit-scrollbar{width:0;height:0;display:none}
   /* CAS-567: .uwrap's calc(22px + env(safe-area-inset-top)) clearance is written for the .uscreens that
      cover the header at top:0. #yourMovies is not one of them — it starts at var(--hdrh), so the header has
      already spent the notch inset and this padding double-counts it: 22px in a desktop harness, 22px + the
@@ -2918,6 +2930,8 @@
      CAS-649: #movingScreen now starts at var(--hdrh) too, same double-count, same fix. It has no sticky
      content of its own, so this is the only Your-Movies treatment it needs — see CAS-636's shell above. */
   #movingScreen .uwrap{padding-top:0}
+  /* CAS-1186: #findScreen starts at var(--hdrh) too, same double-count, same fix. */
+  #findScreen .uwrap{padding-top:0}
   /* CAS-509: same env(safe-area-inset-top) clearance as the header — .uscreen (Your Movies, Agents,
      Review, Account, Service analysis, Lists, About) is fixed from the viewport's true top:0, so its
      .ostop back button was sitting under the notch/status bar with none of the header's allowance. */
@@ -3496,6 +3510,19 @@
           <span class="mclabel mclabel-short">Moving</span>
           <span class="mcbadge" id="movingBadge" style="display:none">0</span>
         </div>
+        <!-- Find (CAS-1186): the third nav destination — every film in MOVIES, searchable by name, with no
+             agent/tab/service/watched/style/Picked-by narrowing of any kind. Same modechip construction as
+             Moving; the magnifying-glass icon is the Watch search box's own glyph (CAS-150), drawn in the
+             same stroke style as the other chip icons. -->
+        <div class="modechip fd" id="findBtn" title="Find" role="button" tabindex="0"
+             aria-pressed="false" aria-label="Find" onclick="openFindScreen()">
+          <svg class="mcicon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle class="s" cx="11" cy="11" r="6.4" stroke-width="2" fill="none"/>
+            <path class="s" d="M15.8 15.8 20 20" stroke-width="2" stroke-linecap="round" fill="none"/>
+          </svg>
+          <span class="mclabel mclabel-full">Find</span>
+          <span class="mclabel mclabel-short">Find</span>
+        </div>
       </div>
     </div>
     <!-- CAS-713: Cascade 9.7's fixed sub-tabs (Cinema/Premium/Rental/Streaming) — a sibling of .brandrow in
@@ -3979,6 +4006,15 @@
      z-index:29) rather than cover it at top:0 — see #agentsScreen,#yourMovies,#movingScreen above. -->
 <div class="uscreen" id="movingScreen" role="dialog" aria-modal="true" aria-label="Moving">
   <div class="uwrap" id="movingBody"></div>
+</div>
+
+<!-- FIND (CAS-1186): the third main nav destination — every film in MOVIES, searchable by name, no agent/
+     tab/service narrowing of any kind. Same shape as #movingScreen just above: opens with no back control,
+     so it sits BELOW the header (top:var(--hdrh), z-index:29) rather than covering it at top:0. Body
+     rendered by renderFindScreen(); the list itself is paged in by findRenderMore() as the user scrolls
+     near the bottom — the whole catalogue (~5,800 films) is never rendered at once. -->
+<div class="uscreen" id="findScreen" role="dialog" aria-modal="true" aria-label="Find">
+  <div class="uwrap" id="findBody"></div>
 </div>
 
 <!-- ACCOUNT (CAS-206 / CAS-210) — what every new agent starts from, how you are told by default, and the
@@ -12312,7 +12348,7 @@ window.closeNavMenu=()=>{
 window.navMenuGo=key=>{
   closeNavMenu();
   logEvent("nav_menu_item",{item:key});
-  if(key==="find") showAgentsHome();
+  if(key==="find") openFindScreen();
   else if(key==="agents") openAgentsScreen();
   else if(key==="invites") openInvitesScreen();
   else if(key==="friends") openFriendsScreen();
@@ -17081,6 +17117,7 @@ window.openAgentsScreen=()=>{
   // CAS-1185: reached from the menu's "Agents" item now, not a header chip — there is no chip of its own to
   // light any more (this screen is a layer on top of the Watch listing, not a different mode of the bar).
   if($("movingScreen").classList.contains("open")) closeMovingScreen();
+  if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186: mutually exclusive with Find too
   renderAgentsScreen();
   $("agentsScreen").scrollTop=0;
   $("agentsScreen").classList.add("open"); lockBodyScroll(true);
@@ -17098,6 +17135,7 @@ window.closeAgentsScreen=()=>{
 // auto-pick is gone). Never persisted; the user's own tap (setMovingWindow) always overrides it.
 window.openMovingScreen=()=>{
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
+  if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186: mutually exclusive with Find too
   movingIsOpen=true;
   movingWindow="2weeks";   // CAS-848: always opens pinned to 2 weeks; a tap (setMovingWindow) still overrides it
   renderMovingScreen();
@@ -17113,6 +17151,104 @@ window.closeMovingScreen=()=>{
   $("movingBtn").classList.remove("active"); $("movingBtn").setAttribute("aria-pressed","false");
   syncWatchChip();
 };
+// ================= CAS-1186: Find — the whole catalogue, searchable by name =============================
+// Every film in MOVIES, no agent/tab/service/watched/style/Picked-by narrowing — the one listing in the app
+// a film reaches even when no agent lists it. Cascade score desc (no score last), ties by title A-Z; no
+// sort control and no filters here (out of scope for this ticket). Paged in 50s as the user nears the
+// bottom (findRenderMore) rather than rendered whole — fillListChunked (the Watch listing's own streamer)
+// is the wrong tool here because it eventually renders its WHOLE input, just non-blockingly; Find's input
+// is the full ~5,800-film catalogue, which must never be fully in the DOM at once.
+const FIND_BATCH = 50;
+let findSearchRaw = "";   // exactly what the user typed, for the empty-state message
+let findSearch = "";      // trimmed + lowercased, for matching
+let findRowsCache = [];   // the current search's sorted result set
+let findShown = 0;        // how many of findRowsCache are in the DOM right now
+function findSortedRows(){
+  const q = findSearch;
+  const rows = q ? MOVIES.filter(m=>m.title.toLowerCase().includes(q)) : MOVIES.slice();
+  // Cascade score, highest first; no score (cascadeScore's -1 sentinel) sorts last; ties by title A-Z.
+  return rows.sort((a,b)=>{
+    const sa=cascadeScore(a), sb=cascadeScore(b);
+    const na=sa<0, nb=sb<0;
+    if(na!==nb) return na ? 1 : -1;
+    if(sa!==sb) return sb-sa;
+    return a.title.localeCompare(b.title);
+  });
+}
+// Renders just the list portion (count line + rows), leaving the head/input alone so a keystroke never
+// steals focus from the box that caused it. Called on open and on every search change.
+function findRenderList(){
+  findRowsCache = findSortedRows();
+  const n = findRowsCache.length;
+  const countEl=$("findCount"); if(countEl) countEl.textContent = `${n} movie${n===1?"":"s"}`;
+  const clr=$("findSearchClear"); if(clr){ clr.hidden=!findSearchRaw; clr.classList.toggle("show", !!findSearchRaw); }
+  const wrap=$("findListWrap"); if(!wrap) return;
+  findShown=0;
+  if(!n){
+    wrap.innerHTML = `<div class="mvempty"><p class="mvemptymain">No movies match "${esc(findSearchRaw)}"</p></div>`;
+    return;
+  }
+  wrap.innerHTML = `<div class="list" id="findList"></div>`;
+  findRenderMore();
+}
+// Appends the next batch of up to FIND_BATCH rows. Called once by findRenderList and again every time the
+// scroll listener below reports the user is nearing the bottom of what's rendered so far.
+function findRenderMore(){
+  const listEl=$("findList"); if(!listEl || findShown>=findRowsCache.length) return;
+  const end=Math.min(findRowsCache.length, findShown+FIND_BATCH);
+  let buf="";
+  for(let i=findShown; i<end; i++){ const m=findRowsCache[i]; buf += taggedOut(m) ? stubHTML(m) : cardHTML(m, isFresh(m)); }
+  listEl.insertAdjacentHTML("beforeend", buf);
+  observeLazyPosters(listEl);
+  findShown=end;
+}
+window.setFindSearch=raw=>{
+  findSearchRaw=raw;
+  findSearch=raw.trim().toLowerCase();
+  findRenderList();
+};
+window.clearFindSearch=()=>{
+  $("findSearchInput").value="";
+  findSearchRaw=""; findSearch="";
+  findRenderList();
+  $("findSearchInput").focus();
+};
+// Builds the head (title, search box, count) once per open and fills the list below it.
+function renderFindScreen(){
+  $("findBody").innerHTML = `
+    <h2 class="osh">Find</h2>
+    <div class="watchsearchwrap" id="findSearchWrap">
+      <input id="findSearchInput" class="search" type="text" inputmode="search" autocomplete="off"
+             placeholder="Search all movies" aria-label="Search all movies" oninput="setFindSearch(this.value)">
+      <button class="searchclear" id="findSearchClear" aria-label="Clear search" type="button" hidden
+              onclick="clearFindSearch()">×</button>
+    </div>
+    <div class="flabel" id="findCount"></div>
+    <div id="findListWrap"></div>`;
+  findRenderList();
+}
+window.openFindScreen=()=>{
+  if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
+  if($("movingScreen").classList.contains("open")) closeMovingScreen();
+  findSearchRaw=""; findSearch="";   // AC9: always reopens with an empty box and the list at the top
+  renderFindScreen();
+  $("findScreen").scrollTop=0;
+  $("findScreen").classList.add("open"); lockBodyScroll(true);
+  $("findBtn").classList.add("active"); $("findBtn").setAttribute("aria-pressed","true");
+  syncWatchChip();
+  logEvent("find_screen_opened",{});
+};
+window.closeFindScreen=()=>{
+  $("findScreen").classList.remove("open"); lockBodyScroll(false);
+  $("findBtn").classList.remove("active"); $("findBtn").setAttribute("aria-pressed","false");
+  syncWatchChip();
+};
+// Appends the next batch once the user has scrolled within one screenful of the bottom of what's rendered.
+$("findScreen").addEventListener("scroll", ()=>{
+  const el=$("findScreen");
+  if(el.scrollTop + el.clientHeight < el.scrollHeight - el.clientHeight) return;
+  findRenderMore();
+}, {passive:true});
 // CAS-534: the header's Agents chip — closes whichever screen currently covers the deck+movie-list home view
 // (Manage Agents, if reached via the menu) to reveal it.
 // CAS-633: also the Watch chip's own onclick now — Watch and Agents both land here whenever they need the
@@ -17120,6 +17256,7 @@ window.closeMovingScreen=()=>{
 window.showAgentsHome=()=>{
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
   if($("movingScreen").classList.contains("open")) closeMovingScreen();
+  if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186
   syncWatchChip();
 };
 // CAS-633: #moviesBtn (Watch) now opens the Find listing itself rather than a dialog, so it can't be lit by
