@@ -14619,24 +14619,29 @@ function msnScoreCardHTML(){
     <div id="msnTrackArea">${msnTrackAreaHTML(c)}</div>
   </div>`;
 }
-// CAS-1128: the drag mutator. Off (value 0) nulls every account-enabled window outright; dragging up from
-// Off arms every account-enabled window at the new value (the person then unticks whichever pills they
-// don't want); dragging between two real scores updates only the windows already ON, leaving the ticked set
-// untouched — ticking/unticking one window by itself is toggleAgentWindow's job, not this one's. msnLastScore
-// (a single remembered value) lets a pill re-arm the agent's last real score once it was dropped to fully
-// Off, rather than always snapping back to the same hardcoded default.
+// CAS-1128: the drag mutator. Off (value 0) nulls every marker outright; dragging up from Off arms every
+// account-enabled window at the new value (the person then unticks whichever pills they don't want);
+// dragging between two real scores updates every window that CARRIES a marker, including one that's off
+// in Service tracking — CAS-1184: a window switched off there still keeps its marker, and normCascade's
+// floor collapse (below) pulls every marker, on or off, down to the lowest one it finds, so an off-window
+// marker left behind by an earlier drag silently ratchets the whole agent back down on every later load. One
+// score means every marker, always. msnLastScore (a single remembered value) lets a pill re-arm the agent's
+// last real score once it was dropped to fully Off, rather than always snapping back to the same hardcoded
+// default.
 let msnLastScore = null;
 function setAgentScore(c, value){
   c.watchMarkers=c.watchMarkers||{};
   delete c._watchMarkersDefaulted;   // CAS-743: this IS the user setting a real value — the guess is gone
   if(value===0){
-    // CAS-1128: Off is track-wide now — every account-enabled window drops to Never, not just the one
-    // this control used to call its "start" window.
-    WATCH_LEVEL_KEYS.forEach(k=>{ if(windowEnabled(k)) c.watchMarkers[k]=null; });
+    // CAS-1184: every marker, not just the account-enabled ones — a marker left behind on an off window
+    // is exactly the stale state that ratchets the score down again later.
+    WATCH_LEVEL_KEYS.forEach(k=>{ c.watchMarkers[k]=null; });
     return;
   }
   value = Math.max(TRACK_MIN, Math.min(TRACK_MAX, Math.round(value)));
-  const onKeys=WATCH_LEVEL_KEYS.filter(k=>windowEnabled(k) && c.watchMarkers[k]!=null);
+  // CAS-1184: every window that already carries a marker moves with the drag, on or off in Service
+  // tracking — only when NONE do (freshly Off) does arming fall back to the account-enabled set.
+  const onKeys=WATCH_LEVEL_KEYS.filter(k=>c.watchMarkers[k]!=null);
   const keys = onKeys.length ? onKeys : WATCH_LEVEL_KEYS.filter(k=>windowEnabled(k));
   keys.forEach(k=>{ c.watchMarkers[k]=value; });
   msnLastScore=value;
@@ -14650,12 +14655,18 @@ function toggleAgentWindow(c, key){
   delete c._watchMarkersDefaulted;
   const onKeys=WATCH_LEVEL_KEYS.filter(k=>windowEnabled(k) && c.watchMarkers[k]!=null);
   if(onKeys.includes(key)){
-    if(onKeys.length===1) WATCH_LEVEL_KEYS.forEach(k=>{ if(windowEnabled(k)) c.watchMarkers[k]=null; });
+    // CAS-1184: dropping the last ON pill nulls every marker, not just the account-enabled ones, so no
+    // stale off-window marker is left behind to ratchet a future score back down.
+    if(onKeys.length===1) WATCH_LEVEL_KEYS.forEach(k=>{ c.watchMarkers[k]=null; });
     else c.watchMarkers[key]=null;
     return;
   }
   const value = onKeys.length ? c.watchMarkers[onKeys[0]] : (msnLastScore!=null ? msnLastScore : 70);
   c.watchMarkers[key]=value;
+  // CAS-1184: switching a window on also catches up any OTHER window that's off in Service tracking but
+  // still carrying a stale marker from an earlier drag/recipe — otherwise that leftover keeps acting as
+  // the floor normCascade collapses everything to, on every load.
+  WATCH_LEVEL_KEYS.forEach(k=>{ if(!windowEnabled(k) && c.watchMarkers[k]!=null) c.watchMarkers[k]=value; });
   msnLastScore=value;
 }
 // Repaints the handle/segments/value text in place — used on every drag pointermove, where tearing the track

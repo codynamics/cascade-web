@@ -568,6 +568,43 @@ test("Mission screen: dragging the single handle moves every listed window's sco
   await expect(page.locator(".msnmark")).toHaveCount(1);
 });
 
+test("Mission screen: the score can be dragged UP again even with a stale marker on a window off in Service tracking (CAS-1184)", async ({ page }) => {
+  // CAS-1184: Premium is off in Service tracking by default for every new account, and never visited by
+  // this onboarding path (toShortlist never opens Where & when) — so this agent's own Premium marker is
+  // exactly the "off-window but still carrying a marker" shape the ticket's observation describes.
+  // onbMassiveCritV2 ladder-marks BIG and every later window — with "cinema" as BIG (the ladder's own
+  // first rung), Premium (a later rung) gets marked too, at the same starting score as the rest.
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  const agentId = await page.evaluate(() => cascades[0].id);
+
+  await openFirstAgentMission(page);
+  const premiumStale = await page.evaluate(() => !windowEnabled("premium") && onbFlow.draft.watchMarkers.premium != null);
+  expect(premiumStale, "fixture assumption: Premium must carry a marker while off in Service tracking").toBe(true);
+
+  const before = Number(await page.locator(".msnval").textContent());
+
+  await page.locator(".msntrackwrap").scrollIntoViewIfNeeded();
+  const trackBox = await page.locator(".msntrackwrap").boundingBox();
+  const handle = page.locator(".msnhandle");
+  const handleBox = await handle.boundingBox();
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(trackBox.x + trackBox.width - 2, handleBox.y + handleBox.height / 2, { steps: 8 });
+  const dragged = Number(await page.locator(".msnval").textContent());
+  expect(dragged, "dragging right must move the score UP, not get stuck at the stale Premium floor").toBeGreaterThan(before);
+
+  await page.mouse.up();
+  const released = Number(await page.locator(".msnval").textContent());
+  expect(released).toBe(dragged);
+
+  await page.locator("#onbStep .osback").click();
+  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+  const saved = await page.evaluate(id => cascades.find(c => c.id === id).watchMarkers.in_cinema, agentId);
+  expect(saved, "the higher score must still be the saved score after Back, not ratcheted back down").toBe(dragged);
+});
+
 test("Mission/hub: no Watch On door, marker values in the Mission card, requirement scope chips, no overflow (CAS-729 AC4/AC5/AC6)", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
