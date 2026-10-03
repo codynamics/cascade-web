@@ -1079,7 +1079,10 @@ test("CAS-1180: a watched film shows as a stub when its own chip is on, and sear
   const setup = await page.evaluate((id) => {
     const film = MOVIES.find(m => m.tmdb_id === id);
     const donor = MOVIES.find(m => primaryStatus(m) === "rental" && cascades.some(c => listedBy(m, c)));
-    if(donor) watchGenreOff[watchTab].add((donor.genres || [])[0] || "Action");
+    // Setting watchGenreOff directly, unlike the chip taps above, doesn't go through a UI handler that
+    // calls render() itself — without this, beforeSearchIds below gets captured from the stale render that
+    // predates the exclusion, so AC6's later (correctly-filtered) snapshot looks like it lost two films.
+    if(donor){ watchGenreOff[watchTab].add((donor.genres || [])[0] || "Action"); render(); }
     return {
       term: film.title.slice(0, Math.min(5, film.title.length)).toLowerCase(),
       donorId: donor ? donor.tmdb_id : null,
