@@ -10605,7 +10605,13 @@ function selScaleMatch(m,c){
   // failing to reach it says the evidence available does not put it there either (CAS-747: now a real fail,
   // not a ride-along — see the function comment above).
   const inf = inferredScale(m);
-  if(inf) return inf.d >= min;
+  if(inf){
+    // CAS-1192: a lower-bound inference can only ADMIT a floor it clears. Above its floor the film is still
+    // genuinely unknown, so it falls back to includeUnbudgeted exactly like a film with no inference at all —
+    // unlike the upcoming inference above it, it must never DENY.
+    if(inf.lowerBound) return inf.d>=min ? true : !!c.includeUnbudgeted;
+    return inf.d >= min;
+  }
   // No real figure and no inference at all: genuinely unknown, decided by the agent's own opt-in.
   return !!c.includeUnbudgeted;
 }
@@ -10646,11 +10652,30 @@ function inferredScale(m){
       out = SCALE_REF.filter(r=>r.d>0 && mid>=r.d).pop() || null;
     }
   }
+  // CAS-1192: a film already in cinemas, on general release, among the most popular showing right now, but
+  // with neither a published budget nor takings (Heart of the Beast was the case that surfaced this). Only a
+  // LOWER BOUND — "at least Studio" — since popularity alone must not stand in for a higher figure (CAS-169
+  // still stands everywhere else); selScaleMatch below reads the `lowerBound` flag to admit but never deny.
+  if(!out && !(m.budget>0) && !(m.worldwide_gross>0)){
+    const st = primaryStatus(m);
+    if((st==="in_cinema" || st==="opening_week") && m.cinema_release){
+      const band = buzzBandOf(m);
+      if(band==="blockbuster" || band==="mustsee"){
+        const studio = SCALE_REF.find(r=>r.label==="Studio");
+        if(studio) out = {...studio, lowerBound:true};
+      }
+    }
+  }
   _scaleInferCache.set(m.tmdb_id, out);
   return out;
 }
 function inferScaleWhy(m){
   const inf=inferredScale(m); if(!inf) return "";
+  if(inf.lowerBound){
+    return "No budget has been published for this film. It is in cinemas on general release and among the "
+         + "most popular films showing, and most films like that were made at Studio scale or bigger. It is "
+         + "an estimate, not a figure Cascade holds.";
+  }
   return `No budget has been published for this film yet. ${inf.label} scale is what the films it is racing `
        + `were made for — the median budget of every title at least as anticipated as this one. `
        + `It is the band its peers sit in, not a figure Cascade holds.`;
