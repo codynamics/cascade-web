@@ -43,7 +43,10 @@ function admittedIds(E, criteria, movies){
   for(const m of movies){
     // Score gate always ON (CAS-825 change item 1) — the app never shows a film that fails it, so an
     // admission answer that ignored it would still disagree with what the app itself lists.
-    if(E.matchesCriteria(m, c, false, false)) out.push(String(m.tmdb_id));
+    // CAS-1195: matchesCriteria alone waives the Awards requirement for a pre-release film (CAS-780,
+    // correct for WATCHES) — but admission here answers "would the LISTING show this film", which also
+    // demands awardsListOK's no-exemption re-check, same as listedBy does for the app's own list.
+    if(E.matchesCriteria(m, c, false, false) && E.awardsListOK(m, c)) out.push(String(m.tmdb_id));
   }
   return out;
 }
