@@ -1234,15 +1234,20 @@ class AwardsAdmissionTests(unittest.TestCase):
         m = {"tmdb_id": tmdb_id, "title": f"CAS-1195 {tmdb_id}", "status": list(status),
              "genres": ["Drama"], "age_rating": "M", "language": "en", "cinema_date": "2026-08-01",
              "wm_critic_score": 70, "popularity": 50, "wm_popularity_percentile": 70,
-             "wm_user_rating": 7.5, "offers": []}
+             "wm_user_rating": 7.5,
+             # showable() needs a real offer behind a RELEASED (non-upcoming/in-cinema) fixture —
+             # cinemas/upcoming carry none and are exempted by isUpcoming/inCinemaConfirmed instead.
+             "offers": [] if status == ["upcoming"] else [{"provider": "Test"}]}
         if award is not None:
             m["award"] = award
         return m
 
     def _cascade(self):
+        # kind:"stream" matters: normCascade's laneCrit zeroes selAwards for the default kind:"cinema"
+        # lane (status:[] -> "cinema"), which would silently disable the very gate under test.
         return [{"id": "c1", "user_id": "u1", "name": "Nominees & Awards", "active": True,
                  "alert_moments": ["opens_soon", "announced"],
-                 "criteria": _criteria(selAwards=4)}]  # 4 = AWARD_STOPS' "Winner" index
+                 "criteria": _criteria(kind="stream", selAwards=4)}]  # 4 = AWARD_STOPS' "Winner" index
 
     # ---- AC1 ----
     def test_unawarded_upcoming_film_not_admitted_in_either_snapshot(self):
