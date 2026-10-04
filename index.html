@@ -190,7 +190,7 @@
      never shrinks below its content, so the brand lockup + freshness line held their full width and
      pushed the icons past the right edge on a 360px phone (CAS-183 added a fourth). Now the freshness line
      ellipsises instead, which is the right thing to lose. */
-  .brandrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .brandrow{display:flex;align-items:center;justify-content:flex-start;gap:8px}
   .brandrow .brand-ident{min-width:0}
   .brandrow .updated{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* CAS-1063: the freshness line's own row, now sharing it with the saving dot. min-width:0 so the
@@ -201,7 +201,7 @@
   .savedot{flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:var(--amber,#F0A63C);
     visibility:hidden}
   .savedot.show{visibility:visible}
-  .hdr-actions{flex:0 0 auto}
+  .hdr-actions{flex:0 0 auto;margin-left:auto}
   .brandlockup{display:inline-flex;align-items:center;gap:8px;vertical-align:middle}
   /* CAS-689: the CASCADE text wordmark is gone — it and the "Updated" freshness line were overlapping the
      three nav chips on an iPhone. The splash's own logo mark (splash-logo.svg) replaces it, inlined rather
@@ -221,8 +221,8 @@
   .buildstamp .env.production{color:var(--dim)}
   /* CAS-616 (v0.9.5): a 2-column grid, not a flex row — `1fr 1fr` makes the two chips resolve to the SAME
      width whatever their labels say, so "same importance, same size" is structural rather than a magic
-     number that rots the next time a label changes. */
-  .hdr-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:center}
+     number that rots the next time a label changes. CAS-1190: a third column for the Find chip. */
+  .hdr-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center}
   /* CAS-183 added a fourth header icon (Your Movies), which at 360px pushed the row past the edge — the
      brand block on the left is ~168px. CAS-530 dropped the bell (moved into the Menu) and widened the
      remaining two into labelled chips, so the same narrow-phone squeeze gets a step of its own below.
@@ -291,17 +291,19 @@
   /* This has to come AFTER the unconditional .modechip rule above — same selector, same specificity, so
      whichever is later in the stylesheet wins regardless of the media query. */
   @media (max-width:460px){
-    .hdr-actions{gap:6px}
+    .brandrow{gap:6px}
+    .hdr-actions{gap:5px}
     .navmenu-wrap .iconbtn{width:36px;height:36px;font-size:17px;border-radius:11px}
-    .modechip{padding:0 7px;gap:4px}
+    .modechip{padding:0 5px;gap:3px}
     .modechip .mclabel-full{display:none}
     .modechip .mclabel-short{display:inline}
   }
   /* CAS-636: a third chip joined the row (Moving), which the two-chip measurements above never accounted
-     for. Below 400px there isn't room for three labelled pills plus the menu icon without clipping the
+     for. Below 429px there isn't room for three labelled pills plus the menu icon without clipping the
      wordmark, so the row drops to icon-only chips there — .mclabel's full/short swap has nothing left to
-     negotiate once both are hidden. */
-  @media (max-width:400px){
+     negotiate once both are hidden. CAS-1190: widened from 400px to 429px so three labelled chips at
+     402–429px wide don't overflow. */
+  @media (max-width:429px){
     .hdr-actions{gap:5px}
     .modechip{padding:0 8px;gap:0;width:38px}
     .modechip .mclabel{display:none}
