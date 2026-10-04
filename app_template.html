@@ -448,6 +448,12 @@
   .fpmeta{font-size:13px;color:var(--dim);text-align:center;margin:0 0 14px}
   .fpcta{display:block;width:100%;background:var(--accentdeep);color:#fff;border:none;border-radius:11px;
     padding:14px;font-weight:800;font-size:15.5px;cursor:pointer;margin:20px 0 10px}
+  /* CAS-1196: the "seen" alert-email answer opens the film page with the Watched ramp showing (no verdict
+     recorded until the member taps one) — .cseg itself is already unscoped (the popover-only styling is on
+     the .cpop ancestor, not .cseg), so this only needs to give the segments their own stacked layout here. */
+  .fpwatched{margin:14px 0}
+  .fpwatchedlead{font-size:13px;font-weight:700;color:var(--dim);margin:0 0 8px}
+  .fpwatched .csegs{display:flex;flex-direction:column;gap:3px}
   .fpfoot{font-size:12px;color:var(--faint);text-align:center;margin:0 0 20px}
   .filmpage .synopsis{margin-bottom:14px}
   .filmpage .mrow{margin-bottom:8px}
@@ -3502,14 +3508,14 @@
         <!-- Moving (CAS-636): the alert feed made visible — every row corresponds to an in-app/email
              notification, so this is the one place Cascade shows "what changed" rather than "what matches".
              The badge counts rows the user hasn't opened this screen with present yet (cascade_moving_seen). -->
-        <div class="modechip mv" id="movingBtn" title="Moving" role="button" tabindex="0"
-             aria-pressed="false" aria-label="Moving" onclick="openMovingScreen()">
+        <div class="modechip mv" id="movingBtn" title="Alerts" role="button" tabindex="0"
+             aria-pressed="false" aria-label="Alerts" onclick="openMovingScreen()">
           <svg class="mcicon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path class="s" d="M4 15.5 10 9.5 14 13.5 20 5.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             <path class="s" d="M14 5.5h6v6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
           </svg>
-          <span class="mclabel mclabel-full">Moving</span>
-          <span class="mclabel mclabel-short">Moving</span>
+          <span class="mclabel mclabel-full">Alerts</span>
+          <span class="mclabel mclabel-short">Alerts</span>
           <span class="mcbadge" id="movingBadge" style="display:none">0</span>
         </div>
         <!-- Find (CAS-1186): the third nav destination — every film in MOVIES, searchable by name, with no
@@ -4006,7 +4012,7 @@
 <!-- MOVING (CAS-636): the alert feed made visible. CAS-649: it opens at boot with no back control, so
      unlike the other one-off Menu-destination .uscreens it must sit BELOW the header (top:var(--hdrh),
      z-index:29) rather than cover it at top:0 — see #agentsScreen,#yourMovies,#movingScreen above. -->
-<div class="uscreen" id="movingScreen" role="dialog" aria-modal="true" aria-label="Moving">
+<div class="uscreen" id="movingScreen" role="dialog" aria-modal="true" aria-label="Alerts">
   <div class="uwrap" id="movingBody"></div>
 </div>
 
@@ -4769,6 +4775,13 @@ const didReset = URLQ.has("reset");
 const DEEPLINK_DESTINATIONS = new Set(["cinema","streaming","moving","family"]);
 const dlParam = URLQ.get("dl");
 let pendingDeepLink = DEEPLINK_DESTINATIONS.has(dlParam) ? dlParam : null;
+// CAS-1196: the alert email's own "when will you watch it?"/"seen it" answer buttons
+// (`?answer=<value>#/film/<id>`). Read here, stripped below like ?dl, but APPLIED later —
+// applyPendingAnswer(), called once this device's sign-in state is actually known — because signed
+// out the answer is ignored outright (AC12) and CascadeAuth hasn't run yet at this point in the file.
+const ANSWER_VALUES = new Set(["cinema","rent","stream","never","seen"]);
+const answerParam = URLQ.get("answer");
+let pendingAnswer = ANSWER_VALUES.has(answerParam) ? answerParam : null;
 if(didReset){
   try{
     Object.keys(localStorage).filter(k=>k.startsWith("cascade_")).forEach(k=>localStorage.removeItem(k));
@@ -4776,8 +4789,8 @@ if(didReset){
 }
 // Strip only what we consumed. `?c=` (a shared Cascade) and `?log` are read further down and clean up after
 // themselves — taking the whole query string here would swallow a share link that arrived alongside ?setup.
-if(didReset || forceSetup || previewStep || pendingDeepLink){
-  ["reset","setup","onboard","step","agent","dl"].forEach(k=>URLQ.delete(k));
+if(didReset || forceSetup || previewStep || pendingDeepLink || pendingAnswer){
+  ["reset","setup","onboard","step","agent","dl","answer"].forEach(k=>URLQ.delete(k));
   const q=URLQ.toString();
   history.replaceState(null, "", location.pathname + (q?"?"+q:"") + location.hash);
 }
@@ -7410,12 +7423,22 @@ window.sendFilmInvite = async()=>{
 // release band render from, so this page can never show the film differently than the card does. No account
 // controls (Notify/Agent/Watched, or the signed-in-only "Invite someone" button) — those act on an account
 // this visitor may not have yet; the one action here is the door into getting one.
-function filmPageHTML(m){
+// CAS-1196: `showWatched` opens the page with the Watched ramp already showing — the alert email's
+// `?answer=seen` landing (see applyPendingAnswer) — without recording any verdict itself; a verdict is
+// only ever recorded by the member tapping one of the ramp's own buttons (pickWatch, shared with the
+// ordinary Watched chip's popover via watchStepsSegmentsHTML).
+function filmPageHTML(m, showWatched){
+  const watchedHTML = showWatched ? `
+    <div class="fpwatched">
+      <div class="fpwatchedlead">Have you seen it?</div>
+      <div class="csegs">${watchStepsSegmentsHTML(m.tmdb_id)}</div>
+    </div>` : "";
   return `
     <div class="fpclose"><button type="button" class="ebtn" onclick="closeFilmPage()"
         title="Close" aria-label="Close">✕</button></div>
     ${cardTopHTML(m)}
     ${bandHTML(m)}
+    ${watchedHTML}
     <button type="button" class="fpcta" onclick="filmPageCta()">Become a Cascade Member</button>
     <div class="fpfoot">Cascade finds and tracks your favorite cinema, rental and streaming for you.</div>`;
 }
@@ -7423,13 +7446,13 @@ function filmPageHTML(m){
 // one file) is a real, permanent, bookmarkable page for the film — see inviteUrlFor.
 const FILM_ROUTE_RE=/^#\/film\/(\d+)$/;
 const filmRouteId=()=>{ const m=FILM_ROUTE_RE.exec(location.hash); return m ? +m[1] : null; };
-function openFilmPage(id){
+function openFilmPage(id, showWatched){
   const m=MOVIES.find(x=>x.tmdb_id===id);
   const el=$("filmPage");
   // #filmPage is one shared element reused for every film opened — CAS-885's invmode class (added only once
   // resolveFilmInvite confirms this id's own invite) must not bleed into an unrelated film opened afterwards.
   el.classList.remove("invmode");
-  el.innerHTML = m ? filmPageHTML(m)
+  el.innerHTML = m ? filmPageHTML(m, showWatched)
     : `<div class="fpclose"><button type="button" class="ebtn" onclick="closeFilmPage()">✕</button></div>
        <div class="fptitle">Film not found</div>
        <div class="fpmeta">This title isn't in Cascade's catalogue right now.</div>`;
@@ -8606,6 +8629,20 @@ document.addEventListener("focus", captureEarlyPanelAnchor, true);
 function armPanelAnchor(){
   watchPanelAnchorY = (performance.now()-earlyPanelAnchorAt<1000) ? earlyPanelAnchorY : scrollY;
 }
+// CAS-1196: the WATCH_STEPS segment buttons themselves, pulled out of openWatchPanel's popover markup so
+// filmPageHTML's own inline "seen" chooser (the alert email's `?answer=seen` landing) can render the exact
+// same ramp, wired to the exact same pickWatch — tapping one records a real verdict there too, there is
+// just no popover around it.
+function watchStepsSegmentsHTML(id){
+  const cur=opinionOf(id);
+  return WATCH_STEPS.map(s=>{
+    const on=cur===s.key;
+    // --segc carries the step's own colour whether it is chosen or not, so the ramp is legible on arrival.
+    return `<button type="button" class="cseg${on?" on":""}" data-key="${s.key}" style="--segc:${s.cd};${on?`background:${s.cd};color:#fff`:""}"
+      onclick="pickWatch(${id},'${s.key}')" aria-pressed="${on}"
+      title="${escA(on?`${s.lbl} — tap to undo`:s.lbl)}"><span class="ci">${ICON[s.ico]}</span><span class="cl">${s.lbl}</span></button>`;
+  }).join("");
+}
 window.openWatchPanel=(id, btn)=>{
   // CAS-281: "was MY panel already open?", not "was ANY panel open?". The old test closed whatever was open
   // and returned, so tapping a second control while a first was open closed the first and opened nothing —
@@ -8617,17 +8654,10 @@ window.openWatchPanel=(id, btn)=>{
   const stub=btn.closest(".stub"); if(stub) stub.classList.add("ratingopen");
   const card=btn.closest(".card"); if(card) card.classList.add("popopen");   // CAS-684
   armPanelAnchor();   // CAS-1028: see captureEarlyPanelAnchor above
-  const cur=opinionOf(id);
   const pop=document.createElement("div");
   // CAS-374: content-width, right-aligned under the Watched chip — no in-panel close, the chip is the toggle.
   pop.className="cpop al-r";
-  pop.innerHTML=`<div class="csegs">${WATCH_STEPS.map(s=>{
-      const on=cur===s.key;
-      // --segc carries the step's own colour whether it is chosen or not, so the ramp is legible on arrival.
-      return `<button type="button" class="cseg${on?" on":""}" data-key="${s.key}" style="--segc:${s.cd};${on?`background:${s.cd};color:#fff`:""}"
-        onclick="pickWatch(${id},'${s.key}')" aria-pressed="${on}"
-        title="${escA(on?`${s.lbl} — tap to undo`:s.lbl)}"><span class="ci">${ICON[s.ico]}</span><span class="cl">${s.lbl}</span></button>`;
-    }).join("")}</div>`;
+  pop.innerHTML=`<div class="csegs">${watchStepsSegmentsHTML(id)}</div>`;
   btn.closest(".actions").appendChild(pop);
   positionPanel(pop);   // CAS-304
   wirePanelSlide(pop, ".cseg", el=>pickWatch(id, el.dataset.key));   // CAS-282
@@ -9667,6 +9697,33 @@ function applyDeepLink(){
     if(agent) briefOpen(agent.id, "agents");
   }
   logEvent("deeplink_applied", {dest});
+}
+// CAS-1196: consumes pendingAnswer (set at boot from ?answer=, the alert email's own link) — called
+// once this device's account is confirmed signed in (both call sites below are the exact two places
+// fireAccountFanout() itself runs from: a session already restored by boot, or one that resolves a
+// moment later via the cascade-auth-change listener). Signed out, neither call site ever runs, so the
+// answer is simply never applied (AC12) — there is no separate "ignore it" branch to write.
+// cinema/rent/stream make the EXACT call a tap on the card's own Watch On control makes (toggleFilmOpt);
+// never clears the card's future ticks (pickNever); seen opens the film with the Watched ramp showing
+// and records no verdict by itself — only the member's own tap on one of its buttons does that.
+function applyPendingAnswer(){
+  const value = pendingAnswer; if(!value) return;
+  pendingAnswer = null;
+  const id = filmRouteId(); if(id==null) return;
+  const m = MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
+  if(value==="never"){
+    pickNever(id);
+    toast(`${m.title} — marked not interested`);
+  } else if(value==="seen"){
+    openFilmPage(id, true);
+    return;
+  } else {
+    const key = value==="cinema" ? "in_cinema" : value;   // rent/stream already match WATCH_LEVEL_KEYS
+    toggleFilmOpt(id, key);
+    const say = value==="cinema" ? "at the cinema" : value==="rent" ? "when it's to rent" : "when it's streaming";
+    toast(`${m.title} — you'll watch it ${say}`);
+  }
+  openFilmPage(id);
 }
 // CAS-823: the same agent+occasion scope as watchScopeRows above, but narrowed only by the tab's own Watch
 // On key — no standing test — so the Also-show chips can show each window's count (renderWatchSheet) before
@@ -12278,9 +12335,9 @@ const HELP_ARTICLES = [
   {slug:"your-services", title:"Your services",
    summary:"Why membership ignores your services but no screen does, and the account-wide services-only switch.",
    body:"Your services — the ones you've told Cascade you actually pay for — shape almost everything you see: what an agent lists when it's scoped to them, what a film's own “where to watch” line says, and what the notify and listing screens show you. They're the lens nearly every screen in the app looks through.\n\nAn agent can scope itself to your services window by window, but there's also one account-wide switch, “Only show films on my services” — turn that on and it governs every agent's listing regardless of what any single agent has scoped for itself.\n\nMembership is the one thing that doesn't look through it. What you pay for Cascade itself is flat, whether you've told it about one service or ten — your services describe what you can watch, never what Cascade charges you to help you find it."},
-  {slug:"moving", title:"Moving",
+  {slug:"moving", title:"Alerts",
    summary:"New versus Changed, and the two-week window.",
-   body:"Moving is where Cascade tells you what's happened lately, split into two kinds of row. New is a film's first appearance for a given agent — something it's never found before. Changed is everything else: a film the agent already had, that's now moved to a different window. A film is never counted as both at once.\n\nYou choose how far back to look — Today, Week, 2 weeks or Month — and Moving shows only what falls inside that window, measured back from right now. Every row names the agent that actually owns the film today, so nothing is shown under an agent that no longer has it."},
+   body:"Alerts is where Cascade tells you what's happened lately, split into two kinds of row. New is a film's first appearance for a given agent — something it's never found before. Changed is everything else: a film the agent already had, that's now moved to a different window. A film is never counted as both at once.\n\nYou choose how far back to look — Today, Week, 2 weeks or Month — and Alerts shows only what falls inside that window, measured back from right now. Every row names the agent that actually owns the film today, so nothing is shown under an agent that no longer has it."},
   {slug:"notifications", title:"Notifications",
    summary:"Exactly what will reach you, by which channel, and when the daily report runs.",
    body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Service tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
@@ -16857,10 +16914,10 @@ const MOVING_WINDOWS = [
 ];
 const MOVING_WINDOW_DAYS = {today:1, week:7, "2weeks":14, month:30};
 const MOVING_EMPTY_COPY = {
-  today:"Nothing has moved today.",
-  week:"Nothing has moved in the last week.",
-  "2weeks":"Nothing has moved in the last 2 weeks.",
-  month:"Nothing has moved in the last month.",
+  today:"No alerts today.",
+  week:"No alerts in the last week.",
+  "2weeks":"No alerts in the last 2 weeks.",
+  month:"No alerts in the last month.",
 };
 // CAS-829, restored by CAS-858: shown instead of MOVING_EMPTY_COPY when the selected window held ledger
 // entries but every one was dropped for having no current owning agent — that is a different truth than
@@ -16967,9 +17024,9 @@ function movingEmptyCopy(win){
 }
 // CAS-668: while Moving is open, the badge must track whatever window is actually on screen (movingWindow),
 // including a tap via setMovingWindow. While it's closed, there is no "on screen" window yet, so the badge
-// predicts the window Moving now always opens on (CAS-848: pinned to 2 weeks, no longer auto-picked).
+// predicts the window Moving now always opens on (CAS-1197: pinned to Today, no longer auto-picked).
 function movingBadgeWindow(){
-  return movingIsOpen ? movingWindow : "2weeks";
+  return movingIsOpen ? movingWindow : "today";
 }
 function movingUnseenCount(){
   const win=movingBadgeWindow();
@@ -17073,7 +17130,7 @@ function renderMovingScreen(){
   // would read as a real (and wrong) answer rather than "still loading".
   const guest=movingIsGuestDevice();
   if(!guest && !movingReady){
-    $("movingBody").innerHTML = `<h2 class="osh">Moving</h2><p class="ossub">${MOVING_SUBTITLE}</p>
+    $("movingBody").innerHTML = `<h2 class="osh">Alerts</h2><p class="ossub">${MOVING_SUBTITLE}</p>
       <div class="mvempty"><p class="mvemptymain">Loading what's moved…</p></div>`;
     updateMovingBadge();
     return;
@@ -17097,7 +17154,7 @@ function renderMovingScreen(){
   // .mvhead's own comment for why the lane heading below it (.grouphead.sub) was floating with nothing to
   // release against otherwise. CAS-869: the truncation notice that used to sit here is gone — the status
   // nav below takes its place; the 200-row ledger fetch cap itself (movingLedgerTruncated) is unchanged.
-  const head=`<div class="mvhead" id="movingHead"><h2 class="osh">Moving</h2><p class="ossub">${MOVING_SUBTITLE}</p>
+  const head=`<div class="mvhead" id="movingHead"><h2 class="osh">Alerts</h2><p class="ossub">${MOVING_SUBTITLE}</p>
     <div class="mvwindows">${pillHTML}</div></div>`;
   // CAS-886: the reply alert is IN THE FLOW, not sticky with #movingHead and not a floating toast — it
   // scrolls away with the rest of the content, the same as everything else here.
@@ -17163,13 +17220,13 @@ window.closeAgentsScreen=()=>{
 // CAS-636: Moving — the alert feed made visible. Same open/close shape as Agents (mutually exclusive with
 // Agents), plus its own render + seen-state pass (renderMovingScreen marks every row it shows
 // as seen and refreshes the badge, per cascade_moving_seen — see that function for the mechanism).
-// CAS-848: which window the visit OPENS on is always 2 weeks now (CAS-671's shortest-window-holding-3-rows
-// auto-pick is gone). Never persisted; the user's own tap (setMovingWindow) always overrides it.
+// CAS-1197: which window the visit OPENS on is always Today now (CAS-848's pin to 2 weeks is gone).
+// Never persisted; the user's own tap (setMovingWindow) always overrides it.
 window.openMovingScreen=()=>{
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
   if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186: mutually exclusive with Find too
   movingIsOpen=true;
-  movingWindow="2weeks";   // CAS-848: always opens pinned to 2 weeks; a tap (setMovingWindow) still overrides it
+  movingWindow="today";   // CAS-1197: always opens pinned to Today; a tap (setMovingWindow) still overrides it
   renderMovingScreen();
   $("movingScreen").scrollTop=0;
   $("movingScreen").classList.add("open"); lockBodyScroll(true);
@@ -18587,7 +18644,7 @@ function tutorialCardDefs(){
     {sel:"#navMenuBtn", text:"Your agents live in this menu. Each one watches for a different kind of film, all the time, so you don't have to."},
     {sel:"#groups .card .r-scores", text:"Two numbers: what people thought, and what critics thought. Your agent only speaks up when a film clears the bar you set."},
     {sel:"#groups .card .ctl.notify", text:"Films move — cinema, then rent, then streaming. Your agent follows each one and tells you when it reaches a window you actually use."},
-    {sel:"#movingBtn", text:"Moving shows what's changed recently — Today, Week, 2 weeks or Month. It opens on 2 weeks, so that's the page to come back to."},
+    {sel:"#movingBtn", text:"Alerts shows what your agents have found for you — Today, Week, 2 weeks or Month. It opens on Today."},
   ];
 }
 // A DOM match that's actually on screen — a condensed ("cinfo") card hides its own .r-scores via
@@ -20401,6 +20458,7 @@ else if(dedupedN)
         // requires. membCompleteNewMembership() clears the flag and drives the equivalent fan-out itself
         // once that RPC actually resolves.
         if(!onbMembershipInFlight) fireAccountFanout('auth-change');
+        applyPendingAnswer();   // CAS-1196: signed in, confirmed just now — see applyPendingAnswer's own comment
       }
     } else if(currentUser !== null){
       currentUser = null;
@@ -20412,6 +20470,7 @@ else if(dedupedN)
     currentUser = uid();
     try{ localStorage.setItem("cascade_had_account","1"); }catch(e){}
     fireAccountFanout('boot-restore');
+    applyPendingAnswer();   // CAS-1196: already signed in at boot — see applyPendingAnswer's own comment
     reRegisterPushIfGranted();   // CAS-1194: keep this device's APNs token fresh, every launch
   }
   // CAS-1108: the "at boot" half of the gate — a direct call, not routed through reconcileOnReturn below, so
@@ -21048,6 +21107,16 @@ else if(dedupedN)
           if(DEEPLINK_DESTINATIONS.has(dl)){
             pendingDeepLink=dl;
             if(onboardingSeen() && !flowOn && !briefOn) applyDeepLink();
+          }
+          // CAS-1196 AC13: the alert email's own ?answer= link, same reasoning as ?dl just above —
+          // location.search never carries it natively, so this tap is the only place it ever arrives.
+          // Already signed in (a warm launch) applies it now; a cold launch leaves it pending for the
+          // cascade-auth-change/boot-restore call sites (applyPendingAnswer's own comment) to pick up
+          // once sign-in resolves.
+          const answer=url.searchParams.get("answer");
+          if(ANSWER_VALUES.has(answer)){
+            pendingAnswer=answer;
+            if(accountActive()) applyPendingAnswer();
           }
         }catch(e){ console.warn("Cascade: appUrlOpen parse failed", e); }
       });

@@ -1223,5 +1223,56 @@ class NewToAgentTests(unittest.TestCase):
         self.assertEqual(hits[0].cascade_id, "c1")
 
 
+class AwardsAdmissionTests(unittest.TestCase):
+    """CAS-1195: compute_admission() -> admit_shim.mjs now admits on matchesCriteria AND awardsListOK —
+    the listing's own rule — not matchesCriteria alone, which waives the Awards requirement for a
+    pre-release film (CAS-780, correct for WATCHES, wrong for "would the listing show this"). AC4 (an
+    agent with no Awards requirement is unaffected) is covered at the engine level, where it can be
+    checked against the real movies.json directly: tests/js/cas1195-award-admission.test.mjs."""
+
+    def _movie(self, tmdb_id, status, award=None):
+        m = {"tmdb_id": tmdb_id, "title": f"CAS-1195 {tmdb_id}", "status": list(status),
+             "genres": ["Drama"], "age_rating": "M", "language": "en", "cinema_date": "2026-08-01",
+             "wm_critic_score": 70, "popularity": 50, "wm_popularity_percentile": 70,
+             "wm_user_rating": 7.5,
+             # showable() needs a real offer behind a RELEASED (non-upcoming/in-cinema) fixture —
+             # cinemas/upcoming carry none and are exempted by isUpcoming/inCinemaConfirmed instead.
+             "offers": [] if status == ["upcoming"] else [{"provider": "Test"}]}
+        if award is not None:
+            m["award"] = award
+        return m
+
+    def _cascade(self):
+        # kind:"stream" matters: normCascade's laneCrit zeroes selAwards for the default kind:"cinema"
+        # lane (status:[] -> "cinema"), which would silently disable the very gate under test.
+        return [{"id": "c1", "user_id": "u1", "name": "Nominees & Awards", "active": True,
+                 "alert_moments": ["opens_soon", "announced"],
+                 "criteria": _criteria(kind="stream", selAwards=4)}]  # 4 = AWARD_STOPS' "Winner" index
+
+    # ---- AC1 ----
+    def test_unawarded_upcoming_film_not_admitted_in_either_snapshot(self):
+        movie = self._movie(9301, ["upcoming"])
+        admission = _admit(self._cascade(), today=[movie], yesterday=[movie])
+        self.assertNotIn("9301", admission["c1"]["today"])
+        self.assertNotIn("9301", admission["c1"]["yesterday"])
+
+    # ---- AC2 ----
+    def test_won_upcoming_film_is_admitted_in_both_snapshots(self):
+        movie = self._movie(9301, ["upcoming"], award="won")
+        admission = _admit(self._cascade(), today=[movie], yesterday=[movie])
+        self.assertIn("9301", admission["c1"]["today"])
+        self.assertIn("9301", admission["c1"]["yesterday"])
+
+    # ---- AC3 ----
+    def test_released_film_follows_the_same_unawarded_awarded_split(self):
+        unawarded = self._movie(9302, ["included_streaming"])
+        admission = _admit(self._cascade(), today=[unawarded])
+        self.assertNotIn("9302", admission["c1"]["today"])
+
+        awarded = self._movie(9303, ["included_streaming"], award="won")
+        admission = _admit(self._cascade(), today=[awarded])
+        self.assertIn("9303", admission["c1"]["today"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,4 @@
-"""Unit tests for the digest renderer + phrasing (CAS-86 / spec 26771457 §6).
+"""Unit tests for the digest renderer (CAS-86 / CAS-1196 redesign, spec 26771457 §6).
 
 Run:  python -m unittest monitor.tests.test_emailer
 """
@@ -8,293 +8,326 @@ import unittest
 import urllib.error
 from unittest import mock
 
-from monitor import render_digest, moment_phrase, digest_subject
+from monitor import render_digest, digest_subject
 from monitor.emailer import (
     USER_AGENT, send_via_resend, format_invite_reply, _invite_window_text, _invite_age_text,
-    _format_short_date,
+    _format_short_date, _weekday_date, _event_pill, _event_context,
 )
 from monitor.matching import Hit, _rank_key
 from monitor.transitions import Transition
 
-_UNSET = object()
+TODAY = _dt.date(2026, 10, 5)
 
 
-def _hit(title, moment, cascade, order=None, services=None, price=None, prior_window=None,
-         movie_id="1", cascade_id=_UNSET, status=("in_cinema",)):
-    """cascade_id defaults to one derived from the agent name, so two calls naming different
-    agents land in different sections (matching.py's own rank-collapse already guarantees a real
-    Hit list never mixes cascade_id with cascade_name this way). Pass cascade_id=None explicitly
-    for a Watch-it hit (no cascade — cascade_name "Your picks").
-
-    status defaults to ["in_cinema"] (CAS-924's outer grouping) so every existing call that never
-    cared about a film's status still lands in one shared status section, unchanged. Pass
-    status=() for a movie record with no resolvable status."""
-    t = Transition(movie_id=movie_id, title=title, moment=moment,
-                   services=services or [], price=price, movie={"status": list(status)})
-    if prior_window is not None:
-        t.prior_window = prior_window
-    if cascade_id is _UNSET:
-        cascade_id = f"id-{cascade}"
-    rank = _rank_key({"criteria": {"order": order}}) if cascade_id is not None else None
-    return Hit(user_id="user-A", cascade_id=cascade_id, cascade_name=cascade, transition=t, rank=rank)
+def _hit(title, moment, cascade="Some Agent", movie_id="1", movie=None, services=None, price=None,
+         order=None):
+    t = Transition(movie_id=movie_id, title=title, moment=moment, services=services or [], price=price,
+                   movie=movie or {})
+    rank = _rank_key({"criteria": {"order": order}})
+    return Hit(user_id="user-A", cascade_id=f"id-{cascade}", cascade_name=cascade, transition=t, rank=rank)
 
 
-class PhraseTests(unittest.TestCase):
-    def test_stream_names_service(self):
-        t = _hit("A", "hits_stream", "x", services=["Netflix"]).transition
-        self.assertEqual(moment_phrase(t), "Now on Netflix")
+class EventPillTests(unittest.TestCase):
+    """CAS-1196 item 2: every pill states its event with a real date, never a bare relative word."""
 
-    def test_stream_without_service_is_generic(self):
-        t = _hit("A", "hits_stream", "x").transition
-        self.assertIn("streaming", moment_phrase(t).lower())
+    def test_opens_soon(self):
+        text, color = _event_pill(_hit("A", "opens_soon").transition, {"cinema_date": "2026-10-08"}, TODAY)
+        self.assertEqual(text, "OPENS Thu 8 Oct")
+        self.assertEqual(color, "violet")
 
-    def test_rent_shows_real_price(self):
-        t = _hit("A", "hits_rent", "x", price=4.99).transition
-        self.assertEqual(moment_phrase(t), "Dropped to rent — $4.99")
+    def test_announced_with_cinema_date(self):
+        text, _ = _event_pill(_hit("A", "announced").transition, {"cinema_date": "2026-12-17"}, TODAY)
+        self.assertEqual(text, "COMING Thu 17 Dec")
 
-    def test_rent_without_price_is_honest(self):
-        t = _hit("A", "hits_rent", "x").transition
-        self.assertEqual(moment_phrase(t), "Now available to rent")
+    def test_announced_without_cinema_date(self):
+        text, _ = _event_pill(_hit("A", "announced").transition, {}, TODAY)
+        self.assertEqual(text, "NEWLY ANNOUNCED")
 
-    def test_cinema_and_weekend(self):
-        self.assertEqual(moment_phrase(_hit("A", "hits_cinema", "x").transition), "In cinemas now")
-        self.assertEqual(moment_phrase(_hit("A", "past_opening_weekend", "x").transition),
-                         "Past its opening weekend")
+    def test_hits_cinema(self):
+        text, color = _event_pill(_hit("A", "hits_cinema").transition, {}, TODAY)
+        self.assertEqual(text, "IN CINEMAS NOW")
+        self.assertEqual(color, "violet")
+
+    def test_past_opening_weekend(self):
+        text, _ = _event_pill(_hit("A", "past_opening_weekend").transition, {}, TODAY)
+        self.assertEqual(text, "IN CINEMAS · PAST OPENING WEEKEND")
+
+    def test_hits_pvod_with_price(self):
+        t = _hit("A", "hits_pvod", services=["Apple TV"], price=29.99).transition
+        text, color = _event_pill(t, {}, TODAY)
+        self.assertEqual(text, "NOW TO BUY OR RENT · APPLE TV · $29.99")
+        self.assertEqual(color, "amber")
+
+    def test_hits_rent_with_price(self):
+        t = _hit("A", "hits_rent", services=["Apple TV"], price=6.99).transition
+        text, _ = _event_pill(t, {}, TODAY)
+        self.assertEqual(text, "NOW TO RENT · APPLE TV · from $6.99")
+
+    def test_hits_rent_without_price_is_honest(self):
+        t = _hit("A", "hits_rent").transition
+        text, _ = _event_pill(t, {}, TODAY)
+        self.assertEqual(text, "NOW TO RENT")
+        self.assertNotIn("from $", text)
+
+    def test_hits_stream(self):
+        t = _hit("A", "hits_stream", services=["Netflix"]).transition
+        text, color = _event_pill(t, {}, TODAY)
+        self.assertEqual(text, "NOW STREAMING · NETFLIX")
+        self.assertEqual(color, "green")
+
+    def test_new_for_you_colour_follows_current_window(self):
+        t = _hit("A", "newly_qualifies").transition
+        _, color_stream = _event_pill(t, {"status": ["included_streaming"]}, TODAY)
+        _, color_rental = _event_pill(t, {"status": ["rental"]}, TODAY)
+        _, color_upcoming = _event_pill(t, {"status": ["upcoming"]}, TODAY)
+        self.assertEqual(color_stream, "green")
+        self.assertEqual(color_rental, "amber")
+        self.assertEqual(color_upcoming, "violet")
 
     def test_no_fabricated_urgency(self):
-        # Honesty guardrail: the weekend line must not invent a "leaving"/countdown claim.
-        line = moment_phrase(_hit("A", "past_opening_weekend", "x").transition).lower()
-        for banned in ("leaving", "last chance", "hurry", "expires", "gone in"):
-            self.assertNotIn(banned, line)
+        # Honesty guardrail: no banned urgency words anywhere a pill can read.
+        for moment in ("opens_soon", "announced", "hits_cinema", "past_opening_weekend",
+                       "hits_pvod", "hits_rent", "hits_stream"):
+            t = _hit("A", moment).transition
+            text, _ = _event_pill(t, {}, TODAY)
+            for banned in ("leaving", "last chance", "hurry", "expires", "gone in"):
+                self.assertNotIn(banned, text.lower())
 
 
-class RenderTests(unittest.TestCase):
-    def setUp(self):
-        self.hits = [
-            _hit("Rent Riser", "hits_rent", "Drama rentals", price=6.99),
-            _hit("Stream Arrival", "hits_stream", "Comedy on Stan", services=["Stan"]),
+class EventContextTests(unittest.TestCase):
+    def test_opens_soon_counts_real_days(self):
+        t = _hit("A", "opens_soon").transition
+        self.assertEqual(_event_context(t, {"cinema_date": "2026-10-08"}, TODAY), "in cinemas in 3 days")
+
+    def test_hits_cinema_since_real_date(self):
+        t = _hit("A", "hits_cinema").transition
+        self.assertEqual(_event_context(t, {"cinema_date": "2026-10-01"}, TODAY), "since Thu 1 Oct")
+
+    def test_hits_rent_names_other_services(self):
+        t = _hit("A", "hits_rent", services=["Apple TV", "Amazon Video"]).transition
+        self.assertEqual(_event_context(t, {}, TODAY), "also on Amazon Video")
+
+    def test_hits_rent_alone_has_no_context(self):
+        t = _hit("A", "hits_rent", services=["Apple TV"]).transition
+        self.assertEqual(_event_context(t, {}, TODAY), "")
+
+    def test_hits_stream_names_service_and_date(self):
+        t = _hit("A", "hits_stream", services=["Netflix"]).transition
+        movie = {"window_dates": {"included_streaming": "2026-10-02"}}
+        self.assertEqual(_event_context(t, movie, TODAY), "on Netflix since Fri 2 Oct")
+
+    def test_newly_qualifies_names_window_and_date(self):
+        t = _hit("A", "newly_qualifies").transition
+        movie = {"status": ["upcoming"], "window_dates": {"upcoming": "2026-09-24"}}
+        self.assertEqual(_event_context(t, movie, TODAY), "Upcoming 24 Sep")
+
+
+class CardRenderTests(unittest.TestCase):
+    """AC1/AC2/AC6: what one card renders."""
+
+    def test_poster_renders_w185_tmdb_src(self):
+        movie = {"status": ["upcoming"], "poster": "/abc.jpg"}
+        hit = _hit("Other Mommy", "opens_soon", movie=movie)
+        d = render_digest([hit], site_url="https://x.test/")
+        self.assertIn('src="https://image.tmdb.org/t/p/w185/abc.jpg"', d["html"])
+        self.assertIn('width="92" height="138"', d["html"])
+        self.assertIn('alt="Other Mommy"', d["html"])
+
+    def test_no_poster_renders_no_broken_image(self):
+        hit = _hit("No Poster", "hits_cinema", movie={"status": ["in_cinema"]})
+        d = render_digest([hit], site_url="https://x.test/")
+        self.assertNotIn("<img", d["html"])
+
+    def test_no_section_headings_survive(self):
+        hits = [
+            _hit("A", "hits_cinema", movie={"status": ["upcoming"]}, movie_id="1"),
+            _hit("B", "hits_stream", services=["Netflix"], movie={"status": ["included_streaming"]},
+                movie_id="2"),
         ]
-
-    def test_subject_counts_updates(self):
-        self.assertEqual(digest_subject(self.hits), "Cascade found 2 updates for you")
-        self.assertEqual(digest_subject(self.hits[:1]), "Cascade found 1 update for you")
-
-    def test_one_consolidated_digest_lists_every_item(self):
-        d = render_digest(self.hits, site_url="https://example.test/app/")
+        d = render_digest(hits, site_url="https://x.test/")
         for part in (d["html"], d["text"]):
-            self.assertIn("Rent Riser", part)
-            self.assertIn("Stream Arrival", part)
-            self.assertIn("Drama rentals", part)      # which Cascade caught it — named on the film itself
-            self.assertIn("Comedy on Stan", part)
-        self.assertIn("$6.99", d["html"])             # real price, real service
-        self.assertIn("Now on Stan", d["html"])
-        self.assertIn("https://example.test/app/", d["html"])   # link back to the site
+            self.assertNotIn("UPCOMING (", part)
+            self.assertNotIn("Your agents have been watching", part)
+
+    def test_meta_line_only_shows_facts_the_film_has(self):
+        movie = {"status": ["included_streaming"], "genres": ["Drama", "History"], "age_rating": "M",
+                 "wm_user_rating": 8.2, "wm_critic_score": 95}
+        hit = _hit("Spotlight", "hits_stream", services=["Netflix"], movie=movie)
+        d = render_digest([hit], site_url="https://x.test/")
+        self.assertIn("Drama, History · M · People 8.2 · Critics 95", d["html"])
+
+    def test_meta_line_omits_missing_facts(self):
+        movie = {"status": ["upcoming"], "genres": ["Horror"], "age_rating": "MA 15+"}
+        hit = _hit("Other Mommy", "opens_soon", movie=movie)
+        d = render_digest([hit], site_url="https://x.test/")
+        self.assertIn("Horror · MA 15+", d["html"])
+        self.assertNotIn("People", d["html"])
+        self.assertNotIn("Critics", d["html"])
+
+    def test_score_chip_shows_the_passed_score(self):
+        hit = _hit("Scored", "hits_cinema", movie_id="1")
+        d = render_digest([hit], site_url="https://x.test/", scores={"1": 87})
+        self.assertIn(">87<", d["html"])
+
+    def test_no_score_omits_the_chip(self):
+        hit = _hit("Unscored", "hits_cinema", movie_id="1")
+        d = render_digest([hit], site_url="https://x.test/", scores={"1": None})
+        d2 = render_digest([hit], site_url="https://x.test/")
+        for d_ in (d, d2):
+            self.assertNotIn('border-radius:8px;border:1px solid', d_["html"])
+
+    def test_context_line_starts_with_agent_name(self):
+        hit = _hit("Film", "past_opening_weekend", cascade="Cinema date night")
+        d = render_digest([hit], site_url="https://x.test/")
+        self.assertIn("Cinema date night", d["html"])
 
     def test_html_escapes_user_content(self):
-        hit = _hit("Bad <script>", "hits_cinema", "My \"quoted\" & <b>Cascade</b>")
+        hit = _hit("Bad <script>", "hits_cinema", cascade="My \"quoted\" & <b>Cascade</b>")
         d = render_digest([hit], site_url="https://x.test/")
         self.assertNotIn("<script>", d["html"])
         self.assertIn("&lt;script&gt;", d["html"])
 
+    def test_view_in_cascade_link(self):
+        hit = _hit("Film", "hits_cinema", movie_id="42")
+        d = render_digest([hit], site_url="https://example.test/app/")
+        self.assertIn("https://example.test/app/#/film/42", d["html"])
+        self.assertIn("View in Cascade", d["html"])
+
     def test_site_url_default_is_the_live_site(self):
-        d = render_digest(self.hits)
+        hit = _hit("Film", "hits_cinema")
+        d = render_digest([hit])
         self.assertIn("cascademovies.com", d["html"])
 
 
-class SectioningTests(unittest.TestCase):
-    """CAS-849: films render inside their agent's own section now (see AgentSectionTests) — these
-    check what survives that change."""
+class ButtonTests(unittest.TestCase):
+    """AC4: buttons depend on where the film stands, gated by Service tracking."""
 
-    def setUp(self):
-        self.hits = [
-            _hit("Warfare", "hits_cinema", "Cinema date night", prior_window="upcoming", movie_id="w"),
-            _hit("The Long Walk", "past_opening_weekend", "Cinema date night", movie_id="tlw"),
-            _hit("Sinners", "hits_stream", "Everyday favourites", services=["Netflix"],
-                 prior_window="rental", movie_id="s"),
-        ]
-
-    def test_films_appear_in_hit_order(self):
-        d = render_digest(self.hits, site_url="https://example.test/app/")
-        for part in (d["html"], d["text"]):
-            self.assertLess(part.index("Warfare"), part.index("The Long Walk"))
-            self.assertLess(part.index("The Long Walk"), part.index("Sinners"))
-
-    def test_no_per_line_found_by_tag(self):
-        d = render_digest(self.hits, site_url="https://example.test/app/")
-        for part in (d["html"], d["text"]):
-            self.assertNotIn("Found by your", part)
-
-    def test_move_line_shown_when_prior_window_known(self):
-        d = render_digest(self.hits, site_url="https://example.test/app/")
-        for part in (d["html"], d["text"]):
-            self.assertIn("Upcoming → In cinema", part)
-            self.assertIn("Rent → Stream", part)
-
-    def test_no_move_line_when_prior_window_unknown(self):
-        d = render_digest(self.hits, site_url="https://example.test/app/")
-        for part in (d["html"], d["text"]):
-            self.assertIn("Past its opening weekend", part)
-        # "The Long Walk" has no prior_window set — never invent a move for it.
-        self.assertNotIn("→ Past", d["html"])
-
-    def test_rendering_is_deterministic(self):
-        d1 = render_digest(self.hits, site_url="https://example.test/app/")
-        d2 = render_digest(self.hits, site_url="https://example.test/app/")
-        self.assertEqual(d1, d2)
-
-
-class AgentSectionTests(unittest.TestCase):
-    """CAS-849: films render grouped under the agent's own section heading, not named per-row."""
-
-    def test_one_agent_named_on_its_section(self):
-        d = render_digest([_hit("Warfare", "hits_cinema", "Cinema date night")],
-                           site_url="https://x.test/")
-        for part in (d["html"], d["text"]):
-            self.assertIn("Warfare", part)
-            self.assertIn("Cinema date night", part)
-
-    def test_two_agents_catching_the_same_film_each_get_their_own_row(self):
-        # matching.py's own _collapse_by_rank already guarantees one (cascade, movie, moment) is
-        # never produced by two DIFFERENT cascades within a single match() call — two cascade_ids
-        # both naming the same film here are two real, separate events, one per agent's section.
-        hits = [
-            _hit("Sinners", "hits_stream", "Everyday favourites", services=["Netflix"]),
-            _hit("Sinners", "hits_stream", "Weekend picks", services=["Netflix"]),
-        ]
-        d = render_digest(hits, site_url="https://x.test/")
-        for part in (d["html"], d["text"]):
-            self.assertEqual(part.count("Sinners"), 2)
-            self.assertIn("Everyday favourites", part)
-            self.assertIn("Weekend picks", part)
-
-    def test_watch_it_hit_reads_your_picks(self):
-        hit = _hit("Warfare", "hits_cinema", "Your picks", cascade_id=None)
+    def test_unreleased_film_has_four_gated_answer_buttons(self):
+        hit = _hit("Other Mommy", "opens_soon", movie={"status": ["upcoming"]}, movie_id="9")
         d = render_digest([hit], site_url="https://x.test/")
+        for value in ("cinema", "rent", "stream", "never"):
+            self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
+        self.assertIn("WHEN WILL YOU WATCH IT?", d["html"])
+
+    def test_rent_switched_off_removes_the_rent_button(self):
+        hit = _hit("Other Mommy", "opens_soon", movie={"status": ["upcoming"]}, movie_id="9")
+        d = render_digest([hit], site_url="https://x.test/",
+                          watch_windows={"rent": {"list": False}})
+        self.assertNotIn("answer=rent", d["html"])
+        self.assertIn("answer=cinema", d["html"])
+        self.assertIn("answer=stream", d["html"])
+        self.assertIn("answer=never", d["html"])
+
+    def test_streaming_film_has_three_buttons(self):
+        hit = _hit("Spotlight", "hits_stream", services=["Netflix"],
+                   movie={"status": ["included_streaming"]}, movie_id="9")
+        d = render_digest([hit], site_url="https://x.test/")
+        for value in ("stream", "seen", "never"):
+            self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
+        self.assertNotIn("answer=cinema", d["html"])
+
+    def test_home_pay_film_has_three_buttons(self):
+        hit = _hit("Ex Machina", "hits_rent", movie={"status": ["rental"]}, movie_id="9")
+        d = render_digest([hit], site_url="https://x.test/")
+        for value in ("rent", "stream", "never"):
+            self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
+        self.assertNotIn("answer=cinema", d["html"])
+        self.assertNotIn("answer=seen", d["html"])
+
+
+class OrderingAndOverflowTests(unittest.TestCase):
+    """AC3: highest Cascade score first, at most 5 cards, "and N more" beyond that."""
+
+    def _hits(self, n):
+        return [_hit(f"Film{i}", "hits_cinema", movie_id=str(i), movie={"status": ["in_cinema"]})
+               for i in range(n)]
+
+    def test_highest_score_first(self):
+        hits = self._hits(3)
+        scores = {"0": 50, "1": 90, "2": 70}
+        d = render_digest(hits, site_url="https://x.test/", scores=scores)
+        self.assertLess(d["html"].index("Film1"), d["html"].index("Film2"))
+        self.assertLess(d["html"].index("Film2"), d["html"].index("Film0"))
+
+    def test_no_score_sorts_last(self):
+        hits = self._hits(2)
+        scores = {"0": None, "1": 10}
+        d = render_digest(hits, site_url="https://x.test/", scores=scores)
+        self.assertLess(d["html"].index("Film1"), d["html"].index("Film0"))
+
+    def test_seven_hits_render_five_cards_and_overflow_line(self):
+        hits = self._hits(7)
+        scores = {str(i): i for i in range(7)}
+        d = render_digest(hits, site_url="https://x.test/", scores=scores)
         for part in (d["html"], d["text"]):
-            self.assertIn("Your picks", part)
+            self.assertIn("and 2 more in Cascade", part)
+        shown = [f"Film{i}" for i in (6, 5, 4, 3, 2)]
+        hidden = ["Film0", "Film1"]
+        for title in shown:
+            self.assertIn(title, d["html"])
+        for title in hidden:
+            self.assertNotIn(title, d["html"])
 
-    def test_agent_and_watch_it_on_the_same_film_each_get_their_own_row(self):
+
+class SubjectTests(unittest.TestCase):
+    """AC5: the subject names the top (highest-score) film and its event."""
+
+    def test_single_film_subject(self):
+        hit = _hit("Other Mommy", "opens_soon", movie={"cinema_date": "2026-10-08"})
+        self.assertEqual(digest_subject([hit], today=TODAY), "Other Mommy opens Thursday")
+
+    def test_multi_film_subject_names_the_top_scored_film(self):
         hits = [
-            _hit("Warfare", "hits_cinema", "Cinema date night"),
-            _hit("Warfare", "hits_cinema", "Your picks", cascade_id=None),
+            _hit("Low Score", "hits_cinema", movie_id="1"),
+            _hit("Other Mommy", "opens_soon", movie_id="2", movie={"cinema_date": "2026-10-08"}),
+            _hit("Mid Score", "hits_stream", movie_id="3"),
         ]
-        d = render_digest(hits, site_url="https://x.test/")
-        for part in (d["html"], d["text"]):
-            self.assertEqual(part.count("Warfare"), 2)
-            self.assertIn("Cinema date night", part)
-            self.assertIn("Your picks", part)
+        scores = {"1": 10, "2": 90, "3": 50}
+        subject = digest_subject(hits, scores=scores, today=TODAY)
+        self.assertEqual(subject, "Other Mommy opens Thursday — and 2 more")
 
-    def test_different_moments_for_the_same_film_stay_separate(self):
-        # Two real, distinct events for the same film — never collapsed into one line.
-        hits = [
-            _hit("Warfare", "hits_cinema", "Cinema date night"),
-            _hit("Warfare", "hits_stream", "Everyday favourites", services=["Netflix"]),
-        ]
-        d = render_digest(hits, site_url="https://x.test/")
-        for part in (d["html"], d["text"]):
-            self.assertEqual(part.count("Warfare"), 2)
+    def test_subject_reflects_reply_count_alone(self):
+        reply = {"to_name": "Sam", "answer": "yes", "film_title": "X",
+                 "window_text": "", "when_text": ""}
+        self.assertEqual(digest_subject([], [reply]), "1 reply to your invites")
+        self.assertEqual(digest_subject([], [reply, reply]), "2 replies to your invites")
 
-    def test_agent_name_appears_once_per_section_not_once_per_row(self):
-        # AC3: three films from the same agent still name that agent exactly once (the heading).
-        hits = [
-            _hit("Film One", "hits_cinema", "Busy Agent", movie_id="1"),
-            _hit("Film Two", "hits_stream", "Busy Agent", services=["Netflix"], movie_id="2"),
-            _hit("Film Three", "hits_rent", "Busy Agent", movie_id="3"),
-        ]
-        d = render_digest(hits, site_url="https://x.test/")
-        self.assertEqual(d["html"].count("Busy Agent"), 1)
-        self.assertEqual(d["text"].count("Busy Agent"), 1)
-
-
-class SectionOrderTests(unittest.TestCase):
-    """AC1 + AC4: section order follows _rank_key() ascending; Your picks always sorts last."""
-
-    def test_rank_one_agent_section_comes_first(self):
-        hits = [
-            _hit("Second Pick", "hits_cinema", "Rank Two Agent", order=2, movie_id="a"),
-            _hit("First Pick", "hits_cinema", "Rank One Agent", order=1, movie_id="b"),
-        ]
-        d = render_digest(hits, site_url="https://x.test/")
-        for part in (d["html"], d["text"]):
-            self.assertLess(part.index("Rank One Agent"), part.index("Rank Two Agent"))
-
-    def test_your_picks_sorts_last_after_a_ranked_agent(self):
-        hits = [
-            _hit("Watched Film", "hits_cinema", "Your picks", cascade_id=None, movie_id="w"),
-            _hit("Agent Film", "hits_cinema", "Some Agent", order=5, movie_id="a"),
-        ]
-        d = render_digest(hits, site_url="https://x.test/")
-        for part in (d["html"], d["text"]):
-            self.assertLess(part.index("Some Agent"), part.index("Your picks"))
-
-    def test_your_picks_sorts_last_even_against_an_unranked_agent(self):
-        hits = [
-            _hit("Watched Film", "hits_cinema", "Your picks", cascade_id=None, movie_id="w"),
-            _hit("Agent Film", "hits_cinema", "No Order Agent", movie_id="a"),
-        ]
-        d = render_digest(hits, site_url="https://x.test/")
-        for part in (d["html"], d["text"]):
-            self.assertLess(part.index("No Order Agent"), part.index("Your picks"))
-
-
-class TagTests(unittest.TestCase):
-    """AC2: New = new_to_agent/newly_qualifies; Changed = every other moment."""
-
-    def test_new_to_agent_tags_new(self):
-        d = render_digest([_hit("Fresh Find", "new_to_agent", "Some Agent")], site_url="https://x.test/")
-        self.assertIn("New", d["html"])
-        self.assertIn("[New]", d["text"])
-
-    def test_newly_qualifies_tags_new(self):
-        d = render_digest([_hit("Now Qualifies", "newly_qualifies", "Some Agent")], site_url="https://x.test/")
-        self.assertIn("New", d["html"])
-        self.assertIn("[New]", d["text"])
-        self.assertIn("matches this agent", d["html"])   # CAS-849: newly_qualifies gets its own sub-line
-
-    def test_hits_rent_tags_changed(self):
-        d = render_digest([_hit("Price Drop", "hits_rent", "Some Agent")], site_url="https://x.test/")
-        self.assertIn("Changed", d["html"])
-        self.assertIn("[Changed]", d["text"])
+    def test_subject_reflects_replies_and_updates_together(self):
+        reply = {"to_name": "Sam", "answer": "yes", "film_title": "X",
+                 "window_text": "", "when_text": ""}
+        subject = digest_subject([_hit("A", "hits_cinema")], [reply])
+        self.assertIn("1 reply to your invites", subject)
+        self.assertIn("1 update", subject)
 
 
 class InlineStylingTests(unittest.TestCase):
-    """AC5: email-client-safe markup only — no <style> block, no class=, no display:flex."""
+    """AC6: email-client-safe markup only — no <style> block, no class=, no flex/grid."""
 
-    def test_no_style_block_class_attr_or_flex(self):
+    def test_no_style_block_class_attr_or_flex_or_grid(self):
         hits = [
-            _hit("Film One", "new_to_agent", "Some Agent"),
-            _hit("Film Two", "hits_rent", "Your picks", cascade_id=None),
+            _hit("Film One", "hits_cinema", movie_id="1"),
+            _hit("Film Two", "hits_rent", cascade="Your picks", movie_id="2"),
         ]
         d = render_digest(hits, site_url="https://x.test/")
         self.assertNotIn("<style", d["html"])
         self.assertNotIn("class=", d["html"])
         self.assertNotIn("display:flex", d["html"])
+        self.assertNotIn("display:grid", d["html"])
 
 
 class InviteRepliesRenderTests(unittest.TestCase):
-    """CAS-887 AC1a/AC3d: the replies block, as render_digest itself renders it. Pipeline-level
-    questions (which users get an email at all) live in monitor/tests/test_invite_replies.py."""
+    """CAS-887: the replies block, kept as-is by the CAS-1196 redesign."""
 
     def _reply(self, to_name="Sam", answer="yes", film_title="Practical Magic 2"):
         return {"to_name": to_name, "answer": answer, "film_title": film_title,
                 "window_text": "In cinemas 17 Sep", "when_text": "replied yesterday"}
 
-    def test_subject_reflects_reply_count_alone(self):
-        self.assertEqual(digest_subject([], [self._reply()]), "1 reply to your invites")
-        self.assertEqual(digest_subject([], [self._reply(), self._reply()]),
-                         "2 replies to your invites")
-
-    def test_subject_reflects_replies_and_updates_together(self):
-        subject = digest_subject([_hit("A", "hits_cinema", "x")], [self._reply()])
-        self.assertIn("1 reply to your invites", subject)
-        self.assertIn("1 update", subject)
-
     def test_subject_unaffected_when_no_replies(self):
-        self.assertEqual(digest_subject([_hit("A", "hits_cinema", "x")]),
-                         "Cascade found 1 update for you")
+        hit = _hit("Other Mommy", "opens_soon", movie={"cinema_date": "2026-10-08"})
+        self.assertEqual(digest_subject([hit], today=TODAY), "Other Mommy opens Thursday")
 
     def test_replies_block_leads_film_entries_html_and_text(self):
-        hits = [_hit("Rent Riser", "hits_rent", "Drama rentals", price=6.99)]
+        hits = [_hit("Rent Riser", "hits_rent", cascade="Drama rentals", price=6.99)]
         replies = [self._reply(to_name="Sam", film_title="Practical Magic 2")]
         d = render_digest(hits, site_url="https://x.test/", replies=replies)
         for part in (d["html"], d["text"]):
@@ -310,18 +343,19 @@ class InviteRepliesRenderTests(unittest.TestCase):
             self.assertIn("In cinemas 17 Sep", part)
             self.assertIn("replied yesterday", part)
 
-    def test_replies_only_digest_has_no_film_transitions_heading(self):
+    def test_replies_only_digest_has_no_film_heading(self):
         # AC2: a replies-only digest must not claim "here's what changed" over an empty list.
         d = render_digest([], site_url="https://x.test/", replies=[self._reply()])
         for part in (d["html"], d["text"]):
-            self.assertNotIn("Your agents have been watching", part)
+            self.assertNotIn("films for you today", part)
+            self.assertNotIn("film for you today", part)
 
     def test_no_replies_leaves_shape_unchanged(self):
-        hits = [_hit("Rent Riser", "hits_rent", "Drama rentals", price=6.99)]
+        hits = [_hit("Rent Riser", "hits_rent", cascade="Drama rentals", price=6.99)]
         d = render_digest(hits, site_url="https://x.test/")
         self.assertNotIn("Replies to your invites", d["html"])
         self.assertNotIn("Replies to your invites", d["text"])
-        self.assertIn("Your agents have been watching", d["html"])
+        self.assertIn("film for you today", d["html"])
 
     def test_replies_block_html_escapes_user_content(self):
         replies = [self._reply(to_name="<script>", film_title="A & B")]
@@ -344,6 +378,10 @@ class InviteReplyFormattingTests(unittest.TestCase):
         self.assertEqual(_format_short_date("2026-09-17"), "17 Sep")
         self.assertEqual(_format_short_date(None), "")
         self.assertEqual(_format_short_date("not-a-date"), "")
+
+    def test_weekday_date(self):
+        self.assertEqual(_weekday_date("2026-10-08"), "Thu 8 Oct")
+        self.assertEqual(_weekday_date(None), "")
 
     def test_window_text_in_cinema_falls_back_to_cinema_date(self):
         movie = {"status": ["in_cinema"], "cinema_date": "2026-09-17"}
@@ -397,76 +435,12 @@ class InviteReplyFormattingTests(unittest.TestCase):
         self.assertEqual(out["when_text"], "")
 
 
-class StatusSectionTests(unittest.TestCase):
-    """CAS-924: the digest gains the same two levels of grouping Moving has — status outer,
-    agent inner."""
-
-    def setUp(self):
-        self.hits = [
-            _hit("Waiting Room", "hits_cinema", "Cinema date night", status=("upcoming",), movie_id="1"),
-            _hit("On Screens", "hits_cinema", "Cinema date night", status=("in_cinema",), movie_id="2"),
-            _hit("For Rent", "hits_rent", "Weekend picks", price=6.99, status=("rental",), movie_id="3"),
-            _hit("Now Streaming", "hits_stream", "Weekend picks", services=["Stan"],
-                 status=("included_streaming",), movie_id="4"),
-        ]
-
-    def test_headings_appear_in_listing_order(self):
-        d = render_digest(self.hits, site_url="https://x.test/")
-        for part in (d["html"], d["text"]):
-            self.assertLess(part.index("Upcoming"), part.index("In Cinema"))
-            self.assertLess(part.index("In Cinema"), part.index("Rent (~$7)"))
-            self.assertLess(part.index("Rent (~$7)"), part.index("Stream (included)"))
-
-    def test_text_part_carries_same_headings_same_order(self):
-        d = render_digest(self.hits, site_url="https://x.test/")
-        text = d["text"]
-        self.assertIn("Upcoming", text)
-        self.assertIn("In Cinema", text)
-        self.assertIn("Rent (~$7)", text)
-        self.assertIn("Stream (included)", text)
-
-    def test_both_agents_appear_in_a_shared_status_section_in_rank_order(self):
-        hits = [
-            _hit("Second Agent's Film", "hits_cinema", "Rank Two Agent", order=2,
-                 status=("in_cinema",), movie_id="a"),
-            _hit("First Agent's Film", "hits_cinema", "Rank One Agent", order=1,
-                 status=("in_cinema",), movie_id="b"),
-        ]
-        d = render_digest(hits, site_url="https://x.test/")
-        for part in (d["html"], d["text"]):
-            in_cinema_idx = part.index("In Cinema")
-            self.assertGreater(part.index("Rank One Agent"), in_cinema_idx)
-            self.assertGreater(part.index("Rank Two Agent"), in_cinema_idx)
-            self.assertLess(part.index("Rank One Agent"), part.index("Rank Two Agent"))
-
-    def test_agent_with_no_film_in_a_status_section_is_absent_from_it(self):
-        d = render_digest(self.hits, site_url="https://x.test/")
-        # "Weekend picks" only has films in rental/included_streaming — never in the upcoming
-        # or in_cinema sections.
-        for part in (d["html"], d["text"]):
-            upcoming_to_rent = part[part.index("Upcoming"):part.index("Rent (~$7)")]
-            self.assertNotIn("Weekend picks", upcoming_to_rent)
-
-    def test_multi_member_status_lands_in_the_furthest_along_section_only(self):
-        hit = _hit("Almost Home", "hits_stream", "Weekend picks", services=["Stan"],
-                    status=("in_cinema", "rental"), movie_id="5")
-        d = render_digest([hit], site_url="https://x.test/")
-        for part in (d["html"], d["text"]):
-            self.assertIn("Rent (~$7)", part)
-            self.assertNotIn("In Cinema", part)
-
-    def test_empty_sections_are_omitted(self):
-        d = render_digest([_hit("Only Upcoming", "hits_cinema", "Some Agent",
-                                 status=("upcoming",))], site_url="https://x.test/")
-        for part in (d["html"], d["text"]):
-            self.assertNotIn("Stream (included)", part)
-            self.assertNotIn("Rent (~$7)", part)
-
-    def test_unresolvable_status_is_not_dropped(self):
-        hit = _hit("No Known Window", "hits_cinema", "Some Agent", status=())
-        d = render_digest([hit], site_url="https://x.test/")
-        for part in (d["html"], d["text"]):
-            self.assertIn("No Known Window", part)
+class RenderingIsDeterministicTests(unittest.TestCase):
+    def test_same_input_same_output(self):
+        hits = [_hit("Warfare", "hits_cinema", cascade="Cinema date night")]
+        d1 = render_digest(hits, site_url="https://example.test/app/", today=TODAY)
+        d2 = render_digest(hits, site_url="https://example.test/app/", today=TODAY)
+        self.assertEqual(d1, d2)
 
 
 class SendViaResendTests(unittest.TestCase):

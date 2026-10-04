@@ -1043,11 +1043,11 @@ test("CAS-670 AC4: a hard reload on a signed-in device never surfaces a firstFou
   disownFilms([film]);
 });
 
-// ---- MOVING OPENS PINNED TO 2 WEEKS (CAS-848), AND THE BADGE COUNTS THE SAME WINDOW THE SCREEN SHOWS
+// ---- MOVING OPENS PINNED TO TODAY (CAS-1197), AND THE BADGE COUNTS THE SAME WINDOW THE SCREEN SHOWS
 // (CAS-668) --------------------------------------------------------------------------------------------
 // CAS-671 removed "Since you last looked" and the visit-cutoff it depended on, opening instead on the
-// shortest window holding 3+ rows. CAS-848 replaced that auto-pick outright: Moving now always opens
-// pinned to 2 weeks, with no prior state and no row-count dependence — see the AC4 test below.
+// shortest window holding 3+ rows. CAS-848 then pinned it to 2 weeks; CAS-1197 repinned it to Today —
+// still no prior state and no row-count dependence — see the AC4 test below.
 // movingWindowRows(win) is still the one recipe both renderMovingScreen and movingUnseenCount read
 // through, so the badge and the list can never disagree about the window.
 const daysAgoISO = n => new Date(Date.now() - n * 864e5).toISOString();
@@ -1088,20 +1088,20 @@ test("CAS-869 AC6: the 200-events sentence is gone — Moving's status nav takes
     "the 200-row ledger fetch cap predicate itself must be unchanged — only the sentence is gone");
 });
 
-test("CAS-848 AC4: openMovingScreen always opens pinned to 2 weeks, with no prior state", () => {
+test("CAS-1197 AC3: openMovingScreen always opens pinned to Today, with no prior state", () => {
   // 9 rows all aged 20 days — under CAS-671's old row-count auto-pick this would have opened on Month.
-  // The new behaviour must ignore row distribution entirely and always land on 2 weeks.
+  // The new behaviour must ignore row distribution entirely and always land on Today.
   const films = unwatchedFilms(9);
   assert.equal(films.length, 9, "sanity: needs 9 distinct unwatched films to seed this scenario");
   seedFirstFound(films, 20);
 
   E.openMovingScreen();
-  assert.equal(E.movingWindow, "2weeks", "openMovingScreen must always land on 2 weeks, regardless of row age/count");
+  assert.equal(E.movingWindow, "today", "openMovingScreen must always land on Today, regardless of row age/count");
   E.closeMovingScreen();
 
-  // Reopening with the same, unchanged data must land on 2 weeks again.
+  // Reopening with the same, unchanged data must land on Today again.
   E.openMovingScreen();
-  assert.equal(E.movingWindow, "2weeks", "reopening with no data change must still land on 2 weeks");
+  assert.equal(E.movingWindow, "today", "reopening with no data change must still land on Today");
   E.closeMovingScreen();
 
   unseedFirstFound(films);
@@ -1115,7 +1115,8 @@ test("CAS-668: rendering a window does not clear the unseen state of rows outsid
   seedFirstFound([filmA], 20);   // aged 20 days — inside month only, outside 2weeks
 
   E.openMovingScreen();
-  assert.equal(E.movingWindow, "2weeks", "sanity: Moving always opens on 2 weeks now");
+  E.setMovingWindow("2weeks");
+  assert.equal(E.movingWindow, "2weeks", "sanity: switched to the 2 weeks window");
   const { shownRows } = E.movingWindowRows("2weeks");
   const shownIds = shownRows.map(r => r.filmId);
   assert.ok(shownIds.includes(idB) && !shownIds.includes(idA), "sanity: filmB is in the 2 weeks window, filmA is not");

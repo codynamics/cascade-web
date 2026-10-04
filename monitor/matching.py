@@ -37,6 +37,8 @@ from .transitions import Transition, _STATUS_MOMENTS, _detail_for
 _SHIM_PATH = Path(__file__).resolve().parent / "admit_shim.mjs"
 # CAS-1097: placement_shim.mjs, invoked once per monitor run by compute_auto_placements() below.
 _PLACEMENT_SHIM_PATH = Path(__file__).resolve().parent / "placement_shim.mjs"
+# CAS-1196: score_shim.mjs, invoked once per monitor run by compute_scores() below.
+_SCORE_SHIM_PATH = Path(__file__).resolve().parent / "score_shim.mjs"
 
 
 @dataclass
@@ -49,9 +51,11 @@ class Hit:
     # CAS-244: which channels THIS agent will accept, read from criteria.channelsLive. None means the agent
     # predates the setting and takes whatever the account allows — the behaviour it already had.
     channels: Optional[dict] = None
-    # CAS-849: this cascade's own _rank_key() tuple, carried on the hit so the digest can order its
-    # agent sections without re-deriving rank from a cascade row it doesn't have. None for a hit with
-    # no cascade (a per-film Watch it tick) — it never sorts by rank, see emailer._agent_sections.
+    # CAS-849: this cascade's own _rank_key() tuple. CAS-1196 retired the digest's old rank-ordered
+    # agent sections (the email now orders by Cascade score instead — see emailer._ordered_by_score),
+    # so this is unread there now; kept for any other caller that still wants a hit's owning agent's
+    # rank without re-deriving it from a cascade row it doesn't have. None for a hit with no cascade
+    # (a per-film Watch it tick).
     rank: Optional[tuple] = None
 
     def wants(self, channel: str) -> bool:
@@ -269,6 +273,34 @@ def compute_auto_placements(agent_films: list, cascades: list, today_movies: lis
         if window:
             out[(user_id, movie_id)] = window
     return out
+
+
+def compute_scores(movie_ids) -> dict:
+    """CAS-1196: ask the shipped engine, ONCE, for the Cascade score of every film named in
+    `movie_ids` — the same question cascadeScore(m) answers for the app's own card (see
+    score_shim.mjs). Same reasoning as compute_admission()/compute_auto_placements() above: the
+    digest's score chip must read the exact figure the app would show, never a second hand-ported
+    guess at it.
+
+    movie_ids : an iterable of movie_id strings — every film any hit in this run's digests might
+                show a score chip for.
+
+    Returns {movie_id str: int|None} — None for a film the shipped catalogue doesn't score yet
+    (cascadeScore's own -1 "no score" answer), never a fabricated number.
+    """
+    ids = sorted({str(mid) for mid in movie_ids})
+    if not ids:
+        return {}
+    proc = subprocess.run(
+        ["node", str(_SCORE_SHIM_PATH)], input=json.dumps({"movieIds": ids}), capture_output=True,
+        text=True, encoding="utf-8", timeout=120,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"score_shim.mjs failed (exit {proc.returncode}): {proc.stderr.strip()}")
+    try:
+        return json.loads(proc.stdout)
+    except json.JSONDecodeError as err:
+        raise RuntimeError(f"score_shim.mjs produced invalid JSON: {err}\n{proc.stdout[:500]}") from err
 
 
 def synthesize_auto_watch_rows(auto_placements: dict, placed_keys: set) -> list:

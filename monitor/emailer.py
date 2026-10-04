@@ -1,12 +1,13 @@
-"""Render + send the digest email (CAS-86 / spec 26771457 §6).
+"""Render + send the digest email (CAS-86 / spec 26771457 §6; redesigned by CAS-1196).
 
-One consolidated email per user per run. Each item names the film, its transition in the
-agent's voice, which Cascade caught it, and links back to the site.
+One consolidated email per user per run: one card per film — poster, a real-dated event pill, the
+film's Cascade score, which agent caught it, and "when will you watch it?" buttons that answer
+themselves (see `?answer=` in app_template.html) — plus the invite-replies block (CAS-887),
+unchanged by this redesign.
 
-Honesty guardrail (spec §5/§6): every line is built from real data only. Prices are the real
-offer price; service names are the real services; the "past opening weekend" line states the
-plain fact (the opening weekend has passed) with no invented "leaving soon" countdown. We never
-show a saving, a timer, or an urgency we can't back up.
+Honesty guardrail (spec §5/§6): every line is built from real data only. Prices are the real offer
+price; service names are the real services; dates are the film's own real dates (never a bare
+relative word); a film with no Cascade score yet shows no chip, never a fabricated one.
 
 ``send_via_resend`` posts to the Resend API with the ``RESEND_API_KEY`` secret read from the
 environment (never hardcoded). ``--dry-run`` in the CLI renders the HTML and sends nothing.
@@ -20,8 +21,8 @@ import os
 import urllib.error
 import urllib.request
 
-# Same monotonic tier order poc_pipeline itself uses to decide a film's `status` — reused here
-# only to pick which window is CURRENT for the invite-replies block, never to re-derive it.
+# Same monotonic tier order poc_pipeline itself uses to decide a film's `status` — reused here to
+# find a film's current window (for grouping, pill colour and button choice), never to re-derive it.
 from poc_pipeline import AVAILABILITY_TIERS, tier_rank
 
 USER_AGENT = "cascade-monitor/1.0 (+https://cascademovies.com)"
@@ -38,6 +39,9 @@ DEFAULT_FROM = "Cascade <onboarding@resend.dev>"
 SITE_URL_ENV = "CASCADE_SITE_URL"
 FROM_ENV = "CASCADE_EMAIL_FROM"
 
+# Cards show at most this many films; the rest get one "and N more" line (CAS-1196 item 6).
+MAX_CARDS = 5
+
 
 def _money(value):
     try:
@@ -46,254 +50,93 @@ def _money(value):
         return None
 
 
-def moment_phrase(transition) -> str:
-    """The agent-voice line for one transition — built only from real data on the transition."""
-    m = transition.moment
-    services = [s for s in (transition.services or []) if s]
-    if m == "hits_stream":
-        return "Now on " + " / ".join(services) if services else "Now streaming — included on your subscription"
-    if m == "hits_rent":
-        price = _money(transition.price)
-        where = (" on " + " / ".join(services)) if services else ""
-        return (f"Dropped to rent — {price}{where}" if price
-                else f"Now available to rent{where}")
-    if m == "hits_pvod":
-        price = _money(transition.price)
-        where = (" on " + " / ".join(services)) if services else ""
-        return (f"Out early on premium — {price}{where}" if price
-                else f"Out early on premium{where}")
-    if m == "hits_cinema":
-        return "In cinemas now"
-    if m == "past_opening_weekend":
-        return "Past its opening weekend"
-    if m == "announced":
-        return "Newly announced"
-    if m == "opens_soon":
-        return "In cinemas next week"
-    if m == "newly_qualifies":
-        return "Now matches this agent"
-    if m == "new_to_agent":
-        return "New to this agent"
-    return m
+def _date_of(value):
+    """A real `date`, or None for anything that isn't one (honesty guardrail — never a placeholder)."""
+    if not value:
+        return None
+    try:
+        return _dt.date.fromisoformat(str(value)[:10])
+    except (ValueError, TypeError):
+        return None
 
 
-# A short, honest sub-line per moment (no invented urgency).
-_MOMENT_NOTE = {
-    "hits_stream": "You can watch it now at no extra cost.",
-    "hits_pvod": "It's available at home early, at the premium price.",
-    "hits_rent": "It's reached the standard rental window.",
-    "hits_cinema": "Its cinema run has begun.",
-    "past_opening_weekend": "The opening weekend has passed — often a quieter time to see it.",
-    # CAS-242. "Reached Cascade", not "was announced by the studio": nobody publishes an announcement date,
-    # so this line says the thing we actually know instead of the thing it would be nicer to claim.
-    "announced": "It has just reached Cascade, and it matches what you asked for.",
-    "opens_soon": "Its published opening date is a week away.",
-    "new_to_agent": "It just started matching this agent.",
-    # CAS-849: newly_qualifies has no single cause (a rating crossing the bar, a metacritic score
-    # or award arriving, a genre/age-rating correction) — this states the honest common fact
-    # instead of guessing which one it was.
-    "newly_qualifies": "Something about it changed, and now it matches this agent.",
-}
+def _format_short_date(value) -> str:
+    """'17 Sep' — day-of-month, no leading zero, abbreviated month, no year. Returns "" for anything
+    not a real date, never a placeholder (honesty guardrail)."""
+    d = _date_of(value)
+    return f"{d.day} {d.strftime('%b')}" if d else ""
 
 
-def digest_subject(hits, replies=None) -> str:
-    """CAS-887: a reply is worth opening the email for on its own, so it leads the subject when
-    there are any — built only from the real counts (honesty guardrail), never an invented "someone
-    replied!" urgency line."""
-    replies = replies or []
-    n = len(hits)
-    if replies:
-        r_word = "reply" if len(replies) == 1 else "replies"
-        subject = f"{len(replies)} {r_word} to your invites"
-        if n:
-            subject += f", {n} update{'' if n == 1 else 's'}"
-        return subject
-    return f"Cascade found {n} update{'' if n == 1 else 's'} for you"
-
-
-# moment -> the window it lands the film in, for the "prior -> destination" move line.
-_DEST_WINDOW = {
-    "hits_cinema": "in_cinema",
-    "hits_pvod": "pvod",
-    "hits_rent": "rental",
-    "hits_stream": "included_streaming",
-}
-
-_WINDOW_LABEL = {
-    "upcoming": "Upcoming",
-    "in_cinema": "In cinema",
-    "rental": "Rent",
-    "included_streaming": "Stream",
-    "pvod": "Premium",
-}
-
-
-def _move_phrase(transition) -> str:
-    """'Prior window -> destination window' (e.g. "Upcoming -> In cinema"), only when the
-    transition actually carries a known prior window. Transition does not have that field yet,
-    so this reads it via getattr and returns "" rather than invent one (honesty guardrail)."""
-    prior = getattr(transition, "prior_window", None)
-    dest = _DEST_WINDOW.get(transition.moment)
-    if not prior or dest is None or prior not in _WINDOW_LABEL:
-        return ""
-    return f"{_WINDOW_LABEL[prior]} → {_WINDOW_LABEL[dest]}"
-
-
-def _header_line(transition) -> str:
-    move = _move_phrase(transition)
-    phrase = moment_phrase(transition)
-    return f"{phrase} · {move}" if move else phrase
-
-
-# CAS-849: the app's own agrank tokens (app_template.html ~L79-80) — rank 1 first, repeating the
-# last colour beyond rank 6, exactly as the app's cascadeRankTint()/.agrank-N CSS already does.
-_RANK_COLORS = ["#A78BFF", "#22D3EE", "#F06FB0", "#FFD166", "#7DD3A0", "#9BA5B5"]
-
-
-def _rank_color(index: int) -> str:
-    return _RANK_COLORS[index] if index < len(_RANK_COLORS) else _RANK_COLORS[-1]
-
-
-def _tint(hex_color: str, alpha: float = 0.08) -> str:
-    """A light wash of `hex_color`, mirroring the app's `color-mix(in srgb, var(--rt) 6%, var(--bg))`
-    heading background (app_template.html ~L500-511) in a form email clients actually render."""
-    h = hex_color.lstrip("#")
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    return f"rgba({r},{g},{b},{alpha})"
-
-
-def is_new_moment(moment: str) -> bool:
-    """CAS-849: the shared classification rule — New = the film's first appearance for this agent
-    (`new_to_agent` / `newly_qualifies`); Changed = every other moment. Nothing is both. Mirrors
-    app_template.html's movingIsNewMoment() so the email and the Moving screen never disagree."""
-    return moment in ("new_to_agent", "newly_qualifies")
-
-
-# CAS-924: the app's own LISTING_ORDER/STATUS_LABEL (app_template.html ~L4073-4089), mirrored here
-# so the digest's outer grouping can never disagree with Moving's. opening_week is kept in the order
-# for the same reason it's in the app's — but poc_pipeline.AVAILABILITY_TIERS (the only tiers a
-# monitor-side movie record's `status` can ever hold) has no such member, so that section can never
-# actually populate; it stays listed rather than silently diverging from the app's constant.
-LISTING_ORDER = ["upcoming", "opening_week", "in_cinema", "pvod", "rental", "included_streaming"]
-
-STATUS_LABEL = {
-    "upcoming": "Upcoming",
-    "opening_week": "In Cinema · Opening week",
-    "in_cinema": "In Cinema",
-    "pvod": "Premium/Rent (~$30)",
-    "rental": "Rent (~$7)",
-    "included_streaming": "Stream (included)",
-}
+def _weekday_date(value) -> str:
+    """'Thu 8 Oct' — weekday, day-of-month, no leading zero, abbreviated month, no year (CAS-1196
+    item 2's own date shape, used by every event pill/context that names a real date)."""
+    d = _date_of(value)
+    return f"{d.strftime('%a')} {d.day} {d.strftime('%b')}" if d else ""
 
 
 def _primary_status(movie):
-    """A movie's primary status for grouping — the furthest-along AVAILABILITY_TIERS member its
-    status set holds (poc_pipeline.tier_rank), the same "furthest travelled" reduction the app's
-    own primaryStatus makes. None if the movie carries none of the named tiers."""
+    """A movie's primary status — the furthest-along AVAILABILITY_TIERS member its status set holds
+    (poc_pipeline.tier_rank). None if the movie carries none of the named tiers."""
     tier = tier_rank((movie or {}).get("status") or [])
     return AVAILABILITY_TIERS[tier] if tier >= 0 else None
 
 
-def _status_sections(hits):
-    """CAS-924: the MAJOR grouping — one outer section per film status, in LISTING_ORDER, each
-    holding the hits for that status (still to be split into per-agent sections by _agent_sections).
-    A hit whose movie carries no resolvable status is never dropped — it lands in a final, unlabelled
-    section instead, the outer-grouping equivalent of _agent_sections' own untinted trailing section.
-
-    Returns a list of {"key", "hits"} — "key" is a LISTING_ORDER member, or None for that fallback."""
-    by_status = {}
-    for h in hits:
-        by_status.setdefault(_primary_status(h.transition.movie), []).append(h)
-    sections = [{"key": k, "hits": by_status[k]} for k in LISTING_ORDER if k in by_status]
-    if None in by_status:
-        sections.append({"key": None, "hits": by_status[None]})
-    return sections
+def _window_date(movie, window):
+    """The real date `window` was reached, same resolve-by-window rule _invite_window_text uses:
+    window_dates first, falling back to cinema_date for upcoming/in_cinema (the one date
+    poc_pipeline derives those two windows from). None when the catalogue doesn't carry one."""
+    date_str = (movie.get("window_dates") or {}).get(window)
+    if not date_str and window in ("upcoming", "in_cinema"):
+        date_str = movie.get("cinema_date")
+    return date_str
 
 
-def _agent_sections(hits):
-    """Group hits into per-agent sections (CAS-849), ordered by each cascade's own `rank` — the
-    `_rank_key()` tuple matching.py already computed and carried onto the Hit, not re-derived here.
-    A hit with no cascade (a per-film Watch it tick, cascade_name "Your picks") is grouped into its
-    own final, untinted section instead, in the order those hits first arrived.
-
-    Returns a list of {"name", "color" (None for the untinted trailing sections), "hits"}."""
-    ranked, ranked_order = {}, []
-    other, other_order = {}, []
-    for h in hits:
-        if h.cascade_id is None:
-            key, bucket, order = h.cascade_name, other, other_order
-        else:
-            key, bucket, order = h.cascade_id, ranked, ranked_order
-        entry = bucket.get(key)
-        if entry is None:
-            entry = {"name": h.cascade_name, "rank": h.rank or (float("inf"), "", ""), "hits": []}
-            bucket[key] = entry
-            order.append(key)
-        entry["hits"].append(h)
-
-    sections = sorted((ranked[k] for k in ranked_order), key=lambda e: e["rank"])
-    for i, section in enumerate(sections):
-        section["color"] = _rank_color(i)
-        del section["rank"]
-    for key in other_order:
-        section = other[key]
-        section["color"] = None
-        del section["rank"]
-        sections.append(section)
-    return sections
+# ---- event pill (CAS-1196 item 2) ------------------------------------------------------------------
+# Pill colour follows the window the moment is ABOUT, not the moment name itself — violet for not yet
+# released, green for streaming, amber for rent/buy (the design image's own three colours).
+_EVENT_COLORS = {
+    "violet": ("#7C5CFF", "#F1EEFE"),
+    "green": ("#1A9C5C", "#E6F9EE"),
+    "amber": ("#B06A00", "#FFF2DC"),
+}
+_WINDOW_COLOR_KEY = {
+    "upcoming": "violet", "opening_week": "violet", "in_cinema": "violet",
+    "pvod": "amber", "rental": "amber", "included_streaming": "green",
+}
 
 
-def _row_text(hit, site_url) -> list:
-    t = hit.transition
-    tag = "New" if is_new_moment(t.moment) else "Changed"
-    return [f"  [{tag}] {t.title}", f"    {_header_line(t)}", f"    {site_url}#/film/{t.movie_id}"]
+def _event_pill(transition, movie, today):
+    """(text, colour-key) for one transition's event pill — every date in it is real (honesty
+    guardrail: never a bare relative word like "soon")."""
+    m = transition.moment
+    services = [s for s in (transition.services or []) if s]
+    svc = services[0].upper() if services else ""
+    if m == "opens_soon":
+        return (f"OPENS {_weekday_date(movie.get('cinema_date'))}".rstrip(), "violet")
+    if m == "announced":
+        date = _weekday_date(movie.get("cinema_date"))
+        return ((f"COMING {date}" if date else "NEWLY ANNOUNCED"), "violet")
+    if m == "hits_cinema":
+        return ("IN CINEMAS NOW", "violet")
+    if m == "past_opening_weekend":
+        return ("IN CINEMAS · PAST OPENING WEEKEND", "violet")
+    if m == "hits_pvod":
+        text = f"NOW TO BUY OR RENT · {svc}" if svc else "NOW TO BUY OR RENT"
+        price = _money(transition.price)
+        return ((f"{text} · {price}" if price else text), "amber")
+    if m == "hits_rent":
+        text = f"NOW TO RENT · {svc}" if svc else "NOW TO RENT"
+        price = _money(transition.price)
+        return ((f"{text} · from {price}" if price else text), "amber")
+    if m == "hits_stream":
+        return ((f"NOW STREAMING · {svc}" if svc else "NOW STREAMING"), "green")
+    if m in ("newly_qualifies", "new_to_agent"):
+        window = _primary_status(movie)
+        return ("NEW FOR YOU", _WINDOW_COLOR_KEY.get(window, "violet"))
+    return (m.upper(), "violet")
 
 
-def _row_html(hit, esc, site_url) -> str:
-    t = hit.transition
-    is_new = is_new_moment(t.moment)
-    pill_bg, pill_fg = ("#E6F9EE", "#1A9C5C") if is_new else ("#E8ECFF", "#3B4FE0")
-    note = _MOMENT_NOTE.get(t.moment, "")
-    # CAS-524: same #/film/<id> hash route inviteUrlFor() builds in the app itself (CAS-883 renamed it
-    # from shareUrlFor), so the link
-    # is the real, permanent film page — tapping it on a device with the app installed is what
-    # the universal-link/AASA setup turns into an in-app open instead of a browser tab.
-    film_url = f"{site_url}#/film/{t.movie_id}"
-    return (
-        '<tr><td style="padding:14px 0;border-bottom:1px solid #e6e8ee;">'
-        f'<a href="{esc(film_url)}" style="text-decoration:none;color:inherit;display:block;">'
-        f'<span style="display:inline-block;font-size:11px;font-weight:800;letter-spacing:0.4px;'
-        f'text-transform:uppercase;padding:2px 9px;border-radius:20px;background:{pill_bg};'
-        f'color:{pill_fg};">{"New" if is_new else "Changed"}</span>'
-        f'<div style="font-size:16px;font-weight:600;color:#141A2A;margin-top:6px;">{esc(t.title)}</div>'
-        f'<div style="font-size:14px;color:#4C7DFF;font-weight:600;margin-top:2px;">{esc(_header_line(t))}</div>'
-        + (f'<div style="font-size:13px;color:#6b7280;margin-top:2px;">{esc(note)}</div>' if note else "")
-        + '</a></td></tr>'
-    )
-
-
-def _status_heading_html(key, count, esc) -> str:
-    return (
-        '<tr><td style="padding:16px 0 6px;">'
-        '<span style="font-size:12px;font-weight:800;letter-spacing:0.4px;text-transform:uppercase;'
-        f'color:#8b95a5;">{esc(STATUS_LABEL[key])} ({count})</span></td></tr>'
-    )
-
-
-def _section_heading_html(section, esc) -> str:
-    color = section["color"]
-    if color:
-        style = f'padding:12px 14px;border-radius:12px;border-left:3px solid {color};background:{_tint(color)};'
-        text_style = f'font-size:13px;font-weight:800;letter-spacing:0.3px;color:{color};'
-    else:
-        style = 'padding:12px 14px;border-radius:12px;background:#f4f5f8;'
-        text_style = 'font-size:13px;font-weight:800;letter-spacing:0.3px;color:#4b5563;'
-    return f'<tr><td style="{style}"><span style="{text_style}">{esc(section["name"])}</span></td></tr>'
-
-
-# CAS-887: label per window, for the replies block's second line (design image: "In cinemas 17
-# Sep" / "Upcoming 24 Sep"). Deliberately its own small map rather than emailer.py's _WINDOW_LABEL
-# above — that one reads as half of a "prior -> destination" move, this reads as a plain fact.
+# ---- context line (CAS-1196 item 1: "a context line starting with the agent's name") --------------
 _INVITE_WINDOW_LABEL = {
     "upcoming": "Upcoming",
     "in_cinema": "In cinemas",
@@ -303,39 +146,274 @@ _INVITE_WINDOW_LABEL = {
 }
 
 
-def _format_short_date(value) -> str:
-    """'17 Sep' — day-of-month, no leading zero, abbreviated month, no year (the design image's own
-    date shape). Returns "" for anything not a real date, never a placeholder (honesty guardrail)."""
-    if not value:
-        return ""
-    try:
-        d = _dt.date.fromisoformat(str(value)[:10])
-    except (ValueError, TypeError):
-        return ""
-    return f"{d.day} {d.strftime('%b')}"
-
-
 def _invite_window_text(movie) -> str:
-    """The invited film's CURRENT window + date, e.g. "In cinemas 17 Sep". `movie` is today's
-    catalogue record (or None/{} if the film has since dropped out of the catalogue). Only ever
-    states a date the catalogue actually carries for that window — upcoming/in_cinema fall back to
-    `cinema_date` (the one date poc_pipeline derives those two windows from itself); a home window
-    with no `window_dates` entry shows its label alone rather than inventing a date."""
+    """The film's CURRENT window + date, e.g. "In cinemas 17 Sep" — shared by the invite-replies
+    block and by newly_qualifies/new_to_agent's own context (CAS-1196 item 2: "the film's current
+    window and date"). `movie` is today's catalogue record (or None/{} if it has since dropped out
+    of the catalogue). A home window with no date on file shows its label alone rather than
+    inventing one (honesty guardrail)."""
     if not movie:
         return ""
-    tier = tier_rank(movie.get("status") or [])
-    if tier < 0:
-        return ""
-    window = AVAILABILITY_TIERS[tier]
+    window = _primary_status(movie)
     label = _INVITE_WINDOW_LABEL.get(window)
     if not label:
         return ""
-    date_str = (movie.get("window_dates") or {}).get(window)
-    if not date_str and window in ("upcoming", "in_cinema"):
-        date_str = movie.get("cinema_date")
-    date_text = _format_short_date(date_str)
+    date_text = _format_short_date(_window_date(movie, window))
     return f"{label} {date_text}" if date_text else label
 
+
+def _event_context(transition, movie, today):
+    """The phrase after the agent's name on its context line, or "" for a moment with nothing to
+    add (the line then reads as the agent's name alone)."""
+    m = transition.moment
+    services = [s for s in (transition.services or []) if s]
+    if m == "opens_soon":
+        d = _date_of(movie.get("cinema_date"))
+        if d and today:
+            n = (d - today).days
+            if n > 0:
+                return f"in cinemas in {n} day{'' if n == 1 else 's'}"
+        return "in cinemas soon"
+    if m == "hits_cinema":
+        date = _weekday_date(_window_date(movie, "in_cinema"))
+        return f"since {date}" if date else ""
+    if m == "hits_rent":
+        others = services[1:]
+        return f"also on {' / '.join(others)}" if others else ""
+    if m == "hits_stream":
+        date = _weekday_date(_window_date(movie, "included_streaming"))
+        svc = services[0] if services else ""
+        if svc and date:
+            return f"on {svc} since {date}"
+        return f"since {date}" if date else ""
+    if m in ("newly_qualifies", "new_to_agent"):
+        return _invite_window_text(movie)
+    return ""
+
+
+def _context_line(hit, today) -> str:
+    phrase = _event_context(hit.transition, hit.transition.movie or {}, today)
+    return f"{hit.cascade_name} · {phrase}" if phrase else hit.cascade_name
+
+
+# ---- subject (CAS-1196 item 5) ----------------------------------------------------------------------
+_SUBJECT_PHRASE = {
+    "hits_cinema": "is in cinemas now",
+    "past_opening_weekend": "is in cinemas",
+    "hits_pvod": "is out to buy or rent",
+    "hits_rent": "is now to rent",
+    "hits_stream": "is now streaming",
+    "announced": "is newly announced",
+    "newly_qualifies": "is new for you",
+    "new_to_agent": "is new for you",
+}
+
+
+def _subject_event_phrase(transition, movie, today) -> str:
+    if transition.moment == "opens_soon":
+        d = _date_of(movie.get("cinema_date"))
+        return f"opens {d.strftime('%A')}" if d else "opens soon"
+    return _SUBJECT_PHRASE.get(transition.moment, "has an update")
+
+
+def _score_of(scores, movie_id):
+    return (scores or {}).get(str(movie_id))
+
+
+def _ordered_by_score(hits, scores):
+    """Highest Cascade score first; a hit with no score (None) sorts last — the same "no score sorts
+    last" rule the app's own card list uses. Stable otherwise, so ties keep hit order."""
+    return sorted(hits, key=lambda h: (_score_of(scores, h.transition.movie_id) is None,
+                                        -(_score_of(scores, h.transition.movie_id) or 0)))
+
+
+def digest_subject(hits, replies=None, scores=None, today=None) -> str:
+    """CAS-887: a reply is worth opening the email for on its own, so it leads the subject when
+    there are any — built only from the real counts (honesty guardrail), never an invented "someone
+    replied!" urgency line. CAS-1196: otherwise the subject names the top film (highest Cascade
+    score) and its event, e.g. "Other Mommy opens Thursday — and 2 more"."""
+    replies = replies or []
+    n = len(hits)
+    if replies:
+        r_word = "reply" if len(replies) == 1 else "replies"
+        subject = f"{len(replies)} {r_word} to your invites"
+        if n:
+            subject += f", {n} update{'' if n == 1 else 's'}"
+        return subject
+    if not n:
+        return "Cascade found 0 updates for you"
+    top = _ordered_by_score(hits, scores)[0]
+    phrase = _subject_event_phrase(top.transition, top.transition.movie or {}, today or _dt.date.today())
+    subject = f"{top.transition.title} {phrase}"
+    if n > 1:
+        subject += f" — and {n - 1} more"
+    return subject
+
+
+# ---- "when will you watch it?" buttons (CAS-1196 item 3) --------------------------------------------
+# (value, label, Service-tracking window key to gate on — None means always offered).
+_BUTTON_DEFS = {
+    "pre_release": ("WHEN WILL YOU WATCH IT?", [
+        ("cinema", "At the cinema", "in_cinema"),
+        ("rent", "When it's to rent", "rent"),
+        ("stream", "When it's streaming", "stream"),
+        ("never", "Not interested", None),
+    ]),
+    "home_pay": (None, [
+        ("rent", "Rent it — add to my list", "rent"),
+        ("stream", "Wait for streaming", "stream"),
+        ("never", "Not interested", None),
+    ]),
+    "streaming": (None, [
+        ("stream", "Add to my list", "stream"),
+        ("seen", "Seen it", None),
+        ("never", "Not interested", None),
+    ]),
+}
+_BUCKET_FOR_WINDOW = {
+    "upcoming": "pre_release", "opening_week": "pre_release", "in_cinema": "pre_release",
+    "pvod": "home_pay", "rental": "home_pay",
+    "included_streaming": "streaming",
+}
+# A window absent from the account's watch_windows object reads as its own on-device default
+# (watchPrefsDefaults() in app_template.html) — in_cinema/rent/stream all start ON; only an
+# explicit {"list": false} turns one off.
+_WATCH_WINDOW_DEFAULT_ON = {"in_cinema": True, "rent": True, "stream": True}
+
+
+def _window_tracked(watch_windows, key) -> bool:
+    if key is None:
+        return True
+    entry = (watch_windows or {}).get(key)
+    if entry is None:
+        return _WATCH_WINDOW_DEFAULT_ON.get(key, True)
+    return bool(entry.get("list"))
+
+
+def _buttons_for(movie, movie_id, site_url, watch_windows):
+    """(heading-or-None, [{"value","label","href","primary"}, ...]) for one film, filtered to the
+    windows switched on in the account's Service tracking (CAS-1196 item 3) — "never"/"seen" are
+    never gated. `primary` marks the bucket's own first-defined button (the filled blue one),
+    regardless of which buttons survive the filter."""
+    bucket_key = _BUCKET_FOR_WINDOW.get(_primary_status(movie), "pre_release")
+    heading, defs = _BUTTON_DEFS[bucket_key]
+    buttons = []
+    for i, (value, label, gate) in enumerate(defs):
+        if not _window_tracked(watch_windows, gate):
+            continue
+        buttons.append({"value": value, "label": label, "primary": i == 0,
+                         "href": f"{site_url}?answer={value}#/film/{movie_id}"})
+    return heading, buttons
+
+
+# ---- HTML building blocks --------------------------------------------------------------------------
+
+def _poster_html(movie, esc, title) -> str:
+    poster = movie.get("poster")
+    if poster:
+        src = f"https://image.tmdb.org/t/p/w185{poster}"
+        return (f'<img src="{esc(src)}" width="92" height="138" alt="{esc(title)}" '
+                'style="display:block;width:92px;height:138px;border-radius:10px;object-fit:cover;'
+                'background:#e6e8ee;">')
+    return ('<div style="width:92px;height:138px;border-radius:10px;background:#e6e8ee;">'
+            '</div>')
+
+
+def _meta_line(movie) -> str:
+    parts = []
+    genres = [g for g in (movie.get("genres") or []) if g]
+    if genres:
+        parts.append(", ".join(genres))
+    if movie.get("age_rating"):
+        parts.append(movie["age_rating"])
+    ur = movie.get("wm_user_rating")
+    if isinstance(ur, (int, float)) and ur > 0:
+        parts.append(f"People {ur:.1f}")
+    cs = movie.get("wm_critic_score")
+    if isinstance(cs, (int, float)) and cs > 0:
+        parts.append(f"Critics {int(cs)}")
+    return " · ".join(parts)
+
+
+def _score_chip_html(score, esc) -> str:
+    if score is None:
+        return ""
+    if score >= 85:
+        fg, bg = "#1A9C5C", "#E6F9EE"
+    elif score >= 70:
+        fg, bg = "#3B4FE0", "#E8ECFF"
+    else:
+        fg, bg = "#6b7280", "#F4F5F8"
+    return (f'<span style="display:inline-block;font-weight:800;font-size:13px;padding:2px 9px;'
+            f'border-radius:8px;border:1px solid {fg};color:{fg};background:{bg};">{score}</span>')
+
+
+def _button_html(btn, esc) -> str:
+    if btn["primary"]:
+        style = ("background:#3B5BFF;color:#ffffff;")
+    elif btn["value"] == "never":
+        style = ("background:#FBEAEA;color:#B23B3B;")
+    else:
+        style = ("background:#EEF0F5;color:#141A2A;")
+    style = ("display:inline-block;font-weight:700;font-size:13px;padding:10px 16px;"
+             "border-radius:10px;text-decoration:none;margin:0 8px 8px 0;") + style
+    return f'<a href="{esc(btn["href"])}" style="{style}">{esc(btn["label"])}</a>'
+
+
+def _card_html(hit, esc, site_url, score, watch_windows, today) -> str:
+    t = hit.transition
+    m = t.movie or {}
+    pill_text, color_key = _event_pill(t, m, today)
+    fg, bg = _EVENT_COLORS[color_key]
+    year = m.get("year")
+    year_html = (f' <span style="font-weight:400;color:#8b95a5;font-size:14px;">{esc(year)}</span>'
+                 if year and year != "----" else "")
+    meta = _meta_line(m)
+    heading, buttons = _buttons_for(m, t.movie_id, site_url, watch_windows)
+    film_url = f"{site_url}#/film/{t.movie_id}"
+
+    buttons_html = ""
+    if heading:
+        buttons_html += ('<div style="font-size:12px;font-weight:800;letter-spacing:0.4px;'
+                          f'text-transform:uppercase;color:#8b95a5;margin-top:14px;">{esc(heading)}</div>')
+    buttons_html += '<div style="margin-top:8px;">' + "".join(_button_html(b, esc) for b in buttons) + '</div>'
+
+    score_html = _score_chip_html(score, esc)
+
+    return (
+        '<tr><td style="padding:18px 0;border-bottom:1px solid #e6e8ee;">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+        f'<td width="92" valign="top">{_poster_html(m, esc, t.title)}</td>'
+        '<td valign="top" style="padding-left:14px;">'
+        f'<span style="display:inline-block;font-size:11px;font-weight:800;letter-spacing:0.4px;'
+        f'text-transform:uppercase;padding:3px 10px;border-radius:20px;background:{bg};color:{fg};">'
+        f'{esc(pill_text)}</span>'
+        f'<div style="font-size:17px;font-weight:700;color:#141A2A;margin-top:8px;">{esc(t.title)}{year_html}</div>'
+        + (f'<div style="font-size:13px;color:#4b5563;margin-top:2px;">{esc(meta)}</div>' if meta else "")
+        + (f'<div style="margin-top:6px;">{score_html}</div>' if score_html else "")
+        + f'<div style="font-size:13px;color:#6b7280;margin-top:4px;">{esc(_context_line(hit, today))}</div>'
+        + buttons_html
+        + f'<div style="margin-top:10px;"><a href="{esc(film_url)}" style="font-size:13px;color:#6b48f2;'
+        'font-weight:700;text-decoration:none;">View in Cascade ›</a></div>'
+        '</td></tr></table></td></tr>'
+    )
+
+
+def _card_text(hit, score, today, site_url) -> list:
+    t = hit.transition
+    m = t.movie or {}
+    year = m.get("year")
+    year_s = f" ({year})" if year and year != "----" else ""
+    pill_text, _ = _event_pill(t, m, today)
+    return [
+        f"{t.title}{year_s} — {pill_text}",
+        f"  {_context_line(hit, today)}",
+        f"  {site_url}#/film/{t.movie_id}",
+        "",
+    ]
+
+
+# ---- invite replies (CAS-887) — unchanged by the CAS-1196 redesign ----------------------------------
 
 def _invite_age_text(created_at, now=None) -> str:
     """Mirrors the app's own inviteAgeText (app_template.html) so the digest and the Invites
@@ -366,8 +444,8 @@ def _invite_age_text(created_at, now=None) -> str:
 def format_invite_reply(row: dict, movie=None, now=None) -> dict:
     """One invite_replies row (plus its film's today-catalogue record, if still present) resolved
     into the shape render_digest's `replies` wants — the window text and reply age are computed
-    here so render_digest itself stays a pure formatter, the same division of labour Transition/Hit
-    already have with moment_phrase above."""
+    here so render_digest itself stays a pure formatter, the same division of labour the score
+    lookup (compute_scores, monitor.matching) and the button rules above have."""
     return {
         "to_name": row.get("to_name") or "Someone",
         "answer": row.get("answer"),
@@ -413,87 +491,91 @@ def _replies_block_html(replies, esc) -> str:
     )
 
 
-def render_digest(hits, site_url: str = None, replies=None) -> dict:
-    """Return {'subject', 'html', 'text'} for one user's consolidated digest.
+# ---- the digest itself --------------------------------------------------------------------------
 
-    CAS-924: grouped into outer status sections in LISTING_ORDER (see _status_sections), each
-    holding its own per-agent sections in rank order (see _agent_sections) — the same two levels
-    of grouping as the Moving screen (app_template.html), so the two never disagree about where a
-    film sits. CAS-849: each row tagged New or Changed (see is_new_moment).
+def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_windows=None,
+                  today=None) -> dict:
+    """Return {'subject', 'html', 'text'} for one user's consolidated digest (CAS-1196: one card
+    per film, no status/agent section headings — see the per-film helpers above).
 
-    hits: list of monitor.matching.Hit (all for the same user)."""
+    hits          : list of monitor.matching.Hit (all for the same user).
+    scores        : {movie_id str: int|None} — monitor.matching.compute_scores()'s answer; a film
+                    absent here, or mapped to None, shows no score chip (honesty guardrail).
+    watch_windows : the account's own Service tracking object (user_prefs.watch_windows) — gates
+                    which "when will you watch it?" buttons are offered (item 3). None reads as the
+                    on-device "never touched this" default (every window on).
+    today         : the date "in N days"/subject phrasing is relative to; defaults to today (UTC).
+    """
     site_url = site_url or os.environ.get(SITE_URL_ENV) or DEFAULT_SITE_URL
     replies = list(replies or [])
-    subject = digest_subject(hits, replies)
-    status_sections = _status_sections(hits)
+    scores = scores or {}
+    today = today or _dt.datetime.now(_dt.timezone.utc).date()
+    ordered = _ordered_by_score(hits, scores)
+    subject = digest_subject(ordered, replies, scores=scores, today=today)
+    shown = ordered[:MAX_CARDS]
+    overflow = len(ordered) - len(shown)
     esc = _html.escape
 
     # ---- plain-text part ----
-    # CAS-887: replies lead — added first, ahead of the "Your agents have been watching" section,
-    # which itself only appears when there is a film transition to report (AC2: a replies-only
-    # digest must not claim "here's what changed" over an empty list).
     text_lines = []
     if replies:
         text_lines.extend(_replies_block_text(replies))
-    if status_sections:
-        text_lines.append("Your agents have been watching. Here's today.")
+    if shown:
+        text_lines.append(f"{len(ordered)} film{'' if len(ordered) == 1 else 's'} for you today")
         text_lines.append("")
-        for status_section in status_sections:
-            if status_section["key"] is not None:
-                text_lines.append(f"{STATUS_LABEL[status_section['key']]} ({len(status_section['hits'])})")
-                text_lines.append("")
-            for section in _agent_sections(status_section["hits"]):
-                text_lines.append(section["name"])
-                for h in section["hits"]:
-                    text_lines.extend(_row_text(h, site_url))
-                text_lines.append("")
-    text_lines += [f"Open Cascade: {site_url}",
-                   "You're getting this because Cascade is watching films for you."]
+        for h in shown:
+            text_lines.extend(_card_text(h, _score_of(scores, h.transition.movie_id), today, site_url))
+        if overflow > 0:
+            text_lines.append(f"...and {overflow} more in Cascade: {site_url}")
+            text_lines.append("")
+    text_lines += [
+        f"Change what I'm told: {site_url}",
+        "Cascade only writes when one of your agents has something worth your time.",
+    ]
     text = "\n".join(text_lines)
 
-    # ---- HTML part (inline styles; email-client safe — no <style>, no class=, no display:flex) ----
-    section_html = []
-    for status_section in status_sections:
-        if status_section["key"] is not None:
-            section_html.append(_status_heading_html(status_section["key"], len(status_section["hits"]), esc))
-        for section in _agent_sections(status_section["hits"]):
-            section_html.append(_section_heading_html(section, esc))
-            section_html.extend(_row_html(h, esc, site_url) for h in section["hits"])
+    # ---- HTML part (inline styles; email-client safe — no <style>, no class=, no display:flex/grid) ----
     body_rows = ""
     if replies:
         body_rows += _replies_block_html(replies, esc)
-    if status_sections:
+    if shown:
+        header_text = "1 film for you today" if len(ordered) == 1 else f"{len(ordered)} films for you today"
         body_rows += (
-            '<tr><td style="padding-top:14px;">'
-            '<div style="font-size:15px;color:#141A2A;font-weight:600;">'
-            "Your agents have been watching. Here's today.</div>"
+            '<tr><td style="padding-bottom:4px;">'
+            f'<div style="font-size:20px;font-weight:800;color:#141A2A;">{esc(header_text)}</div>'
+            f'<div style="font-size:13px;color:#6b7280;margin-top:2px;">'
+            f'{esc(_weekday_date(today.isoformat()))} · picked by your agents</div>'
             '</td></tr>'
-            '<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;">'
-            + "".join(section_html) +
-            '</table></td></tr>'
+            '<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+            + "".join(_card_html(h, esc, site_url, _score_of(scores, h.transition.movie_id),
+                                 watch_windows, today) for h in shown)
+            + '</table></td></tr>'
         )
+        if overflow > 0:
+            body_rows += (
+                '<tr><td style="padding-top:12px;">'
+                f'<a href="{esc(site_url)}" style="font-size:14px;color:#6b48f2;font-weight:700;'
+                f'text-decoration:none;">and {overflow} more in Cascade</a></td></tr>'
+            )
     html_doc = (
         '<!doctype html><html><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1"></head>'
         '<body style="margin:0;background:#f4f5f8;'
         'font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">'
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f8;padding:24px 0;">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="background:#f4f5f8;padding:24px 0;">'
         '<tr><td align="center">'
-        '<table role="presentation" width="480" cellpadding="0" cellspacing="0" '
-        'style="max-width:480px;background:#ffffff;border-radius:14px;padding:24px;">'
-        '<tr><td>'
+        '<table role="presentation" width="600" cellpadding="0" cellspacing="0" '
+        'style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;padding:24px;">'
+        '<tr><td style="padding-bottom:10px;">'
         '<div style="font-size:18px;font-weight:700;letter-spacing:1px;color:#7C5CFF;'
         'text-transform:uppercase;">Cascade</div>'
         '</td></tr>'
         + body_rows +
-        '<tr><td style="padding-top:20px;">'
-        f'<a href="{esc(site_url)}" style="display:inline-block;background:#6b48f2;color:#ffffff;'
-        'text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:11px;">'
-        'Open Cascade</a>'
-        '</td></tr>'
-        '<tr><td style="padding-top:18px;font-size:12px;color:#8b95a5;">'
-        'You&rsquo;re getting this because Cascade is watching films for you. '
-        'Every update here is a real change to a film one of your Cascades was watching.'
+        '<tr><td style="padding-top:20px;font-size:12px;color:#8b95a5;">'
+        'Cascade only writes when one of your agents has something worth your time. '
+        f'<a href="{esc(site_url)}" style="color:#6b48f2;font-weight:700;text-decoration:none;">'
+        'Change what I&rsquo;m told</a>'
         '</td></tr>'
         '</table></td></tr></table></body></html>'
     )
