@@ -20184,7 +20184,10 @@ else if(dedupedN)
       const fields={};
       if(known.name!==row.name) fields.name=row.name;
       if(!!known.active!==!!row.active) fields.active=row.active;
-      if(JSON.stringify(known.alert_moments||[])!==JSON.stringify(row.alert_moments)) fields.alert_moments=row.alert_moments;
+      // CAS-1193: alert_moments must compare against the stored knownRaw value, not known — cascadeToRow
+      // always recomputes alert_moments from the current switches, so known.alert_moments is identical to
+      // row.alert_moments by construction and the stale-value comparison could never fire.
+      if(JSON.stringify(knownRaw.alert_moments||[])!==JSON.stringify(row.alert_moments)) fields.alert_moments=row.alert_moments;
       const knownCriteria=Object.assign({}, known.criteria||{}), rowCriteria=Object.assign({}, row.criteria);
       DEFAULTABLE_CASCADE_FIELDS.forEach(({key,flag})=>{ if(c[flag]){ delete knownCriteria[key]; delete rowCriteria[key]; } });
       if(JSON.stringify(knownCriteria)!==JSON.stringify(rowCriteria)) fields.criteria=row.criteria;
