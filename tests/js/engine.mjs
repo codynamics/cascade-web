@@ -326,7 +326,7 @@ if(typeof window.CascadeAuth === "undefined"){
   filmPageCta: (...args) => window.filmPageCta(...args),
   // CAS-668: the badge/list agreement — movingWindowRows is the one recipe both renderMovingScreen and
   // movingUnseenCount filter through, movingBadgeWindow is which window applies right now (live if Moving
-  // is open, predicted — always "2weeks", CAS-848 — if it's not), and openMovingScreen/closeMovingScreen/
+  // is open, predicted — always "today", CAS-1197 — if it's not), and openMovingScreen/closeMovingScreen/
   // setMovingWindow are the real wire code (DOM reads/writes absorbed by the stub, exactly like the rest of
   // this file's wire calls).
   movingWindowRows, movingUnseenCount, movingBadgeWindow, movingInWindow,

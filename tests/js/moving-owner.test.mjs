@@ -437,7 +437,7 @@ test("CAS-858 AC3: the unseen badge count excludes ownerless entries", () => wit
   );
   E.setMovingReady(true);
 
-  // movingBadgeWindow() predicts "2weeks" while Moving is closed (movingIsOpen is false by default here).
+  // movingBadgeWindow() predicts "today" while Moving is closed (movingIsOpen is false by default here).
   assert.equal(E.movingUnseenCount(), 1,
     "AC3: the badge must count only the one owned, un-seen row — the ownerless entry must not contribute");
 }));
