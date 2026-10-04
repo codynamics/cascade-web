@@ -36,7 +36,7 @@ from . import (compute_transitions, DEFAULT_WEEKEND_N, MOMENTS, match, notificat
                render_digest, send_via_resend, excluded_moments,
                prefs_for, excludes_from_prefs, delivery_plan, send_via_apns, push_copy,
                match_film_watches, match_newly_qualified, match_new_to_agent, suppressed_pairs,
-               compute_admission, compute_auto_placements, synthesize_auto_watch_rows,
+               compute_admission, compute_auto_placements, compute_scores, synthesize_auto_watch_rows,
                format_invite_reply)
 from .catalogue import load_catalogue_file, load_today, load_yesterday_from_git
 from .store import FIXTURE_ID_MAX, FIXTURE_ID_MIN, InMemoryStore, store_from_env
@@ -405,6 +405,11 @@ def main(argv=None) -> int:
         print("[monitor] no new alerts for anyone — no email will be sent.")
         return 0
 
+    # CAS-1196: ONE call to the shipped engine for every film any digest might show a score chip
+    # for — never once per film, never once per user (same reasoning as compute_admission() above).
+    digest_movie_ids = {h.transition.movie_id for hits in by_user.values() for h in hits}
+    scores = compute_scores(digest_movie_ids)
+
     # --- one consolidated digest per user ---
     # CAS-185: there are TWO deliveries now, and they have different failure modes.
     #   email  — goes out only if the user asked for it AND we have an address. A failed send
@@ -426,7 +431,8 @@ def main(argv=None) -> int:
         hits = by_user.get(user_id, [])
         reply_pairs = replies_by_user.get(user_id, [])
         replies = [f for _, f in reply_pairs]
-        digest = render_digest(hits, replies=replies)
+        watch_windows = (account_prefs.get(str(user_id)) or {}).get("watchWindows")
+        digest = render_digest(hits, replies=replies, scores=scores, watch_windows=watch_windows)
         pref = prefs_for(prefs, user_id)
         email = pref["email_address"] or store.fetch_user_email(user_id)
         print(f"[monitor] user {user_id} ({email or 'email unknown'}): "
@@ -474,7 +480,9 @@ def main(argv=None) -> int:
         # in-app/push delivery and the ledger write still owed to this user.
         email_ok = False
         if mailable or mail_replies:
-            digest = render_digest(mailable, replies=[f for _, f in mail_replies])  # only what's delivered
+            # only what's delivered
+            digest = render_digest(mailable, replies=[f for _, f in mail_replies], scores=scores,
+                                   watch_windows=watch_windows)
             email_attempted += 1
             try:
                 send_via_resend(email, digest["subject"], digest["html"], digest["text"])

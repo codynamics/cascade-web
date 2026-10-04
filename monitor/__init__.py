@@ -37,6 +37,7 @@ from .matching import (  # noqa: E402
     matches_criteria,
     compute_admission,
     compute_auto_placements,
+    compute_scores,
     synthesize_auto_watch_rows,
     service_ok,
     notification_rows,
@@ -55,7 +56,6 @@ from .matching import (  # noqa: E402
 from .store import InMemoryStore, SupabaseStore, store_from_env  # noqa: E402
 from .emailer import (  # noqa: E402
     render_digest,
-    moment_phrase,
     digest_subject,
     send_via_resend,
     format_invite_reply,
@@ -68,11 +68,12 @@ from .pusher import (  # noqa: E402
 __all__ = [
     "Transition", "compute_transitions", "DEFAULT_WEEKEND_N", "MOMENTS",
     "Hit", "match", "matches_criteria", "compute_admission", "compute_auto_placements",
+    "compute_scores",
     "synthesize_auto_watch_rows", "service_ok", "notification_rows",
     "suppressed_pairs", "pick_overrides", "excluded_moments", "prefs_for", "excludes_from_prefs", "delivery_plan",
     "PREFS_DEFAULT", "match_film_watches", "WINDOW_TO_MOMENT", "match_newly_qualified",
     "match_new_to_agent",
     "InMemoryStore", "SupabaseStore", "store_from_env",
-    "render_digest", "moment_phrase", "digest_subject", "send_via_resend", "format_invite_reply",
+    "render_digest", "digest_subject", "send_via_resend", "format_invite_reply",
     "send_via_apns", "push_copy",
 ]

@@ -408,6 +408,15 @@ if(typeof window.CascadeAuth === "undefined"){
   // CAS-788: setOpinion is wire code too (window-assigned, same pattern as toggleFilmOpt above) — a
   // test drives a real Watched/"not for me" verdict through it rather than poking watched/blocked by hand.
   setOpinion: (id, kind) => window.setOpinion(id, kind),
+  // CAS-1196: pickNever is wire code too (window-assigned, same pattern as toggleFilmOpt/setOpinion
+  // above). filmRouteId/openFilmPage/applyPendingAnswer are plain functions, in reach directly — a
+  // test drives the alert email's answer-param landing (applyPendingAnswer) through the real
+  // function, setting pendingAnswer/location.hash first via the setter/live reference below, exactly
+  // the two things boot itself reads before calling it.
+  pickNever: (id) => window.pickNever(id),
+  filmRouteId, openFilmPage, applyPendingAnswer, watchStepsSegmentsHTML,
+  setPendingAnswer(v){ pendingAnswer = v; },
+  location,
   get watchPrefs(){ return watchPrefs; },
   setWatchPrefs(w){ watchPrefs = w; },
   watchPrefsDefaults,
