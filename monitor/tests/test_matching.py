@@ -1274,5 +1274,86 @@ class AwardsAdmissionTests(unittest.TestCase):
         self.assertIn("9303", admission["c1"]["today"])
 
 
+class AlertsOffGateTests(unittest.TestCase):
+    """CAS-1198 AC4: an agent whose own Alerts switch is off writes alert_moments:[] (app-side) and
+    produces no hit from match, match_newly_qualified or match_new_to_agent. A film the member has
+    given a hand-set Watch On still produces its hit through match_film_watches regardless — that
+    path owes nothing to any agent's criteria or bell (CAS-484)."""
+
+    PREV_RUN_START = _dt.datetime(2026, 7, 16, 20, 0, tzinfo=_dt.timezone.utc)
+
+    def _movie(self, imdb, status=("rental",), tmdb_id=9501, title="Quiet Agent Film", **extra):
+        m = {"tmdb_id": tmdb_id, "title": title, "genres": ["Drama"], "status": list(status),
+             "cinema_date": "2026-01-01", "language": "en", "wm_critic_score": 70,
+             "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}],
+             "wm_user_rating": imdb}
+        m.update(extra)
+        return m
+
+    def _transitions(self):
+        prev = [{"tmdb_id": 9501, "title": "Quiet Agent Film", "status": [], "cinema_date": "2026-01-01",
+                 "offers": []}]
+        today = [self._movie(7.5, status=("rental",))]
+        return compute_transitions(prev, today, RUN_DATE)
+
+    def _cascade(self, alerts_on, updated_at="2026-07-10T00:00:00+00:00"):
+        return [{"id": "c1", "user_id": "u1", "name": "An agent", "active": True,
+                 "alert_moments": [],   # what alertLive()/momentsOf() write app-side when alertsOn is false
+                 "criteria": _criteria(genre=["Drama"], imdb=7.0, alertsOn=alerts_on),
+                 "updated_at": updated_at}]
+
+    def test_match_fires_nothing_when_alert_moments_is_empty(self):
+        ts = self._transitions()
+        cascades = self._cascade(alerts_on=False)
+        admission = _admit(cascades, today=[t.movie for t in ts])
+        hits = match(cascades, ts, admission=admission, film_watches=_auto_placements(cascades, ts))
+        self.assertEqual(hits, {})
+
+    def test_newly_qualified_fires_nothing_when_alert_moments_is_empty(self):
+        prev = [self._movie(6.5)]
+        today = [self._movie(7.5)]
+        cascades = self._cascade(alerts_on=False)
+        admission = _admit(cascades, today=today, yesterday=prev)
+        hits = match_newly_qualified(cascades, prev, today, admission=admission)
+        self.assertEqual(hits, {})
+
+    def test_new_to_agent_fires_nothing_when_the_agents_own_alerts_switch_is_off(self):
+        prev = [self._movie(6.5)]
+        today = [self._movie(7.5)]
+        cascades = self._cascade(alerts_on=False)
+        admission = _admit(cascades, today=today, yesterday=prev)
+        hits = match_new_to_agent(cascades, prev, today, self.PREV_RUN_START, admission=admission)
+        self.assertEqual(hits, {})
+
+    def test_new_to_agent_still_fires_when_alerts_are_on_despite_no_window_alerts(self):
+        # CAS-785's deliberate design, preserved: alert_moments empty because no WINDOW alert is
+        # switched on must not by itself silence this moment — only the agent's OWN Alerts switch does.
+        prev = [self._movie(6.5)]
+        today = [self._movie(7.5)]
+        cascades = self._cascade(alerts_on=True)
+        admission = _admit(cascades, today=today, yesterday=prev)
+        hits = match_new_to_agent(cascades, prev, today, self.PREV_RUN_START, admission=admission)
+        self.assertEqual(len(hits.get("u1", [])), 1)
+
+    def test_new_to_agent_still_fires_when_alerts_on_is_simply_missing(self):
+        # A row the app hasn't yet corrected to carry the new field (CAS-1198 item 2: "existing agents
+        # correct themselves the next time the app boots") must fail open, not silently mute every
+        # pre-existing agent the moment this ticket ships.
+        prev = [self._movie(6.5)]
+        today = [self._movie(7.5)]
+        cascades = self._cascade(alerts_on=False)
+        del cascades[0]["criteria"]["alertsOn"]
+        admission = _admit(cascades, today=today, yesterday=prev)
+        hits = match_new_to_agent(cascades, prev, today, self.PREV_RUN_START, admission=admission)
+        self.assertEqual(len(hits.get("u1", [])), 1)
+
+    def test_match_film_watches_still_fires_regardless_of_the_agents_alerts_switch(self):
+        ts = self._transitions()
+        watches = [{"user_id": "u1", "movie_id": "9501", "windows": ["rent"]}]
+        hits = match_film_watches(watches, ts)
+        self.assertEqual(len(hits.get("u1", [])), 1)
+        self.assertIsNone(hits["u1"][0].cascade_id)
+
+
 if __name__ == "__main__":
     unittest.main()

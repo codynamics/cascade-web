@@ -725,7 +725,10 @@ def match_new_to_agent(cascades: list, prev_movies: list, today_movies: list, pr
 
     Unlike ``newly_qualifies``, this does not ride a window's own moment (``hits_rent`` etc.) — it
     is its own moment, gated only by the global excluded-moments mute, so it can tell a user their
-    agent gained a film even when they have no window alerts switched on for it.
+    agent gained a film even when they have no WINDOW alerts switched on for it. CAS-1198: the
+    agent's own Alerts switch is a separate, stronger mute than any window — read off
+    ``criteria.alertsOn`` (missing counts as on, for a row not yet corrected to carry it) rather
+    than ``alert_moments``, which this function otherwise ignores by design.
 
     previous_run_start : datetime — the start of the run before this one. Missing/unparsable
                          `updated_at` counts as "not proven stable" (fails closed, same caution as
@@ -758,6 +761,8 @@ def match_new_to_agent(cascades: list, prev_movies: list, today_movies: list, pr
             continue
         if "new_to_agent" in muted.get(str(c["user_id"]), set()):
             continue
+        if not (c.get("criteria") or {}).get("alertsOn", True):
+            continue                       # CAS-1198: this agent's own Alerts switch is off
         updated_at = _parse_dt(c.get("updated_at"))
         if updated_at is None or updated_at >= previous_run_start:
             continue                       # edited inside the window, or unprovable -> silent

@@ -389,6 +389,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // decide whether an agent has changed and what its current floor is — exported so a test can compute the
   // exact signature/floor a seeded agent_films row should carry, rather than guessing at internal state.
   cascSigOf, agentFloor,
+  // CAS-1198: newlyAddedCount, exported so a test can assert the agent's "N new" count is untouched by
+  // toggling alertsOn (AC3) rather than re-deriving it by hand.
+  newlyAddedCount,
   // CAS-1097: earnedWindowForScore/autoPlacementFor/autoPlacementForAdmission are recomputeFound's own
   // Watch-On placement arithmetic, extracted into standalone pure functions so the monitor's
   // placement_shim.mjs can ask the exact same question (a frozen admission_score -> the window it earns,

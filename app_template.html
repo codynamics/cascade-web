@@ -10327,6 +10327,12 @@ function normCascade(c, opts){
   // its windows changed, which is the one thing this ticket explicitly rules out.
   c.includeUnrated = !!c.includeUnrated;
   c.paused = !!c.paused;                      // guest mode (CAS-79): saved on-device but not watching/alerting
+  // CAS-1198: the agent's own Alerts switch, reintroduced after CAS-843 removed the last one. Massive
+  // Movies is the one onboarding agent that starts alerting; every other agent — onboarding, preset or
+  // hand-built — starts quiet until the member switches it on by hand. A stored value (true or false)
+  // is never overwritten, so this only ever fills a GAP, the same guess-vs-real-value discipline as
+  // c.kind just below.
+  if(typeof c.alertsOn!=="boolean") c.alertsOn = (c.template==="onb_massive");
   c.budget = c.budget||0;                    // index into BUDGET_BANDS; 0 = Any
   // CAS-288: the Watch-screen Budget FILTER (budgetOK, just above) never reads this — an unknown budget is
   // excluded whenever a band is set, full stop. CAS-747: selScaleMatch (the Mission Movie Budget requirement)
@@ -10922,7 +10928,9 @@ function accountAlertKeysOn(){
 // the agent's voice, and the alert_moments we hand the monitor — reads off this, so they cannot drift
 // apart and start promising an email that will never arrive.
 function alertLive(c,k){
-  return accountAlertKeysOn().has(k) && reachableRows(c).has(k);
+  // CAS-1198: the agent's own Alerts switch outranks the account's window switches and reachability —
+  // off is off, full stop, whatever moment is asked about.
+  return !!c.alertsOn && accountAlertKeysOn().has(k) && reachableRows(c).has(k);
 }
 const liveAlerts = c => Object.keys(ALERT_SHORT).filter(k=>alertLive(c,k));
 // The same fact, said in the agent's voice — what it will actually come back to you about. Read off the same
@@ -11398,6 +11406,7 @@ function commitDraft(){
     selCrowd:draft.selCrowd, selCritScore:draft.selCritScore, selAwards:draft.selAwards,
     selScale:draft.selScale, selBuzz:draft.selBuzz, selOr:draft.selOr,
     awards:draft.awards, cinemaReleaseOnly:draft.cinemaReleaseOnly, myServices:{...draft.myServices},
+    alertsOn:draft.alertsOn,
     excludeWatched:draft.excludeWatched, excludeBlocked:draft.excludeBlocked,
     // CAS-768: occasions travel with the agent. Left out of this whitelist, the Briefing's Occasions
     // spoke appears to work and the tag is discarded the moment Save is pressed — the same failure
@@ -12340,7 +12349,7 @@ const HELP_ARTICLES = [
    body:"Alerts is where Cascade tells you what's happened lately, split into two kinds of row. New is a film's first appearance for a given agent — something it's never found before. Changed is everything else: a film the agent already had, that's now moved to a different window. A film is never counted as both at once.\n\nYou choose how far back to look — Today, Week, 2 weeks or Month — and Alerts shows only what falls inside that window, measured back from right now. Every row names the agent that actually owns the film today, so nothing is shown under an agent that no longer has it."},
   {slug:"notifications", title:"Notifications",
    summary:"Exactly what will reach you, by which channel, and when the daily report runs.",
-   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Service tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
+   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Service tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for Massive Movies and off for every other agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
   {slug:"your-account-and-data", title:"Your account and data",
    summary:"What is stored, where, and how to delete it.",
    body:`Signed out, everything Cascade knows about you — your agents, what you've watched, your preferences — is stored only on this device, in this browser or app install. Nothing about it reaches anywhere else.\n\nSigned in, that same information is mirrored to your account so it's there again on another device you sign into. Signing out doesn't erase it — it's still on your account, waiting for you to sign back in.\n\nDeleting your account is on the Account screen itself: type DELETE to confirm, and it permanently removes your agents, everything they've found for you, what you've marked watched, your invites and friends, your notification history and your sign-in — there's nothing left to undo.${MEMBERSHIP_ENABLED ? " It doesn't cancel an active App Store subscription, which you'll need to manage separately." : ""}`},
@@ -13443,7 +13452,9 @@ function starterCardsHTML(kind){
           <span class="sc-blurb">${esc(s.blurb)}</span>
           <span class="sc-chan">${esc(starterBar(s, kind))} · <b class="sc-match">${n
             ? `${n} film${n===1?"":"s"} now`
-            : `nothing yet — it'll tell you the moment one lands`}</b></span>
+            // CAS-1198: a preset starts with alerts off (same as any agent not built by onboarding), so
+            // this can no longer promise a specific alert — "find", not "tell you".
+            : `nothing yet — it'll keep watching for one`}</b></span>
         </span>
         <span class="sc-arw">›</span>
       </button>`;
@@ -14437,7 +14448,9 @@ function onbSummary(){
   const d=onbApply(), n=onbCount();
   const step=SHARP_STEPS[onbStepKey];
   const lead=(step && step.lead) ? step.lead() : `watches for <b>${onbGenrePhrase()}</b>`;
-  return `📓 <b>${esc(d.name)}</b> ${lead}${onbRatingClause(d)} — <span class="cnt">${n} film${n===1?"":"s"}</span> so far. I'll tell you the moment one lands on a service.`;
+  // CAS-1198: a live promise, not a fixed one — an alerts-off draft (every agent but Massive Movies,
+  // by default) must not claim alerting it will not do.
+  return `📓 <b>${esc(d.name)}</b> ${lead}${onbRatingClause(d)} — <span class="cnt">${n} film${n===1?"":"s"}</span> so far. ${alertPromise(d)}`;
 }
 // ---- CAS-264: the trail — what you have said so far -------------------------------------------------
 // A line has one weakness a hub never had: on step six you cannot see step three. The flow answers that by
@@ -15032,6 +15045,20 @@ function wireCinemaReleaseToggle(){
     onbFlow.barTouched=true; paint(); selRefresh();
   };
 }
+// CAS-1198: the agent's own Alerts switch — same shape and wiring as wireCinemaReleaseToggle just above.
+function wireAlertsOnToggle(){
+  const sw=$("onbAlertsOn"); if(!sw) return;
+  const paint=()=>{
+    const on=!!onbFlow.draft.alertsOn;
+    sw.classList.toggle("on", on);
+    sw.setAttribute("aria-checked", String(on));
+  };
+  paint();
+  sw.onclick=()=>{
+    onbFlow.draft.alertsOn=!onbFlow.draft.alertsOn;
+    onbFlow.barTouched=true; paint();
+  };
+}
 // ---- Taste-baseline accordion (CAS-146) -----------------------------------------------------------
 let tbOpen = null;   // which row is expanded — exactly one, or none
 let tbLangMoreOpen = false;   // CAS-562: whether the langs row's long-tail chips are unfolded
@@ -15438,6 +15465,11 @@ const SHARP_STEPS = {
       // branch), so a rename opens the identical "name" spoke this row used to.
       return `<p class="ossub">Reconfigure this agent here.${nNew ? ` <b>${nNew}</b> newly added film${nNew===1?"":"s"} in its list right now.` : ""}</p>
         ${occasionsCardHTML()}
+        <div class="usec">ALERTS</div>
+        <div class="switch mini" id="onbAlertsOn" role="switch">
+          <span>🔔 Alert me about this agent's films
+            <small style="color:var(--faint)">— by email, in the app and on your phone</small></span>
+          <span class="knob"></span></div>
         <div class="usec">WHAT IT LOOKS FOR</div>
         ${stylesCardHTML()}
         ${msnScoreCardHTML()}
@@ -15463,7 +15495,7 @@ const SHARP_STEPS = {
         ${d.id ? `<div class="osfoot"><button class="osdel" type="button" onclick="briefDelete()">Delete agent</button></div>` : ""}`;
     },
     refresh(){ paintMsnTrack(); },   // CAS-729: keeps the track's own DOM in step with onbRefresh()'s beat
-    wire(){ wireMsnTrack(); wireReqCards(); wireCinemaReleaseToggle(); wireIncludeUnbudgetedToggle(); },
+    wire(){ wireMsnTrack(); wireReqCards(); wireCinemaReleaseToggle(); wireIncludeUnbudgetedToggle(); wireAlertsOnToggle(); },
   },
   // ---- CAS-188 #2: pick an agent --------------------------------------------------------------------
   // The same cards, the same live counts, in the flow's own frame rather than an overlay of their own.
@@ -16768,7 +16800,9 @@ function agentMetrics(c){
 function agentWhoLineText(c){
   const occ=occasionsSummary(c);
   const occText=(occ==="Loading…" || occ==="None yet") ? "" : occ;
-  return [c.who ? WHO_LABELS[c.who] : "", occText].filter(Boolean).join(" · ");
+  // CAS-1198: the agent's own Alerts switch, named at the end of the same line — on only, never a "not
+  // alerting" variant, so the line stays silent for the common (alerts-off) case rather than warning about it.
+  return [c.who ? WHO_LABELS[c.who] : "", occText, c.alertsOn ? "🔔 Alerts on" : ""].filter(Boolean).join(" · ");
 }
 const fmtAgentRate = n => String(Math.round(n));
 function agentMetricsHTML(c){
