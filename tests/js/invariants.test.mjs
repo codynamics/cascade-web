@@ -1743,14 +1743,17 @@ test("CAS-919: condensedShowsScores agrees with the Watchmode two-source rule, o
 // streaming score (qScore) once released. PVOD sits on the streaming side by decision (it is released).
 // CAS-749 superseded the plain isPreRelease dispatch this test used to assert: an in_cinema/opening_week film
 // with a real qScore now blends it with the mapped buzz figure rather than reading pure buzz. This whole-
-// catalogue expectation is rewritten to that three-way rule; the upcoming-only and released-only spot checks
-// below are unaffected by CAS-749 (upcoming never had a qScore to blend, released never had buzz to blend).
+// catalogue expectation is rewritten to that three-way rule; the released-only spot check below is
+// unaffected (released never had buzz to blend).
 // CAS-919: the three-way dispatch is unchanged, but its two terms are now wmCinemaScore/wmQScore (Watchmode)
 // instead of cinemaScore/qScore (OMDb/TMDB) — qScore/cinemaScore survive under their own names but are no
 // longer what cascadeScore reads.
 // CAS-1005: the upcoming/released spot checks below use fixed fixtures, not E.MOVIES.find() — "not
 // isPreRelease" is not the same test as "released" (opening_week is neither), and a live film's cinema
 // date landing on today can flip its primaryStatus out from under a `find()`.
+// CAS-1191: upcoming now follows the exact same blend rule as in_cinema/opening_week (it no longer has a
+// branch of its own) — the upcomingFilm fixture here carries no ratings, so it still reads as wmCinemaScore
+// alone; the blended case is covered by the CAS-1191 tests below.
 test("CAS-695 AC1: the score's basis switches on primaryStatus — cinema (buzz) before release, streaming (Watchmode) after", () => {
   const upcomingFilm = { status: ["upcoming"], wm_popularity_percentile: 50 };
   assert.equal(E.cascadeScore(upcomingFilm), E.wmCinemaScore(upcomingFilm),
@@ -1760,14 +1763,13 @@ test("CAS-695 AC1: the score's basis switches on primaryStatus — cinema (buzz)
   assert.equal(E.cascadeScore(releasedFilm), E.wmQScore(releasedFilm),
     "released film's Cascade score is not its (Watchmode) wmQScore");
 
-  // Whole catalogue: the same three-way dispatch, never a fourth formula.
+  // Whole catalogue: the same blend rule for upcoming/in_cinema/opening_week, never a fourth formula.
   for(const m of E.MOVIES){
     const ps = E.primaryStatus(m);
     let expected;
-    if(ps === "upcoming") expected = E.wmCinemaScore(m);
-    else if(ps === "in_cinema" || ps === "opening_week"){
+    if(ps === "upcoming" || ps === "in_cinema" || ps === "opening_week"){
       const buzz = E.wmCinemaScore(m), q = E.wmQScore(m);
-      expected = q >= 0 ? Math.round((buzz + q) / 2) : buzz;
+      expected = buzz >= 0 && q >= 0 ? Math.round((buzz + q) / 2) : buzz >= 0 ? buzz : q >= 0 ? q : -1;
     } else expected = E.wmQScore(m);
     assert.equal(E.cascadeScore(m), expected, `${m.title}: cascadeScore disagrees with the basis its own status picks`);
   }
@@ -1938,11 +1940,13 @@ test("CAS-749 AC2: an in-cinema film with a Watchmode buzz percentile of 100 and
     Object.assign(film, saved);
   }
 });
-test("CAS-749 AC3: an upcoming film's Cascade score is unaffected — still the mapped Watchmode buzz figure alone", () => {
-  const film = E.MOVIES.find(m => E.primaryStatus(m) === "upcoming" && E.wmCinemaScore(m) >= 0);
-  assert.ok(film, "no scored upcoming film found — this test would prove nothing");
+// CAS-1191: narrowed to an upcoming film with no Watchmode ratings yet (E.wmQScore(m) === -1) — once a film
+// carries any, CAS-1191 blends it in exactly like in_cinema/opening_week (see the CAS-1191 tests below).
+test("CAS-749 AC3: an upcoming film with no ratings yet scores on the mapped Watchmode buzz figure alone", () => {
+  const film = E.MOVIES.find(m => E.primaryStatus(m) === "upcoming" && E.wmCinemaScore(m) >= 0 && E.wmQScore(m) === -1);
+  assert.ok(film, "no scored, unrated upcoming film found — this test would prove nothing");
   assert.equal(E.cascadeScore(film), E.wmCinemaScore(film),
-    `${film.title}: upcoming film's Cascade score should still be the mapped Watchmode buzz figure alone`);
+    `${film.title}: upcoming film with no ratings should score on the mapped Watchmode buzz figure alone`);
 });
 test("CAS-749 AC4: an in-cinema film with no Watchmode critics score still scores on mapped buzz alone", () => {
   const film = E.MOVIES.find(m => E.primaryStatus(m) === "in_cinema" && E.wmQScore(m) === -1 && E.wmCinemaScore(m) >= 0);

@@ -10049,13 +10049,19 @@ const isPreRelease = m => { const ps=primaryStatus(m); return ps==="upcoming" ||
 // CAS-919: Watchmode is Cascade's score, over wmCinemaScore (Watchmode popularity, re-ranked on the AU
 // ladder cohort and quantile-mapped onto wmReleasedScoreVals) and wmQScore (People x10, Critics / META_ADJ).
 // CAS-920 retired the app's last OMDb reads elsewhere, so this was already true everywhere it mattered.
+// CAS-1191: upcoming now follows the exact same blend rule as in_cinema/opening_week — a film that already
+// carries People or Critics ratings (e.g. from an overseas release) is scored on them alongside its buzz,
+// not on buzz alone just because it hasn't opened here yet.
+function _wmCascadeBlend(m){
+  const buzz=wmCinemaScore(m), q=wmQScore(m);
+  if(buzz>=0 && q>=0) return Math.round((buzz+q)/2);
+  if(buzz>=0) return buzz;
+  if(q>=0) return q;
+  return -1;
+}
 function cascadeScore(m){
   const ps=primaryStatus(m);
-  if(ps==="upcoming") return wmCinemaScore(m);
-  if(ps==="in_cinema" || ps==="opening_week"){
-    const buzz=wmCinemaScore(m), q=wmQScore(m);
-    return q>=0 ? Math.round((buzz+q)/2) : buzz;
-  }
+  if(ps==="upcoming" || ps==="in_cinema" || ps==="opening_week") return _wmCascadeBlend(m);
   return wmQScore(m);
 }
 // wmCascadeScore is cascadeScore's own explicit alias, defined identically (CAS-919 AC4: the two are the
@@ -10063,11 +10069,7 @@ function cascadeScore(m){
 // directly rather than only the "Cascade score" label.
 function wmCascadeScore(m){
   const ps=primaryStatus(m);
-  if(ps==="upcoming") return wmCinemaScore(m);
-  if(ps==="in_cinema" || ps==="opening_week"){
-    const buzz=wmCinemaScore(m), q=wmQScore(m);
-    return q>=0 ? Math.round((buzz+q)/2) : buzz;
-  }
+  if(ps==="upcoming" || ps==="in_cinema" || ps==="opening_week") return _wmCascadeBlend(m);
   return wmQScore(m);
 }
 function wmQScoreSourcesText(m){
@@ -10075,12 +10077,15 @@ function wmQScoreSourcesText(m){
   const c = typeof m.wm_critic_score==="number" && m.wm_critic_score>0;
   return p && c ? "People and Critics" : p ? "People only" : c ? "Critics only" : "";
 }
+// CAS-1191: upcoming reads the same way in_cinema/opening_week does — "Buzz and …" with both, "Buzz" with
+// buzz only, the ratings text alone with ratings only.
 function cascadeScoreSourcesText(m){
   const ps=primaryStatus(m);
-  if(ps==="upcoming") return wmBuzzPctlOf(m)!=null ? "Buzz" : "";
-  if(ps==="in_cinema" || ps==="opening_week"){
-    if(wmQScore(m)<0) return wmBuzzPctlOf(m)!=null ? "Buzz" : "";
-    return `Buzz and ${wmQScoreSourcesText(m)}`;
+  if(ps==="upcoming" || ps==="in_cinema" || ps==="opening_week"){
+    const hasBuzz = wmBuzzPctlOf(m)!=null;
+    const qText = wmQScoreSourcesText(m);
+    if(hasBuzz) return qText ? `Buzz and ${qText}` : "Buzz";
+    return qText;
   }
   return wmQScoreSourcesText(m);
 }
@@ -12232,7 +12237,7 @@ const HELP_ARTICLES = [
    body:"An agent isn't a list you build up film by film. It's a standing search: you tell it what you're after — genres, how far back, an age rating, a minimum score — and it keeps watching the whole catalogue for anything that matches, for as long as it exists.\n\nA film doesn't need you to add it. The moment it qualifies — because it's just been released, its score just cleared your bar, or it just reached a window you're tracking — your agent finds it on its own. Edit an agent's settings and the same thing happens immediately: everything already found is re-checked against the new answer, so an agent's list is never something you have to maintain by hand."},
   {slug:"the-score", title:"The score",
    summary:"People and Critics, where each comes from, and that it is one figure on one scale.",
-   body:"Every film in Cascade carries one Cascade score, from 0 to 100 — not two separate numbers you have to weigh against each other.\n\nOnce a film is released — including PVOD, rental and streaming — that score is built from two things: what people who watched it thought (People), and what critics thought (Critics). When both exist, the score blends them; when only one does, the score is that one alone.\n\nBefore a film opens in cinemas there's nothing to review yet, so its score is built from how much it's being talked about instead — its buzz. Once it's in cinemas, real reviews start counting again: if a People or Critics score exists yet, the score blends it in with buzz rather than switching over to it outright. Either way it lands on the same 0-100 scale, so a marker you set once means the same thing whether the film is still upcoming or already out."},
+   body:"Every film in Cascade carries one Cascade score, from 0 to 100 — not two separate numbers you have to weigh against each other.\n\nOnce a film is released — including PVOD, rental and streaming — that score is built from two things: what people who watched it thought (People), and what critics thought (Critics). When both exist, the score blends them; when only one does, the score is that one alone.\n\nBefore a film opens in cinemas there's usually nothing to review yet, so its score is built from how much it's being talked about instead — its buzz. If it already carries a People or Critics score — say, from an overseas release — the score blends that in with buzz rather than running on buzz alone. Once it's in cinemas, the same rule carries on: if a People or Critics score exists, the score blends it in with buzz rather than switching over to it outright. Either way it lands on the same 0-100 scale, so a marker you set once means the same thing whether the film is still upcoming or already out."},
   {slug:"setting-the-bar", title:"Setting the bar",
    summary:"Markers per window, the single admission floor, and that moving a marker re-places films immediately.",
    body:"Each window an agent tracks — Cinema, Premium, Rent, Stream — can carry its own marker: a minimum score for a film to be listed once it reaches that window. But your agent doesn't re-test a film against a fresh marker every time it moves on — it's admitted the moment it clears the lowest marker among every window you're tracking, and stays admitted from there. Markers still decide where a film is placed: the earliest window you've given a marker is where an agent judges a film in, while a later window you're tracking but haven't marked just carries it forward once it's already admitted.\n\nYou can set a window's marker to Off, which lists everything that reaches that window regardless of score. Turning a window off entirely, so it's never tracked at all, isn't something an agent decides for itself — that's set account-wide, in Service tracking.\n\nDrag a marker and Cascade re-checks every film your agent has already found against the new bar straight away — no refresh needed. A film that no longer clears it drops from the agent's list; one that now does appears. (A film you've set Watch On for yourself by hand is protected from this — see “Watch On and overrides”.)"},
