@@ -206,11 +206,33 @@ def _provider_token(key_id: str, team_id: str, auth_key_b64: str) -> str:
     return token
 
 
+def _invalid_token_reason(status: int, body_text: str = "") -> str | None:
+    """CAS-1194: APNs' two ways of saying 'this device token will never work again' — HTTP 410
+    Gone, or HTTP 400 with a JSON body `{"reason": "BadDeviceToken"}` (or `"Unregistered"`).
+    Returns the reason to log and act on, or None for every other status (those are transient/
+    config errors — the token must be retried, not deleted)."""
+    if status == 410:
+        return "Unregistered"
+    if status == 400:
+        try:
+            reason = json.loads(body_text or "{}").get("reason")
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            return None
+        if reason in ("BadDeviceToken", "Unregistered"):
+            return reason
+    return None
+
+
 def send_via_apns(device_token: str, title: str, body: str, badge: int = None,
-                   thread_id: str = None, payload: dict = None, timeout: int = 10) -> bool:
+                   thread_id: str = None, payload: dict = None, timeout: int = 10,
+                   on_invalid_token=None) -> bool:
     """POST one alert push to APNs. Returns True on a 2xx response, False otherwise — including
     when APNS_* is unset (no-op, mirrors emailer.py with no RESEND_API_KEY) or the request
-    itself fails. Never raises: a bad push must not take the rest of the run down with it."""
+    itself fails. Never raises: a bad push must not take the rest of the run down with it.
+
+    CAS-1194: when APNs rejects `device_token` as permanently invalid (410, or 400
+    BadDeviceToken/Unregistered), `on_invalid_token(device_token)` is called (if given) so the
+    caller can delete that row — this function has no store of its own to do it with."""
     global _warned_missing_config
     key_id = os.environ.get(APNS_KEY_ID_ENV)
     team_id = os.environ.get(APNS_TEAM_ID_ENV)
@@ -238,7 +260,12 @@ def send_via_apns(device_token: str, title: str, body: str, badge: int = None,
 
     try:
         token = _provider_token(key_id, team_id, auth_key_b64)
-    except Exception:   # noqa: BLE001 - a malformed .p8 must not crash the run
+    except Exception as err:   # noqa: BLE001 - a malformed .p8 must not crash the run
+        # CAS-1194: this used to be the one silent failure mode among the four below — nothing
+        # printed, so a broken APNS_AUTH_KEY read as "0 push notification(s)" with no clue why.
+        # Exception class + message only, never auth_key_b64 itself (never interpolated below).
+        print(f"[monitor] APNs provider token could not be minted ({type(err).__name__}: {err}) "
+              "— push not sent this run.")
         return False
 
     data = json.dumps(body_obj).encode("utf-8")
@@ -256,11 +283,19 @@ def send_via_apns(device_token: str, title: str, body: str, badge: int = None,
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             if 200 <= resp.status < 300:
                 return True
-            print(f"[monitor] APNs push rejected for a registered device: HTTP {resp.status}.")
+            invalid_reason = _invalid_token_reason(resp.status)
+            suffix = f" ({invalid_reason}) — removing this device token." if invalid_reason else "."
+            print(f"[monitor] APNs push rejected for a registered device: HTTP {resp.status}{suffix}")
+            if invalid_reason and on_invalid_token:
+                on_invalid_token(device_token)
             return False
     except urllib.error.HTTPError as err:
         reason = err.read().decode("utf-8", "replace") if err.fp else ""
-        print(f"[monitor] APNs push rejected for a registered device: HTTP {err.code} {reason}".rstrip())
+        invalid_reason = _invalid_token_reason(err.code, reason)
+        suffix = " — removing this device token." if invalid_reason else ""
+        print(f"[monitor] APNs push rejected for a registered device: HTTP {err.code} {reason}".rstrip() + suffix)
+        if invalid_reason and on_invalid_token:
+            on_invalid_token(device_token)
         return False
     except Exception as err:   # noqa: BLE001 - network failures degrade to "not delivered"
         print(f"[monitor] APNs push failed for a registered device: {err}.")

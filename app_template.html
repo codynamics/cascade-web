@@ -17716,10 +17716,28 @@ async function upsertPushToken(token){
   if(!c || !owner || !token) return;
   try{
     const { error } = await c.from("push_tokens").upsert(
-      [{ user_id:owner, device_token:token, platform:"ios", app_version:(BUILD_INFO||{}).version || null }],
+      [{ user_id:owner, device_token:token, platform:"ios", app_version:(BUILD_INFO||{}).version || null,
+         last_seen_at:new Date().toISOString() }],
       { onConflict:"user_id,device_token" });
     if(error) console.warn("push_tokens upsert", error);
   }catch(e){ console.warn("Cascade: push token upsert failed", e); }
+}
+// CAS-1194: registerPush() only ever runs when the user exercises the in-app toggle — a device
+// that was granted permission on some earlier launch never otherwise refreshes its APNs token
+// (or last_seen_at/app_version) again. PN.checkPermissions() reads the OS's already-decided
+// answer without asking for a new one, so this can run on every native launch with no prompt:
+// granted re-registers silently, anything else (not asked, denied) makes no plugin call at all.
+async function reRegisterPushIfGranted(){
+  try{
+    if(!(typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform())) return false;
+    const PN=Capacitor.Plugins && Capacitor.Plugins.PushNotifications;
+    if(!PN) return false;
+    const perm=await PN.checkPermissions();
+    if(perm.receive!=="granted") return false;
+    PN.addListener("registration", token => upsertPushToken(token && token.value));
+    await PN.register();
+    return true;
+  }catch(e){ console.warn("Cascade: push re-registration failed", e); return false; }
 }
 let pushRegistering=null;
 // Native: the real iOS permission sheet, then a device-token upsert so CAS-465 has somewhere to deliver
@@ -20394,6 +20412,7 @@ else if(dedupedN)
     currentUser = uid();
     try{ localStorage.setItem("cascade_had_account","1"); }catch(e){}
     fireAccountFanout('boot-restore');
+    reRegisterPushIfGranted();   // CAS-1194: keep this device's APNs token fresh, every launch
   }
   // CAS-1108: the "at boot" half of the gate — a direct call, not routed through reconcileOnReturn below, so
   // boot never also re-triggers pollCatalogue/loadUserPrefs/loadRealAlerts a second time.
