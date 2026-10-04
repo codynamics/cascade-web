@@ -678,7 +678,9 @@ test("alerts: Rent ON alone produces hits_rent, and nothing else, for an agent w
     rent: { list: true }, stream: { list: false },
     upcoming: { list: false },
   }, () => {
-    const wholeLadder = E.normCascade({ status: [] });   // [] = every window, CAS-843's "whole ladder" case
+    // alertsOn:true (CAS-1198): this block isolates the ACCOUNT's Where & when switches, not the agent's
+    // own Alerts switch, which defaults off and would otherwise mask every assertion below.
+    const wholeLadder = E.normCascade({ status: [], alertsOn: true });   // [] = every window, CAS-843's "whole ladder" case
     // Joined rather than deep-equalled: arrays built inside the vm realm fail a strict deep-equal against
     // a host array of identical contents (see the "windows" tests below for the same pattern).
     assert.equal(E.CascadeShape.momentsOf(wholeLadder).join(","), "hits_rent");
@@ -702,7 +704,7 @@ test("alerts: Stream ON produces nothing for an agent scoped to Upcoming only â€
     rent: { list: false }, stream: { list: true },
     upcoming: { list: false },
   }, () => {
-    const upcomingOnly = E.normCascade({ status: ["upcoming"] });
+    const upcomingOnly = E.normCascade({ status: ["upcoming"], alertsOn: true });   // CAS-1198, see note above
     assert.equal(E.CascadeShape.momentsOf(upcomingOnly).length, 0,
       "Stream is switched on account-wide, but an Upcoming-only agent has already let Stream go");
   });
@@ -713,14 +715,14 @@ test("alerts: Upcoming's two sub-switches produce announced and opens_soon indep
     rent: { list: false }, stream: { list: false },
     upcoming: { list: true, subs: { announced: true, opens_soon: false } },
   }, () => {
-    assert.equal(E.CascadeShape.momentsOf(E.normCascade({ status: [] })).join(","), "announced");
+    assert.equal(E.CascadeShape.momentsOf(E.normCascade({ status: [], alertsOn: true })).join(","), "announced");   // CAS-1198
   });
   withWatchPrefs({
     in_cinema: { list: false }, premium: { list: false },
     rent: { list: false }, stream: { list: false },
     upcoming: { list: true, subs: { announced: false, opens_soon: true } },
   }, () => {
-    assert.equal(E.CascadeShape.momentsOf(E.normCascade({ status: [] })).join(","), "opens_soon");
+    assert.equal(E.CascadeShape.momentsOf(E.normCascade({ status: [], alertsOn: true })).join(","), "opens_soon");   // CAS-1198
   });
 });
 

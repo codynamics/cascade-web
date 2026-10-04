@@ -55,7 +55,9 @@ test("CAS-1193: a stale stored alert_moments is corrected to the account's curre
   // Default watchPrefs (upcoming list+both subs, in_cinema, rent, stream on; premium off) is exactly the
   // lee+c21 Service tracking state from the ticket, and yields six live moments for a fully-reachable agent.
   E.setWatchPrefs(E.watchPrefsDefaults());
-  const c = E.normCascade({ id, name: "Massive Movies" });
+  // CAS-1198: alertsOn:true — this test is about alert_moments staleness correction, not the new
+  // per-agent Alerts switch, so it opts in explicitly rather than reading the (now off-by-default) guess.
+  const c = E.normCascade({ id, name: "Massive Movies", alertsOn: true });
   E.cascades.length = 0; E.cascades.push(c);
   signIn(E, client);
   const freshRow = E.CascadeShape.cascadeToRow(c);
@@ -90,7 +92,7 @@ test("CAS-1193: a stored alert_moments that already matches the current switches
   const client = makeFakeClient();
   const id = "f0000000-0000-4000-8000-000000000007";
   E.setWatchPrefs(E.watchPrefsDefaults());
-  const c = E.normCascade({ id, name: "Already Correct" });
+  const c = E.normCascade({ id, name: "Already Correct", alertsOn: true });   // CAS-1198, see note above
   E.cascades.length = 0; E.cascades.push(c);
   signIn(E, client);
   const freshRow = E.CascadeShape.cascadeToRow(c);
