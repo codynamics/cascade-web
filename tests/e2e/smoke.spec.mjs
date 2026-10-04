@@ -1820,6 +1820,13 @@ test("CAS-919: the score row reads Watchmode fields as People/Critics, a missing
   await finishFlow(page);
   await toListing(page);
 
+  // CAS-1191: cascadeScore now blends ratings into an upcoming film's score too, so writing
+  // wm_user_rating/wm_critic_score below can move this card's score across the onboarded agent's own
+  // marker and make filmInWatchRows silently drop the patch (CAS-750/CAS-823's "film left the list"
+  // no-op). Force every window's marker to Off first so the floor can never react to the scores this
+  // test is about to set.
+  await page.evaluate(() => { WATCH_LEVEL_KEYS.forEach(k => { cascades[0].watchMarkers[k] = 0; }); });
+
   const cards = page.locator("#groups .card");
   const card = cards.first();
   await expect(card).toBeVisible();
@@ -1861,6 +1868,11 @@ test("CAS-919: a collapsed card's score row has no Cascade cell and no Pop cell,
   await finishFlow(page);
   await toListing(page);
 
+  // CAS-1191: see the sibling People/Critics test above — blending ratings into an upcoming film's score
+  // means the patch below can itself push this card across the onboarded agent's marker, so force every
+  // window's marker to Off first.
+  await page.evaluate(() => { WATCH_LEVEL_KEYS.forEach(k => { cascades[0].watchMarkers[k] = 0; }); });
+
   const cards = page.locator("#groups .card");
   const card = cards.first();
   await expect(card).toBeVisible();
@@ -1896,6 +1908,11 @@ test("CAS-900: collapsed-card score row is 12px/11px type with People/Critics la
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
+
+  // CAS-1191: see the sibling "no Cascade cell and no Pop cell" test above — force every window's
+  // marker to Off so blending ratings into an upcoming film's score can't itself move this card across
+  // the onboarded agent's own marker.
+  await page.evaluate(() => { WATCH_LEVEL_KEYS.forEach(k => { cascades[0].watchMarkers[k] = 0; }); });
 
   const cards = page.locator("#groups .card");
   const card = cards.first();
