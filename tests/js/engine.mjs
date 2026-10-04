@@ -585,6 +585,11 @@ if(typeof window.CascadeAuth === "undefined"){
   pollCatalogue,
   get catalogueHash(){ return catalogueHash; },
   setCatalogueHash(v){ catalogueHash = v; },
+  // CAS-1194: reRegisterPushIfGranted is window-assigned-adjacent (a plain top-level async
+  // function, like upsertPushToken it calls) — exported directly so a test can drive the native
+  // boot-time re-registration path against a stubbed Capacitor global rather than only through
+  // the full boot sequence the DOM stub absorbs.
+  reRegisterPushIfGranted,
 };
 `;
 

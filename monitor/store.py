@@ -16,6 +16,7 @@ Interface:
   fetch_notify_prefs() -> {user_id: {in_app, email_on, email_address, excluded_moments}}  # CAS-185
   fetch_picks() -> [{user_id, movie_id, state, pinned_to, not_in}]                # CAS-185/CAS-925
   fetch_push_tokens() -> {user_id: [device_token, ...]}                                   # CAS-465
+  delete_push_token(device_token) -> int    # drop a permanently-rejected device token        # CAS-1194
   fetch_unread_counts() -> {user_id: int}                                                 # CAS-465
   fetch_film_watches() -> [{user_id, movie_id, windows, sources}]                # CAS-484/CAS-918
   fetch_watch_notification_keys() -> set[(user_id, movie_id, moment)]  # de-dupe, null-cascade rows
@@ -131,6 +132,13 @@ class InMemoryStore:
         for r in self._push_tokens:
             out.setdefault(str(r.get("user_id")), []).append(r.get("device_token"))
         return out
+
+    def delete_push_token(self, device_token: str) -> int:
+        """CAS-1194: APNs permanently rejected this device token (410/BadDeviceToken) — remove
+        every row for it so it is not retried forever."""
+        before = len(self._push_tokens)
+        self._push_tokens = [r for r in self._push_tokens if r.get("device_token") != device_token]
+        return before - len(self._push_tokens)
 
     def fetch_unread_counts(self) -> dict:
         out: dict = {}
@@ -399,6 +407,22 @@ class SupabaseStore:
         for r in rows:
             out.setdefault(str(r.get("user_id")), []).append(r.get("device_token"))
         return out
+
+    def delete_push_token(self, device_token: str) -> int:
+        """CAS-1194: DELETE every push_tokens row for a device token APNs has permanently
+        rejected (410 Gone, or 400 BadDeviceToken/Unregistered) — service_role, same as every
+        other write here."""
+        req = urllib.request.Request(
+            self._base + f"/push_tokens?device_token=eq.{urllib.parse.quote(device_token)}",
+            headers=self._headers({"Prefer": "return=representation"}),
+            method="DELETE",
+        )
+        with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+            body = resp.read().decode("utf-8")
+        try:
+            return len(json.loads(body))
+        except (json.JSONDecodeError, TypeError):
+            return 0
 
     def fetch_unread_counts(self) -> dict:
         """user_id -> count of unread notifications rows — the same number the in-app bell

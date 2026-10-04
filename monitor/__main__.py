@@ -117,6 +117,18 @@ def _is_int_in_range(value, lo, hi) -> bool:
     return lo <= n <= hi
 
 
+def _delete_push_token(store, device_token: str) -> None:
+    """CAS-1194: APNs told us this device token is permanently dead — remove it so it is not
+    retried forever. Best-effort, same degrade-gracefully convention as _store_call."""
+    fn = getattr(store, "delete_push_token", None)
+    if not callable(fn):
+        return
+    try:
+        fn(device_token)
+    except Exception as err:   # noqa: BLE001 - a delete failure must not abort the run
+        print(f"[monitor] could not delete push token: {err} - it may be retried next run.")
+
+
 def _store_call(store, name, default):
     """Call an optional store method. A store that predates CAS-185 (or a hand-rolled one in a
     test) simply does not have these, and a monitor run must not die over a preference table —
@@ -490,13 +502,25 @@ def main(argv=None) -> int:
         if pushable:
             badge = unread_counts.get(str(user_id), 0) + len(delivered)
             pushed = 0
+            # CAS-1194: a token APNs just declared permanently dead is dropped from the DB and
+            # skipped for the rest of THIS user's hits too, so one bad device doesn't eat a
+            # repeated, pointless APNs round trip per remaining hit in the same run.
+            dead_tokens = set()
             for h in pushable:
                 copy = push_copy(h)
                 payload = {"movie_id": h.transition.movie_id, "moment": h.transition.moment,
                            "cascade_id": h.cascade_id}
                 for tok in tokens:
+                    if tok in dead_tokens:
+                        continue
                     push_attempted += 1
-                    if send_via_apns(tok, copy["title"], copy["body"], badge=badge, payload=payload):
+
+                    def _on_invalid(dead_tok=tok):
+                        dead_tokens.add(dead_tok)
+                        _delete_push_token(store, dead_tok)
+
+                    if send_via_apns(tok, copy["title"], copy["body"], badge=badge, payload=payload,
+                                      on_invalid_token=_on_invalid):
                         pushed += 1
                     else:
                         push_failed += 1

@@ -2,8 +2,11 @@
 
 Run:  python -m unittest monitor.tests.test_pusher
 """
+import io
+import json
 import os
 import unittest
+import urllib.error
 from unittest import mock
 
 from monitor import pusher
@@ -89,6 +92,94 @@ class RejectedPushWarnsVisibly(unittest.TestCase):
         warnings = [c for c in printed.call_args_list if "APNs push rejected" in str(c)]
         self.assertEqual(len(warnings), 1)
         self.assertIn("410", str(warnings[0]))
+
+
+class SilentTokenMintFailureIsLogged(unittest.TestCase):
+    """CAS-1194 AC1: a provider-token mint failure used to be swallowed by a bare
+    `except Exception: return False` with zero output — the one silent path among
+    send_via_apns's four failure modes (the other three each already print a reason). It must
+    now print exactly one line naming the exception class, and never any part of the key
+    material."""
+
+    def setUp(self):
+        self._env_patch = mock.patch.dict(os.environ, {
+            "APNS_KEY_ID": "K1", "APNS_TEAM_ID": "T1",
+            "APNS_AUTH_KEY": "not-real-key-material", "APNS_BUNDLE_ID": "au.com.codynamics.cascade",
+        }, clear=False)
+        self._env_patch.start()
+        self.addCleanup(self._env_patch.stop)
+
+    def test_mint_failure_logs_exception_class_without_key_material(self):
+        with mock.patch.object(pusher, "_provider_token", side_effect=ValueError("bad DER")), \
+             mock.patch("urllib.request.urlopen") as urlopen, \
+             mock.patch("builtins.print") as printed:
+            ok = send_via_apns("device-token", "Title", "Body")
+        self.assertFalse(ok)
+        urlopen.assert_not_called()
+        self.assertEqual(printed.call_count, 1)
+        logged = str(printed.call_args_list[0])
+        self.assertIn("ValueError", logged)
+        self.assertNotIn("not-real-key-material", logged)
+
+
+class InvalidTokenIsLoggedAndHandedBack(unittest.TestCase):
+    """CAS-1194 AC2: APNs' two ways of saying a device token is permanently dead (HTTP 410, or
+    HTTP 400 with a BadDeviceToken/Unregistered body reason) must each name the reason in the
+    log line and call on_invalid_token so the caller can delete that row — never retried
+    forever. A transient error (e.g. HTTP 500) must not trigger either."""
+
+    def setUp(self):
+        self._env_patch = mock.patch.dict(os.environ, {
+            "APNS_KEY_ID": "K1", "APNS_TEAM_ID": "T1",
+            "APNS_AUTH_KEY": "fake-key-not-parsed", "APNS_BUNDLE_ID": "au.com.codynamics.cascade",
+        }, clear=False)
+        self._env_patch.start()
+        self.addCleanup(self._env_patch.stop)
+        self._token_patch = mock.patch.object(pusher, "_provider_token", return_value="fake-jwt")
+        self._token_patch.start()
+        self.addCleanup(self._token_patch.stop)
+
+    def test_410_names_the_reason_and_hands_the_token_back(self):
+        resp = mock.MagicMock()
+        resp.status = 410
+        resp.__enter__.return_value = resp
+        resp.__exit__.return_value = False
+        removed = []
+        with mock.patch("urllib.request.urlopen", return_value=resp), \
+             mock.patch("builtins.print") as printed:
+            ok = send_via_apns("dead-token", "Title", "Body", on_invalid_token=removed.append)
+        self.assertFalse(ok)
+        self.assertEqual(removed, ["dead-token"])
+        warnings = [c for c in printed.call_args_list if "APNs push rejected" in str(c)]
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("Unregistered", str(warnings[0]))
+
+    def test_400_bad_device_token_names_the_reason_and_hands_the_token_back(self):
+        body = json.dumps({"reason": "BadDeviceToken"}).encode("utf-8")
+        err = urllib.error.HTTPError(
+            url="https://api.push.apple.com/3/device/dead-token", code=400,
+            msg="Bad Request", hdrs=None, fp=io.BytesIO(body))
+        removed = []
+        with mock.patch("urllib.request.urlopen", side_effect=err), \
+             mock.patch("builtins.print") as printed:
+            ok = send_via_apns("dead-token", "Title", "Body", on_invalid_token=removed.append)
+        self.assertFalse(ok)
+        self.assertEqual(removed, ["dead-token"])
+        warnings = [c for c in printed.call_args_list if "APNs push rejected" in str(c)]
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("BadDeviceToken", str(warnings[0]))
+
+    def test_transient_error_does_not_trigger_removal(self):
+        resp = mock.MagicMock()
+        resp.status = 500
+        resp.__enter__.return_value = resp
+        resp.__exit__.return_value = False
+        removed = []
+        with mock.patch("urllib.request.urlopen", return_value=resp), \
+             mock.patch("builtins.print"):
+            ok = send_via_apns("live-token", "Title", "Body", on_invalid_token=removed.append)
+        self.assertFalse(ok)
+        self.assertEqual(removed, [])
 
 
 class CopyTemplates(unittest.TestCase):
