@@ -37,6 +37,9 @@ const OUT = path.join(ROOT, "state", "wm_backfill_scoreable.txt");
 // offers/cinema_date/claimedStatus at all) has no such claim, and running deriveStatus's offerless-
 // window fallback over it invents an "upcoming" window deriveStatus was never meant to guess for
 // something that isn't a real movie record yet, which wrongly exempted it from the wmQScore floor.
+// CAS-1191: upcoming now mirrors in_cinema/opening_week's own OR — cinema buzz alone, or a wmQScore
+// that clears the floor — matching cascadeScore's own dispatch (upcoming no longer blends/scores any
+// differently from in_cinema/opening_week once it has ratings).
 export function isScoreable(E, m, floor = 0){
   let ps = E.primaryStatus(m);
   if(ps === "in_cinema" || ps === "opening_week"){
@@ -44,8 +47,7 @@ export function isScoreable(E, m, floor = 0){
     const status = E.deriveStatus({ ...m, claimedStatus });
     ps = E.primaryStatus({ ...m, status });
   }
-  if(ps === "upcoming") return E.wmCinemaScore(m) >= 0;
-  if(ps === "in_cinema" || ps === "opening_week") return E.wmCinemaScore(m) >= 0 || E.wmQScore(m) >= floor;
+  if(ps === "upcoming" || ps === "in_cinema" || ps === "opening_week") return E.wmCinemaScore(m) >= 0 || E.wmQScore(m) >= floor;
   return E.wmQScore(m) >= floor;
 }
 

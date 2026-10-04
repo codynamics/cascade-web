@@ -573,14 +573,26 @@ test("inferred scale: an anticipated film with no budget is placed, not left bla
   }
 });
 
-test("inferred scale: only anticipation is ever read as scale, and only before release", () => {
+test("inferred scale: only anticipation, or CAS-1192's one in-cinema lower bound, is ever read as scale", () => {
   for(const m of E.MOVIES){
-    if(!E.inferredScale(m)) continue;
-    // CAS-169's decision, kept: popularity spikes on availability, so a released film with no money figure
-    // has no scale evidence and must not borrow one.
-    assert.ok(E.isUpcoming(m), `${m.title} is released and was still handed an inferred scale`);
+    const inf = E.inferredScale(m);
+    if(!inf) continue;
     assert.ok(!(m.budget > 0) && !(m.worldwide_gross > 0),
       `${m.title} has real money on it and was inferred anyway — the figure must win`);
+    if(inf.lowerBound){
+      // CAS-1192: the one narrowing of CAS-169 — in cinemas, on general release, in the top buzz bands.
+      const ps = E.primaryStatus(m);
+      assert.ok(ps === "in_cinema" || ps === "opening_week",
+        `${m.title} carries a lower-bound inference but primaryStatus is "${ps}", not in_cinema/opening_week`);
+      assert.ok(m.cinema_release, `${m.title} carries a lower-bound inference without a general cinema release`);
+      const band = E.buzzBandOf(m);
+      assert.ok(band === "blockbuster" || band === "mustsee",
+        `${m.title} carries a lower-bound inference but its buzz band is "${band}", not blockbuster/mustsee`);
+    } else {
+      // CAS-169's decision, kept everywhere else: popularity spikes on availability, so a released film with
+      // no money figure has no scale evidence and must not borrow one.
+      assert.ok(E.isUpcoming(m), `${m.title} is released and was still handed a (non-lower-bound) inferred scale`);
+    }
   }
 });
 
