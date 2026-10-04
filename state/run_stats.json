@@ -1,16 +1,16 @@
 {
-  "date": "2026-10-03",
+  "date": "2026-10-04",
   "tmdb": {
-    "calls": 5904,
+    "calls": 5903,
     "errors": 0,
     "not_found": 0,
     "status_counts": {}
   },
   "watchmode": {
     "quota": 2500,
-    "quota_used": 1164,
-    "remaining_monthly_credits": 1336,
-    "calls": 117,
+    "quota_used": 1281,
+    "remaining_monthly_credits": 1219,
+    "calls": 118,
     "errors": 0,
     "mismatch": 2,
     "mismatch_ids": [
