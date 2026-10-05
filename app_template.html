@@ -4779,7 +4779,11 @@ let pendingDeepLink = DEEPLINK_DESTINATIONS.has(dlParam) ? dlParam : null;
 // (`?answer=<value>#/film/<id>`). Read here, stripped below like ?dl, but APPLIED later —
 // applyPendingAnswer(), called once this device's sign-in state is actually known — because signed
 // out the answer is ignored outright (AC12) and CascadeAuth hasn't run yet at this point in the file.
-const ANSWER_VALUES = new Set(["cinema","rent","stream","never","seen"]);
+// CAS-1201: wow/liked/enjoyed/soso/disliked are literally WATCH_STEPS' own keys (the Watched email
+// column's five buttons), listed by hand rather than derived — WATCH_STEPS itself isn't declared
+// until much further down the file, out of reach of a const this early. A test asserts the two never
+// drift apart.
+const ANSWER_VALUES = new Set(["cinema","rent","stream","never","seen","wow","liked","enjoyed","soso","disliked"]);
 const answerParam = URLQ.get("answer");
 let pendingAnswer = ANSWER_VALUES.has(answerParam) ? answerParam : null;
 if(didReset){
@@ -9706,20 +9710,31 @@ function applyDeepLink(){
 // cinema/rent/stream make the EXACT call a tap on the card's own Watch On control makes (toggleFilmOpt);
 // never clears the card's future ticks (pickNever); seen opens the film with the Watched ramp showing
 // and records no verdict by itself — only the member's own tap on one of its buttons does that.
+// CAS-1201: wow/liked/enjoyed/soso/disliked (WATCH_STEPS' own keys) make the EXACT call the Watched
+// ramp's own buttons make (setOpinion, shared with pickWatch). Both this branch and the cinema/rent/
+// stream one below must SET rather than toggle — toggleFilmOpt/setOpinion are real toggles, so a
+// second open of the same email link would otherwise clear what the first open set. Guard both: only
+// call through when the film doesn't already carry that exact answer.
 function applyPendingAnswer(){
   const value = pendingAnswer; if(!value) return;
   pendingAnswer = null;
+  if(!ANSWER_VALUES.has(value)) return;   // both real call sites already gate on this; belt and braces
   const id = filmRouteId(); if(id==null) return;
   const m = MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
+  const watchedStep = WATCH_STEPS.find(s=>s.key===value);
   if(value==="never"){
     pickNever(id);
     toast(`${m.title} — marked not interested`);
   } else if(value==="seen"){
     openFilmPage(id, true);
     return;
+  } else if(watchedStep){
+    if(opinionOf(id)!==value) setOpinion(id, value);
+    toast(`${m.title} — marked ${watchedStep.lbl}`);
   } else {
     const key = value==="cinema" ? "in_cinema" : value;   // rent/stream already match WATCH_LEVEL_KEYS
-    toggleFilmOpt(id, key);
+    const row = watchLevelsFor(id).find(l=>l.key===key);
+    if(!row || !filmOptOn(id,row)) toggleFilmOpt(id, key);
     const say = value==="cinema" ? "at the cinema" : value==="rent" ? "when it's to rent" : "when it's streaming";
     toast(`${m.title} — you'll watch it ${say}`);
   }

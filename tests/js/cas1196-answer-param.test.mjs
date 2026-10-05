@@ -72,6 +72,83 @@ test("CAS-1196: no pendingAnswer, or no film at the current route, is a silent n
   assert.doesNotThrow(() => E.applyPendingAnswer());
 });
 
+// CAS-1201: the Watched column's five buttons — same ?answer=<value>#/film/<id> link shape as CAS-1196's
+// cinema/rent/stream/never/seen, but landing on the Watched ramp (setOpinion) instead of a Watch On level.
+test("CAS-1201: ANSWER_VALUES' watched values never drift from WATCH_STEPS' own keys", () => {
+  const E = loadEngine();
+  // CAS-1201: WATCH_STEPS is a vm-realm array (loadEngine runs the engine in its own vm.Context) — spread
+  // it into a plain array FIRST, so .map below builds a main-realm array; assert.deepEqual on an array
+  // built straight off the vm realm's own .map fails as "not reference-equal" despite matching content.
+  const watchStepsKeys = [...E.WATCH_STEPS].map(s => s.key).sort();
+  const answerWatchedKeys = [...E.ANSWER_VALUES].filter(v => watchStepsKeys.includes(v)).sort();
+  assert.deepEqual(answerWatchedKeys, watchStepsKeys,
+    "every WATCH_STEPS key must be an accepted answer value, and vice versa");
+});
+
+test("CAS-1201: each Watched answer records that exact verdict, through setOpinion", () => {
+  const E = loadEngine();
+  const used = new Set();
+  for(const step of E.WATCH_STEPS){
+    const m = freshFilmId(E, used);
+    E.location.hash = `#/film/${m.tmdb_id}`;
+    E.setPendingAnswer(step.key);
+    E.applyPendingAnswer();
+    assert.equal(E.opinionOf(m.tmdb_id), step.key,
+      `${step.key} must record the same verdict a tap on the Watched ramp's own "${step.lbl}" step would`);
+  }
+});
+
+test("CAS-1201: opening the same Watched answer link twice leaves the verdict set (setOpinion would otherwise toggle it off)", () => {
+  const E = loadEngine();
+  const m = E.MOVIES[0];
+  E.location.hash = `#/film/${m.tmdb_id}`;
+  E.setPendingAnswer("enjoyed");
+  E.applyPendingAnswer();
+  assert.equal(E.opinionOf(m.tmdb_id), "enjoyed");
+  E.setPendingAnswer("enjoyed");   // simulates opening the email link a second time
+  E.applyPendingAnswer();
+  assert.equal(E.opinionOf(m.tmdb_id), "enjoyed", "a repeat of the same answer must not clear it");
+});
+
+test("CAS-1201: a different Watched answer replaces the film's existing verdict", () => {
+  const E = loadEngine();
+  const m = E.MOVIES[0];
+  E.location.hash = `#/film/${m.tmdb_id}`;
+  E.setPendingAnswer("wow");
+  E.applyPendingAnswer();
+  assert.equal(E.opinionOf(m.tmdb_id), "wow");
+  E.setPendingAnswer("disliked");
+  E.applyPendingAnswer();
+  assert.equal(E.opinionOf(m.tmdb_id), "disliked", "a different answer must replace the old verdict, same as tapping a different ramp step");
+});
+
+test("CAS-1201: an unknown answer value is ignored", () => {
+  const E = loadEngine();
+  const m = E.MOVIES[0];
+  const before = E.opinionOf(m.tmdb_id);
+  E.location.hash = `#/film/${m.tmdb_id}`;
+  E.setPendingAnswer("favourite");   // not in ANSWER_VALUES
+  assert.doesNotThrow(() => E.applyPendingAnswer());
+  assert.equal(E.opinionOf(m.tmdb_id), before, "an unrecognised value must change nothing");
+});
+
+test("CAS-1201: opening the same cinema/rent/stream answer link twice leaves the Watch On tick set", () => {
+  const E = loadEngine();
+  const used = new Set();
+  const cases = [["cinema", "in_cinema"], ["rent", "rent"], ["stream", "stream"]];
+  for(const [answer, levelKey] of cases){
+    const m = freshFilmId(E, used);
+    E.location.hash = `#/film/${m.tmdb_id}`;
+    E.setPendingAnswer(answer);
+    E.applyPendingAnswer();
+    assert.equal(E.notify[m.tmdb_id].wins[levelKey], true);
+    E.setPendingAnswer(answer);   // simulates opening the email link a second time
+    E.applyPendingAnswer();
+    assert.equal(E.notify[m.tmdb_id].wins[levelKey], true,
+      `a repeat ${answer} answer must leave the ${levelKey} Watch On tick set, not toggle it off`);
+  }
+});
+
 test("CAS-1196: filmPageHTML's seen landing shows the Watched ramp, the ordinary page does not", () => {
   const E = loadEngine();
   const m = E.MOVIES[0];
