@@ -105,10 +105,20 @@ def _ec_scalar_from_pkcs8(der: bytes) -> int:
     that OCTET STRING holds an ECPrivateKey = SEQUENCE{version, privateKey OCTET STRING, ...} —
     RFC 5915's second field is `d` itself, always present regardless of the optional trailing
     parameters/publicKey fields."""
+    if b"-----BEGIN" in der:
+        # The secret is documented as "the .p8 file's contents, base64-encoded", which
+        # decodes to PEM text, not DER — strip the armour lines and decode the body.
+        der = base64.b64decode(b"".join(
+            line.strip() for line in der.strip().splitlines()
+            if line.strip() and not line.strip().startswith(b"-----")))
     _, pki_content, _ = _der_read_tlv(der, 0)
     pki_children = _der_children(pki_content)
     ec_der = pki_children[2][1]
-    ec_children = _der_children(ec_der)
+    # ec_der is the whole ECPrivateKey SEQUENCE (tag + length + content). Its fields
+    # are inside the content, so unwrap it first — reading children of the wrapped bytes
+    # returned one element and [1] raised IndexError on every key ever supplied.
+    _, ec_content, _ = _der_read_tlv(ec_der, 0)
+    ec_children = _der_children(ec_content)
     d_bytes = ec_children[1][1]
     return int.from_bytes(d_bytes, "big")
 
