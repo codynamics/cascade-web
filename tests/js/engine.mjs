@@ -164,6 +164,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // watch-list model despite once sitting next to it. YM_SVC/ymSvcOn/ymSvcToggle/ymSvcSetAll/ymWatchedOn/
   // leInnerHTML/leComputeCounts all went with that model.
   WATCH_STEPS,
+  // CAS-1201: ANSWER_VALUES is listed by hand rather than derived from WATCH_STEPS (declared too late in
+  // the file to reach from there) — exported so a test can assert the two never drift apart.
+  ANSWER_VALUES,
   normCascade, showable, primaryStatus, inCinemaWindow, isEstimated, deriveStatus, isUpcoming,
   // CAS-608: exported so a fixture-based test can assert this agrees with poc_pipeline.py's
   // _offerless_window directly, rather than only indirectly through deriveStatus.
