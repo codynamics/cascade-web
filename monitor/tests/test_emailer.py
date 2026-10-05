@@ -17,14 +17,16 @@ from monitor.matching import Hit, _rank_key
 from monitor.transitions import Transition
 
 TODAY = _dt.date(2026, 10, 5)
+_UNSET = object()
 
 
 def _hit(title, moment, cascade="Some Agent", movie_id="1", movie=None, services=None, price=None,
-         order=None):
+         order=None, cascade_id=_UNSET):
     t = Transition(movie_id=movie_id, title=title, moment=moment, services=services or [], price=price,
                    movie=movie or {})
     rank = _rank_key({"criteria": {"order": order}})
-    return Hit(user_id="user-A", cascade_id=f"id-{cascade}", cascade_name=cascade, transition=t, rank=rank)
+    cid = f"id-{cascade}" if cascade_id is _UNSET else cascade_id
+    return Hit(user_id="user-A", cascade_id=cid, cascade_name=cascade, transition=t, rank=rank)
 
 
 class EventPillTests(unittest.TestCase):
@@ -207,7 +209,7 @@ class ButtonTests(unittest.TestCase):
         d = render_digest([hit], site_url="https://x.test/")
         for value in ("cinema", "rent", "stream", "never"):
             self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
-        self.assertIn("WHEN WILL YOU WATCH IT?", d["html"])
+        self.assertIn("WATCH ON", d["html"])
 
     def test_rent_switched_off_removes_the_rent_button(self):
         hit = _hit("Other Mommy", "opens_soon", movie={"status": ["upcoming"]}, movie_id="9")
@@ -218,13 +220,14 @@ class ButtonTests(unittest.TestCase):
         self.assertIn("answer=stream", d["html"])
         self.assertIn("answer=never", d["html"])
 
-    def test_streaming_film_has_three_buttons(self):
+    def test_streaming_film_has_two_buttons(self):
         hit = _hit("Spotlight", "hits_stream", services=["Netflix"],
                    movie={"status": ["included_streaming"]}, movie_id="9")
         d = render_digest([hit], site_url="https://x.test/")
-        for value in ("stream", "seen", "never"):
+        for value in ("stream", "never"):
             self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
         self.assertNotIn("answer=cinema", d["html"])
+        self.assertNotIn("answer=seen", d["html"])
 
     def test_home_pay_film_has_three_buttons(self):
         hit = _hit("Ex Machina", "hits_rent", movie={"status": ["rental"]}, movie_id="9")
@@ -233,6 +236,73 @@ class ButtonTests(unittest.TestCase):
             self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
         self.assertNotIn("answer=cinema", d["html"])
         self.assertNotIn("answer=seen", d["html"])
+
+
+class WatchedColumnTests(unittest.TestCase):
+    """CAS-1202: every card carries the Watched column, unaffected by Service tracking."""
+
+    _WATCHED_VALUES = ("wow", "liked", "enjoyed", "soso", "disliked")
+
+    def test_unreleased_film_has_five_watched_links_in_order(self):
+        hit = _hit("Other Mommy", "opens_soon", movie={"status": ["upcoming"]}, movie_id="9")
+        d = render_digest([hit], site_url="https://x.test/")
+        positions = [d["html"].index(f"https://x.test/?answer={v}#/film/9") for v in self._WATCHED_VALUES]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_rental_film_has_five_watched_links(self):
+        hit = _hit("Ex Machina", "hits_rent", movie={"status": ["rental"]}, movie_id="9")
+        d = render_digest([hit], site_url="https://x.test/")
+        for value in self._WATCHED_VALUES:
+            self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
+
+    def test_streaming_film_has_five_watched_links(self):
+        hit = _hit("Spotlight", "hits_stream", services=["Netflix"],
+                   movie={"status": ["included_streaming"]}, movie_id="9")
+        d = render_digest([hit], site_url="https://x.test/")
+        for value in self._WATCHED_VALUES:
+            self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
+
+    def test_watched_links_survive_every_service_tracking_setting(self):
+        hit = _hit("Other Mommy", "opens_soon", movie={"status": ["upcoming"]}, movie_id="9")
+        d = render_digest([hit], site_url="https://x.test/",
+                          watch_windows={"in_cinema": {"list": False}, "rent": {"list": False},
+                                         "stream": {"list": False}})
+        for value in self._WATCHED_VALUES:
+            self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
+
+    def test_no_rendered_email_contains_answer_seen(self):
+        hits = [
+            _hit("A", "opens_soon", movie={"status": ["upcoming"]}, movie_id="1"),
+            _hit("B", "hits_rent", movie={"status": ["rental"]}, movie_id="2"),
+            _hit("C", "hits_stream", services=["Netflix"], movie={"status": ["included_streaming"]},
+                movie_id="3"),
+        ]
+        d = render_digest(hits, site_url="https://x.test/")
+        self.assertNotIn("answer=seen", d["html"])
+        self.assertNotIn("answer=seen", d["text"])
+
+
+class ContextLineAttributionTests(unittest.TestCase):
+    """CAS-1202: the context line names the sending agent, or says it was the user's own pick."""
+
+    def test_agent_caught_hit_renders_agent_name(self):
+        hit = _hit("Film", "hits_cinema", cascade="Massive Movies", cascade_id="agent-1")
+        d = render_digest([hit], site_url="https://x.test/")
+        self.assertIn("Agent: Massive Movies", d["html"])
+
+    def test_hand_set_hit_renders_your_pick_not_agent(self):
+        hit = _hit("Film", "hits_cinema", cascade="Your picks", cascade_id=None)
+        d = render_digest([hit], site_url="https://x.test/")
+        self.assertIn("Your pick", d["html"])
+        self.assertNotIn("Agent:", d["html"])
+
+    def test_plain_text_part_carries_the_same_wording(self):
+        agent_hit = _hit("Agent Film", "hits_cinema", cascade="Massive Movies", cascade_id="agent-1",
+                         movie_id="1")
+        pick_hit = _hit("Pick Film", "hits_rent", cascade="Your picks", cascade_id=None, movie_id="2")
+        d = render_digest([agent_hit, pick_hit], site_url="https://x.test/")
+        self.assertIn("Agent: Massive Movies", d["text"])
+        self.assertIn("Your pick", d["text"])
 
 
 class OrderingAndOverflowTests(unittest.TestCase):

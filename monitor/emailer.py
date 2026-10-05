@@ -193,7 +193,8 @@ def _event_context(transition, movie, today):
 
 def _context_line(hit, today) -> str:
     phrase = _event_context(hit.transition, hit.transition.movie or {}, today)
-    return f"{hit.cascade_name} · {phrase}" if phrase else hit.cascade_name
+    who = f"Agent: {hit.cascade_name}" if hit.cascade_id else "Your pick"
+    return f"{who} · {phrase}" if phrase else who
 
 
 # ---- subject (CAS-1196 item 5) ----------------------------------------------------------------------
@@ -253,23 +254,32 @@ def digest_subject(hits, replies=None, scores=None, today=None) -> str:
 # ---- "when will you watch it?" buttons (CAS-1196 item 3) --------------------------------------------
 # (value, label, Service-tracking window key to gate on — None means always offered).
 _BUTTON_DEFS = {
-    "pre_release": ("WHEN WILL YOU WATCH IT?", [
-        ("cinema", "At the cinema", "in_cinema"),
-        ("rent", "When it's to rent", "rent"),
-        ("stream", "When it's streaming", "stream"),
-        ("never", "Not interested", None),
+    "pre_release": ("WATCH ON", [
+        ("cinema", "Cinema", "in_cinema"),
+        ("rent", "Rent", "rent"),
+        ("stream", "Stream", "stream"),
+        ("never", "Never", None),
     ]),
-    "home_pay": (None, [
-        ("rent", "Rent it — add to my list", "rent"),
-        ("stream", "Wait for streaming", "stream"),
-        ("never", "Not interested", None),
+    "home_pay": ("WATCH ON", [
+        ("rent", "Rent", "rent"),
+        ("stream", "Stream", "stream"),
+        ("never", "Never", None),
     ]),
-    "streaming": (None, [
-        ("stream", "Add to my list", "stream"),
-        ("seen", "Seen it", None),
-        ("never", "Not interested", None),
+    "streaming": ("WATCH ON", [
+        ("stream", "Stream", "stream"),
+        ("never", "Never", None),
     ]),
 }
+# The Watched column: the app's own five-step Watched scale (WATCH_STEPS in app_template.html), same
+# order, same words, same colours. Each link opens Cascade with that verdict recorded.
+_WATCHED_HEADING = "WATCHED"
+_WATCHED_DEFS = [
+    ("wow", "Wow!", "#0E9F6E"),
+    ("liked", "Watch Again", "#2A9D55"),
+    ("enjoyed", "Enjoyed", "#0E94AB"),
+    ("soso", "So-so", "#6B7280"),
+    ("disliked", "Disliked", "#C26A1B"),
+]
 _BUCKET_FOR_WINDOW = {
     "upcoming": "pre_release", "opening_week": "pre_release", "in_cinema": "pre_release",
     "pvod": "home_pay", "rental": "home_pay",
@@ -304,6 +314,12 @@ def _buttons_for(movie, movie_id, site_url, watch_windows):
         buttons.append({"value": value, "label": label, "primary": i == 0,
                          "href": f"{site_url}?answer={value}#/film/{movie_id}"})
     return heading, buttons
+
+
+def _watched_buttons_for(movie_id, site_url):
+    return [{"value": value, "label": label, "color": color,
+             "href": f"{site_url}?answer={value}#/film/{movie_id}"}
+            for value, label, color in _WATCHED_DEFS]
 
 
 # ---- HTML building blocks --------------------------------------------------------------------------
@@ -349,15 +365,23 @@ def _score_chip_html(score, esc) -> str:
 
 
 def _button_html(btn, esc) -> str:
-    if btn["primary"]:
-        style = ("background:#3B5BFF;color:#ffffff;")
+    if btn.get("color"):
+        style = f"background:#F4F5F8;color:{btn['color']};"
+    elif btn["primary"]:
+        style = "background:#3B5BFF;color:#ffffff;"
     elif btn["value"] == "never":
-        style = ("background:#FBEAEA;color:#B23B3B;")
+        style = "background:#FBEAEA;color:#B23B3B;"
     else:
-        style = ("background:#EEF0F5;color:#141A2A;")
-    style = ("display:inline-block;font-weight:700;font-size:13px;padding:10px 16px;"
-             "border-radius:10px;text-decoration:none;margin:0 8px 8px 0;") + style
+        style = "background:#EEF0F5;color:#141A2A;"
+    style = ("display:block;font-weight:700;font-size:13px;line-height:16px;padding:9px 6px;"
+             "border-radius:9px;text-decoration:none;text-align:center;margin:0 0 6px 0;") + style
     return f'<a href="{esc(btn["href"])}" style="{style}">{esc(btn["label"])}</a>'
+
+
+def _column_html(heading, buttons, esc) -> str:
+    return ('<div style="font-size:11px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;'
+            f'color:#8b95a5;margin-bottom:7px;">{esc(heading)}</div>'
+            + "".join(_button_html(b, esc) for b in buttons))
 
 
 def _card_html(hit, esc, site_url, score, watch_windows, today) -> str:
@@ -372,11 +396,13 @@ def _card_html(hit, esc, site_url, score, watch_windows, today) -> str:
     heading, buttons = _buttons_for(m, t.movie_id, site_url, watch_windows)
     film_url = f"{site_url}#/film/{t.movie_id}"
 
-    buttons_html = ""
-    if heading:
-        buttons_html += ('<div style="font-size:12px;font-weight:800;letter-spacing:0.4px;'
-                          f'text-transform:uppercase;color:#8b95a5;margin-top:14px;">{esc(heading)}</div>')
-    buttons_html += '<div style="margin-top:8px;">' + "".join(_button_html(b, esc) for b in buttons) + '</div>'
+    watched = _watched_buttons_for(t.movie_id, site_url)
+    buttons_html = (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;"><tr>'
+        f'<td width="50%" valign="top" style="padding-right:6px;">{_column_html(heading, buttons, esc)}</td>'
+        f'<td width="50%" valign="top" style="padding-left:6px;">{_column_html(_WATCHED_HEADING, watched, esc)}</td>'
+        '</tr></table>'
+    )
 
     score_html = _score_chip_html(score, esc)
 
@@ -392,10 +418,11 @@ def _card_html(hit, esc, site_url, score, watch_windows, today) -> str:
         + (f'<div style="font-size:13px;color:#4b5563;margin-top:2px;">{esc(meta)}</div>' if meta else "")
         + (f'<div style="margin-top:6px;">{score_html}</div>' if score_html else "")
         + f'<div style="font-size:13px;color:#6b7280;margin-top:4px;">{esc(_context_line(hit, today))}</div>'
-        + buttons_html
         + f'<div style="margin-top:10px;"><a href="{esc(film_url)}" style="font-size:13px;color:#6b48f2;'
         'font-weight:700;text-decoration:none;">View in Cascade ›</a></div>'
-        '</td></tr></table></td></tr>'
+        '</td></tr></table>'
+        + buttons_html
+        + '</td></tr>'
     )
 
 
