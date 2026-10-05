@@ -1,32 +1,40 @@
-"""On-demand notification test harness — orchestration only (CAS-486/CAS-1052).
+"""On-demand notification test harness — orchestration only (CAS-486/CAS-1052/CAS-1203).
 
-Builds a synthetic "yesterday"/"today" catalogue pair from the maintained fixture file
-(tests/fixtures/notify-films.json) with exactly ONE scenario's transition applied, optionally
-cleans up any earlier run's ledger rows for the fixture films first (so the same scenario can be
-run again immediately), then writes the pair to disk and prints where they landed.
+Builds a synthetic "yesterday"/"today" catalogue pair with exactly ONE scenario's transition
+applied, then writes the pair to disk and prints where they landed. CAS-1203: the arm phase now
+tries a REAL film from the live catalogue first — one that one of --target-user's own agents
+would really alert on, caught unaided — and only falls back to the maintained fixture file
+(tests/fixtures/notify-films.json) when nothing in the real catalogue qualifies.
 
 No new engine code: matching, digesting and delivery all stay in the real monitor pipeline
 (compute_transitions/match/render_digest/send_via_resend/send_via_apns via `python -m monitor`),
 so a test run exercises the exact same code path a real day does. This module's own job is
-narrow — synthesise the two catalogue files, and delete the fixture rows a repeat run would
-otherwise collide with.
+narrow — pick/synthesise the two catalogue files, and delete only the ledger rows a run of its
+own created.
 
 CAS-1052: a fixture film matches an agent's real taste criteria only by luck (CAS-486's own
 evidence: a real run against a real account's 6 agents produced zero alerts), so a green harness
-run used to prove nothing. Two changes close that gap, both in this module:
+run used to prove nothing. Two changes closed that gap, both in this module:
 
-  · arm  (the default mode below) also ticks --target-user's per-film Watch-it (film_watch) for
-    the scenario's own window — matching.match_film_watches() honours that independently of any
-    agent's criteria (CAS-484), so the run is guaranteed a match without touching the user's real
-    agents. "announced" has no window-arrival moment (matching.MOMENT_TO_WINDOW never maps to it)
-    so it is left exactly as before — matched only through a real agent, same as CAS-506.
+  · arm (fixture fallback only — CAS-1203's real-film mode never needs this) also ticks
+    --target-user's per-film Watch-it (film_watch) for the scenario's own window —
+    matching.match_film_watches() honours that independently of any agent's criteria (CAS-484),
+    so the run is guaranteed a match without touching the user's real agents. "announced" has no
+    window-arrival moment (matching.MOMENT_TO_WINDOW never maps to it) so it is left exactly as
+    before — matched only through a real agent, same as CAS-506.
   · --verify (a second invocation, AFTER `python -m monitor` has run) tears the temporary tick back
-    down, counts what actually landed in the `notifications` ledger for --target-user (CAS-486's
-    "the ledger IS the in-app delivery", so this number covers every channel that succeeded),
-    reports the run's own email/push attempted-vs-delivered deltas (via the shared runstats.py file
-    `python -m monitor` already writes) and the target user's registered push-token count, and
-    fails the run (non-zero exit) when nothing was recorded — the exact silent-green failure mode
-    this ticket exists to catch.
+    down (fixture mode only — CAS-1203's real-film mode never armed one), counts what actually
+    landed in the `notifications` ledger for --target-user (CAS-486's "the ledger IS the in-app
+    delivery", so this number covers every channel that succeeded), reports the run's own
+    email/push attempted-vs-delivered deltas (via the shared runstats.py file `python -m monitor`
+    already writes) and the target user's registered push-token count, and fails the run
+    (non-zero exit) when nothing was recorded — the exact silent-green failure mode this ticket
+    exists to catch.
+
+CAS-1203: the real film, when one qualifies, is chosen by asking the SAME admission/placement/
+matching code the daily run itself uses (compute_admission/compute_auto_placements/match() —
+never a second, hand-ported guess), so the email it produces has a real poster, names the agent
+that actually caught it, and its buttons open a real film.
 
     python -m monitor.notify_test --scenario hits_cinema --target-user <uuid> \\
         --out-dir /tmp/notify-test
@@ -46,8 +54,14 @@ import sys
 
 import runstats
 
-from .matching import MOMENT_TO_WINDOW
+from poc_pipeline import tier_rank
+
+from .catalogue import load_today
+from .matching import (MOMENT_TO_WINDOW, compute_admission, compute_auto_placements,
+                        compute_scores, excludes_from_prefs, match, suppressed_pairs,
+                        synthesize_auto_watch_rows)
 from .store import FIXTURE_ID_MAX, FIXTURE_ID_MIN, store_from_env
+from .transitions import Transition, _detail_for
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_FIXTURES = os.path.join(_REPO_ROOT, "tests", "fixtures", "notify-films.json")
@@ -60,7 +74,25 @@ SCENARIOS = ("announced", "hits_cinema", "hits_pvod", "hits_rent", "hits_stream"
 # invocations and the intervening `python -m monitor` call already share within one workflow run.
 RUN_STATS_SNAPSHOT_NAME = "run_stats_before.json"
 
+# CAS-1203: the real-film pick this run armed (if any), written by the arm phase and read back by
+# --verify — both live in --out-dir, same as RUN_STATS_SNAPSHOT_NAME above. Absent means this run
+# fell back to the fixture.
+REAL_FILM_STATE_NAME = "real_film_armed.json"
+
 _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
+
+# CAS-1203: the status tier that IS the window each scenario is about — the real-film candidate
+# filter's "it is in the window the scenario is about" test.
+_TARGET_STATUS = {
+    "hits_cinema": "in_cinema", "hits_pvod": "pvod", "hits_rent": "rental",
+    "hits_stream": "included_streaming", "announced": "upcoming",
+}
+# CAS-1203: "moved back one step" — the AVAILABILITY_TIERS rung immediately before each scenario's
+# own target tier, used to build the chosen film's yesterday record. `announced` has none: its
+# film is absent from yesterday entirely (see build_real_catalogues()).
+_STEP_BACK_STATUS = {
+    "hits_cinema": "upcoming", "hits_pvod": "in_cinema", "hits_rent": "pvod", "hits_stream": "rental",
+}
 
 
 def validate_target_user(value) -> str:
@@ -186,6 +218,150 @@ def arm_watch(store, target_user: str, films: list, scenario: str) -> None:
           "independent of this user's real agents.")
 
 
+def _qualifies_status(film: dict, scenario: str) -> bool:
+    """CAS-1203: `film` IS the window `scenario` is about right now — its own status holds the
+    target tier AND nothing ranked higher (via poc_pipeline.AVAILABILITY_TIERS), so "move it back
+    one step" (build_real_catalogues() below) produces a clean, single transition rather than
+    also uncovering a later tier the film has already passed."""
+    status = film.get("status") or []
+    target = _TARGET_STATUS[scenario]
+    if target not in status:
+        return False
+    return scenario == "announced" or tier_rank(status) == tier_rank([target])
+
+
+def _account_prefs_for_user(user_prefs_rows: dict, user_films_rows: list, user_id: str) -> dict:
+    """The one-user slice of the account_prefs shape monitor.__main__.main() builds for the whole
+    run (CAS-825/CAS-1097) — the account facts compute_admission()/compute_auto_placements() read
+    beyond an agent's own criteria."""
+    row = (user_prefs_rows or {}).get(user_id) or {}
+    taste = row.get("taste") or {}
+    film_statuses = [{"movie_id": r.get("movie_id"), "status": r.get("status")}
+                      for r in (user_films_rows or []) if str(r.get("user_id")) == user_id]
+    return {user_id: {
+        "langs": taste.get("langs"),
+        "subServices": row.get("sub_services") or [],
+        "storeServices": row.get("store_services") or [],
+        "filmStatuses": film_statuses,
+        "servicesOnly": bool(row.get("services_only")),
+        "watchWindows": row.get("watch_windows"),
+    }}
+
+
+def find_real_film(store, target_user: str, scenario: str, today_movies: list):
+    """CAS-1203: pick ONE real film from `today_movies` that one of --target-user's own active
+    agents, with this scenario's Alert toggle on, would really catch right now — judged by the
+    SAME admission/placement/matching code the daily run uses (compute_admission(),
+    compute_auto_placements(), match()), never a second hand-ported guess. Returns
+    (pick, reason):
+
+      pick   : None, or {"film": movie dict, "cascade_id", "cascade_name"} for the single
+               qualifying film with the highest Cascade score (matching.compute_scores()).
+      reason : None when `pick` is set; otherwise a short, human-readable explanation of why
+               nothing qualified, for the fallback line AC5 requires.
+
+    A film is never a candidate when it already carries ANY real state on this account — a
+    notifications ledger row for this (cascade, film, scenario), a film_watch row (whatever its
+    windows), or a user_films verdict — the safety rule: this harness must never overwrite or
+    delete anything real. Admission/placement/matching is then asked only of films that already
+    passed that safety filter.
+    """
+    user_cascades = [c for c in store.fetch_active_cascades() if str(c.get("user_id")) == target_user]
+    if not any(scenario in (c.get("alert_moments") or []) for c in user_cascades):
+        return None, f"no agent has the {scenario!r} Alert on for this user"
+
+    already = store.fetch_notification_keys()
+    user_cascade_ids = {c["id"] for c in user_cascades}
+    verdicted = {str(r.get("movie_id")) for r in store.fetch_user_films()
+                 if str(r.get("user_id")) == target_user}
+    watch_ticked = {str(r.get("movie_id")) for r in store.fetch_film_watches()
+                    if str(r.get("user_id")) == target_user}
+
+    candidates = []
+    for film in today_movies:
+        mid = str(film.get("tmdb_id"))
+        if not film.get("poster"):
+            continue
+        if not _qualifies_status(film, scenario):
+            continue
+        if mid in verdicted or mid in watch_ticked:
+            continue
+        if any((cid, mid, scenario) in already for cid in user_cascade_ids):
+            continue
+        candidates.append(film)
+    if not candidates:
+        return None, (f"no unseen film holds the {_TARGET_STATUS[scenario]!r} window with a poster "
+                       "and no existing ledger/Watch-it/verdict row for this user")
+
+    account_prefs = _account_prefs_for_user(store.fetch_user_prefs(), store.fetch_user_films(), target_user)
+    admission = compute_admission(user_cascades, {"today": today_movies}, account_prefs=account_prefs)
+
+    watches = [w for w in store.fetch_film_watches() if str(w.get("user_id")) == target_user]
+    window = MOMENT_TO_WINDOW.get(scenario)
+    if window is not None:
+        agent_films_rows = [r for r in store.fetch_agent_films() if str(r.get("user_id")) == target_user]
+        auto_placements = compute_auto_placements(agent_films_rows, user_cascades, today_movies,
+                                                   account_prefs=account_prefs)
+        placed_keys = {(str(w.get("user_id")), str(w.get("movie_id"))) for w in watches if (w.get("windows") or [])}
+        watches = watches + synthesize_auto_watch_rows(auto_placements, placed_keys)
+
+    muted = excludes_from_prefs(store.fetch_notify_prefs())
+    picks = store.fetch_picks()
+    suppressed = suppressed_pairs(picks)
+
+    qualifying = []
+    for film in candidates:
+        services, price = _detail_for(scenario, film)
+        transition = Transition(str(film["tmdb_id"]), film.get("title", ""), scenario,
+                                 services=services, price=price, movie=film)
+        hits = match(user_cascades, [transition], already=already, admission=admission,
+                     suppressed=suppressed, excluded=muted, film_watches=watches, picks=picks)
+        own_hits = hits.get(target_user) or []
+        if own_hits:
+            qualifying.append((film, own_hits[0]))
+    if not qualifying:
+        return None, (f"{len(candidates)} candidate film(s) hold the right window, but no agent "
+                       f"with the {scenario!r} Alert on actually admits (and places) any of them")
+
+    scores = compute_scores(str(f["tmdb_id"]) for f, _ in qualifying)
+    best_film, best_hit = max(qualifying,
+                               key=lambda pair: scores.get(str(pair[0]["tmdb_id"])) if
+                               scores.get(str(pair[0]["tmdb_id"])) is not None else -1)
+    return {"film": best_film, "cascade_id": best_hit.cascade_id, "cascade_name": best_hit.cascade_name}, None
+
+
+def build_real_catalogues(today_movies: list, chosen_film: dict, scenario: str) -> tuple:
+    """CAS-1203: "today" is the real catalogue, byte-for-byte unchanged (scores are ranked against
+    the whole catalogue, so a one-film catalogue would change which films an agent admits);
+    "yesterday" is the same list with ONLY `chosen_film` moved back one AVAILABILITY_TIERS step
+    (or, for `announced`, left out of yesterday entirely) — every other film holds its own
+    today-state on both days, so compute_transitions() can fire no other transition."""
+    chosen_id = str(chosen_film.get("tmdb_id"))
+    yesterday = []
+    for m in today_movies:
+        if str(m.get("tmdb_id")) != chosen_id:
+            yesterday.append(m)
+            continue
+        if scenario == "announced":
+            continue   # absent from yesterday entirely, same as the fixture's own announced case
+        yesterday.append({**m, "status": [_STEP_BACK_STATUS[scenario]]})
+    return yesterday, today_movies
+
+
+def _write_real_film_state(out_dir: str, real_film: dict) -> None:
+    os.makedirs(out_dir, exist_ok=True)
+    with open(os.path.join(out_dir, REAL_FILM_STATE_NAME), "w", encoding="utf-8") as fh:
+        json.dump(real_film, fh)
+
+
+def _load_real_film_state(out_dir: str):
+    path = os.path.join(out_dir, REAL_FILM_STATE_NAME)
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
 def _snapshot_run_stats(out_dir: str) -> None:
     """CAS-1052: today's runstats.py totals, taken right before `python -m monitor` runs, so
     --verify can isolate THIS run's own email/push attempted/delivered deltas from whatever a same-
@@ -207,32 +383,50 @@ def _section_delta(before: dict, after: dict, section: str) -> dict:
     return {k: a.get(k, 0) - b.get(k, 0) for k in ("attempted", "delivered", "errors")}
 
 
-def report_and_verify(store, target_user: str, films: list, before_stats: dict, after_stats: dict) -> tuple:
-    """CAS-1052: the harness's proof step. Deletes this run's fixture-range ledger rows (their
+def report_and_verify(store, target_user: str, films: list, before_stats: dict, after_stats: dict,
+                       real_film: dict = None) -> tuple:
+    """CAS-1052/CAS-1203: the harness's proof step. Deletes this run's own ledger rows (their
     count IS "in-app rows written" — CAS-486's ledger doubles as the in-app delivery for every
-    channel that succeeded, see matching.Hit.notification_row) and the temporary Watch-it tick
-    arm_watch() set, reports the run's email/push attempted/delivered deltas and the target user's
-    registered push-token count, and returns (returncode, message) — a tuple rather than exiting
-    directly, so this is unit-testable without a process boundary.
+    channel that succeeded, see matching.Hit.notification_row), reports the run's email/push
+    attempted/delivered deltas and the target user's registered push-token count, and returns
+    (returncode, message) — a tuple rather than exiting directly, so this is unit-testable without
+    a process boundary.
+
+    real_film : None for fixture mode (unchanged: the fixture-range ledger sweep, plus tearing
+                down arm_watch()'s temporary Watch-it tick). Otherwise {"tmdb_id", "title",
+                "moment", "cascade_name", "armed_at"} — CAS-1203's real-film mode: delete ONLY the
+                (target_user, tmdb_id, moment) ledger rows created at or after `armed_at`
+                (store.delete_notifications_for_user_film(), never the fixture-range sweep — a
+                real film's id lives outside that range by definition), and there is no tick to
+                tear down (none was ever armed). Names the film and agent in the report line
+                (AC4); fixture mode says "fixture" instead.
 
     A `removed` count of zero is the ONLY failure signal: it means no channel wrote a ledger row for
     `target_user` this run — exactly the silent-green failure this ticket exists to catch. The
     run_stats deltas and push-token count are reported for visibility (so "no device registered" or
     "email never even attempted" is legible), not as a second gate.
     """
-    ids = [f["tmdb_id"] for f in films]
-    removed = store.delete_notifications_for_movie_ids(ids)
-    watch_removed = store.delete_film_watch_for_movie_ids(ids)
+    if real_film is not None:
+        removed = store.delete_notifications_for_user_film(
+            target_user, real_film["tmdb_id"], real_film["moment"], real_film["armed_at"])
+        watch_removed = 0
+        subject = f"film {real_film['title']!r} [{real_film['tmdb_id']}] via agent {real_film['cascade_name']!r}"
+    else:
+        ids = [f["tmdb_id"] for f in films]
+        removed = store.delete_notifications_for_movie_ids(ids)
+        watch_removed = store.delete_film_watch_for_movie_ids(ids)
+        subject = "fixture"
+
     push_tokens = len(store.fetch_push_tokens().get(str(target_user)) or ())
     email_delta = _section_delta(before_stats, after_stats, "email")
     push_delta = _section_delta(before_stats, after_stats, "push")
 
     message = (
-        f"[notify_test] verify target_user={target_user}: in-app rows written {removed}; "
+        f"[notify_test] verify target_user={target_user} ({subject}): in-app rows written {removed}; "
         f"email attempted {email_delta['attempted']}/delivered {email_delta['delivered']}; "
         f"push attempted {push_delta['attempted']}/delivered {push_delta['delivered']}; "
-        f"{push_tokens} registered push token(s) for this user; cleaned up {watch_removed} "
-        "temporary Watch-it row(s)."
+        f"{push_tokens} registered push token(s) for this user"
+        + (f"; cleaned up {watch_removed} temporary Watch-it row(s)." if real_film is None else ".")
     )
     if removed == 0:
         return 1, message + (" FAILED: 0 alert(s) were recorded for this user — the harness "
@@ -242,10 +436,13 @@ def report_and_verify(store, target_user: str, films: list, before_stats: dict, 
 
 def _parse_args(argv):
     p = argparse.ArgumentParser(prog="python -m monitor.notify_test",
-                                 description="CAS-486/CAS-1052 notification test harness — builds "
-                                             "the fixture yesterday/today pair, arms a guaranteed "
-                                             "match, and (with --verify, after `python -m monitor` "
-                                             "has run) proves delivery and tears the tick back down.")
+                                 description="CAS-486/CAS-1052/CAS-1203 notification test harness — "
+                                             "builds a yesterday/today catalogue pair for a real "
+                                             "film one of --target-user's own agents would catch "
+                                             "(falling back to the fixture film plus a guaranteed "
+                                             "Watch-it tick when none qualifies), and (with "
+                                             "--verify, after `python -m monitor` has run) proves "
+                                             "delivery and tears any temporary tick back down.")
     p.add_argument("--scenario", required=True, choices=SCENARIOS)
     p.add_argument("--target-user", required=True, metavar="USER_ID",
                    help="Supabase user_id (uuid) to deliver to. Required — fails closed on an "
@@ -273,7 +470,9 @@ def _run_verify(args, target_user: str, films: list) -> int:
     before_path = os.path.join(args.out_dir, RUN_STATS_SNAPSHOT_NAME)
     before_stats = _load_json(before_path) if os.path.exists(before_path) else {}
     after_stats = runstats.load()
-    rc, message = report_and_verify(store, target_user, films, before_stats, after_stats)
+    real_film = _load_real_film_state(args.out_dir)
+    rc, message = report_and_verify(store, target_user, films, before_stats, after_stats,
+                                    real_film=real_film)
     print(message)
     return rc
 
@@ -285,17 +484,51 @@ def _load_json(path: str):
 
 def _run_arm(args, target_user: str, films: list) -> int:
     run_date = args.date or _dt.date.today().isoformat()
+    store = store_from_env()
+
+    # CAS-1203: never let a stale real-film state from an earlier run in this --out-dir leak into
+    # this run's --verify, whichever path below is taken.
+    real_state_path = os.path.join(args.out_dir, REAL_FILM_STATE_NAME)
+    if os.path.exists(real_state_path):
+        os.remove(real_state_path)
+
+    y_path = os.path.join(args.out_dir, "yesterday.json")
+    t_path = os.path.join(args.out_dir, "today.json")
+
+    if store is not None:
+        today_movies = load_today()
+        pick, reason = find_real_film(store, target_user, args.scenario, today_movies)
+        if pick is not None:
+            armed_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
+            yesterday, today = build_real_catalogues(today_movies, pick["film"], args.scenario)
+            os.makedirs(args.out_dir, exist_ok=True)
+            _write_catalogue(y_path, yesterday, run_date)
+            _write_catalogue(t_path, today, run_date)
+            real_film = {
+                "tmdb_id": str(pick["film"]["tmdb_id"]), "title": pick["film"].get("title", ""),
+                "moment": args.scenario, "cascade_id": pick["cascade_id"],
+                "cascade_name": pick["cascade_name"], "armed_at": armed_at,
+            }
+            _write_real_film_state(args.out_dir, real_film)
+            print(f"[notify_test] REAL FILM: scenario={args.scenario} target_user={target_user} "
+                  f"date={run_date} — chose {real_film['title']!r} [{real_film['tmdb_id']}], caught "
+                  f"by agent {real_film['cascade_name']!r}. Wrote {len(yesterday)} yesterday film(s) "
+                  f"-> {y_path}, {len(today)} today film(s) -> {t_path}. No temporary Watch-it tick "
+                  "armed — the agent catches it unaided.")
+            _snapshot_run_stats(args.out_dir)
+            print(f"[notify_test] next: python -m monitor --today {t_path} --yesterday {y_path} "
+                  f"--date {run_date} --target-user {target_user}")
+            return 0
+        print(f"[notify_test] falling back to the fixture film: {reason}.")
+
     yesterday, today = build_catalogues(films, args.scenario, run_date)
 
     os.makedirs(args.out_dir, exist_ok=True)
-    y_path = os.path.join(args.out_dir, "yesterday.json")
-    t_path = os.path.join(args.out_dir, "today.json")
     _write_catalogue(y_path, yesterday, run_date)
     _write_catalogue(t_path, today, run_date)
     print(f"[notify_test] scenario={args.scenario} target_user={target_user} date={run_date} — "
           f"wrote {len(yesterday)} yesterday film(s) -> {y_path}, {len(today)} today film(s) -> {t_path}.")
 
-    store = store_from_env()
     if args.cleanup:
         cleanup(films, store)
     else:

@@ -1,11 +1,17 @@
-"""CAS-486: the on-demand notification test harness.
+"""CAS-486/CAS-1203: the on-demand notification test harness.
 
-Covers the three things that actually make "intense test cycles" safe and possible:
+Covers the things that actually make "intense test cycles" safe and possible:
   - target_user fails closed (no default that resolves to "everyone")
   - the fixture file's own id range / marker are enforced before anything is built from it
   - build_catalogues fires exactly the requested scenario's transition, nothing else
   - the cleanup DELETE is scoped strictly to the reserved fixture id range, never wider
+  - CAS-1203: find_real_film() picks a real, admitted-and-placed film when one qualifies; never a
+    film already carrying a ledger row, film_watch row, or verdict on the account; falls back
+    (None) when nothing qualifies; build_real_catalogues() moves only the chosen film back one
+    step, yielding exactly one transition; report_and_verify()'s real-film mode deletes only this
+    run's own rows.
 """
+import datetime as _dt
 import io
 import json
 import os
@@ -16,7 +22,8 @@ from contextlib import redirect_stdout
 from monitor import compute_transitions
 from monitor.__main__ import main
 from monitor.notify_test import (DEFAULT_FIXTURES, FIXTURE_MARKER, arm_watch, build_catalogues,
-                                  load_fixture_films, report_and_verify, validate_target_user)
+                                  build_real_catalogues, find_real_film, load_fixture_films,
+                                  report_and_verify, validate_target_user)
 from monitor.store import FIXTURE_ID_MAX, FIXTURE_ID_MIN, InMemoryStore
 
 
@@ -250,6 +257,30 @@ class CleanupScope(unittest.TestCase):
         self.assertEqual(removed, 0)
 
 
+class RealFilmCleanupScope(unittest.TestCase):
+    """CAS-1203: delete_notifications_for_user_film() is the real-film counterpart to CleanupScope
+    above — a real film's tmdb_id lives outside the reserved fixture range, so it needs its own
+    precise (user_id, movie_id, moment, emailed_at >= since) scope rather than that range sweep."""
+
+    def test_only_the_matching_user_movie_moment_at_or_after_since_is_removed(self):
+        store = InMemoryStore(notifications=[
+            {"user_id": "u1", "movie_id": "42", "moment": "hits_stream", "cascade_id": "c1",
+             "emailed_at": "2026-01-02T00:00:01+00:00"},                                  # matches
+            {"user_id": "u1", "movie_id": "42", "moment": "hits_stream", "cascade_id": "c1",
+             "emailed_at": "2026-01-01T00:00:00+00:00"},                                  # too early
+            {"user_id": "u1", "movie_id": "42", "moment": "hits_cinema", "cascade_id": "c1",
+             "emailed_at": "2026-01-02T00:00:01+00:00"},                                  # wrong moment
+            {"user_id": "u2", "movie_id": "42", "moment": "hits_stream", "cascade_id": "c9",
+             "emailed_at": "2026-01-02T00:00:01+00:00"},                                  # wrong user
+            {"user_id": "u1", "movie_id": "43", "moment": "hits_stream", "cascade_id": "c1",
+             "emailed_at": "2026-01-02T00:00:01+00:00"},                                  # wrong movie
+        ])
+        removed = store.delete_notifications_for_user_film("u1", "42", "hits_stream",
+                                                            "2026-01-02T00:00:00+00:00")
+        self.assertEqual(removed, 1)
+        self.assertEqual(len(store.fetch_notification_keys()), 4)
+
+
 class GuaranteedMatchViaWatchIt(unittest.TestCase):
     """CAS-1052 AC1: a target user whose agents match none of the fixture films (here: no agents at
     all) still gets exactly one alert for the scenario via the temporary Watch-it row arm_watch()
@@ -360,6 +391,211 @@ class VerifyExitCode(unittest.TestCase):
         rc, message = report_and_verify(store, self.TARGET_USER, self.films, before, after)
         self.assertEqual(rc, 0)
         self.assertIn("email attempted 1/delivered 1", message)
+
+
+class RealFilmSelection(unittest.TestCase):
+    """CAS-1203: find_real_film() judged by the real admission/placement/matching code (same
+    fixture shapes as monitor.tests.test_matching.AutoPlacementTests, which already proves this
+    engine arithmetic) — never a second, hand-ported guess at what an agent would catch."""
+
+    def _movie(self, tmdb_id=9001, status=("included_streaming",), poster="/x.jpg", **extra):
+        m = {"tmdb_id": tmdb_id, "title": "Auto Placed Film", "genres": ["Drama"],
+             "status": list(status), "cinema_date": "2026-01-01", "language": "en",
+             "wm_critic_score": 70, "popularity": 50, "wm_popularity_percentile": 70,
+             "wm_user_rating": 7.5, "offers": [{"service": "Netflix", "type": "sub"}],
+             "poster": poster}
+        m.update(extra)
+        return m
+
+    def _cascade(self, moments=("hits_stream",), stream_marker=50):
+        # Only `stream` is usable — in_cinema/premium/rent are off (Never) — so an earned score
+        # can only ever land on Stream, matching the AutoPlacementTests precedent this mirrors.
+        markers = {"in_cinema": None, "premium": None, "rent": None, "stream": stream_marker}
+        return {"id": "c1", "user_id": "u1", "name": "Everything", "active": True,
+                "alert_moments": list(moments),
+                "criteria": {"genre": ["Drama"], "imdb": 7.0, "watchMarkers": markers}}
+
+    def _agent_films(self, movie_id="9001", score=80):
+        return [{"user_id": "u1", "cascade_id": "c1", "movie_id": movie_id, "admission_score": score}]
+
+    def test_a_real_film_is_chosen_when_one_qualifies(self):
+        store = InMemoryStore(cascades=[self._cascade()], agent_films=self._agent_films())
+        pick, reason = find_real_film(store, "u1", "hits_stream", [self._movie()])
+        self.assertIsNone(reason)
+        self.assertEqual(pick["film"]["tmdb_id"], 9001)
+        self.assertEqual(pick["cascade_id"], "c1")
+        self.assertEqual(pick["cascade_name"], "Everything")
+
+    def test_a_film_with_an_existing_ledger_row_is_never_chosen(self):
+        store = InMemoryStore(
+            cascades=[self._cascade()], agent_films=self._agent_films(),
+            notifications=[{"cascade_id": "c1", "user_id": "u1", "movie_id": "9001", "moment": "hits_stream"}])
+        pick, reason = find_real_film(store, "u1", "hits_stream", [self._movie()])
+        self.assertIsNone(pick)
+        self.assertIn("no existing ledger/Watch-it/verdict row", reason)
+
+    def test_a_film_with_an_existing_film_watch_row_is_never_chosen(self):
+        store = InMemoryStore(
+            cascades=[self._cascade()], agent_films=self._agent_films(),
+            watches=[{"user_id": "u1", "movie_id": "9001", "windows": ["rent"], "sources": {}}])
+        pick, reason = find_real_film(store, "u1", "hits_stream", [self._movie()])
+        self.assertIsNone(pick)
+        self.assertIn("no existing ledger/Watch-it/verdict row", reason)
+
+    def test_a_film_with_an_existing_verdict_is_never_chosen(self):
+        store = InMemoryStore(
+            cascades=[self._cascade()], agent_films=self._agent_films(),
+            user_films=[{"user_id": "u1", "movie_id": "9001", "status": "liked"}])
+        pick, reason = find_real_film(store, "u1", "hits_stream", [self._movie()])
+        self.assertIsNone(pick)
+        self.assertIn("no existing ledger/Watch-it/verdict row", reason)
+
+    def test_falls_back_when_no_agent_has_the_alert_on(self):
+        store = InMemoryStore(cascades=[self._cascade(moments=())], agent_films=self._agent_films())
+        pick, reason = find_real_film(store, "u1", "hits_stream", [self._movie()])
+        self.assertIsNone(pick)
+        self.assertIn("Alert on", reason)
+
+    def test_falls_back_when_nothing_in_the_catalogue_holds_the_window(self):
+        store = InMemoryStore(cascades=[self._cascade()], agent_films=self._agent_films())
+        pick, reason = find_real_film(store, "u1", "hits_stream", [self._movie(status=("rental",))])
+        self.assertIsNone(pick)
+        self.assertIn("no unseen film holds", reason)
+
+    def test_falls_back_when_candidates_exist_but_no_agent_admits_or_places_any(self):
+        # Genre mismatch (Comedy, not Drama): the candidate holds the right window and has a
+        # poster, but the agent's own criteria admits nothing.
+        store = InMemoryStore(cascades=[self._cascade()], agent_films=self._agent_films())
+        movie = self._movie(genres=["Comedy"])
+        pick, reason = find_real_film(store, "u1", "hits_stream", [movie])
+        self.assertIsNone(pick)
+        self.assertIn("no agent", reason)
+
+    def test_highest_scoring_qualifying_film_wins(self):
+        low = self._movie(tmdb_id=9001, wm_critic_score=40, wm_user_rating=5.0, popularity=5,
+                           wm_popularity_percentile=20)
+        high = self._movie(tmdb_id=9002, wm_critic_score=95, wm_user_rating=9.0, popularity=500,
+                            wm_popularity_percentile=99)
+        agent_films = self._agent_films("9001") + self._agent_films("9002")
+        store = InMemoryStore(cascades=[self._cascade()], agent_films=agent_films)
+        pick, reason = find_real_film(store, "u1", "hits_stream", [low, high])
+        self.assertIsNone(reason)
+        self.assertEqual(pick["film"]["tmdb_id"], 9002,
+            "the film with the clearly higher Cascade score must be the one chosen")
+
+
+class RealFilmCataloguePair(unittest.TestCase):
+    """CAS-1203: build_real_catalogues() moves ONLY the chosen film back one AVAILABILITY_TIERS
+    step (or drops it for `announced`) — every other film is byte-identical on both days, and the
+    pair yields exactly one transition of the right moment."""
+
+    def _movie(self, tmdb_id, status):
+        return {"tmdb_id": tmdb_id, "title": f"Film {tmdb_id}", "status": list(status),
+                "offers": [], "genres": [], "cinema_date": None}
+
+    def test_moving_the_chosen_film_back_one_step_yields_exactly_one_transition(self):
+        today_movies = [self._movie(9001, ["included_streaming"]), self._movie(9002, ["rental"])]
+        yesterday, today = build_real_catalogues(today_movies, today_movies[0], "hits_stream")
+        self.assertEqual(today, today_movies, "today must be the real catalogue, unchanged")
+        transitions = compute_transitions(yesterday, today, _dt.date(2026, 1, 2))
+        fired = [(t.movie_id, t.moment) for t in transitions]
+        self.assertEqual(fired, [("9001", "hits_stream")])
+
+    def test_every_other_film_is_unchanged_in_both_catalogues(self):
+        today_movies = [self._movie(9001, ["included_streaming"]), self._movie(9002, ["rental"])]
+        yesterday, _ = build_real_catalogues(today_movies, today_movies[0], "hits_stream")
+        other_yesterday = next(m for m in yesterday if str(m["tmdb_id"]) == "9002")
+        other_today = next(m for m in today_movies if str(m["tmdb_id"]) == "9002")
+        self.assertEqual(other_yesterday, other_today)
+
+    def test_announced_removes_the_chosen_film_from_yesterday_entirely(self):
+        today_movies = [self._movie(9010, ["upcoming"]), self._movie(9002, ["rental"])]
+        yesterday, today = build_real_catalogues(today_movies, today_movies[0], "announced")
+        self.assertNotIn(9010, [m["tmdb_id"] for m in yesterday])
+        self.assertIn(9010, [m["tmdb_id"] for m in today])
+        transitions = compute_transitions(yesterday, today, _dt.date(2026, 1, 2))
+        fired = [(t.movie_id, t.moment) for t in transitions]
+        self.assertEqual(fired, [("9010", "announced")])
+
+
+class RealFilmNoTickArmed(unittest.TestCase):
+    """CAS-1203 AC3: real-film mode never arms a temporary Watch-it tick — the agent catches the
+    film by itself, so the email names the agent, not "Your picks"."""
+
+    def test_find_real_film_never_writes_a_film_watch_row(self):
+        movie = {"tmdb_id": 9001, "title": "Auto Placed Film", "genres": ["Drama"],
+                 "status": ["included_streaming"], "cinema_date": "2026-01-01", "language": "en",
+                 "wm_critic_score": 70, "popularity": 50, "wm_popularity_percentile": 70,
+                 "wm_user_rating": 7.5, "offers": [{"service": "Netflix", "type": "sub"}],
+                 "poster": "/x.jpg"}
+        markers = {"in_cinema": None, "premium": None, "rent": None, "stream": 50}
+        cascade = {"id": "c1", "user_id": "u1", "name": "Everything", "active": True,
+                   "alert_moments": ["hits_stream"],
+                   "criteria": {"genre": ["Drama"], "imdb": 7.0, "watchMarkers": markers}}
+        agent_films = [{"user_id": "u1", "cascade_id": "c1", "movie_id": "9001", "admission_score": 80}]
+        store = InMemoryStore(cascades=[cascade], agent_films=agent_films)
+        pick, _ = find_real_film(store, "u1", "hits_stream", [movie])
+        self.assertIsNotNone(pick)
+        self.assertEqual(store.fetch_film_watches(), [],
+            "find_real_film must only ever READ the store, never arm a Watch-it tick")
+
+
+class RealFilmVerifyDeletion(unittest.TestCase):
+    """CAS-1203 AC4/safety rule: report_and_verify()'s real-film mode deletes ONLY the row this
+    run itself created — exact (user, movie, moment) match, and only at/after the run's own
+    `armed_at` — and never touches film_watch or user_films."""
+
+    REAL_FILM = {"tmdb_id": "9001", "title": "Auto Placed Film", "moment": "hits_stream",
+                 "cascade_name": "Everything", "armed_at": "2026-01-02T00:00:00+00:00"}
+
+    def test_deletes_only_this_runs_own_row(self):
+        store = InMemoryStore(notifications=[
+            {"user_id": "u1", "movie_id": "9001", "moment": "hits_stream", "cascade_id": "c1",
+             "emailed_at": "2026-01-02T00:00:01+00:00"},                                         # this run
+            {"user_id": "u1", "movie_id": "9001", "moment": "hits_stream", "cascade_id": "c1",
+             "emailed_at": "2026-01-01T00:00:00+00:00"},                                         # earlier/real
+            {"user_id": "u2", "movie_id": "9001", "moment": "hits_stream", "cascade_id": "c9",
+             "emailed_at": "2026-01-02T00:00:01+00:00"},                                         # other user
+            {"user_id": "u1", "movie_id": "9001", "moment": "hits_cinema", "cascade_id": "c1",
+             "emailed_at": "2026-01-02T00:00:01+00:00"},                                         # other moment
+        ])
+        rc, message = report_and_verify(store, "u1", [], {}, {}, real_film=self.REAL_FILM)
+        self.assertEqual(rc, 0)
+        self.assertIn("in-app rows written 1", message)
+        self.assertEqual(len(store.fetch_notification_keys()), 3)
+
+    def test_names_the_film_and_agent_in_real_film_mode(self):
+        store = InMemoryStore(notifications=[
+            {"user_id": "u1", "movie_id": "9001", "moment": "hits_stream", "cascade_id": "c1",
+             "emailed_at": "2026-01-02T00:00:01+00:00"}])
+        rc, message = report_and_verify(store, "u1", [], {}, {}, real_film=self.REAL_FILM)
+        self.assertEqual(rc, 0)
+        self.assertIn("Auto Placed Film", message)
+        self.assertIn("Everything", message)
+        self.assertNotIn("fixture", message)
+
+    def test_fixture_mode_default_still_says_fixture(self):
+        store = InMemoryStore()
+        _rc, message = report_and_verify(store, "u1", [], {}, {})
+        self.assertIn("fixture", message)
+
+    def test_real_film_mode_never_touches_film_watch_or_user_films(self):
+        store = InMemoryStore(
+            notifications=[{"user_id": "u1", "movie_id": "9001", "moment": "hits_stream",
+                           "cascade_id": "c1", "emailed_at": "2026-01-02T00:00:01+00:00"}],
+            watches=[{"user_id": "u1", "movie_id": "42", "windows": ["rent"], "sources": {}}],
+            user_films=[{"user_id": "u1", "movie_id": "7", "status": "liked"}],
+        )
+        report_and_verify(store, "u1", [], {}, {}, real_film=self.REAL_FILM)
+        self.assertEqual(store.fetch_film_watches(),
+                         [{"user_id": "u1", "movie_id": "42", "windows": ["rent"], "sources": {}}])
+        self.assertEqual(store.fetch_user_films(), [{"user_id": "u1", "movie_id": "7", "status": "liked"}])
+
+    def test_zero_matching_rows_fails_closed_in_real_film_mode_too(self):
+        store = InMemoryStore(notifications=[])
+        rc, message = report_and_verify(store, "u1", [], {}, {}, real_film=self.REAL_FILM)
+        self.assertEqual(rc, 1)
+        self.assertIn("FAILED", message)
 
 
 if __name__ == "__main__":
