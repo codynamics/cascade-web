@@ -21,6 +21,8 @@ Interface:
   fetch_film_watches() -> [{user_id, movie_id, windows, sources}]                # CAS-484/CAS-918
   fetch_watch_notification_keys() -> set[(user_id, movie_id, moment)]  # de-dupe, null-cascade rows
   delete_notifications_for_movie_ids(ids) -> int          # CAS-486: fixture-range-only, for notify-test
+  delete_notifications_for_user_film(user_id, movie_id, moment, since) -> int  # CAS-1203: precise,
+                                                           # for notify-test's real-film mode
   upsert_film_watch(user_id, movie_id, window) -> None    # CAS-1052: notify-test's guaranteed-match tick
   delete_film_watch_for_movie_ids(ids) -> int             # CAS-1052: fixture-range-only, for notify-test
   fetch_user_prefs() -> {user_id: {sub_services, store_services, taste, services_only}}    # CAS-825/CAS-853
@@ -167,6 +169,21 @@ class InMemoryStore:
             return 0
         before = len(self._notifications)
         self._notifications = [n for n in self._notifications if str(n.get("movie_id")) not in ids]
+        return before - len(self._notifications)
+
+    def delete_notifications_for_user_film(self, user_id, movie_id, moment: str, since: str) -> int:
+        """CAS-1203: the notify-test harness's real-film mode cleanup — a real film's tmdb_id lives
+        outside the reserved fixture range delete_notifications_for_movie_ids() is scoped to, so
+        that sweep can never find it. Scoped precisely instead: exactly this (user_id, movie_id,
+        moment), and only a row this run itself could have created (``emailed_at`` >= `since`,
+        the arm phase's own timestamp) — never a real alert this user already had standing before
+        the run, and never any OTHER moment for the same film."""
+        before = len(self._notifications)
+        self._notifications = [
+            n for n in self._notifications
+            if not (str(n.get("user_id")) == str(user_id) and str(n.get("movie_id")) == str(movie_id)
+                    and n.get("moment") == moment and (n.get("emailed_at") or "") >= since)
+        ]
         return before - len(self._notifications)
 
     def upsert_film_watch(self, user_id, movie_id, window: str) -> None:
@@ -768,6 +785,27 @@ class SupabaseStore:
         quoted = ",".join(ids)
         req = urllib.request.Request(
             self._base + f"/notifications?movie_id=in.({quoted})",
+            headers=self._headers({"Prefer": "return=representation"}),
+            method="DELETE",
+        )
+        with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+            body = resp.read().decode("utf-8")
+        try:
+            return len(json.loads(body))
+        except (json.JSONDecodeError, TypeError):
+            return 0
+
+    def delete_notifications_for_user_film(self, user_id, movie_id, moment: str, since: str) -> int:
+        """CAS-1203: precise DELETE for the notify-test harness's real-film mode — a real film's
+        tmdb_id is never in the reserved fixture range delete_notifications_for_movie_ids() is
+        scoped to, so that sweep can't find it. Filtered on all four of user_id/movie_id/moment/
+        `emailed_at` >= `since` (the arm phase's own run-start timestamp) directly in the PostgREST
+        query, so this can only ever remove a row this run itself could have created."""
+        req = urllib.request.Request(
+            self._base + (f"/notifications?user_id=eq.{urllib.parse.quote(str(user_id))}"
+                         f"&movie_id=eq.{urllib.parse.quote(str(movie_id))}"
+                         f"&moment=eq.{urllib.parse.quote(moment)}"
+                         f"&emailed_at=gte.{urllib.parse.quote(since)}"),
             headers=self._headers({"Prefer": "return=representation"}),
             method="DELETE",
         )
