@@ -14,14 +14,17 @@ the four unset, ``send_via_apns`` no-ops and returns ``False`` rather than raisi
 with no APNs configured yet (true until Lee adds the GitHub Actions secrets) still completes
 green.
 
-This repo's monitor package is deliberately dependency-free (plain ``urllib``, no pip install
-step in any workflow — see ``store.py``/``emailer.py``), so the ES256 signature itself is
-computed here with nothing beyond the standard library: a minimal DER reader pulls the raw
-private-key scalar out of the PKCS8 ``.p8`` bytes, and a minimal P-256 point-multiplication
-signs the JWT. Apple's provider API is documented as requiring HTTP/2; the request below is
-sent as a plain HTTPS POST because there is no HTTP/2 client in the standard library and this
-repo does not add one without a scoped CI-file exception (see the CAS-465 hand-off comment) —
-a rejected/failed connection here is caught and treated as "not delivered", never a crash.
+This repo's monitor package is deliberately dependency-free (no pip install step in any
+workflow — see ``store.py``/``emailer.py``), so the ES256 signature itself is computed here
+with nothing beyond the standard library: a minimal DER reader pulls the raw private-key
+scalar out of the PKCS8 ``.p8`` bytes, and a minimal P-256 point-multiplication signs the JWT.
+
+Apple's provider API requires HTTP/2, which the standard library's ``urllib`` cannot speak
+(CAS-1204). Rather than add an HTTP/2 package, the request is sent with the ``curl`` binary
+already on the GitHub Actions runner (built with HTTP/2 support), driven from Python via
+``subprocess``. The device token and provider token go to curl only through a ``--config``
+file piped on standard input, never as a command-line argument or in a log line, so neither
+secret can leak into the process list or the Actions log.
 """
 from __future__ import annotations
 
@@ -30,9 +33,8 @@ import hashlib
 import json
 import os
 import secrets
+import subprocess
 import time
-import urllib.error
-import urllib.request
 
 APNS_KEY_ID_ENV = "APNS_KEY_ID"
 APNS_TEAM_ID_ENV = "APNS_TEAM_ID"
@@ -233,6 +235,55 @@ def _invalid_token_reason(status: int, body_text: str = "") -> str | None:
     return None
 
 
+# --------------------------------------------------------------------------- #
+# curl transport (CAS-1204) — Apple's push service refuses anything but HTTP/2,
+# which stdlib urllib cannot speak. The runner's curl can, so we shell out to it.
+# --------------------------------------------------------------------------- #
+_CURL_META_MARKER = "\x1eMETA:"   # \x1e: won't occur in a JSON response body
+
+
+def _curl_config_escape(value: str) -> str:
+    """Escape a value for curl's --config quoted-string syntax: backslash and the closing
+    quote are the only characters that need it."""
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _build_curl_config(url: str, headers: dict, body: str) -> str:
+    """The URL, headers and JSON body for one APNs POST, as a curl --config file read from
+    standard input — so neither the provider token nor the device token is ever passed as a
+    command-line argument (visible in the process list) or appears in a log line."""
+    lines = [f'url = "{_curl_config_escape(url)}"', 'request = "POST"']
+    for name, value in headers.items():
+        lines.append(f'header = "{_curl_config_escape(f"{name}: {value}")}"')
+    lines.append(f'data = "{_curl_config_escape(body)}"')
+    return "\n".join(lines) + "\n"
+
+
+def _redact_secrets(text: str, *secrets_to_strip: str) -> str:
+    """`text` with any of `secrets_to_strip` removed and whitespace/newlines collapsed to one
+    line, for safe logging of curl's own stderr."""
+    redacted = text
+    for secret in secrets_to_strip:
+        if secret:
+            redacted = redacted.replace(secret, "[redacted]")
+    return " ".join(redacted.split())
+
+
+def _parse_curl_output(stdout: str):
+    """(status, http_version, response_body) parsed from the --write-out marker curl appends
+    after the response body, or None when the marker is missing or malformed."""
+    idx = stdout.rfind(_CURL_META_MARKER)
+    if idx == -1:
+        return None
+    response_body = stdout[:idx]
+    meta = stdout[idx + len(_CURL_META_MARKER):].strip()
+    try:
+        status_str, http_version = meta.split(":", 1)
+        return int(status_str), http_version.strip(), response_body
+    except ValueError:
+        return None
+
+
 def send_via_apns(device_token: str, title: str, body: str, badge: int = None,
                    thread_id: str = None, payload: dict = None, timeout: int = 10,
                    on_invalid_token=None) -> bool:
@@ -278,35 +329,61 @@ def send_via_apns(device_token: str, title: str, body: str, badge: int = None,
               "— push not sent this run.")
         return False
 
-    data = json.dumps(body_obj).encode("utf-8")
-    req = urllib.request.Request(
-        f"https://{APNS_HOST}/3/device/{device_token}",
-        data=data, method="POST",
-        headers={
-            "authorization": f"bearer {token}",
-            "apns-topic": bundle_id,
-            "apns-push-type": "alert",
-            "content-type": "application/json",
-        },
-    )
+    headers = {
+        "authorization": f"bearer {token}",
+        "apns-topic": bundle_id,
+        "apns-push-type": "alert",
+        "content-type": "application/json",
+    }
+    url = f"https://{APNS_HOST}/3/device/{device_token}"
+    config_text = _build_curl_config(url, headers, json.dumps(body_obj))
+    cmd = [
+        "curl",
+        "--http2",
+        "--silent",
+        "--show-error",
+        "--max-time", str(timeout),
+        "--write-out", f"{_CURL_META_MARKER}%{{http_code}}:%{{http_version}}",
+        "--config", "-",
+    ]
+
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            if 200 <= resp.status < 300:
-                return True
-            invalid_reason = _invalid_token_reason(resp.status)
-            suffix = f" ({invalid_reason}) — removing this device token." if invalid_reason else "."
-            print(f"[monitor] APNs push rejected for a registered device: HTTP {resp.status}{suffix}")
-            if invalid_reason and on_invalid_token:
-                on_invalid_token(device_token)
-            return False
-    except urllib.error.HTTPError as err:
-        reason = err.read().decode("utf-8", "replace") if err.fp else ""
-        invalid_reason = _invalid_token_reason(err.code, reason)
-        suffix = " — removing this device token." if invalid_reason else ""
-        print(f"[monitor] APNs push rejected for a registered device: HTTP {err.code} {reason}".rstrip() + suffix)
-        if invalid_reason and on_invalid_token:
-            on_invalid_token(device_token)
+        proc = subprocess.run(
+            cmd, input=config_text, capture_output=True, text=True, timeout=timeout + 5)
+    except FileNotFoundError:
+        print("[monitor] APNs push failed for a registered device: curl is not installed.")
         return False
-    except Exception as err:   # noqa: BLE001 - network failures degrade to "not delivered"
-        print(f"[monitor] APNs push failed for a registered device: {err}.")
+    except subprocess.TimeoutExpired:
+        print(f"[monitor] APNs push failed for a registered device: timed out after {timeout}s.")
         return False
+
+    if proc.returncode != 0:
+        stderr_text = _redact_secrets(proc.stderr.strip(), token, device_token)
+        cause = f"curl exited {proc.returncode}" + (f": {stderr_text}" if stderr_text else "")
+        print(f"[monitor] APNs push failed for a registered device: {cause}.")
+        return False
+
+    parsed = _parse_curl_output(proc.stdout)
+    if parsed is None:
+        print("[monitor] APNs push failed for a registered device: could not parse curl's response.")
+        return False
+    status, http_version, response_body = parsed
+
+    if http_version != "2":
+        print(f"[monitor] APNs push failed for a registered device: response used HTTP/{http_version}, "
+              "not HTTP/2 — this runner's curl build may lack HTTP/2 support.")
+        return False
+
+    if 200 <= status < 300:
+        return True
+
+    try:
+        body_reason = json.loads(response_body or "{}").get("reason", "")
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        body_reason = ""
+    invalid_reason = _invalid_token_reason(status, response_body)
+    suffix = " — removing this device token." if invalid_reason else ""
+    print(f"[monitor] APNs push rejected for a registered device: HTTP {status} {body_reason}".rstrip() + suffix)
+    if invalid_reason and on_invalid_token:
+        on_invalid_token(device_token)
+    return False
