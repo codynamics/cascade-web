@@ -3614,13 +3614,13 @@
         <span class="sortic" aria-hidden="true">⇅<span class="sortdot" id="sortDot" hidden></span></span>
       </button>
       <select id="sort" tabindex="-1" aria-hidden="true" hidden>
+        <option value="cinema">Release date</option>
         <option value="availability">Availability</option>
         <option value="imdb">People rating</option>
         <option value="cascade">Cascade score</option>
         <option value="rt">Critics</option>
         <option value="gross">Box office</option>
         <option value="popularity">Most anticipated</option>
-        <option value="cinema">Newest cinema</option>
         <option value="title">Title A–Z</option>
       </select>
     </div>
@@ -9290,13 +9290,13 @@ const PICKER_KINDS = {
   },
 };
 const SORT_OPTS = [
+  {key:"cinema",         label:"Release date"},
   {key:"availability", label:"Availability"},
   {key:"imdb",          label:"People rating"},
   {key:"cascade",       label:"Cascade score"},
   {key:"rt",             label:"Critics"},
   {key:"gross",          label:"Box office"},
   {key:"popularity",    label:"Most anticipated"},
-  {key:"cinema",         label:"Newest cinema"},
   {key:"title",          label:"Title A–Z"},
 ];
 function closePickerPop(){
