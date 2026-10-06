@@ -6009,13 +6009,28 @@ new MutationObserver(()=>armSwitches()).observe(document.body, {childList:true, 
 // field the same way. #authModal's signed-in panel, #logModal and the diagnostics panel's .cascfoot
 // carry no text input, so the keyboard never opens there and this delegate never fires for them.
 const CASCFOOT_KB_SEL = 'input:not([type=checkbox]):not([type=radio]):not([type=range]), textarea';
+// CAS-1210: a mousedown/touch on .cascfoot's own Send button blurs the still-focused field first,
+// which used to remove .kbfocus synchronously — re-sticking the footer and sliding Send out from
+// under the pointer before its mouseup/click ever arrives, so the tap was silently swallowed. While a
+// pointer gesture is in flight, defer the removal until after that gesture's click has had its chance
+// to fire, so the footer cannot move between pointerdown and pointerup.
+let cascfootPointerDown = false;
+document.addEventListener("pointerdown", () => { cascfootPointerDown = true; });
+document.addEventListener("pointerup", () => { cascfootPointerDown = false; });
+document.addEventListener("pointercancel", () => { cascfootPointerDown = false; });
 document.addEventListener("focusin", e => {
   if(!e.target.matches?.(CASCFOOT_KB_SEL)) return;
   e.target.closest(".modal, .diagpanel")?.classList.add("kbfocus");
 });
 document.addEventListener("focusout", e => {
   if(!e.target.matches?.(CASCFOOT_KB_SEL)) return;
-  e.target.closest(".modal, .diagpanel")?.classList.remove("kbfocus");
+  const host = e.target.closest(".modal, .diagpanel");
+  if(!host) return;
+  if(cascfootPointerDown){
+    document.addEventListener("pointerup", () => setTimeout(() => host.classList.remove("kbfocus"), 0), { once: true });
+    return;
+  }
+  host.classList.remove("kbfocus");
 });
 
 // CAS-916: one choke point for the background-scroll lock every overlay open/close path uses. Writing

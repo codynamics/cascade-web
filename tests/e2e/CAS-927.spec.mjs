@@ -95,15 +95,13 @@ test("CAS-927 AC2c: a valid email with no message leaves Send disabled and shows
   await expect(page.locator("#contactSend")).toBeDisabled();
 });
 
-// CAS-1160: confirmed app defect, not a stale assertion. Filling #contactEmail then immediately clicking
-// #contactSend never fires sendContact() — reproduced locally (adding an explicit blur between the fill
-// and the click makes the same insert succeed). #contactEmail's focusout handler (CAS-558's kbfocus un-
-// stick, app_template.html ~line 5975) removes .modal.kbfocus synchronously on blur, snapping .cascfoot
-// from position:static back to its sticky position between the click's mousedown and mouseup — the
-// mouseup lands on whatever the footer's sticky position now covers (#contactBody, per the first repair
-// round's own report) instead of #contactSend, so the click event never fires on Send at all. A real user
-// who taps Send right after typing their email hits the exact same swallowed tap.
-test.fixme("CAS-927 AC2d: a valid message and email with no category chosen enables Send and inserts category \"other\" with null diagnostics", async ({ page }) => {
+// CAS-1210: fixed. Filling #contactEmail then immediately clicking #contactSend used to never fire
+// sendContact() — #contactEmail's focusout handler (CAS-558's kbfocus un-stick, app_template.html
+// ~line 6011) removed .modal.kbfocus synchronously on blur, snapping .cascfoot from position:static
+// back to its sticky position between the click's mousedown and mouseup, so the mouseup landed off
+// #contactSend and the click never fired. The delegate now defers that removal until the gesture's
+// click has had its chance to run, so Send can no longer move out from under the pointer mid-click.
+test("CAS-927 AC2d: a valid message and email with no category chosen enables Send and inserts category \"other\" with null diagnostics", async ({ page }) => {
   await configuredApp(page);
   await openFromSplash(page);
   await page.locator("#contactMsg").fill("Something looks broken.");
@@ -118,9 +116,9 @@ test.fixme("CAS-927 AC2d: a valid message and email with no category chosen enab
   expect(rows[0].diagnostics).toBeNull();
 });
 
-// CAS-1160: confirmed app defect, same #contactSend click-swallow as AC2d just above — the Bug category
-// chip tap doesn't change the mechanism, only AC2d's own comment is needed once.
-test.fixme("CAS-927 AC2e: choosing Bug with a valid message and email inserts category \"bug\" with non-empty diagnostics", async ({ page }) => {
+// CAS-1210: fixed, same #contactSend click-swallow as AC2d just above — the Bug category chip tap
+// doesn't change the mechanism, only AC2d's own comment is needed once.
+test("CAS-927 AC2e: choosing Bug with a valid message and email inserts category \"bug\" with non-empty diagnostics", async ({ page }) => {
   await configuredApp(page);
   await openFromSplash(page);
   await page.locator("#contactCatChips .chip", { hasText: "Bug" }).click();
