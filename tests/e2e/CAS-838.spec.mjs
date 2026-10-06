@@ -5,7 +5,7 @@
 // session is signed-out-but-configured throughout — CascadeAuth's client exists once Supabase is
 // configured regardless of session state, and contact_messages' own RLS policy grants insert to anon.
 import { test, expect } from "@playwright/test";
-import { freshApp, gotoFresh, toShortlist, finishFlow, toListing } from "./helpers.mjs";
+import { gotoFresh, toShortlist, finishFlow, toListing } from "./helpers.mjs";
 
 const CAS838_FAKE_SUPABASE_GLOBAL = `
   window.__contactInserts = [];
@@ -59,8 +59,12 @@ async function openFromSplash(page){
 
 // AC4a — gating moved from "a category is chosen" to "message + email are valid" under CAS-927;
 // category is now optional, so choosing one alone no longer enables Send.
+// CAS-1209: a guest (unconfigured) device now shows #authGuest, not #authSignedOut, on this panel (CAS-559
+// / CAS-1165) — #authContact lives inside #authSignedOut, so openFromSplash() can never reach it under
+// freshApp() any more. configuredApp() (already used by every sibling AC below) is the current reachable
+// "signed-out visitor" state.
 test("CAS-838 AC4a: from the splash, Sign in then Contact us opens the sheet with Send disabled until message and email are valid (CAS-927)", async ({ page }) => {
-  await freshApp(page);
+  await configuredApp(page);
   await openFromSplash(page);
   await expect(page.locator("#contactSend")).toBeDisabled();
   await page.locator("#contactCatChips .chip", { hasText: "Bug" }).click();
@@ -126,8 +130,10 @@ test("CAS-838 AC4d: filling the honeypot and sending performs no insert at all",
 });
 
 // AC4e
+// CAS-1209: same reachability gap as AC4a above — guest mode's #authGuest panel never exposes
+// #authContact, so this needs configuredApp() too.
 test("CAS-838 AC4e: a message longer than 2000 characters cannot be entered", async ({ page }) => {
-  await freshApp(page);
+  await configuredApp(page);
   await openFromSplash(page);
   await page.locator("#contactMsg").fill("x".repeat(2500));
   const value = await page.locator("#contactMsg").inputValue();

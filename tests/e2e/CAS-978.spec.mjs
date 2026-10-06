@@ -124,10 +124,23 @@ test("CAS-978: the Help screen footer opens the same sheet", async ({ page }) =>
   await expect(page.locator("#feedback")).toHaveClass(/open/);
 });
 
+// CAS-1209: AC2/AC3 below test Send's validation with NO account email on file yet — but toShortlist()
+// (CAS-1110) always signs in for real now, and even configuredApp()'s fake-but-configured client still
+// gates through toListing()'s email step (membNeedsEmail() is true for "a REAL (fake or not) Supabase
+// config that hasn't signed in yet"), so both end up signed in with a pre-filled, already-valid email by
+// the time openFromAccount() runs. Guest mode (freshApp, no config.js at all) is the one walk left that
+// reaches the listing fully signed out — membStart() only gates on email when CascadeAuth is configured
+// (CAS-1030) — same gap CAS-1152.spec.mjs's own header documents and works around the same way.
+async function toGuestShortlist(page, kind){
+  await freshApp(page);
+  await page.waitForFunction(() => flowOn === true || document.querySelector("#splashCta"));
+  if(!(await page.evaluate(() => flowOn === true))) await page.locator("#splashCta").click();
+  await walkToServices(page, kind);
+}
+
 // AC2 — category and message enforced client-side; Send stays disabled until all fields are valid.
 test("CAS-978: Send is disabled until category, message and email are all valid", async ({ page }) => {
-  await freshApp(page);
-  await toShortlist(page, "cinema");
+  await toGuestShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openFromAccount(page);
@@ -143,7 +156,7 @@ test("CAS-978: Send is disabled until category, message and email are all valid"
 // AC3 — signed out, the email field is required: filling everything else still leaves Send disabled
 // with an empty email, and the field's error shows once a Send attempt has been made.
 test("CAS-978: signed out, an empty email blocks Send and surfaces its own error", async ({ page }) => {
-  await toShortlist(page, "cinema");
+  await toGuestShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openFromAccount(page);

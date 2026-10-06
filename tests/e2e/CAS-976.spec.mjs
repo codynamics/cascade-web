@@ -61,7 +61,11 @@ test("CAS-976: the spotlight sits over the current card's own anchor, and follow
   await expect(page.locator("#tutText")).toHaveText(CARD_TEXT[1]);
   await page.waitForTimeout(150);
 
-  const anchor = page.locator("#groups .card .r-scores").first();
+  // CAS-1209: a condensed ("cinfo") card hides its own .r-scores via display:none rather than removing it
+  // (tutorialResolveAnchor's own comment, app_template.html) — a plain .first() can resolve to one of
+  // those on a real roster and return a null boundingBox. The app's own anchor resolution already skips
+  // a hidden match; mirror that here with :visible so the anchor is the same element the tour itself used.
+  const anchor = page.locator("#groups .card .r-scores:visible").first();
   const anchorBox = await anchor.boundingBox();
   let holeBox = await page.locator("#tutHole").boundingBox();
   expect(Math.abs(holeBox.x - anchorBox.x)).toBeLessThan(12);

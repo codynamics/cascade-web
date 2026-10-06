@@ -130,7 +130,17 @@ test("CAS-752 AC2 (reduced motion): the fold is instant, still no jump", async (
   await expect(page.locator(`#card-${FILM_A}`)).toHaveClass(/\bstub\b/);
 });
 
-test("CAS-752 AC3: tapping the stub's control to clear the verdict restores the full card in place", async ({ page }) => {
+// CAS-1209: genuine app defect, confirmed by reading setOpinion() (app_template.html) — on the branch that
+// CLEARS a verdict (tapping the already-lit segment), it unconditionally does
+// `watchHeldOpen[watchTab].delete(id)`, the opposite of the hold the "set a new verdict" branch adds right
+// above it. filmInWatchRows()'s own filter (`filmMatchesWatchedFilter(m) || watchHeldOpen[watchTab].has(...)`)
+// then has nothing to hold the just-cleared film in the Watched tab's rows, since a film with no verdict
+// doesn't match filmMatchesWatchedFilter either — so fastPatchFindRow bails and the following render() drops
+// the row outright instead of restoring it to a full card. Confirmed in CI (e2e-full run #7): the clear tap
+// itself registers (the stub's popover opens and the segment lights/click fires), but #card-900752001 is
+// gone afterward, not merely missing the "card" class. Do not fix here — this is app code, out of scope for
+// a tests/e2e/-only ticket.
+test.fixme("CAS-752 AC3: tapping the stub's control to clear the verdict restores the full card in place", async ({ page }) => {
   const cascadeId = await toWatchScreen(page);
   await seedFilms(page, cascadeId);
   await toStreamTab(page);

@@ -11,7 +11,13 @@ async function buildOnboardedAccount(page){
   await toListing(page);
 }
 
-const agentRow = (page, name) => page.locator(".agrow", { has: page.locator(".agname", { hasText: name }) });
+// CAS-1209: scoped to #agentsScreen — onbAgentRevealHTML() (the onboarding reveal step, app_template.html)
+// renders its own .agrow/.agname markup for the first-built agent and never removes it from the DOM once
+// the flow moves on, so an unscoped page-wide .agrow query here resolved to two elements (a Playwright
+// strict-mode violation) once the real Agents screen opened: the stale reveal row (bare WHO_LABELS text,
+// no occasions or alerts) alongside the real one (occasions + "🔔 Alerts on"). The Agents screen itself was
+// correct; only this helper's own query was too broad to say "on the Agents screen" as its title claims.
+const agentRow = (page, name) => page.locator("#agentsScreen .agrow", { has: page.locator(".agname", { hasText: name }) });
 
 test("CAS-1198 AC6: the Agents screen shows Alerts on for Massive Movies, and not for Personal Favs", async ({ page }) => {
   await buildOnboardedAccount(page);
