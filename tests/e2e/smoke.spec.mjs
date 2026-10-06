@@ -289,6 +289,10 @@ test("Watch listing rows' off-screen placeholder height matches their real heigh
 // condensedShowsScores(m) is false), not a sample, and adds a synthetic film with long badge/Budget/Gross
 // values so the check never again depends on the day's catalogue happening to contain that combination.
 test("Collapsed cinfo cards' off-screen placeholder height matches their real height, badge+Budget+Gross included (CAS-1214)", async ({ page }) => {
+  // Every off-screen cinfo row gets its own scrollIntoView + two rAFs, not a 12-row sample like CAS-1036's
+  // test above — on CI's WebKit runner that's measured over the 90s default (qa #957: timed out at exactly
+  // 90000ms with 39 other tests already passed), so this test alone gets more room than the suite default.
+  test.setTimeout(300_000);
   await freshApp(page);
   const diffs = await page.evaluate(async () => {
     const round = n => Math.round(n * 100) / 100;
