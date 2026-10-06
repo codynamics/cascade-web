@@ -455,6 +455,20 @@
   .fpwatchedlead{font-size:13px;font-weight:700;color:var(--dim);margin:0 0 8px}
   .fpwatched .csegs{display:flex;flex-direction:column;gap:3px}
   .fpfoot{font-size:12px;color:var(--faint);text-align:center;margin:0 0 20px}
+  /* CAS-1205: the member film page's confirmation panel (CAS-437 bandHTML.sub.fpconfirm) and its two Watch
+     On/Watched columns, side by side at the same phone width .fpwatched's single stacked ramp above already
+     proves fits — half that width each, still no inner scroll (same .csegs rule, just scoped under .fpcols
+     instead of .cpop/.fpwatched). */
+  .fpconfirm{display:flex;align-items:flex-start;gap:10px;background:rgba(23,212,146,.1);
+    border:1px solid rgba(23,212,146,.35);border-radius:11px;padding:12px 14px;margin:14px 0}
+  .fpconfirm .fpconfirmicon{color:#17d492;flex:0 0 auto;line-height:0;margin-top:1px}
+  .fpconfirm .fpconfirmicon svg{width:18px;height:18px;display:block}
+  .fpconfirmlead{font-size:14px;font-weight:800;color:var(--ink)}
+  .fpconfirmsub{font-size:12.5px;color:var(--dim);margin-top:2px}
+  .fpcols{display:flex;gap:10px;margin:14px 0}
+  .fpcol{flex:1;min-width:0}
+  .fpcollead{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);margin:0 0 8px}
+  .fpcols .csegs{display:flex;flex-direction:column;gap:3px}
   .filmpage .synopsis{margin-bottom:14px}
   .filmpage .mrow{margin-bottom:8px}
   /* CAS-885: the invite landing — added onto the ordinary film page once its token resolves (see
@@ -7431,7 +7445,91 @@ window.sendFilmInvite = async()=>{
 // `?answer=seen` landing (see applyPendingAnswer) — without recording any verdict itself; a verdict is
 // only ever recorded by the member tapping one of the ramp's own buttons (pickWatch, shared with the
 // ordinary Watched chip's popover via watchStepsSegmentsHTML).
+// CAS-1205: true for every film-page render except the invite landing (?inv=, CAS-885's own ask-panel
+// flow stays exactly as it was for every recipient, signed in or not — rule 10's "do not change"). Reads
+// window.CascadePersistence.accountActive() rather than calling accountActive() directly — that name is
+// local to the account-sync IIFE far below (same reason applyPendingAnswer's own header comment gives),
+// so this is the one way code above that IIFE can ask the same question. Not ready yet (the very first
+// boot-time openFilmPage() call, before the IIFE has even run) reads as signed-out, same as every other
+// early reader of this module (see INVITE_TOKEN's own comment below) — refreshOpenFilmPage() corrects the
+// page to the member version once sign-in actually resolves.
+function filmPageIsMember(){
+  return !INVITE_TOKEN && !!(window.CascadePersistence && window.CascadePersistence.accountActive());
+}
+// Rule 5's three Watch On answers: the confirmation panel's own lead text, and which of two sub-lines to
+// show, decided from the film's CURRENT status (the same field bandHTML's cur Slot/cinemaState reads) —
+// not from whatever the email happened to say, so a film that has since arrived gets the "now" line even
+// if the answer was given before it did.
+const FP_WATCH_ON_SAVED_TEXT = {
+  in_cinema:{lead:"watch at the Cinema", now:m=>cinemaState(m).key==="cinema",
+    nowSub:m=>`${esc(m.title)} is in cinemas now.`, laterSub:m=>`We'll alert you when ${esc(m.title)} opens.`},
+  rent:{lead:"watch on Rent", now:m=>m.status.includes("rental"),
+    nowSub:m=>`${esc(m.title)} is available to rent now.`,
+    laterSub:m=>`We'll alert you when ${esc(m.title)} is available to rent.`},
+  stream:{lead:"watch on Stream", now:m=>m.status.includes("included_streaming"),
+    nowSub:m=>`${esc(m.title)} is streaming now.`, laterSub:m=>`We'll alert you when ${esc(m.title)} is streaming.`},
+};
+// What the confirmation panel says, read live off the film's actual state — not a frozen copy of the
+// answer that opened the page — so a later tap on the page's own columns (toggleFilmOpt/pickNever/
+// pickWatch, all re-rendering through refreshOpenFilmPageFor) updates or clears the panel exactly as rule
+// 5's last paragraph asks. null means nothing is set: the panel doesn't show.
+function confirmPanelInfoFor(m){
+  const id=m.tmdb_id, op=opinionOf(id);
+  if(op==="notfor") return {lead:"Saved: Never", sub:`You won't hear about ${esc(m.title)} again.`};
+  const step=WATCH_STEPS.find(s=>s.key===op);
+  if(step) return {lead:`Saved: ${esc(step.lbl)}`, sub:"Marked as watched."};
+  const lvl=watchLevelsFor(id).filter(l=>!l.spent).find(l=>filmOptOn(id,l));
+  const text=lvl && FP_WATCH_ON_SAVED_TEXT[lvl.key];
+  if(!text) return null;
+  return {lead:`Saved: ${text.lead}`, sub: text.now(m) ? text.nowSub(m) : text.laterSub(m)};
+}
+function fpConfirmHTML(m){
+  const info=confirmPanelInfoFor(m);
+  if(!info) return "";
+  return `<div class="fpconfirm"><span class="fpconfirmicon">${ICON.watched}</span>
+    <div><div class="fpconfirmlead">${info.lead}</div><div class="fpconfirmsub">${info.sub}</div></div></div>`;
+}
+// Rule 3's WATCH ON column: one .cseg per window switched on in Service tracking (watchTabsNow's own
+// windowEnabled gating), ladder order — Cinema, [Premium], Rent, Stream when every window is on, which
+// collapses to the ticket's own "Cinema, Rent, Stream" whenever Premium (as on Lee's account) is off —
+// then Never, always. Tapping calls the exact functions the card's own Watch On panel (watchPanelRowsHTML)
+// calls, so a verdict given here can never drift from one given there.
+function fpWatchOnSegmentsHTML(id){
+  const levels=watchLevelsFor(id);
+  const segs=WATCH_LEVEL_KEYS.filter(windowEnabled).map(key=>{
+    const row=levels.find(l=>l.key===key);
+    const on=filmOptOn(id,row);
+    const label=WATCH_LEVEL_SHORT_LABEL[key];
+    const icon=WIN_ICON[WATCH_LEVEL_WIN_ICON[key]];
+    return `<button type="button" class="cseg${on?" on":""}" data-key="${key}" style="--segc:${row.cd};${on?`background:${row.cd};color:#fff`:""}"
+      onclick="toggleFilmOpt(${id},'${key}')" aria-pressed="${on}"
+      title="${escA(on?`${label} — tap to undo`:label)}"><span class="ci">${icon}</span><span class="cl">${esc(label)}</span></button>`;
+  });
+  const never=blocked.has(id);
+  segs.push(`<button type="button" class="cseg${never?" on":""}" data-key="never" style="--segc:#d0453f;${never?"background:#d0453f;color:#fff":""}"
+    onclick="pickNever(${id})" aria-pressed="${never}"
+    title="${escA(never?"Never — tap to undo":"Not for me — excludes it from your cascades")}"><span class="ci">${ICON.block}</span><span class="cl">Never</span></button>`);
+  return segs.join("");
+}
+// Rule 2's member layout: confirmation panel (only when there's something to confirm), the two columns,
+// Done. No membership pitch and no visitor footer — this member already has both.
+function filmPageMemberHTML(m){
+  const id=m.tmdb_id;
+  const confirm = filmPageConfirmId===id ? fpConfirmHTML(m) : "";
+  return `
+    <div class="fpclose"><button type="button" class="ebtn" onclick="closeFilmPage()"
+        title="Close" aria-label="Close">✕</button></div>
+    ${cardTopHTML(m)}
+    ${bandHTML(m)}
+    ${confirm}
+    <div class="fpcols">
+      <div class="fpcol"><div class="fpcollead">WATCH ON</div><div class="csegs">${fpWatchOnSegmentsHTML(id)}</div></div>
+      <div class="fpcol"><div class="fpcollead">WATCHED</div><div class="csegs">${watchStepsSegmentsHTML(id)}</div></div>
+    </div>
+    <button type="button" class="fpcta" onclick="closeFilmPage()">Done</button>`;
+}
 function filmPageHTML(m, showWatched){
+  if(filmPageIsMember()) return filmPageMemberHTML(m);
   const watchedHTML = showWatched ? `
     <div class="fpwatched">
       <div class="fpwatchedlead">Have you seen it?</div>
@@ -7450,12 +7548,17 @@ function filmPageHTML(m, showWatched){
 // one file) is a real, permanent, bookmarkable page for the film — see inviteUrlFor.
 const FILM_ROUTE_RE=/^#\/film\/(\d+)$/;
 const filmRouteId=()=>{ const m=FILM_ROUTE_RE.exec(location.hash); return m ? +m[1] : null; };
+// CAS-1205: which film's page (if any) is currently showing the confirmation panel — set by
+// applyPendingAnswer right before its own final openFilmPage() call, read by filmPageMemberHTML. Cleared on
+// close and whenever a DIFFERENT film is opened, same bleed-prevention reasoning as invmode just below.
+let filmPageConfirmId=null;
 function openFilmPage(id, showWatched){
   const m=MOVIES.find(x=>x.tmdb_id===id);
   const el=$("filmPage");
   // #filmPage is one shared element reused for every film opened — CAS-885's invmode class (added only once
   // resolveFilmInvite confirms this id's own invite) must not bleed into an unrelated film opened afterwards.
   el.classList.remove("invmode");
+  if(filmPageConfirmId!==id) filmPageConfirmId=null;
   el.innerHTML = m ? filmPageHTML(m, showWatched)
     : `<div class="fpclose"><button type="button" class="ebtn" onclick="closeFilmPage()">✕</button></div>
        <div class="fptitle">Film not found</div>
@@ -7473,10 +7576,23 @@ function openFilmPage(id, showWatched){
 }
 window.closeFilmPage=()=>{
   $("filmPage").classList.remove("open");
+  filmPageConfirmId=null;
   history.replaceState(null,"",location.pathname+location.search);   // drop #/film/<id> so a refresh doesn't reopen it
   if(!document.querySelector(".modal.open,.filmpage.open")) lockBodyScroll(false);
   document.title = DEFAULT_TITLE;
 };
+// CAS-1205: re-renders the open film page in place, in whichever version (member/visitor) and confirm
+// state currently apply — the one chokepoint every state-changing tap on its own columns (toggleFilmOpt/
+// pickNever/pickWatch, via their own repaint functions below) and every sign-in/out transition call
+// through, so the page can never go on showing a stale version or a stale "Saved: ..." line. A no-op when
+// no film page is open, or `id` isn't the one currently on screen.
+function refreshOpenFilmPageFor(id){
+  if(filmRouteId()===id && $("filmPage").classList.contains("open")) openFilmPage(id);
+}
+function refreshOpenFilmPage(){
+  const id=filmRouteId();
+  if(id!=null) refreshOpenFilmPageFor(id);
+}
 // CAS-1119 (Lee, 2026-10-01): the page's one action opens cascademovies.com itself — a fresh tab, not the
 // in-app signup flow this used to jump into — and leaves the invite page open behind it, so a recipient who
 // backs out of signing up still has the film and the ask panel to come back to. Capacitor's WKWebView/Android
@@ -8416,6 +8532,7 @@ function repaintWatchControl(id){
       if(newBtn){ newBtn.classList.add("open"); newBtn.setAttribute("aria-expanded","true"); }
     }
   });
+  refreshOpenFilmPageFor(id);   // CAS-1205: keep the film page's own WATCH ON column (if open on this film) in step
 }
 window.toggleFilmOpt=(id,key)=>{
   const levels=watchLevelsFor(id);
@@ -9715,6 +9832,12 @@ function applyDeepLink(){
 // stream one below must SET rather than toggle — toggleFilmOpt/setOpinion are real toggles, so a
 // second open of the same email link would otherwise clear what the first open set. Guard both: only
 // call through when the film doesn't already carry that exact answer.
+// CAS-1205: the toast these three branches used to show is gone — applyPendingAnswer only ever runs once
+// sign-in is confirmed (this function's own header comment), so every landing it produces is now a member
+// one, and the film page's own confirmation panel (filmPageConfirmId, read by filmPageMemberHTML) says the
+// same thing in the place the member is already looking, instead of a banner that scrolls off unseen
+// (rule 6; this is the bug CAS-1205 itself reports). "seen" keeps showing no confirmation of any kind —
+// nothing has been recorded yet, the Watched column is there to answer in.
 function applyPendingAnswer(){
   const value = pendingAnswer; if(!value) return;
   pendingAnswer = null;
@@ -9724,20 +9847,18 @@ function applyPendingAnswer(){
   const watchedStep = WATCH_STEPS.find(s=>s.key===value);
   if(value==="never"){
     pickNever(id);
-    toast(`${m.title} — marked not interested`);
   } else if(value==="seen"){
+    filmPageConfirmId=null;
     openFilmPage(id, true);
     return;
   } else if(watchedStep){
     if(opinionOf(id)!==value) setOpinion(id, value);
-    toast(`${m.title} — marked ${watchedStep.lbl}`);
   } else {
     const key = value==="cinema" ? "in_cinema" : value;   // rent/stream already match WATCH_LEVEL_KEYS
     const row = watchLevelsFor(id).find(l=>l.key===key);
     if(!row || !filmOptOn(id,row)) toggleFilmOpt(id, key);
-    const say = value==="cinema" ? "at the cinema" : value==="rent" ? "when it's to rent" : "when it's streaming";
-    toast(`${m.title} — you'll watch it ${say}`);
   }
+  filmPageConfirmId=id;
   openFilmPage(id);
 }
 // CAS-823: the same agent+occasion scope as watchScopeRows above, but narrowed only by the tab's own Watch
@@ -19467,6 +19588,7 @@ function fastPatchFindRow(id){
 }
 function repaintAfterOpinion(id){
   recomputeFound();
+  refreshOpenFilmPageFor(id);   // CAS-1205: keep the film page's own WATCHED column/confirm panel (if open on this film) in step
   if(fastPatchFindRow(id)) return;                     // instant single-node swap
   render();                                            // fallback (off-screen cards skip layout, so cheap)
 }
@@ -20491,6 +20613,7 @@ else if(dedupedN)
     try{ localStorage.setItem("cascade_had_account","0"); }catch(e){}
     recomputeFound();
     if(typeof render==="function") render();
+    refreshOpenFilmPage();   // CAS-1205: signed out — drop back to the visitor film page (rule 9) if one's open
   }
   let currentUser = null;
   window.addEventListener("cascade-auth-change", () => {
@@ -20507,6 +20630,11 @@ else if(dedupedN)
         // requires. membCompleteNewMembership() clears the flag and drives the equivalent fan-out itself
         // once that RPC actually resolves.
         if(!onbMembershipInFlight) fireAccountFanout('auth-change');
+        // CAS-1205: unconditional, ahead of applyPendingAnswer — swaps an already-open film page from the
+        // visitor to the member version even when there's no pending answer to apply (rule 9). When there
+        // IS one, applyPendingAnswer's own final openFilmPage() call right below runs second and wins,
+        // adding the confirmation panel on top.
+        refreshOpenFilmPage();
         applyPendingAnswer();   // CAS-1196: signed in, confirmed just now — see applyPendingAnswer's own comment
       }
     } else if(currentUser !== null){
@@ -20519,6 +20647,7 @@ else if(dedupedN)
     currentUser = uid();
     try{ localStorage.setItem("cascade_had_account","1"); }catch(e){}
     fireAccountFanout('boot-restore');
+    refreshOpenFilmPage();   // CAS-1205: same reasoning as the auth-change listener's own call, just above
     applyPendingAnswer();   // CAS-1196: already signed in at boot — see applyPendingAnswer's own comment
     reRegisterPushIfGranted();   // CAS-1194: keep this device's APNs token fresh, every launch
   }
