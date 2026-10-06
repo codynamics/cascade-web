@@ -362,6 +362,21 @@ def _load_real_film_state(out_dir: str):
         return json.load(fh)
 
 
+def cleanup_stale_real_film(store, target_user: str, stale: dict, cleanup: bool = True) -> int:
+    """CAS-1207: now that verify() counts a real-film row instead of deleting it (so the member
+    keeps seeing it in Alerts), a leftover row from an EARLIER arm in this --out-dir would
+    otherwise sit in the ledger forever and permanently block find_real_film() from re-choosing
+    the same film for a repeat run — its own de-dupe check (`already` in find_real_film) treats
+    any existing (cascade, movie, moment) row as "already notified". Deletes it regardless of age
+    (store.delete_notifications_for_user_film(..., since="") — "" sorts before every real
+    timestamp, so every matching row qualifies), via the SAME store method the old delete-on-
+    verify behaviour used. `stale` is the earlier run's real_film_armed.json contents (None if
+    there wasn't one); skipped entirely under --no-cleanup."""
+    if stale is None or not cleanup:
+        return 0
+    return store.delete_notifications_for_user_film(target_user, stale["tmdb_id"], stale["moment"], "")
+
+
 def _snapshot_run_stats(out_dir: str) -> None:
     """CAS-1052: today's runstats.py totals, taken right before `python -m monitor` runs, so
     --verify can isolate THIS run's own email/push attempted/delivered deltas from whatever a same-
@@ -385,35 +400,36 @@ def _section_delta(before: dict, after: dict, section: str) -> dict:
 
 def report_and_verify(store, target_user: str, films: list, before_stats: dict, after_stats: dict,
                        real_film: dict = None) -> tuple:
-    """CAS-1052/CAS-1203: the harness's proof step. Deletes this run's own ledger rows (their
-    count IS "in-app rows written" — CAS-486's ledger doubles as the in-app delivery for every
-    channel that succeeded, see matching.Hit.notification_row), reports the run's email/push
-    attempted/delivered deltas and the target user's registered push-token count, and returns
-    (returncode, message) — a tuple rather than exiting directly, so this is unit-testable without
-    a process boundary.
+    """CAS-1052/CAS-1203/CAS-1207: the harness's proof step. In fixture mode, deletes this run's
+    own ledger rows (their count IS "in-app rows written" — CAS-486's ledger doubles as the in-app
+    delivery for every channel that succeeded, see matching.Hit.notification_row). In real-film
+    mode (CAS-1207), it COUNTS instead: the row stays in the member's own Alerts, where it was
+    delivered. Reports the run's email/push attempted/delivered deltas and the target user's
+    registered push-token count, and returns (returncode, message) — a tuple rather than exiting
+    directly, so this is unit-testable without a process boundary.
 
     real_film : None for fixture mode (unchanged: the fixture-range ledger sweep, plus tearing
                 down arm_watch()'s temporary Watch-it tick). Otherwise {"tmdb_id", "title",
-                "moment", "cascade_name", "armed_at"} — CAS-1203's real-film mode: delete ONLY the
-                (target_user, tmdb_id, moment) ledger rows created at or after `armed_at`
-                (store.delete_notifications_for_user_film(), never the fixture-range sweep — a
-                real film's id lives outside that range by definition), and there is no tick to
-                tear down (none was ever armed). Names the film and agent in the report line
-                (AC4); fixture mode says "fixture" instead.
+                "moment", "cascade_name", "armed_at"} — CAS-1203's real-film mode: COUNT (CAS-1207;
+                never delete) the (target_user, tmdb_id, moment) ledger rows created at or after
+                `armed_at` (store.count_notifications_for_user_film(), never the fixture-range
+                sweep — a real film's id lives outside that range by definition), and there is no
+                tick to tear down (none was ever armed). Names the film and agent in the report
+                line (AC4); fixture mode says "fixture" instead.
 
-    A `removed` count of zero is the ONLY failure signal: it means no channel wrote a ledger row for
+    A `found` count of zero is the ONLY failure signal: it means no channel wrote a ledger row for
     `target_user` this run — exactly the silent-green failure this ticket exists to catch. The
     run_stats deltas and push-token count are reported for visibility (so "no device registered" or
     "email never even attempted" is legible), not as a second gate.
     """
     if real_film is not None:
-        removed = store.delete_notifications_for_user_film(
+        found = store.count_notifications_for_user_film(
             target_user, real_film["tmdb_id"], real_film["moment"], real_film["armed_at"])
         watch_removed = 0
         subject = f"film {real_film['title']!r} [{real_film['tmdb_id']}] via agent {real_film['cascade_name']!r}"
     else:
         ids = [f["tmdb_id"] for f in films]
-        removed = store.delete_notifications_for_movie_ids(ids)
+        found = store.delete_notifications_for_movie_ids(ids)
         watch_removed = store.delete_film_watch_for_movie_ids(ids)
         subject = "fixture"
 
@@ -422,13 +438,13 @@ def report_and_verify(store, target_user: str, films: list, before_stats: dict, 
     push_delta = _section_delta(before_stats, after_stats, "push")
 
     message = (
-        f"[notify_test] verify target_user={target_user} ({subject}): in-app rows written {removed}; "
+        f"[notify_test] verify target_user={target_user} ({subject}): in-app rows written {found}; "
         f"email attempted {email_delta['attempted']}/delivered {email_delta['delivered']}; "
         f"push attempted {push_delta['attempted']}/delivered {push_delta['delivered']}; "
         f"{push_tokens} registered push token(s) for this user"
         + (f"; cleaned up {watch_removed} temporary Watch-it row(s)." if real_film is None else ".")
     )
-    if removed == 0:
+    if found == 0:
         return 1, message + (" FAILED: 0 alert(s) were recorded for this user — the harness "
                               "cannot prove delivery.")
     return 0, message
@@ -489,8 +505,21 @@ def _run_arm(args, target_user: str, films: list) -> int:
     # CAS-1203: never let a stale real-film state from an earlier run in this --out-dir leak into
     # this run's --verify, whichever path below is taken.
     real_state_path = os.path.join(args.out_dir, REAL_FILM_STATE_NAME)
+    stale_real_film = _load_real_film_state(args.out_dir)
     if os.path.exists(real_state_path):
         os.remove(real_state_path)
+
+    # CAS-1207: verify() no longer deletes a real-film row once delivered (so the member keeps
+    # seeing it), so a repeat run needs its own cleanup here instead — otherwise that earlier run's
+    # leftover row would permanently block find_real_film() from re-choosing the same film.
+    if stale_real_film is not None and store is not None:
+        if args.cleanup:
+            removed = cleanup_stale_real_film(store, target_user, stale_real_film, args.cleanup)
+            print(f"[notify_test] pre-send cleanup: removed {removed} earlier ledger row(s) for "
+                  f"{stale_real_film.get('title')!r} [{stale_real_film.get('tmdb_id')}] "
+                  f"moment={stale_real_film.get('moment')!r}, whatever their age.")
+        else:
+            print("[notify_test] --no-cleanup: leaving the earlier armed film's ledger row(s) in place.")
 
     y_path = os.path.join(args.out_dir, "yesterday.json")
     t_path = os.path.join(args.out_dir, "today.json")
