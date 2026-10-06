@@ -3261,6 +3261,14 @@
      is chosen from real per-card data, not guessed at build time. 194px (not 219px — see the note above on
      .card:not(.expanded)) measured back as a 219.03px placeholder, matching the real height. */
   .card:not(.expanded).densescores{contain-intrinsic-size:auto 194px}
+  /* CAS-1214: the taller measured height for a collapsed cinfo card whose r-cinfo row carries a badge AND
+     a Gross figure (so it holds three items — badge, Budget, Gross — alongside the always-present Budget
+     cell) — see denseCinfo and the .mrow.r-cinfo .condbadge flex-basis rule below, which forces that same
+     combination to wrap every time rather than leaving it to how wide that film's figures happen to render.
+     197px authored measured back near the real two-line row height (CAS-1214's own measurement: 223px on
+     a card holding exactly those three items), the same zoom-driven authored-vs-real gap documented above
+     on .densescores. */
+  .card.cinfo:not(.expanded).densecinfo{contain-intrinsic-size:auto 197px}
   .card:not(.expanded) .cbody{padding:6px 10px}
   .card:not(.expanded) .ctop{
     grid-template-columns:30px minmax(0,1fr);
@@ -3309,6 +3317,12 @@
   .card.cinfo:not(.expanded) .mrow.r-cinfo button.m{padding:0;background:none;border:none;font-size:11px;line-height:1.2;white-space:nowrap}
   .card.cinfo:not(.expanded) .mrow.r-cinfo .m b{font-size:11px}
   .card.cinfo:not(.expanded) .mrow.r-cinfo .lab{font-size:10px}
+  /* CAS-1214: same deterministic-wrap treatment as .mrow.r-scores .condbadge above — a badge on this row
+     wraps it (own line) whenever the film also has a Gross figure, every time, rather than coming down to
+     whether that film's badge+Budget+Gross text happens to fit this row's width. Budget alone alongside a
+     badge still fits one line (the measured, unforced case every other cinfo card is in), so this only
+     fires together with denseCinfo (cardHTML), which is also what picks the taller placeholder above. */
+  .card.cinfo:not(.expanded).densecinfo .mrow.r-cinfo .condbadge{flex-basis:100%}
   /* availability band: one compact line */
   .card:not(.expanded) .bandw{padding:5px 10px}
   .card:not(.expanded) .avail2{min-height:20px}
@@ -8035,16 +8049,24 @@ function cardHTML(m, markNew=false, {hideDismiss=false}={}){
   // fix (.mrow.r-scores .condbadge{flex-basis:100%}) makes ANY badge on this row wrap it, every time, rather
   // than leaving it to how many characters happen to be in that film's score digits — so any badge at all
   // means the taller placeholder, not just two of the four tiers. cinfoCard is excluded: its row is
-  // .mrow.r-cinfo, a different flex row (badge + budget + gross) that measured as never wrapping regardless
-  // of badge, so giving it the taller placeholder would itself create the same mismatch in reverse.
+  // .mrow.r-cinfo, a different flex row (badge + Budget + Gross) — see denseCinfo just below for when THAT
+  // row wraps and needs its own taller placeholder; the two classes are mutually exclusive since a card is
+  // never both (cinfoCard is the gate on each).
   const denseScores = !!badge && !cinfoCard;
+  // CAS-1214: .mrow.r-cinfo wraps to two lines when it holds all three possible items — badge, Budget and
+  // Gross (Budget alone is always there; see moneyRowHTML/budgetCell) — the combination CAS-1036's original
+  // "r-cinfo never wraps" assumption missed (true for badge+Budget alone, false once Gross joins them: qa
+  // #954/#955, CAS-1214). Gated on the film's own data (badge present AND a real worldwide_gross), not on
+  // how wide that film's figures happen to render, so it always agrees with the CSS rule (.mrow.r-cinfo
+  // .condbadge{flex-basis:100%} under .densecinfo) that forces the same wrap, deterministically, every time.
+  const denseCinfo = cinfoCard && !!badge && m.worldwide_gross>0;
   // What's new is a fact about the film — the day Cascade first picked it up — so it is stated ON the film,
   // and nowhere else (CAS-107). It no longer decides where the film sits in the list, and the header no longer
   // dresses the whole list up as news; the chip just tells you which of these you haven't seen before.
   // CAS-135: the "New this week" and "Past opening weekend" chips are removed — too many tags. What's new
   // is still tracked (freshness) but no longer chipped on the card title. (markNew is kept in the signature
   // for callers but no longer rendered.)
-  return `<div class="card ${expandedSet.has(id)?'expanded':''} ${cinfoCard?'cinfo':''} ${denseScores?'densescores':''}" id="card-${id}">
+  return `<div class="card ${expandedSet.has(id)?'expanded':''} ${cinfoCard?'cinfo':''} ${denseScores?'densescores':''} ${denseCinfo?'densecinfo':''}" id="card-${id}">
     <div class="cbody" onclick="cardTap(event,${id})">
       ${cardTopHTML(m)}
     </div>

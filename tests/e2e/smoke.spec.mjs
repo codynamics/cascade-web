@@ -283,6 +283,53 @@ test("Watch listing rows' off-screen placeholder height matches their real heigh
   expect(maxDiff, `placeholder→real height mismatches sampled: ${JSON.stringify(diffs)}`).toBeLessThan(10);
 });
 
+// CAS-1214: the test above only samples every 15th off-screen row, so it caught today's one real offender
+// (a cinfo card whose r-cinfo row carries a badge, Budget AND Gross — see denseCinfo in cardHTML) only by
+// the luck of which index landed in the sample. This test covers every cinfo row (every film for which
+// condensedShowsScores(m) is false), not a sample, and adds a synthetic film with long badge/Budget/Gross
+// values so the check never again depends on the day's catalogue happening to contain that combination.
+test("Collapsed cinfo cards' off-screen placeholder height matches their real height, badge+Budget+Gross included (CAS-1214)", async ({ page }) => {
+  await freshApp(page);
+  const diffs = await page.evaluate(async () => {
+    const round = n => Math.round(n * 100) / 100;
+    // Same shape real catalogue records use (see cardHTML's own field reads) — budget, gross and
+    // popularity pushed to the hundreds-of-millions/top-of-the-ladder range so this film always gets a
+    // badge and a Gross cell, regardless of what today's real catalogue happens to contain.
+    const synthetic = {
+      tmdb_id: 900000001, title: "CAS-1214 Synthetic Blockbuster", year: "2026", genres: ["Action"],
+      cinema_date: "2026-12-25", age_rating: "M", worldwide_gross: 950000000, budget: 300000000,
+      popularity: 999999, synopsis: "CAS-1214 fixture film — not a real catalogue title.",
+      language: "en", culture: "Western", poster: null, trailers: [], director: "Test Director", cast: [],
+      award: null, award_text: "", offers: [], status: ["in_cinema"],
+      window_dates: { in_cinema: "2026-12-25" }, availability_confidence: "estimated", cinema_release: true,
+      release_dates: [], wm_user_rating: null, wm_critic_score: null, wm_popularity_percentile: 99.99,
+      outcome: "scored", jw_link: null,
+    };
+    const cinfoSample = MOVIES.filter(m => m && m.tmdb_id && !condensedShowsScores(m));
+    const sample = [...cinfoSample, synthetic];
+    const container = document.createElement("div");
+    container.id = "groups";
+    document.body.appendChild(container);
+    container.innerHTML = sample.map(m => cardHTML(m)).join("");
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    const rows = [...container.querySelectorAll(".card.cinfo:not(.expanded)")]
+      .filter(el => el.getBoundingClientRect().top > window.innerHeight * 2);
+    const out = [];
+    for(const el of rows){
+      const before = round(el.getBoundingClientRect().height);
+      el.scrollIntoView({ block: "center" });
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      out.push(round(Math.abs(el.getBoundingClientRect().height - before)));
+    }
+    container.remove();
+    return out;
+  });
+  expect(diffs.length).toBeGreaterThan(5);   // actually sampled off-screen cinfo rows, not an empty list
+  const maxDiff = Math.max(...diffs);
+  expect(maxDiff, `placeholder→real height mismatches, every cinfo row: ${JSON.stringify(diffs)}`).toBeLessThan(10);
+});
+
 // CAS-933 reverses CAS-644: a cold load lands on Watch, never Moving. Moving stays reachable from its own
 // chip, so the CAS-649 regression this test also covers (Moving rendered at inset:0, z-index:84, covering
 // the header — a screen with no navigation and no way out) is now checked there instead of on cold load.
