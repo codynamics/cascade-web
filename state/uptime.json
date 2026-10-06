@@ -1,7 +1,7 @@
 {
-  "lastRun": "2026-10-06T16:17:51.426Z",
-  "consecutiveReds": 0,
-  "slowConsecutiveReds": 0,
+  "lastRun": "2026-10-06T17:17:53.963Z",
+  "consecutiveReds": 1,
+  "slowConsecutiveReds": 1,
   "fastRedNames": [],
   "lastAlertedRedNames": null,
   "lastAlertAt": "2026-09-18T22:17:49.627Z",
@@ -10,56 +10,56 @@
     {
       "name": "site_up",
       "ok": true,
-      "ms": 716,
+      "ms": 725,
       "detail": "HTTP 200, version 1.0.0"
     },
     {
       "name": "movies_json",
       "ok": true,
-      "ms": 619,
+      "ms": 918,
       "detail": "5885 record(s), parses."
     },
     {
       "name": "supabase_canary",
       "ok": true,
-      "ms": 3394,
+      "ms": 2442,
       "detail": "4 agent(s), 1 admitted film(s), film_watch read OK."
     },
     {
       "name": "signup",
       "ok": true,
-      "ms": 1028,
-      "detail": "created and removed lee+probe-1791303468763@codynamics.com.au via delete_my_account."
+      "ms": 888,
+      "detail": "created and removed lee+probe-1791307070696@codynamics.com.au via delete_my_account."
     },
     {
       "name": "orphan_probe_accounts",
       "ok": true,
-      "ms": 232,
+      "ms": 194,
       "detail": "no probe account older than 2h."
     },
     {
       "name": "usage_events_insert",
       "ok": true,
-      "ms": 266,
+      "ms": 520,
       "detail": "HTTP 201"
     },
     {
       "name": "pages_head",
       "ok": true,
-      "ms": 183,
+      "ms": 358,
       "detail": "HEAD https://cascade-web-3x1.pages.dev/ -> HTTP 200"
     },
     {
       "name": "daily_refresh_fresh",
       "ok": true,
-      "ms": 661,
-      "detail": "last \"Daily refresh\" commit 10.3h ago (floor 30h)."
+      "ms": 654,
+      "detail": "last \"Daily refresh\" commit 11.3h ago (floor 30h)."
     },
     {
       "name": "alerts_ran",
-      "ok": true,
-      "ms": 292,
-      "detail": "last successful alerts.yml run 10.3h ago (floor 30h)."
+      "ok": false,
+      "ms": 652,
+      "detail": "last successful alerts.yml run 35.3h ago (floor 30h)."
     }
   ]
 }
