@@ -68,14 +68,16 @@ async function firstMovieId(page){
   return page.evaluate(() => MOVIES[0].tmdb_id);
 }
 
-// CAS-1160: confirmed app defect, not a fixture-length coincidence — reproduced locally on a clean run:
-// scrollHeight=744 vs innerHeight=664 (ios/webkit project, 390x844 viewport). .filmpage.invmode's content
-// (cardTopHTML + bandHTML, reused verbatim per CAS-1119, plus the 2-line-clamped synopsis and the
-// .fpinvite ask panel) is taller than the viewport, so the invite landing isn't the single, no-scroll
-// screen this ticket's own header comment describes. The sender-naming half of this assertion already
-// passes; only the no-scroll half is the defect, named here as the first repair round's own ambiguity.
+// CAS-1211: fixed. #filmPage is a fixed, viewport-exact overlay with its own overflow-y:auto, so its own
+// content was never what grew document.scrollingElement.scrollHeight — .phone (the home screen underneath,
+// position:relative, in normal flow, taller than one viewport on EVERY page) was, invisibly, the whole
+// time. invlock (app_template.html: resolveFilmInvite/openFilmPage/closeFilmPage) hides .phone for exactly
+// as long as the invite ask panel shows; the money/scores/badge/awards/credits rows and the membership
+// CTA/footer are hidden too, on the merits (CAS-885 drew the line at "the film, who invited you, Yes and
+// No"), not because they were the actual cause here. The sender-naming half of this assertion already
+// passed; only the no-scroll half was the defect.
 // AC2a: the ask panel names the sender, and the page does not scroll at the 390x844 project viewport.
-test.fixme("CAS-885 AC2a: a resolving invite renders the ask panel naming the sender, and the page does not scroll", async ({ page }) => {
+test("CAS-885 AC2a: a resolving invite renders the ask panel naming the sender, and the page does not scroll", async ({ page }) => {
   const id = await firstMovieId(page);
   await gotoInvite(page, { token: "cas885-tok-1", id, invitesByToken: { "cas885-tok-1": { sender_name: "Lee" } } });
 

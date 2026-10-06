@@ -471,14 +471,28 @@
   .fpcols .csegs{display:flex;flex-direction:column;gap:3px}
   .filmpage .synopsis{margin-bottom:14px}
   .filmpage .mrow{margin-bottom:8px}
-  /* CAS-885: the invite landing — added onto the ordinary film page once its token resolves (see
-     resolveFilmInvite), never present without ?inv=. A 2-line synopsis clamp buys back the room the ask
-     panel needs. Scoped under .invmode so the everyday film page (no invite) is untouched — same reasoning
-     as CAS-437's own page. */
+  /* CAS-885/CAS-1211: the invite landing — added onto the ordinary film page once its token resolves (see
+     resolveFilmInvite), never present without ?inv=. CAS-885 drew the line at "the film, who invited you,
+     Yes and No" — everything else in cardTopHTML (money/scores/badge/awards/credits) is the full listing's
+     own depth, not a fact this screen asks about, so it is hidden rather than trimmed; the 2-line synopsis
+     clamp keeps the one fact (what it's about) a scroll-free layout has no other room for. The membership
+     CTA + footer below the ask panel's own buttons go too — a recipient answering Yes/No has no account to
+     join with, so the pitch is both redundant and (CAS-1211) part of what pushed the page past one screen.
+     Scoped under .invmode so the everyday film page (no invite) is untouched — same reasoning as CAS-437's
+     own page. CAS-1211: .phone (the home screen underneath, position:relative and in normal flow) is taller
+     than one viewport on every page — ordinarily invisible, scrolled behind whatever fixed-position overlay
+     is open, but still part of the DOCUMENT's own layout height, which is what a recipient's real scroll
+     gesture (and this ticket's own Playwright check, document.scrollingElement.scrollHeight) actually sees.
+     invmode is the one state where that has to not be true, so resolveFilmInvite (below) marks <body> too,
+     and .phone — fully hidden behind #filmPage's own opaque, viewport-filling, same `--bg` background either
+     way — is removed from layout for exactly as long as the invite ask panel is showing. */
   .fpword{font-family:var(--font-body);font-weight:500;letter-spacing:.4em;font-size:13px;color:var(--accenttext);
     text-align:center;padding-left:.4em;margin:0 0 10px}
   .filmpage.invmode .synopsis{-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;
     overflow:hidden;margin-bottom:14px}
+  .filmpage.invmode .mrow,.filmpage.invmode .credits,.filmpage.invmode .fpcta,.filmpage.invmode .fpfoot,
+  .filmpage.invmode .fphr{display:none}
+  body.invlock .phone{display:none}
   .fpinvite{border:1px solid var(--line);border-radius:14px;padding:18px;margin:14px 0;text-align:center}
   .fpinvite-ask{font-size:16px;font-weight:700;line-height:1.4;margin:0 0 16px;color:var(--ink)}
   .fpinvite-ask b{color:var(--accenttext)}
@@ -7572,7 +7586,9 @@ function openFilmPage(id, showWatched){
   const el=$("filmPage");
   // #filmPage is one shared element reused for every film opened — CAS-885's invmode class (added only once
   // resolveFilmInvite confirms this id's own invite) must not bleed into an unrelated film opened afterwards.
+  // CAS-1211: body's invlock (see resolveFilmInvite) rides along with it for the same reason.
   el.classList.remove("invmode");
+  document.body.classList.remove("invlock");
   if(filmPageConfirmId!==id) filmPageConfirmId=null;
   el.innerHTML = m ? filmPageHTML(m, showWatched)
     : `<div class="fpclose"><button type="button" class="ebtn" onclick="closeFilmPage()">✕</button></div>
@@ -7591,6 +7607,7 @@ function openFilmPage(id, showWatched){
 }
 window.closeFilmPage=()=>{
   $("filmPage").classList.remove("open");
+  document.body.classList.remove("invlock");   // CAS-1211: never leaves .phone hidden once the invite page closes
   filmPageConfirmId=null;
   history.replaceState(null,"",location.pathname+location.search);   // drop #/film/<id> so a refresh doesn't reopen it
   if(!document.querySelector(".modal.open,.filmpage.open")) lockBodyScroll(false);
@@ -7666,6 +7683,11 @@ async function resolveFilmInvite(token, id, c){
   const cta=el.querySelector(".fpcta");
   if(!cta) return;
   el.classList.add("invmode");
+  // CAS-1211: the home screen behind this fixed, viewport-filling overlay (.phone, position:relative, in
+  // normal flow) is taller than one viewport on every page — invisible, since #filmPage fully covers it, but
+  // still part of the document's own scrollable height. A recipient's real scroll gesture (and this ticket's
+  // own Playwright check) sees that, not #filmPage's own content, so it is what invlock hides.
+  document.body.classList.add("invlock");
   const close=el.querySelector(".fpclose");
   if(close && !el.querySelector(".fpword")) close.insertAdjacentHTML("afterend", `<div class="fpword">CASCADE</div>`);
   const sender=esc(rows[0].sender_name || "Someone");
