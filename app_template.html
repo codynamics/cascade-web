@@ -9819,6 +9819,34 @@ function applyDeepLink(){
   }
   logEvent("deeplink_applied", {dest});
 }
+// CAS-1206: a notification tap always lands on Alerts (Today), never the film page (CAS-466's
+// openNotifyFilm, retired) — closes anything sitting on top of the main app first, then scrolls the
+// tapped film's row into view if it's one Alerts is currently showing. id may be null (no movie_id, or
+// it doesn't match any row shown) — scrolling is then simply skipped.
+function openAlertsFromPush(id){
+  if($("filmPage").classList.contains("open")) closeFilmPage();
+  if(watchSheetOpen) closeWatchSheet();
+  if($("navMenu").classList.contains("open")) closeNavMenu();
+  openMovingScreen();
+  if(id){
+    const row=document.querySelector(`#movingScreen [id="card-${id}"]`);
+    if(row) row.scrollIntoView({behavior:"smooth", block:"center"});
+  }
+}
+// A push tap that arrives before the main app is actually on screen (sign-in restore or first-run still
+// deciding) is held here and applied once boot finishes — the same pendingDeepLink/applyDeepLink()
+// pattern just above, for the same reason, at the same three call sites (membStartWork/afterSignIn/the
+// boot path's own "onboarding already seen" branch). A tap that arrives while onboarding is actively on
+// screen (flowOn/briefOn) is never queued at all — see the listener itself, further down.
+let pendingPushAlert=false;
+let pendingPushAlertId=null;
+async function applyPendingPushAlert(){
+  if(!pendingPushAlert) return;
+  pendingPushAlert=false;
+  const id=pendingPushAlertId; pendingPushAlertId=null;
+  openAlertsFromPush(id);
+  await markRealAlertsRead();
+}
 // CAS-1196: consumes pendingAnswer (set at boot from ?answer=, the alert email's own link) — called
 // once this device's account is confirmed signed in (both call sites below are the exact two places
 // fireAccountFanout() itself runs from: a session already restored by boot, or one that resolves a
@@ -18971,6 +18999,7 @@ async function membStartWork(viaNewSignup){
   // already seen" branch. After closeMembership() so a "family" destination's Briefing overlay isn't
   // stacking on top of it (same ordering onbMembBack() already uses the other way).
   applyDeepLink();
+  applyPendingPushAlert();   // CAS-1206: same "first run genuinely finished" moment, for a held push tap
   // CAS-976: first listing paint after finishing onboarding — the one automatic trigger point. After
   // applyDeepLink() so a deep-link destination it opened wins; maybeStartTutorial's own "any other screen
   // open" check is what actually enforces that.
@@ -19936,6 +19965,7 @@ function afterSignIn(){
     openCascade(cascades[0].id);
     logEvent("signin_returning",{cascades:cascades.length});
     applyDeepLink();   // CAS-962: arrival, same as the boot path's "onboarding already seen" branch
+    applyPendingPushAlert();   // CAS-1206: same arrival moment, for a held push tap
     return;
   }
   showFoundList(); render();
@@ -20001,6 +20031,7 @@ else if(!openedShared){
   const landingTab = pickLandingWatchTab();
   if(landingTab !== watchTab){ watchTab = landingTab; render(); }
   applyDeepLink();   // CAS-962: onboarding already seen — a returning user's cold boot is safe to act on now
+  applyPendingPushAlert();   // CAS-1206: same "boot decided, safe to act now" moment, for a held push tap
   maybeStartTutorial();   // CAS-976: a returning user who finished onboarding before this shipped, or
                            // skipped it too fast to see all five cards, still gets it once on a normal boot.
 }
@@ -21242,11 +21273,12 @@ else if(dedupedN)
       .eq("user_id", owner).is("read_at", null);
     if(error){ console.warn("notifications mark-read", error); logSyncFailed("notifications", error); }
   };
-  // CAS-466: tap-to-open + foreground handling. Native only, registered once at boot (not inside
-  // registerPush(), which only runs when the user exercises the in-app toggle) — a tap can launch
-  // the app cold, before any toggle interaction this session, and the plugin still delivers the
-  // queued action to a listener attached now. Reuses openNotifyFilm (opens the film's card) and the
-  // same loadRealAlerts/markRealAlertsRead select+update Moving already runs.
+  // CAS-466/CAS-1206: tap-to-open + foreground handling. Native only, registered once at boot (not
+  // inside registerPush(), which only runs when the user exercises the in-app toggle) — a tap can
+  // launch the app cold, before any toggle interaction this session, and the plugin still delivers the
+  // queued action to a listener attached now. A tap always lands on Alerts now (openAlertsFromPush,
+  // CAS-1206), never the film page (CAS-466's original openNotifyFilm) — same loadRealAlerts/
+  // markRealAlertsRead select+update Moving already runs.
   // Badge note: the OS app-icon badge itself has no client-side set/clear call in this plugin version
   // (@capacitor/push-notifications 8.1.2 exposes no badge API) — it is kept correct at delivery time
   // by the `badge` the monitor already computes into each push's `aps.badge` (CAS-465/pusher.py). The
@@ -21259,8 +21291,18 @@ else if(dedupedN)
         const data=(action && action.notification && action.notification.data) || {};
         const id=Number(data.movie_id);
         await loadRealAlerts();
-        if(id) openNotifyFilm(id);
-        await markRealAlertsRead();
+        // CAS-1206: onboarding actively on screen (flowOn/briefOn) drops the tap outright — it is never
+        // queued, so finishing onboarding later does not reopen it. Otherwise, if the main app is
+        // already up (onboardingSeen()), open Alerts now; if boot/sign-in restore is still deciding,
+        // hold it for applyPendingPushAlert() — the same membStartWork/afterSignIn/boot call sites that
+        // already drive applyDeepLink() for ?dl=.
+        if(flowOn || briefOn) return;
+        if(onboardingSeen()){
+          openAlertsFromPush(id || null);
+          await markRealAlertsRead();
+        } else {
+          pendingPushAlert=true; pendingPushAlertId=id || null;
+        }
       });
     }
     // CAS-524: universal-link tap (from a notification email) delivers the full tapped URL here —
