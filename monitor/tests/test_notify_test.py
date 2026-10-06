@@ -8,8 +8,11 @@ Covers the things that actually make "intense test cycles" safe and possible:
   - CAS-1203: find_real_film() picks a real, admitted-and-placed film when one qualifies; never a
     film already carrying a ledger row, film_watch row, or verdict on the account; falls back
     (None) when nothing qualifies; build_real_catalogues() moves only the chosen film back one
-    step, yielding exactly one transition; report_and_verify()'s real-film mode deletes only this
-    run's own rows.
+    step, yielding exactly one transition.
+  - CAS-1207: report_and_verify()'s real-film mode COUNTS this run's own row rather than deleting
+    it (so it stays visible in the member's own Alerts); cleanup_stale_real_film() deletes an
+    earlier run's leftover row instead, so a repeat run on the same film is not permanently
+    suppressed by find_real_film()'s own ledger de-dupe.
 """
 import datetime as _dt
 import io
@@ -22,8 +25,8 @@ from contextlib import redirect_stdout
 from monitor import compute_transitions
 from monitor.__main__ import main
 from monitor.notify_test import (DEFAULT_FIXTURES, FIXTURE_MARKER, arm_watch, build_catalogues,
-                                  build_real_catalogues, find_real_film, load_fixture_films,
-                                  report_and_verify, validate_target_user)
+                                  build_real_catalogues, cleanup_stale_real_film, find_real_film,
+                                  load_fixture_films, report_and_verify, validate_target_user)
 from monitor.store import FIXTURE_ID_MAX, FIXTURE_ID_MIN, InMemoryStore
 
 
@@ -540,19 +543,24 @@ class RealFilmNoTickArmed(unittest.TestCase):
             "find_real_film must only ever READ the store, never arm a Watch-it tick")
 
 
-class RealFilmVerifyDeletion(unittest.TestCase):
-    """CAS-1203 AC4/safety rule: report_and_verify()'s real-film mode deletes ONLY the row this
-    run itself created — exact (user, movie, moment) match, and only at/after the run's own
-    `armed_at` — and never touches film_watch or user_films."""
+class RealFilmVerifyCounts(unittest.TestCase):
+    """CAS-1207: report_and_verify()'s real-film mode COUNTS the row this run itself created —
+    exact (user, movie, moment) match, and only at/after the run's own `armed_at` — makes no
+    delete call, and never touches film_watch or user_films. (Supersedes CAS-1203's delete-based
+    behaviour: deleting the row made it vanish from the member's own Alerts seconds after
+    delivery — CAS-1207's observed bug.)"""
 
     REAL_FILM = {"tmdb_id": "9001", "title": "Auto Placed Film", "moment": "hits_stream",
                  "cascade_name": "Everything", "armed_at": "2026-01-02T00:00:00+00:00"}
 
-    def test_deletes_only_this_runs_own_row(self):
+    def test_counts_only_this_runs_own_row_and_deletes_nothing(self):
+        # Each row below carries a distinct (cascade_id, movie_id, moment) key, since
+        # fetch_notification_keys() returns a de-duplicated SET of those keys — this lets its
+        # length stand in for "how many rows survive" without a same-key row masking a deletion.
         store = InMemoryStore(notifications=[
             {"user_id": "u1", "movie_id": "9001", "moment": "hits_stream", "cascade_id": "c1",
              "emailed_at": "2026-01-02T00:00:01+00:00"},                                         # this run
-            {"user_id": "u1", "movie_id": "9001", "moment": "hits_stream", "cascade_id": "c1",
+            {"user_id": "u1", "movie_id": "9001", "moment": "hits_stream", "cascade_id": "c2",
              "emailed_at": "2026-01-01T00:00:00+00:00"},                                         # earlier/real
             {"user_id": "u2", "movie_id": "9001", "moment": "hits_stream", "cascade_id": "c9",
              "emailed_at": "2026-01-02T00:00:01+00:00"},                                         # other user
@@ -562,7 +570,8 @@ class RealFilmVerifyDeletion(unittest.TestCase):
         rc, message = report_and_verify(store, "u1", [], {}, {}, real_film=self.REAL_FILM)
         self.assertEqual(rc, 0)
         self.assertIn("in-app rows written 1", message)
-        self.assertEqual(len(store.fetch_notification_keys()), 3)
+        # No delete call: all 4 rows, including "this run"'s own, are still there.
+        self.assertEqual(len(store.fetch_notification_keys()), 4)
 
     def test_names_the_film_and_agent_in_real_film_mode(self):
         store = InMemoryStore(notifications=[
@@ -596,6 +605,47 @@ class RealFilmVerifyDeletion(unittest.TestCase):
         rc, message = report_and_verify(store, "u1", [], {}, {}, real_film=self.REAL_FILM)
         self.assertEqual(rc, 1)
         self.assertIn("FAILED", message)
+
+
+class CleanupStaleRealFilm(unittest.TestCase):
+    """CAS-1207 AC2: since report_and_verify() no longer deletes a real-film row (previous test
+    class), an earlier run's leftover row for the same (user, film, moment) would otherwise block
+    find_real_film() from ever re-choosing that film — cleanup_stale_real_film() deletes it
+    instead, regardless of its age, and is a no-op under --no-cleanup or with no stale state."""
+
+    STALE = {"tmdb_id": "9001", "title": "Auto Placed Film", "moment": "hits_stream",
+              "cascade_name": "Everything", "armed_at": "2026-01-02T00:00:00+00:00"}
+
+    def test_deletes_an_earlier_row_for_the_same_user_film_and_moment_whatever_its_age(self):
+        store = InMemoryStore(notifications=[
+            {"user_id": "u1", "movie_id": "9001", "moment": "hits_stream", "cascade_id": "c1",
+             "emailed_at": "2020-01-01T00:00:00+00:00"},   # years old — must still go
+            {"user_id": "u1", "movie_id": "9001", "moment": "hits_cinema", "cascade_id": "c1",
+             "emailed_at": "2026-01-02T00:00:01+00:00"},   # other moment — survives
+            {"user_id": "u2", "movie_id": "9001", "moment": "hits_stream", "cascade_id": "c9",
+             "emailed_at": "2020-01-01T00:00:00+00:00"},   # other user — survives
+        ])
+        removed = cleanup_stale_real_film(store, "u1", self.STALE)
+        self.assertEqual(removed, 1)
+        self.assertEqual(len(store.fetch_notification_keys()), 2)
+
+    def test_skipped_under_no_cleanup(self):
+        store = InMemoryStore(notifications=[
+            {"user_id": "u1", "movie_id": "9001", "moment": "hits_stream", "cascade_id": "c1",
+             "emailed_at": "2020-01-01T00:00:00+00:00"},
+        ])
+        removed = cleanup_stale_real_film(store, "u1", self.STALE, cleanup=False)
+        self.assertEqual(removed, 0)
+        self.assertEqual(len(store.fetch_notification_keys()), 1)
+
+    def test_no_stale_state_is_a_no_op(self):
+        store = InMemoryStore(notifications=[
+            {"user_id": "u1", "movie_id": "9001", "moment": "hits_stream", "cascade_id": "c1",
+             "emailed_at": "2020-01-01T00:00:00+00:00"},
+        ])
+        removed = cleanup_stale_real_film(store, "u1", None)
+        self.assertEqual(removed, 0)
+        self.assertEqual(len(store.fetch_notification_keys()), 1)
 
 
 if __name__ == "__main__":

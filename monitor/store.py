@@ -22,7 +22,9 @@ Interface:
   fetch_watch_notification_keys() -> set[(user_id, movie_id, moment)]  # de-dupe, null-cascade rows
   delete_notifications_for_movie_ids(ids) -> int          # CAS-486: fixture-range-only, for notify-test
   delete_notifications_for_user_film(user_id, movie_id, moment, since) -> int  # CAS-1203: precise,
-                                                           # for notify-test's real-film mode
+                                                           # for notify-test's real-film pre-send cleanup
+  count_notifications_for_user_film(user_id, movie_id, moment, since) -> int  # CAS-1207: same precise
+                                                           # scope, for notify-test's real-film verify()
   upsert_film_watch(user_id, movie_id, window) -> None    # CAS-1052: notify-test's guaranteed-match tick
   delete_film_watch_for_movie_ids(ids) -> int             # CAS-1052: fixture-range-only, for notify-test
   fetch_user_prefs() -> {user_id: {sub_services, store_services, taste, services_only}}    # CAS-825/CAS-853
@@ -185,6 +187,17 @@ class InMemoryStore:
                     and n.get("moment") == moment and (n.get("emailed_at") or "") >= since)
         ]
         return before - len(self._notifications)
+
+    def count_notifications_for_user_film(self, user_id, movie_id, moment: str, since: str) -> int:
+        """CAS-1207: real-film mode's verify() proves delivery by counting the ledger row rather
+        than deleting it (CAS-1207's observed bug: deleting it removed the alert from the member's
+        own Alerts seconds after it was delivered) — same precise (user_id, movie_id, moment,
+        emailed_at >= since) scope delete_notifications_for_user_film uses."""
+        return sum(
+            1 for n in self._notifications
+            if str(n.get("user_id")) == str(user_id) and str(n.get("movie_id")) == str(movie_id)
+            and n.get("moment") == moment and (n.get("emailed_at") or "") >= since
+        )
 
     def upsert_film_watch(self, user_id, movie_id, window: str) -> None:
         """CAS-1052: write (or overwrite) ONE film_watch row keyed on (user_id, movie_id), same
@@ -815,6 +828,18 @@ class SupabaseStore:
             return len(json.loads(body))
         except (json.JSONDecodeError, TypeError):
             return 0
+
+    def count_notifications_for_user_film(self, user_id, movie_id, moment: str, since: str) -> int:
+        """CAS-1207: real-film mode's verify() counts instead of deleting (so the member can still
+        see the alert in Alerts) — same precise filter delete_notifications_for_user_film uses,
+        as a GET instead of a DELETE."""
+        rows = self._get(
+            f"/notifications?select=id&user_id=eq.{urllib.parse.quote(str(user_id))}"
+            f"&movie_id=eq.{urllib.parse.quote(str(movie_id))}"
+            f"&moment=eq.{urllib.parse.quote(moment)}"
+            f"&emailed_at=gte.{urllib.parse.quote(since)}&order=id.asc"
+        )
+        return len(rows)
 
     def upsert_film_watch(self, user_id, movie_id, window: str) -> None:
         """CAS-1052: write ONE temporary film_watch row so notify_test.py can guarantee a match for
