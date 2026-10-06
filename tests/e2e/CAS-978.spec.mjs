@@ -222,9 +222,6 @@ test("CAS-978: a non-broken category sends no diagnostics at all", async ({ page
   await expect(page.locator("#feedbackDiagWrap")).toBeHidden();
   await page.locator("#feedbackEmail").fill("cas978@example.com");
   await page.locator("#feedbackMsg").fill("Wrong poster on this title.");
-  // CAS-1159 requeue: same WebKit fill-then-click-swallow as #contact's Send (CAS-838/864/927's own .blur()
-  // convention) — without the diagnostics switch block, the layout change leaves nothing to absorb it.
-  await page.locator("#feedbackMsg").blur();
   await page.locator("#feedbackSend").click();
   await page.waitForFunction(() => window.__contactInserts.length > 0, null, { timeout: 5000 });
 
@@ -243,9 +240,6 @@ test("CAS-978: a successful send shows the receipt", async ({ page }) => {
   await page.locator("#feedbackCatChips .chip", { hasText: "Membership and billing" }).click();
   await page.locator("#feedbackEmail").fill("cas978@example.com");
   await page.locator("#feedbackMsg").fill("A billing question.");
-  // CAS-1159 requeue: same WebKit fill-then-click-swallow as #contact's Send (CAS-838/864/927's own .blur()
-  // convention) — without the diagnostics switch block, the layout change leaves nothing to absorb it.
-  await page.locator("#feedbackMsg").blur();
   await page.locator("#feedbackSend").click();
   await expect(page.locator("#feedbackBody")).toContainText("Thanks — we read every one of these.");
 });
@@ -261,9 +255,6 @@ test("CAS-978: when the insert rejects, the typed message stays and an error is 
   await page.locator("#feedbackCatChips .chip", { hasText: "An idea" }).click();
   await page.locator("#feedbackEmail").fill("cas978@example.com");
   await page.locator("#feedbackMsg").fill("This should fail to send.");
-  // CAS-1159 requeue: same WebKit fill-then-click-swallow as #contact's Send (CAS-838/864/927's own .blur()
-  // convention) — without the diagnostics switch block, the layout change leaves nothing to absorb it.
-  await page.locator("#feedbackMsg").blur();
   await page.locator("#feedbackSend").click();
 
   await expect(page.locator("#feedbackErr")).toBeVisible();

@@ -6009,13 +6009,28 @@ new MutationObserver(()=>armSwitches()).observe(document.body, {childList:true, 
 // field the same way. #authModal's signed-in panel, #logModal and the diagnostics panel's .cascfoot
 // carry no text input, so the keyboard never opens there and this delegate never fires for them.
 const CASCFOOT_KB_SEL = 'input:not([type=checkbox]):not([type=radio]):not([type=range]), textarea';
+// CAS-1210: a mousedown/touch on .cascfoot's own Send button blurs the still-focused field first,
+// which used to remove .kbfocus synchronously — re-sticking the footer and sliding Send out from
+// under the pointer before its mouseup/click ever arrives, so the tap was silently swallowed. While a
+// pointer gesture is in flight, defer the removal until after that gesture's click has had its chance
+// to fire, so the footer cannot move between pointerdown and pointerup.
+let cascfootPointerDown = false;
+document.addEventListener("pointerdown", () => { cascfootPointerDown = true; });
+document.addEventListener("pointerup", () => { cascfootPointerDown = false; });
+document.addEventListener("pointercancel", () => { cascfootPointerDown = false; });
 document.addEventListener("focusin", e => {
   if(!e.target.matches?.(CASCFOOT_KB_SEL)) return;
   e.target.closest(".modal, .diagpanel")?.classList.add("kbfocus");
 });
 document.addEventListener("focusout", e => {
   if(!e.target.matches?.(CASCFOOT_KB_SEL)) return;
-  e.target.closest(".modal, .diagpanel")?.classList.remove("kbfocus");
+  const host = e.target.closest(".modal, .diagpanel");
+  if(!host) return;
+  if(cascfootPointerDown){
+    document.addEventListener("pointerup", () => setTimeout(() => host.classList.remove("kbfocus"), 0), { once: true });
+    return;
+  }
+  host.classList.remove("kbfocus");
 });
 
 // CAS-916: one choke point for the background-scroll lock every overlay open/close path uses. Writing
@@ -21268,21 +21283,29 @@ else if(dedupedN)
     const now=new Date().toISOString();
     unread.forEach(a=>{ a.read_at=now; });
     updateMovingBadge();
+    clearAppIconBadge();
     if(!c||!owner) return;
     const { error } = await c.from("notifications").update({read_at:now})
       .eq("user_id", owner).is("read_at", null);
     if(error){ console.warn("notifications mark-read", error); logSyncFailed("notifications", error); }
   };
+  // CAS-1208: the server's `badge` (monitor/__main__.py, unread count + delivered pushes) only ever
+  // grows the OS app-icon number — nothing clears it until another push arrives. removeAllDeliveredNotifications()
+  // (@capacitor/push-notifications' native iOS source, PushNotificationsPlugin.swift) resets
+  // applicationIconBadgeNumber to 0 as a side effect, so markRealAlertsRead() — the one place that reads
+  // the bell, from either opening Alerts or tapping a notification — calls it too. No-op off-native.
+  function clearAppIconBadge(){
+    if(typeof Capacitor==="undefined" || !Capacitor.isNativePlatform || !Capacitor.isNativePlatform()) return;
+    const PN=Capacitor.Plugins && Capacitor.Plugins.PushNotifications;
+    if(!PN || !PN.removeAllDeliveredNotifications) return;
+    PN.removeAllDeliveredNotifications().catch(e => console.warn("badge clear", e));
+  }
   // CAS-466/CAS-1206: tap-to-open + foreground handling. Native only, registered once at boot (not
   // inside registerPush(), which only runs when the user exercises the in-app toggle) — a tap can
   // launch the app cold, before any toggle interaction this session, and the plugin still delivers the
   // queued action to a listener attached now. A tap always lands on Alerts now (openAlertsFromPush,
   // CAS-1206), never the film page (CAS-466's original openNotifyFilm) — same loadRealAlerts/
   // markRealAlertsRead select+update Moving already runs.
-  // Badge note: the OS app-icon badge itself has no client-side set/clear call in this plugin version
-  // (@capacitor/push-notifications 8.1.2 exposes no badge API) — it is kept correct at delivery time
-  // by the `badge` the monitor already computes into each push's `aps.badge` (CAS-465/pusher.py). The
-  // in-app Moving badge (updateMovingBadge(), above) is what loadRealAlerts()/markRealAlertsRead() keep live.
   if(typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform()){
     const PN=Capacitor.Plugins && Capacitor.Plugins.PushNotifications;
     if(PN){
