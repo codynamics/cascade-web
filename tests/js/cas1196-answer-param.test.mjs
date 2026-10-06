@@ -10,19 +10,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
-
-function freshFilmId(E, used){
-  const m = E.MOVIES.find(x => !used.has(x.tmdb_id));
-  used.add(m.tmdb_id);
-  return m;
-}
+import { freshFilmId } from "./fresh-film-id.mjs";
 
 test("CAS-1196: cinema/rent/stream answers make the same manual tick toggleFilmOpt makes", () => {
   const E = loadEngine();
   const used = new Set();
   const cases = [["cinema", "in_cinema"], ["rent", "rent"], ["stream", "stream"]];
   for(const [answer, levelKey] of cases){
-    const m = freshFilmId(E, used);
+    const m = freshFilmId(E, used, levelKey);
     E.location.hash = `#/film/${m.tmdb_id}`;
     E.setPendingAnswer(answer);
     E.applyPendingAnswer();
@@ -55,7 +50,7 @@ test("CAS-1196: seen records no verdict by itself", () => {
 
 test("CAS-1196: pendingAnswer is consumed once — a second call is a no-op", () => {
   const E = loadEngine();
-  const m = E.MOVIES[0];
+  const m = freshFilmId(E, new Set(), "in_cinema");
   E.location.hash = `#/film/${m.tmdb_id}`;
   E.setPendingAnswer("cinema");
   E.applyPendingAnswer();
@@ -137,7 +132,7 @@ test("CAS-1201: opening the same cinema/rent/stream answer link twice leaves the
   const used = new Set();
   const cases = [["cinema", "in_cinema"], ["rent", "rent"], ["stream", "stream"]];
   for(const [answer, levelKey] of cases){
-    const m = freshFilmId(E, used);
+    const m = freshFilmId(E, used, levelKey);
     E.location.hash = `#/film/${m.tmdb_id}`;
     E.setPendingAnswer(answer);
     E.applyPendingAnswer();
