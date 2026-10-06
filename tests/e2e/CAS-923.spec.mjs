@@ -27,9 +27,13 @@ for(const kind of ["cinema", "stream"]){
     await openFirstAgentBriefing(page);
     const agentId = await page.evaluate(() => onbFlow.draft.id);
 
-    expect(await cinemaReleaseSwitchOn(page)).toBe(false);   // a freshly built agent starts with it off
+    // CAS-1179: the first-built agent is Massive Movies (rank 0, which `.ag-edit.first()` always opens),
+    // and that recipe now builds with this switch ON by design — it no longer starts every agent off.
+    // Toggle whichever state it actually opens on, and prove THAT value (not a hardcoded one) survives Save.
+    const before = await cinemaReleaseSwitchOn(page);
     await page.locator("#onbCinemaRelease").click();
-    expect(await cinemaReleaseSwitchOn(page)).toBe(true);
+    const after = !before;
+    expect(await cinemaReleaseSwitchOn(page)).toBe(after);
 
     // CAS-934 retired the Briefing's own Save button — Back (#onbStep .osback) is the only exit now, and
     // commits the draft on its way out (briefClose -> briefCommit), same as every other Briefing edit.
@@ -37,11 +41,12 @@ for(const kind of ["cinema", "stream"]){
     await expect(page.locator("#onbStep")).not.toHaveClass(/open/);   // briefClose closes back to Agents
 
     const saved = await page.evaluate(id => cascades.find(c => c.id === id).cinemaReleaseOnly, agentId);
-    expect(saved).toBe(true);
+    expect(saved).toBe(after);
 
-    // Reopen — the switch must still read on, not have been quietly reset by laneCrit on the way to disk.
+    // Reopen — the switch must still read the toggled value, not have been quietly reset by laneCrit on
+    // the way to disk.
     await page.locator(`.agrow[data-id="${agentId}"] .ag-edit`).click();
     await expect(page.locator("#onbCinemaRelease")).toBeVisible();
-    expect(await cinemaReleaseSwitchOn(page)).toBe(true);
+    expect(await cinemaReleaseSwitchOn(page)).toBe(after);
   });
 }
