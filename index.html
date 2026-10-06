@@ -21268,21 +21268,29 @@ else if(dedupedN)
     const now=new Date().toISOString();
     unread.forEach(a=>{ a.read_at=now; });
     updateMovingBadge();
+    clearAppIconBadge();
     if(!c||!owner) return;
     const { error } = await c.from("notifications").update({read_at:now})
       .eq("user_id", owner).is("read_at", null);
     if(error){ console.warn("notifications mark-read", error); logSyncFailed("notifications", error); }
   };
+  // CAS-1208: the server's `badge` (monitor/__main__.py, unread count + delivered pushes) only ever
+  // grows the OS app-icon number — nothing clears it until another push arrives. removeAllDeliveredNotifications()
+  // (@capacitor/push-notifications' native iOS source, PushNotificationsPlugin.swift) resets
+  // applicationIconBadgeNumber to 0 as a side effect, so markRealAlertsRead() — the one place that reads
+  // the bell, from either opening Alerts or tapping a notification — calls it too. No-op off-native.
+  function clearAppIconBadge(){
+    if(typeof Capacitor==="undefined" || !Capacitor.isNativePlatform || !Capacitor.isNativePlatform()) return;
+    const PN=Capacitor.Plugins && Capacitor.Plugins.PushNotifications;
+    if(!PN || !PN.removeAllDeliveredNotifications) return;
+    PN.removeAllDeliveredNotifications().catch(e => console.warn("badge clear", e));
+  }
   // CAS-466/CAS-1206: tap-to-open + foreground handling. Native only, registered once at boot (not
   // inside registerPush(), which only runs when the user exercises the in-app toggle) — a tap can
   // launch the app cold, before any toggle interaction this session, and the plugin still delivers the
   // queued action to a listener attached now. A tap always lands on Alerts now (openAlertsFromPush,
   // CAS-1206), never the film page (CAS-466's original openNotifyFilm) — same loadRealAlerts/
   // markRealAlertsRead select+update Moving already runs.
-  // Badge note: the OS app-icon badge itself has no client-side set/clear call in this plugin version
-  // (@capacitor/push-notifications 8.1.2 exposes no badge API) — it is kept correct at delivery time
-  // by the `badge` the monitor already computes into each push's `aps.badge` (CAS-465/pusher.py). The
-  // in-app Moving badge (updateMovingBadge(), above) is what loadRealAlerts()/markRealAlertsRead() keep live.
   if(typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform()){
     const PN=Capacitor.Plugins && Capacitor.Plugins.PushNotifications;
     if(PN){
