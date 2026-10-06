@@ -40,9 +40,15 @@ async function seedFilms(page, cascadeId){
     // CAS-788 (post-dates this spec): a verdict now clears wins/winsSource outright and leaves recomputeFound's
     // own auto re-arm to put them back — which needs a real score to clear the owning agent's watchMarkers
     // (CAS-752's AC1 dislikes FILM_A, so this isn't optional here the way it is for cas760's own copy of this
-    // fixture, which never calls setOpinion). rt_critic is the least-fussy path to a qualifying cascadeScore.
-    MOVIES.push({ tmdb_id: a, title: "CAS-752 — A", status: ["included_streaming"], offers: [], rt_critic: 85 });
-    MOVIES.push({ tmdb_id: b, title: "CAS-752 — B", status: ["included_streaming"], offers: [], rt_critic: 85 });
+    // fixture, which never calls setOpinion).
+    // CAS-1213: rt_critic is not a field cascadeScore/wmQScore ever reads (the Watchmode migration, CAS-919,
+    // moved scoring onto wm_critic_score/wm_user_rating) — it scored as -1 ("not enough agreement"), so
+    // earnedWindowForScore never cleared the onboarded agent's watchMarkers and the auto re-arm after AC3's
+    // clear-verdict tap silently failed, dropping the film out of filmMatchesWatchTab's non-tagged branch
+    // (and therefore out of watchScopeRows() entirely) instead of restoring the card. wm_critic_score/
+    // wm_user_rating are the fields that basis actually reads; comfortably high so this never rides a floor.
+    MOVIES.push({ tmdb_id: a, title: "CAS-752 — A", status: ["included_streaming"], offers: [], wm_critic_score: 90, wm_user_rating: 9.0 });
+    MOVIES.push({ tmdb_id: b, title: "CAS-752 — B", status: ["included_streaming"], offers: [], wm_critic_score: 90, wm_user_rating: 9.0 });
     [a, b].forEach(id => {
       const e = entryFor(id);
       e.pinnedTo = [cascadeId];
@@ -130,17 +136,15 @@ test("CAS-752 AC2 (reduced motion): the fold is instant, still no jump", async (
   await expect(page.locator(`#card-${FILM_A}`)).toHaveClass(/\bstub\b/);
 });
 
-// CAS-1209: genuine app defect, confirmed by reading setOpinion() (app_template.html) — on the branch that
-// CLEARS a verdict (tapping the already-lit segment), it unconditionally does
-// `watchHeldOpen[watchTab].delete(id)`, the opposite of the hold the "set a new verdict" branch adds right
-// above it. filmInWatchRows()'s own filter (`filmMatchesWatchedFilter(m) || watchHeldOpen[watchTab].has(...)`)
-// then has nothing to hold the just-cleared film in the Watched tab's rows, since a film with no verdict
-// doesn't match filmMatchesWatchedFilter either — so fastPatchFindRow bails and the following render() drops
-// the row outright instead of restoring it to a full card. Confirmed in CI (e2e-full run #7): the clear tap
-// itself registers (the stub's popover opens and the segment lights/click fires), but #card-900752001 is
-// gone afterward, not merely missing the "card" class. Do not fix here — this is app code, out of scope for
-// a tests/e2e/-only ticket.
-test.fixme("CAS-752 AC3: tapping the stub's control to clear the verdict restores the full card in place", async ({ page }) => {
+// CAS-1209's hypothesis (that setOpinion()'s clear branch deletes watchHeldOpen's hold instead of adding
+// it) read as plausible from app_template.html alone but was never run. CAS-1213 verified it against the
+// real engine (tests/js/engine.mjs) with this exact fixture and found it wrong: a cleared verdict makes
+// taggedOut(m) false, and filmMatchesWatchedFilter(m) already returns true unconditionally whenever
+// taggedOut is false — so watchHeldOpen's state can never be the thing excluding this row, hold or no hold.
+// The real cause was this fixture's own rt_critic field (see seedFilms above) — dead weight that
+// cascadeScore/wmQScore never reads, so it scored -1 and silently broke the auto re-arm AC3 depends on.
+// Fixed by seedFilms' wm_critic_score/wm_user_rating swap; app_template.html needed no change.
+test("CAS-752 AC3: tapping the stub's control to clear the verdict restores the full card in place", async ({ page }) => {
   const cascadeId = await toWatchScreen(page);
   await seedFilms(page, cascadeId);
   await toStreamTab(page);

@@ -1,159 +1,6 @@
 {
-  "checked_at": "2026-10-06T06:01:59.066191+00:00",
+  "checked_at": "2026-10-06T20:38:06.433681+00:00",
   "checks": [
-    {
-      "name": "catalogue_size",
-      "ok": true,
-      "value": 5885,
-      "threshold": 5500,
-      "detail": "5885 record(s).",
-      "status": "ok",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "catalogue_integrity",
-      "ok": true,
-      "value": 5885,
-      "threshold": 0,
-      "detail": "every record parses, carries tmdb_id + title + release info, no duplicates.",
-      "status": "ok",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "tmdb_fetch",
-      "ok": true,
-      "value": 5903,
-      "threshold": 0,
-      "detail": "5903 call(s), 0 error(s), 0 not-found (0.0%).",
-      "status": "ok",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "watchmode_fetch",
-      "ok": true,
-      "value": 118,
-      "threshold": 375,
-      "detail": "118 call(s), 0 errors, 1219 of 2500 credit(s) remaining this month (floor 375).",
-      "status": "ok",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "watchmode_pace",
-      "ok": false,
-      "value": 2802,
-      "threshold": 2500,
-      "detail": "117 credit(s)/day average, projecting 2802 of 2500 by the 2026-10-12 reset. Quota exhausts around 2026-10-09.",
-      "status": "fail",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "oscarbase_fetch",
-      "ok": true,
-      "value": 750,
-      "threshold": 0,
-      "detail": "750 call(s), 0 errors.",
-      "status": "ok",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "score_coverage",
-      "ok": true,
-      "value": 5783,
-      "threshold": 5175,
-      "detail": "5783 scored film(s) vs 5750 last refresh (90% floor).",
-      "status": "ok",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "usage_events_insert",
-      "ok": true,
-      "value": 1,
-      "threshold": 1,
-      "detail": "HTTP 201",
-      "status": "ok",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "auth_signin",
-      "ok": true,
-      "value": 1,
-      "threshold": 1,
-      "detail": "session returned.",
-      "status": "ok",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "client_error_rate",
-      "ok": null,
-      "value": 2,
-      "threshold": 50,
-      "detail": "only 2 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
-      "status": "unknown",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "empty_account_rate",
-      "ok": null,
-      "value": 2,
-      "threshold": 50,
-      "detail": "only 2 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
-      "status": "unknown",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "activity_floor",
-      "ok": null,
-      "value": 2,
-      "threshold": 50,
-      "detail": "only 2 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
-      "status": "unknown",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "watchmode_identity",
-      "ok": false,
-      "value": 2,
-      "threshold": 0,
-      "detail": "2 identity mismatch(es) this run. TMDB id(s): 1522126, 1318621.",
-      "status": "fail",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "watchmode_remap_backlog",
-      "ok": null,
-      "value": 112,
-      "threshold": 151,
-      "detail": "112 record(s) awaiting repair, down from 151 last night.",
-      "status": "warn",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "released_scored_without_rating",
-      "ok": true,
-      "value": 0,
-      "threshold": 0,
-      "detail": "every 'scored' candidate outside the ladder cohort carries a real rating.",
-      "status": "ok",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "landmark_films",
-      "ok": true,
-      "value": 7,
-      "threshold": 7,
-      "detail": "all 7 landmark film(s) published and scoreable.",
-      "status": "ok",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
-    {
-      "name": "watchmode_freshness",
-      "ok": false,
-      "value": 15.3,
-      "threshold": 5.0,
-      "detail": "15.3% of weekly-TTL film(s) stale past 14d, 0.0% of film(s) released within 365d stale past 45d, oldest stamp in the catalogue is 24 day(s) old.",
-      "status": "fail",
-      "checked_at": "2026-10-04T20:37:21.664141+00:00"
-    },
     {
       "name": "email_send",
       "ok": null,
@@ -171,6 +18,159 @@
       "detail": "APNs configured but no push attempted this run \u2014 unavailable.",
       "status": "unknown",
       "checked_at": "2026-10-06T06:01:59.066191+00:00"
+    },
+    {
+      "name": "catalogue_size",
+      "ok": true,
+      "value": 5933,
+      "threshold": 5500,
+      "detail": "5933 record(s).",
+      "status": "ok",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "catalogue_integrity",
+      "ok": true,
+      "value": 5933,
+      "threshold": 0,
+      "detail": "every record parses, carries tmdb_id + title + release info, no duplicates.",
+      "status": "ok",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "tmdb_fetch",
+      "ok": true,
+      "value": 5900,
+      "threshold": 0,
+      "detail": "5900 call(s), 0 error(s), 0 not-found (0.0%).",
+      "status": "ok",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "watchmode_fetch",
+      "ok": true,
+      "value": 138,
+      "threshold": 375,
+      "detail": "138 call(s), 0 errors, 1101 of 2500 credit(s) remaining this month (floor 375).",
+      "status": "ok",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "watchmode_pace",
+      "ok": false,
+      "value": 2725,
+      "threshold": 2500,
+      "detail": "120 credit(s)/day average, projecting 2725 of 2500 by the 2026-10-12 reset. Quota exhausts around 2026-10-10.",
+      "status": "fail",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "oscarbase_fetch",
+      "ok": true,
+      "value": 750,
+      "threshold": 0,
+      "detail": "750 call(s), 0 errors.",
+      "status": "ok",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "score_coverage",
+      "ok": true,
+      "value": 5831,
+      "threshold": 5205,
+      "detail": "5831 scored film(s) vs 5783 last refresh (90% floor).",
+      "status": "ok",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "usage_events_insert",
+      "ok": true,
+      "value": 1,
+      "threshold": 1,
+      "detail": "HTTP 201",
+      "status": "ok",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "auth_signin",
+      "ok": true,
+      "value": 1,
+      "threshold": 1,
+      "detail": "session returned.",
+      "status": "ok",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "client_error_rate",
+      "ok": null,
+      "value": 4,
+      "threshold": 50,
+      "detail": "only 4 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
+      "status": "unknown",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "empty_account_rate",
+      "ok": null,
+      "value": 4,
+      "threshold": 50,
+      "detail": "only 4 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
+      "status": "unknown",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "activity_floor",
+      "ok": null,
+      "value": 4,
+      "threshold": 50,
+      "detail": "only 4 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
+      "status": "unknown",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "watchmode_identity",
+      "ok": false,
+      "value": 2,
+      "threshold": 0,
+      "detail": "2 identity mismatch(es) this run. TMDB id(s): 1522126, 1318621.",
+      "status": "fail",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "watchmode_remap_backlog",
+      "ok": null,
+      "value": 66,
+      "threshold": 112,
+      "detail": "66 record(s) awaiting repair, down from 112 last night.",
+      "status": "warn",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "released_scored_without_rating",
+      "ok": true,
+      "value": 0,
+      "threshold": 0,
+      "detail": "every 'scored' candidate outside the ladder cohort carries a real rating.",
+      "status": "ok",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "landmark_films",
+      "ok": true,
+      "value": 7,
+      "threshold": 7,
+      "detail": "all 7 landmark film(s) published and scoreable.",
+      "status": "ok",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
+    },
+    {
+      "name": "watchmode_freshness",
+      "ok": false,
+      "value": 16.4,
+      "threshold": 5.0,
+      "detail": "16.4% of weekly-TTL film(s) stale past 14d, 0.0% of film(s) released within 365d stale past 45d, oldest stamp in the catalogue is 26 day(s) old.",
+      "status": "fail",
+      "checked_at": "2026-10-06T20:38:06.433681+00:00"
     }
   ],
   "ok": false

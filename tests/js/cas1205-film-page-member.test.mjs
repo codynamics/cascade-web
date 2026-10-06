@@ -5,18 +5,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
+import { freshFilmId } from "./fresh-film-id.mjs";
 
 function signIn(E){
   E.CascadeAuth.enabled = true;
   E.CascadeAuth.client = {};
   E.CascadeAuth.session = { user: { id: "cas1205-test-user" } };
   E.CascadeAuth.status = "signed-in";
-}
-
-function freshFilmId(E, used){
-  const m = E.MOVIES.find(x => !used.has(x.tmdb_id));
-  used.add(m.tmdb_id);
-  return m;
 }
 
 test("CAS-1205: signed out, the film page is exactly today's visitor markup", () => {
@@ -95,7 +90,7 @@ test("CAS-1205: an applied cinema/rent/stream answer shows the confirmation pane
     ["stream", "stream", "Saved: watch on Stream"],
   ];
   for(const [answer, levelKey, lead] of cases){
-    const m = freshFilmId(E, used);
+    const m = freshFilmId(E, used, levelKey);
     E.location.hash = `#/film/${m.tmdb_id}`;
     E.setPendingAnswer(answer);
     E.applyPendingAnswer();
