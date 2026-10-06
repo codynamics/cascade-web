@@ -1,6 +1,63 @@
 {
   "runs": [
     {
+      "run_at": "2026-10-06T20:37:51Z",
+      "run_date": "2026-10-06",
+      "github_run_id": "37523173373",
+      "catalogue": {
+        "before": 5885,
+        "after": 5933,
+        "new": 48,
+        "removed": 0,
+        "updated": 235,
+        "unchanged": 5650
+      },
+      "new_by_status": {
+        "upcoming": 1,
+        "in_cinema": 0,
+        "pvod": 0,
+        "rental": 11,
+        "included_streaming": 36,
+        "released": 0,
+        "other": 0
+      },
+      "new_by_age": {
+        "unreleased": 1,
+        "under_1y": 2,
+        "1_to_5y": 0,
+        "5_to_20y": 45,
+        "over_20y": 0,
+        "unknown": 0
+      },
+      "status_changes": {
+        "rental->included_streaming": 3,
+        "in_cinema->rental": 3
+      },
+      "sources": {
+        "tmdb": {
+          "calls": 5900,
+          "errors": 0,
+          "not_found": 0,
+          "films_new": 48,
+          "films_updated": 235
+        },
+        "watchmode": {
+          "calls": 138,
+          "errors": 0,
+          "films_new": 0,
+          "films_updated": 0
+        },
+        "oscarbase": {
+          "calls": 750,
+          "errors": 0,
+          "films_updated": 4
+        }
+      },
+      "notes": [
+        "films_new attributed by each new title's availability_source (discovery path is not separately recorded on the record)."
+      ]
+    },
+    {
       "run_at": "2026-10-04T20:37:09Z",
       "run_date": "2026-10-04",
       "github_run_id": "37230436878",
