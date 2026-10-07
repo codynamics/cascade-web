@@ -2565,31 +2565,27 @@
      (which agents picked it), replacing #watchTabs, the Now line and the Occasion/Picked by pills. Tapping
      a stop still runs through setWatchTab underneath (renderWatchTop/setWatchStage below); the stage split
      (Upcoming vs In Cinema) is new state layered on top, never a second tab system. */
-  .watchtop{display:flex;gap:10px;margin:10px 12px 0}
-  .cascbar.rail .watchtop{margin:9px 12px 0}
+  .watchtop{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);column-gap:10px;margin:10px 12px 0}
+  .cascbar.rail .watchtop{margin:10px 12px 0}
   .watchtop[hidden]{display:none}
-  .stagecol{flex:0 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px;position:relative;
-    padding-left:2px}
-  /* The connecting line joins the dot centres (9px dot, so 4.5px in from the stop's own left edge, nudged
-     for the stepped indent below) — a single gradient through the four stage colours rather than one rule
-     per segment, so it never has to agree separately with however many stops actually exist. */
-  .stagecol::before{content:"";position:absolute;left:6.5px;top:12px;bottom:12px;width:1.5px;
-    background:linear-gradient(180deg,var(--upcoming),var(--amber),var(--blue),var(--green));opacity:.75}
-  .stagestop{position:relative;display:flex;align-items:center;gap:6px;background:none;border:0;
-    padding:2px 8px 2px 0;margin:0;color:var(--dim);font-family:inherit;cursor:pointer;text-align:left;
-    border-radius:999px;width:fit-content}
-  /* CAS-1223: each stop sits one step further right than the one above it. */
-  .stagestop:nth-child(1){margin-left:0}
-  .stagestop:nth-child(2){margin-left:9px}
-  .stagestop:nth-child(3){margin-left:18px}
-  .stagestop:nth-child(4){margin-left:27px}
-  .stagestop:nth-child(5){margin-left:36px}
-  .stagestop .stagecount{font-size:12px;font-weight:800;color:var(--ink);line-height:1}
-  .stagestop .gdot{flex:none}
-  .stagestop .stagename{font-size:11px;font-weight:700;color:var(--dim);white-space:nowrap}
-  .stagestop.on{height:25px;border:1px solid var(--sgc,var(--brand-blue));
-    background:color-mix(in srgb, var(--sgc,var(--brand-blue)) 20%, var(--bg));
-    box-shadow:0 3px 10px -3px var(--sgc,var(--brand-blue))}
+  /* One row shape for both columns: 26px high, fully rounded, 1px border, the same tinted fill when
+     selected. Stage rows and agent rows sit on the same 30px rhythm and share the block's two edges. */
+  .stagecol{min-width:0;display:flex;flex-direction:column;gap:4px;position:relative}
+  /* The rail: one straight line down the far left, through every dot centre (1px border + 9px padding +
+     half a 9px dot = 14.5px), from the first row's centre to the last row's centre. */
+  .stagecol::before{content:"";position:absolute;left:13.75px;top:13px;bottom:13px;width:1.5px;
+    background:linear-gradient(180deg,var(--upcoming),var(--amber),var(--blue),var(--green));opacity:.7}
+  .stagestop{position:relative;display:flex;align-items:center;gap:8px;width:100%;height:26px;
+    box-sizing:border-box;background:none;border:1px solid transparent;border-radius:999px;
+    padding:0 10px 0 9px;margin:0;color:var(--dim);font-family:inherit;cursor:pointer;text-align:left}
+  .stagestop .gdot{flex:none;box-shadow:0 0 0 3px var(--bg)}
+  .stagestop .stagename{flex:1;min-width:0;font-size:11.5px;font-weight:700;color:var(--dim);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stagestop .stagecount{flex:none;font-size:11.5px;font-weight:800;color:var(--faint);line-height:1;
+    font-variant-numeric:tabular-nums}
+  .stagestop.on{border-color:color-mix(in srgb, var(--sgc,var(--brand-blue)) 60%, var(--panel));
+    background:color-mix(in srgb, var(--sgc,var(--brand-blue)) 14%, var(--bg))}
+  .stagestop.on .gdot{box-shadow:none}
   .stagestop.on .stagecount,.stagestop.on .stagename{color:#fff}
   .stagestop.on[data-stage="upcoming"]{--sgc:var(--upcoming)}
   .stagestop.on[data-stage="in_cinema"]{--sgc:var(--amber)}
@@ -2597,33 +2593,41 @@
   .stagestop.on[data-stage="rent"]{--sgc:var(--blue)}
   .stagestop.on[data-stage="stream"]{--sgc:var(--green)}
   .stagestop:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-  .agentcol{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
-  .watchagentrow{display:flex;align-items:center;gap:6px;background:none;border:1px solid transparent;
-    padding:2px 8px 2px 2px;margin:0;color:var(--dim);font-family:inherit;cursor:pointer;text-align:left;
-    border-radius:999px;width:fit-content;max-width:100%;height:25px;box-sizing:border-box}
-  .watchagentrow .agicon{width:19px;height:19px;border-radius:6px;font-size:11px}
-  .watchagentname{font-size:11px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;
-    white-space:nowrap;min-width:0}
+  .agentcol{min-width:0;display:flex;flex-direction:column;gap:4px}
+  .watchagentrow{display:flex;align-items:center;gap:7px;width:100%;height:26px;box-sizing:border-box;
+    background:none;border:1px solid transparent;border-radius:999px;padding:0 10px 0 3px;margin:0;
+    color:var(--ink);font-family:inherit;cursor:pointer;text-align:left}
+  .watchagentrow.agrank-1{--rt:var(--agrank-1)}
+  .watchagentrow.agrank-2{--rt:var(--agrank-2)}
+  .watchagentrow.agrank-3{--rt:var(--agrank-3)}
+  .watchagentrow.agrank-4{--rt:var(--agrank-4)}
+  .watchagentrow.agrank-5{--rt:var(--agrank-5)}
+  .watchagentrow.agrank-6{--rt:var(--agrank-6)}
+  /* The Agents screen's own icon tile and rank tint (.agrow.agrank-N .agicon), at this row's size. */
+  .watchagentrow .agicon{width:18px;height:18px;border-radius:6px;font-size:11px;
+    background:color-mix(in srgb, var(--rt,var(--brand-blue)) 22%, var(--panel));
+    border:1px solid color-mix(in srgb, var(--rt,var(--brand-blue)) 55%, var(--panel))}
+  .watchagentname{flex:1;min-width:0;font-size:11.5px;font-weight:700;color:var(--ink);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
   .watchagentrow.on{border-color:color-mix(in srgb, var(--rt,var(--brand-blue)) 60%, var(--panel));
-    background:color-mix(in srgb, var(--rt,var(--brand-blue)) 13%, var(--bg))}
-  .watchagentrow:not(.on){opacity:.9}
+    background:color-mix(in srgb, var(--rt,var(--brand-blue)) 14%, var(--bg))}
   .watchagentrow:not(.on) .agicon{filter:grayscale(1);opacity:.55}
   .watchagentrow:not(.on) .watchagentname{color:var(--faint);font-weight:600}
-  .watchagentrow.watchagentmore{color:var(--dim);font-weight:700;font-size:11px;border-color:var(--line);
-    background:var(--panel2)}
   .watchagentrow:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   /* ---- CAS-1223: the tools row under the stage/agent block — the two-way sort switch, search and
      filter — replacing the standalone sort button and the old search/filter pair's old position. ---- */
-  .watchtools{display:flex;gap:8px;margin:9px 12px 0;align-items:stretch}
-  .cascbar.rail .watchtools{margin:8px 12px 0}
+  .watchtools{display:flex;gap:8px;margin:10px 12px 0;align-items:stretch}
+  .cascbar.rail .watchtools{margin:10px 12px 0}
   .watchtools[hidden]{display:none}
   .sortswitch{flex:1;min-width:0;display:flex;align-items:stretch;height:34px;border-radius:10px;
-    border:1px solid var(--line);background:var(--panel2);overflow:hidden}
-  .sortglyph{flex:0 0 auto;display:flex;align-items:center;padding:0 7px;font-size:12px;color:var(--faint)}
+    border:1px solid var(--line);background:var(--panel2);overflow:hidden;padding:3px;box-sizing:border-box}
+  .sortglyph{flex:0 0 auto;display:flex;align-items:center;padding:0 7px 0 5px;font-size:12px;color:var(--faint)}
   .sortswitchopt{flex:1;min-width:0;background:none;border:0;color:var(--dim);font-family:inherit;
     font-size:11.5px;font-weight:600;cursor:pointer;padding:0 6px;overflow:hidden;text-overflow:ellipsis;
-    white-space:nowrap}
-  .sortswitchopt.on{background:var(--brand-blue);color:#fff;font-weight:800}
+    white-space:nowrap;border-radius:7px}
+  .sortswitchopt.on{background:var(--brand-blue);color:#fff;font-weight:700}
+  /* The stage line names the stage and carries its count, so the first stage heading above the list goes. */
+  #groups > .group:first-child > .grouphead:not(.sub){display:none}
   .sortswitchopt:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
   /* ---- CAS-718: the Watch control bar's search field and its Filters sheet — replaces the scope bar's
      three pills and the genre row's own standalone home above. Same on-colour (--brand-blue) as the tabs/
@@ -3223,9 +3227,9 @@
   .ymcasclist .agname{font-size:14px;line-height:1.3;flex:1 1 auto}
   .ymcasclist .agsum{font-size:11px;line-height:1.3;-webkit-line-clamp:1;flex:0 0 auto;white-space:nowrap;
     font-weight:700;color:var(--faint)}
-  /* CAS-777: Watch's own "Agents to include" row (ag-occ) stacks a second line for the agent's occasions.
-     leInnerHTML's ym-casc rows (Manage Lists) don't carry this class and keep the row-direction .agmain
-     above untouched. */
+  /* CAS-777: Watch's own agent-narrowing row (ag-occ) stacked a second line for the agent's occasions.
+     CAS-1226 removed the row's one call site (renderWatchSheet); kept here unused, same as agentOccasionsLine
+     itself, since nothing requires either to go and CAS-779 AC2 still exercises the line builder directly. */
   .ymcasclist .agrow.ag-occ .agmain{flex-direction:column;gap:1px}
   .agocc{font-size:11px;line-height:1.3;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ymcasclist .ymcasctgl{width:22px;height:22px;font-size:11px}
@@ -3734,7 +3738,7 @@
     <div id="cascDetail"></div>
   </div>
   <!-- CAS-718: the Filters sheet — Watched + Styles, the two working pieces of filtering carried over from
-       the old scope bar/genre row. CAS-719 added "Picked by"; "Current status"/"Agents to include" are
+       the old scope bar/genre row. CAS-719 added "Picked by"; "Current status"/agent narrowing are
        separate follow-on tickets and are deliberately not here. Slides up from the bottom over a scrim;
        position:fixed so its place in the DOM doesn't matter. -->
   <div class="wsheetscrim" id="watchSheetScrim" onclick="closeWatchSheet()"></div>
@@ -9355,6 +9359,10 @@ function watchStageCountFor(stop){
 }
 // CAS-1223: the stage line (left) + agent lozenges (right) — replaces renderWatchTabs' old header tray.
 // Agent inclusion (watchAgentOff below) is one shared Set now, not per-tab, so it needs no tab/stage swap.
+// CAS-1226: the agent lozenge row's own order — every agent, ranked, no overflow slice ("+N more" is
+// gone) — pulled out so a test can assert "every agent shows" directly, without the DOM write the harness
+// below can't capture.
+function watchTopAgentsRanked(){ return [...cascades].sort(cascadeOrderCmp); }
 function renderWatchTop(){
   const el=$("watchTop"); if(!el) return;
   const stops=watchStageStopsNow();
@@ -9365,24 +9373,22 @@ function renderWatchTop(){
     const on=s.key===curKey;
     return `<button type="button" class="stagestop${on?" on":""}" data-stage="${s.key}"
         aria-pressed="${on}" onclick="setWatchStage('${s.key}')">
-      <span class="stagecount">${watchStageCountFor(s)}</span>
       <span class="gdot ${s.dot}" aria-hidden="true"></span>
       <span class="stagename">${esc(s.label)}</span>
+      <span class="stagecount">${watchStageCountFor(s)}</span>
     </button>`;
   }).join("");
-  const ranked=[...cascades].sort(cascadeOrderCmp);
-  const overflow=ranked.length>4;
-  const shown=overflow ? ranked.slice(0,3) : ranked;
-  const agentHTML=shown.map(c=>{
+  const ranked=watchTopAgentsRanked();
+  const agentHTML=ranked.map(c=>{
     const on=!watchAgentOff.has(c.id);
     const rank=cascadeRankTint(c);
-    return `<button type="button" class="watchagentrow agrow${rank?` agrank-${rank}`:""}${on?" on":""}"
+    return `<button type="button" class="watchagentrow${rank?` agrank-${rank}`:""}${on?" on":""}"
         data-id="${escA(c.id)}" aria-pressed="${on}"
         aria-label="${escA((on?"Remove ":"Include ")+c.name+" in Watch")}" onclick="toggleWatchAgent('${escA(c.id)}')">
       <span class="agicon" aria-hidden="true">${c.icon}</span>
       <span class="watchagentname">${esc(c.name)}</span>
     </button>`;
-  }).join("") + (overflow ? `<button type="button" class="watchagentrow watchagentmore" onclick="openWatchSheet()">+${ranked.length-3} more</button>` : "");
+  }).join("");
   el.innerHTML = `<div class="stagecol" role="tablist" aria-label="Stage">${stageHTML}</div>
     <div class="agentcol">${agentHTML}</div>`;
 }
@@ -9612,7 +9618,7 @@ window.toggleWatchAlsoShow = key => {
   render();
 };
 window.clearWatchAlsoShow = () => { watchAlsoShow[watchTab].clear(); render(); scrollWatchListingToTop(); };   // CAS-857
-// CAS-720: "Agents to include" — restores the agent narrowing scopeRows() gave up when CAS-718 retired the
+// CAS-720: agent inclusion — restores the agent narrowing scopeRows() gave up when CAS-718 retired the
 // deck's per-list agent picker (see that function's own comment), reading from this sheet state instead of
 // the old activeIds/cascOff deck selection. Session-only, empty-means-"nothing excluded".
 // CAS-1223: one shared Set now, not per-tab — "one selection applies to every stage... is not saved
@@ -9621,14 +9627,6 @@ const watchAgentOff = new Set();
 window.toggleWatchAgent = id => {
   watchAgentOff.has(id) ? watchAgentOff.delete(id) : watchAgentOff.add(id);
   render();
-};
-// CAS-857: also the active-filter chip's clear (removes the agent narrowing) — both scroll back to the top.
-window.selectAllWatchAgents = () => { watchAgentOff.clear(); render(); scrollWatchListingToTop(); };
-window.clearAllWatchAgents = () => {
-  watchAgentOff.clear();
-  cascades.forEach(c=>watchAgentOff.add(c.id));
-  render();
-  scrollWatchListingToTop();
 };
 // CAS-863: "Show only available on my services" moves off the retired watch-list model's own persisted
 // record onto per-tab state, shaped like watchAgentOff above — but persisted (its own localStorage key),
@@ -9697,7 +9695,6 @@ window.clearAllWatchFilters = () => {
   watchWatchedSel[watchTab].clear();
   watchGenreOff[watchTab].clear();
   watchAlsoShow[watchTab].clear();
-  watchAgentOff.clear();
   // CAS-1144: "cleared" means the narrowing no longer applies, not reset-to-default — mineOnly's own
   // default is ON (CAS-753), which still narrows, so clearing it here means OFF.
   setWatchMineOnly(false);
@@ -9725,6 +9722,8 @@ document.addEventListener("keydown", e=>{ if(e.key==="Escape" && watchSheetOpen)
 const chipSummary = labels => labels.length<=2 ? labels.join(", ") : `${labels.slice(0,2).join(", ")} +${labels.length-2}`;
 // CAS-777: alphabetical by name (occasionRegSorted's own order), escaped per name before chipSummary's
 // "first two, then +N" join so a special character in an occasion's name can't break the row's markup.
+// CAS-1226: no longer called from renderWatchSheet (its one render call site, the agent-narrowing
+// section's row, is gone) — kept, and still exported, purely for CAS-779 AC2's own regression test below.
 const agentOccasionsLine = c => {
   const names=(c.occasions||[]).map(occasionName).filter(Boolean).sort((a,b)=>a.localeCompare(b)).map(esc);
   return names.length ? chipSummary(names) : "No occasion";
@@ -9732,6 +9731,16 @@ const agentOccasionsLine = c => {
 // CAS-718: builds the sheet's two sections (Watched, Styles) from `rows` BEFORE either narrows them — same
 // "a toggled-off option stays offerable" rule CAS-714's genre row always followed — plus the Filters
 // button's badge, the active-filter chip row, and the footer's live result count.
+// CAS-1226: the Filters badge's own count, pulled out of renderWatchSheet so a test can assert directly
+// that agent selection no longer moves it (section 2 of the ticket — the agent section left the sheet).
+function watchFiltersActiveCount(){
+  const genreOff=watchGenreOff[watchTab];
+  const watchedSel=watchWatchedSel[watchTab];
+  const pickedBy=watchPickedBySafe(watchTab);
+  const alsoShowSet=watchAlsoShow[watchTab];
+  const mineOnly=watchMineOnlyOn();
+  return (pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(alsoShowSet.size?1:0)+(mineOnly?0:1);
+}
 function renderWatchSheet(rows, shownCount){
   const genreOff=watchGenreOff[watchTab];
   const genres=[...new Set(rows.flatMap(m=>m.genres||[]))].sort();
@@ -9739,12 +9748,9 @@ function renderWatchSheet(rows, shownCount){
   const watchedSel=watchWatchedSel[watchTab];
   const pickedBy=watchPickedBySafe(watchTab);
   const alsoShowSet=watchAlsoShow[watchTab];
-  // CAS-1223: one shared Set now, not per-tab — "one selection applies to every stage... is not saved
-  // anywhere" (the agent lozenge row in #watchTop toggles this same Set via the same toggleWatchAgent).
-  const agentOff=watchAgentOff;
   // CAS-753: default is ON, so — unlike every set/off field above — it counts as a deviation when it's OFF.
   const mineOnly=watchMineOnlyOn();
-  const activeCount=(pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(alsoShowSet.size?1:0)+(agentOff.size?1:0)+(mineOnly?0:1);
+  const activeCount=watchFiltersActiveCount();
   const badge=$("watchFilterBadge");
   if(badge){ badge.hidden=activeCount===0; badge.textContent=activeCount; }
   const filterBtn=$("watchFilterBtn"); if(filterBtn) filterBtn.classList.toggle("on", activeCount>0);
@@ -9780,23 +9786,6 @@ function renderWatchSheet(rows, shownCount){
       ${isOwn?"":`onclick="toggleWatchAlsoShow('${w.key}')"`}>
       <span class="gdot ${w.key}" aria-hidden="true"></span>${esc(w.label)}<span class="jn">${count}</span>${isOwn?`<span class="alwaystag">always</span>`:""}</button>`;
   }).join("");
-  // CAS-720: leInnerHTML's Agents-to-include checklist (agent name + switch), in cascades rank order —
-  // no per-agent count/Edit here, this list only ever narrows which agents this tab draws from.
-  // CAS-769: narrowed to the currently selected occasion's own pool first — this checklist operates
-  // WITHIN that pool rather than replacing or being replaced by it.
-  const agentRowsSorted=[...cascades]
-    .filter(c=>!watchOccasion || (c.occasions||[]).includes(watchOccasion))
-    .sort(cascadeOrderCmp);
-  const agentRowsHTML=agentRowsSorted.map(c=>{
-    const on=!agentOff.has(c.id);
-    return `<div class="agrow ym-casc ag-occ agent-${c.kind==="stream"?"str":"cin"}">
-      <span class="agicon" aria-hidden="true">${c.icon}</span>
-      <span class="agmain"><span class="agname">${esc(c.name)}</span><span class="agocc">${agentOccasionsLine(c)}</span></span>
-      <button type="button" class="ymcasctgl${on?" on":""}" aria-pressed="${on}"
-        aria-label="${escA((on?"Remove ":"Include ")+c.name+" in this tab")}"
-        onclick="toggleWatchAgent('${escA(c.id)}')">✓</button>
-    </div>`;
-  }).join("") || `<p class="unone">No agents yet.</p>`;
   // CAS-1223: moved in from the tools row's own two-way switch (Release date/Cascade score) — this is the
   // full eight-option list, so every SORT_OPTS entry stays reachable even though the switch only ever shows
   // two of them. Same chip pattern/pick() as Picked by; syncSortCtl (called by PICKER_KINDS.sort.pick)
@@ -9839,16 +9828,7 @@ function renderWatchSheet(rows, shownCount){
     ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Also show</span></div>
       <div class="chips">${alsoShowHTML}</div>
-    </div>`}
-    <div class="wsheetsec">
-      <div class="wsheethd"><span>Agents to include</span>
-        <span class="wsheetlinks">
-          <button type="button" class="linkbtn" onclick="selectAllWatchAgents()">Select all</button>
-          <button type="button" class="linkbtn" onclick="clearAllWatchAgents()">Clear all</button>
-        </span>
-      </div>
-      <div class="ymcasclist">${agentRowsHTML}</div>
-    </div>`;
+    </div>`}`;
   const showBtn=$("watchSheetShowBtn");
   if(showBtn) showBtn.textContent = shownCount ? `Show ${shownCount} film${shownCount===1?"":"s"}` : "No films match";
   const chips=[];
@@ -9892,13 +9872,15 @@ function watchScopeRows(){
     });
   }
   if(!acs.length) return [];
-  // CAS-1146: once at least one agent is unticked for this tab, a film's single CAS-709 owner
-  // (filmOwnerCascade) must also be ticked — "some ticked agent lists it" alone let an unticked
-  // agent's film ride in under a ticked co-lister. All-ticked (agentOff empty) is untouched.
+  // CAS-1226: switching an agent off must never ADD a film, so this starts from the exact all-agents-on
+  // list (listedBy against the full cascades set, not just acs) and only ever subtracts — a film whose
+  // single CAS-709 owner (filmOwnerCascade) is switched off drops out; an unowned film is never touched
+  // by the agent switches at all.
   if(agentOff.size){
     return MOVIES.filter(m=>{
+      if(!cascades.some(c=>listedBy(m,c))) return false;
       const owner=filmOwnerCascade(m);
-      return owner && acs.some(c=>c.id===owner.id) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m);
+      return (!owner || !agentOff.has(owner.id)) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m);
     });
   }
   return MOVIES.filter(m=>acs.some(c=>listedBy(m,c)) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m));
@@ -10054,8 +10036,8 @@ function watchAlsoShowPool(){
 }
 // CAS-1180 Part D: while the search box holds text, the listing stops being "this tab, filtered" and becomes
 // "every film any of the account's agents lists, anywhere" — render() swaps its own tab/Picked by/Watched/
-// Styles/Also show/Agents-to-include/mineOnly-narrowed `rows` for this set instead. `cascades.some` (not
-// watchAgentOff's included set) is deliberate: Agents to include is one of the filters search ignores. A
+// Styles/Also show/agent-narrowed `rows` for this set instead. `cascades.some` (not watchAgentOff's
+// included set) is deliberate: agent inclusion is one of the filters search ignores. A
 // verdict film is still listedBy's own ordinary call (CAS-718's excludeWatched:false), so it's included too.
 function watchSearchRows(wsearch){
   return MOVIES.filter(m => m.title.toLowerCase().includes(wsearch) && cascades.some(c=>listedBy(m,c)));
@@ -19739,7 +19721,15 @@ function filmInWatchRows(m){
   if(watchOccasion){
     const owner=filmOwnerCascade(m);
     if(!owner || !acs.some(c=>c.id===owner.id) || !(owner.occasions||[]).includes(watchOccasion)) return false;
-  } else if(!acs.length || !acs.some(c=>listedBy(m,c))) return false;
+  } else {
+    // CAS-1226: same "all-agents-on list, minus an off owner, unowned films untouched" rule as
+    // watchScopeRows's identical branch — see its comment.
+    if(!cascades.some(c=>listedBy(m,c))) return false;
+    if(agentOff.size){
+      const owner=filmOwnerCascade(m);
+      if(owner && agentOff.has(owner.id)) return false;
+    }
+  }
   if(!filmMatchesWatchTab(m, watchTab)) return false;
   if(!watchStageMatches(m)) return false;   // CAS-1223: same Upcoming/In Cinema split watchScopeRows applies
   const wsearch=watchSearch[watchTab];
