@@ -3664,6 +3664,11 @@ test("CAS-793 AC3/AC4: watchScopeRows admits a film under an occasion only when 
       pinFilm(id, nonOwner.id);
       E.recomputeFound();
       E.setWatchTab("in_cinema");
+      // CAS-1223: the Cinema tab now also narrows to whichever stage (Upcoming/In Cinema) is selected —
+      // pin it to match pickTabbedFilm()'s actual pick so this test's assertions are about ownership, not
+      // incidentally about which half of the stage split the film happens to fall in.
+      const savedStage = E.watchCinemaStage;
+      E.setWatchCinemaStage(E.primaryStatus(film) === "upcoming" ? "upcoming" : "in_cinema");
       try {
         assert.equal(E.filmOwnerCascade(film).id, owner.id, "setup: the lower-order pin must own the film");
         E.setWatchOccasion(occMe.id);
@@ -3674,6 +3679,7 @@ test("CAS-793 AC3/AC4: watchScopeRows admits a film under an occasion only when 
       } finally {
         E.setWatchOccasion(null);
         E.setWatchTab(savedTab);
+        E.setWatchCinemaStage(savedStage);
         delete E.notify[id];
       }
     });
@@ -3696,6 +3702,9 @@ test("CAS-793: unticking the owning agent in \"Agents to include\" removes the f
       E.recomputeFound();
       E.setWatchTab("in_cinema");
       E.setWatchOccasion(occ.id);
+      // CAS-1223: pin the stage to match pickTabbedFilm()'s actual pick — see the sibling CAS-793 test above.
+      const savedStage = E.watchCinemaStage;
+      E.setWatchCinemaStage(E.primaryStatus(film) === "upcoming" ? "upcoming" : "in_cinema");
       try {
         assert.equal(E.filmOwnerCascade(film).id, owner.id, "setup: the lower-order pin must own the film");
         assert.ok(E.watchScopeRows().some(m => m.tmdb_id === id), "setup: the film must reach the tab before any agent is unticked");
@@ -3705,6 +3714,7 @@ test("CAS-793: unticking the owning agent in \"Agents to include\" removes the f
         E.toggleWatchAgent(owner.id);   // re-tick, restoring watchAgentOff to its prior (empty) state
         E.setWatchOccasion(null);
         E.setWatchTab(savedTab);
+        E.setWatchCinemaStage(savedStage);
         delete E.notify[id];
       }
     });

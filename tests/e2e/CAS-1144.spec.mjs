@@ -58,6 +58,9 @@ test("CAS-1144 AC2/AC3: a Watch filter hiding everything prices an honest Clear 
   await settleListing(page);
   await expect(page.locator(`#card-${FILM_ID}`)).toBeVisible();
 
+  // CAS-1223: the search field is no longer shown by default — tapping the search button swaps the tools
+  // row for it (openWatchSearch, unchanged underneath).
+  await page.locator("#watchSearchBtn").click();
   await page.fill("#watchSearchInput", "zzznomatch1144");
   await page.waitForTimeout(250);   // CAS-514's debounced render picking up the new search text
   await settleListing(page);

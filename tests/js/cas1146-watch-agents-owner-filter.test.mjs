@@ -73,7 +73,7 @@ test("CAS-1146: watchScopeRows' no-occasion branch admits a film only when its O
       wireFilm(idF, [a.id, b.id]);
       wireFilm(idG, [b.id]);
       E.setWatchTab("stream");
-      E.watchAgentOff.stream.clear();
+      E.watchAgentOff.clear();
       try {
         assert.equal(E.filmOwnerCascade(E.MOVIES.find(m => m.tmdb_id === idF)).id, a.id, "setup: a must own F");
         assert.equal(E.filmOwnerCascade(E.MOVIES.find(m => m.tmdb_id === idG)).id, b.id, "setup: b must own G");
@@ -101,7 +101,7 @@ test("CAS-1146: watchScopeRows' no-occasion branch admits a film only when its O
         assert.ok(!rows.includes(idG), "b unticked: G (owned by the now-unticked b) must not appear");
         E.toggleWatchAgent(b.id);   // re-tick, restore watchAgentOff to empty
       } finally {
-        E.watchAgentOff.stream.clear();
+        E.watchAgentOff.clear();
         E.setWatchTab(savedTab);
         unplantFilm(idF);
         unplantFilm(idG);

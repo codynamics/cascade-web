@@ -298,16 +298,19 @@
     .modechip .mclabel-full{display:none}
     .modechip .mclabel-short{display:inline}
   }
-  /* CAS-636: a third chip joined the row (Moving), which the two-chip measurements above never accounted
-     for. Below 429px there isn't room for three labelled pills plus the menu icon without clipping the
-     wordmark, so the row drops to icon-only chips there — .mclabel's full/short swap has nothing left to
-     negotiate once both are hidden. CAS-1190: widened from 400px to 429px so three labelled chips at
-     402–429px wide don't overflow. */
+  /* CAS-636: a third chip joined the row (Moving). CAS-1190: widened from 400px to 429px so three labelled
+     chips at 402–429px wide don't overflow.
+     CAS-1223: the icon-only squeeze below this breakpoint existed to protect a text wordmark (CAS-689
+     removed it) — labels stay on now, the chips just give up their equal-column width and shrink to
+     content instead, and the freshness line (#updated) is guaranteed its full, un-ellipsised text rather
+     than ceding room to three fixed-width squares. */
   @media (max-width:429px){
-    .hdr-actions{gap:5px}
-    .modechip{padding:0 8px;gap:0;width:38px}
-    .modechip .mclabel{display:none}
+    .hdr-actions{gap:5px;grid-template-columns:repeat(3,auto);justify-content:end}
+    .modechip{padding:0 7px;gap:4px;width:auto}
+    .modechip .mcicon{width:15px;height:15px}
+    .modechip .mclabel-short{font-size:12.5px;font-weight:700}
     .mcbadge{top:-5px;right:-3px}
+    .brandrow .updated{overflow:visible;text-overflow:clip}
   }
   /* CAS-269: the rule that hid the 📍 AU pill below 420px went with the pill itself. The header now has
      one thing on the left that can give way — the freshness line — and it ellipsises rather than pushing
@@ -2558,12 +2561,78 @@
      .scopebar's own — same row shape, one step further down the bar. */
 
   .cascbar.rail .genrefilter{margin:8px 12px 9px}
-  /* ---- CAS-718: the Watch control bar (search + Filters + sort) and its Filters sheet — replaces the
-     scope bar's three pills and the genre row's own standalone home above. Same on-colour (--brand-blue)
-     as the tabs/old scope bar, for the same reason: these are chrome belonging to the Find/Watch chip. */
-  .watchctl{display:flex;gap:8px;margin:9px 12px 0;align-items:stretch}
-  .cascbar.rail .watchctl{margin:8px 12px 0}
-  .watchsearchwrap{flex:1;min-width:0;position:relative;display:flex;align-items:center}
+  /* ---- CAS-1223: the Watch top area — a stage line (which window a film is at) beside an agent column
+     (which agents picked it), replacing #watchTabs, the Now line and the Occasion/Picked by pills. Tapping
+     a stop still runs through setWatchTab underneath (renderWatchTop/setWatchStage below); the stage split
+     (Upcoming vs In Cinema) is new state layered on top, never a second tab system. */
+  .watchtop{display:flex;gap:10px;margin:10px 12px 0}
+  .cascbar.rail .watchtop{margin:9px 12px 0}
+  .watchtop[hidden]{display:none}
+  .stagecol{flex:0 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px;position:relative;
+    padding-left:2px}
+  /* The connecting line joins the dot centres (9px dot, so 4.5px in from the stop's own left edge, nudged
+     for the stepped indent below) — a single gradient through the four stage colours rather than one rule
+     per segment, so it never has to agree separately with however many stops actually exist. */
+  .stagecol::before{content:"";position:absolute;left:6.5px;top:12px;bottom:12px;width:1.5px;
+    background:linear-gradient(180deg,var(--upcoming),var(--amber),var(--blue),var(--green));opacity:.75}
+  .stagestop{position:relative;display:flex;align-items:center;gap:6px;background:none;border:0;
+    padding:2px 8px 2px 0;margin:0;color:var(--dim);font-family:inherit;cursor:pointer;text-align:left;
+    border-radius:999px;width:fit-content}
+  /* CAS-1223: each stop sits one step further right than the one above it. */
+  .stagestop:nth-child(1){margin-left:0}
+  .stagestop:nth-child(2){margin-left:9px}
+  .stagestop:nth-child(3){margin-left:18px}
+  .stagestop:nth-child(4){margin-left:27px}
+  .stagestop:nth-child(5){margin-left:36px}
+  .stagestop .stagecount{font-size:12px;font-weight:800;color:var(--ink);line-height:1}
+  .stagestop .gdot{flex:none}
+  .stagestop .stagename{font-size:11px;font-weight:700;color:var(--dim);white-space:nowrap}
+  .stagestop.on{height:25px;border:1px solid var(--sgc,var(--brand-blue));
+    background:color-mix(in srgb, var(--sgc,var(--brand-blue)) 20%, var(--bg));
+    box-shadow:0 3px 10px -3px var(--sgc,var(--brand-blue))}
+  .stagestop.on .stagecount,.stagestop.on .stagename{color:#fff}
+  .stagestop.on[data-stage="upcoming"]{--sgc:var(--upcoming)}
+  .stagestop.on[data-stage="in_cinema"]{--sgc:var(--amber)}
+  .stagestop.on[data-stage="premium"]{--sgc:var(--purple)}
+  .stagestop.on[data-stage="rent"]{--sgc:var(--blue)}
+  .stagestop.on[data-stage="stream"]{--sgc:var(--green)}
+  .stagestop:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .agentcol{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+  .watchagentrow{display:flex;align-items:center;gap:6px;background:none;border:1px solid transparent;
+    padding:2px 8px 2px 2px;margin:0;color:var(--dim);font-family:inherit;cursor:pointer;text-align:left;
+    border-radius:999px;width:fit-content;max-width:100%;height:25px;box-sizing:border-box}
+  .watchagentrow .agicon{width:19px;height:19px;border-radius:6px;font-size:11px}
+  .watchagentname{font-size:11px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;min-width:0}
+  .watchagentrow.on{border-color:color-mix(in srgb, var(--rt,var(--brand-blue)) 60%, var(--panel));
+    background:color-mix(in srgb, var(--rt,var(--brand-blue)) 13%, var(--bg))}
+  .watchagentrow:not(.on){opacity:.9}
+  .watchagentrow:not(.on) .agicon{filter:grayscale(1);opacity:.55}
+  .watchagentrow:not(.on) .watchagentname{color:var(--faint);font-weight:600}
+  .watchagentrow.watchagentmore{color:var(--dim);font-weight:700;font-size:11px;border-color:var(--line);
+    background:var(--panel2)}
+  .watchagentrow:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  /* ---- CAS-1223: the tools row under the stage/agent block — the two-way sort switch, search and
+     filter — replacing the standalone sort button and the old search/filter pair's old position. ---- */
+  .watchtools{display:flex;gap:8px;margin:9px 12px 0;align-items:stretch}
+  .cascbar.rail .watchtools{margin:8px 12px 0}
+  .watchtools[hidden]{display:none}
+  .sortswitch{flex:1;min-width:0;display:flex;align-items:stretch;height:34px;border-radius:10px;
+    border:1px solid var(--line);background:var(--panel2);overflow:hidden}
+  .sortglyph{flex:0 0 auto;display:flex;align-items:center;padding:0 7px;font-size:12px;color:var(--faint)}
+  .sortswitchopt{flex:1;min-width:0;background:none;border:0;color:var(--dim);font-family:inherit;
+    font-size:11.5px;font-weight:600;cursor:pointer;padding:0 6px;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap}
+  .sortswitchopt.on{background:var(--brand-blue);color:#fff;font-weight:800}
+  .sortswitchopt:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
+  /* ---- CAS-718: the Watch control bar's search field and its Filters sheet — replaces the scope bar's
+     three pills and the genre row's own standalone home above. Same on-colour (--brand-blue) as the tabs/
+     old scope bar, for the same reason: these are chrome belonging to the Find/Watch chip. ---- */
+  .watchsearchwrap{display:flex;align-items:center;gap:8px;margin:9px 12px 0}
+  .cascbar.rail .watchsearchwrap{margin:8px 12px 0}
+  /* CAS-1223: the clear (×) is positioned against the field alone, not the whole row — the close button
+     added below sits outside that field, as its own flex item, so the two never overlap. */
+  .watchsearchfield{flex:1;min-width:0;position:relative;display:flex;align-items:center}
   .watchsearchwrap .search{padding:9px 32px 9px 12px;font-size:14px}
   .watchsearchwrap .searchclear{width:24px;height:24px}
   /* CAS-840: OCCASION + PICKED BY — two-line pills sharing the row's spare width (flex:1 1 0), replacing
@@ -3575,12 +3644,9 @@
         </div>
       </div>
     </div>
-    <!-- CAS-713: Cascade 9.7's fixed sub-tabs (Cinema/Premium/Rental/Streaming) — a sibling of .brandrow in
-         <header>. CAS-893: no longer full-bleed (CAS-828) — an inset tray hanging off the Watch chip.
-         CAS-905: the tray is now a neutral well (colour moved to the selected tab) and the connector stem
-         is gone. id/role/aria and renderWatchTabs()/ensureWatchTab() are unchanged; only the element's box
-         and where it sits moved. -->
-    <div class="wtabs2 watchtabs" id="watchTabs" role="tablist" aria-label="Watch nav"></div>
+    <!-- CAS-1223: the fixed sub-tabs that used to hang off the Watch chip here (Cinema/Premium/Rental/
+         Streaming, #watchTabs) are gone — the stage line in the Watch top area (#watchTop, in #cascbar
+         below) replaced them, and it isn't header chrome shared by every screen the way this tray was. -->
     <!-- CAS-656: a persistent, non-dismissing state for "the account failed to load and you're looking at
          on-device data" — a toast was the wrong weight (it scrolls away; this stays until a load succeeds).
          Lives in the sticky header, not any one screen, so it survives navigation between Agents, Moving and
@@ -3601,40 +3667,22 @@
   <div class="cascbar blue" id="cascbar">
     <!-- CAS-371: the "AGENTS" heading is gone — the agent box is the first thing in the bar now, so
          everything below it sits that much higher. -->
-    <!-- CAS-713/828/893 — Cascade 9.7's fixed sub-tabs (Cinema/Premium/Rental/Streaming): #watchTabs itself
-         lives in <header>, as an inset tray hanging off the Watch chip — see the .watchtabs comment there. -->
-    <!-- CAS-718: replaces the old WATCH ON/For review/Watched pills, the standalone genre row, and the
-         deck's per-list search/funnel with ONE consolidated per-tab control: a search box, a Filters
-         button (opens #watchSheet — Watched + Styles), and the sort control, unchanged, moved in from the
-         retired deck. -->
-    <div class="watchctl">
-      <!-- CAS-769/822/840: the occasion pill is the FIRST child, taking the horizontal space the search box
-           gives up by collapsing to an icon — rendered only once two or more occasions exist across
-           the roster (renderWatchCtl below), so this costs nothing until the user has tagged something.
-           CAS-840: a real button opening an in-app listbox (togglePickerFor below), not the invisible
-           <select>-stretched-over-the-pill device CAS-822 shipped. -->
-      <div class="pickerwrap" id="occWrap" hidden>
-        <button type="button" class="pickerbtn" id="occBtn" aria-haspopup="listbox" aria-expanded="false"
-                onclick="togglePickerFor('occ',this)">
-          <span class="pblbl">Occasion</span>
-          <span class="pbval"><span class="pbtext" id="occName">All</span><span class="pbchev" aria-hidden="true">▾</span></span>
-        </button>
+    <!-- CAS-1223: the stage line (which window a film is at) beside the agent column (which agents picked
+         it) — replaces #watchTabs, the Now line (#jumpBar/#listCtl) and the Occasion/Picked by pills.
+         renderWatchTop() below fills this in; setWatchStage still calls setWatchTab underneath it. -->
+    <div class="watchtop" id="watchTop"></div>
+    <!-- CAS-1223: the tools row — a two-way sort switch, search and Filters — replaces the standalone sort
+         button and moves search/Filters down here from the old .watchctl row. Swaps for #watchSearchWrap
+         below while a search is open (renderWatchCtl). -->
+    <div class="watchtools" id="watchTools">
+      <div class="sortswitch" id="watchSortSwitch" role="group" aria-label="Sort">
+        <span class="sortglyph" aria-hidden="true">⇅</span>
+        <button type="button" class="sortswitchopt" id="watchSortCinema" aria-pressed="false"
+                onclick="PICKER_KINDS.sort.pick('cinema')">Release date</button>
+        <button type="button" class="sortswitchopt" id="watchSortCascade" aria-pressed="false"
+                onclick="PICKER_KINDS.sort.pick('cascade')">Cascade score</button>
       </div>
-      <!-- CAS-840: moved in from the Filters sheet (was `.pickedbyseg`, CAS-719) — always present, search
-           expanded or not, unlike the occasion pill above. Same shared listbox device. -->
-      <div class="pickerwrap">
-        <button type="button" class="pickerbtn" id="pickedByBtn" aria-haspopup="listbox" aria-expanded="false"
-                onclick="togglePickerFor('pickedby',this)">
-          <span class="pblbl">Picked by</span>
-          <span class="pbval"><span class="pbtext" id="pickedByName">All</span><span class="pbchev" aria-hidden="true">▾</span></span>
-        </button>
-      </div>
-      <div class="watchsearchwrap" id="watchSearchWrap">
-        <input id="watchSearchInput" class="search" type="text" inputmode="search" autocomplete="off"
-               placeholder="Search all your films" aria-label="Search all your films">
-        <button class="searchclear" id="watchSearchClear" aria-label="Clear search" type="button" hidden>×</button>
-      </div>
-      <button type="button" class="watchiconbtn" id="watchSearchBtn" aria-label="Search all your films" hidden
+      <button type="button" class="watchiconbtn" id="watchSearchBtn" aria-label="Search all your films"
               onclick="openWatchSearch()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
           stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.4"/><path d="M15.8 15.8 20 20"/></svg>
@@ -3647,25 +3695,32 @@
              stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.2 5.4h15.6l-6 7.2v6l-3.6 1.8v-7.8z"/></svg>
         <span class="wfbadge" id="watchFilterBadge" hidden>0</span>
       </button>
-      <!-- CAS-1181: a real button opening the shared listbox popover (togglePickerFor, same device as the
-           Occasion/Picked by pills), replacing the invisible-<select>-stretched-over-the-icon device that
-           opened the browser's own unstyled list. The select stays only as inert state (tabindex="-1",
-           hidden — never clicked or focused) so syncSortCtl's own option lookup is untouched. -->
-      <button type="button" class="sortctl ca-btn x" id="sortCtl" aria-haspopup="listbox" aria-expanded="false"
-              aria-label="Order" onclick="togglePickerFor('sort',this)">
-        <span class="sortic" aria-hidden="true">⇅<span class="sortdot" id="sortDot" hidden></span></span>
-      </button>
-      <select id="sort" tabindex="-1" aria-hidden="true" hidden>
-        <option value="cinema">Release date</option>
-        <option value="availability">Availability</option>
-        <option value="imdb">People rating</option>
-        <option value="cascade">Cascade score</option>
-        <option value="rt">Critics</option>
-        <option value="gross">Box office</option>
-        <option value="popularity">Most anticipated</option>
-        <option value="title">Title A–Z</option>
-      </select>
     </div>
+    <div class="watchsearchwrap" id="watchSearchWrap" hidden>
+      <div class="watchsearchfield">
+        <input id="watchSearchInput" class="search" type="text" inputmode="search" autocomplete="off"
+               placeholder="Search all your films" aria-label="Search all your films">
+        <button class="searchclear" id="watchSearchClear" aria-label="Clear search" type="button" hidden>×</button>
+      </div>
+      <button type="button" class="watchiconbtn watchsearchclose" id="watchSearchCloseBtn"
+              aria-label="Close search" onclick="clearWatchSearch()">×</button>
+    </div>
+    <!-- CAS-1223: the standalone sort button is gone from Watch — kept only as inert state (hidden, never
+         focused) so syncSortCtl's own #sort option lookup is untouched. -->
+    <button type="button" class="sortctl ca-btn x" id="sortCtl" aria-haspopup="listbox" aria-expanded="false"
+            aria-label="Order" hidden onclick="togglePickerFor('sort',this)">
+      <span class="sortic" aria-hidden="true">⇅<span class="sortdot" id="sortDot" hidden></span></span>
+    </button>
+    <select id="sort" tabindex="-1" aria-hidden="true" hidden>
+      <option value="cinema">Release date</option>
+      <option value="availability">Availability</option>
+      <option value="imdb">People rating</option>
+      <option value="cascade">Cascade score</option>
+      <option value="rt">Critics</option>
+      <option value="gross">Box office</option>
+      <option value="popularity">Most anticipated</option>
+      <option value="title">Title A–Z</option>
+    </select>
     <!-- CAS-718: one chip per active (non-default) sheet section, each clearing just that section. -->
     <div class="chips watchactivefilters" id="watchActiveFilters" role="group" aria-label="Active filters" hidden></div>
     <!-- CAS-863: the watch-list card row (#cascStrip, retired as a browsing concept since CAS-718) and the
@@ -3675,14 +3730,6 @@
       <input id="cascSearchInput" class="search" type="text" inputmode="search"
              placeholder="Search this cascade" autocomplete="off" aria-label="Search this cascade">
       <button class="searchclear show" id="cascSearchClose" aria-label="Close search" type="button">×</button>
-    </div>
-    <!-- CAS-275: jump to a section of the listing. It is rendered from the sections that ACTUALLY exist in
-         the current list, so it can never offer a destination that isn't there — and it hides itself when
-         there is only one, because a jump control with one destination scrolls you nowhere. CAS-371 took the
-         order control out of this row (it now rides with the open agent card, above) — chips are all that's
-         left, so the row is just the jump rail now. -->
-    <div class="listctl" id="listCtl">
-      <div class="jumpbar" id="jumpBar" hidden></div>
     </div>
     <div id="cascDetail"></div>
   </div>
@@ -6081,6 +6128,12 @@ function syncSortCtl(){
   const opt=$("sort").querySelector(`option[value="${filt.sort}"]`);
   $("sortCtl").title="Order: "+(opt?opt.textContent:"");
   $("sortDot").hidden=!sortPicked;   // CAS-819: dot reflects an explicit pick, not just "off DEFAULT_SORT"
+  // CAS-1223: the visible two-way switch in the tools row — only two of SORT_OPTS' eight values have a
+  // half here, so a pick from the Filters sheet's own full "Sort by" list (any of the other six) correctly
+  // leaves neither half filled.
+  const cinBtn=$("watchSortCinema"), casBtn=$("watchSortCascade");
+  if(cinBtn){ const on=filt.sort==="cinema"; cinBtn.classList.toggle("on",on); cinBtn.setAttribute("aria-pressed",String(on)); }
+  if(casBtn){ const on=filt.sort==="cascade"; casBtn.classList.toggle("on",on); casBtn.setAttribute("aria-pressed",String(on)); }
 }
 $("imdbMin").oninput=e=>{filt.imdb=+e.target.value;$("imdbVal").textContent=filt.imdb?filt.imdb.toFixed(1)+"+":"Any";render();};
 $("rtMin").oninput=e=>{filt.rt=+e.target.value;$("rtVal").textContent=filt.rt?filt.rt+"%+":"Any";render();};
@@ -9230,15 +9283,96 @@ window.setWatchTab = key => {
   render();
   jumpToSection(WATCH_TAB_SCROLL_TARGET[key]);
 };
-function renderWatchTabs(){
-  const el=$("watchTabs"); if(!el) return;
-  const tabs=watchTabsNow();
-  // CAS-821: #watchTabs now lives in <header>, shared by every screen (Agents, Moving, ...) that sits below
-  // it — so the strip must also drop out whenever one of those .uscreens covers the Watch listing, on top
-  // of CAS-725's existing "no enabled window" rule.
-  el.hidden = !tabs.length || !!document.querySelector(".uscreen.open");
-  el.innerHTML = tabs.map(t=>`<button type="button" class="wtabbtn${watchTab===t.key?" on":""}"
-      role="tab" aria-selected="${watchTab===t.key}" onclick="setWatchTab('${t.key}')">${t.label}</button>`).join("");
+// CAS-1223: which half of the Cinema tab is on screen — "upcoming" or "in_cinema". watchTab itself stays
+// exactly as before (still just the four WATCH_LEVEL_KEYS values) so every existing per-tab dict
+// (watchSearch, watchPickedBy, watchGenreOff, ...) and filmMatchesWatchTab are untouched; this is a second,
+// narrower filter layered on top, consulted only while watchTab==="in_cinema" (watchStageMatches below).
+let watchCinemaStage = "upcoming";
+// CAS-1223: one stop per stage down the stepped line, in ladder order — a window switched off in Where &
+// when has no stop (built from watchTabsNow(), same as the old tab strip). The Cinema tab becomes two
+// stops; every other tab keeps its own single stop, same key/label it always had.
+const STAGE_DOT = {upcoming:"upcoming", in_cinema:"in_cinema", premium:"pvod", rent:"rental", stream:"included_streaming"};
+function watchStageStopsNow(){
+  const stops=[];
+  watchTabsNow().forEach(t=>{
+    if(t.key==="in_cinema"){
+      stops.push({key:"upcoming", tabKey:"in_cinema", label:"Upcoming", dot:STAGE_DOT.upcoming});
+      stops.push({key:"in_cinema", tabKey:"in_cinema", label:"In Cinema", dot:STAGE_DOT.in_cinema});
+    } else {
+      stops.push({key:t.key, tabKey:t.key, label:t.label, dot:STAGE_DOT[t.key]});
+    }
+  });
+  return stops;
+}
+// Tapping a stop still runs through setWatchTab for the tab it belongs to — the only new behaviour is the
+// Cinema tab's own Upcoming/In Cinema split, which setWatchTab knows nothing about (and doesn't need to:
+// a tap that doesn't change `watchTab` has to re-render itself, since setWatchTab no-ops on no change).
+window.setWatchStage = key => {
+  const stop=watchStageStopsNow().find(s=>s.key===key); if(!stop) return;
+  if(watchTab!==stop.tabKey){
+    if(stop.tabKey==="in_cinema") watchCinemaStage=key;
+    setWatchTab(stop.tabKey);
+    return;
+  }
+  if(stop.tabKey==="in_cinema" && watchCinemaStage!==key){
+    const from=watchCinemaStage;
+    watchCinemaStage=key;
+    logEvent("watch_tab", {tab:key, from});
+    render();
+  }
+};
+// CAS-1223: true for a film belonging to the Cinema tab's currently-selected half — Upcoming is exactly
+// primaryStatus "upcoming"; In Cinema is everything else the Cinema tab shows (opening_week/in_cinema).
+// Every other tab has no stage split, so this is always true for them.
+function watchStageMatches(m){
+  if(watchTab!=="in_cinema") return true;
+  const isUpcoming = primaryStatus(m)==="upcoming";
+  return watchCinemaStage==="upcoming" ? isUpcoming : !isUpcoming;
+}
+// CAS-1223: a stop's own count — "the number of films the list shows for that stage with the current
+// agents, filters and search applied" — computed by temporarily aiming the real pipeline (watchVisibleRows)
+// at that stop's tab/stage and reading it back, the same save/swap/restore device pickLandingWatchTab
+// already uses rather than a second, parallel counting implementation that could drift from the real one.
+function watchStageCountFor(stop){
+  const savedTab=watchTab, savedStage=watchCinemaStage;
+  watchTab=stop.tabKey;
+  if(stop.tabKey==="in_cinema") watchCinemaStage = stop.key==="upcoming" ? "upcoming" : "in_cinema";
+  const n=watchVisibleRows().rows.filter(m=>!taggedOut(m)).length;
+  watchTab=savedTab; watchCinemaStage=savedStage;
+  return n;
+}
+// CAS-1223: the stage line (left) + agent lozenges (right) — replaces renderWatchTabs' old header tray.
+// Agent inclusion (watchAgentOff below) is one shared Set now, not per-tab, so it needs no tab/stage swap.
+function renderWatchTop(){
+  const el=$("watchTop"); if(!el) return;
+  const stops=watchStageStopsNow();
+  if(!stops.length){ el.hidden=true; el.innerHTML=""; return; }
+  el.hidden=false;
+  const curKey = watchTab==="in_cinema" ? watchCinemaStage : watchTab;
+  const stageHTML=stops.map(s=>{
+    const on=s.key===curKey;
+    return `<button type="button" class="stagestop${on?" on":""}" data-stage="${s.key}"
+        aria-pressed="${on}" onclick="setWatchStage('${s.key}')">
+      <span class="stagecount">${watchStageCountFor(s)}</span>
+      <span class="gdot ${s.dot}" aria-hidden="true"></span>
+      <span class="stagename">${esc(s.label)}</span>
+    </button>`;
+  }).join("");
+  const ranked=[...cascades].sort(cascadeOrderCmp);
+  const overflow=ranked.length>4;
+  const shown=overflow ? ranked.slice(0,3) : ranked;
+  const agentHTML=shown.map(c=>{
+    const on=!watchAgentOff.has(c.id);
+    const rank=cascadeRankTint(c);
+    return `<button type="button" class="watchagentrow agrow${rank?` agrank-${rank}`:""}${on?" on":""}"
+        data-id="${escA(c.id)}" aria-pressed="${on}"
+        aria-label="${escA((on?"Remove ":"Include ")+c.name+" in Watch")}" onclick="toggleWatchAgent('${escA(c.id)}')">
+      <span class="agicon" aria-hidden="true">${c.icon}</span>
+      <span class="watchagentname">${esc(c.name)}</span>
+    </button>`;
+  }).join("") + (overflow ? `<button type="button" class="watchagentrow watchagentmore" onclick="openWatchSheet()">+${ranked.length-3} more</button>` : "");
+  el.innerHTML = `<div class="stagecol" role="tablist" aria-label="Stage">${stageHTML}</div>
+    <div class="agentcol">${agentHTML}</div>`;
 }
 // CAS-718: the search box's placeholder/value follow whichever tab is active — restoring the raw text you
 // left in THAT tab (not the lowercased match term, so casing/whitespace survive a tab switch) is the same
@@ -9250,6 +9384,10 @@ const watchSearchRaw = {in_cinema:"", premium:"", rent:"", stream:""};
 // CAS-775: holds a REGISTER ID now (was a name) — see the Occasions register above. null still means "All".
 let watchOccasion = null;
 try{ watchOccasion = localStorage.getItem("cascade_watch_occasion") || null; }catch(e){}
+// CAS-1223: the Occasion pill left the Watch screen — nothing there can un-set a stale selection any more,
+// so a device carrying one from before this ticket has it cleared once, the same as a fresh "All" start.
+// The Occasions register, Manage occasions and the agent editor's occasion card are untouched by this.
+if(watchOccasion){ watchOccasion=null; try{ localStorage.setItem("cascade_watch_occasion", ""); }catch(e){} }
 window.setWatchOccasion = id => {
   watchOccasion = (!id || id==="All") ? null : id;
   try{ localStorage.setItem("cascade_watch_occasion", watchOccasion||""); }catch(e){}
@@ -9269,6 +9407,10 @@ function closeWatchSearchIfEmpty(){
   const inp=$("watchSearchInput");
   if(watchSearchOpen && inp && !inp.value){ watchSearchOpen=false; renderWatchCtl(); }
 }
+// CAS-1223: the Occasion/Picked by pills this used to repaint are gone from Watch (Picked by is still a
+// Filters-sheet section, renderWatchSheet's own job). All that's left is the search field's own text/clear
+// state and swapping it for the tools row (#watchTools) while search is open — the search button itself
+// moved into that row (openWatchSearch/clearWatchSearch, unchanged).
 function renderWatchCtl(){
   const inp=$("watchSearchInput");
   if(inp){
@@ -9281,34 +9423,9 @@ function renderWatchCtl(){
   }
   const clr=$("watchSearchClear");
   if(clr){ const has=!!(inp && inp.value); clr.hidden=!has; clr.classList.toggle("show", has); }
-  // CAS-769/775: the occasion pill only earns its keep once there are at least two occasions in the
-  // REGISTER to choose between — with none or one, it stays absent and the search box keeps its original
-  // full-width form. (A register entry no agent yet carries still counts — CAS-775 AC2.)
-  const regEntries=occasionRegSorted();
-  const showOcc=regEntries.length>=2;
-  const occWrap=$("occWrap"), searchWrap=$("watchSearchWrap"), searchBtn=$("watchSearchBtn");
-  if(occWrap) occWrap.hidden = !showOcc || watchSearchOpen;
-  if(searchBtn) searchBtn.hidden = !showOcc || watchSearchOpen;
-  if(searchWrap) searchWrap.hidden = showOcc && !watchSearchOpen;
-  if(showOcc && !watchSearchOpen) renderOccBar(regEntries);
-  // CAS-840: Picked by is always present — search expanded or not, occasion pill shown or not.
-  renderPickedByPill();
-}
-// CAS-769/775/822/840: repaints the occasion pill's visible name and its .on tint (on once a real
-// occasion, not "All", is selected) from the REGISTER (occasionRegSorted — already alphabetical).
-function renderOccBar(regEntries){
-  const btn=$("occBtn"), name=$("occName"); if(!btn||!name) return;
-  const items=[{id:null,name:"All"}, ...regEntries];
-  const cur=items.find(o=>o.id===watchOccasion) || items[0];
-  name.textContent = cur.name;
-  btn.classList.toggle("on", watchOccasion!=null);
-}
-// CAS-840: same repaint, for the Picked by pill — moved in from the Filters sheet's `.pickedbyseg`.
-function renderPickedByPill(){
-  const btn=$("pickedByBtn"), name=$("pickedByName"); if(!btn||!name) return;
-  const key=watchPickedBySafe(watchTab);
-  name.textContent = PICKED_BY_OPTS.find(o=>o.key===key).label;
-  btn.classList.toggle("on", key!=="all");
+  const tools=$("watchTools"), searchWrap=$("watchSearchWrap");
+  if(tools) tools.hidden=watchSearchOpen;
+  if(searchWrap) searchWrap.hidden=!watchSearchOpen;
 }
 // CAS-714/CAS-718: which genres are toggled OFF (hidden) in each Watch tab's own view — session-only, one
 // Set per tab. Never persisted and never written back to any cascade's own stored c.genre: this only
@@ -9483,22 +9600,21 @@ window.toggleWatchAlsoShow = key => {
   render();
 };
 window.clearWatchAlsoShow = () => { watchAlsoShow[watchTab].clear(); render(); scrollWatchListingToTop(); };   // CAS-857
-// CAS-720: "Agents to include" — restores the per-tab agent narrowing scopeRows() gave up when CAS-718
-// retired the deck's per-list agent picker (see that function's own comment), reading from this sheet
-// state instead of the old activeIds/cascOff deck selection. Same per-tab, session-only, empty-means-
-// "nothing excluded" off-set shape as watchGenreOff — so a tab that's never had this
-// filter touched defaults to every agent included, with no separate "all on" bookkeeping needed.
-const watchAgentOff = {in_cinema:new Set(), premium:new Set(), rent:new Set(), stream:new Set()};
+// CAS-720: "Agents to include" — restores the agent narrowing scopeRows() gave up when CAS-718 retired the
+// deck's per-list agent picker (see that function's own comment), reading from this sheet state instead of
+// the old activeIds/cascOff deck selection. Session-only, empty-means-"nothing excluded".
+// CAS-1223: one shared Set now, not per-tab — "one selection applies to every stage... is not saved
+// anywhere" (the ticket's own words for the new agent lozenge row in #watchTop).
+const watchAgentOff = new Set();
 window.toggleWatchAgent = id => {
-  const set=watchAgentOff[watchTab];
-  set.has(id) ? set.delete(id) : set.add(id);
+  watchAgentOff.has(id) ? watchAgentOff.delete(id) : watchAgentOff.add(id);
   render();
 };
 // CAS-857: also the active-filter chip's clear (removes the agent narrowing) — both scroll back to the top.
-window.selectAllWatchAgents = () => { watchAgentOff[watchTab].clear(); render(); scrollWatchListingToTop(); };
+window.selectAllWatchAgents = () => { watchAgentOff.clear(); render(); scrollWatchListingToTop(); };
 window.clearAllWatchAgents = () => {
-  const off=watchAgentOff[watchTab]; off.clear();
-  cascades.forEach(c=>off.add(c.id));
+  watchAgentOff.clear();
+  cascades.forEach(c=>watchAgentOff.add(c.id));
   render();
   scrollWatchListingToTop();
 };
@@ -9569,7 +9685,7 @@ window.clearAllWatchFilters = () => {
   watchWatchedSel[watchTab].clear();
   watchGenreOff[watchTab].clear();
   watchAlsoShow[watchTab].clear();
-  watchAgentOff[watchTab].clear();
+  watchAgentOff.clear();
   // CAS-1144: "cleared" means the narrowing no longer applies, not reset-to-default — mineOnly's own
   // default is ON (CAS-753), which still narrows, so clearing it here means OFF.
   setWatchMineOnly(false);
@@ -9611,7 +9727,9 @@ function renderWatchSheet(rows, shownCount){
   const watchedSel=watchWatchedSel[watchTab];
   const pickedBy=watchPickedBySafe(watchTab);
   const alsoShowSet=watchAlsoShow[watchTab];
-  const agentOff=watchAgentOff[watchTab];
+  // CAS-1223: one shared Set now, not per-tab — "one selection applies to every stage... is not saved
+  // anywhere" (the agent lozenge row in #watchTop toggles this same Set via the same toggleWatchAgent).
+  const agentOff=watchAgentOff;
   // CAS-753: default is ON, so — unlike every set/off field above — it counts as a deviation when it's OFF.
   const mineOnly=watchMineOnlyOn();
   const activeCount=(pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(alsoShowSet.size?1:0)+(agentOff.size?1:0)+(mineOnly?0:1);
@@ -9667,6 +9785,15 @@ function renderWatchSheet(rows, shownCount){
         onclick="toggleWatchAgent('${escA(c.id)}')">✓</button>
     </div>`;
   }).join("") || `<p class="unone">No agents yet.</p>`;
+  // CAS-1223: moved in from the tools row's own two-way switch (Release date/Cascade score) — this is the
+  // full eight-option list, so every SORT_OPTS entry stays reachable even though the switch only ever shows
+  // two of them. Same chip pattern/pick() as Picked by; syncSortCtl (called by PICKER_KINDS.sort.pick)
+  // keeps the switch's own on-state honest whichever of the eight gets chosen here.
+  const sortByHTML=SORT_OPTS.map(o=>{
+    const on=o.key===filt.sort;
+    return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
+      onclick="PICKER_KINDS.sort.pick('${o.key}')">${esc(o.label)}</button>`;
+  }).join("");
   const body=$("watchSheetBody");
   if(body) body.innerHTML=`
     <div class="wsheetsec">
@@ -9675,6 +9802,10 @@ function renderWatchSheet(rows, shownCount){
         aria-checked="${mineOnly}" onclick="toggleWatchMineOnly()">
         <span>Show only available on my services</span><span class="knob"></span>
       </div>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Sort by</span></div>
+      <div class="chips">${sortByHTML}</div>
     </div>
     <div class="wsheetsec">
       <div class="wsheethd"><span>Picked by</span></div>
@@ -9717,8 +9848,8 @@ function renderWatchSheet(rows, shownCount){
   if(genreOff.size) chips.push({label:chipSummary([...genreOff]), clear:"clearAllWatchStyles()"});
   if(alsoShowSet.size) chips.push({label:chipSummary(ALSO_SHOW_WINDOWS.filter(w=>alsoShowSet.has(w.key)).map(w=>w.label)),
     clear:"clearWatchAlsoShow()"});
-  if(agentOff.size) chips.push({label:chipSummary(cascades.filter(c=>agentOff.has(c.id)).map(c=>c.name)),
-    clear:"selectAllWatchAgents()"});
+  // CAS-1223: a switched-off agent reads directly off its own lozenge in #watchTop now, so the active-filter
+  // row no longer duplicates it as a chip (section 4 of the ticket).
   const bar=$("watchActiveFilters"); if(!bar) return;
   if(!chips.length){ bar.hidden=true; bar.innerHTML=""; return; }
   bar.hidden=false;
@@ -9734,7 +9865,7 @@ function watchScopeRows(){
   // empty branch (already keyed off rows.length) shows its existing empty state rather than a live listing
   // under a blank strip.
   if(!watchTabsNow().length) return [];
-  const agentOff=watchAgentOff[watchTab];
+  const agentOff=watchAgentOff;
   const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
   // CAS-793: a selected occasion narrows by the FILM'S OWNER (filmOwnerCascade — the single CAS-709 global
   // owner; ownership is never occasion-aware) carrying the occasion, not by "some included agent lists it" —
@@ -9745,7 +9876,7 @@ function watchScopeRows(){
     if(!pool.length) return [];
     return MOVIES.filter(m=>{
       const owner=filmOwnerCascade(m);
-      return owner && pool.some(c=>c.id===owner.id) && filmMatchesWatchTab(m, watchTab);
+      return owner && pool.some(c=>c.id===owner.id) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m);
     });
   }
   if(!acs.length) return [];
@@ -9755,10 +9886,30 @@ function watchScopeRows(){
   if(agentOff.size){
     return MOVIES.filter(m=>{
       const owner=filmOwnerCascade(m);
-      return owner && acs.some(c=>c.id===owner.id) && filmMatchesWatchTab(m, watchTab);
+      return owner && acs.some(c=>c.id===owner.id) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m);
     });
   }
-  return MOVIES.filter(m=>acs.some(c=>listedBy(m,c)) && filmMatchesWatchTab(m, watchTab));
+  return MOVIES.filter(m=>acs.some(c=>listedBy(m,c)) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m));
+}
+// CAS-1223: render()'s own Watch pipeline (tab scope → search → Picked by/Styles/Watched → mine-only →
+// search-override), pulled out of render() so watchStageCountFor can aim the exact same pipeline at a
+// stage stop that isn't the active one and read its count back, rather than a second implementation that
+// could drift from what render() actually draws.
+function watchVisibleRows(){
+  let rows=watchScopeRows();
+  const wsearch=watchSearch[watchTab];
+  if(wsearch) rows=rows.filter(m=>m.title.toLowerCase().includes(wsearch));
+  const preSheetRows=rows;
+  if(watchPickedBy[watchTab]!=="all") rows=rows.filter(filmMatchesPickedBy);
+  const genreOff=watchGenreOff[watchTab];
+  if(genreOff.size) rows=rows.filter(m=>!(m.genres||[]).some(g=>genreOff.has(g)));
+  const heldThisTab=watchHeldOpen[watchTab];
+  rows=rows.filter(m=>filmMatchesWatchedFilter(m) || heldThisTab.has(m.tmdb_id));
+  const preMineOnlyRows=rows;
+  const mineOnly=watchMineOnlyOn();
+  if(mineOnly) rows=rows.filter(m=>!HOME_KEYS.includes(primaryStatus(m)) || matchesServices(m, primaryStatus(m)));
+  if(wsearch) rows=watchSearchRows(wsearch);
+  return {rows, preSheetRows, preMineOnlyRows, mineOnly};
 }
 // CAS-933: the one landing-tab decision, shared by boot and the end of onboarding. Cinema only when it
 // would actually show something — asked of watchScopeRows/filmMatchesWatchedFilter, the listing's own real
@@ -9873,7 +10024,7 @@ function applyPendingAnswer(){
 // never called for it.
 function watchAlsoShowPool(){
   if(!watchTabsNow().length) return [];
-  const agentOff=watchAgentOff[watchTab];
+  const agentOff=watchAgentOff;
   const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
   const ownKey = m => filmNotifyState(m.tmdb_id).key===watchTab;
   let pool;
@@ -11431,7 +11582,7 @@ function emptyResultsHTML(){
   // CAS-1144: this tab's own empty state used to price RELAXERS/filt — the last-opened agent's builder
   // criteria, which plays no part in what the Watch tab actually lists (see the ticket). Derive the reason
   // only from the Watch pipeline itself, in the order a person would actually hit them.
-  const agentOff=watchAgentOff[watchTab];
+  const agentOff=watchAgentOff;
   const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
   if(!acs.some(c=>windowUsable(c, watchTab))){
     return `<div class="empty">
@@ -17547,11 +17698,9 @@ function syncWatchChip(){
     if(had) render();
   }
   $("moviesBtn").classList.toggle("active", showing);
-  // CAS-821: #watchTabs now lives in the shared header, so it has to drop out/reappear on this same
-  // open/close pair — riding `showing`, the previously active window stays selected since watchTab itself
-  // is untouched. Moving it in/out changes --hdrh (the strip's own tier), so re-measure right after,
-  // not only on resize — jumpToSection and .grouphead.sub's sticky offset both read --stickyh live.
-  renderWatchTabs();
+  // CAS-1223: #watchTop (the stage/agent block) lives in #cascbar, not the shared header — unlike the old
+  // #watchTabs tray it needs no explicit drop-out/reappear here, since #cascbar sits naturally behind
+  // whichever .uscreen covers it. Still re-measure: a covering screen closing can change --hdrh.
   syncHeaderHeight();
 }
 // CAS-A2: do NOT close the Agents screen here. It is where the user came from, and closing it
@@ -19320,39 +19469,10 @@ function render(){
   // Two lists, one pass: `rows` is everything on screen, `shown` is everything that still gets a full card.
   // The difference is the films you tagged out — they stay on screen as stubs, and they don't count as
   // results, because you told us you didn't want them.
-  // CAS-713/CAS-717: the active Watch tab narrows `rows` before anything below reads it, so the jump bar
-  // and the groups can never disagree about what this render actually shows.
-  let rows=watchScopeRows();
-  // CAS-718: the tab's own search box narrows next — same case-insensitive substring match the old
-  // per-list search always used.
-  const wsearch=watchSearch[watchTab];
-  if(wsearch) rows=rows.filter(m=>m.title.toLowerCase().includes(wsearch));
-  // CAS-718: the Filters sheet's two sections (Styles, Watched) are built from the tab's full
-  // search-narrowed set above, THEN narrow `rows` the same way the tab/search already did — so the sheet,
-  // the jump bar and the groups agree with it too, and can never show a film the sheet says is hidden.
-  const preSheetRows=rows;
-  if(watchPickedBy[watchTab]!=="all") rows=rows.filter(filmMatchesPickedBy);
-  const genreOff=watchGenreOff[watchTab];
-  if(genreOff.size) rows=rows.filter(m=>!(m.genres||[]).some(g=>genreOff.has(g)));
-  // CAS-823: no separate current-status narrowing step any more — the standing/Also-show test is now inside
-  // filmMatchesWatchTab itself (watchScopeRows above already applied it), so there is nothing left to do here.
-  // CAS-752: a held film (see watchHeldOpen above) stays a row despite failing its own new verdict's filter.
-  const heldThisTab=watchHeldOpen[watchTab];
-  rows=rows.filter(m=>filmMatchesWatchedFilter(m) || heldThisTab.has(m.tmdb_id));
-  // CAS-753: "Show only available on my services" — gates only the three home-window sections
-  // (HOME_KEYS, the same set the agent-level per-window scope already uses), never Cinema/Upcoming, which
-  // carry no offers to test in the first place. `preMineOnlyRows` lets the empty branch below tell "the
-  // catalogue genuinely has nothing" apart from "this scope, with nothing picked, ate everything".
-  const preMineOnlyRows=rows;
-  const mineOnly=watchMineOnlyOn();
-  if(mineOnly) rows=rows.filter(m=>!HOME_KEYS.includes(primaryStatus(m)) || matchesServices(m, primaryStatus(m)));
-  // CAS-1180 Part D: a non-empty search box replaces every narrowing above with watchSearchRows' own wider
-  // set — everything upstream of this line (tab scope, Picked by, Styles, Watched, mineOnly) stays exactly
-  // as it was for when the box is cleared again; it just stops being what gets drawn while it holds text.
-  if(wsearch) rows=watchSearchRows(wsearch);
+  const {rows, preSheetRows, preMineOnlyRows, mineOnly}=watchVisibleRows();
   const shown=rows.filter(m=>!taggedOut(m));
   const stubbed=rows.length-shown.length;
-  renderWatchTabs();
+  renderWatchTop();
   renderWatchCtl();
   renderWatchSheet(preSheetRows, shown.length);
   renderCascadeBar(rows.length);
@@ -19601,7 +19721,7 @@ function patchFindCounts(){
 // left the list.
 function filmInWatchRows(m){
   if(!watchTabsNow().length) return false;
-  const agentOff=watchAgentOff[watchTab];
+  const agentOff=watchAgentOff;
   const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
   // CAS-793: same owner-based occasion test as watchScopeRows — see its comment.
   if(watchOccasion){
@@ -19609,6 +19729,7 @@ function filmInWatchRows(m){
     if(!owner || !acs.some(c=>c.id===owner.id) || !(owner.occasions||[]).includes(watchOccasion)) return false;
   } else if(!acs.length || !acs.some(c=>listedBy(m,c))) return false;
   if(!filmMatchesWatchTab(m, watchTab)) return false;
+  if(!watchStageMatches(m)) return false;   // CAS-1223: same Upcoming/In Cinema split watchScopeRows applies
   const wsearch=watchSearch[watchTab];
   if(wsearch && !m.title.toLowerCase().includes(wsearch)) return false;
   if(watchPickedBy[watchTab]!=="all" && !filmMatchesPickedBy(m)) return false;
