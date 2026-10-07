@@ -6,13 +6,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
 
-// A minimal chainable fake query builder covering exactly the acctOp "update" shape
-// (from(table).update(fields).match(m)[.eq(...)].select()) — same convention cas1094-account-store.test.mjs
-// uses, trimmed to what this test needs.
+// A minimal chainable fake query builder covering both the acctOp "update" shape
+// (from(table).update(fields).match(m)[.eq(...)].select()) and the "upsert" shape
+// (from(table).upsert(fields, opts), no .select() chain) — same convention
+// cas1094-account-store.test.mjs uses, trimmed to what this test needs. CAS-1218: pushUserPrefsCols issues
+// "upsert" now (a load no longer bootstrap-inserts the row, so the first real column write has to be able
+// to create it), carrying op.match merged straight into the single fields object, not a separate .match().
 function makeQueryBuilder(table, calls){
   const state = { table };
   const b = {
     update(fields){ state.kind = "update"; state.fields = fields; return b; },
+    upsert(fields, opts){ state.kind = "upsert"; state.fields = fields; state.opts = opts; return b; },
     match(m){ state.match = m; return b; },
     eq(col, val){ state.eqCol = col; state.eqVal = val; return b; },
     select(){ return b; },
@@ -56,16 +60,17 @@ test("CAS-1095 AC2: toggling one service issues one update whose payload contain
     E.onChipToggle("svc");
     await new Promise(r => setTimeout(r, 0));   // let acctOp's queued send resolve against the fake client
 
-    const updates = calls.filter(c => c.table === "user_prefs" && c.kind === "update");
-    assert.equal(updates.length, 1, "exactly one user_prefs update must be issued for one toggle");
-    assert.deepEqual(Object.keys(updates[0].fields).sort(), ["store_services", "sub_services"],
+    const updates = calls.filter(c => c.table === "user_prefs" && c.kind === "upsert");
+    assert.equal(updates.length, 1, "exactly one user_prefs upsert must be issued for one toggle");
+    assert.deepEqual(Object.keys(updates[0].fields).filter(k => k !== "user_id").sort(),
+      ["store_services", "sub_services"],
       "the payload must carry only the services column(s) — no services_only/touched drift, no whole row");
     // updates[0].fields.sub_services is an array built inside engine.mjs's vm sandbox — spread it into a
     // plain host-realm array first, or deepEqual (deepStrictEqual under node:assert/strict) fails on Array
     // prototype identity alone, independent of contents (same cross-realm gotcha this suite hits elsewhere).
     assert.deepEqual([...updates[0].fields.sub_services], ["Netflix"]);
     assert.deepEqual([...updates[0].fields.store_services], []);
-    assert.deepEqual({ ...updates[0].match }, { user_id: "cas1095-test-user" });
+    assert.equal(updates[0].fields.user_id, "cas1095-test-user");
   } finally { signOut(E); }
 });
 

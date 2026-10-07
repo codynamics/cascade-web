@@ -21571,14 +21571,18 @@ else if(dedupedN)
   // Each caller names exactly the column(s) its own settings change actually touched; no other field of
   // userPrefsRow() ever travels. No updated_at conflict check: each setting is independent, so the last
   // write of that column wins, the same rule notify_prefs' pushNotifyPrefs above follows.
+  // CAS-1218: upsert (not update) on user_id — loadUserPrefs() no longer bootstrap-inserts a missing row
+  // of its own, so the first real settings change a person makes is what creates the row, in the same one
+  // request that sets the column(s) that change touched (merge-duplicates: existing columns this op
+  // doesn't name are left alone, same as update's behaviour on a row that already exists).
   function pushUserPrefsCols(cols){
     if(!accountActive()) return;
     const owner=uid(); if(!owner) return;
     const row = userPrefsRow();
     const fields = {};
     cols.forEach(c => { fields[c] = row[c]; });
-    return window.CascadeAccountStore.acctOp({ table:"user_prefs", kind:"update", match:{ user_id:owner },
-      fields, onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
+    return window.CascadeAccountStore.acctOp({ table:"user_prefs", kind:"upsert", match:{ user_id:owner },
+      fields, onConflict:"user_id", onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
   }
   // CAS-561 merge rule: user_prefs is one row per user holding whole-object fields (taste,
   // watch_windows) rather than an array of rows like cascades — there is nothing to diff or prune per
@@ -21612,30 +21616,17 @@ else if(dedupedN)
     if(!ok){ recordSyncOutcome("user_prefs", false, { message:"load failed" }); return; }
     recordSyncOutcome("user_prefs", true);
     const row=(window.CascadeAccountStore.acctStore.user_prefs||[])[0];
-    // CAS-837: ref_code is an account fact with no local-device counterpart, and — unlike every field
-    // below — has to resolve even before the account's first user_prefs row exists (a brand-new signup).
-    // Adopt what the account already has, or (nobody has minted one yet, row or no row) generate one now
-    // and write it with its own targeted upsert, never through a userPrefsRow()-shaped push, so a push of
-    // an unrelated setting from another device can never carry a stale/absent ref_code over this one.
+    // CAS-837: ref_code is an account fact with no local-device counterpart. Adopt what the account
+    // already has; a load must never write, so minting one for an account that has none yet waits for
+    // this device's own first real user_prefs write (pushUserPrefsCols's upsert below creates the row),
+    // rather than a load writing it on the spot (CAS-1218: refCode() has no caller yet to mint one for).
     if(row && typeof row.ref_code==="string" && row.ref_code){
       refCodeCache = row.ref_code;
-    } else if(!refCodeCache){
-      const code = genRefCode();
-      refCodeCache = code;
-      // CAS-1218: through the normal acctOp queue, ignoreDuplicates — so two devices minting a ref_code at
-      // once leave exactly one, never one device's mint overwriting the other's already-committed code.
-      window.CascadeAccountStore.acctOp({ table:"user_prefs", kind:"upsert", match:{ user_id: uid() },
-        fields:{ ref_code: code }, onConflict:"user_id", ignoreDuplicates:true,
-        onDone:(ok,err)=>{ if(!ok) console.warn("ref_code write", err); } });
     }
-    if(!row){
-      // CAS-1218: same queue/ignoreDuplicates treatment as the ref_code mint above — a load creating the
-      // row at all must never be able to overwrite one another device created a moment earlier.
-      window.CascadeAccountStore.acctOp({ table:"user_prefs", kind:"upsert", match:{ user_id: uid() },
-        fields:{}, onConflict:"user_id", ignoreDuplicates:true,
-        onDone:(ok,err)=>{ if(!ok) console.warn("user_prefs bootstrap insert", err); } });
-      return;
-    }
+    // CAS-1218: a load must never write — unlike before, a missing row is simply left missing here.
+    // pushUserPrefsCols's own upsert (below in this file) creates it the moment this device's own first
+    // real settings change needs to write a column, so that write is the only one the account ever sees.
+    if(!row) return;
     setTo(prefs.sub, row.sub_services||[]);
     setTo(prefs.store, row.store_services||[]);
     prefs.on = !!row.services_only;

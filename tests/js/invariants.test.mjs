@@ -2856,7 +2856,9 @@ function fakeSingleRowTable(table, row){
     range(){ return b; },
     update(fields){ b._fields = fields; return b; },
     match(){ return b; },
-    upsert(rows){ b._fields = rows[0]; return b; },
+    // CAS-1218: acctOp's own "upsert" kind calls .upsert(fields, opts) with a single merged object
+    // (match + fields), never an array — unlike agent_films' upsert_many, which this fake never serves.
+    upsert(fields){ b._fields = fields; return b; },
     then(resolve, reject){
       let result;
       if(b._fields){
