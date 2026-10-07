@@ -5197,9 +5197,12 @@ function recomputeFound(){
   // off that stale state is exactly what re-armed `auto` over a manual pick and pushed it to `film_watch`
   // before this device's own film_watch load had even resolved. `!CP` covers only the one paint before the
   // persistence IIFE has run (nothing can reach the network yet at that point either), same fallback as above.
-  // CAS-736: agentFilmsReady joins the same gate — earned is now derived from this device's own agent_films
-  // read (below), so a placement written before that read resolves is exactly the same stale-write risk.
-  const placementReady = !CP || (CP.filmWatchReady && CP.agentFilmsReady);
+  // CAS-736: agentFilmsLoaded joins the same gate — earned is now derived from this device's own
+  // agent_films read (below), so a placement written before that read resolves is exactly the same
+  // stale-write risk. CAS-1224: reads agentFilmsLoaded, not agentFilmsReady — the latter now additionally
+  // waits on this very placement pass's own resulting write having flushed, which this gate cannot depend
+  // on without becoming circular.
+  const placementReady = !CP || (CP.filmWatchReady && CP.agentFilmsLoaded);
   hits.forEach((ids,id)=>{
     const e=entryFor(id);
     e.wins=e.wins||{};
@@ -9266,6 +9269,14 @@ function inFindScope(m){
 // availability statuses the listing below even considers. Session-only state, exactly like `scope`
 // above: never persisted, so a fresh load always starts on Cinema.
 let watchTab = "in_cinema";
+// CAS-1224: pickLandingWatchTab()'s cold-boot call (below, outside any IIFE) runs before the account-sync
+// IIFE even exists — on a signed-in device, `cascades` is still [] at that instant (CAS-1221 retired the
+// synchronous disk mirror loadCascades() used to seed it from), so the pick it makes is a provisional
+// guess, not the real answer. Set true exactly there; fireAccountFanout redoes the pick once cascades has
+// actually loaded, and clears this without redoing anything if the device is still on the tab it guessed.
+// setWatchTab (a real user tap) clears it too — a manual choice, even one made before the fan-out settles,
+// must never be overridden by a late-arriving "correction".
+let landingTabPendingAccountData = false;
 // CAS-717: which status section a tab auto-scrolls to on opening — its own eponymous group, reusing
 // jumpToSection's existing delta/settle scroll logic rather than new scroll code.
 const WATCH_TAB_SCROLL_TARGET = {in_cinema:"in_cinema", premium:"pvod", rent:"rental", stream:"included_streaming"};
@@ -9276,6 +9287,7 @@ function ensureWatchTab(){
   if(tabs.length && !tabs.some(t=>t.key===watchTab)) watchTab=tabs[0].key;
 }
 window.setWatchTab = key => {
+  landingTabPendingAccountData = false;   // CAS-1224: a real tap always wins over a late re-pick
   if(watchTab===key) return;
   const from=watchTab;
   watchTab=key;
@@ -20165,6 +20177,10 @@ else if(!openedShared && (forceSetup || !onboardingSeen())) showSplash();
 else if(!openedShared){
   const landingTab = pickLandingWatchTab();
   if(landingTab !== watchTab){ watchTab = landingTab; render(); }
+  // CAS-1224: this device may be signed in with `cascades` still [] (the account's own load hasn't run
+  // yet) — the pick above is only as good as whatever's in memory RIGHT NOW. fireAccountFanout redoes it
+  // once the account's real cascades/watch-window state has actually loaded.
+  landingTabPendingAccountData = true;
   applyDeepLink();   // CAS-962: onboarding already seen — a returning user's cold boot is safe to act on now
   applyPendingPushAlert();   // CAS-1206: same "boot decided, safe to act now" moment, for a held push tap
   maybeStartTutorial();   // CAS-976: a returning user who finished onboarding before this shipped, or
@@ -20277,6 +20293,17 @@ else if(dedupedN)
   // its own admission_score) before its own load of the account's ledger had resolved, racing whatever
   // score another device already recorded for the same film.
   let agentFilmsReady = true;
+  // CAS-1224: agentFilmsReady (above) used to flip true the instant loadAgentFilms() resolves, which is
+  // also the moment recomputeFound's own render() may push a freshly-matched admission
+  // (pendingAgentFilmPushes' setTimeout(0) flush) — a macrotask decoupled from fireAccountFanout's own
+  // promise chain. A caller that only polls agentFilmsReady (every e2e-integrity spec's waitForAccountLoads
+  // does exactly this) could see it true and move on — e.g. reloading the page — while that push was still
+  // airborne, and the leftover request could land inside a LATER boot's own "nothing may write before the
+  // fan-out settles" window (AC4/AC5). agentFilmsLoaded now carries the ORIGINAL "has this device's own
+  // ledger loaded" meaning — it is what recomputeFound/pushAgentFilmAdmission/flushAgentFilmPushes actually
+  // gate on. agentFilmsReady is repointed to a strictly later, truly "settled" signal: it only flips true
+  // once any push that load triggered has also been flushed.
+  let agentFilmsLoaded = true;
   // CAS-740/CAS-1053: whether this device's own loadUserPrefs() has resolved yet this session — CAS-1095
   // removed the whole-row-push race this flag originally guarded against (a per-column acctOp push can no
   // longer overwrite an unrelated field, load in flight or not), but it still gates the CAS-1053 loading
@@ -20688,6 +20715,7 @@ else if(dedupedN)
     filmWatchReady=false;
     userPrefsReady=false;
     agentFilmsReady=false;
+    agentFilmsLoaded=false;
     const allLoads = Promise.allSettled([
       loadAccount(), loadAccountFilms(), loadNotifyPrefs(), loadRealAlerts(),
       loadFilmPicks(), loadInvites(), loadFriends(),
@@ -20701,7 +20729,18 @@ else if(dedupedN)
       // that took one of those branches would be stuck on watchPrefsLoadingHTML() until some unrelated
       // render() happened to fire.
       loadUserPrefs().finally(()=>{ userPrefsReady=true; if(typeof render==="function") render(); }),
-      loadAgentFilms().finally(()=>{ agentFilmsReady=true; if(typeof render==="function") render(); }),
+      // CAS-1224: agentFilmsLoaded flips first, unblocking recomputeFound's placementReady so this render
+      // can push a freshly-matched admission — then that push (if any) is flushed and AWAITED right here,
+      // before agentFilmsReady flips. Promise.allSettled waits for this whole async finally to finish, so
+      // `await allLoads` below never returns while a push from this load is still in flight.
+      loadAgentFilms().finally(async ()=>{
+        agentFilmsLoaded=true;
+        if(typeof render==="function") render();
+        if(agentFilmPushFlushTimer){ clearTimeout(agentFilmPushFlushTimer); agentFilmPushFlushTimer=null; }
+        await flushAgentFilmPushes();
+        agentFilmsReady=true;
+        if(typeof render==="function") render();
+      }),
     ]);
     allLoads.then(()=>{
       const t1 = performance.now();
@@ -20718,6 +20757,15 @@ else if(dedupedN)
     // so cascades landing after it never get a window at all. A pure recompute (CAS-1218: never a write by
     // itself), safe to repeat here now that every load this fan-out owns has actually settled.
     applyWatchPrefsToCascades();
+    // CAS-1224: redo the cold-boot landing-tab pick now that cascades/watchPrefs hold the account's real
+    // answer, not the empty-device default pickLandingWatchTab() saw at boot. Only when the boot-time pick
+    // is still pending AND the device is still sitting on whatever it provisionally guessed — a real tap
+    // (setWatchTab) already cleared the flag, and must never be second-guessed by a late correction.
+    if(landingTabPendingAccountData){
+      landingTabPendingAccountData = false;
+      const landingTab = pickLandingWatchTab();
+      if(landingTab !== watchTab) watchTab = landingTab;
+    }
     if(typeof render==="function") render();
     // CAS-1035 AC2 (CAS-1100: the old outbox-replay wrapper is retired — acctOp's own persisted queue is
     // this device's only durability story left, so sending the queue directly IS the whole job now):
@@ -21297,12 +21345,13 @@ else if(dedupedN)
   // at a time — the same few requests as before, just sent one at a time instead of all enqueued at once.
   async function flushAgentFilmPushes(){
     agentFilmPushFlushTimer = null;
-    // CAS-1224: pushAgentFilmAdmission already checks agentFilmsReady before queuing, but this flush is a
+    // CAS-1224: pushAgentFilmAdmission already checks agentFilmsLoaded before queuing, but this flush is a
     // separate macrotask (setTimeout 0) from that queuing call — a fan-out that starts (and flips this
     // false) in the gap between the two still reaches here with something already queued. Retry rather
     // than send: nothing here is lost either way, but sending now would be exactly the early write AC4/AC5
-    // exists to catch.
-    if(!agentFilmsReady){ agentFilmPushFlushTimer = setTimeout(flushAgentFilmPushes, 50); return; }
+    // exists to catch. (fireAccountFanout's own call into this function, right after setting
+    // agentFilmsLoaded=true, always passes this check — it never hits the retry path.)
+    if(!agentFilmsLoaded){ agentFilmPushFlushTimer = setTimeout(flushAgentFilmPushes, 50); return; }
     const pending = [...pendingAgentFilmPushes.values()];
     pendingAgentFilmPushes.clear();
     if(!window.CascadeAccountStore || !pending.length) return;
@@ -21344,9 +21393,11 @@ else if(dedupedN)
     // recomputeFound pass that runs on the first paint, before the load resolves, has no way to know which
     // admissions the account already holds, so a push from here could stamp a fresh admitted_at/admission_score
     // over real history. applyAgentFilmRows (loadAgentFilms' own apply step) replaces the whole local ledger
-    // once the load resolves, and agentFilmsReady's own render() re-fires recomputeFound right after — any
+    // once the load resolves, and agentFilmsLoaded's own render() re-fires recomputeFound right after — any
     // admission dropped here is simply re-derived (and, if still due, re-pushed) on that next pass.
-    if(!agentFilmsReady) return;
+    // CAS-1224: agentFilmsLoaded, not agentFilmsReady — the latter now also waits on this very push having
+    // flushed, so gating on it here would never let the first push through.
+    if(!agentFilmsLoaded) return;
     const owner=uid(); if(!owner) return;
     // A deferred retry (below) whose signed-in account changed underneath it — sign-out, then a
     // DIFFERENT account signing in, while this was still waiting on the original cascade's own upsert —
@@ -21849,9 +21900,15 @@ else if(dedupedN)
                                 set AGENT_FILM_DEFER_MS(v){ AGENT_FILM_DEFER_MS=v; },
                                 // CAS-736: same read/write-primitive shape as filmWatchReady above, so a
                                 // test can drive recomputeFound's "this device's own ledger hasn't loaded
-                                // yet" gate directly.
+                                // yet" gate directly. CAS-1224: setting agentFilmsReady also sets
+                                // agentFilmsLoaded (the gate recomputeFound/pushAgentFilmAdmission actually
+                                // read) in lockstep, so existing tests driving this one flag still block/
+                                // unblock placement exactly as before; agentFilmsLoaded is exposed
+                                // separately for anything that needs the finer-grained signal.
                                 get agentFilmsReady(){ return agentFilmsReady; },
-                                set agentFilmsReady(v){ agentFilmsReady=!!v; },
+                                set agentFilmsReady(v){ agentFilmsReady=!!v; agentFilmsLoaded=!!v; },
+                                get agentFilmsLoaded(){ return agentFilmsLoaded; },
+                                set agentFilmsLoaded(v){ agentFilmsLoaded=!!v; },
                                 // CAS-487: the return-to-tab entry point itself, so the bell's own refresh
                                 // can be exercised the same way — without waiting on a real
                                 // focus/visibilitychange event.
