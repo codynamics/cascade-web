@@ -87,17 +87,18 @@ test("CAS-1157 AC6: signed out, draft mode — windows stay memory-only, but rea
 });
 
 test("CAS-1157 AC7: flowStart() resets watchPrefs to defaults before any answer, signed out", () => {
-  const store = new Map();
-  store.set("cascade_watch_prefs", JSON.stringify({ stream:{list:true}, rent:{list:false} }));
-  const E = loadEngine({ localStorageStore: store });
+  const E = loadEngine();
   E.CascadeAuth.enabled = true;
-
-  assert.equal(E.windowEnabled("rent"), false, "sanity: the engine loaded the seeded leftover value");
+  // CAS-1221: watchPrefs is never read from disk any more — the leftover this guards against can only be
+  // an in-memory carry-over from earlier in the same page load (e.g. a previous draft). watchPrefs itself
+  // is exposed as a getter-only binding, so mutate the object in place rather than reassign it.
+  Object.keys(E.watchPrefs).forEach(k => delete E.watchPrefs[k]);
+  Object.assign(E.watchPrefs, { stream:{list:true}, rent:{list:false} });
 
   E.flowStart();
 
   assert.equal(JSON.stringify(E.watchPrefs), JSON.stringify(E.watchPrefsDefaults()),
-    "a signed-out first run must not inherit a leftover cascade_watch_prefs from an earlier session on this device");
+    "a signed-out first run must not inherit a leftover watchPrefs value from earlier in this page's life");
 });
 
 test("CAS-1157 AC8: discardOnbDraft() resets watchPrefs back to defaults", () => {

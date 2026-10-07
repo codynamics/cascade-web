@@ -3,54 +3,53 @@
 // {...watchPrefsDefaults(), ...migrateWatch(saved)} — an absent key is refilled from the default, and
 // upcoming/in_cinema/rent/stream all default to true (CAS-1123). The fix stores an off window explicitly
 // as {list:false} instead of deleting it, so it survives the merge the same way an on window already did.
+//
+// CAS-1221: watchPrefs is account data now (held in memory only, loaded from/pushed to the account's own
+// user_prefs.watch_windows column — see AC4/AC5 below) — there is no longer a local-disk "reload" to prove
+// survival across for a device with no account. AC1-AC3 instead prove wwToggleWin's own in-memory shape
+// directly: an off window must be the explicit {list:false} CAS-1156 fixed it to be, not a deleted key, since
+// that exact shape is what migrateWatch/the account round trip (AC4 below) depends on to not silently
+// resurrect a turned-off window.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
 
 const ALL_KEYS = ["upcoming", "in_cinema", "rent", "stream"];
 
-test("CAS-1156 AC1: switching a default-on window off survives a reload, the other three stay on", () => {
+test("CAS-1156 AC1: switching a default-on window off stores it explicitly as {list:false}, the other three stay on", () => {
   for(const key of ALL_KEYS){
-    const store = new Map();
-    const E1 = loadEngine({ localStorageStore: store });
-    E1.window.openWhereWhen();
-    E1.window.wwToggleWin(key);
+    const E = loadEngine();
+    E.window.openWhereWhen();
+    E.window.wwToggleWin(key);
 
-    // Simulate a reload: a brand new engine instance (fresh module-level state) over the SAME storage.
-    const E2 = loadEngine({ localStorageStore: store });
-    assert.equal(E2.windowEnabled(key), false, `${key} must stay off after a reload`);
+    assert.equal(E.windowEnabled(key), false, `${key} must be off immediately after the toggle`);
+    assert.equal(E.watchPrefs[key].list, false, `${key} must be stored as an explicit {list:false}, not deleted`);
     for(const other of ALL_KEYS){
       if(other === key) continue;
-      assert.equal(E2.windowEnabled(other), true, `${other} must still read on after only ${key} was switched off`);
+      assert.equal(E.windowEnabled(other), true, `${other} must still read on after only ${key} was switched off`);
     }
   }
 });
 
-test("CAS-1156 AC2: switching rent off and back on again survives a reload", () => {
-  const store = new Map();
-  const E1 = loadEngine({ localStorageStore: store });
-  E1.window.openWhereWhen();
-  E1.window.wwToggleWin("rent");   // off
-  E1.window.wwToggleWin("rent");   // back on
+test("CAS-1156 AC2: switching rent off and back on again leaves it on", () => {
+  const E = loadEngine();
+  E.window.openWhereWhen();
+  E.window.wwToggleWin("rent");   // off
+  E.window.wwToggleWin("rent");   // back on
 
-  const E2 = loadEngine({ localStorageStore: store });
-  assert.equal(E2.windowEnabled("rent"), true, "rent must read on again after being switched back on");
+  assert.equal(E.windowEnabled("rent"), true, "rent must read on again after being switched back on");
 });
 
-test("CAS-1156 AC3: premium (default off) switched on then off again survives each reload", () => {
-  const store = new Map();
-  const E1 = loadEngine({ localStorageStore: store });
-  E1.window.openWhereWhen();
-  E1.window.wwToggleWin("premium");   // on
+test("CAS-1156 AC3: premium (default off) switched on then off again ends up off, explicitly", () => {
+  const E = loadEngine();
+  E.window.openWhereWhen();
+  E.window.wwToggleWin("premium");   // on
+  assert.equal(E.windowEnabled("premium"), true, "premium must read on right after being switched on");
 
-  const E2 = loadEngine({ localStorageStore: store });
-  assert.equal(E2.windowEnabled("premium"), true, "premium must read on after a reload");
+  E.window.wwToggleWin("premium");   // off again
 
-  E2.window.openWhereWhen();
-  E2.window.wwToggleWin("premium");   // off again
-
-  const E3 = loadEngine({ localStorageStore: store });
-  assert.equal(E3.windowEnabled("premium"), false, "premium must read off again after a second reload");
+  assert.equal(E.windowEnabled("premium"), false, "premium must read off again after being switched off a second time");
+  assert.equal(E.watchPrefs.premium.list, false, "premium must be stored as an explicit {list:false}, not deleted");
 });
 
 // CAS-1156 AC4/AC5: the account-load side (loadUserPrefs, via acctLoad) — same fake-Supabase convention as

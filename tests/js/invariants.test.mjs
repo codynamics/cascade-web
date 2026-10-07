@@ -2667,7 +2667,7 @@ function withFilmVerdictState(fn){
   try { fn(); } finally { restore(); }
 }
 
-test("CAS-738 AC3: saveWatchStatus writes cascade_wow and cascade_enjoyed to localStorage while signed in", () => withFilmVerdictState(() => {
+test("CAS-1221: saveWatchStatus writes nothing to localStorage — wow/enjoyed verdicts are held in memory only", () => withFilmVerdictState(() => {
   signInWithClient({ from(){ return { upsert: async () => ({ error: null }) }; } });
   try {
     const wowId = 738001, enjoyedId = 738002;
@@ -2676,14 +2676,11 @@ test("CAS-738 AC3: saveWatchStatus writes cascade_wow and cascade_enjoyed to loc
 
     E.CascadePersistence.saveWatchStatus();
 
-    // CAS-1100: cascade_wow/cascade_enjoyed are plain, un-namespaced keys now (CAS-957's acctKey is
-    // retired — a real sign-out wipes them outright instead), so they're read back directly.
-    const storedWow = JSON.parse(E.localStorage.getItem("cascade_wow") || "[]");
-    const storedEnjoyed = JSON.parse(E.localStorage.getItem("cascade_enjoyed") || "[]");
-    assert.ok(storedWow.includes(wowId),
-      "cascade_wow must reach localStorage the instant saveWatchStatus runs, not only be scheduled for the account");
-    assert.ok(storedEnjoyed.includes(enjoyedId),
-      "cascade_enjoyed must reach localStorage the instant saveWatchStatus runs, not only be scheduled for the account");
+    // CAS-1221: there is no on-device mirror left at all — a verdict reaches the account only through
+    // pushFilmVerdict's own acctOp (CAS-738 AC4, below, proves filmRows()/applyFilmRows() still carry wow/
+    // enjoyed through that path).
+    assert.equal(E.localStorage.getItem("cascade_wow"), null, "cascade_wow must never reach localStorage");
+    assert.equal(E.localStorage.getItem("cascade_enjoyed"), null, "cascade_enjoyed must never reach localStorage");
   } finally {
     signOut();
   }

@@ -4846,8 +4846,6 @@ if(didReset || forceSetup || previewStep || pendingDeepLink || pendingAnswer){
 // private-mode store fails silently and the app still runs. The setup meter reads this: it must not tell you
 // your work is "saved on this device" when nothing is being saved (honesty guardrail).
 const storageWorks = (()=>{ try{ localStorage.setItem("cascade_probe","1"); localStorage.removeItem("cascade_probe"); return true; }catch(e){ return false; } })();
-function loadSet(k){ try{ return new Set(JSON.parse(localStorage.getItem(k)||"[]")); }catch(e){ return new Set(); } }
-function saveSet(k,set){ try{ localStorage.setItem(k, JSON.stringify([...set])); }catch(e){} }
 // CAS-1100: every account-mirroring local key below used to be namespaced by the account it belonged to
 // (CAS-957's acctKey/acctSuffix) — a device used by two accounts must never let one account's cache answer
 // for the other's. That guarantee now comes from the real sign-out chokepoint itself (the cascade-auth-
@@ -4861,48 +4859,89 @@ function saveSet(k,set){ try{ localStorage.setItem(k, JSON.stringify([...set]));
 // happened in the past. Purged once per boot, ahead of every plain read below, so stale leftovers can never
 // be mistaken for live data and never linger on disk forever either. cascade_outbox(@Y) and
 // cascade_cascade_known(@Y) are retired features' own leftovers (CAS-1035's outbox, and an older on-device
-// known-set tracker that predates this file's history); the live, still-written "cascade_watch_known" bare
-// key is deliberately excluded from its own pattern below — only a namespaced (`@`-suffixed) leftover of it
-// is legacy. "cascade_ops@<uid>" (acctOp's own live, still-written queue — predates this ticket) is excluded
-// from the `@`-suffixed pattern for the same reason: it is current data, not a CAS-957 leftover, and must
-// survive a plain reload so an unsent write isn't silently dropped (CAS-1035 AC3). A real sign-out already
-// wipes it outright via wipeAccountLocalState, below.
+// known-set tracker that predates this file's history). "cascade_ops@<uid>" (acctOp's own live, still-
+// written queue — predates this ticket) is excluded from the `@`-suffixed pattern for the same reason: it is
+// current data, not a CAS-957 leftover, and must survive a plain reload so an unsent write isn't silently
+// dropped (CAS-1035 AC3). A real sign-out already wipes it outright via wipeAccountLocalState, below.
 (function purgeLegacyAccountKeys(){
   try{
     Object.keys(localStorage).forEach(k=>{
       if((/^cascade_[^@]*@/.test(k) && k.indexOf("cascade_ops@")!==0)
          || k.indexOf("cascade_cascade_known")===0
          || k.indexOf("cascade_outbox")===0
-         || (k.indexOf("cascade_watch_known")===0 && k!=="cascade_watch_known")){
+         || k.indexOf("cascade_watch_known")===0){
         try{ localStorage.removeItem(k); }catch(e){}
       }
     });
   }catch(e){}
 })();
-const watched = loadSet("cascade_watched");
-const blocked = loadSet("cascade_blocked");
+// CAS-1221: every key below held account data mirrored to disk — a device signed in before this build
+// shipped still carries them. Deleted once, unconditionally, on this first boot of this build (whether or
+// not a session is restored), so an old build's leftover cache can never be read as a stale answer. Nothing
+// in this build ever writes any of them again (see each one's own chokepoint, below), so this never needs a
+// second pass once a device's cache is clean.
+(function purgeServerFirstLocalKeys(){
+  const legacy = ["cascade_cascades", "cascade_watched", "cascade_disliked", "cascade_blocked",
+    "cascade_indifferent", "cascade_wow", "cascade_enjoyed", "cascade_notify", "cascade_watch_known",
+    "cascade_notifyprefs", "cascade_prefs", "cascade_ux", "cascade_taste_base", "cascade_watch_prefs",
+    "cascade_moving_seen", "cascade_occasions", "cascade_onb_answers"];
+  try{ legacy.forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} }); }catch(e){}
+})();
+// CAS-1221: every localStorage/sessionStorage key this app may still write, one line each — the single
+// source of truth both for a human reading this file and for tests/lint/device-key-allowlist.mjs, which
+// fails `npm run test:lint` on any setItem whose key isn't named here. A prefix entry ends in "@" or "-"
+// (matched as a prefix, never an exact key — acctOp's queue is namespaced per account, and the Supabase
+// SDK namespaces its own session key per project).
+const DEVICE_KEY_ALLOWLIST = {
+  // ---- not account data, or data with nowhere else to live — stays indefinitely -------------------------
+  "sb-": "the Supabase SDK's own session-token key (sb-<project-ref>-auth-token) — vendored supabase-js.js writes this directly; not a call site in this file, named here for completeness",
+  "cascade_client_key": "this device's own anonymous client id — never the account's",
+  "cascade_ops@": "acctOp's own unsent-operations queue, one per account (cascade_ops@<uid>) — operations still owed, never a snapshot of account state",
+  "cascade_log": "the on-device usage/debug log ring buffer",
+  "cascade_acq": "the one-time acquisition-source stamp this device arrived with",
+  "cascade_inv": "an invite code captured from a deep link before sign-in claims it",
+  "cascade_diag": "a session-only diagnostics flag, set by ?diag= in the URL",
+  "cascade_probe": "a throwaway write-then-remove, used only to test whether storage works at all",
+  "cascade_visits": "an anonymous per-device open count — never account data, nothing reads it live",
+  // ---- device-only UX state; CAS-1222 (CAS-1220's follow-up) moves these onto the account ---------------
+  "cascade_active": "which agent tab is open",
+  "cascade_active_multi": "which agent tabs are open, multi-select",
+  "cascade_watch_occasion": "the Watch screen's open Occasion filter",
+  "cascade_watch_mineonly": "the Watch screen's Mine-only filter",
+  "cascade_seen_found": "which Found films this device has already seen appear",
+  "cascade_first_found": "the first-seen date this device recorded per film",
+  "cascade_admit_drift": "this device's own admission-drift diagnostic snapshot",
+  "cascade_had_account": "whether this device was signed in as of its last boot (CAS-517 cold-start gate)",
+  "cascade_onboarded": "whether this device has completed onboarding once",
+  "cascade_tutorial_seen": "whether this device has dismissed the tutorial",
+  "cascade_review_sessions": "the app-review prompt's session counter",
+  "cascade_review_asked_ver": "the last app version the review prompt asked on",
+  "cascade_agent": "the in-progress onboarding agent draft",
+  "cascade_watchwins": "the in-progress onboarding Watch wizard draft",
+};
+// CAS-1221: account data with a home on the server (user_films) is held in memory only now — no device
+// read, no device write. A cold start shows the loading state until loadAccountFilms()/applyFilmRows()
+// (the account-sync IIFE, below) answer; nothing here ever seeds from a device cache again.
+const watched = new Set();
+const blocked = new Set();
 // ---- The three things you can say about a film you're done with (CAS-100) -------
-// Liked / Didn't like / Not for me, mutually exclusive, one storage pattern each. `watched` stays the set of
-// films you've SEEN — every exclusion rule, taste weight and Cascade toggle already reads it, so the opinion
-// rides alongside it instead of replacing it: `cascade_disliked` marks which of the watched ones you didn't
-// enjoy. That makes the migration honest and free — a film you ticked watched before today reads as Liked,
-// which is what "seen it, keep it out of my results" always meant.
-const disliked = loadSet("cascade_disliked");
+// Liked / Didn't like / Not for me, mutually exclusive. `watched` stays the set of films you've SEEN — every
+// exclusion rule, taste weight and Cascade toggle already reads it, so the opinion rides alongside it
+// instead of replacing it: `disliked` marks which of the watched ones you didn't enjoy.
+const disliked = new Set();
 // CAS-183: and the FOURTH thing — you watched it and it left you cold. "So-so" is not a weak like: it must
 // not pull the taste weighting toward more of the same, and it must not be filed under "didn't like" either,
 // because that pushes the kind down the list. It is its own answer, riding alongside `watched` the same way
-// `disliked` does, so a film ticked before today keeps meaning exactly what it meant.
-const indifferent = loadSet("cascade_indifferent");
+// `disliked` does.
+const indifferent = new Set();
 // CAS-278: and the FIFTH — the top of the scale. "Watch Again" is a strong answer, but it is not the same
 // answer as "that was extraordinary", and a five-point scale that stops at "I'd watch it again" has no room
 // at the top for the films the whole thing exists to find. It rides alongside `watched` exactly as the other
-// two markers do, so it costs no migration: nothing is in this set until somebody puts it there, and every
-// film ticked before today keeps meaning precisely what it meant.
-const wowed = loadSet("cascade_wow");
+// two markers do.
+const wowed = new Set();
 // CAS-349: and a SIXTH, between Watch Again and So-so — "I enjoyed it" without it being one you'd go back to.
-// Same pattern as `wowed`/`indifferent`: rides alongside `watched`, costs no migration, and a film ticked
-// before today keeps meaning precisely what it meant (nothing is in this set until somebody puts it there).
-const enjoyed = loadSet("cascade_enjoyed");
+// Same pattern as `wowed`/`indifferent`: rides alongside `watched`.
+const enjoyed = new Set();
 const isWow      = id => watched.has(id) && wowed.has(id) && !disliked.has(id) && !indifferent.has(id);
 const isEnjoyed  = id => watched.has(id) && enjoyed.has(id) && !wowed.has(id) && !disliked.has(id) && !indifferent.has(id);
 const isDisliked = id => watched.has(id) && disliked.has(id);
@@ -4911,13 +4950,11 @@ const isSoso     = id => watched.has(id) && indifferent.has(id) && !disliked.has
 const opinionOf  = id => blocked.has(id) ? "notfor" : isDisliked(id) ? "disliked"
                        : isSoso(id) ? "soso" : isWow(id) ? "wow" : isEnjoyed(id) ? "enjoyed"
                        : watched.has(id) ? "liked" : "";
-// CAS-183: ONE chokepoint for every write of a watch status, so the per-account sync has a single place to
-// wrap — exactly the way saveCascades() is wrapped for the `cascades` table.
-function saveWatchStatus(){
-  saveSet("cascade_watched",watched); saveSet("cascade_disliked",disliked);
-  saveSet("cascade_blocked",blocked); saveSet("cascade_indifferent",indifferent);
-  saveSet("cascade_wow",wowed); saveSet("cascade_enjoyed",enjoyed);
-}
+// CAS-183/CAS-1221: there is no longer a device mirror to write — every verdict change already reaches the
+// account the instant it happens (pushFilmVerdict, one acctOp per change) and applyFilmRows is the only
+// place these six sets are ever rebuilt. Kept as a no-op chokepoint so every existing call site (CAS-100's
+// opinion toggles) stays unchanged.
+function saveWatchStatus(){}
 const expandedSet = new Set();   // which cards are expanded (session only)
 
 // ---- The Found list: auto-membership + overrides + provenance (CAS-67) ---------------------------------
@@ -4942,85 +4979,27 @@ const expandedSet = new Set();   // which cards are expanded (session only)
 // onboarding notify step and by the setup sheet, and it is what the daily monitor reads to decide whether
 // to email, to leave an in-app alert, or to do neither. `email` is deliberately its own field and not
 // assumed to be the sign-in address — a person can sign in with one and want alerts at another.
-const NOTIFY_PREFS_KEY = "cascade_notifyprefs";
 // CAS-463: inApp used to default true because flipping it was a no-op local flag. Now it gates a real OS
 // permission request, so a true default would leave the toggle looking "on" for every first-time visitor
 // without ever having asked — the one thing this ticket exists to prevent. Starts false; only a resolved
 // permission grant (registerPush(), below) may flip it.
 const notifyPrefsDefault = () => ({inApp:false, emailOn:false, email:""});
+// CAS-1221: held in memory only — loadNotifyPrefs() (the account-sync IIFE, below) is the only thing that
+// ever sets this away from the signed-out default, straight from the notify_prefs row.
 let notifyPrefs = notifyPrefsDefault();
-try{ const o=JSON.parse(localStorage.getItem(NOTIFY_PREFS_KEY)||"null");
-     if(o && typeof o==="object") notifyPrefs={...notifyPrefsDefault(), ...o}; }catch(e){}
-function saveNotifyPrefs(){
-  if(onbDraftModeOn) return;   // CAS-1099: a pre-membership draft's notify choices stay memory-only
-  try{ localStorage.setItem(NOTIFY_PREFS_KEY, JSON.stringify(notifyPrefs)); }catch(e){}
-}
-const NOTIFY_KEY="cascade_notify";
-function loadNotify(){
-  let n={};
-  try{ const o=JSON.parse(localStorage.getItem(NOTIFY_KEY)||"{}"); if(o && typeof o==="object" && !Array.isArray(o)) n=o; }catch(e){}
-  Object.keys(n).forEach(k=>{                       // anything malformed is discarded, not trusted
-    const e=n[k];
-    if(!e || typeof e!=="object"){ delete n[k]; return; }
-    e.source = e.source==="manual" ? "manual" : "auto";
-    e.cascadeIds = Array.isArray(e.cascadeIds) ? e.cascadeIds : [];
-    // CAS-279: the two halves of "move this film to another cascade". Membership is DERIVED from an agent's
-    // criteria and rewritten on every recompute, so a move that only edited cascadeIds would be undone by
-    // the next render — a control that appears to work and silently doesn't. These are the override layer,
-    // and are the only thing that can outrank the criteria.
-    //   pinnedTo — cascade ids this film is IN by hand, whether or not their criteria match it
-    //   notIn    — cascade ids this film has been moved OUT of, whether or not their criteria match it
-    e.pinnedTo = Array.isArray(e.pinnedTo) ? e.pinnedTo.filter(x=>typeof x==="string") : [];
-    e.notIn    = Array.isArray(e.notIn)    ? e.notIn.filter(x=>typeof x==="string")    : [];
-    // CAS-844: `removed`/`claimed` served the Pick ring, which is gone — strip any stale copy an old
-    // device already wrote rather than let a legacy field silently keep meaning nothing forever.
-    delete e.removed; delete e.claimed;
-  });
-  // Migration: every film you tracked by hand under the old model WAS a manual add — carry it over as one,
-  // rather than dropping the list you built on the floor the day the model inverted.
-  try{
-    const old=JSON.parse(localStorage.getItem("cascade_tracked")||"[]");
-    if(Array.isArray(old) && old.length){
-      old.forEach(id=>{ if(!n[id]) n[id]={source:"manual", cascadeIds:[]}; });
-      // Write the new list BEFORE dropping the old one. The other order loses the user's whole list if the
-      // write fails (a full quota, a locked-down browser) — the one moment we'd have nothing to fall back on.
-      localStorage.setItem(NOTIFY_KEY, JSON.stringify(n));
-      localStorage.removeItem("cascade_tracked");
-    }
-  }catch(e){}
-  return n;
-}
-const notify = loadNotify();
-let notifySaved=null;
-function saveNotify(){
-  // CAS-1153: no session means nothing persists — a signed-out render's recompute must not resurrect
-  // the key wipeAccountLocalState() just removed. Dropping the cache sentinel too (rather than leaving
-  // it stale) guarantees the first write after the next sign-in is never skipped as a false no-op.
-  const a=window.CascadeAuth;
-  if(!(a && a.session && a.session.user)){ notifySaved=null; return; }
-  const s=JSON.stringify(notify);
-  if(s===notifySaved) return;                       // recompute runs on every render — only real changes write
-  notifySaved=s;
-  try{ localStorage.setItem(NOTIFY_KEY, s); }catch(e){}
-}
+function saveNotifyPrefs(){}
+// CAS-1221: `notify` is reconstructed wholesale from the server (film_watch + film_picks, via
+// clearAccountNotify()/applyWatchRows/loadFilmPicks in the account-sync IIFE below) on every sign-in, boot
+// and reconcile — nothing here is ever read back from disk, so there is nothing left to load or migrate.
+const notify = {};
+function saveNotify(){}
 // CAS-636: Moving's own seen-state — {filmId: lastSeenGroupKey} — separate from the Notifications inbox's
 // read_at, since a Moving row stays visible for the life of its condition and only stops COUNTING once
-// seen; it is never marked read/removed the way an inbox entry is. Same load/save shape as NOTIFY_KEY above.
-const MOVING_SEEN_KEY="cascade_moving_seen";
-function loadMovingSeen(){
-  try{
-    const o=JSON.parse(localStorage.getItem(MOVING_SEEN_KEY)||"{}");
-    return (o && typeof o==="object" && !Array.isArray(o)) ? o : {};
-  }catch(e){ return {}; }
-}
-const movingSeen=loadMovingSeen();
-let movingSeenSaved=null;
-function saveMovingSeen(){
-  const s=JSON.stringify(movingSeen);
-  if(s===movingSeenSaved) return;
-  movingSeenSaved=s;
-  try{ localStorage.setItem(MOVING_SEEN_KEY, s); }catch(e){}
-}
+// seen; it is never marked read/removed the way an inbox entry is. CAS-1221: held in memory only —
+// loadUserPrefs() (the account-sync IIFE, below) is the only thing that ever populates this from the
+// account's own user_prefs.moving_seen column.
+const movingSeen={};
+function saveMovingSeen(){}
 const entryFor = id => notify[id] || (notify[id]={source:"auto", cascadeIds:[], pinnedTo:[], notIn:[]});
 // CAS-279: the two override tests, defined once so the listing, the counts and the Found set cannot disagree
 // about where a film lives. An entry that predates this change has neither array and answers false to both.
@@ -5254,18 +5233,10 @@ const foundSource = id => {
 const cascadesFor = id => ((notify[id]||{}).cascadeIds||[])
   .map(cid=>cascades.find(c=>c.id===cid)).filter(Boolean);
 // `touched` = the user has worked the my-services switch by hand, so we stop auto-defaulting it for them.
-function loadPrefs(){ try{ const p=JSON.parse(localStorage.getItem("cascade_prefs")||"{}");
-  // CAS-251: a service saved under a variant name is folded onto its canonical one on the way in, so
-  // somebody who picked "Netflix Standard with Ads" last week still has Netflix picked today.
-  // CAS-1014: also fold spacing/case/punctuation variants (svcFold), so a pick saved under a spelling
-  // that has since merged into another still matches today's canonical one.
-  const canon = xs => new Set((xs||[]).map(s=>svcFold(svcCanon(s))));
-  return {on:!!p.on, touched:!!p.touched, sub:canon(p.sub), store:canon(p.store)}; }
-  catch(e){ return {on:false,touched:false,sub:new Set(),store:new Set()}; } }
-function savePrefs(){
-  if(onbDraftModeOn) return;   // CAS-1099: a pre-membership draft's services stay memory-only
-  try{ localStorage.setItem("cascade_prefs",
-  JSON.stringify({on:prefs.on,touched:prefs.touched,sub:[...prefs.sub],store:[...prefs.store]})); }catch(e){} }
+// CAS-1221: held in memory only — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
+// ever populates this away from the signed-out default, straight from the account's own user_prefs row.
+function loadPrefs(){ return {on:false,touched:false,sub:new Set(),store:new Set()}; }
+function savePrefs(){}
 // CAS-1095: savePrefs() backs more than one distinct user_prefs settings change (services picked, and
 // services-only/touched) — each call site names exactly which column(s) its own edit touched. A no-op
 // (guarded internally) until window.CascadePersistence exists and the device is signed in.
@@ -5287,9 +5258,10 @@ const prefs = loadPrefs();
 let visits=1;
 try{ visits=(+localStorage.getItem("cascade_visits")||0)+1; localStorage.setItem("cascade_visits", String(visits)); }catch(e){}
 // UX-psychology framings sit behind one flag so the plain version is the A/B control. Default on.
+// CAS-1221: held in memory only — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
+// ever flips this away from the default, straight from the account's own user_prefs.framing column.
 const ux = {on:true};
-try{ const v=localStorage.getItem("cascade_ux"); if(v!==null) ux.on = v==="1"; }catch(e){}
-function saveUx(){ try{ localStorage.setItem("cascade_ux", ux.on?"1":"0"); }catch(e){} }
+function saveUx(){}
 // CAS-702: the ONE default sort. Every fallback that means "no sort chosen yet" reads this, never a literal
 // string of its own — three different literals (imdb / availability / cascade) tracked three different eras
 // of what "the default" meant (CAS-148, CAS-618) and had drifted out of step with each other.
@@ -5305,55 +5277,13 @@ const filt={status:new Set(), year:new Set(), age:new Set(), culture:new Set(), 
   watchTiers:new Set()};   // CAS-382: the agent's own Filter control — see watchTiersById
 const $=id=>document.getElementById(id);
 
-// ---- My Cascades: saved living searches (prototype state — localStorage, per device) ----
-const SORT_MIG_KEY = "cascade_sortmig_148";   // one-shot: see the sort migration in loadCascades()
-const SORT_MIG_KEY_2 = "cascade_sortmig_cascade";  // one-shot: default order becomes the Cascade score
-const LANG_MIG_KEY = "cascade_langmig_560";   // one-shot: see the CAS-560 language migration below
-function loadCascades(){
-  try{
-    const a=JSON.parse(localStorage.getItem("cascade_cascades")||"[]");
-    if(!Array.isArray(a)) return [];
-    // The budget sort is gone (it buried tentpoles TMDB has no budget for). Carry old Blockbuster
-    // Cascades over to the popularity sort rather than silently dropping them back to IMDb.
-    a.forEach(c=>{ if(c.sort==="budget") c.sort="popularity"; });
-    // CAS-148: "imdb" used to BE the default order, so every Cascade ever saved carries it whether or not
-    // anyone chose it. The default is now the availability timeline, so that carried-over value is migrated
-    // — ONCE, and written back, so an IMDb order picked deliberately from here on is never overwritten.
-    try{
-      if(!localStorage.getItem(SORT_MIG_KEY)){
-        a.forEach(c=>{ if(!c.sort || c.sort==="imdb") c.sort="availability"; });
-        localStorage.setItem("cascade_cascades", JSON.stringify(a));
-        localStorage.setItem(SORT_MIG_KEY,"1");
-      }
-    }catch(e){}
-      // Same shape again, one key later: "availability" used to BE the default order (CAS-148), so every
-      // agent saved since carries it whether or not anyone chose it. The default is now the Cascade score,
-      // so that carried-over value is migrated - ONCE, and written back, so an availability order picked
-      // deliberately from here on is never overwritten. Any other order the user chose is left alone.
-      if(!localStorage.getItem(SORT_MIG_KEY_2)){
-        a.forEach(c=>{ if(!c.sort || c.sort==="availability" || c.sort==="imdb") c.sort=DEFAULT_SORT; });
-        localStorage.setItem("cascade_cascades", JSON.stringify(a));
-        localStorage.setItem(SORT_MIG_KEY_2,"1");
-      }
-    // CAS-560: language retired as a per-agent field. normCascade() forces c.lang to [] on every load
-    // regardless, so this is belt-and-braces — it writes the migrated value BACK to storage once, so the
-    // raw saved JSON stops carrying a stray ["en"] forever rather than only correcting it in memory.
-    try{
-      if(!localStorage.getItem(LANG_MIG_KEY)){
-        if(a.some(c=>(c.lang||[]).length)){
-          a.forEach(c=>{ c.lang=[]; });
-          localStorage.setItem("cascade_cascades", JSON.stringify(a));
-        }
-        localStorage.setItem(LANG_MIG_KEY,"1");
-      }
-    }catch(e){}
-    return a;   // filled out to the current shape by normCascade() below — a Cascade saved before the
-                // language/rating-stop controls existed still opens clean, and means what it always meant.
-  }catch(e){ return []; }
-}
-function saveCascades(){
-  if(onbDraftModeOn) return;   // CAS-1099: a pre-membership draft's agents stay memory-only
-  try{ localStorage.setItem("cascade_cascades", JSON.stringify(cascades)); }catch(e){} }
+// ---- My Cascades: saved living searches (held in memory; the account is the only durable home) ----
+// CAS-1221: there is no device mirror left to load from or migrate — a signed-in device starts empty and
+// loadAccount() (the account-sync IIFE, below) is the only thing that ever fills this in, straight off the
+// account's own `cascades` rows (already in their current shape; normCascade() below still fills out any
+// column a legacy server row predates).
+function loadCascades(){ return []; }
+function saveCascades(){}
 // CAS-1109: a placeholder here, in the same outer scope as saveCascades above — a guest device has no
 // account to delete anything from. The account-sync IIFE further down reassigns this (exactly the way it
 // reassigns saveCascades itself, "wrap the one save chokepoint") to the real implementation: an immediate
@@ -5443,23 +5373,11 @@ try{ localStorage.removeItem("cascade_onb_answers_v2"); }catch(e){}
 // taste/watch_windows/moving_seen (CAS-561/742): an empty array is a real, distinct answer from "no device
 // has saved this yet", so saveOccasionReg below only skips a write when the JSON is byte-identical, never
 // when the array is empty.
-const OCCASIONS_KEY="cascade_occasions";
-function loadOccasionReg(){
-  try{
-    const a=JSON.parse(localStorage.getItem(OCCASIONS_KEY)||"[]");
-    if(!Array.isArray(a)) return [];
-    return a.filter(o=>o && typeof o.id==="string" && typeof o.name==="string");
-  }catch(e){ return []; }
-}
+// CAS-1221: held in memory only — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
+// ever populates this, straight off the account's own user_prefs.occasions column.
+function loadOccasionReg(){ return []; }
 const occasionReg = loadOccasionReg();
-let occasionRegSaved=null;
-function saveOccasionReg(){
-  if(onbDraftModeOn) return;   // CAS-1099: a pre-membership draft's occasions stay memory-only
-  const s=JSON.stringify(occasionReg);
-  if(s===occasionRegSaved) return;
-  occasionRegSaved=s;
-  try{ localStorage.setItem(OCCASIONS_KEY, s); }catch(e){}
-}
+function saveOccasionReg(){}
 const occasionName = id => (occasionReg.find(o=>o.id===id)||{}).name || "";
 const occasionRegSorted = () => [...occasionReg].sort((a,b)=>a.name.localeCompare(b.name));
 // AC11: an id matching no register entry is dropped on save — the one choke point commitDraft's whitelist
@@ -13383,7 +13301,7 @@ const STARTERS = [
          myServices:false, selCrowd:0, selCritics:0, selScale:0, selBuzz:0}},
 ];
 // The briefing answers, in the shape every recipe's `when` expects. This is also the shape the
-// onboarding screens write and the shape stored under ONB_ANSWERS_KEY.
+// onboarding screens write and the shape `onbAnswers` (held in memory — see onbAnswersLoad/Save) carries.
 function onbAnswersDefault(){
   return {who:["me"], cinema:"special", awards:"big", depth:"best", never:[], taste:{partner:[], kids:[]}};
 }
@@ -13409,19 +13327,17 @@ function agentNewestDays(c){
   return best;
 }
 const AGENT_STALE_DAYS = 21;
-const ONB_ANSWERS_KEY = "cascade_onb_answers";
-function onbAnswersLoad(){
-  try{ const raw=localStorage.getItem(ONB_ANSWERS_KEY);
-       return raw ? {...onbAnswersDefault(), ...JSON.parse(raw)} : onbAnswersDefault(); }
-  catch(e){ return onbAnswersDefault(); }
-}
-function onbAnswersSave(a){
-  try{ localStorage.setItem(ONB_ANSWERS_KEY, JSON.stringify(a)); }catch(e){}
-}
+// CAS-1221: held in memory only, not round-tripped through disk at all any more — loadUserPrefs() (the
+// account-sync IIFE, below) is the only thing that ever adopts the never-show/depth fields into this, off
+// the account's own user_prefs.never_show/onb_depth columns; onbAnswersLoad/Save stay the one chokepoint
+// pair both that load and userPrefsRow's own push read and write through.
+let onbAnswers = onbAnswersDefault();
+function onbAnswersLoad(){ return onbAnswers; }
+function onbAnswersSave(a){ onbAnswers = a; }
 
 // ---- CAS-908: onboarding v2 answers + four-agent generator ------------------------------------
-// onbAnswersDefault/ONB_ANSWERS_KEY above stay — the account-level sync path (userPrefsRow/
-// loadUserPrefs) still reads them for the never-show/depth fields, unrelated to onboarding itself.
+// onbAnswersDefault above stays — the account-level sync path (userPrefsRow/loadUserPrefs) still reads it
+// for the never-show/depth fields, unrelated to onboarding itself.
 // ONB_AGENTS/buildOnbAgents (the old per-answer recipe table) and obStripHTML/obLastKeys (the old
 // roster strip) are gone — CAS-911 retired them once FLOWS below stopped calling either.
 function onbAnswersV2Default(){
@@ -14054,7 +13970,6 @@ function saveWatch(){
 // rather than forking a second copy of it, so the Where & when screen (CAS-562: its own top-menu destination,
 // split out of the old combined Preferences page) and the (now-orphaned) per-agent screen can never teach
 // two different lessons about what a switch does.
-const WATCH_PREFS_KEY="cascade_watch_prefs";
 // CAS-1123: every default window carries just `list` now — a window that's on both lists and alerts, so
 // a new member is alerted in every window they watch instead of hearing about nothing (Lee's report).
 // CAS-1177: Upcoming also defaults its two extra moments, "When announced" and "Opening next week", on —
@@ -14065,12 +13980,11 @@ const watchPrefsDefaults = () => ({
   // premium starts fully off, same as it always has (CAS-243) — the one window nobody should be opted
   // into by default.
 });
+// CAS-1221: held in memory only — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
+// ever populates this, straight off the account's own user_prefs.watch_windows column (migrateWatch still
+// runs there, on the server's own row).
 let watchPrefs = watchPrefsDefaults();
-try{
-  const raw=JSON.parse(localStorage.getItem(WATCH_PREFS_KEY)||"null");
-  if(raw && typeof raw==="object") watchPrefs={...watchPrefsDefaults(), ...migrateWatch(raw)};
-}catch(e){}
-function saveWatchPrefs(){ try{ localStorage.setItem(WATCH_PREFS_KEY, JSON.stringify(watchPrefs)); }catch(e){} }
+function saveWatchPrefs(){}
 let prefsWatchMode=false;   // true only while the Where & when you'll watch screen is on screen
 const activeWatch = () => prefsWatchMode ? watchPrefs : (onbFlow.watch || {});
 // The single source of truth propagates to every EXISTING agent immediately, not just new ones — an agent's
@@ -14451,7 +14365,6 @@ function onbGenrePhrase(){
 // applied to every agent on top of that agent's own criteria. It is the world your agents search, so
 // narrowing it re-narrows all of them at once — that is the point of it being one thing rather than a
 // copy per agent. Defaults are permissive on purpose: it must never be the reason a new user sees nothing.
-const BASE_KEY = "cascade_taste_base";
 const baseDefaults = () => ({genres:[], year:YEAR_DEFAULT, langs:["en"],
                              ageLo:0, ageHi:AGE_LEVELS.length-1});
 // genres:[] means "all" — an empty include-list matches everything, the same convention the cascade
@@ -14466,12 +14379,10 @@ const baseDefaults = () => ({genres:[], year:YEAR_DEFAULT, langs:["en"],
 // "Every option, filter off" is deliberately not the same as listing every option: 188 films carry no genre
 // at all and 186 are in a language outside the twelve we list, and a filter that is off must not drop them.
 const tbNone = v => v===null;                 // explicitly cleared
+// CAS-1221: held in memory only — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
+// ever populates this, straight off the account's own user_prefs.taste column.
 let tasteBase = baseDefaults();
-try{ const o=JSON.parse(localStorage.getItem(BASE_KEY)||"null");
-     if(o && typeof o==="object") tasteBase={...baseDefaults(), ...o}; }catch(e){}
-function saveTasteBase(){
-  if(onbDraftModeOn) return;   // CAS-1099: a pre-membership draft's taste stays memory-only
-  try{ localStorage.setItem(BASE_KEY, JSON.stringify(tasteBase)); }catch(e){} }
+function saveTasteBase(){}
 // CAS-250: the baseline asks the same question as the agent's own how-far-back, so it answers it the same
 // way — a rolling number of years, converted once from the old index.
 const baseYearsBack = () => (typeof tasteBase.yearsBack==="number")
@@ -16081,7 +15992,7 @@ const SHARP_STEPS = {
   // ---- CAS-910: onboarding v2's ten question screens, preview-only, reachable via ?step=<key> only. Not
   // listed in FLOWS: the cutover (wiring these in, retiring the old sequence) is CAS-911. Every screen here
   // writes onbFlow.answersV2 and persists through onbAnswersV2Save() — onbFlow.answers/onbAnswersDefault()/
-  // ONB_ANSWERS_KEY (the live sequence's own) are untouched.
+  // onbAnswers (the live sequence's own) are untouched.
   // CAS-953 Change 2: the first screen of the whole sequence. CAS-1165 retired the splash's public
   // "What is Cascade?" page this screen was originally kept separate from; v2_about stands on its own now.
   v2_about: {
@@ -20549,7 +20460,7 @@ else if(dedupedN)
             // array, which only this save chokepoint can correct.
             if(!ok){
               const i=cascades.findIndex(x=>x.id===c.id);
-              if(i>=0){ cascades.splice(i,1); saveCascadesLocal(); if(typeof render==="function") render(); }
+              if(i>=0){ cascades.splice(i,1); if(typeof render==="function") render(); }
             }
           } };
         window.CascadeAccountStore.acctOp(op);
@@ -20591,7 +20502,6 @@ else if(dedupedN)
     const i = cascades.findIndex(x=>x.id===id);
     if(i<0) return;
     cascades[i] = rowToCascade(freshRow);
-    saveCascadesLocal();
     if(typeof render==="function") render();
   }
 
@@ -20617,19 +20527,10 @@ else if(dedupedN)
     const c=client(); if(!c||!accountActive()) return;
     const ok = await window.CascadeAccountStore.acctLoad([{ table:"cascades", pk:"id" }]);
     if(!ok){ console.warn("Cascade load failed"); cascadesReady=true; recordSyncOutcome("cascades", false, { message:"load failed" }); return; }
-    // CAS-733 Change 5: one-time legacy cleanup — a device carrying a pre-account guest agent set
-    // (built back when signed-out was still a usable state) stops carrying it the moment its account
-    // load actually succeeds.
-    try{ localStorage.removeItem("cascade_cascades"); }catch(e){}
     const rows = (window.CascadeAccountStore.acctStore.cascades||[]).filter(r=>!r.deleted_at);   // CAS-1092
     const remote = cascadeOpOverlay(rows).map(rowToCascade);
     remote.sort(cascadeOrderCmp);
     replaceCascades(remote);
-    // CAS-516: a signed-in device's local cache is otherwise never written and a cold start (the webview
-    // reloaded after being backgrounded) has nothing to paint until this network round trip returns — a
-    // 20+ second blank screen on a slow reconnect. Mirror the authoritative list into the guest cache
-    // directly so the NEXT cold start has something instant to show while this same fetch revalidates.
-    saveCascadesLocal();
     recordSyncOutcome("cascades", true);
     if(typeof afterSignIn==="function") afterSignIn();
   }
@@ -20638,23 +20539,13 @@ else if(dedupedN)
   // built on this device that isn't already accounted for by the on-sign-in fold in loadAccount().
 
   // ---- wrap the one save chokepoint ----------------------------------------
-  // CAS-691: signed in, an edit used to reach nothing durable until the account round trip finished — it
-  // lived only in the in-memory array, so a reload (or the tab dying) before that round trip completed
-  // silently reverted it. Every save now ALWAYS mirrors into the on-device cache first (guest or signed
-  // in, same write), and separately schedules the account sync when signed in — the account sync is what
-  // RECONCILES from here on, not the only place the edit is ever recorded. This does mean the guest cache
-  // key is no longer untouched while signed in (it previously was, deliberately, so sign-out returned a
-  // returning guest to their pre-signin on-device set) — but loadAccount() already mirrors the
-  // authoritative account state into that same key on every successful load (CAS-516), so that
-  // protection was already partial; making saves durable the same way closes the actual data-loss hole
-  // without adding a second, inconsistent cache.
-  const saveCascadesLocal = saveCascades;
+  // CAS-1221: there is no on-device cache left to mirror into — an edit reaches durability the moment it
+  // reaches the account (acctOp persists its own queue synchronously; CAS-1109), not before.
   saveCascades = function(){
     // CAS-733 Change 1: a configured build with no signed-in session has no agent store of its own any
     // more — the old guest set this used to build in localStorage is exactly what let a device carry
     // agents an account never saw. Onboarding holds its build in memory only until the account exists.
     if(acct() && acct().enabled && !accountActive()) return;
-    saveCascadesLocal();
     // CAS-1109: acctOp has no debounce to wait out — every changed row is pushed the instant this chokepoint
     // runs, same as every other acctOp-backed table (no more scheduleSync/runSync's 400ms debounce).
     if(accountActive()) syncCascadesToAccount();
@@ -20824,7 +20715,6 @@ else if(dedupedN)
       const remote = cascadeOpOverlay(rows).map(rowToCascade);
       remote.sort(cascadeOrderCmp);
       replaceCascades(remote);
-      saveCascadesLocal();
     });
   }
   // CAS-408: two devices only converge without a live subscription if SOMETHING re-pulls the account
@@ -21106,17 +20996,10 @@ else if(dedupedN)
   // device that hasn't caught up yet) this device has already seen and moved past locally. Same shape and
   // persistence as CAS-734's old per-row cascade baseline, scoped to one timestamp per film instead of a
   // full-row sig.
-  const WATCH_KNOWN_KEY = "cascade_watch_known";
-  function loadWatchKnown(){
-    try{
-      const arr = JSON.parse(localStorage.getItem(WATCH_KNOWN_KEY) || "[]");
-      return new Map(Array.isArray(arr) ? arr : []);
-    }catch(e){ return new Map(); }
-  }
-  function saveWatchKnown(){
-    try{ localStorage.setItem(WATCH_KNOWN_KEY, JSON.stringify([...watchKnown])); }catch(e){}
-  }
-  let watchKnown = loadWatchKnown();
+  // CAS-1221: held in memory only — the in-memory copy of whatever this session has already applied is the
+  // whole point of this baseline, and a fresh session starting with nothing known is the correct, honest
+  // answer (not a stale disk copy from a previous session). applyWatchRows (below) is this Map's only writer.
+  let watchKnown = new Map();
   function watchRows(){
     const owner=uid(), out=[];
     for(const id in notify){
@@ -21159,7 +21042,6 @@ else if(dedupedN)
       });
       if(r.updated_at) watchKnown.set(String(id), r.updated_at);
     });
-    saveWatchKnown();
     recomputeFound();
     if(typeof render==="function") render();
   }

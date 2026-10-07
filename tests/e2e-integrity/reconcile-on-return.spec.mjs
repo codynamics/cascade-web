@@ -203,20 +203,16 @@ test("AC4/AC5: a delayed boot shows the loading state (never this device's stale
   await seedUserPrefs(user.id, { ref_code: "CAS1219AC45" });
   await seedNotifyPrefs(user.id, { in_app: true, email_on: true, email_address: email });
 
-  // A clean boot first, so the local cache genuinely agrees with the server before it's doctored.
+  // A clean boot first, so the account load genuinely ran once before this device "reboots".
   await gotoIntegrityFresh(page);
   await signInFromSplash(page, email);
   await settleListing(page);
   await waitForAccountLoads(page);
   expect(await page.evaluate(() => cascades[0].watchMarkers.stream)).toBe(70);
 
-  // Doctor the device's own cached agent so a stale paint, if one happened, would be visibly wrong.
-  await page.evaluate(() => {
-    const arr = JSON.parse(localStorage.getItem("cascade_cascades"));
-    arr[0].watchMarkers.stream = 15;
-    arr[0].name = "STALE DOCTORED NAME";
-    localStorage.setItem("cascade_cascades", JSON.stringify(arr));
-  });
+  // CAS-1221: there is no on-device mirror left to doctor (cascade_cascades is never written) — a reload
+  // starts this device's own `cascades` at [] unconditionally, which is the thing AC4/AC5 actually need to
+  // prove: NOTHING, stale or otherwise, may paint before the fan-out settles.
 
   // AC5: every /rest/v1/ response delayed 3s at boot.
   await page.route("**/rest/v1/**", async route => {
@@ -227,17 +223,14 @@ test("AC4/AC5: a delayed boot shows the loading state (never this device's stale
   await page.reload();
   await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
 
-  // Still well inside the 3s delay: no group (so no film count), the loading state instead, and the
-  // doctored local name must never have reached the screen.
+  // Still well inside the 3s delay: no group (so no film count), the loading state instead.
   await page.waitForTimeout(1200);
   const duringLoad = await page.evaluate(() => ({
     groups: document.querySelectorAll("#groups .group").length,
     loading: !!document.querySelector("#groups .acctloading"),
-    bodyHasStaleName: document.body.textContent.includes("STALE DOCTORED NAME"),
   }));
   expect(duringLoad.groups, "no group — and so no film count — may render before the fan-out settles").toBe(0);
   expect(duringLoad.loading, "the loading state must be showing instead").toBe(true);
-  expect(duringLoad.bodyHasStaleName, "the doctored local agent name must never reach the screen").toBe(false);
   expect(restWrites(requests), "no non-GET request may start before the fan-out has settled").toEqual([]);
 
   await settleListing(page);
