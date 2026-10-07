@@ -14079,14 +14079,22 @@ const activeWatch = () => prefsWatchMode ? watchPrefs : (onbFlow.watch || {});
 // saved before this ticket) and again every time the Where & when screen changes a switch.
 // CAS-723: the same derived windows go to every agent regardless of c.kind now, so `w` is computed once
 // outside the loop rather than per agent.
-function syncWatchPrefsToCascades(){
+// CAS-1218: applying the derived windows to every in-memory agent is a pure recompute, so it must never by
+// itself queue a write — a load/boot/reconcile calls this one, never syncWatchPrefsToCascades below, which
+// additionally saves and may only be reached from an explicit person-initiated change (a Where & when
+// switch, an onboarding answer).
+function applyWatchPrefsToCascades(){
   const w=watchAllWindows(watchPrefs);
   cascades.forEach(c=>{
     c.status=watchToStatuses(w); c.listStatus=listToStatuses(w); c.watchWindows=w;
   });
+}
+function syncWatchPrefsToCascades(){
+  applyWatchPrefsToCascades();
   saveCascades();
 }
-syncWatchPrefsToCascades();   // once at boot, so a cascade saved before CAS-532 opens already in lockstep
+applyWatchPrefsToCascades();   // once at boot, so a cascade saved before CAS-532 opens already in lockstep —
+                                // derivation only, no save (CAS-1218)
 // CAS-1157: the one function the v2_cinema/v2_rent answers and the v2_done roster commit all call to keep
 // the account's Where & when windows in step with them — the only place this mapping lives. A "no" switches
 // the window off ({list:false}, CAS-1156's stored shape); anything else (yes, or not yet answered) leaves it
@@ -17381,7 +17389,11 @@ function movingRowHTML(row){
 // for now) can tell what has been shown. CAS-668: the row set marked seen is movingWindowRows(movingWindow)
 // — the exact same function and the exact same window the badge computation reads, so the two can never
 // disagree.
-function renderMovingScreen(){
+// CAS-1218: markSeen is true only from the person's own tap (openMovingScreen, setMovingWindow) — never
+// from the automatic re-render loadRealAlerts()/loadInvites() trigger while Alerts is already open (which a
+// reconcileOnReturn poll can run with nobody touching anything), so a write to moving_seen (and the
+// user_prefs push it carries) happens only on an explicit visit to a window, never a background refresh.
+function renderMovingScreen(markSeen){
   // CAS-667: while a signed-in device's alerts ledger is still in flight, movingData() returns nothing to
   // paint — say so explicitly instead of falling through to the "nothing has moved" empty state, which
   // would read as a real (and wrong) answer rather than "still loading".
@@ -17393,8 +17405,10 @@ function renderMovingScreen(){
     return;
   }
   const {shownRows}=movingWindowRows(movingWindow);
-  shownRows.forEach(r=>{ movingSeen[r.filmId]=r.tag; });
-  saveMovingSeen();
+  if(markSeen){
+    shownRows.forEach(r=>{ movingSeen[r.filmId]=r.tag; });
+    saveMovingSeen();
+  }
   updateMovingBadge();
   // CAS-904: one full-width labelled pill (Watch's OCCASION/PICKED BY pattern, CAS-840) opening the same
   // shared listbox (.cpop.pickpop via togglePickerFor) — replaces the CAS-650 chip row. MOVING_WINDOWS
@@ -17457,7 +17471,7 @@ function renderMovingScreen(){
 window.setMovingWindow=(key)=>{
   if(!MOVING_WINDOWS.some(w=>w.key===key) || movingWindow===key) return;
   movingWindow=key;
-  renderMovingScreen();
+  renderMovingScreen(true);
 };
 window.openAgentsScreen=()=>{
   // CAS-1185: reached from the menu's "Agents" item now, not a header chip — there is no chip of its own to
@@ -17484,7 +17498,7 @@ window.openMovingScreen=()=>{
   if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186: mutually exclusive with Find too
   movingIsOpen=true;
   movingWindow="today";   // CAS-1197: always opens pinned to Today; a tap (setMovingWindow) still overrides it
-  renderMovingScreen();
+  renderMovingScreen(true);
   $("movingScreen").scrollTop=0;
   $("movingScreen").classList.add("open"); lockBodyScroll(true);
   $("movingBtn").classList.add("active"); $("movingBtn").setAttribute("aria-pressed","true");
@@ -20978,13 +20992,18 @@ else if(dedupedN)
       // to the signed-in account's own email — not a device default, since a fixed default written at row
       // creation is not device state.
       const bootEmail = ((acct().user && acct().user.email) || "").trim() || null;
-      c.from("notify_prefs").upsert([{ user_id:owner, in_app:true, email_on:true, email_address:bootEmail }], { onConflict:"user_id" }).then(({error})=>{
-        if(error){ console.warn("notify_prefs bootstrap insert", error); return; }
-        notifyPrefs.inApp = true;
-        notifyPrefs.emailOn = true;
-        notifyPrefs.email = bootEmail || "";
-        saveNotifyPrefsLocal();
-      });
+      // CAS-1218: through the normal acctOp queue, not a direct fire-and-forget request — and
+      // ignoreDuplicates, so two devices bootstrapping the same missing row at once leave exactly one row,
+      // neither overwriting the other (a load must never win a write race against itself).
+      window.CascadeAccountStore.acctOp({ table:"notify_prefs", kind:"upsert", match:{ user_id:owner },
+        fields:{ in_app:true, email_on:true, email_address:bootEmail }, onConflict:"user_id", ignoreDuplicates:true,
+        onDone:(ok,err)=>{
+          if(!ok){ console.warn("notify_prefs bootstrap insert", err); return; }
+          notifyPrefs.inApp = true;
+          notifyPrefs.emailOn = true;
+          notifyPrefs.email = bootEmail || "";
+          saveNotifyPrefsLocal();
+        } });
       notifyPrefsReady=true;
       return;
     }
@@ -21237,11 +21256,14 @@ else if(dedupedN)
     let i = 0;
     for(const batch of batches){
       i++;
+      // CAS-1218: ignoreDuplicates — a row this account already holds (another device's earlier admission,
+      // or a race between two devices admitting the same film at once) is never overwritten; admitted_at/
+      // admission_score are frozen history, not something a later device's own guess may replace.
       const op={ table:"agent_films", kind:"upsert_many",
                  items: batch.map(p=>({ match:{ user_id:p.owner, cascade_id:p.cascadeId, movie_id:p.movieId },
                                          fields:{ admitted_at:p.row.admitted_at, admission_score:p.row.admission_score,
                                                   admission_status:p.row.admission_status, agent_sig:p.row.agent_sig } })),
-                 onConflict:"user_id,cascade_id,movie_id" };
+                 onConflict:"user_id,cascade_id,movie_id", ignoreDuplicates:true };
       op.onDone=(ok,err)=>recordSyncOutcome("agent_films", ok, err);
       const _t460batch = performance.now();
       console.log('[CAS-460] flushAgentFilmPushes batch start', i+'/'+batches.length, 'rows', batch.length, _t460batch);
@@ -21254,6 +21276,13 @@ else if(dedupedN)
   }
   function pushAgentFilmAdmission(cascadeId, movieId, row, deferCtx){
     if(!accountActive()) return;
+    // CAS-1218: nothing may reach agent_films before this session's own loadAgentFilms has returned — a
+    // recomputeFound pass that runs on the first paint, before the load resolves, has no way to know which
+    // admissions the account already holds, so a push from here could stamp a fresh admitted_at/admission_score
+    // over real history. applyAgentFilmRows (loadAgentFilms' own apply step) replaces the whole local ledger
+    // once the load resolves, and agentFilmsReady's own render() re-fires recomputeFound right after — any
+    // admission dropped here is simply re-derived (and, if still due, re-pushed) on that next pass.
+    if(!agentFilmsReady) return;
     const owner=uid(); if(!owner) return;
     // A deferred retry (below) whose signed-in account changed underneath it — sign-out, then a
     // DIFFERENT account signing in, while this was still waiting on the original cascade's own upsert —
@@ -21544,14 +21573,18 @@ else if(dedupedN)
     } else if(!refCodeCache){
       const code = genRefCode();
       refCodeCache = code;
-      c.from("user_prefs").upsert([{ user_id: uid(), ref_code: code }], { onConflict:"user_id" }).then(({error})=>{
-        if(error) console.warn("ref_code write", error);
-      });
+      // CAS-1218: through the normal acctOp queue, ignoreDuplicates — so two devices minting a ref_code at
+      // once leave exactly one, never one device's mint overwriting the other's already-committed code.
+      window.CascadeAccountStore.acctOp({ table:"user_prefs", kind:"upsert", match:{ user_id: uid() },
+        fields:{ ref_code: code }, onConflict:"user_id", ignoreDuplicates:true,
+        onDone:(ok,err)=>{ if(!ok) console.warn("ref_code write", err); } });
     }
     if(!row){
-      c.from("user_prefs").upsert([{ user_id: uid() }], { onConflict:"user_id" }).then(({error})=>{
-        if(error) console.warn("user_prefs bootstrap insert", error);
-      });
+      // CAS-1218: same queue/ignoreDuplicates treatment as the ref_code mint above — a load creating the
+      // row at all must never be able to overwrite one another device created a moment earlier.
+      window.CascadeAccountStore.acctOp({ table:"user_prefs", kind:"upsert", match:{ user_id: uid() },
+        fields:{}, onConflict:"user_id", ignoreDuplicates:true,
+        onDone:(ok,err)=>{ if(!ok) console.warn("user_prefs bootstrap insert", err); } });
       return;
     }
     setTo(prefs.sub, row.sub_services||[]);
@@ -21564,7 +21597,7 @@ else if(dedupedN)
     if(row.watch_windows && typeof row.watch_windows==="object" && Object.keys(row.watch_windows).length){
       watchPrefs = {...watchPrefsDefaults(), ...migrateWatch(row.watch_windows)};
       saveWatchPrefsLocal();
-      syncWatchPrefsToCascades();
+      applyWatchPrefsToCascades();   // CAS-1218: a load only derives display state, never saves
     }
     // CAS-740: `touched` has no legitimate value that means "unanswered" other than SQL null itself —
     // false is a real answer ("hasn't touched the switch yet"), so a row nobody has ever saved this
@@ -21967,7 +22000,11 @@ else if(dedupedN)
     if(op.kind === "upsert"){
       // CAS-1096: op.onConflict names the real composite key (e.g. "user_id,movie_id") — a retry of the
       // same op can never duplicate the row, same reasoning as the "insert" kind above.
-      return await c.from(op.table).upsert(Object.assign({}, op.match, op.fields), { onConflict:op.onConflict });
+      // CAS-1218: op.ignoreDuplicates (unset/false for every pre-existing caller, so their behaviour is
+      // unchanged) lets a load-triggered bootstrap insert (a missing notify_prefs/user_prefs row, a minted
+      // ref_code) refuse to overwrite a row that already exists, rather than updating it.
+      return await c.from(op.table).upsert(Object.assign({}, op.match, op.fields),
+        { onConflict:op.onConflict, ignoreDuplicates:!!op.ignoreDuplicates });
     }
     if(op.kind === "upsert_many"){
       // CAS-1136: the same composite-key reasoning as "upsert" above, one request for every row in op.items.
@@ -21977,8 +22014,10 @@ else if(dedupedN)
       // own CAS-1064 defer already keeps an unconfirmed cascade's rows out of a batch in the first place, so
       // this is a narrower, already-rare edge case, and a dropped batch still surfaces via recordSyncOutcome
       // (the degraded banner) rather than silently vanishing.
+      // CAS-1218: op.ignoreDuplicates, same reasoning as "upsert" above — agent_films' own admitted_at/
+      // admission_score are frozen history, never something a later write may overwrite.
       const rows = op.items.map(item => Object.assign({}, item.match, item.fields));
-      return await c.from(op.table).upsert(rows, { onConflict:op.onConflict });
+      return await c.from(op.table).upsert(rows, { onConflict:op.onConflict, ignoreDuplicates:!!op.ignoreDuplicates });
     }
     if(op.kind === "update"){
       let q = c.from(op.table).update(op.fields).match(op.match);
