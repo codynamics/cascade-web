@@ -20729,16 +20729,14 @@ else if(dedupedN)
       // that took one of those branches would be stuck on watchPrefsLoadingHTML() until some unrelated
       // render() happened to fire.
       loadUserPrefs().finally(()=>{ userPrefsReady=true; if(typeof render==="function") render(); }),
-      // CAS-1224: agentFilmsLoaded flips first, unblocking recomputeFound's placementReady so this render
-      // can push a freshly-matched admission — then that push (if any) is flushed and AWAITED right here,
-      // before agentFilmsReady flips. Promise.allSettled waits for this whole async finally to finish, so
-      // `await allLoads` below never returns while a push from this load is still in flight.
-      loadAgentFilms().finally(async ()=>{
+      // CAS-1224: agentFilmsLoaded flips here, unblocking recomputeFound's placementReady and
+      // pushAgentFilmAdmission so this render can queue a freshly-matched admission — but NOT flushed yet.
+      // applyWatchPrefsToCascades() below (run only once every load in allLoads has settled) can still
+      // change which films a wide-open agent matches, so flushing here would miss — and leave unflushed
+      // past agentFilmsReady — any admission that derivation newly surfaces. The real flush, awaited before
+      // agentFilmsReady flips, happens once below instead, after that derivation has had its say.
+      loadAgentFilms().finally(()=>{
         agentFilmsLoaded=true;
-        if(typeof render==="function") render();
-        if(agentFilmPushFlushTimer){ clearTimeout(agentFilmPushFlushTimer); agentFilmPushFlushTimer=null; }
-        await flushAgentFilmPushes();
-        agentFilmsReady=true;
         if(typeof render==="function") render();
       }),
     ]);
@@ -20766,6 +20764,17 @@ else if(dedupedN)
       const landingTab = pickLandingWatchTab();
       if(landingTab !== watchTab) watchTab = landingTab;
     }
+    if(typeof render==="function") render();
+    // CAS-1224: the real agent_films flush, moved here from loadAgentFilms' own .finally() above — this
+    // render just ran against cascades/watchPrefs that applyWatchPrefsToCascades() only just finished
+    // deriving, which can surface a match recomputeFound's EARLIER pass (loadAgentFilms' own .finally,
+    // before this derivation had run) never saw. Flushing there and flipping agentFilmsReady before this
+    // point left exactly that late admission unflushed while every e2e-integrity "fan-out has settled"
+    // check had already started trusting agentFilmsReady — the AC4/AC5 write-after-settled leak. One flush
+    // point now, after every load AND this derivation have both had their say.
+    if(agentFilmPushFlushTimer){ clearTimeout(agentFilmPushFlushTimer); agentFilmPushFlushTimer=null; }
+    await flushAgentFilmPushes();
+    agentFilmsReady=true;
     if(typeof render==="function") render();
     // CAS-1035 AC2 (CAS-1100: the old outbox-replay wrapper is retired — acctOp's own persisted queue is
     // this device's only durability story left, so sending the queue directly IS the whole job now):
@@ -21349,8 +21358,9 @@ else if(dedupedN)
     // separate macrotask (setTimeout 0) from that queuing call — a fan-out that starts (and flips this
     // false) in the gap between the two still reaches here with something already queued. Retry rather
     // than send: nothing here is lost either way, but sending now would be exactly the early write AC4/AC5
-    // exists to catch. (fireAccountFanout's own call into this function, right after setting
-    // agentFilmsLoaded=true, always passes this check — it never hits the retry path.)
+    // exists to catch. (fireAccountFanout's own call into this function, made once every load AND
+    // applyWatchPrefsToCascades()'s own derivation have settled — well after agentFilmsLoaded flips true —
+    // always passes this check; it never hits the retry path.)
     if(!agentFilmsLoaded){ agentFilmPushFlushTimer = setTimeout(flushAgentFilmPushes, 50); return; }
     const pending = [...pendingAgentFilmPushes.values()];
     pendingAgentFilmPushes.clear();
