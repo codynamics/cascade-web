@@ -20529,9 +20529,26 @@ else if(dedupedN)
       if(JSON.stringify(knownCriteria)!==JSON.stringify(rowCriteria)) fields.criteria=row.criteria;
       if(!Object.keys(fields).length) return;
       const op = { table:"cascades", kind:"update", match:{ id:c.id }, fields, expectUpdatedAt: knownRaw.updated_at,
+        // CAS-1217: the account's row wins a conflict — replace THIS agent in the UI's own `cascades`
+        // array (and the on-device cache) with what the account just confirmed, so the losing copy is
+        // never pushed again unless the person edits this agent again afterwards (this function's own
+        // diff, next time it runs, then finds nothing left to send).
+        onConflictRow: fresh => adoptAccountCascadeRow(c.id, fresh),
         onDone:(ok,err)=>recordSyncOutcome("cascades", ok, err) };
       window.CascadeAccountStore.acctOp(op);
     });
+  }
+  // CAS-1217: the one place a losing device's own `cascades` entry gets replaced with what the account
+  // just confirmed after a conflict — syncCascadesToAccount's own onConflictRow hook above calls this
+  // directly. reconcileCascadesOnReturn (below, in the account-sync IIFE) replaces the whole array
+  // instead, via replaceCascades/acctLoad's own wholesale-read guarantee, so this is only ever a
+  // single-row correction mid-session.
+  function adoptAccountCascadeRow(id, freshRow){
+    const i = cascades.findIndex(x=>x.id===id);
+    if(i<0) return;
+    cascades[i] = rowToCascade(freshRow);
+    saveCascadesLocal();
+    if(typeof render==="function") render();
   }
 
   // ---- read path: acctLoad replaces whatever this device held, wholesale ----------------------------------
@@ -20744,6 +20761,28 @@ else if(dedupedN)
   // CAS-1108: the "at boot" half of the gate — a direct call, not routed through reconcileOnReturn below, so
   // boot never also re-triggers pollCatalogue/loadUserPrefs/loadRealAlerts a second time.
   checkBuildGate();
+  // CAS-1217: the cascades half of reconcileOnReturn's own re-pull story below — a device with no unsent
+  // agent write of its own re-pulls cascades on return, so an edit made on a different device is no longer
+  // only ever picked up on this device's next cold start or sign-in. Guarded the same way loadUserPrefs is
+  // in reconcileOnReturn itself: skipped while this device still has an unsent cascades update OR
+  // delete_agent rpc queued, so a pull can never land on top of an edit (or a delete) that hasn't reached
+  // the account yet and read as though it had been undone.
+  function reconcileCascadesOnReturn(){
+    const store = window.CascadeAccountStore;
+    if(!store) return;
+    const hasUnsentCascadeWrite = () => store.queue.some(op => op.table==="cascades" || op.table==="delete_agent");
+    if(hasUnsentCascadeWrite()) return;
+    store.acctLoad([{ table:"cascades", pk:"id" }]).then(ok=>{
+      // Re-checked after the await: an edit (or a delete) this device made while that fetch was in flight
+      // must win over whatever the fetch just read, exactly like the guard just above.
+      if(!ok || hasUnsentCascadeWrite()) return;
+      const rows = (store.acctStore.cascades||[]).filter(r=>!r.deleted_at);
+      const remote = cascadeOpOverlay(rows).map(rowToCascade);
+      remote.sort(cascadeOrderCmp);
+      replaceCascades(remote);
+      saveCascadesLocal();
+    });
+  }
   // CAS-408: two devices only converge without a live subscription if SOMETHING re-pulls the account
   // — sign-in alone left a device that never signs out again permanently stuck on whatever it saw at
   // its last sign-in. Returning to the tab is the natural moment: skip it while a push from THIS
@@ -20757,8 +20796,13 @@ else if(dedupedN)
     // catalogue, so this runs unconditionally rather than behind the accountActive() gate.
     pollCatalogue();
     if(!accountActive()) return;
-    // CAS-1096/CAS-1109: cascades/user_films/film_watch/film_picks have no reconcile left to run here —
-    // every write is immediate (acctOp), so there is nothing background convergence would still need to pull.
+    // CAS-1096/CAS-1109/CAS-1217: user_films/film_watch/film_picks still have no reconcile left to run
+    // here — every write to them is immediate (acctOp), so there is nothing background convergence would
+    // still need to pull. cascades is no longer in that list: two devices each holding their own `cascades`
+    // UI array (not just the shared acctStore mirror) only converged on a cold start or sign-in before this,
+    // so an edit made elsewhere could sit unseen for a whole open session. See reconcileCascadesOnReturn,
+    // just below.
+    reconcileCascadesOnReturn();
     // CAS-561: taste/watch_windows only pulled the account's answer on sign-in/boot before this —
     // a tab left open across a change on another device stayed on its stale baseline until reloaded.
     // CAS-1095: guarded on the acctOp queue holding no still-unsent user_prefs write, the same reasoning
@@ -21653,11 +21697,16 @@ else if(dedupedN)
                                 set notifyPrefsReady(v){ notifyPrefsReady=!!v; },
                                 // CAS-1109: cascadeOrderCmp still backs the agent list's own sort — exposed by
                                 // reference the same way every other pure helper here is, so a test can assert
-                                // the total-order tie-break directly. No background reconcile left to run
-                                // (cascades, like every other acctOp-backed table, writes immediately) and no
-                                // per-row conflict resolver of its own — a concurrent edit resolves through
-                                // acctOp's own generic expectUpdatedAt handling (processOp), not a
-                                // cascades-specific function.
+                                // the total-order tie-break directly.
+                                // CAS-1217: a concurrent edit resolves through acctOp's own generic
+                                // expectUpdatedAt handling (processOp) — the account's row always wins — but
+                                // cascades is NOT otherwise reconcile-free like every other acctOp-backed table
+                                // here: reconcileCascadesOnReturn (reached only through reconcileOnReturn,
+                                // exposed below) pulls agents on return the same way user_prefs already does,
+                                // and syncCascadesToAccount's own onConflictRow hook is cascades-specific —
+                                // the one extra step a table needs when it keeps its own UI-facing array
+                                // distinct from CascadeAccountStore's shared mirror, which cascades does and
+                                // every other acctOp-backed table here does not.
                                 cascadeOrderCmp,
                                 // CAS-691: the guest-cache reload seam (what a cold boot re-reads localStorage
                                 // into before the account fan-out ever runs), the wrapped save chokepoints
@@ -21957,16 +22006,32 @@ else if(dedupedN)
       catch(e){ result = { error:e, status:0 }; }
       const { error, status, data } = result;
       if(!error){
-        if(op.kind === "update" && op.expectUpdatedAt !== undefined && Array.isArray(data) && data.length === 0){
-          // 0 rows affected: another device updated this row first. Reload it, replace it in memory —
-          // this device's optimistic change loses, the same way any conflicting write should.
-          const { data: fresh, error: reErr } = await c.from(op.table).select("*").match(op.match).single();
-          if(!reErr && fresh){
-            const rows = acctStore[op.table] || (acctStore[op.table] = []);
-            const row = rows.find(r => rowMatches(r, op.match));
-            if(row) Object.assign(row, fresh); else rows.push(fresh);
+        if(op.kind === "update" && op.expectUpdatedAt !== undefined && Array.isArray(data)){
+          const rows = acctStore[op.table] || (acctStore[op.table] = []);
+          const row = rows.find(r => rowMatches(r, op.match));
+          if(data.length === 0){
+            // 0 rows affected: another device updated this row first. Reload it, replace it in memory —
+            // this device's optimistic change loses, the same way any conflicting write should.
+            const { data: fresh, error: reErr } = await c.from(op.table).select("*").match(op.match).single();
+            if(!reErr && fresh){
+              if(row) Object.assign(row, fresh); else rows.push(fresh);
+              // CAS-1217: the mirror update above is the shared acctOp-level story every table gets;
+              // onConflictRow is the one extra hook a caller attaches when it ALSO keeps its own
+              // UI-facing array distinct from this mirror (cascades' syncCascadesToAccount is the one
+              // caller that does). Without it, the losing copy sits uncorrected in that separate array
+              // and the very next save pushes it again — now with the fresh updated_at this branch just
+              // adopted — overwriting the winner a moment later (the CAS-1217 incident).
+              if(op.onConflictRow) op.onConflictRow(fresh);
+            }
+            toast("Updated on another device");
+          } else if(row && data[0]){
+            // CAS-1217: a successful (non-conflicting) update's response carries the row's NEW updated_at.
+            // Without taking it back into the mirror here, this device's own very next edit to the same
+            // row still compares against the value from BEFORE this write and is refused as if a
+            // different device had won, when nothing else ever touched it — the self-conflict storm the
+            // incident's own point 3 logged (one device alternating refused/accepted against itself).
+            Object.assign(row, data[0]);
           }
-          toast("Updated on another device");
         }
         if(op.onDone) op.onDone(true, null);
         return "done";
