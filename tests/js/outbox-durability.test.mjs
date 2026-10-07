@@ -121,11 +121,13 @@ test("CAS-1035 AC2 (CAS-1096 shape): a failed film_watch push survives a simulat
   assert.ok(film_watch_op(E1, movieId), "a failed push must leave the op durably queued for this movie");
   assert.equal(E1.notify[film.tmdb_id].wins.stream, true, "sanity: the local tick itself is still on");
 
-  // Simulated reboot: a fresh JS realm (new loadEngine call) sharing the same localStorage-backed queue —
-  // `notify` itself is also restored from localStorage at top-level init, exactly as a real page load does.
+  // Simulated reboot: a fresh JS realm (new loadEngine call) sharing the same localStorage-backed queue.
+  // CAS-1221: `notify` itself is account data now, held in memory only — it is NOT restored from
+  // localStorage at top-level init any more (only the acctOp queue is, and still is, CAS-1035's own
+  // durability story). A fresh boot genuinely shows nothing until a load or a replay answers.
   const E2 = loadEngine({ localStorageStore: store });
-  assert.equal(E2.notify[film.tmdb_id]?.wins?.stream, true,
-    "sanity: the tick survived the localStorage round-trip on its own, before any account load runs");
+  assert.equal(E2.notify[film.tmdb_id], undefined,
+    "sanity: a fresh boot starts with no local tick at all — there is no disk mirror left to restore it from");
 
   // This boot's connection still fails the upsert, and film_watch's own read returns an OLDER remote row
   // for the same movie — no windows ticked at all, i.e. the state from before this device's tick.

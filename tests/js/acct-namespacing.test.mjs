@@ -131,19 +131,20 @@ test("CAS-957 AC3: a refused (42501) new-agent insert is dropped from the local 
   assert.equal(secondClient.upsertCalls.length, 0, "a dropped row must never be retried on the next sync — it no longer exists in `cascades`");
 });
 
-test("CAS-1100 AC4: a real sign-out wipes cascade_cascades from disk, so a different account signing in on this device never inherits it", async () => {
+test("CAS-1221: loadAccount() never writes cascade_cascades to disk at all, so a different account signing in on this device never inherits it", async () => {
   const E = loadEngine();
 
-  // Sign in as A, leaving its own local mirror on disk (CAS-516's saveCascadesLocal).
+  // Sign in as A.
   const A_ROW = { id: "a0000000-0000-4000-8000-0000000000a1", user_id: "cas1100-acct-A", name: "A agent", criteria: {}, alert_moments: [], active: true, created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z" };
   signIn(E, "cas1100-acct-A", fakeCascadesClient({ selectRows: [A_ROW] }));
   await E.CascadePersistence.loadAccount();
-  assert.ok(E.localStorage.getItem("cascade_cascades"), "sanity: A's own load mirrored its agent locally");
+  // CAS-516's instant-paint mirror is retired (CAS-1221) — a load holds A's agent in memory only.
+  assert.equal(E.localStorage.getItem("cascade_cascades"), null, "loadAccount() must never write cascade_cascades to localStorage");
 
   // Sign out — the real chokepoint every sign-out path (button, session expiry, account deletion) runs.
   E.CascadeAuth.enabled = false; E.CascadeAuth.client = null; E.CascadeAuth.session = null;
   E.CascadePersistence.signOutReset();
-  assert.equal(E.localStorage.getItem("cascade_cascades"), null, "sign-out must wipe the local mirror outright, not merely stop trusting it");
+  assert.equal(E.localStorage.getItem("cascade_cascades"), null, "sign-out leaves no local mirror either — there was never one to wipe");
 
   // Sign in as B, whose account has never heard of A's agent.
   const B_ID = "b0000000-0000-4000-8000-0000000000b1";

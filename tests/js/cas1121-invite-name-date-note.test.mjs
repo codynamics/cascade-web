@@ -7,13 +7,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
 
-// A chainable fake query builder covering both shapes this flow needs: a plain insert() (invites,
-// invite_emails) and acctOp's own update().match().select() (the display_name push), plus
-// update().eq() (the friends.last_used_at stamp) — same convention cas1095-userprefs-cols.test.mjs uses.
+// A chainable fake query builder covering the shapes this flow needs: a plain insert() (invites,
+// invite_emails), acctOp's own upsert(fields, opts) (the display_name push — CAS-1218: pushUserPrefsCols
+// moved from update().match().select() to a single upsert call, so the first real column write can create
+// the row a load no longer bootstrap-inserts), and update().eq() (the friends.last_used_at stamp) — same
+// convention cas1095-userprefs-cols.test.mjs uses.
 function makeQueryBuilder(table, calls){
   const state = { table };
   const b = {
     insert(rows){ calls.push({ table, kind: "insert", rows }); return Promise.resolve({ error: null }); },
+    upsert(fields, opts){
+      calls.push({ table, kind: "upsert", fields, opts });
+      return Promise.resolve({ data: [fields], error: null, status: 200 });
+    },
     update(fields){ state.kind = "update"; state.fields = fields; return b; },
     match(m){ state.match = m; return b; },
     eq(col, val){ state.eqCol = col; state.eqVal = val; calls.push({ ...state }); return Promise.resolve({ error: null }); },
@@ -55,8 +61,8 @@ test("CAS-1121 AC1: sending with a name, date and note inserts sender_name/sugge
   assert.equal(insert.rows[0].suggested_date, E.TODAY);
   assert.equal(insert.rows[0].note, "Bring snacks");
   assert.equal(E.displayNameCache, "Priya Lee");
-  const prefsUpdate = calls.find(c => c.table === "user_prefs" && c.kind === "update");
-  assert.ok(prefsUpdate, "expected a user_prefs update");
+  const prefsUpdate = calls.find(c => c.table === "user_prefs" && c.kind === "upsert");
+  assert.ok(prefsUpdate, "expected a user_prefs upsert");
   assert.equal(prefsUpdate.fields.display_name, "Priya Lee");
 });
 

@@ -52,8 +52,6 @@ async function toTab(page, key){
   await settleListing(page);
 }
 
-// CAS-823: the rail's own element is now .nowstop, not .jchip (renderJumpBar's non-scrolling rewrite).
-const jumpChipKeys = page => page.locator("#jumpBar .nowstop").evaluateAll(chips => chips.map(c => c.dataset.jump));
 const groupKeys = page => page.locator("#groups .group").evaluateAll(gs => gs.map(g => g.dataset.g));
 
 test.afterEach(async ({ page }) => {
@@ -78,9 +76,11 @@ test("CAS-754 AC1: the Streaming tab leads with Upcoming, jump chips follow (Upc
   await page.evaluate(() => { ["upcoming", "in_cinema", "rental"].forEach(k => watchAlsoShow.stream.add(k)); render(); });
   await toTab(page, "stream");
 
+  // CAS-1223: the jump rail (#jumpBar/.nowstop) this test used to check alongside the group order is gone
+  // from the Watch screen — the stage line replaced it, and neither stage stops nor their counts claim to
+  // mirror the Streaming tab's own group order the way the old rail did. Group order is still this AC's
+  // real subject and stays covered.
   expect((await groupKeys(page))[0]).toBe("upcoming");
-  // Relative order of the remaining chips is unchanged: Cinema before Rent before Stream.
-  expect(await jumpChipKeys(page)).toEqual(["upcoming", "in_cinema", "rental", "included_streaming"]);
 });
 
 // CAS-855, 2026-09-08 (post-dates this spec by a day): Lee reversed CAS-237 — every listing leads with

@@ -151,14 +151,20 @@ if(typeof window.CascadeAuth === "undefined"){
   // code the stub absorbs anyway) so a test can drive listingGroups' tab-based order directly.
   get watchTab(){ return watchTab; },
   setWatchTab(v){ watchTab = v; },
+  // CAS-1223: watchCinemaStage (the Upcoming/In Cinema split within the "in_cinema" tab) — same raw getter/
+  // setter shape as watchTab above, so a test exercising the Cinema tab can choose which half it means
+  // rather than silently inheriting the UI's own "Upcoming" default.
+  get watchCinemaStage(){ return watchCinemaStage; },
+  setWatchCinemaStage(v){ watchCinemaStage = v; },
   watchWatchedSel, watchGenreOff, watchSearch, filmMatchesWatchedFilter, filmMatchesWatchTab,
   // CAS-1180: watchHeldOpen (CAS-752's held-this-visit set, by reference like watchGenreOff above) and
   // watchSearchRows (the search box's own wider, tab/filter-ignoring row set, Part D) — exported so a test
   // can clear the hold directly and assert the real search behaviour rather than re-deriving either.
   watchHeldOpen, watchSearchRows,
-  // CAS-793: watchAgentOff (CAS-720's own per-tab "Agents to include" state, by reference like watchGenreOff
-  // above) and toggleWatchAgent (its wire mutator, wrapped like toggleFilmOpt below) — so a test can drive a
-  // real untick through the real function and assert watchScopeRows' owner-based occasion filter honours it.
+  // CAS-793: watchAgentOff (CAS-720's own "Agents to include" state, by reference — CAS-1223 made it one
+  // shared Set rather than per-tab) and toggleWatchAgent (its wire mutator, wrapped like toggleFilmOpt
+  // below) — so a test can drive a real untick through the real function and assert watchScopeRows' owner-
+  // based occasion filter honours it.
   watchAgentOff, toggleWatchAgent: (id) => window.toggleWatchAgent(id),
   // CAS-863: WATCH_STEPS is the watched-verdict ramp the Watch On panel renders — unrelated to the retired
   // watch-list model despite once sitting next to it. YM_SVC/ymSvcOn/ymSvcToggle/ymSvcSetAll/ymWatchedOn/

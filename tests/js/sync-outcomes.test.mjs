@@ -3,36 +3,35 @@
 // for weeks (nobody reads a phone's console). recordSyncOutcome/syncOutcomeReport/anySyncTargetDegraded are
 // the fix: one outcome per sync target, read by the on-device diagnostics panel and by the in-app degraded
 // indicator. CAS-1095 moved user_prefs off the whole-row upsert (syncUserPrefsNow) onto acctOp's per-column
-// update, with the outcome hook wired through acctOp's own onDone callback (see pushUserPrefsCols in
+// write, with the outcome hook wired through acctOp's own onDone callback (see pushUserPrefsCols in
 // app_template.html) — these tests now drive that real seam (CascadePersistence.pushUserPrefsCols) with a
 // stubbed Supabase client, the same convention acct-read.test.mjs and CAS-740's own tests use.
+// CAS-1218: pushUserPrefsCols went from acctOp kind "update" to kind "upsert" (a load no longer bootstrap-
+// inserts the row of its own accord, so the first real column write has to be able to create it) — the fake
+// below follows that same single upsert(fields, opts) call, no .select() chain.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
 
 const E = loadEngine();
 
-// A minimal fake client that only ever serves acctOp "update" calls against ONE table
-// (update(fields).match(m).select()), replaying a queued sequence of errors (or null for success) — the
-// last entry repeats once the queue is exhausted, so a test can drive as many attempts as it needs from a
-// short list. A non-null error is a permanent (4xx) failure — acctOp never retries one, matching how a real
-// schema-cache error behaves.
+// A minimal fake client that only ever serves acctOp "upsert" calls against ONE table (upsert(fields, opts)),
+// replaying a queued sequence of errors (or null for success) — the last entry repeats once the queue is
+// exhausted, so a test can drive as many attempts as it needs from a short list. A non-null error is a
+// permanent (4xx) failure — acctOp never retries one, matching how a real schema-cache error behaves.
 function fakeUpsertClient(table, errQueue){
   let i = 0;
   return {
     from(t){
       assert.equal(t, table, `this fake only serves ${table}`);
-      const b = {
-        update(fields){ b._fields = fields; return b; },
-        match(m){ b._match = m; return b; },
-        select(){
+      return {
+        upsert(fields){
           const err = errQueue[Math.min(i, errQueue.length - 1)];
           i++;
-          const result = err ? { data: null, error: err, status: 400 } : { data: [b._fields], error: null, status: 200 };
+          const result = err ? { data: null, error: err, status: 400 } : { data: [fields], error: null, status: 200 };
           return { then(resolve, reject){ return Promise.resolve(result).then(resolve, reject); } };
         },
       };
-      return b;
     },
   };
 }

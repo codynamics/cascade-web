@@ -68,7 +68,7 @@ test("CAS-1180 AC1: a verdict film standing in Streaming shows there once its ow
     E.setOpinion(id, "enjoyed");
     E.watchHeldOpen.stream.clear();   // AC1: the held-this-visit hold is cleared — not what's on screen here
     E.setWatchTab("stream");
-    E.watchAgentOff.stream.clear();
+    E.watchAgentOff.clear();
     try {
       assert.ok(E.taggedOut(film), "setup: the film must carry a verdict");
       assert.equal(E.opinionOf(id), "enjoyed", "setup: the verdict must be enjoyed");
@@ -82,7 +82,7 @@ test("CAS-1180 AC1: a verdict film standing in Streaming shows there once its ow
       assert.ok(!visibleOn("stream").includes(id), "AC1: hidden again once the chip is switched back off");
     } finally {
       E.watchWatchedSel.stream.clear();
-      E.watchAgentOff.stream.clear();
+      E.watchAgentOff.clear();
       E.watchHeldOpen.stream.clear();
       E.setWatchTab(savedTab);
       E.setOpinion(id, "enjoyed");   // setOpinion's own on/off toggle — undoes the verdict before unplanting
@@ -100,8 +100,7 @@ test("CAS-1180 AC2: a verdict film standing in Rental belongs to Rental's rows, 
     const film = E.MOVIES.find(m => m.tmdb_id === id);
     E.setOpinion(id, "enjoyed");
     E.watchHeldOpen.rent.clear();
-    E.watchAgentOff.rent.clear();
-    E.watchAgentOff.stream.clear();
+    E.watchAgentOff.clear();
     try {
       assert.ok(E.filmMatchesWatchTab(film, "rent"), "AC2: belongs to Rental, the window it stands in now");
       assert.ok(!E.filmMatchesWatchTab(film, "stream"), "AC2: does not also belong to Streaming");
@@ -115,7 +114,7 @@ test("CAS-1180 AC2: a verdict film standing in Rental belongs to Rental's rows, 
       assert.ok(!E.watchScopeRows().some(m => m.tmdb_id === id), "AC2: never in Streaming's rows at all");
     } finally {
       E.watchWatchedSel.rent.clear();
-      E.watchAgentOff.rent.clear();
+      E.watchAgentOff.clear();
       E.watchHeldOpen.rent.clear();
       E.setWatchTab(savedTab);
       E.setOpinion(id, "enjoyed");
@@ -144,7 +143,7 @@ test("CAS-1180 Part D: watchSearchRows spans every tab/window and ignores Styles
     E.watchHeldOpen.stream.clear();
     E.setWatchTab("stream");
     E.watchGenreOff.stream.add((filmRental.genres || [])[0] || "Action");
-    E.watchAgentOff.stream.add(a.id);   // "Agents to include" narrowed to no agents at all on this tab
+    E.watchAgentOff.add(a.id);   // "Agents to include" narrowed to no agents at all on this tab
     try {
       assert.ok(!E.watchScopeRows().some(m => m.tmdb_id === idRental),
         "setup: the ordinary tab scope must exclude the Rental film from Streaming");
@@ -157,7 +156,7 @@ test("CAS-1180 Part D: watchSearchRows spans every tab/window and ignores Styles
       assert.ok(E.taggedOut(filmVerdict), "setup: the found film must actually carry a verdict");
     } finally {
       E.watchGenreOff.stream.clear();
-      E.watchAgentOff.stream.clear();
+      E.watchAgentOff.clear();
       E.watchHeldOpen.stream.clear();
       E.setWatchTab(savedTab);
       E.setOpinion(idVerdict, "enjoyed");

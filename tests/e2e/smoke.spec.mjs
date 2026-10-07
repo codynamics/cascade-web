@@ -374,7 +374,9 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   await finishFlow(page);
   await toListing(page);
 
-  await expect(page.locator(".wtabbtn", { hasText: "Premium" })).toHaveCount(0);
+  // CAS-1223: the old header tab strip (#watchTabs .wtabbtn) is gone — the stage line in #watchTop (one
+  // .stagestop per enabled window, same derivation off watchTabsNow()) replaced it.
+  await expect(page.locator(".stagestop", { hasText: "Premium" })).toHaveCount(0);
 
   await openWhereWhenScreen(page);
   await expect(page.locator(".osh", { hasText: "Service tracking" })).toBeVisible();
@@ -383,7 +385,7 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   await expect(premiumLane).toHaveClass(/on/);
   await closeWhereWhenScreen(page);
 
-  const premiumTab = page.locator(".wtabbtn", { hasText: "Premium" });
+  const premiumTab = page.locator(".stagestop", { hasText: "Premium" });
   await expect(premiumTab).toBeVisible();
 
   // CAS-1028: same live-catalogue coincidence as CAS-723's test below — today's whole catalogue carries only
@@ -419,7 +421,7 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
       showable: donor ? showable(donor) : null,
       admitted: donor ? !!(entry && entry.cascadeIds && entry.cascadeIds.length > 0) : null,
       cards: document.querySelectorAll("#groups .card").length,
-      premiumTab: Array.from(document.querySelectorAll(".wtabbtn")).some(el => el.textContent.includes("Premium")),
+      premiumTab: Array.from(document.querySelectorAll(".stagestop")).some(el => el.textContent.includes("Premium")),
     };
   });
   console.log(`CAS-1133 donor=${cas1133Diag.donorId ?? "NONE"} status=${cas1133Diag.status} showable=${cas1133Diag.showable} admitted=${cas1133Diag.admitted} cards=${cas1133Diag.cards} premiumTab=${cas1133Diag.premiumTab}`);
@@ -448,14 +450,14 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
     throw e;
   }
   const cardId = await premiumCard.getAttribute("id");
-  await page.locator(".wtabbtn", { hasText: "Streaming" }).click();
+  await page.locator(".stagestop", { hasText: "Streaming" }).click();
   await expect(page.locator(`#${cardId}`)).toHaveCount(0);
 
   await openWhereWhenScreen(page);
   await premiumLane.locator(".agwt", { hasText: "Track" }).click();
   await expect(premiumLane).not.toHaveClass(/on/);
   await closeWhereWhenScreen(page);
-  await expect(page.locator(".wtabbtn", { hasText: "Premium" })).toHaveCount(0);
+  await expect(page.locator(".stagestop", { hasText: "Premium" })).toHaveCount(0);
 });
 
 // CAS-723: c.kind retires — every agent now watches every window enabled in Where & when, with no cinema/
@@ -1023,7 +1025,9 @@ test("Watch Cinema tab leads with Upcoming; the Streaming tab does not (CAS-750)
   expect(cinemaFirst).toBe("upcoming");
 
   await trackAStreamingFilm(page);
-  await page.locator(".wtabbtn", { hasText: "Streaming" }).click();
+  // CAS-1223: the old header tab strip (#watchTabs .wtabbtn) is gone — "Streaming" is still its own single
+  // stop in the new stage line (#watchTop .stagestop).
+  await page.locator(".stagestop", { hasText: "Streaming" }).click();
   // CAS-753: "my services" defaults ON per tab, and this guest session never picks any — without turning it
   // off here, trackAStreamingFilm's own film is filtered straight back out and the tab never carries anything
   // to read a first group off (see disableMineOnlyOnCurrentTab's own comment above).
@@ -1033,47 +1037,10 @@ test("Watch Cinema tab leads with Upcoming; the Streaming tab does not (CAS-750)
   expect(streamFirst).not.toBe("upcoming");
 });
 
-// CAS-750 AC3: the jump bar is built from the sections the DOM actually holds (renderJumpBar's own
-// long-standing rule), so it has to keep tracking the groups' own order even after this ticket makes that
-// order tab-dependent rather than fixed — checked on both tabs rather than assumed from the source.
-// CAS-823: the rail's own element is now .nowstop, not .jchip (renderJumpBar's non-scrolling rewrite); the
-// Streaming tab's default is also narrowed to its own standing alone (Also-show starts empty), so it is no
-// longer guaranteed to carry more than one group the way Cinema's Upcoming+In cinema default always has.
-test("Watch jump bar entries follow the groups' own order, on both the Cinema and Streaming tabs (CAS-750)", async ({ page }) => {
-  await toShortlist(page, "cinema");
-  await finishFlow(page);
-  await toListing(page);
-
-  const readOrder = async () => ({
-    groupOrder: await page.locator("#groups .group").evaluateAll(gs => gs.map(g => g.dataset.g)),
-    jumpOrder: await page.locator("#jumpBar .nowstop").evaluateAll(chips => chips.map(c => c.dataset.jump)),
-  });
-
-  const cinema = await readOrder();
-  expect(cinema.groupOrder.length).toBeGreaterThan(1);
-  expect(cinema.jumpOrder).toEqual(cinema.groupOrder);
-
-  // CAS-897: see trackAStreamingFilm above — the Streaming tab has no default bucket, so it needs a
-  // tracked film before it carries anything to check order against.
-  await trackAStreamingFilm(page);
-  await page.locator(".wtabbtn", { hasText: "Streaming" }).click();
-  // CAS-753: "my services" defaults ON per tab, and this guest session never picks any — without turning it
-  // off here, trackAStreamingFilm's own film is filtered straight back out and the tab carries no group at
-  // all to check an order against (see disableMineOnlyOnCurrentTab's own comment above).
-  await disableMineOnlyOnCurrentTab(page);
-  await settleListing(page);
-  const stream = await readOrder();
-  expect(stream.groupOrder.length).toBeGreaterThan(0);
-  // CAS-1030: renderJumpBar hides the bar (and renders no .nowstop chips at all) once there are fewer than
-  // 2 groups — its own long-standing rule, confirmed in CI: a lone-standing Streaming tab (this section's
-  // own single tracked film, no default bucket) hit exactly that gate, so jumpOrder was legitimately []
-  // rather than a broken order. The order check only applies once there is an order to have.
-  if(stream.groupOrder.length > 1){
-    expect(stream.jumpOrder).toEqual(stream.groupOrder);
-  }else{
-    expect(stream.jumpOrder).toEqual([]);
-  }
-});
+// CAS-750 AC3's jump bar (#jumpBar/.nowstop) was the subject of a dedicated order-following test here. CAS-
+// 1223 removed the Now line from the Watch screen entirely (replaced by the stage line, which narrows the
+// list rather than jumping to a spot in it) — there is nothing left for that test to check, so it went with
+// the feature rather than being left to assert an empty locator.
 
 // CAS-1180: setOpinion() clears every Watch On rung the moment a verdict is given, so a watched film's
 // filmNotifyState(id).key is always empty — filmMatchesWatchTab used to key off that same (now-empty)
@@ -1086,7 +1053,7 @@ test("CAS-1180: a watched film shows as a stub when its own chip is on, and sear
   await finishFlow(page);
   await toListing(page);
   await trackAStreamingFilm(page);
-  await page.locator(".wtabbtn", { hasText: "Streaming" }).click();
+  await page.locator(".stagestop", { hasText: "Streaming" }).click();
   await disableMineOnlyOnCurrentTab(page);
   await settleListing(page);
 
@@ -1143,6 +1110,9 @@ test("CAS-1180: a watched film shows as a stub when its own chip is on, and sear
 
   const beforeSearchIds = await page.locator("#groups .card, #groups .stub").evaluateAll(els => els.map(el => el.id));
 
+  // CAS-1223: the search field is no longer in the tools row by default — tapping the search button swaps
+  // the row for it (openWatchSearch, unchanged underneath).
+  await page.locator("#watchTools #watchSearchBtn").click();
   const input = page.locator("#watchSearchInput");
   await expect(input).toHaveAttribute("placeholder", "Search all your films");
 

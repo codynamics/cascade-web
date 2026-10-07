@@ -271,6 +271,12 @@ alter table public.user_prefs drop constraint if exists user_prefs_display_name_
 alter table public.user_prefs add constraint user_prefs_display_name_check
   check (display_name is null or char_length(display_name) between 1 and 60);
 
+-- CAS-1220: per-account view state (selected occasion, selected agent, per-tab my-services-only,
+-- tutorial seen, review-prompt state, the Found list as last looked at) — same whole-object jsonb
+-- shape and NULL carry-up rule as taste/watch_windows/moving_seen/occasions above: NULL means "no
+-- device has saved this yet". Column only here; the app move is a separate ticket.
+alter table public.user_prefs add column if not exists view jsonb;
+
 alter table public.user_prefs enable row level security;
 
 drop policy if exists user_prefs_owner on public.user_prefs;

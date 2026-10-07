@@ -30,6 +30,14 @@ export function testEmail(tag){
   return `cas1093-${tag}-${Date.now()}-${seq}@integrity.test`;
 }
 
+/** CAS-1224: a fresh, never-reused ref_code per call — same reasoning as testEmail(), so a retry (which
+ * re-runs the whole test, seeding a new account) can never collide with a prior attempt's leftover row on
+ * the partial-unique user_prefs_ref_code_idx. */
+export function testRefCode(tag){
+  seq += 1;
+  return `${tag}-${Date.now()}-${seq}`;
+}
+
 /** A confirmed test user, created directly via the local admin API — no email round trip needed. */
 export async function createTestUser(email){
   const { data, error } = await admin.auth.admin.createUser({ email, email_confirm: true });
@@ -65,6 +73,77 @@ export async function liveNotifyPrefs(userId){
     .maybeSingle();
   if(error) throw new Error(`liveNotifyPrefs failed: ${error.message}`);
   return data;
+}
+
+/** CAS-1218: how many notify_prefs rows this account actually has — a plain count (not maybeSingle, which
+ * would itself error out on more than one row) so a test can assert "exactly one" survived a bootstrap race. */
+export async function countNotifyPrefsRows(userId){
+  const { data, error } = await admin.from("notify_prefs").select("user_id").eq("user_id", userId);
+  if(error) throw new Error(`countNotifyPrefsRows failed: ${error.message}`);
+  return data.length;
+}
+
+/** CAS-1218: seed a user_prefs row directly, bypassing the client entirely — the account-already-has-this
+ * baseline AC1/AC6 need so that boot/reconcile never has to bootstrap-insert anything of its own. */
+export async function seedUserPrefs(userId, fields){
+  const { error } = await admin.from("user_prefs").insert({ user_id: userId, ...fields });
+  if(error) throw new Error(`seedUserPrefs failed: ${error.message}`);
+}
+
+/** CAS-1218: seed a notify_prefs row directly, same reasoning as seedUserPrefs above. */
+export async function seedNotifyPrefs(userId, fields){
+  const { error } = await admin.from("notify_prefs").insert({ user_id: userId, ...fields });
+  if(error) throw new Error(`seedNotifyPrefs failed: ${error.message}`);
+}
+
+/** CAS-1218: seed one agent_films row directly — the one table AC3/AC4 assert a device may never overwrite
+ * real admission history on (admitted_at/admission_score are frozen the moment a film first admits). */
+export async function seedAgentFilm(userId, cascadeId, movieId, fields){
+  const { error } = await admin.from("agent_films")
+    .insert({ user_id: userId, cascade_id: cascadeId, movie_id: String(movieId), ...fields });
+  if(error) throw new Error(`seedAgentFilm failed: ${error.message}`);
+}
+
+/** The agent_films row currently on the server for this (cascade, movie), or null. */
+export async function liveAgentFilm(cascadeId, movieId){
+  const { data, error } = await admin.from("agent_films")
+    .select("admitted_at,admission_score,admission_status,agent_sig")
+    .eq("cascade_id", cascadeId).eq("movie_id", String(movieId))
+    .maybeSingle();
+  if(error) throw new Error(`liveAgentFilm failed: ${error.message}`);
+  return data;
+}
+
+/** CAS-1218: records every REST request (GET included) this page makes to the local stack for the rest of
+ * its life, each entry timestamped at request-start and again once its response actually lands — the
+ * primitive the server-first invariants assert against directly (real network traffic, not app-reported
+ * state) instead of trusting app code to say a write never happened. */
+export function recordRestRequests(page){
+  const prefix = SUPABASE_URL + "/rest/v1/";
+  const requests = [];
+  page.on("request", req => {
+    const url = req.url();
+    if(!url.startsWith(prefix)) return;
+    const table = url.slice(prefix.length).split("?")[0];
+    const entry = { method: req.method(), table, startedAt: Date.now(), finishedAt: null };
+    requests.push(entry);
+    req.response().then(() => { entry.finishedAt = Date.now(); }).catch(() => {});
+  });
+  return requests;
+}
+
+/** CAS-1224: usage_events and push_tokens are device telemetry, not account data — excluded only from the
+ * no-table-given ("did this write any account data at all") calls below, never from a call naming one of
+ * these tables directly. */
+const DEVICE_TELEMETRY_TABLES = ["usage_events", "push_tokens"];
+
+/** CAS-1218: every non-GET entry currently recorded by `requests` (as returned by recordRestRequests) for
+ * one table — the "a load/render/poll must never write" invariants' own assertion primitive. Reads live off
+ * the array each call, so it reflects whatever has actually happened by the time a test checks it. */
+export function restWrites(requests, table){
+  return requests.filter(r => r.method !== "GET" && (
+    table === undefined ? !DEVICE_TELEMETRY_TABLES.includes(r.table) : r.table === table
+  ));
 }
 
 /** The one-time code a real sign-in would have emailed — fetched via the admin API instead of standing up

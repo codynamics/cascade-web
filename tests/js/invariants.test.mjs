@@ -2667,7 +2667,7 @@ function withFilmVerdictState(fn){
   try { fn(); } finally { restore(); }
 }
 
-test("CAS-738 AC3: saveWatchStatus writes cascade_wow and cascade_enjoyed to localStorage while signed in", () => withFilmVerdictState(() => {
+test("CAS-1221: saveWatchStatus writes nothing to localStorage — wow/enjoyed verdicts are held in memory only", () => withFilmVerdictState(() => {
   signInWithClient({ from(){ return { upsert: async () => ({ error: null }) }; } });
   try {
     const wowId = 738001, enjoyedId = 738002;
@@ -2676,14 +2676,11 @@ test("CAS-738 AC3: saveWatchStatus writes cascade_wow and cascade_enjoyed to loc
 
     E.CascadePersistence.saveWatchStatus();
 
-    // CAS-1100: cascade_wow/cascade_enjoyed are plain, un-namespaced keys now (CAS-957's acctKey is
-    // retired — a real sign-out wipes them outright instead), so they're read back directly.
-    const storedWow = JSON.parse(E.localStorage.getItem("cascade_wow") || "[]");
-    const storedEnjoyed = JSON.parse(E.localStorage.getItem("cascade_enjoyed") || "[]");
-    assert.ok(storedWow.includes(wowId),
-      "cascade_wow must reach localStorage the instant saveWatchStatus runs, not only be scheduled for the account");
-    assert.ok(storedEnjoyed.includes(enjoyedId),
-      "cascade_enjoyed must reach localStorage the instant saveWatchStatus runs, not only be scheduled for the account");
+    // CAS-1221: there is no on-device mirror left at all — a verdict reaches the account only through
+    // pushFilmVerdict's own acctOp (CAS-738 AC4, below, proves filmRows()/applyFilmRows() still carry wow/
+    // enjoyed through that path).
+    assert.equal(E.localStorage.getItem("cascade_wow"), null, "cascade_wow must never reach localStorage");
+    assert.equal(E.localStorage.getItem("cascade_enjoyed"), null, "cascade_enjoyed must never reach localStorage");
   } finally {
     signOut();
   }
@@ -2856,7 +2853,9 @@ function fakeSingleRowTable(table, row){
     range(){ return b; },
     update(fields){ b._fields = fields; return b; },
     match(){ return b; },
-    upsert(rows){ b._fields = rows[0]; return b; },
+    // CAS-1218: acctOp's own "upsert" kind calls .upsert(fields, opts) with a single merged object
+    // (match + fields), never an array — unlike agent_films' upsert_many, which this fake never serves.
+    upsert(fields){ b._fields = fields; return b; },
     then(resolve, reject){
       let result;
       if(b._fields){
@@ -3665,6 +3664,11 @@ test("CAS-793 AC3/AC4: watchScopeRows admits a film under an occasion only when 
       pinFilm(id, nonOwner.id);
       E.recomputeFound();
       E.setWatchTab("in_cinema");
+      // CAS-1223: the Cinema tab now also narrows to whichever stage (Upcoming/In Cinema) is selected —
+      // pin it to match pickTabbedFilm()'s actual pick so this test's assertions are about ownership, not
+      // incidentally about which half of the stage split the film happens to fall in.
+      const savedStage = E.watchCinemaStage;
+      E.setWatchCinemaStage(E.primaryStatus(film) === "upcoming" ? "upcoming" : "in_cinema");
       try {
         assert.equal(E.filmOwnerCascade(film).id, owner.id, "setup: the lower-order pin must own the film");
         E.setWatchOccasion(occMe.id);
@@ -3675,6 +3679,7 @@ test("CAS-793 AC3/AC4: watchScopeRows admits a film under an occasion only when 
       } finally {
         E.setWatchOccasion(null);
         E.setWatchTab(savedTab);
+        E.setWatchCinemaStage(savedStage);
         delete E.notify[id];
       }
     });
@@ -3697,6 +3702,9 @@ test("CAS-793: unticking the owning agent in \"Agents to include\" removes the f
       E.recomputeFound();
       E.setWatchTab("in_cinema");
       E.setWatchOccasion(occ.id);
+      // CAS-1223: pin the stage to match pickTabbedFilm()'s actual pick — see the sibling CAS-793 test above.
+      const savedStage = E.watchCinemaStage;
+      E.setWatchCinemaStage(E.primaryStatus(film) === "upcoming" ? "upcoming" : "in_cinema");
       try {
         assert.equal(E.filmOwnerCascade(film).id, owner.id, "setup: the lower-order pin must own the film");
         assert.ok(E.watchScopeRows().some(m => m.tmdb_id === id), "setup: the film must reach the tab before any agent is unticked");
@@ -3706,6 +3714,7 @@ test("CAS-793: unticking the owning agent in \"Agents to include\" removes the f
         E.toggleWatchAgent(owner.id);   // re-tick, restoring watchAgentOff to its prior (empty) state
         E.setWatchOccasion(null);
         E.setWatchTab(savedTab);
+        E.setWatchCinemaStage(savedStage);
         delete E.notify[id];
       }
     });

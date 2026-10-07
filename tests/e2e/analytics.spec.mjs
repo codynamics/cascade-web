@@ -98,7 +98,9 @@ test("CAS-941: switching Watch tab logs watch_tab; re-tapping the active tab log
   await toListing(page);
 
   const fromTab = await page.evaluate(() => watchTab);
-  const streamBtn = page.locator("#watchTabs .wtabbtn", { hasText: "Streaming" });
+  // CAS-1223: the old header tab strip (#watchTabs .wtabbtn) is gone — the stage line in #watchTop replaced
+  // it; "Streaming" is still its own single stop there (only the Cinema tab split into Upcoming/In Cinema).
+  const streamBtn = page.locator("#watchTop .stagestop", { hasText: "Streaming" });
   await expect(streamBtn).toBeVisible();
 
   await streamBtn.click();
