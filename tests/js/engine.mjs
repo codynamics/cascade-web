@@ -372,6 +372,14 @@ if(typeof window.CascadeAuth === "undefined"){
   // lookup and the occasion pool test directly rather than scraping rendered headings. agentChipHTML is the
   // one DOM-free render helper worth exporting here too, so a test can assert the chip's own name/HTML.
   filmOwnerCascade, filmOwnerOrder, splitByOwner, watchScopeRows, agentChipHTML,
+  // CAS-1226: filmInWatchRows (fastPatchFindRow's own single-card membership test, same agent-off rule as
+  // watchScopeRows applied per-film) — exported so a test can assert the two agree rather than only testing
+  // watchScopeRows and trusting the comment that says they match. watchTopAgentsRanked is renderWatchTop's
+  // own agent order with the "+N more" overflow slice gone — exported so a test can assert "every agent
+  // shows" without the DOM write the harness below can't capture. watchFiltersActiveCount is the Filters
+  // badge's own count, pulled out of renderWatchSheet for the same DOM-write reason — a test can assert
+  // switching an agent off no longer moves it.
+  filmInWatchRows, watchTopAgentsRanked, watchFiltersActiveCount,
   // CAS-819: listingGroups reads sortPicked (the Watch bar's own #sort control) — exposed through a
   // get/set-over-a-let shape so a test can drive it the way #sort's own onchange does. ymSort itself
   // (Your Movies' own sort control) went with the rest of the retired watch-list model in CAS-863.
