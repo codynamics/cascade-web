@@ -1275,10 +1275,10 @@
   .tt.sub{background:rgba(72,199,142,.16);color:#a7eccb} .tt.free{background:rgba(72,199,142,.16);color:#a7eccb}
   .tt.rent{background:rgba(90,169,240,.16);color:#bcdcff} .tt.buy{background:rgba(164,134,240,.16);color:#d3c2ff}
   /* ---- empty states: never a dead end ---- */
-  .empty{color:var(--dim);text-align:center;padding:34px 18px 40px;font-size:14px}
-  .empty .emoji{font-size:30px;margin-bottom:10px}
-  .empty .eh{font-size:15px;font-weight:800;color:var(--ink);line-height:1.35;margin-bottom:7px}
-  .empty .ep{font-size:13.5px;color:var(--dim);line-height:1.6;max-width:330px;margin:0 auto}
+  .empty,.acctloading{color:var(--dim);text-align:center;padding:34px 18px 40px;font-size:14px}
+  .empty .emoji,.acctloading .emoji{font-size:30px;margin-bottom:10px}
+  .empty .eh,.acctloading .eh{font-size:15px;font-weight:800;color:var(--ink);line-height:1.35;margin-bottom:7px}
+  .empty .ep,.acctloading .ep{font-size:13.5px;color:var(--dim);line-height:1.6;max-width:330px;margin:0 auto}
   .ebtns{display:flex;flex-direction:column;gap:7px;margin:14px auto 0;max-width:330px}
   .ebtn{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:11px;
     padding:11px 12px;font-size:12.5px;font-weight:700;cursor:pointer;text-align:left;
@@ -19367,9 +19367,39 @@ function listingGroups(rows, ac){
     })
     .filter(x=>x.items.length);
 }
+// CAS-1219 Change 4: true once every account-data load this session's own boot/sign-in fan-out owns has
+// actually settled. A guest device (or an account whose fan-out already resolved) is always settled —
+// nothing left to wait on. cascadesReady alone decides at the very first boot paint (render() below is
+// called once before the account-store IIFE — and so window.CascadePersistence — even exists); once it
+// does, every load fireAccountFanout starts must also have resolved before render() may draw an agent
+// name or a film count off cascades/agent_films/film_watch/user_prefs — otherwise it would still be this
+// device's stale local cache, not the account's real answer.
+function accountFanoutSettled(){
+  if(!cascadesReady) return false;
+  const cp = window.CascadePersistence;
+  if(!cp || !cp.accountActive()) return true;
+  return cp.filmWatchReady && cp.agentFilmsReady && cp.userPrefsReady;
+}
+// CAS-1219 Change 4: the loading state render() shows instead of a device-authored agent name or film
+// count, for the same span accountFanoutSettled() above covers. Deliberately NOT .empty/.emptyres (every
+// other empty state in this file) — tests/e2e*/helpers.mjs's settleListing() treats either of those
+// classes as "the listing has settled", and this state is the opposite of settled.
+function accountLoadingHTML(){
+  return `<div class="acctloading">
+    <div class="emoji">⏳</div>
+    <div class="eh">Loading your account…</div>
+    <div class="ep">Hang on while we load your agents and films.</div>
+  </div>`;
+}
 function render(){
   renderGen++;   // CAS-129: supersede any card-fill still streaming from a previous render
   const myGen=renderGen;   // CAS-421: only THIS render may lift the blur it didn't set
+  if(!accountFanoutSettled()){
+    $("groups").innerHTML = accountLoadingHTML();
+    renderJumpBar();
+    syncHeaderHeight();
+    return;
+  }
   // The re-run. Every paint re-selects each Cascade's auto set from scratch and re-applies your overrides on
   // top — so a criteria edit, a new Cascade, a deleted one, a film you just marked watched, a service you just
   // picked, all land in the Found list immediately, and none of them can clobber an override. It's cheap
@@ -20810,20 +20840,39 @@ else if(dedupedN)
     // catalogue, so this runs unconditionally rather than behind the accountActive() gate.
     pollCatalogue();
     if(!accountActive()) return;
-    // CAS-1096/CAS-1109/CAS-1217: user_films/film_watch/film_picks still have no reconcile left to run
-    // here — every write to them is immediate (acctOp), so there is nothing background convergence would
-    // still need to pull. cascades is no longer in that list: two devices each holding their own `cascades`
-    // UI array (not just the shared acctStore mirror) only converged on a cold start or sign-in before this,
-    // so an edit made elsewhere could sit unseen for a whole open session. See reconcileCascadesOnReturn,
+    // CAS-1217: two devices each holding their own `cascades` UI array (not just the shared acctStore
+    // mirror) only converged on a cold start or sign-in before that ticket — see reconcileCascadesOnReturn,
     // just below.
     reconcileCascadesOnReturn();
-    // CAS-561: taste/watch_windows only pulled the account's answer on sign-in/boot before this —
+    // CAS-561/CAS-1095: taste/watch_windows only pulled the account's answer on sign-in/boot before this —
     // a tab left open across a change on another device stayed on its stale baseline until reloaded.
-    // CAS-1095: guarded on the acctOp queue holding no still-unsent user_prefs write, the same reasoning
-    // as !upTimer used to cover — a pull can't land on top of an edit this device made that hasn't
-    // reached the account yet.
+    // Guarded on the acctOp queue holding no still-unsent write of that type, the same reasoning as !upTimer
+    // used to cover — a pull can't land on top of an edit this device made that hasn't reached the account
+    // yet. CAS-1219: every other account data type gets the same treatment now — verdicts (user_films),
+    // Watch On and pins (film_watch/film_picks), notify prefs and the admission ledger (agent_films) were
+    // the "no reconcile left to run" list the comment removed above used to name; a device left open across
+    // a change made elsewhere could sit unseen for a whole session until this.
     const acctStore = window.CascadeAccountStore;
-    if(!acctStore || !acctStore.queue.some(op => op.table==="user_prefs")) loadUserPrefs();
+    const noUnsentWrite = table => !acctStore || !acctStore.queue.some(op => op.table===table);
+    if(noUnsentWrite("user_prefs")) loadUserPrefs();
+    if(noUnsentWrite("user_films")) loadAccountFilms();
+    // film_watch's own load clears the WHOLE shared `notify` object before applying (clearAccountNotify,
+    // fired synchronously ahead of either async apply — see its own comment). Gated on film_picks too, or
+    // that clear would wipe a still-unsent pin/pick out of memory before loadFilmPicks ever got a chance to
+    // re-apply it — the same hazard reconcileCascadesOnReturn's own re-check-after-await guards against.
+    if(noUnsentWrite("film_watch") && noUnsentWrite("film_picks")) loadFilmWatches();
+    if(noUnsentWrite("film_picks")) loadFilmPicks();
+    if(noUnsentWrite("notify_prefs")) loadNotifyPrefs();
+    // CAS-1097: agent_films is never deleted and a push only ever happens once per (cascade,movie) — but an
+    // admission made on another device still needs to arrive here. applyAgentFilmRows replaces the whole
+    // local ledger wholesale and (unlike loadAccountFilms/loadFilmWatches/loadFilmPicks above) draws no
+    // repaint of its own, so this re-renders once the pull actually lands.
+    if(noUnsentWrite("agent_films")) loadAgentFilms().then(()=>{ if(typeof render==="function") render(); });
+    // Invites and friends carry no acctOp queue entry of their own — every write to either is an immediate
+    // RPC/insert, not a queued op — so there is nothing to guard and no risk of landing on top of an unsent
+    // edit; safe to re-pull unconditionally, same as loadRealAlerts below.
+    loadInvites();
+    loadFriends();
     // CAS-487: there is no push channel on web, so nothing else ever refreshes the ledger —
     // without this, an open tab's Moving badge is frozen at whatever it was on load.
     loadRealAlerts();
@@ -21590,11 +21639,15 @@ else if(dedupedN)
     setTo(prefs.sub, row.sub_services||[]);
     setTo(prefs.store, row.store_services||[]);
     prefs.on = !!row.services_only;
-    if(row.taste && typeof row.taste==="object" && Object.keys(row.taste).length){
+    // CAS-1219: an empty `{}` IS a real answer — "the account cleared its last entry" — same as the
+    // occasions array below; only a genuinely absent/non-object column (no device has saved under this
+    // column yet) is left alone. Dropping the old Object.keys(...).length check is the actual fix: that
+    // check used to read a genuine clear as "unanswered" and silently keep this device's stale value.
+    if(row.taste && typeof row.taste==="object"){
       tasteBase = {...baseDefaults(), ...row.taste};
       saveTasteBaseLocal();
     }
-    if(row.watch_windows && typeof row.watch_windows==="object" && Object.keys(row.watch_windows).length){
+    if(row.watch_windows && typeof row.watch_windows==="object"){
       watchPrefs = {...watchPrefsDefaults(), ...migrateWatch(row.watch_windows)};
       saveWatchPrefsLocal();
       applyWatchPrefsToCascades();   // CAS-1218: a load only derives display state, never saves
@@ -21609,13 +21662,14 @@ else if(dedupedN)
     if(typeof row.onb_depth==="string" && row.onb_depth){ onb.depth=row.onb_depth; onbChanged=true; }
     if(onbChanged) onbAnswersSaveLocal(onb);
     if(row.framing===true || row.framing===false){ if(ux.on!==row.framing){ ux.on=row.framing; saveUxLocal(); } }
-    if(row.moving_seen && typeof row.moving_seen==="object" && Object.keys(row.moving_seen).length){
+    // CAS-1219: same "empty IS a real answer" fix as taste/watch_windows above.
+    if(row.moving_seen && typeof row.moving_seen==="object"){
       Object.keys(movingSeen).forEach(k=>delete movingSeen[k]);
       Object.assign(movingSeen, row.moving_seen);
       saveMovingSeenLocal();
     }
-    // CAS-775: unlike taste/watch_windows/moving_seen above, an empty array IS a real answer here — only a
-    // genuinely absent/non-array column (no device has saved under this column yet) is left alone.
+    // CAS-775: an empty array IS a real answer here too — only a genuinely absent/non-array column (no
+    // device has saved under this column yet) is left alone.
     if(Array.isArray(row.occasions)){
       occasionReg.length=0;
       row.occasions.filter(o=>o && typeof o.id==="string" && typeof o.name==="string").forEach(o=>occasionReg.push(o));
