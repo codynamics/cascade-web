@@ -5,7 +5,7 @@
 // only breaks the write count while nothing shows on screen is exactly what this suite exists to catch.
 import { test, expect } from "@playwright/test";
 import {
-  admin, createTestUser, seedCascades, testEmail, countNotifyPrefsRows,
+  admin, createTestUser, seedCascades, testEmail, testRefCode, countNotifyPrefsRows,
   seedUserPrefs, seedNotifyPrefs, seedAgentFilm, liveAgentFilm, recordRestRequests, restWrites,
   gotoIntegrityFresh, signInFromSplash,
 } from "./helpers.mjs";
@@ -25,7 +25,7 @@ test("AC1: a clean load, five reconciles and opening Watch/Agents/Find/Settings 
   const user = await createTestUser(email);
   await seedCascades(user.id, [{ name: "AC1 agent A" }, { name: "AC1 agent B" }, { name: "AC1 agent C" }]);
   await seedUserPrefs(user.id, {
-    ref_code: "CAS1218AC1",
+    ref_code: testRefCode("CAS1218AC1"),
     watch_windows: { upcoming: { list: true }, in_cinema: { list: true }, rent: { list: true }, stream: { list: true } },
   });
   await seedNotifyPrefs(user.id, { in_app: true, email_on: true, email_address: email });

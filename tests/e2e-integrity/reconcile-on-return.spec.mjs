@@ -6,7 +6,7 @@
 // account-integrity.spec.mjs/server-first.spec.mjs.
 import { test, expect } from "@playwright/test";
 import {
-  admin, createTestUser, seedCascades, seedUserPrefs, seedNotifyPrefs, testEmail,
+  admin, createTestUser, seedCascades, seedUserPrefs, seedNotifyPrefs, testEmail, testRefCode,
   recordRestRequests, restWrites, gotoIntegrityFresh, signInFromSplash,
 } from "./helpers.mjs";
 import { settleListing } from "../e2e/helpers.mjs";
@@ -141,7 +141,7 @@ test("AC2: an emptied taste object on the server is adopted by reconcileOnReturn
   const email = testEmail("cas1219-ac2");
   const user = await createTestUser(email);
   await seedCascades(user.id, [{ name: "AC2 agent" }]);
-  await seedUserPrefs(user.id, { ref_code: "CAS1219AC2", taste: { langs: ["fr"] } });
+  await seedUserPrefs(user.id, { ref_code: testRefCode("CAS1219AC2"), taste: { langs: ["fr"] } });
 
   await gotoIntegrityFresh(page);
   await signInFromSplash(page, email);
@@ -200,7 +200,7 @@ test("AC4/AC5: a delayed boot shows the loading state (never this device's stale
   const user = await createTestUser(email);
   const [agent] = await seedCascades(user.id, [{ name: "AC45 Distinct Agent",
     criteria: { watchMarkers: { stream: 70 }, status: ["included_streaming"], kind: "stream" } }]);
-  await seedUserPrefs(user.id, { ref_code: "CAS1219AC45" });
+  await seedUserPrefs(user.id, { ref_code: testRefCode("CAS1219AC45") });
   await seedNotifyPrefs(user.id, { in_app: true, email_on: true, email_address: email });
 
   // A clean boot first, so the account load genuinely ran once before this device "reboots".

@@ -20713,6 +20713,12 @@ else if(dedupedN)
     // anything. A table whose own load fails still leaves acctTableFail latched for it (see acctRead),
     // which the sync side already gates on, so a failed load here still means zero writes to that table.
     await allLoads;
+    // CAS-1224: loadUserPrefs() only derives watch-window status onto whatever cascades already existed
+    // at ITS OWN resolution — independently timed against loadAccount() in the Promise.allSettled above —
+    // so cascades landing after it never get a window at all. A pure recompute (CAS-1218: never a write by
+    // itself), safe to repeat here now that every load this fan-out owns has actually settled.
+    applyWatchPrefsToCascades();
+    if(typeof render==="function") render();
     // CAS-1035 AC2 (CAS-1100: the old outbox-replay wrapper is retired — acctOp's own persisted queue is
     // this device's only durability story left, so sending the queue directly IS the whole job now):
     // resend anything still queued from before this boot, now that every load above has had its chance to
@@ -21291,6 +21297,12 @@ else if(dedupedN)
   // at a time — the same few requests as before, just sent one at a time instead of all enqueued at once.
   async function flushAgentFilmPushes(){
     agentFilmPushFlushTimer = null;
+    // CAS-1224: pushAgentFilmAdmission already checks agentFilmsReady before queuing, but this flush is a
+    // separate macrotask (setTimeout 0) from that queuing call — a fan-out that starts (and flips this
+    // false) in the gap between the two still reaches here with something already queued. Retry rather
+    // than send: nothing here is lost either way, but sending now would be exactly the early write AC4/AC5
+    // exists to catch.
+    if(!agentFilmsReady){ agentFilmPushFlushTimer = setTimeout(flushAgentFilmPushes, 50); return; }
     const pending = [...pendingAgentFilmPushes.values()];
     pendingAgentFilmPushes.clear();
     if(!window.CascadeAccountStore || !pending.length) return;

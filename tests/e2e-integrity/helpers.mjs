@@ -30,6 +30,14 @@ export function testEmail(tag){
   return `cas1093-${tag}-${Date.now()}-${seq}@integrity.test`;
 }
 
+/** CAS-1224: a fresh, never-reused ref_code per call — same reasoning as testEmail(), so a retry (which
+ * re-runs the whole test, seeding a new account) can never collide with a prior attempt's leftover row on
+ * the partial-unique user_prefs_ref_code_idx. */
+export function testRefCode(tag){
+  seq += 1;
+  return `${tag}-${Date.now()}-${seq}`;
+}
+
 /** A confirmed test user, created directly via the local admin API — no email round trip needed. */
 export async function createTestUser(email){
   const { data, error } = await admin.auth.admin.createUser({ email, email_confirm: true });
@@ -124,11 +132,18 @@ export function recordRestRequests(page){
   return requests;
 }
 
+/** CAS-1224: usage_events and push_tokens are device telemetry, not account data — excluded only from the
+ * no-table-given ("did this write any account data at all") calls below, never from a call naming one of
+ * these tables directly. */
+const DEVICE_TELEMETRY_TABLES = ["usage_events", "push_tokens"];
+
 /** CAS-1218: every non-GET entry currently recorded by `requests` (as returned by recordRestRequests) for
  * one table — the "a load/render/poll must never write" invariants' own assertion primitive. Reads live off
  * the array each call, so it reflects whatever has actually happened by the time a test checks it. */
 export function restWrites(requests, table){
-  return requests.filter(r => r.method !== "GET" && (table === undefined || r.table === table));
+  return requests.filter(r => r.method !== "GET" && (
+    table === undefined ? !DEVICE_TELEMETRY_TABLES.includes(r.table) : r.table === table
+  ));
 }
 
 /** The one-time code a real sign-in would have emailed — fetched via the admin API instead of standing up
