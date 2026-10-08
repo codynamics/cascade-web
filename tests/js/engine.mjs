@@ -305,6 +305,16 @@ if(typeof window.CascadeAuth === "undefined"){
   // editor's own ymCascOff/ymCascToggle/leOpen scratch state) is retired.
   emptyResultsHTML,
   get activeIds(){ return activeIds; },
+  // CAS-1222: activeId/setActive — the single-select chokepoint itself, and the id it leaves selected —
+  // exported so a test can drive a real selection and assert the view-field push it issues, rather than
+  // only reading the resulting array.
+  get activeId(){ return activeId; },
+  setActive,
+  // CAS-1222: agentState (the onboarding invite draft, cascade_agent before this ticket) — a plain mutable
+  // object, never reassigned, exported by reference like cascades/occasionReg elsewhere in this file.
+  // tutorialSeen/markTutorialSeen are plain top-level functions, exported directly like reviewPromptEligible
+  // and friends below.
+  agentState, tutorialSeen, markTutorialSeen,
   // CAS-667: movingData is wire-adjacent (it reads window.CascadePersistence.accountActive()) but its
   // row-selection arithmetic is exactly the kind of decision this harness exists to test. realAlerts and
   // firstFound are exposed by reference (mutated via push, never reassigned, in test use) so a test can seed

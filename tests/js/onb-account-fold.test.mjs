@@ -100,8 +100,16 @@ test("CAS-1099 AC1: completing membership issues exactly one complete_membership
   const outcome = await E.membCompleteNewMembership();
 
   assert.equal(outcome, "created");
-  assert.deepEqual(client.rpcCalls.map(c => c.name), ["complete_membership"],
-    "exactly one complete_membership call — no other rpc");
+  // CAS-1222: finishing onboarding lands you on the first agent you just built — a real, deliberate
+  // consequence of THIS user action (same setActive() chokepoint a rail tap drives), not a load/render
+  // side effect — so completing membership now ALSO carries that selection onto the account, as two
+  // merge_user_prefs_view rpc calls (active, activeMulti) behind the one complete_membership call. What
+  // this AC actually guards against — a direct insert/upsert to cascades/user_prefs/notify_prefs bypassing
+  // the one RPC — is asserted below instead of a literal rpc-call allowlist.
+  const rpcNames = client.rpcCalls.map(c => c.name);
+  assert.equal(rpcNames[0], "complete_membership", "the first and only membership call must be complete_membership");
+  assert.deepEqual(rpcNames.slice(1).sort(), ["merge_user_prefs_view", "merge_user_prefs_view"],
+    "the only other calls allowed are the two view-field pushes landing on the first agent");
   assert.equal(client.writes.cascades.length, 0, "no direct insert/upsert to cascades");
   assert.equal(client.writes.user_prefs.length, 0, "no direct insert/upsert to user_prefs");
   assert.equal(client.writes.notify_prefs.length, 0, "no direct insert/upsert to notify_prefs");
