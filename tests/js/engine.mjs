@@ -194,7 +194,14 @@ if(typeof window.CascadeAuth === "undefined"){
   // total/coverage, "worth adding" ranking) — exported so a test can drive them against a controlled
   // population rather than the DOM they normally render into.
   serviceAdvice, svcAdviceFilms,
-  SUB_SERVICES, STORE_SERVICES, stageDate, curSlot, cinemaState, EST_OFFSET, TODAY,
+  SUB_SERVICES, STORE_SERVICES, stageDate, curSlot, cinemaState, EST_OFFSET,
+  // CAS-1232: TODAY exposed as a getter (was a plain value) so setToday's reassignment is visible
+  // to a caller reading it back; setToday is the same clock-advance a real device's pollCatalogue
+  // does (advanceClock: reassign TODAY, re-derive every film's status, drop the compute caches) —
+  // scripts/scoreable_shim.mjs uses it to judge scoreability as of an explicit date instead of this
+  // process's own wall clock.
+  get TODAY(){ return TODAY; },
+  setToday(v){ TODAY = v; rederiveStatuses(); invalidateComputeCaches(); },
   inCinemaRun, CINEMA_RUN_DAYS, LISTING_ORDER, orderFor, listingOrder,
   // CAS-702: the one default-sort constant, and the raw comparator dispatch, so a test can assert the
   // rendered order against an independently-run comparator rather than re-deriving sortForKey's branches.

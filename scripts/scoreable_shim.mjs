@@ -6,12 +6,20 @@
 // monitor/admit_shim.mjs (CAS-825) already established: writing a second copy of this rule in
 // Python is the defect CAS-986 exists to avoid, so this file is a thin pipe, not a reimplementation.
 //
-// Request shape:  { "movies": [ <movie dict>, ... ], "floor": <int, optional, default 0> }
+// Request shape:  { "movies": [ <movie dict>, ... ], "floor": <int, optional, default 0>,
+//                    "today": <"YYYY-MM-DD", optional> }
 // Response shape: { "scoreable_ids": [ <tmdb_id>, ... ] }
 //
 // CAS-997: `floor` is the Cascade-score publication floor — poc_pipeline.py passes its
 // WM_PUBLISH_FLOOR (default 60) here. Defaulting to 0 when omitted keeps this shim's own
 // existing callers/tests (none of which name a floor) on the pre-CAS-997 unfloored rule.
+//
+// CAS-1232: `today` pins the engine's notion of "today" (isScoreable's deriveStatus/primaryStatus
+// re-derivation, e.g. the cinema-estimate-window check) to an explicit date instead of this
+// process's own wall clock/timezone — poc_pipeline.py's publication path passes the catalogue's
+// own build date, so a film doesn't cross WM_PUBLISH_FLOOR between refreshes purely because the
+// CI runner's clock ticked over. Omitted entirely, every existing caller (including
+// wm_scoreable_manifest.mjs's own CAS-922 manifest build) keeps asking against the real date.
 import { loadEngine } from "../tests/js/engine.mjs";
 import { isScoreable } from "./wm_scoreable_manifest.mjs";
 
@@ -30,6 +38,7 @@ async function main(){
   const E = loadEngine();
   const movies = req.movies || [];
   const floor = req.floor || 0;
+  if (req.today) E.setToday(req.today);
   let failed = 0;
   const scoreable_ids = movies.filter(m => {
     try {
