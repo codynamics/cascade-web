@@ -1432,7 +1432,7 @@ def run_scoreability_probe(candidates: dict, today: datetime.date, budget: int,
     return probe_candidates(candidates, today, budget, wm_idmap, published_ids, tv_tmdb_ids)
 
 
-def scoreable_ids(movies: list, floor: int = 0) -> set:
+def scoreable_ids(movies: list, floor: int = 0, today: str | None = None) -> set:
     """CAS-986's publication test: ask the shipped engine (scripts/scoreable_shim.mjs, which calls
     isScoreable() — the same rule scripts/wm_scoreable_manifest.mjs already encodes for CAS-922)
     which of `movies` can carry a Cascade score today. One process for the whole batch, never per
@@ -1443,6 +1443,13 @@ def scoreable_ids(movies: list, floor: int = 0) -> set:
     (apply_two_tier_publication) passes WM_PUBLISH_FLOOR explicitly; every other caller is
     unaffected unless it opts in.
 
+    CAS-1232: `today` (an ISO date) pins the engine's own notion of "today" instead of leaving it
+    to the subprocess's wall clock/timezone — omitted (the default), the shim asks against the
+    real date exactly as before. The publication path passes the catalogue's own build date so a
+    title's scoreability can't flip between refreshes just because the clock ticked over; the gate
+    test (tests/test_data_quality.py) passes the committed catalogue's own `generated` stamp for
+    the same reason.
+
     CAS-992: a candidate with no `status` (a shape gap in a legacy/pre-fix candidates.json entry —
     the shim itself is also hardened to never let one bad record fail the whole batch) is
     normalised to `status: []` here, in place, before the call — `primaryStatus()` indexes into
@@ -1450,8 +1457,10 @@ def scoreable_ids(movies: list, floor: int = 0) -> set:
     for m in movies:
         if m.get("status") is None:
             m["status"] = []
-    payload = json.dumps({"movies": movies, "floor": floor})
-    proc = subprocess.run(["node", SCOREABLE_SHIM], input=payload, capture_output=True,
+    request = {"movies": movies, "floor": floor}
+    if today:
+        request["today"] = today
+    proc = subprocess.run(["node", SCOREABLE_SHIM], input=json.dumps(request), capture_output=True,
                           text=True, timeout=180, check=True)
     return {int(x) for x in json.loads(proc.stdout)["scoreable_ids"]}
 
@@ -1573,27 +1582,39 @@ def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery
     probe_outcomes = run_scoreability_probe(candidates, today, probe_budget, previously_published_ids)
 
     try:
-        engine_ids = scoreable_ids(list(candidates.values()), floor=WM_PUBLISH_FLOOR)
+        engine_ids = scoreable_ids(list(candidates.values()), floor=WM_PUBLISH_FLOOR, today=today_iso)
+        tomorrow_iso = (today + datetime.timedelta(days=1)).isoformat()
+        engine_ids_tomorrow = scoreable_ids(list(candidates.values()), floor=WM_PUBLISH_FLOOR,
+                                            today=tomorrow_iso)
         engine_ok = True
     except Exception as err:  # noqa: BLE001 — a broken engine call must never wipe the catalogue
         print(f"[warn] CAS-986: scoreability engine call failed ({err}) — publishing the "
               "previously-published set unchanged this run.")
         engine_ids = set(previously_published_ids)
+        engine_ids_tomorrow = engine_ids
         engine_ok = False
 
-    # CAS-1027: a candidate the engine calls scoreable today may still be a raw candidate-pool
-    # stub (CAS-991's merge_backcatalogue_candidates, or any other thin source) — give it the same
-    # TMDB enrichment any other published title carries before select_publishable's own guard
-    # (is_publishable_record) decides membership. No Watchmode credits spent; an already-enriched
-    # candidate is left untouched.
-    enrich_stats = enrich_candidates_for_publication(candidates, engine_ids, today)
+    # CAS-1232: a non-held title must clear WM_PUBLISH_FLOOR both today AND tomorrow (UTC) to stay
+    # eligible on engine grounds — one that clears today but is already known to decay below the
+    # floor before the next daily refresh must not publish only to be torn down a day later with
+    # no code change (the "gate goes red on its own" shape this exists to stop). Held titles are
+    # unaffected: select_publishable/revalidate_published_floor's own held-id exemption is a
+    # separate OR branch, evaluated independently of this set.
+    stable_engine_ids = engine_ids & engine_ids_tomorrow
 
-    published_records, stats = select_publishable(candidates, engine_ids, previously_published_ids,
+    # CAS-1027: a candidate the engine calls scoreable today (and tomorrow) may still be a raw
+    # candidate-pool stub (CAS-991's merge_backcatalogue_candidates, or any other thin source) —
+    # give it the same TMDB enrichment any other published title carries before select_publishable's
+    # own guard (is_publishable_record) decides membership. No Watchmode credits spent; an already-
+    # enriched candidate is left untouched.
+    enrich_stats = enrich_candidates_for_publication(candidates, stable_engine_ids, today)
+
+    published_records, stats = select_publishable(candidates, stable_engine_ids, previously_published_ids,
                                                    held_ids, CATALOGUE_TARGET)
     # CAS-1105: a final safety net, independent of how each record's status got here — catches a
     # title left published by any path (including a one-off correction script) that never called
     # select_publishable itself to re-decide membership.
-    published_records, floor_dropped = revalidate_published_floor(published_records, engine_ids, held_ids)
+    published_records, floor_dropped = revalidate_published_floor(published_records, stable_engine_ids, held_ids)
     if floor_dropped:
         stats["demoted"] += floor_dropped
         stats["published"] -= floor_dropped

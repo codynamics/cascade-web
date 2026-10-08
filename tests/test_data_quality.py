@@ -399,17 +399,25 @@ class OnlyFloorQualifyingTitlesPublish(unittest.TestCase):
     exempt, everything else needs wmQScore >= the floor). Runs the same real engine call
     apply_two_tier_publication itself makes (poc_pipeline.scoreable_ids -> scripts/
     scoreable_shim.mjs -> isScoreable) against the whole published catalogue, so a regression that
-    republishes a below-floor title is caught here rather than assumed from the pipeline's intent."""
+    republishes a below-floor title is caught here rather than assumed from the pipeline's intent.
+
+    CAS-1232: judged as of the catalogue's OWN build date (this file's "generated" stamp), never
+    the test runner's wall clock/timezone — a film's score decays with time, so between daily
+    refreshes a title can cross below the floor on its own with no code change, which used to turn
+    this gate red for a reason that was never a regression (see that ticket's own proof)."""
 
     @classmethod
     def setUpClass(cls):
-        cls.movies = load()["movies"]
+        cls.doc = load()
+        cls.movies = cls.doc["movies"]
 
     def test_every_published_film_clears_the_publish_floor(self):
         # CAS-1067: a below-floor title can stay published indefinitely by design when a user
         # holds state on it (select_publishable's own held_ids exemption) — encode that same
         # exemption, from the same source of truth, rather than treating it as an offender.
-        scoreable = pp.scoreable_ids(self.movies, floor=pp.WM_PUBLISH_FLOOR)
+        today = parse_date(self.doc.get("generated"))
+        scoreable = pp.scoreable_ids(self.movies, floor=pp.WM_PUBLISH_FLOOR,
+                                     today=today.isoformat() if today else None)
         held_ids = pp.load_user_held_ids()
         offenders = [m.get("title", m.get("tmdb_id")) for m in self.movies
                     if m["tmdb_id"] not in scoreable
