@@ -16900,9 +16900,6 @@ function briefNewAgent(){
 function briefCommit(){
   draft = onbApply();
   const {c} = commitDraft();
-  // CAS-1229: an agent's own criteria changing isn't one of watchNavKey()'s five things, but it must still
-  // land in the Watch list immediately — this is the one explicit exception decision 3 doesn't name.
-  markWatchNavigated();
   showFoundList(); render();
   logEvent("briefing_saved",{id:c.id, matches:watchCount(c)});
 }
@@ -16917,7 +16914,6 @@ window.briefDelete=()=>{
   // was just deleted, so there is nothing left to commit it TO. Clear the draft first, or commitDraft's
   // Object.assign would throw reaching for a deck entry that's gone.
   onbFlow.draft=null;
-  markWatchNavigated();   // CAS-1229: a deleted agent's films must leave the list now, not at the next nav
   briefClose(); showFoundList(); render();
 };
 // The one place the Briefing decides where you land. Back always lands here now, so this is the only
@@ -19449,61 +19445,7 @@ function accountLoadingHTML(){
     <div class="ep">Hang on while we load your agents and films.</div>
   </div>`;
 }
-// CAS-1229 decision 3: "the settled list" — the Watch list keeps its films and their order until the
-// person actually navigates (changes stage, switches an agent on or off, changes sort, searches, or
-// applies a filter). watchNavKey() fingerprints exactly those five things; render() compares it against
-// the key in force the last time it did a full rebuild, and only treats a change in THAT fingerprint as a
-// navigation. Everything else — a reconcile pull, a verdict, a Watch On tick, a pin — repaints through
-// reconcilePatchSettledList() below instead, which never adds, removes, reorders or reflows a card.
-let watchSettledNavKey = null;
-// CAS-1229 AC2: a render() call counter, reset/read through CascadePersistence — lets a test assert the
-// exact number of times render() itself ran (not just "the DOM looks the same"), the literal AC2 wording.
-let renderCallCount = 0;
-function watchNavKey(){
-  return JSON.stringify([
-    watchTab,
-    [...watchAgentOff].sort(),
-    sortPicked, filt.sort,
-    watchSearch[watchTab]||"",
-    watchPickedBy[watchTab],
-    [...watchGenreOff[watchTab]].sort(),
-    [...watchWatchedSel[watchTab]].sort(),
-    watchMineOnlyOn(),
-    watchOccasion,
-  ]);
-}
-// CAS-1229: forces the NEXT render() to run a full rebuild regardless of watchNavKey() — for the handful
-// of actions (committing or deleting an agent's own criteria) that change what the list should show
-// without touching any of the five things watchNavKey() itself fingerprints.
-function markWatchNavigated(){ watchSettledNavKey = null; }
-// CAS-1229 AC2-6: patches every card/stub currently on screen from the latest data, in place — same
-// position, same DOM node unless its OWN content actually changed, poster never cleared. A film that
-// would newly join or leave the list is left alone either way (decision 3: that only happens at the next
-// navigation); this only ever updates a row that is already there.
-function reconcilePatchSettledList(){
-  const wrap=$("groups");
-  wrap.querySelectorAll('[id^="card-"]').forEach(row=>{
-    const id=Number(row.id.slice(5)); if(!isFinite(id)) return;
-    const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
-    const t=document.createElement("template");
-    t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m))).trim();
-    const fresh=t.content.firstElementChild;
-    // AC6: a poster that has already loaded (an inline background-image, no data-lazybg left to observe)
-    // is carried over onto the fresh node BEFORE the comparison below, so a card whose only "change" is
-    // being regenerated never reads as different, and never re-triggers its own lazy-load.
-    const oldPoster=row.querySelector(".poster");
-    const newPoster=fresh.querySelector(".poster");
-    const loadedBg = oldPoster && oldPoster.style.backgroundImage;
-    if(loadedBg && newPoster){ newPoster.style.backgroundImage=loadedBg; newPoster.removeAttribute("data-lazybg"); }
-    if(row.outerHTML===fresh.outerHTML) return;   // AC2: nothing about this card actually changed
-    observeLazyPosters(t.content);
-    row.replaceWith(fresh);
-  });
-  updatePrefSwitch(); updatePrefBtn(); updateUxSwitch();
-  markFoundSeen();
-}
 function render(){
-  renderCallCount++;
   renderGen++;   // CAS-129: supersede any card-fill still streaming from a previous render
   const myGen=renderGen;   // CAS-421: only THIS render may lift the blur it didn't set
   if(!accountFanoutSettled()){
@@ -19518,15 +19460,6 @@ function render(){
   // (Cascades × titles) and it means membership has exactly one definition, evaluated in exactly one place.
   recomputeFound();
   ensureWatchTab();   // CAS-725: keep the active tab valid before it drives rows/scope-bar below
-  // CAS-1229: everything above must run even on a settled (non-navigating) pass — recomputeFound is what
-  // keeps notify/found/taggedOut honest, and ensureWatchTab can itself force a navigation (a tab that just
-  // became invalid) which watchNavKey() (read next) must see.
-  {
-    const navKey = watchNavKey();
-    const navigated = watchSettledNavKey===null || navKey!==watchSettledNavKey;
-    watchSettledNavKey = navKey;
-    if(!navigated){ reconcilePatchSettledList(); return; }
-  }
   // Two lists, one pass: `rows` is everything on screen, `shown` is everything that still gets a full card.
   // The difference is the films you tagged out — they stay on screen as stubs, and they don't count as
   // results, because you told us you didn't want them.
@@ -20955,23 +20888,8 @@ else if(dedupedN)
       const rows = (store.acctStore.cascades||[]).filter(r=>!r.deleted_at);
       const remote = cascadeOpOverlay(rows).map(rowToCascade);
       remote.sort(cascadeOrderCmp);
-      if(reconcileUnchanged("cascades", remote)) return;
       replaceCascades(remote);
     });
-  }
-  // CAS-1229: a reconcile pull that brings back exactly what this device already holds for a table must
-  // change nothing and draw nothing — compared per table (JSON of the rows this device would otherwise
-  // apply), not by a blanket "something, somewhere, might have changed" render(). Each table's own apply
-  // site below calls this once, right before the render() it would otherwise always fire; the cheap
-  // bookkeeping above it (clearing/merging local mirrors, recomputeFound) still always runs unconditionally
-  // — only the repaint itself is skipped, so nothing about sync correctness changes, just how often the
-  // Watch list repaints for data that didn't.
-  const reconcileTableSig = {};
-  function reconcileUnchanged(table, data){
-    const sig = JSON.stringify(data);
-    if(reconcileTableSig[table]===sig) return true;
-    reconcileTableSig[table]=sig;
-    return false;
   }
   // CAS-408: two devices only converge without a live subscription if SOMETHING re-pulls the account
   // — sign-in alone left a device that never signs out again permanently stuck on whatever it saw at
@@ -21012,9 +20930,8 @@ else if(dedupedN)
     // CAS-1097: agent_films is never deleted and a push only ever happens once per (cascade,movie) — but an
     // admission made on another device still needs to arrive here. applyAgentFilmRows replaces the whole
     // local ledger wholesale and (unlike loadAccountFilms/loadFilmWatches/loadFilmPicks above) draws no
-    // repaint of its own, so this re-renders once the pull actually lands — but only when it actually
-    // changed something (CAS-1229: loadAgentFilms now reports that back, rather than this always repainting).
-    if(noUnsentWrite("agent_films")) loadAgentFilms().then(changed=>{ if(changed && typeof render==="function") render(); });
+    // repaint of its own, so this re-renders once the pull actually lands.
+    if(noUnsentWrite("agent_films")) loadAgentFilms().then(()=>{ if(typeof render==="function") render(); });
     // Invites and friends carry no acctOp queue entry of their own — every write to either is an immediate
     // RPC/insert, not a queued op — so there is nothing to guard and no risk of landing on top of an unsent
     // edit; safe to re-pull unconditionally, same as loadRealAlerts below.
@@ -21024,22 +20941,9 @@ else if(dedupedN)
     // without this, an open tab's Moving badge is frozen at whatever it was on load.
     loadRealAlerts();
   }
-  // CAS-1229 decision 1: focus and visibilitychange coalesce into one reconcile pass, and a return within
-  // 60 seconds of the last pass does nothing — ten of each dispatched in a burst must cost at most one
-  // pull. The floor is on reconcileOnReturn ITSELF (set synchronously before any of its own awaits), not a
-  // trailing debounce, so two events in the very same tick are already covered, not just ones 60s apart.
-  // The 3-minute heartbeat poll below stays independent of this floor, unchanged from before this ticket.
-  let reconcileLastRun = 0;
-  const RECONCILE_RETURN_FLOOR_MS = 60*1000;
-  function reconcileOnReturnThrottled(){
-    const now = Date.now();
-    if(now - reconcileLastRun < RECONCILE_RETURN_FLOOR_MS) return;
-    reconcileLastRun = now;
-    reconcileOnReturn();
-  }
-  window.addEventListener("focus", reconcileOnReturnThrottled);
+  window.addEventListener("focus", reconcileOnReturn);
   document.addEventListener("visibilitychange", () => {
-    if(document.visibilityState==="visible") reconcileOnReturnThrottled();
+    if(document.visibilityState==="visible") reconcileOnReturn();
   });
   // CAS-487: a tab can stay focused and visible for hours without ever firing focus/visibilitychange
   // again, so the bell also needs a heartbeat independent of returning to the tab. Reuses
@@ -21083,9 +20987,6 @@ else if(dedupedN)
     });
     agMetricsCache.clear();   // CAS-867: a synced verdict can flip taggedOut() same as a local one can
     recomputeFound();
-    // CAS-1229: skip the repaint (not the merge above) when this is byte-identical to the last rows this
-    // device applied for this table — a reconcile pull that changed nothing must draw nothing.
-    if(reconcileUnchanged("user_films", rows)) return;
     if(typeof render==="function") render();
   }
   // CAS-1096: every verdict change goes through acctOp as one operation on that one row — no baseline
@@ -21249,8 +21150,6 @@ else if(dedupedN)
       if(Array.isArray(r.not_in)) e.notIn = r.not_in.filter(x=>typeof x==="string");
     });
     recomputeFound();
-    // CAS-1229: same render-only skip as applyFilmRows — the merge above always runs.
-    if(reconcileUnchanged("film_picks", remote)) return;
     if(typeof render==="function") render();
   }
 
@@ -21318,8 +21217,6 @@ else if(dedupedN)
       if(r.updated_at) watchKnown.set(String(id), r.updated_at);
     });
     recomputeFound();
-    // CAS-1229: same render-only skip as applyFilmRows — the merge above always runs regardless.
-    if(reconcileUnchanged("film_watch", rows)) return;
     if(typeof render==="function") render();
   }
   // CAS-1096: the row film_watch would carry for ONE film right now — windows+sources computed straight
@@ -21548,21 +21445,17 @@ else if(dedupedN)
       };
     });
     agentFilms=next;
-    // CAS-1229: reports whether this pull actually differed from the last one this device applied, so a
-    // reconcile-driven caller can skip its own render() when nothing changed (the boot/sign-in fan-out's
-    // own callers ignore this and always render, same as before this ticket).
-    return !reconcileUnchanged("agent_films", rows);
   }
   // CAS-1097: loads through acctLoad, the same shape as every other acctOp-backed table (loadAccountFilms/
   // loadFilmPicks/loadFilmWatches) — acctLoad's own .range() paging (ACCT_STORE_PAGE=1000) already covers
   // what the old bespoke paginated loop did. acctOpPendingOverlay keeps a still-unconfirmed local insert
   // visible across a reload the same way it does for every other table.
   async function loadAgentFilms(){
-    if(!accountActive()) return false;
+    if(!accountActive()) return;
     const ok = await window.CascadeAccountStore.acctLoad([{ table:"agent_films", pk:"movie_id" }]);
-    if(!ok){ recordSyncOutcome("agent_films", false, { message:"load failed" }); return false; }
+    if(!ok){ recordSyncOutcome("agent_films", false, { message:"load failed" }); return; }
     recordSyncOutcome("agent_films", true);
-    return applyAgentFilmRows(acctOpPendingOverlay("agent_films", window.CascadeAccountStore.acctStore.agent_films,
+    applyAgentFilmRows(acctOpPendingOverlay("agent_films", window.CascadeAccountStore.acctStore.agent_films,
       r=>agentFilmKey(r.cascade_id,r.movie_id)));
   }
 
@@ -21844,8 +21737,6 @@ else if(dedupedN)
     if(typeof row.display_name==="string" && row.display_name) displayNameCache = row.display_name;
     savePrefsLocal();
     syncServiceChips(); updatePrefSwitch(); updatePrefBtn();
-    // CAS-1229: render-only skip, same pattern as applyFilmRows — every adoption above always runs.
-    if(reconcileUnchanged("user_prefs", row)) return;
     if(typeof render==="function") render();
   }
   const saveTasteBaseLocal = saveTasteBase;
@@ -22022,16 +21913,6 @@ else if(dedupedN)
                                 // can be exercised the same way — without waiting on a real
                                 // focus/visibilitychange event.
                                 reconcileOnReturn,
-                                // CAS-1229: the render() call counter (AC2's literal wording) plus the
-                                // settled-list nav key, exposed the same read/write-primitive way as every
-                                // other test seam here — reset to 0 right before the pass a test wants to
-                                // measure, read back after. markWatchNavigated forces the NEXT render() to
-                                // do a full rebuild regardless of watchNavKey(), for a test that wants to
-                                // establish a fresh settled list without driving a real stage/agent/sort/
-                                // search/filter change to get there.
-                                get renderCallCount(){ return renderCallCount; },
-                                set renderCallCount(v){ renderCallCount=v; },
-                                markWatchNavigated,
                                 // CAS-488: the catalogue-refresh seam and its busy-check, exposed the same way.
                                 pollCatalogue, catalogueUIBusy,
                                 // CAS-503: the live-clock seam, so a date boundary can be exercised without
