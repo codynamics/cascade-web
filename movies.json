@@ -543366,65 +543366,6 @@
     },
     {
       "age_rating": null,
-      "availability_confidence": "estimated",
-      "availability_source": "tmdb_providers",
-      "award": null,
-      "award_text": "",
-      "budget": null,
-      "cast": [
-        "Kiran Abbavaram",
-        "Sri Gouri Priya Reddy"
-      ],
-      "cinema_date": "2026-07-24",
-      "cinema_release": true,
-      "culture": "Indian",
-      "director": "Ravi Namburii",
-      "first_seen": "2026-09-16",
-      "genres": [
-        "Romance",
-        "Drama"
-      ],
-      "imdb_id": "tt37161651",
-      "jw_link": null,
-      "language": "te",
-      "last_polled": "2026-09-17",
-      "last_probed": "2026-09-29",
-      "offers": [],
-      "outcome": "scored",
-      "poll_tier": "active",
-      "popularity": 0.4927,
-      "poster": "/9BjK1Mh8fofyHNYZNMJ8oLhBXDw.jpg",
-      "probe_count": 1,
-      "release_dates": [
-        {
-          "date": "2026-07-24",
-          "region": "AU",
-          "type": 3
-        }
-      ],
-      "status": [
-        "in_cinema"
-      ],
-      "synopsis": "Two young people navigate their first experience of love, dealing with its powerful emotions and obstacles while discovering the delicate nature of newfound romance.",
-      "title": "Chennai Love Story",
-      "tmdb_id": 1443136,
-      "tmdb_not_found_streak": 0,
-      "trailers": [
-        "nYYjR9diizE"
-      ],
-      "window_dates": {
-        "upcoming": "2026-07-22",
-        "in_cinema": "2026-08-12"
-      },
-      "wm_critic_score": null,
-      "wm_fields_fetched_at": "2026-09-29",
-      "wm_popularity_percentile": 96.69,
-      "wm_user_rating": 5.6,
-      "worldwide_gross": null,
-      "year": "2026"
-    },
-    {
-      "age_rating": null,
       "availability_confidence": "confirmed",
       "availability_source": "tmdb_providers",
       "budget": null,

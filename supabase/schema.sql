@@ -1536,11 +1536,29 @@ where user_id is not null
   and exists (select 1 from public.analytics_admins a where a.user_id = auth.uid())
 group by user_id, (coalesce(data ->> 'step', data ->> 'key', '(unknown)'));
 
+-- CAS-1227: admin_member_emails used to select straight from auth.users, which Supabase flags
+-- as a security-definer view exposing auth.users (auth_users_exposed) regardless of the
+-- analytics_admins guard inside its body. admin_member_emails_list() carries that same guard as
+-- an explicit SECURITY DEFINER function instead, and the view is now a security_invoker = true
+-- wrapper around it — no public view depends on auth.users directly any more.
+create or replace function public.admin_member_emails_list()
+returns table (user_id uuid, email text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select u.id, u.email::text
+  from auth.users u
+  where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid())
+$$;
+
+revoke all on function public.admin_member_emails_list() from public, anon;
+grant execute on function public.admin_member_emails_list() to authenticated;
+
 create or replace view public.admin_member_emails
-with (security_invoker = false) as
-select id as user_id, email::text as email
-from auth.users u
-where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid());
+with (security_invoker = true) as
+select user_id, email from public.admin_member_emails_list();
 
 -- CAS-1092: cascades can now carry a soft delete (deleted_at); exclude those rows here too.
 create or replace view public.admin_cascades
@@ -1553,7 +1571,7 @@ where deleted_at is null
 revoke all on public.admin_members          from anon, public;
 revoke all on public.admin_member_activity  from anon, public;
 revoke all on public.admin_member_onboarding from anon, public;
-revoke all on public.admin_member_emails    from anon, public;
+revoke all on public.admin_member_emails    from anon, public, authenticated;
 revoke all on public.admin_cascades         from anon, public;
 
 grant select on public.admin_members          to authenticated;
@@ -1561,6 +1579,13 @@ grant select on public.admin_member_activity  to authenticated;
 grant select on public.admin_member_onboarding to authenticated;
 grant select on public.admin_member_emails    to authenticated;
 grant select on public.admin_cascades         to authenticated;
+
+-- CAS-1227: these views only ever needed SELECT — drop the INSERT/UPDATE/DELETE/TRUNCATE/
+-- REFERENCES/TRIGGER grants Supabase adds to every view by default.
+revoke insert, update, delete, truncate, references, trigger on public.admin_members from authenticated;
+revoke insert, update, delete, truncate, references, trigger on public.admin_member_activity from authenticated;
+revoke insert, update, delete, truncate, references, trigger on public.admin_member_onboarding from authenticated;
+revoke insert, update, delete, truncate, references, trigger on public.admin_cascades from authenticated;
 
 -- ---------------------------------------------------------------------------
 -- delete_my_account — self-service account deletion (CAS-980)
