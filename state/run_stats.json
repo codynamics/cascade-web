@@ -1,21 +1,23 @@
 {
-  "date": "2026-10-07",
+  "date": "2026-10-09",
   "tmdb": {
-    "calls": 5900,
+    "calls": 5901,
     "errors": 0,
     "not_found": 0,
     "status_counts": {}
   },
   "watchmode": {
     "quota": 2500,
-    "quota_used": 1537,
-    "remaining_monthly_credits": 963,
-    "calls": 139,
+    "quota_used": 1676,
+    "remaining_monthly_credits": 824,
+    "calls": 186,
     "errors": 0,
-    "mismatch": 2,
+    "mismatch": 4,
     "mismatch_ids": [
+      1318621,
       1522126,
-      1318621
+      1493400,
+      1698575
     ]
   },
   "oscarbase": {
