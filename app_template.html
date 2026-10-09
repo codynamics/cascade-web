@@ -18983,7 +18983,7 @@ function membCodeErrorShow(msg){
 // review address here too.
 function membCodeMsgText(email){
   const a=window.CascadeAuth;
-  return (a && typeof a.verifyMsgFor==="function") ? a.verifyMsgFor(email) : ("Enter the code we sent to "+email+".");
+  return (a && typeof a.verifyMsgFor==="function") ? a.verifyMsgFor(email) : ("Enter the code we sent to "+email+". If it isn't in your inbox, check Junk. Only the newest code works.");
 }
 // B10: called every time #membScreen opens fresh, so a previous attempt never leaks into a new one.
 function membResetCodeState(){
@@ -19034,7 +19034,8 @@ window.membResendCode=()=>{
   membCodeErrorShow(null);
   const msg=$("membCodeMsg");
   window.CascadeAuth.continueWithEmail(membCodeEmail).then(result=>{
-    if(!result.ok) membCodeErrorShow("Could not resend: "+(result.error||""));
+    if(result.rateLimited) membCodeErrorShow("A code was sent less than a minute ago. Use the newest email, or wait a moment and resend.");
+    else if(!result.ok) membCodeErrorShow("Could not resend: "+(result.error||""));
   });
   if(msg) msg.innerHTML=esc(membCodeMsgText(membCodeEmail))+
     ' <button type="button" class="linkbtn" id="membChangeEmail" onclick="membBackToEmail()" style="vertical-align:baseline">Change email</button>';
@@ -19159,7 +19160,7 @@ window.membStart=()=>{
       // CAS-1169: continueWithEmail only requests a code — the code is confirmed right here on
       // #membScreen (State B, membSubmitCode), never on #authModal's own verify step.
       window.CascadeAuth.continueWithEmail(email, { createUser: true }).then(result=>{
-        if(result.ok){ membShowCodeState(email); idle(); }
+        if(result.ok || result.rateLimited){ membShowCodeState(email); idle(); }
         else{ onbMembershipInFlight=false; membEmailError(result.error||"Could not send a sign-in code — try again."); idle(); }
       });
     });
@@ -22892,7 +22893,7 @@ else if(dedupedN)
   let verifyEmail = null, verifyResolve = null;
   // CAS-1073 AC3: the review address must never render as UI text — the review code screen shows
   // the same generic copy as every other state on this panel.
-  const verifyMsgFor = email => isReviewEmail(email) ? 'Enter your code.' : 'Enter the code we sent to ' + email + '.';
+  const verifyMsgFor = email => isReviewEmail(email) ? 'Enter your code.' : 'Enter the code we sent to ' + email + ". If it isn't in your inbox, check Junk. Only the newest code works.";
   // CAS-1169: exposed so the membership screen's own inline code step (classic script, no shared scope
   // with this module) can show the review address the same generic copy, without re-deriving it here too.
   api.verifyMsgFor = verifyMsgFor;
@@ -22910,20 +22911,22 @@ else if(dedupedN)
     btn.disabled = true;
     btn.textContent = 'Resend code in 0:' + String(remaining).padStart(2, '0');
   };
-  const startResendTimer = () => {
+  // CAS-1242: an optional deadline lets a caller resume an existing cooldown (the continued-request
+  // window below) instead of always restarting the countdown at a fresh 60s.
+  const startResendTimer = (deadline) => {
     stopResendTimer();
-    resendDeadline = Date.now() + 60000;
+    resendDeadline = deadline || (Date.now() + 60000);
     renderResendTimer();
     resendTimer = setInterval(renderResendTimer, 1000);
   };
 
-  const enterVerify = (email, onVerified) => {
+  const enterVerify = (email, onVerified, resumeDeadline) => {
     verifyEmail = email; verifyResolve = onVerified || null;
     gid('authVerifyMsg').textContent = verifyMsgFor(email);
     gid('authVerifyErr').textContent = '';
     gid('authCode').value = '';
     showPanel('authVerify');
-    startResendTimer();
+    startResendTimer(resumeDeadline);
   };
   // The membership step's email gate has no code-entry UI of its own (CAS-1056: that lives only in this
   // panel) — it hands off here instead: open this modal straight onto the verify step for the code it
@@ -23046,6 +23049,11 @@ else if(dedupedN)
         if(error.code === 'otp_disabled'){
           return { ok: false, noAccount: true, error: error.message };
         }
+        // CAS-1242: a code already went out inside Supabase's own 60s minimum — not a real failure,
+        // so this must not count toward auth_failed, and the raw server sentence must never reach the UI.
+        if(error.code === 'over_email_send_rate_limit' || (!error.code && error.status === 429)){
+          return { ok: false, rateLimited: true, error: error.message };
+        }
         logClientHealthEvent("auth_failed", authFailedPayload(error));
         return { ok: false, error: error.message };
       } catch(err){
@@ -23139,18 +23147,44 @@ else if(dedupedN)
 
     gid('authEmail').addEventListener('input', () => { msg.textContent = ''; });
 
+    // CAS-1242: a real sign-in sent 11 code emails in 45 minutes because Continue had no in-flight
+    // guard (two presses while the first request was still out) and no memory of a code it had just
+    // sent (every later press requested another, each one invalidating the last). authContinueBusy
+    // blocks the former; authContinueEmail/Deadline remember the latter so a repeat press for the same
+    // email inside the 60s window goes straight back to the code already sent instead of requesting a new one.
+    let authContinueBusy = false;
+    let authContinueEmail = null, authContinueDeadline = 0;
+
     gid('authContinue').addEventListener('click', async () => {
+      if(authContinueBusy) return;
       const email = readEmail(); if(!email) return;
-      msg.textContent = 'Sending a code…';
-      const result = await api.continueWithEmail(email, { createUser: false });
-      if(!result.ok){
-        msg.textContent = result.noAccount
-          ? "There's no Cascade account for that email."
-          : 'Could not send a code: ' + result.error;
+      if(authContinueEmail === email && Date.now() < authContinueDeadline){
+        enterVerify(email, null, authContinueDeadline);
         return;
       }
-      msg.textContent = '';
-      enterVerify(email, null);
+      const btn = gid('authContinue');
+      authContinueBusy = true; btn.disabled = true;
+      msg.textContent = 'Sending a code…';
+      try {
+        const result = await api.continueWithEmail(email, { createUser: false });
+        if(result.rateLimited){
+          authContinueEmail = email; authContinueDeadline = Date.now() + 60000;
+          msg.textContent = '';
+          enterVerify(email, null, authContinueDeadline);
+          return;
+        }
+        if(!result.ok){
+          msg.textContent = result.noAccount
+            ? "There's no Cascade account for that email."
+            : 'Could not send a code: ' + result.error;
+          return;
+        }
+        authContinueEmail = email; authContinueDeadline = Date.now() + 60000;
+        msg.textContent = '';
+        enterVerify(email, null, authContinueDeadline);
+      } finally {
+        authContinueBusy = false; btn.disabled = false;
+      }
     });
 
     gid('authVerifyBtn').addEventListener('click', async () => {
@@ -23184,7 +23218,11 @@ else if(dedupedN)
       gid('authVerifyMsg').textContent = 'Sending a new code…';
       const result = await api.continueWithEmail(verifyEmail);
       gid('authVerifyMsg').textContent = verifyMsgFor(verifyEmail);
-      if(!result.ok) gid('authVerifyErr').textContent = 'Could not resend: ' + result.error;
+      if(result.rateLimited){
+        gid('authVerifyErr').textContent = 'A code was sent less than a minute ago. Use the newest email, or wait a moment and resend.';
+      } else if(!result.ok){
+        gid('authVerifyErr').textContent = 'Could not resend: ' + result.error;
+      }
     });
 
     gid('authSignOut').addEventListener('click', async () => {
