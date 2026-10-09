@@ -9417,6 +9417,9 @@ function watchStageStopsNow(){
 // Tapping a stop still runs through setWatchTab for the tab it belongs to — the only new behaviour is the
 // Cinema tab's own Upcoming/In Cinema split, which setWatchTab knows nothing about (and doesn't need to:
 // a tap that doesn't change `watchTab` has to re-render itself, since setWatchTab no-ops on no change).
+// CAS-1238: a stop's own section id — the Cinema stops' key IS the LISTING_ORDER group id (upcoming/
+// in_cinema) already; every other stop only has that mapping via WATCH_TAB_SCROLL_TARGET.
+const watchStageScrollTarget = stop => stop.tabKey==="in_cinema" ? stop.key : WATCH_TAB_SCROLL_TARGET[stop.tabKey];
 window.setWatchStage = key => {
   const stop=watchStageStopsNow().find(s=>s.key===key); if(!stop) return;
   if(watchTab!==stop.tabKey){
@@ -9429,7 +9432,11 @@ window.setWatchStage = key => {
     watchCinemaStage=key;
     logEvent("watch_tab", {tab:key, from});
     render();
+    return;
   }
+  // CAS-1238: the tapped stage is already the selected one — no tab/stage change, so no re-render; just
+  // land back on that stage's own section, the same jumpToSection landing a stage switch uses above.
+  jumpToSection(watchStageScrollTarget(stop));
 };
 // CAS-1223: true for a film belonging to the Cinema tab's currently-selected half — Upcoming is exactly
 // primaryStatus "upcoming"; In Cinema is everything else the Cinema tab shows (opening_week/in_cinema).
@@ -19971,7 +19978,9 @@ window.jumpToSection = (k, opts) => {
     return g.getBoundingClientRect().top - jumpOccludedBottom(chromeId) - 8;
   };
   const first=delta(); if(first===null) return;
-  scroller.scrollBy({top:first, behavior:"smooth"});
+  // CAS-1238: honour prefers-reduced-motion for the jump itself, same gate REDUCE_MOTION already applies
+  // to card animations elsewhere — the settle corrections below are already instant.
+  scroller.scrollBy({top:first, behavior: REDUCE_MOTION.matches ? "auto" : "smooth"});
   let tries=0;
   const settle=()=>{
     const d=delta();
