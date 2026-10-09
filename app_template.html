@@ -9636,18 +9636,41 @@ const ALSO_SHOW_WINDOWS = [
   {key:"rental", label:"At rental", cd:"var(--blue)"},
   {key:"included_streaming", label:"Streaming", cd:"var(--green)"},
 ];
+// CAS-1235: a film "disappears" when its Watch On moves to a later stage (e.g. Upcoming → Streaming) unless
+// every earlier-than-own-standing window is already widened in — so each non-Cinema tab now defaults to
+// widening every ALSO_SHOW_WINDOWS entry EARLIER than its own standing on the upcoming/in_cinema/rental/
+// included_streaming ladder, not none. Premium's own standing (pvod) sits outside that four-window ladder
+// entirely, so only upcoming/in_cinema (both before it either way) apply to Premium.
+const WATCH_ALSO_SHOW_DEFAULT = {
+  premium: ["upcoming", "in_cinema"],
+  rent: ["upcoming", "in_cinema"],
+  stream: ["upcoming", "in_cinema", "rental"],
+};
 // Which windows are switched ON (widened in) per tab — same per-tab, session-only shape as watchGenreOff,
-// but "nothing switched on" here means the tab's own standing ALONE, not "everything shows" (CAS-720's off-
-// set had the opposite default). The tab's own window is tested by WATCH_TAB_OWN_STANDING directly and is
-// never added to this Set, so it can never be switched off from here.
-const watchAlsoShow = {in_cinema:new Set(), premium:new Set(), rent:new Set(), stream:new Set()};
+// but "nothing switched OFF from default" here means WATCH_ALSO_SHOW_DEFAULT, not empty (CAS-1235) — CAS-720's
+// off-set had yet a third default ("everything shows"). The tab's own window is tested by
+// WATCH_TAB_OWN_STANDING directly and is never added to this Set, so it can never be switched off from here.
+const watchAlsoShow = {in_cinema:new Set(), premium:new Set(WATCH_ALSO_SHOW_DEFAULT.premium),
+  rent:new Set(WATCH_ALSO_SHOW_DEFAULT.rent), stream:new Set(WATCH_ALSO_SHOW_DEFAULT.stream)};
 window.toggleWatchAlsoShow = key => {
   if(WATCH_TAB_OWN_STANDING[watchTab]===key) return;   // the tab's own window — not switchable
   const set=watchAlsoShow[watchTab];
   set.has(key) ? set.delete(key) : set.add(key);
   render();
 };
-window.clearWatchAlsoShow = () => { watchAlsoShow[watchTab].clear(); render(); scrollWatchListingToTop(); };   // CAS-857
+// CAS-1235: "clear" returns Also-show to its default (the earlier-stages-on state), not to empty — empty
+// would itself now read as a deviation (watchAlsoShowIsDefault below), the opposite of what Clear means.
+window.clearWatchAlsoShow = () => {
+  watchAlsoShow[watchTab]=new Set(WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
+  render(); scrollWatchListingToTop();
+};   // CAS-857
+// CAS-1235: true when a tab's Also-show set exactly matches its default — the badge/active-filter-chip's own
+// "no deviation" test, now that the default is no longer empty.
+function watchAlsoShowIsDefault(tab){
+  const def=WATCH_ALSO_SHOW_DEFAULT[tab]||[];
+  const cur=watchAlsoShow[tab];
+  return cur.size===def.length && def.every(k=>cur.has(k));
+}
 // CAS-720: agent inclusion — restores the agent narrowing scopeRows() gave up when CAS-718 retired the
 // deck's per-list agent picker (see that function's own comment), reading from this sheet state instead of
 // the old activeIds/cascOff deck selection. Session-only, empty-means-"nothing excluded".
@@ -9713,7 +9736,8 @@ window.clearAllWatchFilters = () => {
   watchPickedBy[watchTab]="all";
   watchWatchedSel[watchTab].clear();
   watchGenreOff[watchTab].clear();
-  watchAlsoShow[watchTab].clear();
+  // CAS-1235: same as the Also-show section's own clear — back to default, not empty.
+  watchAlsoShow[watchTab]=new Set(WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
   // CAS-1144: "cleared" means the narrowing no longer applies, not reset-to-default — mineOnly's own
   // default is ON (CAS-753), which still narrows, so clearing it here means OFF.
   setWatchMineOnly(false);
@@ -9755,9 +9779,9 @@ function watchFiltersActiveCount(){
   const genreOff=watchGenreOff[watchTab];
   const watchedSel=watchWatchedSel[watchTab];
   const pickedBy=watchPickedBySafe(watchTab);
-  const alsoShowSet=watchAlsoShow[watchTab];
   const mineOnly=watchMineOnlyOn();
-  return (pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(alsoShowSet.size?1:0)+(mineOnly?0:1);
+  // CAS-1235: Also-show's default is no longer empty — only a DIFFERENCE from WATCH_ALSO_SHOW_DEFAULT counts.
+  return (pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(watchAlsoShowIsDefault(watchTab)?0:1)+(mineOnly?0:1);
 }
 function renderWatchSheet(rows, shownCount){
   const genreOff=watchGenreOff[watchTab];
@@ -9856,7 +9880,8 @@ function renderWatchSheet(rows, shownCount){
   if(watchedSel.size) chips.push({label:chipSummary(REVIEW_STEPS.filter(v=>watchedSel.has(v.key)).map(v=>v.lbl)),
     clear:"clearAllWatchWatched()"});
   if(genreOff.size) chips.push({label:chipSummary([...genreOff]), clear:"clearAllWatchStyles()"});
-  if(alsoShowSet.size) chips.push({label:chipSummary(ALSO_SHOW_WINDOWS.filter(w=>alsoShowSet.has(w.key)).map(w=>w.label)),
+  // CAS-1235: only a difference from the (no-longer-empty) default counts as an active filter here.
+  if(!watchAlsoShowIsDefault(watchTab)) chips.push({label:chipSummary(ALSO_SHOW_WINDOWS.filter(w=>alsoShowSet.has(w.key)).map(w=>w.label)),
     clear:"clearWatchAlsoShow()"});
   // CAS-1223: a switched-off agent reads directly off its own lozenge in #watchTop now, so the active-filter
   // row no longer duplicates it as a chip (section 4 of the ticket).
@@ -19407,6 +19432,22 @@ function cascadeRankTint(c){
   const idx=sorted.findIndex(x=>x.id===c.id);
   return idx<0 ? null : (idx%6)+1;
 }
+// CAS-1235: a plain stage name for an earlier-stage section showing under another tab's default widening —
+// distinct from STATUS_LABEL (whose pvod/rental entries carry a price suffix meant for that status's OWN
+// tab heading) and from ALSO_SHOW_WINDOWS' own labels (written for the Filters sheet's chips, not a listing
+// heading).
+const ALSO_SHOW_STAGE_LABEL = {upcoming:"Upcoming", in_cinema:"In Cinema", rental:"Rental", included_streaming:"Streaming"};
+// CAS-1235: the short tab name a widened-in section's heading reads "set to watch on <...>" — Cinema needs
+// no entry: it carries no Also-show section (filmMatchesWatchTab's "in_cinema" branch never widens), so
+// watchGroupHeading below never reaches this map for that tab.
+const WATCH_TAB_ON_LABEL = {premium:"Premium", rent:"Rent", stream:"Stream"};
+// CAS-1235: render()'s own group heading — STATUS_LABEL[g] unchanged for the tab's own section (Cinema
+// included), or "<stage> · set to watch on <tab>" for an earlier-stage section the tab's default (or a
+// manually widened) Also-show window pulled in.
+function watchGroupHeading(g){
+  if(watchTab==="in_cinema" || g===WATCH_TAB_OWN_STANDING[watchTab]) return STATUS_LABEL[g];
+  return `${ALSO_SHOW_STAGE_LABEL[g]} · set to watch on ${WATCH_TAB_ON_LABEL[watchTab]}`;
+}
 // Splits a status section's already agent-sorted `items` (filmOwnerOrder is listingGroups' primary sort
 // key, so one agent's films already run contiguously) into per-owner runs, in the same order.
 function splitByOwner(items){
@@ -19627,7 +19668,7 @@ function render(){
     // exclusion — so the header counts every item, matching what fillListChunked below actually streams.
     const live=items.length;
     const grp=document.createElement("div"); grp.className="group"; grp.dataset.g=g;
-    grp.innerHTML=`<div class="grouphead"><span class="gdot ${g}"></span>${STATUS_LABEL[g]}
+    grp.innerHTML=`<div class="grouphead"><span class="gdot ${g}"></span>${watchGroupHeading(g)}
       <span class="gcount">${live}</span></div>`;
     wrap.appendChild(grp);
     if(!blocks){

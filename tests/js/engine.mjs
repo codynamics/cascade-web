@@ -157,6 +157,16 @@ if(typeof window.CascadeAuth === "undefined"){
   get watchCinemaStage(){ return watchCinemaStage; },
   setWatchCinemaStage(v){ watchCinemaStage = v; },
   watchWatchedSel, watchGenreOff, watchSearch, filmMatchesWatchedFilter, filmMatchesWatchTab,
+  // CAS-1235: watchAlsoShow (by reference — toggleWatchAlsoShow/clearWatchAlsoShow mutate or reassign the
+  // per-tab Set in place) plus the default it now widens to and the heading render() builds from a group's
+  // status key, so a test can assert the default-on behaviour and its heading text without scraping the DOM
+  // the stub swallows. WATCH_TAB_OWN_STANDING already exists for filmMatchesWatchTab's own use above.
+  watchAlsoShow, WATCH_ALSO_SHOW_DEFAULT, watchAlsoShowIsDefault, watchGroupHeading, WATCH_TAB_OWN_STANDING,
+  clearWatchAlsoShow: () => window.clearWatchAlsoShow(),
+  // CAS-1235 AC4: watchStageStopsNow/watchStageCountFor (CAS-1223's stage-strip count, aimed at a stop
+  // through the same watchVisibleRows() pipeline the listing itself uses) — exported so a test can assert
+  // the count agrees with the real listing directly, rather than trusting that both read the same pipeline.
+  watchStageStopsNow, watchStageCountFor, watchVisibleRows,
   // CAS-1180: watchHeldOpen (CAS-752's held-this-visit set, by reference like watchGenreOff above) and
   // watchSearchRows (the search box's own wider, tab/filter-ignoring row set, Part D) — exported so a test
   // can clear the hold directly and assert the real search behaviour rather than re-deriving either.
