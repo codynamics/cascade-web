@@ -5246,14 +5246,18 @@ function recomputeFound(){
       if(e.watchEarned===undefined) e.watchEarned = earnedWindowForScore(owner, cascadeScore(m));
       earned = e.watchEarned;
     }
-    if(earned==null) return;                    // below every marker at admission — no value written
     // STATUS_RUNG numbers a film's current window on the exact same ladder WINDOW_RUNG numbers the four
     // watch levels (CAS-280), so the film's rung IS its natural standing key — snapped forward past
     // whichever windows are off or set to Never. CAS-1128: the earliest window at or after the film's
     // current rung that this agent has actually switched ON (windowFollowed) — an admitted, unwatched
     // film's Watch On moves forward only as far as a window the agent itself tracks, never into one it has
     // left OFF. (autoPlacementFor, CAS-1097.)
+    // CAS-1233: earned==null ("below every marker at admission") no longer skips placement — a listed film
+    // always gets a Watch On, so autoPlacementFor now falls back to standing/last-followed itself. The one
+    // remaining reason finalKey can still come back null is the owner following no window at all, which
+    // means nothing could have admitted this film in the first place — genuinely nothing to write.
     const finalKey=autoPlacementFor(owner, m, earned);
+    if(!finalKey) return;
     // CAS-1096 AC5: automatic Watch On placement is explicitly NOT moved onto acctOp by this ticket —
     // only a hand-set/cleared Watch On (toggleFilmOpt/pickNever/setOpinion) pushes.
     WATCH_LEVEL_KEYS.forEach(k=>{ e.wins[k]=false; });
@@ -8254,17 +8258,27 @@ function earnedWindowForScore(owner, score){
 }
 // CAS-736/CAS-1128: the later of `earned` (fixed at admission) and `standing` (the film's CURRENT window,
 // snapped forward to the nearest window this agent actually follows) — what stops the cinema/streaming
-// score-basis flip at release from demoting or dropping an already-found film. Returns null when `earned`
-// itself is null (below every marker at admission — no placement at all).
+// score-basis flip at release from demoting or dropping an already-found film.
+// CAS-1233: `earned` can itself be null (below every marker at admission) — that is not "no placement",
+// since the film is listed regardless and a listed film always carries a Watch On. The fallback is the
+// same forward walk `standing` already does, just run from the film's current rung with no score test —
+// the earliest window at or after it that this agent follows — and, when the film has already travelled
+// past every window this agent follows, the agent's own last followed window, so there is always
+// somewhere to land.
 function autoPlacementFor(owner, m, earned){
-  if(earned==null) return null;
   const rung=STATUS_RUNG[primaryStatus(m)];
-  let standing=null;
-  if(rung>0){
-    const si=WATCH_LEVEL_KEYS.findIndex(k=>WINDOW_RUNG[k]===rung);
-    for(let j=si; j>=0 && j<WATCH_LEVEL_KEYS.length; j++){
-      if(windowFollowed(owner,WATCH_LEVEL_KEYS[j])){ standing=WATCH_LEVEL_KEYS[j]; break; }
+  // CAS-1233: rung 0 (upcoming) now joins this walk too (previously gated to rung>0) — "at or after
+  // upcoming" is every real window, so the earliest one this agent follows. For earned!=null this can
+  // never push `standing` past `earned` itself (earned's own forward scan is strictly more selective,
+  // score-gated as well as followed-gated, so its index can only be the same or later), so existing
+  // non-null-earned placements are unaffected.
+  const standing = WATCH_LEVEL_KEYS.find(k => WINDOW_RUNG[k]>=rung && windowFollowed(owner,k)) || null;
+  if(earned==null){
+    if(standing) return standing;
+    for(let j=WATCH_LEVEL_KEYS.length-1; j>=0; j--){
+      if(windowFollowed(owner,WATCH_LEVEL_KEYS[j])) return WATCH_LEVEL_KEYS[j];
     }
+    return null;   // the owner follows no window at all — nothing could have admitted this film either
   }
   return (standing && WINDOW_RUNG[standing]>WINDOW_RUNG[earned]) ? standing : earned;
 }
