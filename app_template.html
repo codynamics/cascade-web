@@ -4591,6 +4591,17 @@ function fmtDay(iso){
   const [y,m,d]=iso.split("-");
   return `${+d} ${MONTHS[+m-1]} ${y.slice(2)}`;
 }
+// CAS-1237: the catalogue pointer's `generated` is the pipeline's bare UTC calendar date — wrong for
+// hours every AU morning, since a run at 07:30 Sydney is still 20:30 the PREVIOUS day in UTC.
+// `generatedAt` (a real timestamp) converts correctly through the viewer's own Australia/Sydney
+// calendar date (sydneyYMD, defined with Moving's other Sydney-date helpers below — hoisted, so the
+// forward reference is fine); a pointer that predates generatedAt falls back to the bare date exactly
+// as before.
+function catalogueHeaderDate(pointer){
+  const iso=pointer && pointer.generatedAt;
+  const t=iso && Date.parse(iso);
+  return (t && !isNaN(t)) ? sydneyYMD(t) : (pointer && pointer.generated) || "";
+}
 function yearOf(m){ return (m.cinema_date||m.year||"").slice(0,4); }
 // CAS-945: hardened to escape all five HTML metacharacters (& first, so the entity text the other
 // replacements introduce is not itself re-encoded). Still safe for its original text-node call sites.
@@ -9094,7 +9105,7 @@ async function pollCatalogue(){
             // directly and isn't part of render()'s rebuild, so it's kept honest here — unconditionally, since
             // a one-line text write can never disturb an open modal/drawer/popup the way a full rebuild could.
             // CAS-689: no "Updated " prefix — see the initial-paint site's comment.
-            if(pointer.generated){ BUILD_DATE = pointer.generated; $("updated").textContent = fmtDay(BUILD_DATE); }
+            if(pointer.generated){ BUILD_DATE = catalogueHeaderDate(pointer); $("updated").textContent = fmtDay(BUILD_DATE); }
             captureClaimedStatus();
             // CAS-490: MOVIES was just replaced wholesale, so any ?fixtures=1 merge (CAS-486) is gone — re-apply
             // it here rather than only on cascade-auth-change, so a fixture film survives a catalogue refresh
@@ -17307,11 +17318,30 @@ try{ movingReady = localStorage.getItem("cascade_had_account") !== "1"; }catch(e
 function movingIsGuestDevice(){
   try{ return localStorage.getItem("cascade_had_account") !== "1"; }catch(e){ return true; }
 }
+// CAS-1237: the Sydney calendar date (YYYY-MM-DD) a timestamp falls on for the account holder —
+// shared by movingInWindow's "today" period and movingAgeText, so a 24-hour rolling window can
+// never read an evening alert as "today" again the next Sydney morning.
+function sydneyYMD(ts){
+  const parts=new Intl.DateTimeFormat("en-CA", {timeZone:"Australia/Sydney",
+    year:"numeric", month:"2-digit", day:"2-digit"}).formatToParts(new Date(ts));
+  const get=k=>parts.find(p=>p.type===k).value;
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+// Whole Sydney calendar days between `dateStr` and now (0 = today, 1 = yesterday, ...). Both sides
+// go through sydneyYMD first, so the subtraction is between two UTC-midnight date-only values —
+// exact multiples of a day, immune to the DST half-hour a raw instant-to-instant diff would carry.
+function sydneyDaysAgo(dateStr){
+  const t=dateStr && Date.parse(dateStr);
+  if(!t || isNaN(t)) return null;
+  return Math.round((Date.parse(sydneyYMD(Date.now())) - Date.parse(sydneyYMD(t)))/864e5);
+}
 // A row's `date` is either a realAlerts emailed_at timestamp or a firstFound day string — both parse with
-// Date.parse. Every window is a rolling window measured back from now.
+// Date.parse. "today" is the Sydney calendar date (CAS-1237); the longer windows stay rolling, measured
+// back from now.
 function movingInWindow(dateStr, windowKey){
   const t=dateStr && Date.parse(dateStr);
   if(!t || isNaN(t)) return false;
+  if(windowKey==="today") return sydneyDaysAgo(dateStr)===0;
   const days=MOVING_WINDOW_DAYS[windowKey];
   return days!=null && t>Date.now()-days*864e5;
 }
@@ -17361,7 +17391,7 @@ function movingData(){
       if(!owner){ droppedByFilm.set(fid,{date:a.emailed_at}); return; }
       byFilm.set(fid,{filmId:fid, m, tag:movingIsNewMoment(a.moment)?"new":"changed",
         reason:REAL_MOMENT_SAID[a.moment]||a.moment,
-        agentId:owner.id, date:a.emailed_at});
+        agentId:owner.id, date:a.emailed_at, moment:a.moment});
     });
     rows.push(...byFilm.values());
     dropped.push(...droppedByFilm.values());
@@ -17466,24 +17496,51 @@ function movingSections(rows){
     .filter(s=>s.lanes.length);
 }
 // A row's `date` is either a realAlerts emailed_at timestamp or a firstFound day string — both parse with
-// Date.parse. Calendar-day difference from now, said plainly; never a fabricated precision.
+// Date.parse. Sydney calendar-day difference from now (CAS-1237), said plainly; never a fabricated
+// precision, and never a 24-hour rolling count that calls 17:00-yesterday "today" the next morning.
 function movingAgeText(dateStr){
-  const t=dateStr && Date.parse(dateStr);
-  if(!t || isNaN(t)) return "";
-  const days=Math.floor((Date.now()-t)/864e5);
+  const days=sydneyDaysAgo(dateStr);
+  if(days==null) return "";
   if(days<=0) return "today";
   if(days===1) return "yesterday";
   return `${days} days ago`;
 }
-// The item is the change line above the SAME card the Watch listing renders for that film — taggedOut()
-// picks the stub exactly as Watch does, and the full card omits the "Not for this list" control (Moving
-// is not a list, so there is nothing to be not-for) but is otherwise the same card.
-function movingRowHTML(row){
-  const m=row.m;
-  const age=movingAgeText(row.date);
-  const why=`<div class="mvwhy"><span class="mvchip ${row.tag}">${row.tag==="new"?"NEW":"CHANGED"}</span> · ${esc(row.reason)}${age?` · ${esc(age)}`:""}</div>`;
-  const card=taggedOut(m) ? stubHTML(m) : cardHTML(m, false, {hideDismiss:true});
-  return `<div class="mvitem">${why}${card}</div>`;
+// CAS-1237: opens_soon/past_opening_weekend are reminders — nothing about the film changed — so they
+// get their own chip wording instead of borrowing CHANGED's. Same .mvchip class (and so colour) as the
+// tag it stands in for; only the word shown is different.
+const MOVING_REMINDER_CHIP = {opens_soon:"SOON", past_opening_weekend:"REMINDER"};
+function movingChipLabel(row){
+  return MOVING_REMINDER_CHIP[row.moment] || (row.tag==="new" ? "NEW" : "CHANGED");
+}
+// CAS-1237 AC5: consecutive rows in one lane (already sorted by movingLanes) that share the same
+// chip, reason and age are one event told once, not the same line repeated above every card in the
+// run — group runs of (chip, reason, age) rather than re-deriving them per row at render time, so the
+// grouping and the group's own why-line can never disagree about what they're describing.
+function movingRowGroups(rows){
+  const groups=[];
+  rows.forEach(row=>{
+    const chip=movingChipLabel(row), age=movingAgeText(row.date);
+    const prev=groups[groups.length-1];
+    if(prev && prev.chip===chip && prev.reason===row.reason && prev.age===age) prev.rows.push(row);
+    else groups.push({chip, reason:row.reason, age, tag:row.tag, rows:[row]});
+  });
+  return groups;
+}
+function movingWhyHTML(group){
+  return `<div class="mvwhy"><span class="mvchip ${group.tag}">${esc(group.chip)}</span> · ${esc(group.reason)}${group.age?` · ${esc(group.age)}`:""}</div>`;
+}
+// The card is the SAME one the Watch listing renders for that film — taggedOut() picks the stub exactly
+// as Watch does, and the full card omits the "Not for this list" control (Moving is not a list, so
+// there is nothing to be not-for) but is otherwise unchanged.
+function movingCardHTML(row){
+  return taggedOut(row.m) ? stubHTML(row.m) : cardHTML(row.m, false, {hideDismiss:true});
+}
+// One why-line per group, above its first card only — the rest of the group's cards carry no why-line
+// of their own, so a run of matching rows says its reason exactly once.
+function movingLaneHTML(rows){
+  return movingRowGroups(rows).map(g=>
+    g.rows.map((row,i)=>`<div class="mvitem">${i===0?movingWhyHTML(g):""}${movingCardHTML(row)}</div>`).join("")
+  ).join("");
 }
 // movingSeen no longer decides whether a row renders — every row inside the selected window shows, full
 // stop. It is still upserted here so movingUnseenCount() (the chip badge — the only thing movingSeen is
@@ -17552,7 +17609,7 @@ function renderMovingScreen(markSeen){
       const clickable = ` role="button" tabindex="0" data-cid="${escA(lane.cascade.id)}" onclick="openMovingAgentEl(this)" style="cursor:pointer"`;
       return `<div class="ablock${tint?` agrank-${tint}`:""}">
         <div class="grouphead sub"${clickable}><span>${name}</span><span class="gcount" style="margin-left:auto">${lane.rows.length}</span></div>
-        <div class="mvlist">${lane.rows.map(movingRowHTML).join("")}</div>
+        <div class="mvlist">${movingLaneHTML(lane.rows)}</div>
       </div>`;
     }).join("");
     return `<div class="group" data-g="${g}">
@@ -17564,7 +17621,7 @@ function renderMovingScreen(markSeen){
   // see those functions' own comments for how they were generalised to take a container.
   const jumpCtl=`<div class="listctl" id="movingListCtl"><div class="jumpbar" id="movingJumpBar" hidden></div></div>`;
   $("movingBody").innerHTML = head + alertHTML + jumpCtl + `<div id="movingGroups">${sectionsHTML}</div>`;
-  observeLazyPosters($("movingBody"));   // CAS-1103: movingRowHTML's cards carry the same lazy poster tiles
+  observeLazyPosters($("movingBody"));   // CAS-1103: movingLaneHTML's cards carry the same lazy poster tiles
   renderJumpBar({jumpBarId:"movingJumpBar", listCtlId:"movingListCtl", groupsSel:"#movingGroups .group", isOwn:()=>false, label:"Jump to"});
   syncHeaderHeight();   // CAS-852: #movingHead's height can change (window switch) — re-measure so the lane heading's --stickyh offset never drifts
 }

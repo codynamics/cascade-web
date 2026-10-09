@@ -370,6 +370,12 @@ if(typeof window.CascadeAuth === "undefined"){
   // setMovingWindow are the real wire code (DOM reads/writes absorbed by the stub, exactly like the rest of
   // this file's wire calls).
   movingWindowRows, movingUnseenCount, movingBadgeWindow, movingInWindow,
+  // CAS-1237: movingAgeText/sydneyDaysAgo are the Sydney-calendar-day age test, and
+  // movingChipLabel/movingRowGroups are the reminder-chip wording and the consecutive-run grouping
+  // behind the Alerts why-line — all pure, exported so a test can assert them without parsing
+  // renderMovingScreen's DOM. catalogueHeaderDate/sydneyYMD are the same Sydney-calendar-date
+  // conversion applied to the header's freshness label.
+  movingAgeText, sydneyDaysAgo, movingChipLabel, movingRowGroups, catalogueHeaderDate, sydneyYMD,
   // CAS-848: movingLanes is the pure per-agent grouping/ranking step renderMovingScreen paints from — a
   // test can assert lane order/membership without parsing the rendered HTML.
   // CAS-852: movingWindowRank is the per-row ladder position movingLanes now sorts by ahead of newest-

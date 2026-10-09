@@ -355,6 +355,56 @@ class WindowPlacementTests(unittest.TestCase):
         self.assertEqual(counts, {"no_placement": 1})
 
 
+class ReminderWatchOnGateTests(unittest.TestCase):
+    """CAS-1237 AC1: opens_soon/past_opening_weekend are reminders that a film is about to (or
+    just did) reach cinemas — false for a film the user has already placed on Rent/Stream, by
+    hand or by auto-placement. A film with no placement row at all keeps today's behaviour (the
+    reminder fires), same as WindowPlacementTests.test_non_window_moments_fire_with_no_placement_row."""
+
+    def _movie(self, tmdb_id=8001, title="Soon Film", status=("upcoming",)):
+        return {"tmdb_id": tmdb_id, "title": title, "genres": ["Drama"], "status": list(status),
+                "cinema_date": "2026-07-23", "language": "en", "wm_critic_score": 70, "popularity": 50,
+                "wm_popularity_percentile": 70,
+                "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}],
+                "wm_user_rating": 7.5}
+
+    def _cascade(self, moments):
+        return [{"id": "c1", "user_id": "u1", "name": "Everything", "active": True,
+                 "alert_moments": list(moments), "criteria": _criteria(genre=["Drama"], imdb=7.0)}]
+
+    def _match(self, cascades, moment, movie, windows):
+        admission = _admit(cascades, today=[movie])
+        t = Transition(str(movie["tmdb_id"]), movie["title"], moment, movie=movie)
+        watches = ([{"user_id": "u1", "movie_id": str(movie["tmdb_id"]), "windows": windows}]
+                   if windows is not None else [])
+        return match(cascades, [t], admission=admission, film_watches=watches)
+
+    def test_opens_soon_silent_once_placed_on_stream(self):
+        movie = self._movie()
+        hits = self._match(self._cascade(["opens_soon"]), "opens_soon", movie, ["stream"])
+        self.assertEqual(hits, {})
+
+    def test_opens_soon_fires_when_placed_on_cinema(self):
+        movie = self._movie()
+        hits = self._match(self._cascade(["opens_soon"]), "opens_soon", movie, ["in_cinema"])
+        self.assertEqual(len(hits.get("u1", [])), 1)
+
+    def test_opens_soon_fires_with_no_placement_row(self):
+        movie = self._movie()
+        hits = self._match(self._cascade(["opens_soon"]), "opens_soon", movie, None)
+        self.assertEqual(len(hits.get("u1", [])), 1)
+
+    def test_past_opening_weekend_silent_once_placed_on_rent(self):
+        movie = self._movie(status=("opening_week",))
+        hits = self._match(self._cascade(["past_opening_weekend"]), "past_opening_weekend", movie, ["rent"])
+        self.assertEqual(hits, {})
+
+    def test_past_opening_weekend_fires_when_placed_on_cinema(self):
+        movie = self._movie(status=("opening_week",))
+        hits = self._match(self._cascade(["past_opening_weekend"]), "past_opening_weekend", movie, ["in_cinema"])
+        self.assertEqual(len(hits.get("u1", [])), 1)
+
+
 class AutoPlacementTests(unittest.TestCase):
     """CAS-1097: agent_films stops being client-pushed CURRENT membership — but an admitted film
     with no film_watch row of its own (automatic placement stopped being client-pushed per CAS-1096)

@@ -3320,6 +3320,13 @@ def run(simulate_day: bool = False):
 
     payload = {
         "generated": today.isoformat(),
+        # CAS-1237: the precise UTC instant this run actually happened, alongside the bare `today`
+        # date above (left untouched — CAS-1232's publish-floor determinism and the data-quality
+        # tests key off it). The header's freshness label needs real time-of-day to convert
+        # correctly to the account holder's own calendar date; a bare date can't carry that — a run
+        # at 07:30 Sydney is already 20:30 the PREVIOUS day in UTC, and `today` alone has already
+        # lost which of the two it was.
+        "generatedAt": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "region": REGION,
         "currency": CURRENCY,
         "live": LIVE,
@@ -3408,11 +3415,16 @@ CATALOGUE_DROPPED_FIELDS = (
 )
 
 
-def write_catalogue(records: list[dict], catalogue_date: str) -> None:
+def write_catalogue(records: list[dict], catalogue_date: str, generated_at: str | None = None) -> None:
     """CAS-1101: alongside the inlined MOVIES payload, publish a compact content-hashed catalogue
     file (client-read fields only, no indentation) plus a small pointer file at the site root, so
     a data-only refresh doesn't have to re-ship all of index.html. Old hashed files are pruned,
-    keeping only the one just written and whatever the pointer named before this call."""
+    keeping only the one just written and whatever the pointer named before this call.
+
+    generated_at : CAS-1237's precise UTC timestamp (see payload["generatedAt"] in run()) — None
+                  for a caller that predates it. The app converts it to the viewer's own Sydney
+                  calendar date for the header label; `catalogue_date` (the bare UTC date) stays
+                  the pointer's `generated` field, unchanged, for every other reader."""
     os.makedirs(CATALOGUE_DIR, exist_ok=True)
     prev_name = None
     if os.path.exists(CATALOGUE_POINTER):
@@ -3431,7 +3443,8 @@ def write_catalogue(records: list[dict], catalogue_date: str) -> None:
 
     with open(CATALOGUE_POINTER, "w", encoding="utf-8") as f:
         json.dump({"file": f"catalogue/{file_name}", "hash": file_hash,
-                    "generated": catalogue_date, "count": len(records)}, f, separators=(",", ":"))
+                    "generated": catalogue_date, "generatedAt": generated_at,
+                    "count": len(records)}, f, separators=(",", ":"))
         f.write("\n")
 
     keep = {file_name}
@@ -3447,10 +3460,15 @@ def build_html(records: list[dict] | None = None, provider_status: dict | None =
     Keeps the app a single double-clickable file (no server, no CORS).
     Also stamps the release/build version (CAS-124) into the app and /version.json."""
     catalogue_date = datetime.date.today().isoformat()
+    # CAS-1237: the precise instant this build is of real catalogue data — reused unchanged on a bare
+    # --build-html rebuild (records is None) exactly like catalogue_date above, so a code-only rebuild
+    # of an unchanged catalogue never claims to have refreshed data it didn't.
+    generated_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     if records is None:  # --build-html on its own: rebuild from the last movies.json
         catalogue = json.load(open(OUTPUT_FILE, encoding="utf-8"))
         records = catalogue["movies"]
         catalogue_date = catalogue.get("generated", catalogue_date)
+        generated_at = catalogue.get("generatedAt", generated_at)
     if not os.path.exists(TEMPLATE_FILE):
         print("! app_template.html not found — cannot build index.html"); return
     info = build_version_info(provider_status)
@@ -3472,7 +3490,7 @@ def build_html(records: list[dict] | None = None, provider_status: dict | None =
     with open(BUILD_INFO_JS, "w", encoding="utf-8") as f:
         f.write("window.BUILD_INFO = " + json.dumps(info) + ";\n")
     print(f"stamped v{info['version']} · build {info['build']} · {info['commit']}")
-    write_catalogue(records, catalogue_date)
+    write_catalogue(records, catalogue_date, generated_at)
     write_csp_headers()
     _sync_ios_www()
 
