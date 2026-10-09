@@ -161,6 +161,13 @@ if(typeof window.CascadeAuth === "undefined"){
   get watchCinemaStage(){ return watchCinemaStage; },
   setWatchCinemaStage(v){ watchCinemaStage = v; },
   watchWatchedSel, watchGenreOff, watchSearch, filmMatchesWatchedFilter, filmMatchesWatchTab,
+  // CAS-1234: watchBadgeSel (by reference, same convention as watchWatchedSel/watchGenreOff above) plus the
+  // predicate render() filters through and the sheet's own option list (icon/label come from TENT_BADGE,
+  // already exported below — BADGE_FILTER_OPTS carries only the key and its live descriptor), so a test can
+  // drive a Badges selection directly and assert both the real filter and the printed percentage.
+  watchBadgeSel, filmMatchesBadgeFilter, BADGE_FILTER_OPTS,
+  toggleWatchBadge: (key) => window.toggleWatchBadge(key),
+  clearAllWatchBadge: () => window.clearAllWatchBadge(),
   // CAS-1235: watchAlsoShow (by reference — toggleWatchAlsoShow/clearWatchAlsoShow mutate or reassign the
   // per-tab Set in place) plus the default it now widens to and the heading render() builds from a group's
   // status key, so a test can assert the default-on behaviour and its heading text without scraping the DOM
@@ -226,6 +233,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // the invite page's rendered top literally contains the same cardTopHTML(m) output, not a re-derived copy.
   cardTopHTML, filmPageHTML,
   inferredScale, inferScaleWhy, budgetCell, moneyRowHTML, SCALE_INFER_MIN_PEERS, popOf, scaleTier,
+  // CAS-1234: TENT_BADGE is scaleTier's own icon/label lookup (the card badge's exact source) — exported so
+  // a test can assert the Badges sheet section names the same icon/label scaleTier(m) implies.
+  TENT_BADGE,
   // CAS-742: the two catalogue-derived compute-once caches, exposed by reference (Map, never reassigned) so
   // a test can assert their .size directly, plus the one function that clears both — the real invalidation
   // point wired into the catalogue swap.

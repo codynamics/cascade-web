@@ -2727,6 +2727,17 @@
   .alsochip .jn{font-weight:800;opacity:.85}
   .alsochip .alwaystag{font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;opacity:.7}
   .alsochip:disabled{cursor:default;opacity:1}
+  /* CAS-1234: the Badges section — one full-width row per option (a descriptor line needs room a .chip's
+     single-line pill doesn't have), gold-tinted ON to match the card's own .tentbadge colour rather than
+     the --wwc-tinted convention above, since the card badge is gold regardless of which tier it names. */
+  .badgeopts{display:flex;flex-direction:column;gap:8px}
+  .badgeopt{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;text-align:left;
+    font:inherit;padding:9px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--dim);cursor:pointer}
+  .badgeopt.on{background:rgba(245,214,117,.10);border-color:rgba(245,214,117,.45)}
+  .badgeoptrow{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--ink)}
+  .badgeopt .jn{font-weight:800;opacity:.85;margin-left:2px}
+  .badgeoptdesc{font-size:11.5px;color:var(--dim);line-height:1.35}
   .wsheethd{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
   .wsheethd>span:first-child{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
   .wsheetlinks{display:flex;gap:12px}
@@ -9550,6 +9561,10 @@ window.clearAllWatchStyles = () => {
 // selection hides tagged-out films entirely, exactly the old scope.watched=false default.
 const watchSearch = {in_cinema:"", premium:"", rent:"", stream:""};
 const watchWatchedSel = {in_cinema:new Set(), premium:new Set(), rent:new Set(), stream:new Set()};
+// CAS-1234: the Badges section's own selection — same per-tab, session-only, empty-means-"nothing
+// narrowed" shape as watchWatchedSel above. Values are scaleTier(m)'s own keys (landmark/mustsee/
+// blockbuster/anticipated), so filmMatchesBadgeFilter below never needs a translation layer either.
+const watchBadgeSel = {in_cinema:new Set(), premium:new Set(), rent:new Set(), stream:new Set()};
 // CAS-719: who set the current tab's Watch On level — All/Agent (auto)/Me (manual), single-select,
 // same per-tab session-only shape as watchGenreOff/watchWatchedSel above. Values other than "all" match
 // filmWatchSource(id)'s own return values directly ("auto"/"manual"), so there is no translation layer
@@ -9754,6 +9769,13 @@ window.enableWatchMineOnly = () => { setWatchMineOnly(true); render(); scrollWat
 function filmMatchesWatchedFilter(m){
   return taggedOut(m) ? watchWatchedSel[watchTab].has(opinionOf(m.tmdb_id)) : true;
 }
+// CAS-1234: nothing selected narrows nothing (point 2 of the ticket); one or more selected keeps only a
+// film whose own scaleTier(m) — Landmark first, then the buzz band, exactly as the card badge reads it —
+// is one of the picks.
+function filmMatchesBadgeFilter(m){
+  const sel=watchBadgeSel[watchTab];
+  return !sel.size || sel.has(scaleTier(m));
+}
 // CAS-752: a film given a verdict THIS VISIT stays a row — folded to its stub by the existing keepRowInPlace
 // animation — even though its own new verdict just made it fail filmMatchesWatchedFilter above. Session-only
 // and per-tab, same shape as heldOpen's hold for the Found view; settleWatchHeldOpen (called wherever
@@ -9783,11 +9805,19 @@ window.toggleWatchWatched = key => {
   render();
 };
 window.clearAllWatchWatched = () => { watchWatchedSel[watchTab].clear(); render(); scrollWatchListingToTop(); };   // CAS-857
+// CAS-1234: same toggle/clear-all shape as toggleWatchWatched/clearAllWatchWatched above.
+window.toggleWatchBadge = key => {
+  const set=watchBadgeSel[watchTab];
+  set.has(key) ? set.delete(key) : set.add(key);
+  render();
+};
+window.clearAllWatchBadge = () => { watchBadgeSel[watchTab].clear(); render(); scrollWatchListingToTop(); };   // CAS-857
 window.clearAllWatchFilters = () => {
   watchSearchRaw[watchTab]=""; watchSearch[watchTab]="";
   watchPickedBy[watchTab]="all";
   watchWatchedSel[watchTab].clear();
   watchGenreOff[watchTab].clear();
+  watchBadgeSel[watchTab].clear();
   // CAS-1235: same as the Also-show section's own clear — back to default, not empty.
   watchAlsoShow[watchTab]=new Set(WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
   // CAS-1144: "cleared" means the narrowing no longer applies, not reset-to-default — mineOnly's own
@@ -9830,16 +9860,18 @@ const agentOccasionsLine = c => {
 function watchFiltersActiveCount(){
   const genreOff=watchGenreOff[watchTab];
   const watchedSel=watchWatchedSel[watchTab];
+  const badgeSel=watchBadgeSel[watchTab];
   const pickedBy=watchPickedBySafe(watchTab);
   const mineOnly=watchMineOnlyOn();
   // CAS-1235: Also-show's default is no longer empty — only a DIFFERENCE from WATCH_ALSO_SHOW_DEFAULT counts.
-  return (pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(watchAlsoShowIsDefault(watchTab)?0:1)+(mineOnly?0:1);
+  return (pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(badgeSel.size?1:0)+(watchAlsoShowIsDefault(watchTab)?0:1)+(mineOnly?0:1);
 }
 function renderWatchSheet(rows, shownCount){
   const genreOff=watchGenreOff[watchTab];
   const genres=[...new Set(rows.flatMap(m=>m.genres||[]))].sort();
   watchSheetGenres[watchTab]=genres;
   const watchedSel=watchWatchedSel[watchTab];
+  const badgeSel=watchBadgeSel[watchTab];
   const pickedBy=watchPickedBySafe(watchTab);
   const alsoShowSet=watchAlsoShow[watchTab];
   // CAS-753: default is ON, so — unlike every set/off field above — it counts as a deviation when it's OFF.
@@ -9889,6 +9921,19 @@ function renderWatchSheet(rows, shownCount){
     return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
       onclick="PICKER_KINDS.sort.pick('${o.key}')">${esc(o.label)}</button>`;
   }).join("");
+  // CAS-1234: counts come from `rows` — the same pre-Picked-by/Styles/Watched/Also-show pool Styles' own
+  // genre chips above are built from — so a badge nobody's picked yet still shows what picking it would
+  // cost (the "a toggled-off option stays offerable" rule CAS-718's comment names).
+  const badgeHTML=BADGE_FILTER_OPTS.map(opt=>{
+    const b=TENT_BADGE[opt.key];
+    const on=badgeSel.has(opt.key);
+    const count=rows.filter(m=>scaleTier(m)===opt.key).length;
+    return `<button type="button" class="badgeopt${on?" on":""}" aria-pressed="${on}"
+      onclick="toggleWatchBadge('${opt.key}')">
+      <span class="badgeoptrow"><span class="badgeopticon" aria-hidden="true">${b.ico}</span>
+      <b>${esc(b.label)}</b><span class="jn">${count}</span></span>
+      <span class="badgeoptdesc">${esc(opt.descriptor())}</span></button>`;
+  }).join("");
   const body=$("watchSheetBody");
   if(body) body.innerHTML=`
     <div class="wsheetsec">
@@ -9922,7 +9967,11 @@ function renderWatchSheet(rows, shownCount){
     ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Also show</span></div>
       <div class="chips">${alsoShowHTML}</div>
-    </div>`}`;
+    </div>`}
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Badges</span></div>
+      <div class="badgeopts">${badgeHTML}</div>
+    </div>`;
   const showBtn=$("watchSheetShowBtn");
   if(showBtn) showBtn.textContent = shownCount ? `Show ${shownCount} film${shownCount===1?"":"s"}` : "No films match";
   const chips=[];
@@ -9935,6 +9984,8 @@ function renderWatchSheet(rows, shownCount){
   // CAS-1235: only a difference from the (no-longer-empty) default counts as an active filter here.
   if(!watchAlsoShowIsDefault(watchTab)) chips.push({label:chipSummary(ALSO_SHOW_WINDOWS.filter(w=>alsoShowSet.has(w.key)).map(w=>w.label)),
     clear:"clearWatchAlsoShow()"});
+  if(badgeSel.size) chips.push({label:chipSummary(BADGE_FILTER_OPTS.filter(o=>badgeSel.has(o.key)).map(o=>TENT_BADGE[o.key].label)),
+    clear:"clearAllWatchBadge()"});
   // CAS-1223: a switched-off agent reads directly off its own lozenge in #watchTop now, so the active-filter
   // row no longer duplicates it as a chip (section 4 of the ticket).
   const bar=$("watchActiveFilters"); if(!bar) return;
@@ -9992,6 +10043,7 @@ function watchVisibleRows(){
   if(watchPickedBy[watchTab]!=="all") rows=rows.filter(filmMatchesPickedBy);
   const genreOff=watchGenreOff[watchTab];
   if(genreOff.size) rows=rows.filter(m=>!(m.genres||[]).some(g=>genreOff.has(g)));
+  if(watchBadgeSel[watchTab].size) rows=rows.filter(filmMatchesBadgeFilter);
   const heldThisTab=watchHeldOpen[watchTab];
   rows=rows.filter(m=>filmMatchesWatchedFilter(m) || heldThisTab.has(m.tmdb_id));
   const preMineOnlyRows=rows;
@@ -10534,6 +10586,15 @@ function scaleTier(m){
   if(isLandmark(m)) return "landmark";
   return buzzBandOf(m);
 }
+// CAS-1234: the Watch Filters sheet's Badges section — one option per scaleTier(m) value, in the ladder's
+// own highest-to-lowest order. Each descriptor is a function, not a frozen string, so the printed
+// percentage can never disagree with BUZZ_PCTL's real cuts (AC2).
+const BADGE_FILTER_OPTS = [
+  {key:"landmark",    descriptor:() => "Award-winning, acclaimed by critics, made at scale"},
+  {key:"mustsee",     descriptor:() => `The top ${100-BUZZ_PCTL[3]}% most talked-about new films`},
+  {key:"blockbuster", descriptor:() => `The top ${100-BUZZ_PCTL[2]}% most talked-about new films`},
+  {key:"anticipated", descriptor:() => `The top ${100-BUZZ_PCTL[1]}% most talked-about new films`},
+];
 
 // CAS-140: E (Exempt) and RC (Refused Classification) are NOT maturity rungs — E is a carve-out for
 // content that isn't classified at all, RC is prohibited content — so neither belongs on the ascending
@@ -11631,7 +11692,7 @@ function scopeEmptyHTML(){
 // listing never filters by) is touched right now — the guard for offering a "Clear filters" way out at all.
 function watchFiltersActive(){
   return !!watchSearch[watchTab] || watchPickedBy[watchTab]!=="all" || watchGenreOff[watchTab].size>0
-    || watchWatchedSel[watchTab].size>0 || watchMineOnlyOn() || watchOccasion!=null;
+    || watchWatchedSel[watchTab].size>0 || watchBadgeSel[watchTab].size>0 || watchMineOnlyOn() || watchOccasion!=null;
 }
 // CAS-1144: re-runs render()'s own Watch pipeline (watchScopeRows → search → Picked by → hidden styles →
 // Watched filter → mine-only) with every one of the tab's own narrowings cleared, so the count on "Clear
@@ -11641,17 +11702,20 @@ function watchRowsWithFiltersCleared(){
   const tab=watchTab;
   const snap={search:watchSearch[tab], raw:watchSearchRaw[tab], pickedBy:watchPickedBy[tab],
     genreOff:new Set(watchGenreOff[tab]), watchedSel:new Set(watchWatchedSel[tab]),
+    badgeSel:new Set(watchBadgeSel[tab]),
     mineOnly:watchMineOnly[tab], occasion:watchOccasion};
   watchSearch[tab]=""; watchSearchRaw[tab]="";
   watchPickedBy[tab]="all";
   watchGenreOff[tab].clear();
   watchWatchedSel[tab].clear();
+  watchBadgeSel[tab].clear();
   watchMineOnly[tab]=false;
   watchOccasion=null;
   let rows=watchScopeRows();
   if(watchPickedBy[tab]!=="all") rows=rows.filter(filmMatchesPickedBy);
   const genreOff=watchGenreOff[tab];
   if(genreOff.size) rows=rows.filter(m=>!(m.genres||[]).some(g=>genreOff.has(g)));
+  if(watchBadgeSel[tab].size) rows=rows.filter(filmMatchesBadgeFilter);
   const heldThisTab=watchHeldOpen[tab];
   rows=rows.filter(m=>filmMatchesWatchedFilter(m) || heldThisTab.has(m.tmdb_id));
   const n=rows.filter(m=>!taggedOut(m)).length;
@@ -11659,6 +11723,7 @@ function watchRowsWithFiltersCleared(){
   watchPickedBy[tab]=snap.pickedBy;
   watchGenreOff[tab].clear(); snap.genreOff.forEach(g=>watchGenreOff[tab].add(g));
   watchWatchedSel[tab].clear(); snap.watchedSel.forEach(v=>watchWatchedSel[tab].add(v));
+  watchBadgeSel[tab].clear(); snap.badgeSel.forEach(v=>watchBadgeSel[tab].add(v));
   watchMineOnly[tab]=snap.mineOnly;
   watchOccasion=snap.occasion;
   return n;
@@ -19636,6 +19701,7 @@ function watchNavKey(){
     watchPickedBy[watchTab],
     [...watchGenreOff[watchTab]].sort(),
     [...watchWatchedSel[watchTab]].sort(),
+    [...watchBadgeSel[watchTab]].sort(),
     watchMineOnlyOn(),
     watchOccasion,
   ]);
@@ -19982,6 +20048,7 @@ function filmInWatchRows(m){
   if(watchPickedBy[watchTab]!=="all" && !filmMatchesPickedBy(m)) return false;
   const genreOff=watchGenreOff[watchTab];
   if(genreOff.size && (m.genres||[]).some(g=>genreOff.has(g))) return false;
+  if(watchBadgeSel[watchTab].size && !filmMatchesBadgeFilter(m)) return false;
   if(!filmMatchesWatchedFilter(m) && !watchHeldOpen[watchTab].has(m.tmdb_id)) return false;
   if(watchMineOnlyOn() && HOME_KEYS.includes(primaryStatus(m)) && !matchesServices(m, primaryStatus(m))) return false;
   return true;
