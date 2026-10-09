@@ -89,6 +89,10 @@ function makeContext(localStorageStore){
     getComputedStyle: () => node(),
     CSS: { escape: s => String(s) },
     URLSearchParams, URL, TextEncoder, TextDecoder, structuredClone, crypto,
+    // CAS-1241: acctOp's sendOnceWithTimeout now aborts the losing side of its timeout race — the same
+    // Node global referenced here, not a sandbox-local copy, so `new AbortController()` inside the engine
+    // produces a real AbortSignal a test can assert on with `instanceof` against the outer realm's class.
+    AbortController,
     CustomEvent: class { constructor(type, opts){ this.type = type; Object.assign(this, opts || {}); } },
     Event: class { constructor(type){ this.type = type; } },
     MutationObserver: class { observe(){} disconnect(){} takeRecords(){ return []; } },

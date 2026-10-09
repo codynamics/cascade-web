@@ -22426,12 +22426,23 @@ else if(dedupedN)
   let SEND_ONCE_TIMEOUT_MS = 15000;
   async function sendOnceWithTimeout(c, op){
     const startedAt = Date.now();
+    // CAS-1241: the timeout race below used to only resolve the CALLER's wait — it never cancelled the
+    // real request. The loser kept running against PostgREST/Postgres in the background, so a slow upsert/
+    // rpc (a row lock on CI's local Supabase stack, e.g. CAS-1222's merge_user_prefs_view) left behind an
+    // abandoned transaction still holding that row's lock; every retry then opened a NEW competing request
+    // against the same row instead of replacing the stuck one, compounding the contention each attempt
+    // rather than resolving it. Aborting the underlying fetch here lets Postgres release the lock (or drop
+    // the connection) before the next retry fires, so a retry gets a clean attempt.
+    const controller = (typeof AbortController !== "undefined") ? new AbortController() : null;
     let timer;
     const timedOut = new Promise(resolve => {
-      timer = setTimeout(() => resolve({ error: new Error("acctOp: sendOnce timed out"), status: 0 }), SEND_ONCE_TIMEOUT_MS);
+      timer = setTimeout(() => {
+        if(controller) controller.abort();
+        resolve({ error: new Error("acctOp: sendOnce timed out"), status: 0 });
+      }, SEND_ONCE_TIMEOUT_MS);
     });
     try{
-      const result = await Promise.race([sendOnce(c, op), timedOut]);
+      const result = await Promise.race([sendOnce(c, op, controller && controller.signal), timedOut]);
       if(result && result.error && result.error.message === "acctOp: sendOnce timed out"){
         console.warn("acctOp sendOnce timeout", op.table, op.kind, (Date.now()-startedAt)+"ms");
       }
@@ -22439,11 +22450,18 @@ else if(dedupedN)
     } finally { clearTimeout(timer); }
   }
 
-  async function sendOnce(c, op){
+  // Applies .abortSignal(signal) when both a signal and the method exist — a test double's fake query
+  // builder (tests/js's fakeClient convention) implements only the chain methods its own scripted
+  // responses need, so calling a method it never declared would throw rather than simply no-op.
+  function withAbort(q, signal){
+    return (signal && q && typeof q.abortSignal === "function") ? q.abortSignal(signal) : q;
+  }
+
+  async function sendOnce(c, op, signal){
     if(op.kind === "insert"){
       // Client-generated uuid, upserted on id with ignoreDuplicates — a retry of the same op can never
       // duplicate the row.
-      return await c.from(op.table).upsert(op.fields, { onConflict:"id", ignoreDuplicates:true });
+      return await withAbort(c.from(op.table).upsert(op.fields, { onConflict:"id", ignoreDuplicates:true }), signal);
     }
     if(op.kind === "upsert"){
       // CAS-1096: op.onConflict names the real composite key (e.g. "user_id,movie_id") — a retry of the
@@ -22451,8 +22469,9 @@ else if(dedupedN)
       // CAS-1218: op.ignoreDuplicates (unset/false for every pre-existing caller, so their behaviour is
       // unchanged) lets a load-triggered bootstrap insert (a missing notify_prefs/user_prefs row, a minted
       // ref_code) refuse to overwrite a row that already exists, rather than updating it.
-      return await c.from(op.table).upsert(Object.assign({}, op.match, op.fields),
+      const q = c.from(op.table).upsert(Object.assign({}, op.match, op.fields),
         { onConflict:op.onConflict, ignoreDuplicates:!!op.ignoreDuplicates });
+      return await withAbort(q, signal);
     }
     if(op.kind === "upsert_many"){
       // CAS-1136: the same composite-key reasoning as "upsert" above, one request for every row in op.items.
@@ -22465,17 +22484,19 @@ else if(dedupedN)
       // CAS-1218: op.ignoreDuplicates, same reasoning as "upsert" above — agent_films' own admitted_at/
       // admission_score are frozen history, never something a later write may overwrite.
       const rows = op.items.map(item => Object.assign({}, item.match, item.fields));
-      return await c.from(op.table).upsert(rows, { onConflict:op.onConflict, ignoreDuplicates:!!op.ignoreDuplicates });
+      const q = c.from(op.table).upsert(rows, { onConflict:op.onConflict, ignoreDuplicates:!!op.ignoreDuplicates });
+      return await withAbort(q, signal);
     }
     if(op.kind === "update"){
       let q = c.from(op.table).update(op.fields).match(op.match);
       // expectUpdatedAt is always the exact string PostgREST returned for that row — passed straight
       // through, never via new Date(), which would lose the microseconds.
       if(op.expectUpdatedAt !== undefined) q = q.eq("updated_at", op.expectUpdatedAt);
-      return await q.select();   // .select() makes PostgREST return the affected rows, so 0 rows back is
-                                  // how a conflicting expectUpdatedAt is told apart from a genuine success.
+      q = q.select();             // .select() makes PostgREST return the affected rows, so 0 rows back is
+                                   // how a conflicting expectUpdatedAt is told apart from a genuine success.
+      return await withAbort(q, signal);
     }
-    if(op.kind === "delete") return await c.from(op.table).delete().match(op.match);
+    if(op.kind === "delete") return await withAbort(c.from(op.table).delete().match(op.match), signal);
     if(op.kind === "rpc"){
       // CAS-1222: a client with no .rpc() at all (every Supabase client in production has one — this only
       // ever happens against a test double someone forgot to stub it on) can never succeed on any retry.
@@ -22484,7 +22505,7 @@ else if(dedupedN)
       // every other queued write behind a doomed op for several seconds. Answered as a real, permanent 4xx
       // instead, the same shape a genuine RLS refusal already takes.
       if(typeof c.rpc !== "function") return { data:null, error:{ message:"acctOp: client has no rpc()" }, status:400 };
-      return await c.rpc(op.table, op.fields || {});
+      return await withAbort(c.rpc(op.table, op.fields || {}), signal);
     }
     throw new Error("acctOp: unknown kind " + op.kind);
   }
