@@ -6146,6 +6146,27 @@ function showFoundList(){ settleFoundView(); }
 // own onchange below, cleared wherever filt.sort is assigned from a stored cascade (applyCascade) — never
 // persisted, so a reload starts false same as filt.sort itself starts at DEFAULT_SORT.
 let sortPicked=false;
+// CAS-1240: the switch's own effective key — mirrors listingGroups' own tabDflt/isUserSort derivation
+// exactly (the Cinema tab's default is "availability", every other tab's is DEFAULT_SORT), so the switch
+// can never claim an order the list isn't actually rendered in. Reading raw filt.sort here (the pre-fix
+// bug) left the Cinema tab's default read as "Cascade score" lit, while the list itself rendered release-
+// date order.
+function watchSortActiveKey(){
+  const tabDflt = watchTab==="in_cinema" ? "availability" : DEFAULT_SORT;
+  return sortPicked ? filt.sort : tabDflt;
+}
+// CAS-1240: the switch's two halves, each carrying the direction arrow that matches what the list actually
+// does when that half is the one selected. Release date reads soonest-first (↑) on the in_cinema tab
+// (Upcoming and In Cinema both live under it) and newest-first (↓) on every released tab (Rent/Stream/
+// Premium) — Cascade score is always highest-first (↓), the one direction the "cascade" sort ever produces.
+function watchSortSwitchHalves(){
+  const key=watchSortActiveKey();
+  const cinemaOn=key==="cinema"||key==="availability", cascadeOn=key==="cascade";
+  return {
+    cinema: {on:cinemaOn, label: cinemaOn ? `Release date ${watchTab==="in_cinema"?"↑":"↓"}` : "Release date"},
+    cascade: {on:cascadeOn, label: cascadeOn ? "Cascade score ↓" : "Cascade score"},
+  };
+}
 // CAS-1181: PICKER_KINDS.sort's pick() is what changes filt.sort now (the popover replaced the invisible
 // <select>); this just repaints the icon button around it — a tooltip naming the current order, and the
 // active-dot for "you're off the default". The select itself stays only as inert state for the lookup below.
@@ -6157,12 +6178,14 @@ function syncSortCtl(){
   const opt=$("sort").querySelector(`option[value="${filt.sort}"]`);
   $("sortCtl").title="Order: "+(opt?opt.textContent:"");
   $("sortDot").hidden=!sortPicked;   // CAS-819: dot reflects an explicit pick, not just "off DEFAULT_SORT"
-  // CAS-1223: the visible two-way switch in the tools row — only two of SORT_OPTS' eight values have a
-  // half here, so a pick from the Filters sheet's own full "Sort by" list (any of the other six) correctly
-  // leaves neither half filled.
+  // CAS-1223/CAS-1240: the visible two-way switch in the tools row — only two of SORT_OPTS' eight values
+  // have a half here, so a pick from the Filters sheet's own full "Sort by" list (any of the other six)
+  // correctly leaves neither half filled. Each half's own label (not just its "on" state) comes from
+  // watchSortSwitchHalves() too, so the direction arrow never drifts from what's actually selected.
   const cinBtn=$("watchSortCinema"), casBtn=$("watchSortCascade");
-  if(cinBtn){ const on=filt.sort==="cinema"; cinBtn.classList.toggle("on",on); cinBtn.setAttribute("aria-pressed",String(on)); }
-  if(casBtn){ const on=filt.sort==="cascade"; casBtn.classList.toggle("on",on); casBtn.setAttribute("aria-pressed",String(on)); }
+  const halves=watchSortSwitchHalves();
+  if(cinBtn){ cinBtn.classList.toggle("on",halves.cinema.on); cinBtn.setAttribute("aria-pressed",String(halves.cinema.on)); cinBtn.textContent=halves.cinema.label; }
+  if(casBtn){ casBtn.classList.toggle("on",halves.cascade.on); casBtn.setAttribute("aria-pressed",String(halves.cascade.on)); casBtn.textContent=halves.cascade.label; }
 }
 $("imdbMin").oninput=e=>{filt.imdb=+e.target.value;$("imdbVal").textContent=filt.imdb?filt.imdb.toFixed(1)+"+":"Any";render();};
 $("rtMin").oninput=e=>{filt.rt=+e.target.value;$("rtVal").textContent=filt.rt?filt.rt+"%+":"Any";render();};
@@ -9573,9 +9596,12 @@ const PICKER_KINDS = {
   sort: {
     items: () => SORT_OPTS,
     current: () => filt.sort,
-    // CAS-819: choosing "Cascade score" (DEFAULT_SORT's own option) is choosing the default back — anything
-    // else is a genuine pick, which is what sortPicked (the active-dot's own flag) tracks.
-    pick: key => { filt.sort=key; sortPicked=(filt.sort!==DEFAULT_SORT); syncSortCtl(); render(); },
+    // CAS-1240: any explicit tap/pick is a genuine pick, full stop. CAS-819's original rule compared the
+    // chosen key against DEFAULT_SORT instead, which silently dropped the pick whenever someone chose
+    // Cascade score on a tab whose own default isn't DEFAULT_SORT — the Cinema tab's is "availability", so
+    // tapping "Cascade score" there set filt.sort to DEFAULT_SORT's own value and read as choosing the
+    // default back, when it was the one tab where that tap was the only way to leave the default at all.
+    pick: key => { filt.sort=key; sortPicked=true; syncSortCtl(); render(); },
   },
 };
 const SORT_OPTS = [

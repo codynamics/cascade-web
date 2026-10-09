@@ -422,6 +422,12 @@ if(typeof window.CascadeAuth === "undefined"){
   // (Your Movies' own sort control) went with the rest of the retired watch-list model in CAS-863.
   get sortPicked(){ return sortPicked; },
   setSortPicked(v){ sortPicked = v; },
+  // CAS-1240: PICKER_KINDS exposes the Watch bar's own sort switch (pick('cinema')/pick('cascade')) so a
+  // test can drive the exact tap the two switch buttons' onclick calls, rather than setting filt.sort/
+  // sortPicked by hand and assuming that's equivalent. watchSortActiveKey/watchSortSwitchHalves are the
+  // pure functions syncSortCtl's DOM-writing paints from — exported so a test can assert the switch's own
+  // displayed state without scraping the DOM the stub swallows.
+  PICKER_KINDS, watchSortActiveKey, watchSortSwitchHalves,
   // CAS-613: auto-notify's own decision surface. recomputeFound is the wire-adjacent entry point (it reads
   // cascades/MOVIES and writes notify), exposed the same way movingData is above; notify/entryFor let a test
   // seed and read the per-film arming state directly; watchPrefs is exposed through a getter/setter (like
