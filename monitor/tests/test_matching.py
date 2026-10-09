@@ -809,6 +809,29 @@ class OwnerAttributionTests(unittest.TestCase):
         self.assertFalse(hits[0].wants("email"))
         self.assertTrue(hits[0].wants("in_app"))
 
+    # CAS-1239 AC4: the monitor must name the same owner as the app for the ticket's own AC1 (no-pin,
+    # the higher-ranked candidate's own score gate fails) and AC5 (a pin wins even though the pinned
+    # agent's own score gate fails) scenarios. compute_admission() already bakes the real engine's score
+    # gate into "today"'s admission set (CAS-825), so _resolve_owner's "b" (lowest-rank ADMITTING agent)
+    # was already the strict LISTS test the app's filmOwnerCascade now also uses — these two confirm that
+    # equivalence rather than changing any production code.
+    def test_h_cas1239_ac1_owner_falls_to_the_listing_agent_when_the_higher_ranked_ones_score_gate_fails(self):
+        c0 = self._cascade("c0", 0, moments=())   # would otherwise own it, but its own floor is unclearable
+        c0["criteria"]["watchMarkers"] = {"in_cinema": 1000, "rent": 1000, "stream": 1000}
+        c2 = self._cascade("c2", 2)                # wide open — actually admits/lists the film
+        hits = self._match([c0, c2], self._transitions())["u1"]
+        self.assertEqual(len(hits), 1, "AC1: the film must still produce exactly one hit, never zero")
+        self.assertEqual(hits[0].cascade_id, "c2", "AC1: ownership falls through to the agent that actually admits it")
+
+    def test_i_cas1239_ac5_a_pin_wins_even_though_the_pinned_agents_own_score_gate_fails(self):
+        h = self._cascade("h", 0)                  # fires, wide open, would otherwise own the film
+        p = self._cascade("p", 5, moments=())       # pinned by hand; its own floor would never admit it
+        p["criteria"]["watchMarkers"] = {"in_cinema": 1000, "rent": 1000, "stream": 1000}
+        picks = [{"user_id": "u1", "movie_id": "1", "pinned_to": ["p"]}]
+        hits = self._match([h, p], self._transitions(), picks=picks)["u1"]
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].cascade_id, "p", "AC5: the pin must win whatever the pinned agent's own criteria say")
+
 
 class PerAgentChannels(unittest.TestCase):
     """CAS-244: the account decides which channels EXIST; an agent decides which of them it uses.

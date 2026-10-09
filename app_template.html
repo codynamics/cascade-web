@@ -5308,8 +5308,6 @@ const foundSource = id => {
   if(!e || !found.has(id)) return "off";
   return e.source==="manual" ? "manual" : "auto";
 };
-const cascadesFor = id => ((notify[id]||{}).cascadeIds||[])
-  .map(cid=>cascades.find(c=>c.id===cid)).filter(Boolean);
 // `touched` = the user has worked the my-services switch by hand, so we stop auto-defaulting it for them.
 // CAS-1221: held in memory only — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
 // ever populates this away from the signed-out default, straight from the account's own user_prefs row.
@@ -8457,14 +8455,28 @@ function notifyChipHTML(id){
 function agentChipSource(id, owner){
   return owner ? (pinnedInto(id,owner) ? "manual" : "auto") : null;
 }
-// CAS-861: owner is gated through ownerIfShown — a film held by an agent the account's my-services switch
-// would hide from the listing reads "No agent" here rather than crediting an owner the listing itself
-// wouldn't show. Every real card renders from a catalogue film, so m is always found in production; the
-// fallback below only ever matters for the odd id with no MOVIES entry.
+// CAS-1239: filmOwnerCascade needs a real catalogue film (listedBy reads its genres/status/etc.) — an id
+// with no MOVIES entry (should never happen for a real card; a couple of synthetic-id tests exercise it on
+// purpose) falls back to the raw recorded pin/membership directly, with no listedBy check, same as before
+// this ticket.
+function rawCascadeIdOwner(id){
+  const e=notify[id]||{};
+  const ids=(e.pinnedTo||[]).length ? e.pinnedTo : (e.cascadeIds||[]);
+  let best=null;
+  ids.forEach(cid=>{
+    const c=cascades.find(x=>x.id===cid);
+    if(c && (!best || (c.order??Number.MAX_SAFE_INTEGER)<(best.order??Number.MAX_SAFE_INTEGER))) best=c;
+  });
+  return best;
+}
+// CAS-1239: owner comes straight from filmOwnerCascade, the one owner-resolution function every surface
+// shares — a film held by an agent the account's my-services switch would hide from the listing reads
+// "No agent" here rather than crediting an owner the listing itself wouldn't show. Every real card renders
+// from a catalogue film, so m is always found in production; the fallback below only ever matters for the
+// odd id with no MOVIES entry.
 function agentChipHTML(id){
   const m=MOVIES.find(x=>x.tmdb_id===id);
-  const rawOwner=cascadesFor(id)[0]||null;
-  const owner=m ? ownerIfShown(m, rawOwner) : rawOwner;
+  const owner=m ? filmOwnerCascade(m) : rawCascadeIdOwner(id);
   const lbl = owner ? owner.name : "No agent";
   const title = owner
     ? `Owned by ${owner.icon} ${owner.name}. Tap to move to a different agent.`
@@ -8481,8 +8493,11 @@ function agentChipHTML(id){
 }
 // The panel's rows: one per cascade, ordered by rank (CAS-708's `.order`, ascending), a true single-select —
 // hence the round .wwb tick, not the Lists checklist's square one — with the film's current owner pre-ticked.
+// CAS-1239: the same filmOwnerCascade the chip above reads, so the row this panel pre-ticks can never be a
+// different agent than the chip that opened it named.
 function agentPanelRowsHTML(id){
-  const owner=cascadesFor(id)[0]||null;
+  const m=MOVIES.find(x=>x.tmdb_id===id);
+  const owner=m ? filmOwnerCascade(m) : rawCascadeIdOwner(id);
   const sorted=[...cascades].sort(cascadeOrderCmp);
   const rows=sorted.map(c=>{
     const on=!!owner && owner.id===c.id;
@@ -17372,7 +17387,7 @@ function movingData(){
       if(watched.has(Number(fid))) return;
       const m=MOVIES.find(x=>String(x.tmdb_id)===fid);
       if(!m) return;
-      const owner=filmOwnerShown(m);
+      const owner=filmOwnerCascade(m);
       if(!owner){ dropped.push({date:firstFound[fid]}); return; }
       rows.push({filmId:fid, m, tag:"new", reason:"New to your agents",
         agentId:owner.id, date:firstFound[fid]});
@@ -17387,7 +17402,7 @@ function movingData(){
       if(byFilm.has(fid) || droppedByFilm.has(fid)) return;
       const m=MOVIES.find(x=>String(x.tmdb_id)===fid);
       if(!m) return;
-      const owner=filmOwnerShown(m);
+      const owner=filmOwnerCascade(m);
       if(!owner){ droppedByFilm.set(fid,{date:a.emailed_at}); return; }
       byFilm.set(fid,{filmId:fid, m, tag:movingIsNewMoment(a.moment)?"new":"changed",
         reason:REAL_MOMENT_SAID[a.moment]||a.moment,
@@ -19444,38 +19459,42 @@ function fillListChunked(listEl, items, gen, freshFn, onDone){
   };
   step();
 }
-// CAS-713: which agent OWNS a film, for the Watch tabs' agent-rank sectioning within a status section.
-// This is the same single-owner assignment recomputeFound() just wrote to notify[id].cascadeIds (CAS-709:
-// unpinned, the film's highest-ranked/lowest-.order match; pinned, its pinned cascade(s) — the min of
-// those if more than one). A film recomputeFound never reached (should not happen for anything already in
-// `rows`, which only ever holds films some active agent already lists) sorts last rather than throwing.
-function filmOwnerOrder(m){
-  const ids=(notify[m.tmdb_id]||{}).cascadeIds||[];
-  if(!ids.length) return Number.MAX_SAFE_INTEGER;
-  return Math.min(...ids.map(id=>{ const c=cascades.find(x=>x.id===id); return c ? (c.order??Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER; }));
-}
-// CAS-717: the same owner match as filmOwnerOrder, but returning the cascade itself (for its name/icon)
-// rather than just its rank — used to divide a status section into per-agent blocks below.
+// CAS-1239: the ONE owner a film has everywhere — the lane heading, the agent chip, the agent-off rule,
+// Moving/Alerts attribution and the sort key (filmOwnerOrder, below) all resolve ownership through this
+// single function, so none of them can disagree with another about who owns a film. (The bug this fixed:
+// the chip read "No agent" for a film whose lane still credited an agent that had stopped actually
+// listing it — two different owner definitions, below, now collapsed into one.)
+//   a. a hand-pin (notify[id].pinnedTo) always wins, whatever the criteria say (CAS-709) — the lowest
+//      .order among the pinned cascades, if pinned into more than one. A paused cascade is never a pin
+//      target, same as recomputeFound's own candidates filter.
+//   b. otherwise, the film's recorded membership (notify[id].cascadeIds, recomputeFound's own admission
+//      answer) stays the owner as long as it still actually LISTS the film (listedBy) — the ordinary,
+//      no-drift case, and the one every existing fixture that wires cascadeIds directly relies on.
+//   c. a recorded membership can go stale (CAS-728's sticky admission, or matchesCriteria's pre-release
+//      Awards exemption, which listedBy's awardsListOK re-check does not carry) — once the recorded owner
+//      no longer lists the film, the owner is instead the highest-ranked (lowest .order) of ANY of the
+//      account's cascades that actually lists it today. No cascade lists it: no owner (null).
+//   d. no recorded membership at all (notify[id].cascadeIds empty or missing) means no owner, full stop —
+//      this is never re-derived by scanning every cascade's listedBy from scratch. recomputeFound already
+//      guarantees any film a cascade actually watches is already IN its membership, so an account with a
+//      genuinely unmembered film has nothing to fall back to either.
 function filmOwnerCascade(m){
-  const ids=(notify[m.tmdb_id]||{}).cascadeIds||[];
-  let best=null;
-  ids.forEach(id=>{
-    const c=cascades.find(x=>x.id===id);
-    if(c && (!best || (c.order??Number.MAX_SAFE_INTEGER)<(best.order??Number.MAX_SAFE_INTEGER))) best=c;
-  });
-  return best;
+  const byOrder=(best,c)=>(!best || (c.order??Number.MAX_SAFE_INTEGER)<(best.order??Number.MAX_SAFE_INTEGER)) ? c : best;
+  const pinned=((notify[m.tmdb_id]||{}).pinnedTo||[])
+    .map(id=>cascades.find(x=>x.id===id)).filter(c=>c && !c.paused);
+  if(pinned.length) return pinned.reduce(byOrder, null);
+  const memberIds=(notify[m.tmdb_id]||{}).cascadeIds||[];
+  if(!memberIds.length) return null;
+  const member=memberIds.map(id=>cascades.find(x=>x.id===id)).filter(Boolean).reduce(byOrder, null);
+  if(member && !member.paused && listedBy(m, member)) return member;
+  return cascades.filter(c=>!c.paused && listedBy(m,c)).reduce(byOrder, null);
 }
-// CAS-861: narrows an already-chosen owner to one a SURFACE (Moving, the card's agent chip) may actually
-// credit — null if the listing itself would exclude this film for that cascade (the my-services gate above
-// all). Membership (filmOwnerCascade/cascadesFor, watchesFilm, recomputeFound, the agent_films ledger) is
-// untouched and keeps ignoring that gate on purpose (CAS-132/381: an agent still holds a film you cannot
-// currently stream) — only what gets SHOWN as an owner changes. Reuses listedBy, the exact test the listing
-// itself applies, so a surface can never disagree with it.
-function ownerIfShown(m, owner){
-  return owner && listedBy(m, owner) ? owner : null;
-}
-function filmOwnerShown(m){
-  return ownerIfShown(m, filmOwnerCascade(m));
+// CAS-713: filmOwnerOrder is listingGroups' own primary sort key — the same owner filmOwnerCascade/
+// splitByOwner resolve, read down to just its rank, so the sort and the per-agent split can never run a
+// different agent's films together. No owner sorts last rather than throwing.
+function filmOwnerOrder(m){
+  const c=filmOwnerCascade(m);
+  return c ? (c.order??Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
 }
 // CAS-760: which of the six rank tints a cascade's sub-heading band gets — its POSITION among the
 // account's cascades sorted by `order` (order values are sparse, so the position, not the raw number),
