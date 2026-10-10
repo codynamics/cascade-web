@@ -3573,6 +3573,13 @@
   .mftog.on{background:var(--sel-bd)}
   .mftog.on i{left:21px}
   #watchSheet .chip.on{background:var(--sel-bg);border-color:var(--sel-bd)}
+  /* Now showing stays on one line at every phone width (fix to CAS-1247) */
+  .stgroups .stagestop .stagename{white-space:nowrap}
+  @media (max-width:409px){
+    .stgrp{padding:4px}
+    .stsegs{gap:2px}
+    .stgroups .stagestop{padding:0 3px}
+  }
 </style>
 </head>
 <body>
