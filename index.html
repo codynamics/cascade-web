@@ -3665,6 +3665,43 @@
   .tfeed .ft span{display:block;font:500 11px/1.3 var(--font-body);color:var(--faint);margin-top:2px}
   .tfeed .mv{font:700 11px/1 var(--font-body);flex:none}
   .tfeed .mv.up{color:#5fe0cf} .tfeed .mv.dn{color:#f3a063}
+  /* ==== MATCH ON CARDS (Lee, 2026-10-11) ==============================================================
+     Match is the badge at the top right of a card; the Cascade score moves to the far right of the People
+     and Critics row. How sure Match is shows as strength of colour plus one to three signal bars, so the
+     number itself is always readable. The badge is information, not a button, so it carries no outline. */
+  .ctop.hasmatch .title{position:relative;overflow:visible;padding-right:58px}
+  .ctop.hasmatch .metaline{padding-right:58px}
+  .qhero{position:absolute;top:1px;right:0;width:50px;height:41px;border-radius:10px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:3px;background:rgba(124,92,255,.62);color:#fff}
+  .qhero b{font:800 18px/1 var(--font-body)}
+  .qhero .hl{display:flex;align-items:flex-end;gap:4px}
+  .qhero small{font:700 7.5px/1 var(--font-body);letter-spacing:.5px;text-transform:uppercase;color:rgba(255,255,255,.8)}
+  .qhero.c2{background:rgba(124,92,255,.36)}
+  .qhero.c1{background:rgba(124,92,255,.15);color:#d6ccff}
+  .qhero.c0{background:rgba(255,255,255,.05);color:var(--faint)}
+  .qhero.c0 small{color:var(--faint)}
+  .mbars{display:inline-flex;align-items:flex-end;gap:1.5px;height:8px}
+  .mbars i{width:2px;border-radius:1px;background:rgba(255,255,255,.26)}
+  .mbars i:nth-child(1){height:3px}
+  .mbars i:nth-child(2){height:5.5px}
+  .mbars i:nth-child(3){height:8px}
+  .mbars i.on{background:#fff}
+  /* the Cascade score: the last thing on the People and Critics row. A card that shows no such row (the
+     cinema-info card) keeps it beside the title instead, left of Match. Both chips are always in the markup;
+     these rules show the right one. */
+  .ctop.hasmatch .title .qscore.tq{display:none}
+  .card.cinfo:not(.expanded) .ctop.hasmatch .title .qscore.tq{display:inline-block}
+  .card:not(.expanded) .ctop.hasmatch .mrow.r-scores{gap:6px}
+  .ctop.hasmatch .mrow.r-scores .oscmark{order:1}
+  .ctop.hasmatch .mrow.r-scores .qscore.rown{order:2;margin-left:auto;padding:1px 5px}
+  .ctop.hasmatch .mrow.r-scores .condbadge{order:3}
+  .ctop.hasmatch .mrow.r-scores .attrib{order:4}
+  /* narrow phones: drop the two coloured dots and tighten the gap so People, Critics, an awards mark and the
+     score still share a line */
+  @media (max-width:389px){
+    .card:not(.expanded) .ctop.hasmatch .mrow.r-scores .dot{display:none}
+    .card:not(.expanded) .ctop.hasmatch .mrow.r-scores{gap:4px}
+  }
 </style>
 </head>
 <body>
@@ -6594,10 +6631,21 @@ function attributionHTML(m){
   const text = names.length<=2 ? names.join(", ") : `${names[0]}, ${names[1]} +${names.length-2}`;
   return `<span class="attrib" title="${escA(names.join(", "))}">${esc(text)}</span>`;
 }
-function qScoreHTML(m){
+function qScoreHTML(m, extraClass=""){
+  const cls = extraClass ? " "+extraClass : "";
   const q=cascadeScore(m);
-  if(q<0) return `<span class="qscore none" title="Not enough agreement to score this yet">&ndash;</span>`;
-  return `<span class="qscore ${q>=85?"hi":q>=70?"mid":"lo"}" title="Cascade score &mdash; ${escA(cascadeScoreSourcesText(m))}">${q}</span>`;
+  if(q<0) return `<span class="qscore none${cls}" title="Not enough agreement to score this yet">&ndash;</span>`;
+  return `<span class="qscore ${q>=85?"hi":q>=70?"mid":"lo"}${cls}" title="Cascade score &mdash; ${escA(cascadeScoreSourcesText(m))}">${q}</span>`;
+}
+// CAS-1253: the Match badge — top right of a signed-in card. tasteMatch(m) (CAS-1251) returns null when
+// there isn't yet enough evidence; otherwise {value, level} drive the number and the signal-bar count.
+// Certainty is colour strength (qhero.c1/c2/c3) plus bars — the number itself never fades.
+const MATCH_SURE_TEXT = {1:"early guess", 2:"getting there", 3:"sure"};
+function matchBadgeHTML(m){
+  const t = tasteMatch(m);
+  if(!t) return `<span class="qhero c0" title="Match appears once you have given 5 verdicts." aria-label="Match not available yet"><b>&ndash;</b><span class="hl"><small>Match</small></span></span>`;
+  const bars = [1,2,3].map(i => `<i${i<=t.level?' class="on"':''}></i>`).join("");
+  return `<span class="qhero c${t.level}" title="Match ${t.value}. Cascade's estimate of how much you'll like this, from your own verdicts." aria-label="Match ${t.value}, ${MATCH_SURE_TEXT[t.level]}"><b>${t.value}</b><span class="hl"><small>Match</small><span class="mbars" aria-hidden="true">${bars}</span></span></span>`;
 }
 function sortMoviesBy(a,b,key){
   switch(key){
@@ -8122,20 +8170,27 @@ function cardTopHTML(m){
          onclick="event.stopPropagation()" title="Play the trailer" aria-label="${escA("Play the trailer for "+m.title)}">▶</a>`
     : "";
   const badge = scaleBadge(m);
+  // CAS-1253: Match replaces the Cascade score at the top right of a card once someone is signed in — the
+  // score itself moves to the far right of the People/Critics row (cinema-info cards, which have no such
+  // row, keep it beside the title instead; see the "MATCH ON CARDS" CSS for which chip each card shows).
+  // Signed out (the shared film page, onboarding) the card draws exactly as it always has.
+  const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
+  const titleScore = signedIn ? qScoreHTML(m, "tq") + matchBadgeHTML(m) : qScoreHTML(m);
+  const rowScore = signedIn ? qScoreHTML(m, "rown") : "";
   // CAS-179: one grid, one order — title · genres·language · synopsis · money · scores · awards, with
   // the poster spanning down to the scores row and the scale badge tucked under it beside the awards.
-  return `<div class="ctop">
+  return `<div class="ctop${signedIn?" hasmatch":""}">
       <!-- CAS-276: the tombstone is the POSTER, and nothing else. -->
       <div class="ptomb">
         <div class="poster"${posterAttr}>${play}</div>
       </div>
       <!-- CAS-373: the title text gets its own span so it (not the badge) is what truncates — the rating
            badge is flex:none and always shows, collapsed or expanded. -->
-      <div class="title"><span class="titletext">${m.title}</span>${cert}${fixtureBadge}${qScoreHTML(m)}</div>
+      <div class="title"><span class="titletext">${m.title}</span>${cert}${fixtureBadge}${titleScore}</div>
       <div class="metaline">${(m.genres||[]).length ? esc((m.genres||[]).join(", "))+cult : cult.replace(/^ · /,"")}</div>
       ${syn}
       <div class="mrow r-money">${moneyRowHTML(m)}</div>
-      <div class="mrow r-scores">${scoresRowHTML(m)}${oscMarkHTML(m)}${condensedBadgeHTML(m)}${attributionHTML(m)}</div>
+      <div class="mrow r-scores">${scoresRowHTML(m)}${rowScore}${oscMarkHTML(m)}${condensedBadgeHTML(m)}${attributionHTML(m)}</div>
       <!-- CAS-686: condensed-card-only — shown instead of r-scores when this film gets the "cinfo" class
            on .card. Hidden everywhere else, including the expanded card and the invite/film page, by the
            base .r-cinfo{display:none}. -->
