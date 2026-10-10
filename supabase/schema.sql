@@ -277,6 +277,26 @@ alter table public.user_prefs add constraint user_prefs_display_name_check
 -- device has saved this yet". Column only here; the app move is a separate ticket.
 alter table public.user_prefs add column if not exists view jsonb;
 
+-- CAS-1222: a per-field, concurrency-safe merge into `view` — see migration 0009 for the full reasoning.
+-- Unlike taste/watch_windows/moving_seen/occasions above, `view` packs several independent fields that two
+-- devices can change at the same moment, so a whole-column upsert (every other column's own write path)
+-- would let whichever push lands second clobber the first device's field. security invoker (the default —
+-- stated explicitly): user_prefs_owner's own RLS confines both branches of this upsert to the caller's row.
+create or replace function public.merge_user_prefs_view(p_patch jsonb)
+returns void
+language sql
+security invoker
+set search_path = public
+as $$
+  insert into public.user_prefs (user_id, view)
+  values (auth.uid(), p_patch)
+  on conflict (user_id) do update
+    set view = coalesce(public.user_prefs.view, '{}'::jsonb) || excluded.view;
+$$;
+
+revoke all on function public.merge_user_prefs_view(jsonb) from public;
+grant execute on function public.merge_user_prefs_view(jsonb) to authenticated;
+
 alter table public.user_prefs enable row level security;
 
 drop policy if exists user_prefs_owner on public.user_prefs;

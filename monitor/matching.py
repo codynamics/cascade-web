@@ -104,6 +104,11 @@ WINDOW_TO_MOMENT = {
 MOMENT_TO_WINDOW = {moment: window for window, moment in WINDOW_TO_MOMENT.items()}
 WINDOW_ARRIVAL_MOMENTS = frozenset(WINDOW_TO_MOMENT.values())
 
+# CAS-1237: opens_soon/past_opening_weekend are cinema-opening REMINDERS — they must stand down
+# once the user's own Watch On for the film has moved past cinema (Rent/Stream, hand-set or auto),
+# since a reminder to see it in cinemas is false for a film the user has already placed elsewhere.
+REMINDER_MOMENTS = frozenset({"opens_soon", "past_opening_weekend"})
+
 # CAS-918: the rung ladder a film's Watch On climbs, lowest first — used to tell a genuine
 # forward move (Rent -> Stream overnight) from a moment for a window the film hasn't reached yet.
 WINDOW_RANK = {"in_cinema": 1, "premium": 2, "rent": 3, "stream": 4}
@@ -125,6 +130,19 @@ def _film_watch_placements(film_watches) -> dict:
         row["windows"].update(windows)
         row["sources"].update(w.get("sources") or {})
     return out
+
+
+def _current_watch_on(placements: dict, user_id, movie_id) -> Optional[str]:
+    """CAS-1237: the film's current Watch On for this user — the highest-ranked member of its
+    placement set (WINDOW_RANK; Watch On is single-select on the client, so in steady state there
+    is at most one member, with CAS-918's overnight rollover the only case where two briefly
+    coexist, in which case the FURTHER one is what the user would actually see on the card). None
+    when the film carries no placement row at all (or an empty one) — "no Watch On set"."""
+    row = placements.get((str(user_id), str(movie_id)))
+    windows = row["windows"] if row else None
+    if not windows:
+        return None
+    return max(windows, key=lambda w: WINDOW_RANK.get(w, 0))
 
 
 def _forward_matches(windows_here: set, sources: dict, target: str) -> bool:
@@ -505,9 +523,11 @@ def match(cascades: list, transitions: list, already=None, admission=None, suppr
                   forward-matches this way. Any other window-arrival moment for the film is
                   skipped. A film with no row here (or an empty `windows`) skips EVERY
                   window-arrival moment for it — fail closed, the app would not have shown it in
-                  that tab either. Non-window moments (announced, opens_soon,
-                  past_opening_weekend, newly_qualifies, new_to_agent) are never gated by this.
-                  None/missing behaves as "nothing is placed anywhere".
+                  that tab either. newly_qualifies and new_to_agent are never gated by this.
+                  CAS-1237: opens_soon/past_opening_weekend ARE gated, but the other way around —
+                  they skip only once a row exists AND its current Watch On (see
+                  ``_current_watch_on``) is past cinema; a film with no row here still gets the
+                  reminder, same as always. None/missing behaves as "nothing is placed anywhere".
     placement_counts : an optional dict this call increments in place, so a caller can report the
                   size of CAS-841's effect: "no_placement" for a hit skipped because the film has
                   no placement row (or an empty one), "wrong_window" for a hit skipped because the
@@ -550,6 +570,10 @@ def match(cascades: list, transitions: list, already=None, admission=None, suppr
                 continue
             if not service_ok(t, criteria):
                 continue
+            if t.moment in REMINDER_MOMENTS:
+                current = _current_watch_on(placements, c["user_id"], t.movie_id)
+                if current is not None and current != "in_cinema":
+                    continue                                # already placed past cinema — no reminder
             if t.moment in WINDOW_ARRIVAL_MOMENTS:
                 row = placements.get((str(c["user_id"]), str(t.movie_id)))
                 if not row:

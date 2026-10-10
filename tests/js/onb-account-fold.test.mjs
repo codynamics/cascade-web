@@ -100,8 +100,20 @@ test("CAS-1099 AC1: completing membership issues exactly one complete_membership
   const outcome = await E.membCompleteNewMembership();
 
   assert.equal(outcome, "created");
-  assert.deepEqual(client.rpcCalls.map(c => c.name), ["complete_membership"],
-    "exactly one complete_membership call — no other rpc");
+  // CAS-1222 used to say landing on the first agent you just built was a deliberate consequence of
+  // finishing onboarding, carrying that selection onto the account as two merge_user_prefs_view calls
+  // (active, activeMulti), with a third (reviewSessions, CAS-1241 B4) riding along from the same fan-out.
+  // CAS-1243: the arrival itself is fireAccountFanout -> loadAccount -> afterSignIn's own "land on the
+  // first agent" step, the exact same boot-path mechanism a returning sign-in uses on an account that
+  // already has agents — not something the person tapped. The rule has no exceptions for it: afterSignIn's
+  // own landing call now passes push:false, and reviewSessions' write moved off this load path entirely
+  // (page-hidden only), so nothing beyond complete_membership itself reaches the account here. What this AC
+  // actually guards against — a direct insert/upsert to cascades/user_prefs/notify_prefs bypassing the one
+  // RPC — is asserted below instead of a literal rpc-call allowlist.
+  const rpcNames = client.rpcCalls.map(c => c.name);
+  assert.equal(rpcNames[0], "complete_membership", "the first and only membership call must be complete_membership");
+  assert.deepEqual(rpcNames.slice(1), [],
+    "CAS-1243: landing on the first agent (and the boot-time review-session bump) must never reach the account on its own — only an explicit tap or this device's own page-hidden moment may push either");
   assert.equal(client.writes.cascades.length, 0, "no direct insert/upsert to cascades");
   assert.equal(client.writes.user_prefs.length, 0, "no direct insert/upsert to user_prefs");
   assert.equal(client.writes.notify_prefs.length, 0, "no direct insert/upsert to notify_prefs");

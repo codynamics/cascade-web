@@ -355,6 +355,56 @@ class WindowPlacementTests(unittest.TestCase):
         self.assertEqual(counts, {"no_placement": 1})
 
 
+class ReminderWatchOnGateTests(unittest.TestCase):
+    """CAS-1237 AC1: opens_soon/past_opening_weekend are reminders that a film is about to (or
+    just did) reach cinemas — false for a film the user has already placed on Rent/Stream, by
+    hand or by auto-placement. A film with no placement row at all keeps today's behaviour (the
+    reminder fires), same as WindowPlacementTests.test_non_window_moments_fire_with_no_placement_row."""
+
+    def _movie(self, tmdb_id=8001, title="Soon Film", status=("upcoming",)):
+        return {"tmdb_id": tmdb_id, "title": title, "genres": ["Drama"], "status": list(status),
+                "cinema_date": "2026-07-23", "language": "en", "wm_critic_score": 70, "popularity": 50,
+                "wm_popularity_percentile": 70,
+                "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}],
+                "wm_user_rating": 7.5}
+
+    def _cascade(self, moments):
+        return [{"id": "c1", "user_id": "u1", "name": "Everything", "active": True,
+                 "alert_moments": list(moments), "criteria": _criteria(genre=["Drama"], imdb=7.0)}]
+
+    def _match(self, cascades, moment, movie, windows):
+        admission = _admit(cascades, today=[movie])
+        t = Transition(str(movie["tmdb_id"]), movie["title"], moment, movie=movie)
+        watches = ([{"user_id": "u1", "movie_id": str(movie["tmdb_id"]), "windows": windows}]
+                   if windows is not None else [])
+        return match(cascades, [t], admission=admission, film_watches=watches)
+
+    def test_opens_soon_silent_once_placed_on_stream(self):
+        movie = self._movie()
+        hits = self._match(self._cascade(["opens_soon"]), "opens_soon", movie, ["stream"])
+        self.assertEqual(hits, {})
+
+    def test_opens_soon_fires_when_placed_on_cinema(self):
+        movie = self._movie()
+        hits = self._match(self._cascade(["opens_soon"]), "opens_soon", movie, ["in_cinema"])
+        self.assertEqual(len(hits.get("u1", [])), 1)
+
+    def test_opens_soon_fires_with_no_placement_row(self):
+        movie = self._movie()
+        hits = self._match(self._cascade(["opens_soon"]), "opens_soon", movie, None)
+        self.assertEqual(len(hits.get("u1", [])), 1)
+
+    def test_past_opening_weekend_silent_once_placed_on_rent(self):
+        movie = self._movie(status=("opening_week",))
+        hits = self._match(self._cascade(["past_opening_weekend"]), "past_opening_weekend", movie, ["rent"])
+        self.assertEqual(hits, {})
+
+    def test_past_opening_weekend_fires_when_placed_on_cinema(self):
+        movie = self._movie(status=("opening_week",))
+        hits = self._match(self._cascade(["past_opening_weekend"]), "past_opening_weekend", movie, ["in_cinema"])
+        self.assertEqual(len(hits.get("u1", [])), 1)
+
+
 class AutoPlacementTests(unittest.TestCase):
     """CAS-1097: agent_films stops being client-pushed CURRENT membership — but an admitted film
     with no film_watch row of its own (automatic placement stopped being client-pushed per CAS-1096)
@@ -758,6 +808,29 @@ class OwnerAttributionTests(unittest.TestCase):
         self.assertEqual(hits[0].cascade_id, "c0")
         self.assertFalse(hits[0].wants("email"))
         self.assertTrue(hits[0].wants("in_app"))
+
+    # CAS-1239 AC4: the monitor must name the same owner as the app for the ticket's own AC1 (no-pin,
+    # the higher-ranked candidate's own score gate fails) and AC5 (a pin wins even though the pinned
+    # agent's own score gate fails) scenarios. compute_admission() already bakes the real engine's score
+    # gate into "today"'s admission set (CAS-825), so _resolve_owner's "b" (lowest-rank ADMITTING agent)
+    # was already the strict LISTS test the app's filmOwnerCascade now also uses — these two confirm that
+    # equivalence rather than changing any production code.
+    def test_h_cas1239_ac1_owner_falls_to_the_listing_agent_when_the_higher_ranked_ones_score_gate_fails(self):
+        c0 = self._cascade("c0", 0, moments=())   # would otherwise own it, but its own floor is unclearable
+        c0["criteria"]["watchMarkers"] = {"in_cinema": 1000, "rent": 1000, "stream": 1000}
+        c2 = self._cascade("c2", 2)                # wide open — actually admits/lists the film
+        hits = self._match([c0, c2], self._transitions())["u1"]
+        self.assertEqual(len(hits), 1, "AC1: the film must still produce exactly one hit, never zero")
+        self.assertEqual(hits[0].cascade_id, "c2", "AC1: ownership falls through to the agent that actually admits it")
+
+    def test_i_cas1239_ac5_a_pin_wins_even_though_the_pinned_agents_own_score_gate_fails(self):
+        h = self._cascade("h", 0)                  # fires, wide open, would otherwise own the film
+        p = self._cascade("p", 5, moments=())       # pinned by hand; its own floor would never admit it
+        p["criteria"]["watchMarkers"] = {"in_cinema": 1000, "rent": 1000, "stream": 1000}
+        picks = [{"user_id": "u1", "movie_id": "1", "pinned_to": ["p"]}]
+        hits = self._match([h, p], self._transitions(), picks=picks)["u1"]
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].cascade_id, "p", "AC5: the pin must win whatever the pinned agent's own criteria say")
 
 
 class PerAgentChannels(unittest.TestCase):

@@ -2727,6 +2727,17 @@
   .alsochip .jn{font-weight:800;opacity:.85}
   .alsochip .alwaystag{font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;opacity:.7}
   .alsochip:disabled{cursor:default;opacity:1}
+  /* CAS-1234: the Badges section — one full-width row per option (a descriptor line needs room a .chip's
+     single-line pill doesn't have), gold-tinted ON to match the card's own .tentbadge colour rather than
+     the --wwc-tinted convention above, since the card badge is gold regardless of which tier it names. */
+  .badgeopts{display:flex;flex-direction:column;gap:8px}
+  .badgeopt{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;text-align:left;
+    font:inherit;padding:9px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--dim);cursor:pointer}
+  .badgeopt.on{background:rgba(245,214,117,.10);border-color:rgba(245,214,117,.45)}
+  .badgeoptrow{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--ink)}
+  .badgeopt .jn{font-weight:800;opacity:.85;margin-left:2px}
+  .badgeoptdesc{font-size:11.5px;color:var(--dim);line-height:1.35}
   .wsheethd{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
   .wsheethd>span:first-child{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
   .wsheetlinks{display:flex;gap:12px}
@@ -4591,6 +4602,17 @@ function fmtDay(iso){
   const [y,m,d]=iso.split("-");
   return `${+d} ${MONTHS[+m-1]} ${y.slice(2)}`;
 }
+// CAS-1237: the catalogue pointer's `generated` is the pipeline's bare UTC calendar date — wrong for
+// hours every AU morning, since a run at 07:30 Sydney is still 20:30 the PREVIOUS day in UTC.
+// `generatedAt` (a real timestamp) converts correctly through the viewer's own Australia/Sydney
+// calendar date (sydneyYMD, defined with Moving's other Sydney-date helpers below — hoisted, so the
+// forward reference is fine); a pointer that predates generatedAt falls back to the bare date exactly
+// as before.
+function catalogueHeaderDate(pointer){
+  const iso=pointer && pointer.generatedAt;
+  const t=iso && Date.parse(iso);
+  return (t && !isNaN(t)) ? sydneyYMD(t) : (pointer && pointer.generated) || "";
+}
 function yearOf(m){ return (m.cinema_date||m.year||"").slice(0,4); }
 // CAS-945: hardened to escape all five HTML metacharacters (& first, so the entity text the other
 // replacements introduce is not itself re-encoded). Still safe for its original text-node call sites.
@@ -4896,7 +4918,11 @@ if(didReset || forceSetup || previewStep || pendingDeepLink || pendingAnswer){
 // Does this browser actually keep anything for us? Every save below is wrapped in try/catch, so a blocked or
 // private-mode store fails silently and the app still runs. The setup meter reads this: it must not tell you
 // your work is "saved on this device" when nothing is being saved (honesty guardrail).
-const storageWorks = (()=>{ try{ localStorage.setItem("cascade_probe","1"); localStorage.removeItem("cascade_probe"); return true; }catch(e){ return false; } })();
+// CAS-1222: used to be a throwaway write-then-remove probe (cascade_probe) — removed along with every other
+// key this ticket retires. A plain existence check loses only the decades-old Safari-private-mode-with-
+// zero-quota edge case, which private mode no longer has; every real "storage is blocked" case (e.g. a
+// browser setting that disables it outright) still throws on `localStorage` itself.
+const storageWorks = (()=>{ try{ return typeof localStorage !== "undefined"; }catch(e){ return false; } })();
 // CAS-1100: every account-mirroring local key below used to be namespaced by the account it belonged to
 // (CAS-957's acctKey/acctSuffix) — a device used by two accounts must never let one account's cache answer
 // for the other's. That guarantee now comes from the real sign-out chokepoint itself (the cascade-auth-
@@ -4938,13 +4964,19 @@ const storageWorks = (()=>{ try{ localStorage.setItem("cascade_probe","1"); loca
     "cascade_moving_seen", "cascade_occasions", "cascade_onb_answers"];
   try{ legacy.forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} }); }catch(e){}
 })();
-// CAS-1221: every localStorage/sessionStorage key this app may still write, one line each — the single
-// source of truth both for a human reading this file and for tests/lint/device-key-allowlist.mjs, which
-// fails `npm run test:lint` on any setItem whose key isn't named here. A prefix entry ends in "@" or "-"
-// (matched as a prefix, never an exact key — acctOp's queue is namespaced per account, and the Supabase
-// SDK namespaces its own session key per project).
+// CAS-1221/CAS-1222: every localStorage/sessionStorage key this app may still write, one line each — the
+// single source of truth both for a human reading this file and for tests/lint/device-key-allowlist.mjs,
+// which fails `npm run test:lint` on any setItem whose key isn't named here. A prefix entry ends in "@" or
+// "-" (matched as a prefix, never an exact key — acctOp's queue is namespaced per account, and the
+// Supabase SDK namespaces its own session key per project).
+// CAS-1222: shrunk to exactly these nine — every device-only UX key CAS-1220 flagged (active agent(s),
+// per-tab mine-only, the Found-as-last-looked-at snapshot, tutorial seen, the review-prompt pair, the
+// onboarding invite draft, the admission-drift diagnostic, the selected-occasion filter) now lives on the
+// account (user_prefs.view) instead, or — cascade_watch_occasion (dead since CAS-1223), cascade_watchwins
+// (confirmed to have no reader), cascade_probe/cascade_visits (both confirmed dead, see storageWorks and
+// `visits` above) — was simply retired outright. What's left is either not account data (a device-only
+// fact with nowhere else to live) or acctOp's own live, unsent-writes queue.
 const DEVICE_KEY_ALLOWLIST = {
-  // ---- not account data, or data with nowhere else to live — stays indefinitely -------------------------
   "sb-": "the Supabase SDK's own session-token key (sb-<project-ref>-auth-token) — vendored supabase-js.js writes this directly; not a call site in this file, named here for completeness",
   "cascade_client_key": "this device's own anonymous client id — never the account's",
   "cascade_ops@": "acctOp's own unsent-operations queue, one per account (cascade_ops@<uid>) — operations still owed, never a snapshot of account state",
@@ -4952,24 +4984,23 @@ const DEVICE_KEY_ALLOWLIST = {
   "cascade_acq": "the one-time acquisition-source stamp this device arrived with",
   "cascade_inv": "an invite code captured from a deep link before sign-in claims it",
   "cascade_diag": "a session-only diagnostics flag, set by ?diag= in the URL",
-  "cascade_probe": "a throwaway write-then-remove, used only to test whether storage works at all",
-  "cascade_visits": "an anonymous per-device open count — never account data, nothing reads it live",
-  // ---- device-only UX state; CAS-1222 (CAS-1220's follow-up) moves these onto the account ---------------
-  "cascade_active": "which agent tab is open",
-  "cascade_active_multi": "which agent tabs are open, multi-select",
-  "cascade_watch_occasion": "the Watch screen's open Occasion filter",
-  "cascade_watch_mineonly": "the Watch screen's Mine-only filter",
-  "cascade_seen_found": "which Found films this device has already seen appear",
-  "cascade_first_found": "the first-seen date this device recorded per film",
-  "cascade_admit_drift": "this device's own admission-drift diagnostic snapshot",
   "cascade_had_account": "whether this device was signed in as of its last boot (CAS-517 cold-start gate)",
   "cascade_onboarded": "whether this device has completed onboarding once",
-  "cascade_tutorial_seen": "whether this device has dismissed the tutorial",
-  "cascade_review_sessions": "the app-review prompt's session counter",
-  "cascade_review_asked_ver": "the last app version the review prompt asked on",
-  "cascade_agent": "the in-progress onboarding agent draft",
-  "cascade_watchwins": "the in-progress onboarding Watch wizard draft",
 };
+// CAS-1222 item 5: "the first boot of this build deletes every other cascade_ key" — rather than naming
+// each retired/migrated key by hand (easy to miss one), this sweeps any "cascade_" key NOT in the
+// allowlist above, unconditionally, every boot. Idempotent (a clean device finds nothing to remove) and a
+// superset of CAS-1221's own purgeServerFirstLocalKeys/purgeLegacyAccountKeys above — kept alongside them
+// rather than replacing them, since this ticket's job is adding this sweep, not auditing theirs.
+(function purgeNonAllowlistedCascadeKeys(){
+  try{
+    Object.keys(localStorage).forEach(k=>{
+      if(k.indexOf("cascade_")!==0 || k.indexOf("cascade_ops@")===0) return;
+      if(DEVICE_KEY_ALLOWLIST[k]) return;
+      try{ localStorage.removeItem(k); }catch(e){}
+    });
+  }catch(e){}
+})();
 // CAS-1221: account data with a home on the server (user_films) is held in memory only now — no device
 // read, no device write. A cold start shows the loading state until loadAccountFilms()/applyFilmRows()
 // (the account-sync IIFE, below) answer; nothing here ever seeds from a device cache again.
@@ -5237,14 +5268,18 @@ function recomputeFound(){
       if(e.watchEarned===undefined) e.watchEarned = earnedWindowForScore(owner, cascadeScore(m));
       earned = e.watchEarned;
     }
-    if(earned==null) return;                    // below every marker at admission — no value written
     // STATUS_RUNG numbers a film's current window on the exact same ladder WINDOW_RUNG numbers the four
     // watch levels (CAS-280), so the film's rung IS its natural standing key — snapped forward past
     // whichever windows are off or set to Never. CAS-1128: the earliest window at or after the film's
     // current rung that this agent has actually switched ON (windowFollowed) — an admitted, unwatched
     // film's Watch On moves forward only as far as a window the agent itself tracks, never into one it has
     // left OFF. (autoPlacementFor, CAS-1097.)
+    // CAS-1233: earned==null ("below every marker at admission") no longer skips placement — a listed film
+    // always gets a Watch On, so autoPlacementFor now falls back to standing/last-followed itself. The one
+    // remaining reason finalKey can still come back null is the owner following no window at all, which
+    // means nothing could have admitted this film in the first place — genuinely nothing to write.
     const finalKey=autoPlacementFor(owner, m, earned);
+    if(!finalKey) return;
     // CAS-1096 AC5: automatic Watch On placement is explicitly NOT moved onto acctOp by this ticket —
     // only a hand-set/cleared Watch On (toggleFilmOpt/pickNever/setOpinion) pushes.
     WATCH_LEVEL_KEYS.forEach(k=>{ e.wins[k]=false; });
@@ -5284,8 +5319,6 @@ const foundSource = id => {
   if(!e || !found.has(id)) return "off";
   return e.source==="manual" ? "manual" : "auto";
 };
-const cascadesFor = id => ((notify[id]||{}).cascadeIds||[])
-  .map(cid=>cascades.find(c=>c.id===cid)).filter(Boolean);
 // `touched` = the user has worked the my-services switch by hand, so we stop auto-defaulting it for them.
 // CAS-1221: held in memory only — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
 // ever populates this away from the signed-out default, straight from the account's own user_prefs row.
@@ -5303,14 +5336,19 @@ function pushFilmVerdict(id, kind){ if(window.CascadePersistence) window.Cascade
 function pushFilmWatch(id, prevSig){ if(window.CascadePersistence) window.CascadePersistence.pushFilmWatch(id, prevSig); }
 function pushFilmPick(id){ if(window.CascadePersistence) window.CascadePersistence.pushFilmPick(id); }
 function filmWatchRowSig(id){ return window.CascadePersistence ? window.CascadePersistence.filmWatchRowSig(id) : "[]"; }
+// CAS-1222: same guarded-shim shape as pushPrefsCols/pushFilmVerdict above — every view-field write site
+// below (setActive, deleteAgentAsk, setWatchMineOnly, markTutorialSeen, bumpReviewPromptSessionCount,
+// markReviewPromptAsked, trackAdmitDrift, the invite draft's saveAgentState) is defined, and callable,
+// before window.CascadePersistence exists yet. pushViewField is one immediate merge_user_prefs_view rpc
+// per call (item 1's discrete per-tap fields); pushViewFieldDebounced coalesces a burst of calls within
+// VIEW_DEBOUNCE_MS into ONE rpc naming every field that changed (item 4: the invite draft and the
+// admission-drift diagnostic, named there as sharing "the same debounced view write").
+function pushViewField(key, value){ if(window.CascadePersistence) window.CascadePersistence.pushViewField(key, value); }
+function pushViewFieldDebounced(key, value){ if(window.CascadePersistence) window.CascadePersistence.pushViewFieldDebounced(key, value); }
 const prefs = loadPrefs();
-// How many times this browser has opened the app. CAS-273 removed its ONE reader — "Finish your agent" had
-// to arrive after the agent proved itself, so it needed to know this wasn't the first visit — so the counter
-// is now written and never read. It is kept, and only because it is a COUNT: throwing it away resets every
-// existing browser to zero, and the next feature that wants "is this a returning visitor" would have to wait
-// for the history to build up again. Nothing decides anything on it today; if you add a reader, this is it.
-let visits=1;
-try{ visits=(+localStorage.getItem("cascade_visits")||0)+1; localStorage.setItem("cascade_visits", String(visits)); }catch(e){}
+// CAS-1222: the per-device open counter CAS-273 already left with no reader (cascade_visits) is retired
+// outright, not migrated — nothing in this ticket's own audit found a use for it either, and a dead count
+// gains nothing by moving to the account.
 // UX-psychology framings sit behind one flag so the plain version is the A/B control. Default on.
 // CAS-1221: held in memory only — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
 // ever flips this away from the default, straight from the account's own user_prefs.framing column.
@@ -5378,25 +5416,32 @@ const cascades = loadCascades();
 let cascadesReady = true;
 try{ cascadesReady = localStorage.getItem("cascade_had_account") !== "1"; }catch(e){}
 // ---- The active Cascade(s) (CAS-566: no more built-in "All"; CAS-634: the rail is multi-select) -------
-// activeId names the FIRST selected agent, or null when there isn't one — kept so a build from before this
-// ticket still loads on the same device. activeIds is the FULL selection the rail and the listing read
-// from; cascade_active_multi is its own persisted array, and cascade_active always mirrors activeIds[0].
+// activeId names the FIRST selected agent, or null when there isn't one. activeIds is the FULL selection
+// the rail and the listing read from — activeId always mirrors activeIds[0].
+// CAS-1222: in-memory only now — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
+// ever populates these away from the signed-out default of "nothing selected", straight off the account's
+// own user_prefs.view.active/activeMulti fields. A guest device (no account to answer) starts and stays at
+// this default every reload, same as prefs/tasteBase/watchPrefs above — reconcileActiveIds just below
+// still supplies the "every agent, once there are some" fallback either way.
 function firstAgentId(){ return cascades.length ? cascades[0].id : null; }
 let activeId = null;
-try{ activeId = localStorage.getItem("cascade_active") || null; }catch(e){}
 let activeIds = [];
-try{
-  const _rawActiveMulti = localStorage.getItem("cascade_active_multi");
-  const _parsedActiveMulti = _rawActiveMulti ? JSON.parse(_rawActiveMulti) : null;
-  if(Array.isArray(_parsedActiveMulti)) activeIds = _parsedActiveMulti.filter(id=>typeof id==="string");
-}catch(e){}
-if(!activeIds.length && activeId) activeIds=[activeId];
-function saveActiveIds(){ try{ localStorage.setItem("cascade_active_multi", JSON.stringify(activeIds)); }catch(e){} }
-function setActive(id){
+// CAS-1222: setActive is the one explicit-selection chokepoint (a rail tap, or landing on an agent just
+// created/duplicated/onboarded) — pushed immediately, same "written by the user action that changes it"
+// rule as every other item-1 field. reconcileActiveIds just below is NOT a user action (it's the fallback
+// safety net that runs after every cascades reload) and must never push: two devices each reconciling
+// around a load in flight must never race each other to overwrite the account's real selection with a
+// transient local fallback.
+// CAS-1243: push defaults true for every real tap, but afterSignIn()'s own "arrival lands on the first
+// agent" call is a boot/load outcome, not something the person did — it passes push:false so neither this
+// nor openCascade's own forwarded call writes anything.
+function setActive(id, push=true){
   activeId=id||firstAgentId();
   activeIds = activeId ? [activeId] : [];
-  try{ localStorage.setItem("cascade_active",activeId||""); }catch(e){}
-  saveActiveIds();
+  if(push){
+    pushViewField("active", activeId);
+    pushViewField("activeMulti", [...activeIds]);
+  }
 }
 const activeCascade = () => cascades.find(c=>c.id===activeId) || null;
 // CAS-566/R2/R7: land on the stored agent(s) if they still exist; otherwise every agent, once there are
@@ -5409,8 +5454,6 @@ function reconcileActiveIds(){
   activeIds = activeIds.filter(id=>cascades.some(c=>c.id===id));
   if(!activeIds.length && cascades.length) activeIds=cascades.map(c=>c.id);
   activeId = activeIds[0] || null;
-  try{ localStorage.setItem("cascade_active",activeId||""); }catch(e){}
-  saveActiveIds();
 }
 reconcileActiveIds();
 
@@ -5497,10 +5540,10 @@ function deleteOccasion(id){
 // for it, which is the raw-UUID chip Lee saw.
 const OCCASION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isOccasionIdShape = s => typeof s==="string" && OCCASION_ID_RE.test(s);
-// MIGRATION (CAS-775): the shipped build stored occasion NAMES in c.occasions and in the
-// cascade_watch_occasion localStorage value. Runs once, gated on the register still being empty — once it
-// has any entry (from this migration or from a real createOccasion call) the gate never opens again, which
-// is what makes a second call a no-op (AC8) with no separate "have I migrated" flag to keep in sync.
+// MIGRATION (CAS-775): the shipped build stored occasion NAMES in c.occasions. Runs once, gated on the
+// register still being empty — once it has any entry (from this migration or from a real createOccasion
+// call) the gate never opens again, which is what makes a second call a no-op (AC8) with no separate
+// "have I migrated" flag to keep in sync.
 function migrateOccasionNamesIfNeeded(){
   if(occasionReg.length) return;
   const legacyNames=new Set();
@@ -5518,14 +5561,9 @@ function migrateOccasionNamesIfNeeded(){
     c.occasions = c.occasions.map(name=>byName.get(name)).filter(Boolean);
   });
   saveCascades();
-  // CAS-775: rewrites the localStorage value only — `watchOccasion` itself is declared further down the
-  // script (still in its temporal dead zone here, since this runs at top-level load time before that line
-  // executes) and initialises itself from this same key, so it picks up the migrated id when it runs.
-  let legacyWatchOccasion=null;
-  try{ legacyWatchOccasion = localStorage.getItem("cascade_watch_occasion") || null; }catch(e){}
-  if(legacyWatchOccasion && byName.has(legacyWatchOccasion)){
-    try{ localStorage.setItem("cascade_watch_occasion", byName.get(legacyWatchOccasion)); }catch(e){}
-  }
+  // CAS-1222: `watchOccasion` itself is retired to an in-memory-only null (dead since CAS-1223, which
+  // removed the Watch screen's only UI that could ever set it) — there is no longer a localStorage value
+  // for this migration to carry forward.
 }
 migrateOccasionNamesIfNeeded();
 
@@ -6124,6 +6162,27 @@ function showFoundList(){ settleFoundView(); }
 // own onchange below, cleared wherever filt.sort is assigned from a stored cascade (applyCascade) — never
 // persisted, so a reload starts false same as filt.sort itself starts at DEFAULT_SORT.
 let sortPicked=false;
+// CAS-1240: the switch's own effective key — mirrors listingGroups' own tabDflt/isUserSort derivation
+// exactly (the Cinema tab's default is "availability", every other tab's is DEFAULT_SORT), so the switch
+// can never claim an order the list isn't actually rendered in. Reading raw filt.sort here (the pre-fix
+// bug) left the Cinema tab's default read as "Cascade score" lit, while the list itself rendered release-
+// date order.
+function watchSortActiveKey(){
+  const tabDflt = watchTab==="in_cinema" ? "availability" : DEFAULT_SORT;
+  return sortPicked ? filt.sort : tabDflt;
+}
+// CAS-1240: the switch's two halves, each carrying the direction arrow that matches what the list actually
+// does when that half is the one selected. Release date reads soonest-first (↑) on the in_cinema tab
+// (Upcoming and In Cinema both live under it) and newest-first (↓) on every released tab (Rent/Stream/
+// Premium) — Cascade score is always highest-first (↓), the one direction the "cascade" sort ever produces.
+function watchSortSwitchHalves(){
+  const key=watchSortActiveKey();
+  const cinemaOn=key==="cinema"||key==="availability", cascadeOn=key==="cascade";
+  return {
+    cinema: {on:cinemaOn, label: cinemaOn ? `Release date ${watchTab==="in_cinema"?"↑":"↓"}` : "Release date"},
+    cascade: {on:cascadeOn, label: cascadeOn ? "Cascade score ↓" : "Cascade score"},
+  };
+}
 // CAS-1181: PICKER_KINDS.sort's pick() is what changes filt.sort now (the popover replaced the invisible
 // <select>); this just repaints the icon button around it — a tooltip naming the current order, and the
 // active-dot for "you're off the default". The select itself stays only as inert state for the lookup below.
@@ -6135,12 +6194,14 @@ function syncSortCtl(){
   const opt=$("sort").querySelector(`option[value="${filt.sort}"]`);
   $("sortCtl").title="Order: "+(opt?opt.textContent:"");
   $("sortDot").hidden=!sortPicked;   // CAS-819: dot reflects an explicit pick, not just "off DEFAULT_SORT"
-  // CAS-1223: the visible two-way switch in the tools row — only two of SORT_OPTS' eight values have a
-  // half here, so a pick from the Filters sheet's own full "Sort by" list (any of the other six) correctly
-  // leaves neither half filled.
+  // CAS-1223/CAS-1240: the visible two-way switch in the tools row — only two of SORT_OPTS' eight values
+  // have a half here, so a pick from the Filters sheet's own full "Sort by" list (any of the other six)
+  // correctly leaves neither half filled. Each half's own label (not just its "on" state) comes from
+  // watchSortSwitchHalves() too, so the direction arrow never drifts from what's actually selected.
   const cinBtn=$("watchSortCinema"), casBtn=$("watchSortCascade");
-  if(cinBtn){ const on=filt.sort==="cinema"; cinBtn.classList.toggle("on",on); cinBtn.setAttribute("aria-pressed",String(on)); }
-  if(casBtn){ const on=filt.sort==="cascade"; casBtn.classList.toggle("on",on); casBtn.setAttribute("aria-pressed",String(on)); }
+  const halves=watchSortSwitchHalves();
+  if(cinBtn){ cinBtn.classList.toggle("on",halves.cinema.on); cinBtn.setAttribute("aria-pressed",String(halves.cinema.on)); cinBtn.textContent=halves.cinema.label; }
+  if(casBtn){ casBtn.classList.toggle("on",halves.cascade.on); casBtn.setAttribute("aria-pressed",String(halves.cascade.on)); casBtn.textContent=halves.cascade.label; }
 }
 $("imdbMin").oninput=e=>{filt.imdb=+e.target.value;$("imdbVal").textContent=filt.imdb?filt.imdb.toFixed(1)+"+":"Any";render();};
 $("rtMin").oninput=e=>{filt.rt=+e.target.value;$("rtVal").textContent=filt.rt?filt.rt+"%+":"Any";render();};
@@ -8245,17 +8306,27 @@ function earnedWindowForScore(owner, score){
 }
 // CAS-736/CAS-1128: the later of `earned` (fixed at admission) and `standing` (the film's CURRENT window,
 // snapped forward to the nearest window this agent actually follows) — what stops the cinema/streaming
-// score-basis flip at release from demoting or dropping an already-found film. Returns null when `earned`
-// itself is null (below every marker at admission — no placement at all).
+// score-basis flip at release from demoting or dropping an already-found film.
+// CAS-1233: `earned` can itself be null (below every marker at admission) — that is not "no placement",
+// since the film is listed regardless and a listed film always carries a Watch On. The fallback is the
+// same forward walk `standing` already does, just run from the film's current rung with no score test —
+// the earliest window at or after it that this agent follows — and, when the film has already travelled
+// past every window this agent follows, the agent's own last followed window, so there is always
+// somewhere to land.
 function autoPlacementFor(owner, m, earned){
-  if(earned==null) return null;
   const rung=STATUS_RUNG[primaryStatus(m)];
-  let standing=null;
-  if(rung>0){
-    const si=WATCH_LEVEL_KEYS.findIndex(k=>WINDOW_RUNG[k]===rung);
-    for(let j=si; j>=0 && j<WATCH_LEVEL_KEYS.length; j++){
-      if(windowFollowed(owner,WATCH_LEVEL_KEYS[j])){ standing=WATCH_LEVEL_KEYS[j]; break; }
+  // CAS-1233: rung 0 (upcoming) now joins this walk too (previously gated to rung>0) — "at or after
+  // upcoming" is every real window, so the earliest one this agent follows. For earned!=null this can
+  // never push `standing` past `earned` itself (earned's own forward scan is strictly more selective,
+  // score-gated as well as followed-gated, so its index can only be the same or later), so existing
+  // non-null-earned placements are unaffected.
+  const standing = WATCH_LEVEL_KEYS.find(k => WINDOW_RUNG[k]>=rung && windowFollowed(owner,k)) || null;
+  if(earned==null){
+    if(standing) return standing;
+    for(let j=WATCH_LEVEL_KEYS.length-1; j>=0; j--){
+      if(windowFollowed(owner,WATCH_LEVEL_KEYS[j])) return WATCH_LEVEL_KEYS[j];
     }
+    return null;   // the owner follows no window at all — nothing could have admitted this film either
   }
   return (standing && WINDOW_RUNG[standing]>WINDOW_RUNG[earned]) ? standing : earned;
 }
@@ -8423,14 +8494,28 @@ function notifyChipHTML(id){
 function agentChipSource(id, owner){
   return owner ? (pinnedInto(id,owner) ? "manual" : "auto") : null;
 }
-// CAS-861: owner is gated through ownerIfShown — a film held by an agent the account's my-services switch
-// would hide from the listing reads "No agent" here rather than crediting an owner the listing itself
-// wouldn't show. Every real card renders from a catalogue film, so m is always found in production; the
-// fallback below only ever matters for the odd id with no MOVIES entry.
+// CAS-1239: filmOwnerCascade needs a real catalogue film (listedBy reads its genres/status/etc.) — an id
+// with no MOVIES entry (should never happen for a real card; a couple of synthetic-id tests exercise it on
+// purpose) falls back to the raw recorded pin/membership directly, with no listedBy check, same as before
+// this ticket.
+function rawCascadeIdOwner(id){
+  const e=notify[id]||{};
+  const ids=(e.pinnedTo||[]).length ? e.pinnedTo : (e.cascadeIds||[]);
+  let best=null;
+  ids.forEach(cid=>{
+    const c=cascades.find(x=>x.id===cid);
+    if(c && (!best || (c.order??Number.MAX_SAFE_INTEGER)<(best.order??Number.MAX_SAFE_INTEGER))) best=c;
+  });
+  return best;
+}
+// CAS-1239: owner comes straight from filmOwnerCascade, the one owner-resolution function every surface
+// shares — a film held by an agent the account's my-services switch would hide from the listing reads
+// "No agent" here rather than crediting an owner the listing itself wouldn't show. Every real card renders
+// from a catalogue film, so m is always found in production; the fallback below only ever matters for the
+// odd id with no MOVIES entry.
 function agentChipHTML(id){
   const m=MOVIES.find(x=>x.tmdb_id===id);
-  const rawOwner=cascadesFor(id)[0]||null;
-  const owner=m ? ownerIfShown(m, rawOwner) : rawOwner;
+  const owner=m ? filmOwnerCascade(m) : rawCascadeIdOwner(id);
   const lbl = owner ? owner.name : "No agent";
   const title = owner
     ? `Owned by ${owner.icon} ${owner.name}. Tap to move to a different agent.`
@@ -8447,8 +8532,11 @@ function agentChipHTML(id){
 }
 // The panel's rows: one per cascade, ordered by rank (CAS-708's `.order`, ascending), a true single-select —
 // hence the round .wwb tick, not the Lists checklist's square one — with the film's current owner pre-ticked.
+// CAS-1239: the same filmOwnerCascade the chip above reads, so the row this panel pre-ticks can never be a
+// different agent than the chip that opened it named.
 function agentPanelRowsHTML(id){
-  const owner=cascadesFor(id)[0]||null;
+  const m=MOVIES.find(x=>x.tmdb_id===id);
+  const owner=m ? filmOwnerCascade(m) : rawCascadeIdOwner(id);
   const sorted=[...cascades].sort(cascadeOrderCmp);
   const rows=sorted.map(c=>{
     const on=!!owner && owner.id===c.id;
@@ -8881,12 +8969,13 @@ function stubHTML(m){
 // anyway, so forgetting it costs nothing.
 const NEW_DAYS = 14;                                    // what "this week" means. One dial, in one place.
 const FIRST_FOUND_PRUNE_DAYS = NEW_DAYS + 30;           // margin past NEW_DAYS before a stamp is forgotten
-const FIRST_KEY = "cascade_first_found";
-function loadFirstFound(){
-  try{ const o=JSON.parse(localStorage.getItem(FIRST_KEY)||"{}");
-    return (o && typeof o==="object" && !Array.isArray(o)) ? o : {}; }catch(e){ return {}; }
-}
-const firstFound = loadFirstFound();
+// CAS-1222: cascade_first_found is retired — agent_films.admitted_at (CAS-742) already supersedes it as
+// the real, account-wide answer wherever a per-agent admission date is needed (agentNewestDays/
+// agentMetricsCompute below read `row.admitted_at` first, with `firstFound` now only the no-ledger-row
+// fallback — a pin, or a guest with no account at all). What's left has no account column of its own and
+// nothing in this ticket asks for one, so it is simply never persisted: in-memory only, rebuilt fresh
+// every boot, same as every other CAS-1221-era field with no server home.
+const firstFound = {};
 let firstSaved=null;
 function trackFirstFound(){
   Object.keys(firstFound).forEach(id=>{ if(daysSince(firstFound[id]) > FIRST_FOUND_PRUNE_DAYS) delete firstFound[id]; });
@@ -8894,30 +8983,40 @@ function trackFirstFound(){
   // (never the catalogue's build date), it IS "when YOU are looking", so the separate variable is gone.
   found.forEach(id=>{ if(!firstFound[id]) firstFound[id]=TODAY; });
   const s=JSON.stringify(firstFound);
-  if(s===firstSaved) return;                            // runs on every render — only real changes write
-  firstSaved=s;
-  try{ localStorage.setItem(FIRST_KEY, s); }catch(e){}
+  firstSaved=s;   // CAS-1222: kept only so a future reader can cheaply tell "unchanged since last pass"
 }
 // CAS-715: was this admission caused by the world moving, or by editing the agent? firstFound/isNewFound
 // only ever answer "is this film new to the list", with no opinion on WHY — the Watch On chip's glow needs
 // the second half: a film that only showed up because you just widened an agent isn't news about the FILM,
 // so it must not glow, even though it did just land on the list. recomputeFound is the one place that can
 // still tell the two apart (see its own cascadeDrift/wasFound comments) — it stamps the verdict here, once,
-// at the moment of admission. Device-local, same as firstFound (CAS-715 accepted that limitation rather than
-// wait on CAS-742-style account plumbing).
-const ADMIT_DRIFT_KEY = "cascade_admit_drift";
-function loadAdmitDrift(){
-  try{ const o=JSON.parse(localStorage.getItem(ADMIT_DRIFT_KEY)||"{}");
-    return (o && typeof o==="object" && !Array.isArray(o)) ? o : {}; }catch(e){ return {}; }
-}
-const admitDrift = loadAdmitDrift();
+// at the moment of admission.
+// CAS-1222 Change 4: moved onto the account (user_prefs.view.admitDrift) as a scoped exception to CAS-1218
+// ("only an explicit user action may write account data") — it is not user content, but the SET it holds
+// only ever changes as a consequence of the user's own agent edit: cascadeDrift (above) can only go true
+// when an agent's criteria no longer matches the signature stored at its last admission, which happens
+// only by editing that agent (on this device or another) — never by a load, poll, render or reconcile
+// alone re-running the same comparison against unchanged inputs. The JSON-diff guard below (unchanged from
+// before this ticket) is what then turns "the set changed" into "write", so a push only ever follows a
+// real edit, never a boot/reconcile/poll that merely re-confirms the same set. Debounced/coalesced with
+// the invite draft's own writes (saveAgentState) — see pushViewFieldDebounced's own comment.
+const admitDrift = {};
 let admitDriftSaved=null;
 function trackAdmitDrift(){
   Object.keys(admitDrift).forEach(id=>{ if(!found.has(+id)) delete admitDrift[id]; });
   const s=JSON.stringify(admitDrift);
   if(s===admitDriftSaved) return;
   admitDriftSaved=s;
-  try{ localStorage.setItem(ADMIT_DRIFT_KEY, s); }catch(e){}
+  // CAS-1222: never push before this device's own user_prefs load has resolved at least once this boot —
+  // `admitDrift` starts empty, before cascades/agent_films have even loaded, so a push off that bare
+  // in-memory default would stomp the account's real history the instant it lands (the same "never write
+  // before this device's own load has resolved" hazard CAS-1218 exists to prevent elsewhere). loadUserPrefs
+  // (below) adopts the real value into this same object and calls render(), which re-runs this function —
+  // by then userPrefsReady is true, so the diff (now against the just-adopted baseline) is free to push
+  // again should anything about to change (a genuine edit) actually differ from it.
+  if(window.CascadePersistence && window.CascadePersistence.userPrefsReady){
+    pushViewFieldDebounced("admitDrift", {...admitDrift});
+  }
 }
 const daysSince = iso => Math.round((Date.parse(TODAY) - Date.parse(iso)) / 864e5);
 // CAS-742: the account's own answer to "when was this film found", read off agent_films.admitted_at
@@ -9060,7 +9159,7 @@ async function pollCatalogue(){
             // directly and isn't part of render()'s rebuild, so it's kept honest here — unconditionally, since
             // a one-line text write can never disturb an open modal/drawer/popup the way a full rebuild could.
             // CAS-689: no "Updated " prefix — see the initial-paint site's comment.
-            if(pointer.generated){ BUILD_DATE = pointer.generated; $("updated").textContent = fmtDay(BUILD_DATE); }
+            if(pointer.generated){ BUILD_DATE = catalogueHeaderDate(pointer); $("updated").textContent = fmtDay(BUILD_DATE); }
             captureClaimedStatus();
             // CAS-490: MOVIES was just replaced wholesale, so any ?fixtures=1 merge (CAS-486) is gone — re-apply
             // it here rather than only on cascade-auth-change, so a fixture film survives a catalogue refresh
@@ -9323,6 +9422,9 @@ function watchStageStopsNow(){
 // Tapping a stop still runs through setWatchTab for the tab it belongs to — the only new behaviour is the
 // Cinema tab's own Upcoming/In Cinema split, which setWatchTab knows nothing about (and doesn't need to:
 // a tap that doesn't change `watchTab` has to re-render itself, since setWatchTab no-ops on no change).
+// CAS-1238: a stop's own section id — the Cinema stops' key IS the LISTING_ORDER group id (upcoming/
+// in_cinema) already; every other stop only has that mapping via WATCH_TAB_SCROLL_TARGET.
+const watchStageScrollTarget = stop => stop.tabKey==="in_cinema" ? stop.key : WATCH_TAB_SCROLL_TARGET[stop.tabKey];
 window.setWatchStage = key => {
   const stop=watchStageStopsNow().find(s=>s.key===key); if(!stop) return;
   if(watchTab!==stop.tabKey){
@@ -9335,7 +9437,11 @@ window.setWatchStage = key => {
     watchCinemaStage=key;
     logEvent("watch_tab", {tab:key, from});
     render();
+    return;
   }
+  // CAS-1238: the tapped stage is already the selected one — no tab/stage change, so no re-render; just
+  // land back on that stage's own section, the same jumpToSection landing a stage switch uses above.
+  jumpToSection(watchStageScrollTarget(stop));
 };
 // CAS-1223: true for a film belonging to the Cinema tab's currently-selected half — Upcoming is exactly
 // primaryStatus "upcoming"; In Cinema is everything else the Cinema tab shows (opening_week/in_cinema).
@@ -9397,18 +9503,14 @@ function renderWatchTop(){
 // "leave and come back" rule the old per-list search always followed.
 const watchSearchRaw = {in_cinema:"", premium:"", rent:"", stream:""};
 // CAS-769: unlike every other Watch-tab control, the selected occasion is a MODE (which of your agents
-// you're watching for), not a per-tab filter — so it is a single value, sticky across tabs and reloads,
+// you're watching for), not a per-tab filter — so it was a single value, sticky across tabs and reloads,
 // rather than one Set per tab. null means "All".
-// CAS-775: holds a REGISTER ID now (was a name) — see the Occasions register above. null still means "All".
+// CAS-1222: dead since CAS-1223 removed the Watch screen's Occasion pill — nothing left can set this to
+// anything but null, so it stays in-memory-only rather than migrating to the account. The Occasions
+// register, Manage occasions and the agent editor's occasion card are untouched by this.
 let watchOccasion = null;
-try{ watchOccasion = localStorage.getItem("cascade_watch_occasion") || null; }catch(e){}
-// CAS-1223: the Occasion pill left the Watch screen — nothing there can un-set a stale selection any more,
-// so a device carrying one from before this ticket has it cleared once, the same as a fresh "All" start.
-// The Occasions register, Manage occasions and the agent editor's occasion card are untouched by this.
-if(watchOccasion){ watchOccasion=null; try{ localStorage.setItem("cascade_watch_occasion", ""); }catch(e){} }
 window.setWatchOccasion = id => {
   watchOccasion = (!id || id==="All") ? null : id;
-  try{ localStorage.setItem("cascade_watch_occasion", watchOccasion||""); }catch(e){}
   render();
 };
 // CAS-769: whether the search box is expanded over the occasion row right now — never persisted, and
@@ -9471,6 +9573,10 @@ window.clearAllWatchStyles = () => {
 // selection hides tagged-out films entirely, exactly the old scope.watched=false default.
 const watchSearch = {in_cinema:"", premium:"", rent:"", stream:""};
 const watchWatchedSel = {in_cinema:new Set(), premium:new Set(), rent:new Set(), stream:new Set()};
+// CAS-1234: the Badges section's own selection — same per-tab, session-only, empty-means-"nothing
+// narrowed" shape as watchWatchedSel above. Values are scaleTier(m)'s own keys (landmark/mustsee/
+// blockbuster/anticipated), so filmMatchesBadgeFilter below never needs a translation layer either.
+const watchBadgeSel = {in_cinema:new Set(), premium:new Set(), rent:new Set(), stream:new Set()};
 // CAS-719: who set the current tab's Watch On level — All/Agent (auto)/Me (manual), single-select,
 // same per-tab session-only shape as watchGenreOff/watchWatchedSel above. Values other than "all" match
 // filmWatchSource(id)'s own return values directly ("auto"/"manual"), so there is no translation layer
@@ -9517,9 +9623,12 @@ const PICKER_KINDS = {
   sort: {
     items: () => SORT_OPTS,
     current: () => filt.sort,
-    // CAS-819: choosing "Cascade score" (DEFAULT_SORT's own option) is choosing the default back — anything
-    // else is a genuine pick, which is what sortPicked (the active-dot's own flag) tracks.
-    pick: key => { filt.sort=key; sortPicked=(filt.sort!==DEFAULT_SORT); syncSortCtl(); render(); },
+    // CAS-1240: any explicit tap/pick is a genuine pick, full stop. CAS-819's original rule compared the
+    // chosen key against DEFAULT_SORT instead, which silently dropped the pick whenever someone chose
+    // Cascade score on a tab whose own default isn't DEFAULT_SORT — the Cinema tab's is "availability", so
+    // tapping "Cascade score" there set filt.sort to DEFAULT_SORT's own value and read as choosing the
+    // default back, when it was the one tab where that tap was the only way to leave the default at all.
+    pick: key => { filt.sort=key; sortPicked=true; syncSortCtl(); render(); },
   },
 };
 const SORT_OPTS = [
@@ -9606,18 +9715,41 @@ const ALSO_SHOW_WINDOWS = [
   {key:"rental", label:"At rental", cd:"var(--blue)"},
   {key:"included_streaming", label:"Streaming", cd:"var(--green)"},
 ];
+// CAS-1235: a film "disappears" when its Watch On moves to a later stage (e.g. Upcoming → Streaming) unless
+// every earlier-than-own-standing window is already widened in — so each non-Cinema tab now defaults to
+// widening every ALSO_SHOW_WINDOWS entry EARLIER than its own standing on the upcoming/in_cinema/rental/
+// included_streaming ladder, not none. Premium's own standing (pvod) sits outside that four-window ladder
+// entirely, so only upcoming/in_cinema (both before it either way) apply to Premium.
+const WATCH_ALSO_SHOW_DEFAULT = {
+  premium: ["upcoming", "in_cinema"],
+  rent: ["upcoming", "in_cinema"],
+  stream: ["upcoming", "in_cinema", "rental"],
+};
 // Which windows are switched ON (widened in) per tab — same per-tab, session-only shape as watchGenreOff,
-// but "nothing switched on" here means the tab's own standing ALONE, not "everything shows" (CAS-720's off-
-// set had the opposite default). The tab's own window is tested by WATCH_TAB_OWN_STANDING directly and is
-// never added to this Set, so it can never be switched off from here.
-const watchAlsoShow = {in_cinema:new Set(), premium:new Set(), rent:new Set(), stream:new Set()};
+// but "nothing switched OFF from default" here means WATCH_ALSO_SHOW_DEFAULT, not empty (CAS-1235) — CAS-720's
+// off-set had yet a third default ("everything shows"). The tab's own window is tested by
+// WATCH_TAB_OWN_STANDING directly and is never added to this Set, so it can never be switched off from here.
+const watchAlsoShow = {in_cinema:new Set(), premium:new Set(WATCH_ALSO_SHOW_DEFAULT.premium),
+  rent:new Set(WATCH_ALSO_SHOW_DEFAULT.rent), stream:new Set(WATCH_ALSO_SHOW_DEFAULT.stream)};
 window.toggleWatchAlsoShow = key => {
   if(WATCH_TAB_OWN_STANDING[watchTab]===key) return;   // the tab's own window — not switchable
   const set=watchAlsoShow[watchTab];
   set.has(key) ? set.delete(key) : set.add(key);
   render();
 };
-window.clearWatchAlsoShow = () => { watchAlsoShow[watchTab].clear(); render(); scrollWatchListingToTop(); };   // CAS-857
+// CAS-1235: "clear" returns Also-show to its default (the earlier-stages-on state), not to empty — empty
+// would itself now read as a deviation (watchAlsoShowIsDefault below), the opposite of what Clear means.
+window.clearWatchAlsoShow = () => {
+  watchAlsoShow[watchTab]=new Set(WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
+  render(); scrollWatchListingToTop();
+};   // CAS-857
+// CAS-1235: true when a tab's Also-show set exactly matches its default — the badge/active-filter-chip's own
+// "no deviation" test, now that the default is no longer empty.
+function watchAlsoShowIsDefault(tab){
+  const def=WATCH_ALSO_SHOW_DEFAULT[tab]||[];
+  const cur=watchAlsoShow[tab];
+  return cur.size===def.length && def.every(k=>cur.has(k));
+}
 // CAS-720: agent inclusion — restores the agent narrowing scopeRows() gave up when CAS-718 retired the
 // deck's per-list agent picker (see that function's own comment), reading from this sheet state instead of
 // the old activeIds/cascOff deck selection. Session-only, empty-means-"nothing excluded".
@@ -9628,25 +9760,14 @@ window.toggleWatchAgent = id => {
   watchAgentOff.has(id) ? watchAgentOff.delete(id) : watchAgentOff.add(id);
   render();
 };
-// CAS-863: "Show only available on my services" moves off the retired watch-list model's own persisted
-// record onto per-tab state, shaped like watchAgentOff above — but persisted (its own localStorage key),
-// since this is the one Filters-sheet field that survives a reload, matching its pre-863 behaviour.
+// CAS-863: "Show only available on my services" is per-tab state, shaped like watchAgentOff above — but
+// persisted, since this is the one Filters-sheet field that survives a reload.
 // CAS-753: mineOnly defaults ON.
-const MINE_ONLY_KEY = "cascade_watch_mineonly";
-function loadWatchMineOnly(){
-  try{
-    const raw=localStorage.getItem(MINE_ONLY_KEY);
-    if(raw===null) return null;
-    const parsed=JSON.parse(raw);
-    return (parsed && typeof parsed==="object") ? parsed : null;
-  }catch(e){ return null; }
-}
+// CAS-1222: in-memory default now — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
+// ever populates this away from the signed-out "every tab ON" default, straight off the account's own
+// user_prefs.view.mineOnly field.
 const watchMineOnly = {in_cinema:true, premium:true, rent:true, stream:true};
-(function(){
-  const loaded=loadWatchMineOnly();
-  if(loaded) for(const k in watchMineOnly) if(typeof loaded[k]==="boolean") watchMineOnly[k]=loaded[k];
-})();
-function saveWatchMineOnly(){ try{ localStorage.setItem(MINE_ONLY_KEY, JSON.stringify(watchMineOnly)); }catch(e){} }
+function saveWatchMineOnly(){ pushViewField("mineOnly", {...watchMineOnly}); }
 const watchMineOnlyOn = () => watchMineOnly[watchTab];
 function setWatchMineOnly(v){ watchMineOnly[watchTab]=!!v; saveWatchMineOnly(); }
 window.toggleWatchMineOnly = () => { setWatchMineOnly(!watchMineOnlyOn()); render(); };
@@ -9659,6 +9780,13 @@ window.enableWatchMineOnly = () => { setWatchMineOnly(true); render(); scrollWat
 // testable as inFindScope always was.
 function filmMatchesWatchedFilter(m){
   return taggedOut(m) ? watchWatchedSel[watchTab].has(opinionOf(m.tmdb_id)) : true;
+}
+// CAS-1234: nothing selected narrows nothing (point 2 of the ticket); one or more selected keeps only a
+// film whose own scaleTier(m) — Landmark first, then the buzz band, exactly as the card badge reads it —
+// is one of the picks.
+function filmMatchesBadgeFilter(m){
+  const sel=watchBadgeSel[watchTab];
+  return !sel.size || sel.has(scaleTier(m));
 }
 // CAS-752: a film given a verdict THIS VISIT stays a row — folded to its stub by the existing keepRowInPlace
 // animation — even though its own new verdict just made it fail filmMatchesWatchedFilter above. Session-only
@@ -9689,17 +9817,25 @@ window.toggleWatchWatched = key => {
   render();
 };
 window.clearAllWatchWatched = () => { watchWatchedSel[watchTab].clear(); render(); scrollWatchListingToTop(); };   // CAS-857
+// CAS-1234: same toggle/clear-all shape as toggleWatchWatched/clearAllWatchWatched above.
+window.toggleWatchBadge = key => {
+  const set=watchBadgeSel[watchTab];
+  set.has(key) ? set.delete(key) : set.add(key);
+  render();
+};
+window.clearAllWatchBadge = () => { watchBadgeSel[watchTab].clear(); render(); scrollWatchListingToTop(); };   // CAS-857
 window.clearAllWatchFilters = () => {
   watchSearchRaw[watchTab]=""; watchSearch[watchTab]="";
   watchPickedBy[watchTab]="all";
   watchWatchedSel[watchTab].clear();
   watchGenreOff[watchTab].clear();
-  watchAlsoShow[watchTab].clear();
+  watchBadgeSel[watchTab].clear();
+  // CAS-1235: same as the Also-show section's own clear — back to default, not empty.
+  watchAlsoShow[watchTab]=new Set(WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
   // CAS-1144: "cleared" means the narrowing no longer applies, not reset-to-default — mineOnly's own
   // default is ON (CAS-753), which still narrows, so clearing it here means OFF.
   setWatchMineOnly(false);
   watchOccasion=null;
-  try{ localStorage.setItem("cascade_watch_occasion", ""); }catch(e){}
   render();
   scrollWatchListingToTop();   // CAS-857
 };
@@ -9736,16 +9872,18 @@ const agentOccasionsLine = c => {
 function watchFiltersActiveCount(){
   const genreOff=watchGenreOff[watchTab];
   const watchedSel=watchWatchedSel[watchTab];
+  const badgeSel=watchBadgeSel[watchTab];
   const pickedBy=watchPickedBySafe(watchTab);
-  const alsoShowSet=watchAlsoShow[watchTab];
   const mineOnly=watchMineOnlyOn();
-  return (pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(alsoShowSet.size?1:0)+(mineOnly?0:1);
+  // CAS-1235: Also-show's default is no longer empty — only a DIFFERENCE from WATCH_ALSO_SHOW_DEFAULT counts.
+  return (pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(badgeSel.size?1:0)+(watchAlsoShowIsDefault(watchTab)?0:1)+(mineOnly?0:1);
 }
 function renderWatchSheet(rows, shownCount){
   const genreOff=watchGenreOff[watchTab];
   const genres=[...new Set(rows.flatMap(m=>m.genres||[]))].sort();
   watchSheetGenres[watchTab]=genres;
   const watchedSel=watchWatchedSel[watchTab];
+  const badgeSel=watchBadgeSel[watchTab];
   const pickedBy=watchPickedBySafe(watchTab);
   const alsoShowSet=watchAlsoShow[watchTab];
   // CAS-753: default is ON, so — unlike every set/off field above — it counts as a deviation when it's OFF.
@@ -9795,6 +9933,19 @@ function renderWatchSheet(rows, shownCount){
     return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
       onclick="PICKER_KINDS.sort.pick('${o.key}')">${esc(o.label)}</button>`;
   }).join("");
+  // CAS-1234: counts come from `rows` — the same pre-Picked-by/Styles/Watched/Also-show pool Styles' own
+  // genre chips above are built from — so a badge nobody's picked yet still shows what picking it would
+  // cost (the "a toggled-off option stays offerable" rule CAS-718's comment names).
+  const badgeHTML=BADGE_FILTER_OPTS.map(opt=>{
+    const b=TENT_BADGE[opt.key];
+    const on=badgeSel.has(opt.key);
+    const count=rows.filter(m=>scaleTier(m)===opt.key).length;
+    return `<button type="button" class="badgeopt${on?" on":""}" aria-pressed="${on}"
+      onclick="toggleWatchBadge('${opt.key}')">
+      <span class="badgeoptrow"><span class="badgeopticon" aria-hidden="true">${b.ico}</span>
+      <b>${esc(b.label)}</b><span class="jn">${count}</span></span>
+      <span class="badgeoptdesc">${esc(opt.descriptor())}</span></button>`;
+  }).join("");
   const body=$("watchSheetBody");
   if(body) body.innerHTML=`
     <div class="wsheetsec">
@@ -9828,7 +9979,11 @@ function renderWatchSheet(rows, shownCount){
     ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Also show</span></div>
       <div class="chips">${alsoShowHTML}</div>
-    </div>`}`;
+    </div>`}
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Badges</span></div>
+      <div class="badgeopts">${badgeHTML}</div>
+    </div>`;
   const showBtn=$("watchSheetShowBtn");
   if(showBtn) showBtn.textContent = shownCount ? `Show ${shownCount} film${shownCount===1?"":"s"}` : "No films match";
   const chips=[];
@@ -9838,8 +9993,11 @@ function renderWatchSheet(rows, shownCount){
   if(watchedSel.size) chips.push({label:chipSummary(REVIEW_STEPS.filter(v=>watchedSel.has(v.key)).map(v=>v.lbl)),
     clear:"clearAllWatchWatched()"});
   if(genreOff.size) chips.push({label:chipSummary([...genreOff]), clear:"clearAllWatchStyles()"});
-  if(alsoShowSet.size) chips.push({label:chipSummary(ALSO_SHOW_WINDOWS.filter(w=>alsoShowSet.has(w.key)).map(w=>w.label)),
+  // CAS-1235: only a difference from the (no-longer-empty) default counts as an active filter here.
+  if(!watchAlsoShowIsDefault(watchTab)) chips.push({label:chipSummary(ALSO_SHOW_WINDOWS.filter(w=>alsoShowSet.has(w.key)).map(w=>w.label)),
     clear:"clearWatchAlsoShow()"});
+  if(badgeSel.size) chips.push({label:chipSummary(BADGE_FILTER_OPTS.filter(o=>badgeSel.has(o.key)).map(o=>TENT_BADGE[o.key].label)),
+    clear:"clearAllWatchBadge()"});
   // CAS-1223: a switched-off agent reads directly off its own lozenge in #watchTop now, so the active-filter
   // row no longer duplicates it as a chip (section 4 of the ticket).
   const bar=$("watchActiveFilters"); if(!bar) return;
@@ -9897,6 +10055,7 @@ function watchVisibleRows(){
   if(watchPickedBy[watchTab]!=="all") rows=rows.filter(filmMatchesPickedBy);
   const genreOff=watchGenreOff[watchTab];
   if(genreOff.size) rows=rows.filter(m=>!(m.genres||[]).some(g=>genreOff.has(g)));
+  if(watchBadgeSel[watchTab].size) rows=rows.filter(filmMatchesBadgeFilter);
   const heldThisTab=watchHeldOpen[watchTab];
   rows=rows.filter(m=>filmMatchesWatchedFilter(m) || heldThisTab.has(m.tmdb_id));
   const preMineOnlyRows=rows;
@@ -10439,6 +10598,15 @@ function scaleTier(m){
   if(isLandmark(m)) return "landmark";
   return buzzBandOf(m);
 }
+// CAS-1234: the Watch Filters sheet's Badges section — one option per scaleTier(m) value, in the ladder's
+// own highest-to-lowest order. Each descriptor is a function, not a frozen string, so the printed
+// percentage can never disagree with BUZZ_PCTL's real cuts (AC2).
+const BADGE_FILTER_OPTS = [
+  {key:"landmark",    descriptor:() => "Award-winning, acclaimed by critics, made at scale"},
+  {key:"mustsee",     descriptor:() => `The top ${100-BUZZ_PCTL[3]}% most talked-about new films`},
+  {key:"blockbuster", descriptor:() => `The top ${100-BUZZ_PCTL[2]}% most talked-about new films`},
+  {key:"anticipated", descriptor:() => `The top ${100-BUZZ_PCTL[1]}% most talked-about new films`},
+];
 
 // CAS-140: E (Exempt) and RC (Refused Classification) are NOT maturity rungs — E is a carve-out for
 // content that isn't classified at all, RC is prohibited content — so neither belongs on the ascending
@@ -11251,14 +11419,14 @@ function applyCascade(c){
 }
 // Opening is idempotent: landing a card in the deck's centre IS selecting it, so this can be called
 // with the already-open Cascade. Closing is the centre card's × — never a side-effect of selection.
-window.openCascade=id=>{
+window.openCascade=(id, push=true)=>{
   // CAS-134: moving to another cascade is leaving this one's list, so its held stubs settle now — a film you
   // answered under one agent must not turn up as a stub on another agent's New list.
   // CAS-634: "already open" now also has to mean nothing ELSE is selected — an id matching activeId can
   // still be riding alongside other agents in activeIds, and this is the single-select entry point (Manage
   // Agents, sign-in landing), so it always has to collapse back down to just this one.
   const c=cascades.find(x=>x.id===id); if(!c || (activeId===id && activeIds.length===1)) return;
-  setActive(id); settleFoundView(); settleWatchHeldOpen(); applyCascade(c); restoreCascadeSearch();
+  setActive(id, push); settleFoundView(); settleWatchHeldOpen(); applyCascade(c); restoreCascadeSearch();
   $("groups").classList.add("listloading");     // CAS-421: held blurred till the new agent's list is ready
   closeFilterPanel(); restoreCascadeWatchTiers(); render();
   logEvent("cascade_opened", {key:c.template||"custom"});
@@ -11536,7 +11704,7 @@ function scopeEmptyHTML(){
 // listing never filters by) is touched right now — the guard for offering a "Clear filters" way out at all.
 function watchFiltersActive(){
   return !!watchSearch[watchTab] || watchPickedBy[watchTab]!=="all" || watchGenreOff[watchTab].size>0
-    || watchWatchedSel[watchTab].size>0 || watchMineOnlyOn() || watchOccasion!=null;
+    || watchWatchedSel[watchTab].size>0 || watchBadgeSel[watchTab].size>0 || watchMineOnlyOn() || watchOccasion!=null;
 }
 // CAS-1144: re-runs render()'s own Watch pipeline (watchScopeRows → search → Picked by → hidden styles →
 // Watched filter → mine-only) with every one of the tab's own narrowings cleared, so the count on "Clear
@@ -11546,17 +11714,20 @@ function watchRowsWithFiltersCleared(){
   const tab=watchTab;
   const snap={search:watchSearch[tab], raw:watchSearchRaw[tab], pickedBy:watchPickedBy[tab],
     genreOff:new Set(watchGenreOff[tab]), watchedSel:new Set(watchWatchedSel[tab]),
+    badgeSel:new Set(watchBadgeSel[tab]),
     mineOnly:watchMineOnly[tab], occasion:watchOccasion};
   watchSearch[tab]=""; watchSearchRaw[tab]="";
   watchPickedBy[tab]="all";
   watchGenreOff[tab].clear();
   watchWatchedSel[tab].clear();
+  watchBadgeSel[tab].clear();
   watchMineOnly[tab]=false;
   watchOccasion=null;
   let rows=watchScopeRows();
   if(watchPickedBy[tab]!=="all") rows=rows.filter(filmMatchesPickedBy);
   const genreOff=watchGenreOff[tab];
   if(genreOff.size) rows=rows.filter(m=>!(m.genres||[]).some(g=>genreOff.has(g)));
+  if(watchBadgeSel[tab].size) rows=rows.filter(filmMatchesBadgeFilter);
   const heldThisTab=watchHeldOpen[tab];
   rows=rows.filter(m=>filmMatchesWatchedFilter(m) || heldThisTab.has(m.tmdb_id));
   const n=rows.filter(m=>!taggedOut(m)).length;
@@ -11564,6 +11735,7 @@ function watchRowsWithFiltersCleared(){
   watchPickedBy[tab]=snap.pickedBy;
   watchGenreOff[tab].clear(); snap.genreOff.forEach(g=>watchGenreOff[tab].add(g));
   watchWatchedSel[tab].clear(); snap.watchedSel.forEach(v=>watchWatchedSel[tab].add(v));
+  watchBadgeSel[tab].clear(); snap.badgeSel.forEach(v=>watchBadgeSel[tab].add(v));
   watchMineOnly[tab]=snap.mineOnly;
   watchOccasion=snap.occasion;
   return n;
@@ -12117,8 +12289,9 @@ function deleteAgentAsk(c){
     activeIds=activeIds.filter(id=>id!==c.id);
     if(!activeIds.length && cascades.length) activeIds=[firstAgentId()];
     activeId=activeIds[0]||null;
-    try{ localStorage.setItem("cascade_active",activeId||""); }catch(e){}
-    saveActiveIds();
+    // CAS-1222: deleting an agent is itself the user action — push the corrected selection, same as setActive.
+    pushViewField("active", activeId);
+    pushViewField("activeMulti", [...activeIds]);
     clearFilters(); syncFilterUI();
   }
   logEvent("cascade_deleted",{id:c.id, films:mine});
@@ -14102,12 +14275,10 @@ function listToStatuses(watch){
 // CAS-723: no more per-agent kind to read — see watchAllWindows above.
 function watchStatuses(){ return watchToStatuses(watchAllWindows(onbFlow.watch)); }
 function listStatuses(){  return listToStatuses(watchAllWindows(onbFlow.watch)); }
-// Persisted per agent, so backing out to the shortlist and returning keeps your answer — but picking a
-// DIFFERENT agent gets that agent's own seed rather than the last one's leftovers.
-const WATCH_KEY="cascade_watchwins";
-function saveWatch(){
-  try{ localStorage.setItem(WATCH_KEY, JSON.stringify({agent:wiz.starter||null, watch:onbFlow.watch})); }catch(e){}
-}
+// CAS-1222: retired outright — this ticket's own audit found cascade_watchwins (the serialized {agent,
+// watch} this used to write) had no reader anywhere in the file; onbFlow.watch itself (held in memory,
+// mutated directly by the lane-card switches below) is what every live read of the in-progress wizard
+// draft actually uses, backing out to the shortlist and back included.
 // ---- CAS-532: Where & when you'll watch, promoted to a global setting --------------------------------
 // One answer for every agent, the same way tasteBase.langs already is — not a per-agent seed a new agent
 // copies and can then drift from. `prefsWatchMode` retargets the SAME lane-card machinery (winFlags,
@@ -14290,7 +14461,6 @@ function wwChanged(key){
     render();   // CAS-725 AC5: the Watch screen's tab strip follows the window you just switched, no reload
     return;
   }
-  saveWatch();
   logEvent("watch_windows_changed",{window:key, list:winOn(key,"list")});
   drawWatchLanes();   // the window's own lit state and its one switch
   onbRefresh();       // …and the CTA's live count, which really did just move
@@ -16900,6 +17070,9 @@ function briefNewAgent(){
 function briefCommit(){
   draft = onbApply();
   const {c} = commitDraft();
+  // CAS-1236: an agent's own criteria changing isn't one of watchNavKey()'s five things, but it must still
+  // land in the Watch list immediately — this is the one explicit exception decision 3 doesn't name.
+  markWatchNavigated();
   showFoundList(); render();
   logEvent("briefing_saved",{id:c.id, matches:watchCount(c)});
 }
@@ -16914,6 +17087,7 @@ window.briefDelete=()=>{
   // was just deleted, so there is nothing left to commit it TO. Clear the draft first, or commitDraft's
   // Object.assign would throw reaching for a deck entry that's gone.
   onbFlow.draft=null;
+  markWatchNavigated();   // CAS-1236: a deleted agent's films must leave the list now, not at the next nav
   briefClose(); showFoundList(); render();
 };
 // The one place the Briefing decides where you land. Back always lands here now, so this is the only
@@ -17262,11 +17436,30 @@ try{ movingReady = localStorage.getItem("cascade_had_account") !== "1"; }catch(e
 function movingIsGuestDevice(){
   try{ return localStorage.getItem("cascade_had_account") !== "1"; }catch(e){ return true; }
 }
+// CAS-1237: the Sydney calendar date (YYYY-MM-DD) a timestamp falls on for the account holder —
+// shared by movingInWindow's "today" period and movingAgeText, so a 24-hour rolling window can
+// never read an evening alert as "today" again the next Sydney morning.
+function sydneyYMD(ts){
+  const parts=new Intl.DateTimeFormat("en-CA", {timeZone:"Australia/Sydney",
+    year:"numeric", month:"2-digit", day:"2-digit"}).formatToParts(new Date(ts));
+  const get=k=>parts.find(p=>p.type===k).value;
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+// Whole Sydney calendar days between `dateStr` and now (0 = today, 1 = yesterday, ...). Both sides
+// go through sydneyYMD first, so the subtraction is between two UTC-midnight date-only values —
+// exact multiples of a day, immune to the DST half-hour a raw instant-to-instant diff would carry.
+function sydneyDaysAgo(dateStr){
+  const t=dateStr && Date.parse(dateStr);
+  if(!t || isNaN(t)) return null;
+  return Math.round((Date.parse(sydneyYMD(Date.now())) - Date.parse(sydneyYMD(t)))/864e5);
+}
 // A row's `date` is either a realAlerts emailed_at timestamp or a firstFound day string — both parse with
-// Date.parse. Every window is a rolling window measured back from now.
+// Date.parse. "today" is the Sydney calendar date (CAS-1237); the longer windows stay rolling, measured
+// back from now.
 function movingInWindow(dateStr, windowKey){
   const t=dateStr && Date.parse(dateStr);
   if(!t || isNaN(t)) return false;
+  if(windowKey==="today") return sydneyDaysAgo(dateStr)===0;
   const days=MOVING_WINDOW_DAYS[windowKey];
   return days!=null && t>Date.now()-days*864e5;
 }
@@ -17297,7 +17490,7 @@ function movingData(){
       if(watched.has(Number(fid))) return;
       const m=MOVIES.find(x=>String(x.tmdb_id)===fid);
       if(!m) return;
-      const owner=filmOwnerShown(m);
+      const owner=filmOwnerCascade(m);
       if(!owner){ dropped.push({date:firstFound[fid]}); return; }
       rows.push({filmId:fid, m, tag:"new", reason:"New to your agents",
         agentId:owner.id, date:firstFound[fid]});
@@ -17312,11 +17505,11 @@ function movingData(){
       if(byFilm.has(fid) || droppedByFilm.has(fid)) return;
       const m=MOVIES.find(x=>String(x.tmdb_id)===fid);
       if(!m) return;
-      const owner=filmOwnerShown(m);
+      const owner=filmOwnerCascade(m);
       if(!owner){ droppedByFilm.set(fid,{date:a.emailed_at}); return; }
       byFilm.set(fid,{filmId:fid, m, tag:movingIsNewMoment(a.moment)?"new":"changed",
         reason:REAL_MOMENT_SAID[a.moment]||a.moment,
-        agentId:owner.id, date:a.emailed_at});
+        agentId:owner.id, date:a.emailed_at, moment:a.moment});
     });
     rows.push(...byFilm.values());
     dropped.push(...droppedByFilm.values());
@@ -17421,24 +17614,51 @@ function movingSections(rows){
     .filter(s=>s.lanes.length);
 }
 // A row's `date` is either a realAlerts emailed_at timestamp or a firstFound day string — both parse with
-// Date.parse. Calendar-day difference from now, said plainly; never a fabricated precision.
+// Date.parse. Sydney calendar-day difference from now (CAS-1237), said plainly; never a fabricated
+// precision, and never a 24-hour rolling count that calls 17:00-yesterday "today" the next morning.
 function movingAgeText(dateStr){
-  const t=dateStr && Date.parse(dateStr);
-  if(!t || isNaN(t)) return "";
-  const days=Math.floor((Date.now()-t)/864e5);
+  const days=sydneyDaysAgo(dateStr);
+  if(days==null) return "";
   if(days<=0) return "today";
   if(days===1) return "yesterday";
   return `${days} days ago`;
 }
-// The item is the change line above the SAME card the Watch listing renders for that film — taggedOut()
-// picks the stub exactly as Watch does, and the full card omits the "Not for this list" control (Moving
-// is not a list, so there is nothing to be not-for) but is otherwise the same card.
-function movingRowHTML(row){
-  const m=row.m;
-  const age=movingAgeText(row.date);
-  const why=`<div class="mvwhy"><span class="mvchip ${row.tag}">${row.tag==="new"?"NEW":"CHANGED"}</span> · ${esc(row.reason)}${age?` · ${esc(age)}`:""}</div>`;
-  const card=taggedOut(m) ? stubHTML(m) : cardHTML(m, false, {hideDismiss:true});
-  return `<div class="mvitem">${why}${card}</div>`;
+// CAS-1237: opens_soon/past_opening_weekend are reminders — nothing about the film changed — so they
+// get their own chip wording instead of borrowing CHANGED's. Same .mvchip class (and so colour) as the
+// tag it stands in for; only the word shown is different.
+const MOVING_REMINDER_CHIP = {opens_soon:"SOON", past_opening_weekend:"REMINDER"};
+function movingChipLabel(row){
+  return MOVING_REMINDER_CHIP[row.moment] || (row.tag==="new" ? "NEW" : "CHANGED");
+}
+// CAS-1237 AC5: consecutive rows in one lane (already sorted by movingLanes) that share the same
+// chip, reason and age are one event told once, not the same line repeated above every card in the
+// run — group runs of (chip, reason, age) rather than re-deriving them per row at render time, so the
+// grouping and the group's own why-line can never disagree about what they're describing.
+function movingRowGroups(rows){
+  const groups=[];
+  rows.forEach(row=>{
+    const chip=movingChipLabel(row), age=movingAgeText(row.date);
+    const prev=groups[groups.length-1];
+    if(prev && prev.chip===chip && prev.reason===row.reason && prev.age===age) prev.rows.push(row);
+    else groups.push({chip, reason:row.reason, age, tag:row.tag, rows:[row]});
+  });
+  return groups;
+}
+function movingWhyHTML(group){
+  return `<div class="mvwhy"><span class="mvchip ${group.tag}">${esc(group.chip)}</span> · ${esc(group.reason)}${group.age?` · ${esc(group.age)}`:""}</div>`;
+}
+// The card is the SAME one the Watch listing renders for that film — taggedOut() picks the stub exactly
+// as Watch does, and the full card omits the "Not for this list" control (Moving is not a list, so
+// there is nothing to be not-for) but is otherwise unchanged.
+function movingCardHTML(row){
+  return taggedOut(row.m) ? stubHTML(row.m) : cardHTML(row.m, false, {hideDismiss:true});
+}
+// One why-line per group, above its first card only — the rest of the group's cards carry no why-line
+// of their own, so a run of matching rows says its reason exactly once.
+function movingLaneHTML(rows){
+  return movingRowGroups(rows).map(g=>
+    g.rows.map((row,i)=>`<div class="mvitem">${i===0?movingWhyHTML(g):""}${movingCardHTML(row)}</div>`).join("")
+  ).join("");
 }
 // movingSeen no longer decides whether a row renders — every row inside the selected window shows, full
 // stop. It is still upserted here so movingUnseenCount() (the chip badge — the only thing movingSeen is
@@ -17507,7 +17727,7 @@ function renderMovingScreen(markSeen){
       const clickable = ` role="button" tabindex="0" data-cid="${escA(lane.cascade.id)}" onclick="openMovingAgentEl(this)" style="cursor:pointer"`;
       return `<div class="ablock${tint?` agrank-${tint}`:""}">
         <div class="grouphead sub"${clickable}><span>${name}</span><span class="gcount" style="margin-left:auto">${lane.rows.length}</span></div>
-        <div class="mvlist">${lane.rows.map(movingRowHTML).join("")}</div>
+        <div class="mvlist">${movingLaneHTML(lane.rows)}</div>
       </div>`;
     }).join("");
     return `<div class="group" data-g="${g}">
@@ -17519,7 +17739,7 @@ function renderMovingScreen(markSeen){
   // see those functions' own comments for how they were generalised to take a container.
   const jumpCtl=`<div class="listctl" id="movingListCtl"><div class="jumpbar" id="movingJumpBar" hidden></div></div>`;
   $("movingBody").innerHTML = head + alertHTML + jumpCtl + `<div id="movingGroups">${sectionsHTML}</div>`;
-  observeLazyPosters($("movingBody"));   // CAS-1103: movingRowHTML's cards carry the same lazy poster tiles
+  observeLazyPosters($("movingBody"));   // CAS-1103: movingLaneHTML's cards carry the same lazy poster tiles
   renderJumpBar({jumpBarId:"movingJumpBar", listCtlId:"movingListCtl", groupsSel:"#movingGroups .group", isOwn:()=>false, label:"Jump to"});
   syncHeaderHeight();   // CAS-852: #movingHead's height can change (window switch) — re-measure so the lane heading's --stickyh offset never drifts
 }
@@ -18768,7 +18988,7 @@ function membCodeErrorShow(msg){
 // review address here too.
 function membCodeMsgText(email){
   const a=window.CascadeAuth;
-  return (a && typeof a.verifyMsgFor==="function") ? a.verifyMsgFor(email) : ("Enter the code we sent to "+email+".");
+  return (a && typeof a.verifyMsgFor==="function") ? a.verifyMsgFor(email) : ("Enter the code we sent to "+email+". If it isn't in your inbox, check Junk. Only the newest code works.");
 }
 // B10: called every time #membScreen opens fresh, so a previous attempt never leaks into a new one.
 function membResetCodeState(){
@@ -18795,7 +19015,12 @@ function membShowCodeState(email){
   // directly above it, so the same scroll reveals both.
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     const scr=$("membScreen"), btn=document.querySelector(".membcta");
-    if(scr && btn && typeof btn.scrollIntoView==="function") btn.scrollIntoView({block:"end"});
+    if(!(scr && btn && typeof btn.scrollIntoView==="function")) return;
+    btn.scrollIntoView({block:"end"});
+    // CAS-1242: WebKit's own "end" alignment can still leave the button's bottom edge a sub-pixel
+    // past the screen's (observed ~0.08px, CAS-1169 AC3) — round that stray fraction back in.
+    const over = btn.getBoundingClientRect().bottom - scr.getBoundingClientRect().bottom;
+    if(over > 0) scr.scrollTop += Math.ceil(over);
   }));
 }
 // B9: back to State A — email editable and focused, code step gone, countdown stopped, both errors clear.
@@ -18819,7 +19044,8 @@ window.membResendCode=()=>{
   membCodeErrorShow(null);
   const msg=$("membCodeMsg");
   window.CascadeAuth.continueWithEmail(membCodeEmail).then(result=>{
-    if(!result.ok) membCodeErrorShow("Could not resend: "+(result.error||""));
+    if(result.rateLimited) membCodeErrorShow("A code was sent less than a minute ago. Use the newest email, or wait a moment and resend.");
+    else if(!result.ok) membCodeErrorShow("Could not resend: "+(result.error||""));
   });
   if(msg) msg.innerHTML=esc(membCodeMsgText(membCodeEmail))+
     ' <button type="button" class="linkbtn" id="membChangeEmail" onclick="membBackToEmail()" style="vertical-align:baseline">Change email</button>';
@@ -18944,19 +19170,21 @@ window.membStart=()=>{
       // CAS-1169: continueWithEmail only requests a code — the code is confirmed right here on
       // #membScreen (State B, membSubmitCode), never on #authModal's own verify step.
       window.CascadeAuth.continueWithEmail(email, { createUser: true }).then(result=>{
-        if(result.ok){ membShowCodeState(email); idle(); }
+        if(result.ok || result.rateLimited){ membShowCodeState(email); idle(); }
         else{ onbMembershipInFlight=false; membEmailError(result.error||"Could not send a sign-in code — try again."); idle(); }
       });
     });
   } else proceed(false);
 };
 // ---- FIRST-RUN TUTORIAL (CAS-976) — five coach marks anchored to the real listing controls, shown once
-// per account the first time the listing paints after onboarding. CAS-1100: wiped on sign-out along with
-// every other account-local key (wipeAccountLocalState), so a different account signing in on this device
-// never inherits "seen" from whoever was signed in before.
-const TUTORIAL_SEEN_KEY="cascade_tutorial_seen";
-function tutorialSeen(){ try{ return localStorage.getItem(TUTORIAL_SEEN_KEY)==="1"; }catch(e){ return true; } }
-function markTutorialSeen(){ try{ localStorage.setItem(TUTORIAL_SEEN_KEY,"1"); }catch(e){} }
+// per account the first time the listing paints after onboarding.
+// CAS-1222: in-memory only now, adopted off the account's own user_prefs.view.tutorialSeen field by
+// loadUserPrefs() (the account-sync IIFE, below) — a different account signing in on this device never
+// inherits "seen" from whoever was signed in before, same guarantee CAS-1100's wipeAccountLocalState used
+// to give the old localStorage key, now simply a consequence of there being nothing device-local to wipe.
+let tutorialSeenFlag=false;
+function tutorialSeen(){ return tutorialSeenFlag; }
+function markTutorialSeen(){ tutorialSeenFlag=true; pushViewField("tutorialSeen", true); }
 // The four anchored cards, in order; the fifth (closing, centred, no anchor) is appended in startTutorial.
 // Copy was originally verbatim per the CAS-976 ticket; CAS-1013 corrected the Moving card and the closing
 // card below, which had drifted from shipped behaviour (Moving's rolling window, the 5pm Sydney alert
@@ -19226,15 +19454,14 @@ window.enableAgent=id=>{ const c=cascades.find(x=>x.id===id); if(c) inviteCascad
 // ================= Agent invite → dynamic learning → done (CAS-78 / spec 26640386 §2) =================
 // PROTOTYPE MOCK ONLY. Every control here is visual: no card is taken, nothing is billed, no real
 // notification is ever sent. The copy is careful never to imply a charge WILL happen — it's a free month,
-// the future price is shown honestly with "we ask first", and a footnote says it's a preview. State is
-// localStorage, per device.
-function loadAgentState(){
-  try{ const o=JSON.parse(localStorage.getItem("cascade_agent")||"{}");
-    return {alerts:o.alerts!==false, email:!!o.email, learning:o.learning!==false, invited:!!o.invited}; }
-  catch(e){ return {alerts:true, email:false, learning:true, invited:false}; }
-}
+// the future price is shown honestly with "we ask first", and a footnote says it's a preview.
+// CAS-1222 Change 4: in-memory default now — loadUserPrefs() (the account-sync IIFE, below) is the only
+// thing that ever adopts a real answer, off the account's own user_prefs.view.agent field. Writes go
+// through the debounced merge (pushViewFieldDebounced), coalescing with trackAdmitDrift's own writes —
+// see that function's own comment for why the two share one debounced push.
+function loadAgentState(){ return {alerts:true, email:false, learning:true, invited:false}; }
 const agentState = loadAgentState();
-function saveAgentState(){ try{ localStorage.setItem("cascade_agent", JSON.stringify(agentState)); }catch(e){} }
+function saveAgentState(){ pushViewFieldDebounced("agent", {...agentState}); }
 let inviteStep=0;   // 0 invite · 1 learning · 2 done
 function openInvite(){
   inviteStep=0;
@@ -19341,38 +19568,42 @@ function fillListChunked(listEl, items, gen, freshFn, onDone){
   };
   step();
 }
-// CAS-713: which agent OWNS a film, for the Watch tabs' agent-rank sectioning within a status section.
-// This is the same single-owner assignment recomputeFound() just wrote to notify[id].cascadeIds (CAS-709:
-// unpinned, the film's highest-ranked/lowest-.order match; pinned, its pinned cascade(s) — the min of
-// those if more than one). A film recomputeFound never reached (should not happen for anything already in
-// `rows`, which only ever holds films some active agent already lists) sorts last rather than throwing.
-function filmOwnerOrder(m){
-  const ids=(notify[m.tmdb_id]||{}).cascadeIds||[];
-  if(!ids.length) return Number.MAX_SAFE_INTEGER;
-  return Math.min(...ids.map(id=>{ const c=cascades.find(x=>x.id===id); return c ? (c.order??Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER; }));
-}
-// CAS-717: the same owner match as filmOwnerOrder, but returning the cascade itself (for its name/icon)
-// rather than just its rank — used to divide a status section into per-agent blocks below.
+// CAS-1239: the ONE owner a film has everywhere — the lane heading, the agent chip, the agent-off rule,
+// Moving/Alerts attribution and the sort key (filmOwnerOrder, below) all resolve ownership through this
+// single function, so none of them can disagree with another about who owns a film. (The bug this fixed:
+// the chip read "No agent" for a film whose lane still credited an agent that had stopped actually
+// listing it — two different owner definitions, below, now collapsed into one.)
+//   a. a hand-pin (notify[id].pinnedTo) always wins, whatever the criteria say (CAS-709) — the lowest
+//      .order among the pinned cascades, if pinned into more than one. A paused cascade is never a pin
+//      target, same as recomputeFound's own candidates filter.
+//   b. otherwise, the film's recorded membership (notify[id].cascadeIds, recomputeFound's own admission
+//      answer) stays the owner as long as it still actually LISTS the film (listedBy) — the ordinary,
+//      no-drift case, and the one every existing fixture that wires cascadeIds directly relies on.
+//   c. a recorded membership can go stale (CAS-728's sticky admission, or matchesCriteria's pre-release
+//      Awards exemption, which listedBy's awardsListOK re-check does not carry) — once the recorded owner
+//      no longer lists the film, the owner is instead the highest-ranked (lowest .order) of ANY of the
+//      account's cascades that actually lists it today. No cascade lists it: no owner (null).
+//   d. no recorded membership at all (notify[id].cascadeIds empty or missing) means no owner, full stop —
+//      this is never re-derived by scanning every cascade's listedBy from scratch. recomputeFound already
+//      guarantees any film a cascade actually watches is already IN its membership, so an account with a
+//      genuinely unmembered film has nothing to fall back to either.
 function filmOwnerCascade(m){
-  const ids=(notify[m.tmdb_id]||{}).cascadeIds||[];
-  let best=null;
-  ids.forEach(id=>{
-    const c=cascades.find(x=>x.id===id);
-    if(c && (!best || (c.order??Number.MAX_SAFE_INTEGER)<(best.order??Number.MAX_SAFE_INTEGER))) best=c;
-  });
-  return best;
+  const byOrder=(best,c)=>(!best || (c.order??Number.MAX_SAFE_INTEGER)<(best.order??Number.MAX_SAFE_INTEGER)) ? c : best;
+  const pinned=((notify[m.tmdb_id]||{}).pinnedTo||[])
+    .map(id=>cascades.find(x=>x.id===id)).filter(c=>c && !c.paused);
+  if(pinned.length) return pinned.reduce(byOrder, null);
+  const memberIds=(notify[m.tmdb_id]||{}).cascadeIds||[];
+  if(!memberIds.length) return null;
+  const member=memberIds.map(id=>cascades.find(x=>x.id===id)).filter(Boolean).reduce(byOrder, null);
+  if(member && !member.paused && listedBy(m, member)) return member;
+  return cascades.filter(c=>!c.paused && listedBy(m,c)).reduce(byOrder, null);
 }
-// CAS-861: narrows an already-chosen owner to one a SURFACE (Moving, the card's agent chip) may actually
-// credit — null if the listing itself would exclude this film for that cascade (the my-services gate above
-// all). Membership (filmOwnerCascade/cascadesFor, watchesFilm, recomputeFound, the agent_films ledger) is
-// untouched and keeps ignoring that gate on purpose (CAS-132/381: an agent still holds a film you cannot
-// currently stream) — only what gets SHOWN as an owner changes. Reuses listedBy, the exact test the listing
-// itself applies, so a surface can never disagree with it.
-function ownerIfShown(m, owner){
-  return owner && listedBy(m, owner) ? owner : null;
-}
-function filmOwnerShown(m){
-  return ownerIfShown(m, filmOwnerCascade(m));
+// CAS-713: filmOwnerOrder is listingGroups' own primary sort key — the same owner filmOwnerCascade/
+// splitByOwner resolve, read down to just its rank, so the sort and the per-agent split can never run a
+// different agent's films together. No owner sorts last rather than throwing.
+function filmOwnerOrder(m){
+  const c=filmOwnerCascade(m);
+  return c ? (c.order??Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
 }
 // CAS-760: which of the six rank tints a cascade's sub-heading band gets — its POSITION among the
 // account's cascades sorted by `order` (order values are sparse, so the position, not the raw number),
@@ -19385,6 +19616,22 @@ function cascadeRankTint(c){
   const sorted=[...cascades].sort(cascadeOrderCmp);
   const idx=sorted.findIndex(x=>x.id===c.id);
   return idx<0 ? null : (idx%6)+1;
+}
+// CAS-1235: a plain stage name for an earlier-stage section showing under another tab's default widening —
+// distinct from STATUS_LABEL (whose pvod/rental entries carry a price suffix meant for that status's OWN
+// tab heading) and from ALSO_SHOW_WINDOWS' own labels (written for the Filters sheet's chips, not a listing
+// heading).
+const ALSO_SHOW_STAGE_LABEL = {upcoming:"Upcoming", in_cinema:"In Cinema", rental:"Rental", included_streaming:"Streaming"};
+// CAS-1235: the short tab name a widened-in section's heading reads "set to watch on <...>" — Cinema needs
+// no entry: it carries no Also-show section (filmMatchesWatchTab's "in_cinema" branch never widens), so
+// watchGroupHeading below never reaches this map for that tab.
+const WATCH_TAB_ON_LABEL = {premium:"Premium", rent:"Rent", stream:"Stream"};
+// CAS-1235: render()'s own group heading — STATUS_LABEL[g] unchanged for the tab's own section (Cinema
+// included), or "<stage> · set to watch on <tab>" for an earlier-stage section the tab's default (or a
+// manually widened) Also-show window pulled in.
+function watchGroupHeading(g){
+  if(watchTab==="in_cinema" || g===WATCH_TAB_OWN_STANDING[watchTab]) return STATUS_LABEL[g];
+  return `${ALSO_SHOW_STAGE_LABEL[g]} · set to watch on ${WATCH_TAB_ON_LABEL[watchTab]}`;
 }
 // Splits a status section's already agent-sorted `items` (filmOwnerOrder is listingGroups' primary sort
 // key, so one agent's films already run contiguously) into per-owner runs, in the same order.
@@ -19445,13 +19692,79 @@ function accountLoadingHTML(){
     <div class="ep">Hang on while we load your agents and films.</div>
   </div>`;
 }
+// CAS-1236 decision 3: "the settled list" — the Watch list keeps its films and their order until the
+// person actually navigates (changes stage, switches an agent on or off, changes sort, searches, or
+// applies a filter). watchNavKey() fingerprints exactly those five things; render() compares it against
+// the key in force the last time it did a full rebuild, and only treats a change in THAT fingerprint as a
+// navigation. Everything else — a reconcile pull, a verdict, a Watch On tick, a pin — repaints through
+// reconcilePatchSettledList() below instead, which never adds, removes, reorders or reflows a card.
+let watchSettledNavKey = null;
+// CAS-1236 AC-LOAD (CAS-1231's root cause): watchNavKey() matching alone is not proof the on-screen list is
+// actually filled — a full-rebuild pass can run (and record a nav key) before the account has any real data
+// to show, whether because render() caught the account mid-load or because the agent genuinely matched
+// nothing yet. reconcilePatchSettledList() below only ever updates cards that already exist, so trusting a
+// nav-key match recorded against an unfilled list leaves it unfilled forever once the real data arrives at
+// the SAME key — CAS-1231 exactly. Tracks whether the last full rebuild actually produced a row; render()
+// forces a full rebuild (never a patch) whenever this is false, regardless of the nav key.
+let watchListFilled = false;
+// CAS-1236 AC2: a render() call counter, reset/read through CascadePersistence — lets a test assert the
+// exact number of times render() itself ran (not just "the DOM looks the same"), the literal AC2 wording.
+let renderCallCount = 0;
+function watchNavKey(){
+  return JSON.stringify([
+    watchTab,
+    [...watchAgentOff].sort(),
+    sortPicked, filt.sort,
+    watchSearch[watchTab]||"",
+    watchPickedBy[watchTab],
+    [...watchGenreOff[watchTab]].sort(),
+    [...watchWatchedSel[watchTab]].sort(),
+    [...watchBadgeSel[watchTab]].sort(),
+    watchMineOnlyOn(),
+    watchOccasion,
+  ]);
+}
+// CAS-1236: forces the NEXT render() to run a full rebuild regardless of watchNavKey() — for the handful
+// of actions (committing or deleting an agent's own criteria) that change what the list should show
+// without touching any of the five things watchNavKey() itself fingerprints.
+function markWatchNavigated(){ watchSettledNavKey = null; }
+// CAS-1236 AC2-6: patches every card/stub currently on screen from the latest data, in place — same
+// position, same DOM node unless its OWN content actually changed, poster never cleared. A film that
+// would newly join or leave the list is left alone either way (decision 3: that only happens at the next
+// navigation); this only ever updates a row that is already there.
+function reconcilePatchSettledList(){
+  const wrap=$("groups");
+  wrap.querySelectorAll('[id^="card-"]').forEach(row=>{
+    const id=Number(row.id.slice(5)); if(!isFinite(id)) return;
+    const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
+    const t=document.createElement("template");
+    t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m))).trim();
+    const fresh=t.content.firstElementChild;
+    // AC6: a poster that has already loaded (an inline background-image, no data-lazybg left to observe)
+    // is carried over onto the fresh node BEFORE the comparison below, so a card whose only "change" is
+    // being regenerated never reads as different, and never re-triggers its own lazy-load.
+    const oldPoster=row.querySelector(".poster");
+    const newPoster=fresh.querySelector(".poster");
+    const loadedBg = oldPoster && oldPoster.style.backgroundImage;
+    if(loadedBg && newPoster){ newPoster.style.backgroundImage=loadedBg; newPoster.removeAttribute("data-lazybg"); }
+    if(row.outerHTML===fresh.outerHTML) return;   // AC2: nothing about this card actually changed
+    observeLazyPosters(t.content);
+    row.replaceWith(fresh);
+  });
+  updatePrefSwitch(); updatePrefBtn(); updateUxSwitch();
+}
 function render(){
+  renderCallCount++;
   renderGen++;   // CAS-129: supersede any card-fill still streaming from a previous render
   const myGen=renderGen;   // CAS-421: only THIS render may lift the blur it didn't set
   if(!accountFanoutSettled()){
     $("groups").innerHTML = accountLoadingHTML();
     renderJumpBar();
     syncHeaderHeight();
+    // CAS-1236 AC-LOAD: the loading placeholder just replaced whatever cards were on screen (if any) — the
+    // list is not filled, so the next render that actually gets past this gate must do a full rebuild, not
+    // trust a nav key a possibly-premature earlier pass recorded against a list that no longer exists.
+    watchListFilled = false;
     return;
   }
   // The re-run. Every paint re-selects each Cascade's auto set from scratch and re-applies your overrides on
@@ -19460,10 +19773,25 @@ function render(){
   // (Cascades × titles) and it means membership has exactly one definition, evaluated in exactly one place.
   recomputeFound();
   ensureWatchTab();   // CAS-725: keep the active tab valid before it drives rows/scope-bar below
+  // CAS-1236: everything above must run even on a settled (non-navigating) pass — recomputeFound is what
+  // keeps notify/found/taggedOut honest, and ensureWatchTab can itself force a navigation (a tab that just
+  // became invalid) which watchNavKey() (read next) must see.
+  {
+    const navKey = watchNavKey();
+    // AC-LOAD: the settled list is established by first load, the account finishing loading, a real
+    // stage/agent/sort/filter/search change, or switching tab — never by a background reconcile. !watchListFilled
+    // covers both "account finishing loading" and "any render where the list was empty" (CAS-1231's exact
+    // mechanism): a full rebuild that found nothing must not be trusted as a settled list the next pass can
+    // merely patch, even when nothing navigational changed in between.
+    const navigated = watchSettledNavKey===null || navKey!==watchSettledNavKey || !watchListFilled;
+    watchSettledNavKey = navKey;
+    if(!navigated){ reconcilePatchSettledList(); return; }
+  }
   // Two lists, one pass: `rows` is everything on screen, `shown` is everything that still gets a full card.
   // The difference is the films you tagged out — they stay on screen as stubs, and they don't count as
   // results, because you told us you didn't want them.
   const {rows, preSheetRows, preMineOnlyRows, mineOnly}=watchVisibleRows();
+  watchListFilled = rows.length>0;   // CAS-1236 AC-LOAD: records whether THIS full rebuild actually filled
   const shown=rows.filter(m=>!taggedOut(m));
   const stubbed=rows.length-shown.length;
   renderWatchTop();
@@ -19497,7 +19825,6 @@ function render(){
       : emptyResultsHTML();
     renderJumpBar();          // CAS-275: no sections, so no jump rail — and no stale one left behind
     syncHeaderHeight();       // CAS-761: the empty states above can still change #cascbar's height
-    markFoundSeen();
     listReady();
     return;
   }
@@ -19525,7 +19852,7 @@ function render(){
     // exclusion — so the header counts every item, matching what fillListChunked below actually streams.
     const live=items.length;
     const grp=document.createElement("div"); grp.className="group"; grp.dataset.g=g;
-    grp.innerHTML=`<div class="grouphead"><span class="gdot ${g}"></span>${STATUS_LABEL[g]}
+    grp.innerHTML=`<div class="grouphead"><span class="gdot ${g}"></span>${watchGroupHeading(g)}
       <span class="gcount">${live}</span></div>`;
     wrap.appendChild(grp);
     if(!blocks){
@@ -19559,8 +19886,6 @@ function render(){
   // the user was actually looking at kept its previous HTML — a new agent only appeared after a reload.
   // render() already runs on every one of those paths, so re-render the layer here if it is open.
   if($("agentsScreen")?.classList.contains("open")) renderAgentsScreen();
-  // You are looking at it — so the next visit's "since you last looked" counts from here.
-  markFoundSeen();
 }
 // ---- CAS-275: jump to a section --------------------------------------------------------------------
 // The listing is sectioned by availability window and can run to the whole catalogue, so "take me to the
@@ -19660,7 +19985,9 @@ window.jumpToSection = (k, opts) => {
     return g.getBoundingClientRect().top - jumpOccludedBottom(chromeId) - 8;
   };
   const first=delta(); if(first===null) return;
-  scroller.scrollBy({top:first, behavior:"smooth"});
+  // CAS-1238: honour prefers-reduced-motion for the jump itself, same gate REDUCE_MOTION already applies
+  // to card animations elsewhere — the settle corrections below are already instant.
+  scroller.scrollBy({top:first, behavior: REDUCE_MOTION.matches ? "auto" : "smooth"});
   let tries=0;
   const settle=()=>{
     const d=delta();
@@ -19737,6 +20064,7 @@ function filmInWatchRows(m){
   if(watchPickedBy[watchTab]!=="all" && !filmMatchesPickedBy(m)) return false;
   const genreOff=watchGenreOff[watchTab];
   if(genreOff.size && (m.genres||[]).some(g=>genreOff.has(g))) return false;
+  if(watchBadgeSel[watchTab].size && !filmMatchesBadgeFilter(m)) return false;
   if(!filmMatchesWatchedFilter(m) && !watchHeldOpen[watchTab].has(m.tmdb_id)) return false;
   if(watchMineOnlyOn() && HOME_KEYS.includes(primaryStatus(m)) && !matchesServices(m, primaryStatus(m))) return false;
   return true;
@@ -19857,25 +20185,53 @@ function keepRowInPlace(id, repaint){
 // demonstrably done its job before it asks. Fired from the moment a user marks a film their agent found
 // as watched (window.setOpinion, below) — not on launch, not mid-onboarding, not after an error.
 const REVIEW_PROMPT_MIN_SESSIONS = 3;
-const REVIEW_PROMPT_SESSIONS_KEY = "cascade_review_sessions";
-const REVIEW_PROMPT_ASKED_KEY = "cascade_review_asked_ver";
+// CAS-1222: in-memory now, adopted off the account's own user_prefs.view.reviewSessions/reviewAskedVer
+// fields — "a few sessions" becomes an account-wide count across every device, not a per-device one.
+let reviewPromptSessionsCount = 0;
+let reviewPromptAskedVer = null;
+// A bump happens unconditionally, synchronously, at boot (CAS-940's app_open) — long before this device's
+// own user_prefs load has had any chance to tell it what the account's real count already is. Pushing
+// straight off this session's bare local default (0+1) would stomp every other session's count the
+// moment it lands, the exact "never write before this device's own load has resolved" hazard CAS-1218
+// exists to prevent elsewhere. Queued instead: loadUserPrefs (the account-sync IIFE, below) applies this
+// session's +1 ON TOP of whatever the account answers with, the first time it resolves this boot — never
+// a bare local count.
+let reviewSessionBumpPending = false;
+// CAS-1243: loadUserPrefs computes the replayed count (above) but must not push it itself — a load never
+// writes (CAS-1218). This flag marks "this device holds a replayed count the account hasn't seen yet";
+// flushReviewSessionsIfPending() is the one place that ever clears it and sends the write, fired only once
+// the page is actually hidden, never from the load/boot path itself.
+let reviewSessionsPushPending = false;
 // One count per page load (called alongside app_open, below) — "a few sessions" means a few separate
 // visits, not a few actions within one.
 function bumpReviewPromptSessionCount(){
-  let n=0;
-  try{ n = Number(localStorage.getItem(REVIEW_PROMPT_SESSIONS_KEY)) || 0; }catch(e){}
-  n += 1;
-  try{ localStorage.setItem(REVIEW_PROMPT_SESSIONS_KEY, String(n)); }catch(e){}
-  return n;
+  reviewPromptSessionsCount += 1;
+  reviewSessionBumpPending = true;
+  return reviewPromptSessionsCount;
 }
-function reviewPromptSessionCount(){
-  try{ return Number(localStorage.getItem(REVIEW_PROMPT_SESSIONS_KEY)) || 0; }catch(e){ return 0; }
+function reviewPromptSessionCount(){ return reviewPromptSessionsCount; }
+// CAS-1243 (F2b): the account write reviewSessionBumpPending's replay used to make from inside
+// loadUserPrefs() itself — a load/boot path, which must never write (CAS-1218). Fired instead from the
+// page-hidden path (real visitors) or directly by a test (the read-only seam this ticket asks for) —
+// either way, at most one push per page load: the guard flag is cleared the instant it fires.
+function flushReviewSessionsIfPending(){
+  if(!reviewSessionsPushPending) return;
+  reviewSessionsPushPending = false;
+  pushViewField("reviewSessions", reviewPromptSessionsCount);
 }
-function reviewPromptAskedVersion(){
-  try{ return localStorage.getItem(REVIEW_PROMPT_ASKED_KEY); }catch(e){ return null; }
-}
+// Real visitors: document.hidden true is the one signal that fires reliably before the tab actually goes
+// away, so this is where the deferred write actually leaves the device. Deferred one macrotask rather than
+// called straight from the handler: a hidden firing because the tab is merely backgrounding still has a live
+// document, so the setTimeout(0) below runs practically at once; a hidden firing because THIS device is
+// navigating away (a reload, in particular — reconcile-on-return.spec.mjs's own AC4/AC5 drives exactly that
+// as its "a delayed boot" case) tears the document's realm down before that macrotask ever gets a turn, so
+// the push never leaves — nothing lost, since the next boot's own loadUserPrefs() replays this session's +1
+// on top of whatever count the account answers with and queues its own, later flush.
+document.addEventListener("visibilitychange", () => { if(document.hidden) setTimeout(flushReviewSessionsIfPending, 0); });
+function reviewPromptAskedVersion(){ return reviewPromptAskedVer; }
 function markReviewPromptAsked(ver){
-  try{ localStorage.setItem(REVIEW_PROMPT_ASKED_KEY, String(ver)); }catch(e){}
+  reviewPromptAskedVer = String(ver);
+  pushViewField("reviewAskedVer", reviewPromptAskedVer);
 }
 // The single named predicate CAS-969 AC3 asks for — every threshold this feature has lives here, and
 // nowhere else decides. Pure: takes the facts, returns the verdict, never reads state itself.
@@ -20098,8 +20454,11 @@ function afterSignIn(){
     // unfiltered despite activeId being correct. openCascade()'s own "already active, do nothing" guard
     // would hit that exact case, so clear activeId first to force it through setActive + applyCascade +
     // the switcher highlight + the repaint.
+    // CAS-1243: this is arrival at a load's own outcome, not a tap — push:false so landing on the first
+    // agent (on every sign-in/boot, including an already-fully-populated account) never writes active/
+    // activeMulti; see setActive's own comment.
     activeId=null;
-    openCascade(cascades[0].id);
+    openCascade(cascades[0].id, false);
     logEvent("signin_returning",{cascades:cascades.length});
     applyDeepLink();   // CAS-962: arrival, same as the boot path's "onboarding already seen" branch
     applyPendingPushAlert();   // CAS-1206: same arrival moment, for a held push tap
@@ -20115,32 +20474,10 @@ function afterSignIn(){
   flowStart();
 }
 
-// ---- Re-engagement: what Cascade found while you weren't looking (CAS-69) ------------------------------
-// "Cascade found 3 for you since you last looked" has to be TRUE, so it is measured, not asserted: we store
-// the Found list as it stood the last time you looked at it (a boot, or opening the Found list), and the line
-// only fires on ids that weren't in it. First run seeds the snapshot and says nothing — there is no "last
-// time" to compare against, and greeting a new user with news would be the fabrication this guardrail is for.
-// Deliberately NOT "while you were away": a Cascade you created five minutes ago also finds films, and you
-// weren't away. "Since you last looked" is the claim the data can actually support.
-const SEEN_KEY="cascade_seen_found";
-function loadSeenFound(){
-  try{ const v=localStorage.getItem(SEEN_KEY); return v==null ? null : new Set(JSON.parse(v)); }
-  catch(e){ return null; }
-}
-function markFoundSeen(){ try{ localStorage.setItem(SEEN_KEY, JSON.stringify([...found])); }catch(e){} }
-
 // Boot: a Cascade left open on the last visit reopens with its filters applied.
 const booted=activeCascade();
 if(booted){ applyCascade(booted); }
-// Read the snapshot BEFORE the first paint: rendering the Found view marks everything in it as seen (you are,
-// after all, looking at it), so asking afterwards what was new would always answer "nothing".
-const seenFound = loadSeenFound();
 render();
-// CAS-287 removed the "found N since you last looked" banner, so nothing reads this comparison at boot any
-// more. The SNAPSHOT itself still matters and is deliberately kept: markFoundSeen() is what the 🆕 chip on
-// each card is measured against (CAS-70 freshness), and seeding it on a first run is what stops every film
-// in the catalogue reading as new to somebody who has never seen any of them.
-if(!seenFound) markFoundSeen();   // first run: seed it, and say nothing — there is no "last time" to compare to
 // A shared link takes precedence over first-run onboarding — they arrived to look at a specific radar.
 const openedShared = openSharedFromURL();
 // CAS-940: one app_open per page load, ahead of the onboarding routing decision below — plat/ver/ret/onb/acq
@@ -20233,6 +20570,25 @@ if(filmId!=null) openFilmPage(filmId);
 if(didReset) toast("🧹 Local state cleared — this is a clean first run.");
 else if(dedupedN)
   toast(`🧹 Cleaned up ${dedupedN} duplicate Cascade${dedupedN===1?"":"s"} — ${dedupedN===1?"it was an identical copy":"they were identical copies"} finding the same films twice.`);
+
+// CAS-1241 Part A: whether an account-sync request may carry keepalive:true. The Fetch standard rejects a
+// keepalive request once its body, plus whatever else is in flight, exceeds a 64 KiB cap — CAS-1222's
+// merge_user_prefs_view can carry tens of KB for an account with a broad agent (admitDrift), well
+// past that cap on its own, and a rejected keepalive request reads to supabase-js as status 0, jamming the
+// whole queue behind it (isTransient(0) retries forever, sendQueue() never moves past it). A large write
+// doesn't need keepalive anyway: the acctOp queue itself is persisted and re-sent on the next boot, so a
+// request this big surviving a frozen/closed tab mid-flight was never the guarantee keepalive bought here —
+// only the small, routine account-sync rows CAS-1035 wrote this for actually need it. A plain top-level
+// function declaration (not inside the IIFE below), which a classic script hoists onto the shared global —
+// so the auth module's own fetch wrapper (a separate <script type="module">, further down, sharing that
+// global but not this script's own let/const bindings) can call it by bare name with no window. prefix.
+const KEEPALIVE_MAX_BODY_BYTES = 8000;
+function acctFetchKeepalive(init){
+  const body = init && init.body;
+  if(body===undefined || body===null) return true;
+  if(typeof body!=="string") return false;
+  return new TextEncoder().encode(body).length <= KEEPALIVE_MAX_BODY_BYTES;
+}
 
 // ============================================================================
 // Per-account Cascade persistence (CAS-83 / spec 26771457 §3-§4)
@@ -20754,9 +21110,18 @@ else if(dedupedN)
       const landingTab = pickLandingWatchTab();
       if(landingTab !== watchTab) watchTab = landingTab;
     }
+    // CAS-1241 (B4/B5): render() cannot be trusted to run recomputeFound() here — accountFanoutSettled()
+    // (CAS-1236) is still false until agentFilmsReady flips below, and render() returns before ever
+    // calling recomputeFound() while that's the case (every render() call this whole fan-out has made so
+    // far, from each load's own .finally(), hit the same gate and returned early). Without a direct call,
+    // every admission this derivation surfaces — and the admitDrift bookkeeping recomputeFound
+    // drives — is discovered only on the NEXT render() below, the one just AFTER agentFilmsReady flips
+    // true: the flush just below finds nothing queued yet, agentFilmsReady flips, and only then does this
+    // device's real admission sweep start sending — exactly the AC4/AC5 write-after-settled leak.
+    recomputeFound();
     if(typeof render==="function") render();
     // CAS-1224: the real agent_films flush, moved here from loadAgentFilms' own .finally() above — this
-    // render just ran against cascades/watchPrefs that applyWatchPrefsToCascades() only just finished
+    // recompute just ran against cascades/watchPrefs that applyWatchPrefsToCascades() only just finished
     // deriving, which can surface a match recomputeFound's EARLIER pass (loadAgentFilms' own .finally,
     // before this derivation had run) never saw. Flushing there and flipping agentFilmsReady before this
     // point left exactly that late admission unflushed while every e2e-integrity "fan-out has settled"
@@ -20778,11 +21143,13 @@ else if(dedupedN)
   // localStorage. Supersedes CAS-957's per-account namespacing (acctKey/acctSuffix): with every one of
   // these keys wiped outright on sign-out, there is no longer a different account's cache left to collide
   // with in the first place.
+  // CAS-1222: cascade_tutorial_seen/cascade_review_sessions/cascade_review_asked_ver dropped — none of the
+  // three is ever written to disk any more (in-memory only, see each field's own CAS-1222 comment), so
+  // there is nothing left here for a sign-out to wipe; signOutReset below resets the in-memory vars directly.
   const ACCOUNT_LOCAL_KEYS = ["cascade_cascades", "cascade_watched", "cascade_disliked", "cascade_blocked",
     "cascade_indifferent", "cascade_wow", "cascade_enjoyed", "cascade_notify", "cascade_watch_known",
     "cascade_notifyprefs", "cascade_prefs", "cascade_ux", "cascade_taste_base", "cascade_watch_prefs",
-    "cascade_moving_seen", "cascade_occasions", "cascade_onb_answers", "cascade_tutorial_seen",
-    "cascade_review_sessions", "cascade_review_asked_ver"];
+    "cascade_moving_seen", "cascade_occasions", "cascade_onb_answers"];
   function wipeAccountLocalState(){
     ACCOUNT_LOCAL_KEYS.forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
     // The acctOp queue (CascadeAccountStore's own cascade_ops@<uid>) is this account's own unsent writes —
@@ -20821,6 +21188,15 @@ else if(dedupedN)
     notifyPrefsReady=true;   // CAS-741: nothing left to wait on
     refCodeCache=null;   // CAS-837: a different account's shared links must not carry this one's code
     displayNameCache=null;   // CAS-1121: same reasoning — must not prefill this account's name for the next one
+    // CAS-1222: every `view` field, back to its signed-out default — none of these has a device-local
+    // mirror left to re-read a default from (the wipe above has nothing to remove for any of them), so each
+    // is reset directly, same reasoning as taste/watchPrefs/notifyPrefs just above.
+    activeId=null; activeIds=[];
+    for(const k in watchMineOnly) watchMineOnly[k]=true;
+    tutorialSeenFlag=false;
+    reviewPromptSessionsCount=0; reviewSessionBumpPending=false; reviewSessionsPushPending=false; reviewPromptAskedVer=null;
+    Object.assign(agentState, loadAgentState());
+    Object.keys(admitDrift).forEach(k=>delete admitDrift[k]); admitDriftSaved=null;
     // CAS-656: nothing left to be disconnected from — clear any failure this device carried from its last
     // signed-in session, or the banner would wrongly survive a sign-out.
     Object.keys(acctTableFail).forEach(t=>setAcctTableFail(t, false));
@@ -20888,8 +21264,23 @@ else if(dedupedN)
       const rows = (store.acctStore.cascades||[]).filter(r=>!r.deleted_at);
       const remote = cascadeOpOverlay(rows).map(rowToCascade);
       remote.sort(cascadeOrderCmp);
+      if(reconcileUnchanged("cascades", remote)) return;
       replaceCascades(remote);
     });
+  }
+  // CAS-1236: a reconcile pull that brings back exactly what this device already holds for a table must
+  // change nothing and draw nothing — compared per table (JSON of the rows this device would otherwise
+  // apply), not by a blanket "something, somewhere, might have changed" render(). Each table's own apply
+  // site below calls this once, right before the render() it would otherwise always fire; the cheap
+  // bookkeeping above it (clearing/merging local mirrors, recomputeFound) still always runs unconditionally
+  // — only the repaint itself is skipped, so nothing about sync correctness changes, just how often the
+  // Watch list repaints for data that didn't.
+  const reconcileTableSig = {};
+  function reconcileUnchanged(table, data){
+    const sig = JSON.stringify(data);
+    if(reconcileTableSig[table]===sig) return true;
+    reconcileTableSig[table]=sig;
+    return false;
   }
   // CAS-408: two devices only converge without a live subscription if SOMETHING re-pulls the account
   // — sign-in alone left a device that never signs out again permanently stuck on whatever it saw at
@@ -20918,7 +21309,11 @@ else if(dedupedN)
     // a change made elsewhere could sit unseen for a whole session until this.
     const acctStore = window.CascadeAccountStore;
     const noUnsentWrite = table => !acctStore || !acctStore.queue.some(op => op.table===table);
-    if(noUnsentWrite("user_prefs")) loadUserPrefs();
+    // CAS-1222: a view-field write is a queued "merge_user_prefs_view" rpc op, a different table name from
+    // the whole-column "user_prefs" upserts above it — gated here too, or a reconcile pull landing while
+    // one is still unsent would adopt the server's pre-merge row over this device's own still-in-flight
+    // change (e.g. an agent just tapped on Watch, momentarily reverting before the merge actually lands).
+    if(noUnsentWrite("user_prefs") && noUnsentWrite("merge_user_prefs_view")) loadUserPrefs();
     if(noUnsentWrite("user_films")) loadAccountFilms();
     // film_watch's own load clears the WHOLE shared `notify` object before applying (clearAccountNotify,
     // fired synchronously ahead of either async apply — see its own comment). Gated on film_picks too, or
@@ -20931,7 +21326,7 @@ else if(dedupedN)
     // admission made on another device still needs to arrive here. applyAgentFilmRows replaces the whole
     // local ledger wholesale and (unlike loadAccountFilms/loadFilmWatches/loadFilmPicks above) draws no
     // repaint of its own, so this re-renders once the pull actually lands.
-    if(noUnsentWrite("agent_films")) loadAgentFilms().then(()=>{ if(typeof render==="function") render(); });
+    if(noUnsentWrite("agent_films")) loadAgentFilms().then(changed=>{ if(changed && typeof render==="function") render(); });
     // Invites and friends carry no acctOp queue entry of their own — every write to either is an immediate
     // RPC/insert, not a queued op — so there is nothing to guard and no risk of landing on top of an unsent
     // edit; safe to re-pull unconditionally, same as loadRealAlerts below.
@@ -20941,9 +21336,22 @@ else if(dedupedN)
     // without this, an open tab's Moving badge is frozen at whatever it was on load.
     loadRealAlerts();
   }
-  window.addEventListener("focus", reconcileOnReturn);
+  // CAS-1236 decision 1: focus and visibilitychange coalesce into one reconcile pass, and a return within
+  // 60 seconds of the last pass does nothing — ten of each dispatched in a burst must cost at most one
+  // pull. The floor is on reconcileOnReturn ITSELF (set synchronously before any of its own awaits), not a
+  // trailing debounce, so two events in the very same tick are already covered, not just ones 60s apart.
+  // The 3-minute heartbeat poll below stays independent of this floor, unchanged from before this ticket.
+  let reconcileLastRun = 0;
+  const RECONCILE_RETURN_FLOOR_MS = 60*1000;
+  function reconcileOnReturnThrottled(){
+    const now = Date.now();
+    if(now - reconcileLastRun < RECONCILE_RETURN_FLOOR_MS) return;
+    reconcileLastRun = now;
+    reconcileOnReturn();
+  }
+  window.addEventListener("focus", reconcileOnReturnThrottled);
   document.addEventListener("visibilitychange", () => {
-    if(document.visibilityState==="visible") reconcileOnReturn();
+    if(document.visibilityState==="visible") reconcileOnReturnThrottled();
   });
   // CAS-487: a tab can stay focused and visible for hours without ever firing focus/visibilitychange
   // again, so the bell also needs a heartbeat independent of returning to the tab. Reuses
@@ -20987,6 +21395,9 @@ else if(dedupedN)
     });
     agMetricsCache.clear();   // CAS-867: a synced verdict can flip taggedOut() same as a local one can
     recomputeFound();
+    // CAS-1236: skip the repaint (not the merge above) when this is byte-identical to the last rows this
+    // device applied for this table — a reconcile pull that changed nothing must draw nothing.
+    if(reconcileUnchanged("user_films", rows)) return;
     if(typeof render==="function") render();
   }
   // CAS-1096: every verdict change goes through acctOp as one operation on that one row — no baseline
@@ -21150,6 +21561,8 @@ else if(dedupedN)
       if(Array.isArray(r.not_in)) e.notIn = r.not_in.filter(x=>typeof x==="string");
     });
     recomputeFound();
+    // CAS-1236: same render-only skip as applyFilmRows — the merge above always runs regardless.
+    if(reconcileUnchanged("film_picks", remote)) return;
     if(typeof render==="function") render();
   }
 
@@ -21217,6 +21630,8 @@ else if(dedupedN)
       if(r.updated_at) watchKnown.set(String(id), r.updated_at);
     });
     recomputeFound();
+    // CAS-1236: same render-only skip as applyFilmRows — the merge above always runs regardless.
+    if(reconcileUnchanged("film_watch", rows)) return;
     if(typeof render==="function") render();
   }
   // CAS-1096: the row film_watch would carry for ONE film right now — windows+sources computed straight
@@ -21445,17 +21860,21 @@ else if(dedupedN)
       };
     });
     agentFilms=next;
+    // CAS-1236: reports whether this pull actually differed from the last one this device applied, so a
+    // reconcile-driven caller can skip its own render() when nothing changed (the boot/sign-in fan-out's
+    // own callers ignore this and always render, same as before this ticket).
+    return !reconcileUnchanged("agent_films", rows);
   }
   // CAS-1097: loads through acctLoad, the same shape as every other acctOp-backed table (loadAccountFilms/
   // loadFilmPicks/loadFilmWatches) — acctLoad's own .range() paging (ACCT_STORE_PAGE=1000) already covers
   // what the old bespoke paginated loop did. acctOpPendingOverlay keeps a still-unconfirmed local insert
   // visible across a reload the same way it does for every other table.
   async function loadAgentFilms(){
-    if(!accountActive()) return;
+    if(!accountActive()) return false;
     const ok = await window.CascadeAccountStore.acctLoad([{ table:"agent_films", pk:"movie_id" }]);
-    if(!ok){ recordSyncOutcome("agent_films", false, { message:"load failed" }); return; }
+    if(!ok){ recordSyncOutcome("agent_films", false, { message:"load failed" }); return false; }
     recordSyncOutcome("agent_films", true);
-    applyAgentFilmRows(acctOpPendingOverlay("agent_films", window.CascadeAccountStore.acctStore.agent_films,
+    return applyAgentFilmRows(acctOpPendingOverlay("agent_films", window.CascadeAccountStore.acctStore.agent_films,
       r=>agentFilmKey(r.cascade_id,r.movie_id)));
   }
 
@@ -21650,6 +22069,36 @@ else if(dedupedN)
     return window.CascadeAccountStore.acctOp({ table:"user_prefs", kind:"upsert", match:{ user_id:owner },
       fields, onConflict:"user_id", onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
   }
+  // CAS-1222: `view` packs several independent per-account UI-state fields that two devices can change at
+  // the same moment — unlike every other user_prefs column above, a whole-column upsert (pushUserPrefsCols'
+  // own path) would let whichever push lands second clobber the first device's field. Both helpers below
+  // route through merge_user_prefs_view (migration 0009) instead, which merges the patch INTO whatever
+  // `view` already holds, server-side, in the write itself, so write order never matters.
+  function pushViewField(key, value){
+    if(!accountActive()) return;
+    const owner=uid(); if(!owner) return;
+    return window.CascadeAccountStore.acctOp({ table:"merge_user_prefs_view", kind:"rpc",
+      fields:{ p_patch:{ [key]:value } }, onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
+  }
+  // CAS-1222 Change 4: the invite draft's own writes (saveAgentState) and trackAdmitDrift's own GC pass
+  // both land here — a burst of either within VIEW_DEBOUNCE_MS merges into ONE rpc call naming every field
+  // that changed, rather than a push per call.
+  let pendingViewPatch = {};
+  let viewPushTimer = null;
+  let VIEW_DEBOUNCE_MS = 500;
+  function flushViewPatch(){
+    const patch = pendingViewPatch; pendingViewPatch = {};
+    if(!Object.keys(patch).length || !accountActive()) return;
+    const owner=uid(); if(!owner) return;
+    return window.CascadeAccountStore.acctOp({ table:"merge_user_prefs_view", kind:"rpc",
+      fields:{ p_patch:patch }, onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
+  }
+  function pushViewFieldDebounced(key, value){
+    if(!accountActive()) return;
+    pendingViewPatch[key] = value;
+    clearTimeout(viewPushTimer);
+    viewPushTimer = setTimeout(flushViewPatch, VIEW_DEBOUNCE_MS);
+  }
   // CAS-561 merge rule: user_prefs is one row per user holding whole-object fields (taste,
   // watch_windows) rather than an array of rows like cascades — there is nothing to diff or prune per
   // item, so "last write wins" IS the update itself: whichever device's push reaches the account last is
@@ -21735,8 +22184,55 @@ else if(dedupedN)
     // CAS-1121: adopt the account's own name once it has one — never overwritten by a device that hasn't
     // sent a name yet, same "leave alone, don't carry up" rule as every other field above.
     if(typeof row.display_name==="string" && row.display_name) displayNameCache = row.display_name;
+    // CAS-1222: `view` packs several independent fields into one jsonb column — each adopted (or left
+    // alone, "no answer yet") per-field, the same carry-up rule as every column above; see pushViewField/
+    // pushViewFieldDebounced for why a WRITE to any one of them goes through a server-side per-field merge
+    // instead of this column's own whole-object upsert (irrelevant here — a load never writes).
+    {
+      const v = (row.view && typeof row.view==="object") ? row.view : {};
+      if(typeof v.active==="string" || v.active===null){
+        activeId = v.active;
+        activeIds = Array.isArray(v.activeMulti) ? v.activeMulti.filter(id=>typeof id==="string") : (activeId?[activeId]:[]);
+        reconcileActiveIds();
+      }
+      if(v.mineOnly && typeof v.mineOnly==="object"){
+        for(const k in watchMineOnly) if(typeof v.mineOnly[k]==="boolean") watchMineOnly[k]=v.mineOnly[k];
+      }
+      if(typeof v.tutorialSeen==="boolean") tutorialSeenFlag = v.tutorialSeen;
+      // CAS-1222: a bump queued before this load resolved is replayed ON TOP of the account's real count,
+      // never trusting this session's bare local default — see bumpReviewPromptSessionCount's own comment.
+      // CAS-1243 (F2b): computed here, but the write itself is deferred to flushReviewSessionsIfPending()
+      // (page-hidden) — a load must never write (CAS-1218).
+      if(reviewSessionBumpPending){
+        reviewSessionBumpPending = false;
+        reviewPromptSessionsCount = (typeof v.reviewSessions==="number" ? v.reviewSessions : 0) + 1;
+        reviewSessionsPushPending = true;
+      } else if(typeof v.reviewSessions==="number"){
+        reviewPromptSessionsCount = v.reviewSessions;
+      }
+      if(typeof v.reviewAskedVer==="string" || v.reviewAskedVer===null) reviewPromptAskedVer = v.reviewAskedVer;
+      if(v.agent && typeof v.agent==="object"){
+        if(typeof v.agent.alerts==="boolean") agentState.alerts=v.agent.alerts;
+        if(typeof v.agent.email==="boolean") agentState.email=v.agent.email;
+        if(typeof v.agent.learning==="boolean") agentState.learning=v.agent.learning;
+        if(typeof v.agent.invited==="boolean") agentState.invited=v.agent.invited;
+      }
+      // CAS-1222: admitDriftSaved must move with admitDrift itself — trackAdmitDrift's own diff guard
+      // compares against whatever it last saw LOCALLY, including pre-load calls (userPrefsReady false)
+      // that still update the signature without pushing. Left unsynced here, the very next trackAdmitDrift()
+      // call (render() just below re-runs it) would compare the just-adopted value against that stale
+      // pre-load signature and push a spurious "reconcile" the moment this load resolves, even with no
+      // genuine edit.
+      if(v.admitDrift && typeof v.admitDrift==="object"){
+        Object.keys(admitDrift).forEach(k=>delete admitDrift[k]);
+        Object.assign(admitDrift, v.admitDrift);
+      }
+      admitDriftSaved = JSON.stringify(admitDrift);
+    }
     savePrefsLocal();
     syncServiceChips(); updatePrefSwitch(); updatePrefBtn();
+    // CAS-1236: render-only skip, same pattern as applyFilmRows — every adoption above always runs.
+    if(reconcileUnchanged("user_prefs", row)) return;
     if(typeof render==="function") render();
   }
   const saveTasteBaseLocal = saveTasteBase;
@@ -21829,6 +22325,19 @@ else if(dedupedN)
                                 // an actual settings-change push without going through a UI control.
                                 pushNotifyPrefs, prefsRow, pickRows, pushFilmPick, loadFilmPicks,
                                 loadUserPrefs, pushUserPrefsCols, userPrefsRow,
+                                // CAS-1222: the real per-field view-write chokepoints, exposed the same way
+                                // every other real write chokepoint here is — pushViewFieldDebounced's own
+                                // queue/timer are exposed too (flushViewPatch, VIEW_DEBOUNCE_MS get/set) so a
+                                // test can force a flush rather than sleep for the real debounce delay, the
+                                // same shape SAVING_INDICATOR_DELAY_MS already uses above.
+                                pushViewField, pushViewFieldDebounced, flushViewPatch,
+                                get VIEW_DEBOUNCE_MS(){ return VIEW_DEBOUNCE_MS; },
+                                set VIEW_DEBOUNCE_MS(v){ VIEW_DEBOUNCE_MS=v; },
+                                // CAS-1243 (F2b/AC3): the review-session count's own write is deferred to the
+                                // page-hidden moment (real visitors) rather than loadUserPrefs — this is the
+                                // read-only seam a test fires directly instead of a real visibilitychange
+                                // event, the same convention flushViewPatch above gives the view-field debounce.
+                                flushReviewSessionsIfPending,
                                 // CAS-740: read/write, same shape as filmWatchReady/agentFilmsReady above —
                                 // so a test can drive user_prefs' own "the account hasn't answered yet" gate
                                 // directly, the same way fireAccountFanout drives it for real.
@@ -21913,6 +22422,20 @@ else if(dedupedN)
                                 // can be exercised the same way — without waiting on a real
                                 // focus/visibilitychange event.
                                 reconcileOnReturn,
+                                // CAS-1236: the render() call counter (AC2's literal wording) plus the
+                                // settled-list nav key's own fill bookkeeping, exposed the same read/write-
+                                // primitive way as every other test seam here — reset to 0 right before the
+                                // pass a test wants to measure, read back after. markWatchNavigated forces
+                                // the NEXT render() to do a full rebuild regardless of watchNavKey(), for a
+                                // test that wants to establish a fresh settled list without driving a real
+                                // stage/agent/sort/search/filter change to get there. watchListFilled (read-
+                                // only) is the AC-LOAD bookkeeping itself — whether the last full rebuild
+                                // actually produced a row — so a test can assert the exact mechanism that
+                                // used to leave CAS-1231's list empty forever, not just its end result.
+                                get renderCallCount(){ return renderCallCount; },
+                                set renderCallCount(v){ renderCallCount=v; },
+                                markWatchNavigated,
+                                get watchListFilled(){ return watchListFilled; },
                                 // CAS-488: the catalogue-refresh seam and its busy-check, exposed the same way.
                                 pollCatalogue, catalogueUIBusy,
                                 // CAS-503: the live-clock seam, so a date boundary can be exercised without
@@ -22095,12 +22618,23 @@ else if(dedupedN)
   let SEND_ONCE_TIMEOUT_MS = 15000;
   async function sendOnceWithTimeout(c, op){
     const startedAt = Date.now();
+    // CAS-1241: the timeout race below used to only resolve the CALLER's wait — it never cancelled the
+    // real request. The loser kept running against PostgREST/Postgres in the background, so a slow upsert/
+    // rpc (a row lock on CI's local Supabase stack, e.g. CAS-1222's merge_user_prefs_view) left behind an
+    // abandoned transaction still holding that row's lock; every retry then opened a NEW competing request
+    // against the same row instead of replacing the stuck one, compounding the contention each attempt
+    // rather than resolving it. Aborting the underlying fetch here lets Postgres release the lock (or drop
+    // the connection) before the next retry fires, so a retry gets a clean attempt.
+    const controller = (typeof AbortController !== "undefined") ? new AbortController() : null;
     let timer;
     const timedOut = new Promise(resolve => {
-      timer = setTimeout(() => resolve({ error: new Error("acctOp: sendOnce timed out"), status: 0 }), SEND_ONCE_TIMEOUT_MS);
+      timer = setTimeout(() => {
+        if(controller) controller.abort();
+        resolve({ error: new Error("acctOp: sendOnce timed out"), status: 0 });
+      }, SEND_ONCE_TIMEOUT_MS);
     });
     try{
-      const result = await Promise.race([sendOnce(c, op), timedOut]);
+      const result = await Promise.race([sendOnce(c, op, controller && controller.signal), timedOut]);
       if(result && result.error && result.error.message === "acctOp: sendOnce timed out"){
         console.warn("acctOp sendOnce timeout", op.table, op.kind, (Date.now()-startedAt)+"ms");
       }
@@ -22108,11 +22642,18 @@ else if(dedupedN)
     } finally { clearTimeout(timer); }
   }
 
-  async function sendOnce(c, op){
+  // Applies .abortSignal(signal) when both a signal and the method exist — a test double's fake query
+  // builder (tests/js's fakeClient convention) implements only the chain methods its own scripted
+  // responses need, so calling a method it never declared would throw rather than simply no-op.
+  function withAbort(q, signal){
+    return (signal && q && typeof q.abortSignal === "function") ? q.abortSignal(signal) : q;
+  }
+
+  async function sendOnce(c, op, signal){
     if(op.kind === "insert"){
       // Client-generated uuid, upserted on id with ignoreDuplicates — a retry of the same op can never
       // duplicate the row.
-      return await c.from(op.table).upsert(op.fields, { onConflict:"id", ignoreDuplicates:true });
+      return await withAbort(c.from(op.table).upsert(op.fields, { onConflict:"id", ignoreDuplicates:true }), signal);
     }
     if(op.kind === "upsert"){
       // CAS-1096: op.onConflict names the real composite key (e.g. "user_id,movie_id") — a retry of the
@@ -22120,8 +22661,9 @@ else if(dedupedN)
       // CAS-1218: op.ignoreDuplicates (unset/false for every pre-existing caller, so their behaviour is
       // unchanged) lets a load-triggered bootstrap insert (a missing notify_prefs/user_prefs row, a minted
       // ref_code) refuse to overwrite a row that already exists, rather than updating it.
-      return await c.from(op.table).upsert(Object.assign({}, op.match, op.fields),
+      const q = c.from(op.table).upsert(Object.assign({}, op.match, op.fields),
         { onConflict:op.onConflict, ignoreDuplicates:!!op.ignoreDuplicates });
+      return await withAbort(q, signal);
     }
     if(op.kind === "upsert_many"){
       // CAS-1136: the same composite-key reasoning as "upsert" above, one request for every row in op.items.
@@ -22134,18 +22676,29 @@ else if(dedupedN)
       // CAS-1218: op.ignoreDuplicates, same reasoning as "upsert" above — agent_films' own admitted_at/
       // admission_score are frozen history, never something a later write may overwrite.
       const rows = op.items.map(item => Object.assign({}, item.match, item.fields));
-      return await c.from(op.table).upsert(rows, { onConflict:op.onConflict, ignoreDuplicates:!!op.ignoreDuplicates });
+      const q = c.from(op.table).upsert(rows, { onConflict:op.onConflict, ignoreDuplicates:!!op.ignoreDuplicates });
+      return await withAbort(q, signal);
     }
     if(op.kind === "update"){
       let q = c.from(op.table).update(op.fields).match(op.match);
       // expectUpdatedAt is always the exact string PostgREST returned for that row — passed straight
       // through, never via new Date(), which would lose the microseconds.
       if(op.expectUpdatedAt !== undefined) q = q.eq("updated_at", op.expectUpdatedAt);
-      return await q.select();   // .select() makes PostgREST return the affected rows, so 0 rows back is
-                                  // how a conflicting expectUpdatedAt is told apart from a genuine success.
+      q = q.select();             // .select() makes PostgREST return the affected rows, so 0 rows back is
+                                   // how a conflicting expectUpdatedAt is told apart from a genuine success.
+      return await withAbort(q, signal);
     }
-    if(op.kind === "delete") return await c.from(op.table).delete().match(op.match);
-    if(op.kind === "rpc") return await c.rpc(op.table, op.fields || {});
+    if(op.kind === "delete") return await withAbort(c.from(op.table).delete().match(op.match), signal);
+    if(op.kind === "rpc"){
+      // CAS-1222: a client with no .rpc() at all (every Supabase client in production has one — this only
+      // ever happens against a test double someone forgot to stub it on) can never succeed on any retry.
+      // Thrown-synchronously-under-await, it would otherwise surface as status 0 (no HTTP response), which
+      // isTransient() reads as a network blip and retries three times with backoff — needlessly serialising
+      // every other queued write behind a doomed op for several seconds. Answered as a real, permanent 4xx
+      // instead, the same shape a genuine RLS refusal already takes.
+      if(typeof c.rpc !== "function") return { data:null, error:{ message:"acctOp: client has no rpc()" }, status:400 };
+      return await withAbort(c.rpc(op.table, op.fields || {}), signal);
+    }
     throw new Error("acctOp: unknown kind " + op.kind);
   }
 
@@ -22353,7 +22906,7 @@ else if(dedupedN)
   let verifyEmail = null, verifyResolve = null;
   // CAS-1073 AC3: the review address must never render as UI text — the review code screen shows
   // the same generic copy as every other state on this panel.
-  const verifyMsgFor = email => isReviewEmail(email) ? 'Enter your code.' : 'Enter the code we sent to ' + email + '.';
+  const verifyMsgFor = email => isReviewEmail(email) ? 'Enter your code.' : 'Enter the code we sent to ' + email + ". If it isn't in your inbox, check Junk. Only the newest code works.";
   // CAS-1169: exposed so the membership screen's own inline code step (classic script, no shared scope
   // with this module) can show the review address the same generic copy, without re-deriving it here too.
   api.verifyMsgFor = verifyMsgFor;
@@ -22371,20 +22924,22 @@ else if(dedupedN)
     btn.disabled = true;
     btn.textContent = 'Resend code in 0:' + String(remaining).padStart(2, '0');
   };
-  const startResendTimer = () => {
+  // CAS-1242: an optional deadline lets a caller resume an existing cooldown (the continued-request
+  // window below) instead of always restarting the countdown at a fresh 60s.
+  const startResendTimer = (deadline) => {
     stopResendTimer();
-    resendDeadline = Date.now() + 60000;
+    resendDeadline = deadline || (Date.now() + 60000);
     renderResendTimer();
     resendTimer = setInterval(renderResendTimer, 1000);
   };
 
-  const enterVerify = (email, onVerified) => {
+  const enterVerify = (email, onVerified, resumeDeadline) => {
     verifyEmail = email; verifyResolve = onVerified || null;
     gid('authVerifyMsg').textContent = verifyMsgFor(email);
     gid('authVerifyErr').textContent = '';
     gid('authCode').value = '';
     showPanel('authVerify');
-    startResendTimer();
+    startResendTimer(resumeDeadline);
   };
   // The membership step's email gate has no code-entry UI of its own (CAS-1056: that lives only in this
   // panel) — it hands off here instead: open this modal straight onto the verify step for the code it
@@ -22460,12 +23015,16 @@ else if(dedupedN)
       // reachable to construct the client that signs a user in.
       const createClient = window.supabase && window.supabase.createClient;
       if (typeof createClient !== 'function') throw new Error('Supabase client library not loaded');
-      // CAS-1035: every request this client makes carries keepalive:true, so a push already under way
-      // survives the page being frozen (backgrounded, or the tab closing) instead of being killed
-      // mid-flight. The payloads here are small account-sync rows, well inside keepalive's request size
-      // limit.
+      // CAS-1035: a small request carries keepalive:true, so a push already under way survives the page
+      // being frozen (backgrounded, or the tab closing) instead of being killed mid-flight. CAS-1241: the
+      // Fetch standard rejects a keepalive request once its body (plus whatever else is in flight) passes
+      // a 64 KiB cap, and CAS-1222's merge_user_prefs_view can carry tens of KB for a broad agent — well
+      // past it. acctFetchKeepalive (the classic script above — a plain top-level function declaration,
+      // so it's reachable here by name off the shared global, no window. prefix needed) decides per
+      // request; a write too big for keepalive doesn't need it anyway, since the acctOp queue is
+      // persisted and re-sent on the next boot regardless.
       supa = api.client = createClient(url, key, {
-        global: { fetch: (input, init) => fetch(input, { ...(init||{}), keepalive: true }) }
+        global: { fetch: (input, init) => fetch(input, { ...(init||{}), keepalive: acctFetchKeepalive(init) }) }
       });   // defaults: persistSession + detectSessionInUrl
     } catch(err){
       console.warn('Cascade: Supabase client unavailable — staying in guest mode.', err);
@@ -22506,6 +23065,11 @@ else if(dedupedN)
         // than error.message per the ticket's own instruction.
         if(error.code === 'otp_disabled'){
           return { ok: false, noAccount: true, error: error.message };
+        }
+        // CAS-1242: a code already went out inside Supabase's own 60s minimum — not a real failure,
+        // so this must not count toward auth_failed, and the raw server sentence must never reach the UI.
+        if(error.code === 'over_email_send_rate_limit' || (!error.code && error.status === 429)){
+          return { ok: false, rateLimited: true, error: error.message };
         }
         logClientHealthEvent("auth_failed", authFailedPayload(error));
         return { ok: false, error: error.message };
@@ -22600,18 +23164,44 @@ else if(dedupedN)
 
     gid('authEmail').addEventListener('input', () => { msg.textContent = ''; });
 
+    // CAS-1242: a real sign-in sent 11 code emails in 45 minutes because Continue had no in-flight
+    // guard (two presses while the first request was still out) and no memory of a code it had just
+    // sent (every later press requested another, each one invalidating the last). authContinueBusy
+    // blocks the former; authContinueEmail/Deadline remember the latter so a repeat press for the same
+    // email inside the 60s window goes straight back to the code already sent instead of requesting a new one.
+    let authContinueBusy = false;
+    let authContinueEmail = null, authContinueDeadline = 0;
+
     gid('authContinue').addEventListener('click', async () => {
+      if(authContinueBusy) return;
       const email = readEmail(); if(!email) return;
-      msg.textContent = 'Sending a code…';
-      const result = await api.continueWithEmail(email, { createUser: false });
-      if(!result.ok){
-        msg.textContent = result.noAccount
-          ? "There's no Cascade account for that email."
-          : 'Could not send a code: ' + result.error;
+      if(authContinueEmail === email && Date.now() < authContinueDeadline){
+        enterVerify(email, null, authContinueDeadline);
         return;
       }
-      msg.textContent = '';
-      enterVerify(email, null);
+      const btn = gid('authContinue');
+      authContinueBusy = true; btn.disabled = true;
+      msg.textContent = 'Sending a code…';
+      try {
+        const result = await api.continueWithEmail(email, { createUser: false });
+        if(result.rateLimited){
+          authContinueEmail = email; authContinueDeadline = Date.now() + 60000;
+          msg.textContent = '';
+          enterVerify(email, null, authContinueDeadline);
+          return;
+        }
+        if(!result.ok){
+          msg.textContent = result.noAccount
+            ? "There's no Cascade account for that email."
+            : 'Could not send a code: ' + result.error;
+          return;
+        }
+        authContinueEmail = email; authContinueDeadline = Date.now() + 60000;
+        msg.textContent = '';
+        enterVerify(email, null, authContinueDeadline);
+      } finally {
+        authContinueBusy = false; btn.disabled = false;
+      }
     });
 
     gid('authVerifyBtn').addEventListener('click', async () => {
@@ -22645,7 +23235,11 @@ else if(dedupedN)
       gid('authVerifyMsg').textContent = 'Sending a new code…';
       const result = await api.continueWithEmail(verifyEmail);
       gid('authVerifyMsg').textContent = verifyMsgFor(verifyEmail);
-      if(!result.ok) gid('authVerifyErr').textContent = 'Could not resend: ' + result.error;
+      if(result.rateLimited){
+        gid('authVerifyErr').textContent = 'A code was sent less than a minute ago. Use the newest email, or wait a moment and resend.';
+      } else if(!result.ok){
+        gid('authVerifyErr').textContent = 'Could not resend: ' + result.error;
+      }
     });
 
     gid('authSignOut').addEventListener('click', async () => {

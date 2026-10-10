@@ -89,6 +89,10 @@ function makeContext(localStorageStore){
     getComputedStyle: () => node(),
     CSS: { escape: s => String(s) },
     URLSearchParams, URL, TextEncoder, TextDecoder, structuredClone, crypto,
+    // CAS-1241: acctOp's sendOnceWithTimeout now aborts the losing side of its timeout race — the same
+    // Node global referenced here, not a sandbox-local copy, so `new AbortController()` inside the engine
+    // produces a real AbortSignal a test can assert on with `instanceof` against the outer realm's class.
+    AbortController,
     CustomEvent: class { constructor(type, opts){ this.type = type; Object.assign(this, opts || {}); } },
     Event: class { constructor(type){ this.type = type; } },
     MutationObserver: class { observe(){} disconnect(){} takeRecords(){ return []; } },
@@ -121,6 +125,10 @@ if(typeof window.CascadeAuth === "undefined"){
 }
 ;globalThis.__ENGINE__ = {
   MOVIES, CASCADE, STATUS_LABEL, SHOWABLE_N,
+  // CAS-1241 Part A: acctFetchKeepalive is the pure cap check the account-sync client's fetch wrapper (the
+  // auth module, a separate <script type="module"> this harness doesn't load) calls by name off window —
+  // exported directly here since it's a plain top-level function in the classic script, not window-only.
+  acctFetchKeepalive,
   // CAS-771: filmByMovieId is the exact lookup the bell (realAlertsHTML) and Moving (movingData) use to
   // resolve a stored movie_id string to its catalogue record — exported so the tmdb_id guardrail test can
   // drive the real comparison rather than re-implementing it.
@@ -157,6 +165,23 @@ if(typeof window.CascadeAuth === "undefined"){
   get watchCinemaStage(){ return watchCinemaStage; },
   setWatchCinemaStage(v){ watchCinemaStage = v; },
   watchWatchedSel, watchGenreOff, watchSearch, filmMatchesWatchedFilter, filmMatchesWatchTab,
+  // CAS-1234: watchBadgeSel (by reference, same convention as watchWatchedSel/watchGenreOff above) plus the
+  // predicate render() filters through and the sheet's own option list (icon/label come from TENT_BADGE,
+  // already exported below — BADGE_FILTER_OPTS carries only the key and its live descriptor), so a test can
+  // drive a Badges selection directly and assert both the real filter and the printed percentage.
+  watchBadgeSel, filmMatchesBadgeFilter, BADGE_FILTER_OPTS,
+  toggleWatchBadge: (key) => window.toggleWatchBadge(key),
+  clearAllWatchBadge: () => window.clearAllWatchBadge(),
+  // CAS-1235: watchAlsoShow (by reference — toggleWatchAlsoShow/clearWatchAlsoShow mutate or reassign the
+  // per-tab Set in place) plus the default it now widens to and the heading render() builds from a group's
+  // status key, so a test can assert the default-on behaviour and its heading text without scraping the DOM
+  // the stub swallows. WATCH_TAB_OWN_STANDING already exists for filmMatchesWatchTab's own use above.
+  watchAlsoShow, WATCH_ALSO_SHOW_DEFAULT, watchAlsoShowIsDefault, watchGroupHeading, WATCH_TAB_OWN_STANDING,
+  clearWatchAlsoShow: () => window.clearWatchAlsoShow(),
+  // CAS-1235 AC4: watchStageStopsNow/watchStageCountFor (CAS-1223's stage-strip count, aimed at a stop
+  // through the same watchVisibleRows() pipeline the listing itself uses) — exported so a test can assert
+  // the count agrees with the real listing directly, rather than trusting that both read the same pipeline.
+  watchStageStopsNow, watchStageCountFor, watchVisibleRows,
   // CAS-1180: watchHeldOpen (CAS-752's held-this-visit set, by reference like watchGenreOff above) and
   // watchSearchRows (the search box's own wider, tab/filter-ignoring row set, Part D) — exported so a test
   // can clear the hold directly and assert the real search behaviour rather than re-deriving either.
@@ -212,6 +237,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // the invite page's rendered top literally contains the same cardTopHTML(m) output, not a re-derived copy.
   cardTopHTML, filmPageHTML,
   inferredScale, inferScaleWhy, budgetCell, moneyRowHTML, SCALE_INFER_MIN_PEERS, popOf, scaleTier,
+  // CAS-1234: TENT_BADGE is scaleTier's own icon/label lookup (the card badge's exact source) — exported so
+  // a test can assert the Badges sheet section names the same icon/label scaleTier(m) implies.
+  TENT_BADGE,
   // CAS-742: the two catalogue-derived compute-once caches, exposed by reference (Map, never reassigned) so
   // a test can assert their .size directly, plus the one function that clears both — the real invalidation
   // point wired into the catalogue swap.
@@ -305,6 +333,16 @@ if(typeof window.CascadeAuth === "undefined"){
   // editor's own ymCascOff/ymCascToggle/leOpen scratch state) is retired.
   emptyResultsHTML,
   get activeIds(){ return activeIds; },
+  // CAS-1222: activeId/setActive — the single-select chokepoint itself, and the id it leaves selected —
+  // exported so a test can drive a real selection and assert the view-field push it issues, rather than
+  // only reading the resulting array.
+  get activeId(){ return activeId; },
+  setActive,
+  // CAS-1222: agentState (the onboarding invite draft, cascade_agent before this ticket) — a plain mutable
+  // object, never reassigned, exported by reference like cascades/occasionReg elsewhere in this file.
+  // tutorialSeen/markTutorialSeen are plain top-level functions, exported directly like reviewPromptEligible
+  // and friends below.
+  agentState, tutorialSeen, markTutorialSeen,
   // CAS-667: movingData is wire-adjacent (it reads window.CascadePersistence.accountActive()) but its
   // row-selection arithmetic is exactly the kind of decision this harness exists to test. realAlerts and
   // firstFound are exposed by reference (mutated via push, never reassigned, in test use) so a test can seed
@@ -346,6 +384,12 @@ if(typeof window.CascadeAuth === "undefined"){
   // setMovingWindow are the real wire code (DOM reads/writes absorbed by the stub, exactly like the rest of
   // this file's wire calls).
   movingWindowRows, movingUnseenCount, movingBadgeWindow, movingInWindow,
+  // CAS-1237: movingAgeText/sydneyDaysAgo are the Sydney-calendar-day age test, and
+  // movingChipLabel/movingRowGroups are the reminder-chip wording and the consecutive-run grouping
+  // behind the Alerts why-line — all pure, exported so a test can assert them without parsing
+  // renderMovingScreen's DOM. catalogueHeaderDate/sydneyYMD are the same Sydney-calendar-date
+  // conversion applied to the header's freshness label.
+  movingAgeText, sydneyDaysAgo, movingChipLabel, movingRowGroups, catalogueHeaderDate, sydneyYMD,
   // CAS-848: movingLanes is the pure per-agent grouping/ranking step renderMovingScreen paints from — a
   // test can assert lane order/membership without parsing the rendered HTML.
   // CAS-852: movingWindowRank is the per-row ladder position movingLanes now sorts by ahead of newest-
@@ -392,6 +436,12 @@ if(typeof window.CascadeAuth === "undefined"){
   // (Your Movies' own sort control) went with the rest of the retired watch-list model in CAS-863.
   get sortPicked(){ return sortPicked; },
   setSortPicked(v){ sortPicked = v; },
+  // CAS-1240: PICKER_KINDS exposes the Watch bar's own sort switch (pick('cinema')/pick('cascade')) so a
+  // test can drive the exact tap the two switch buttons' onclick calls, rather than setting filt.sort/
+  // sortPicked by hand and assuming that's equivalent. watchSortActiveKey/watchSortSwitchHalves are the
+  // pure functions syncSortCtl's DOM-writing paints from — exported so a test can assert the switch's own
+  // displayed state without scraping the DOM the stub swallows.
+  PICKER_KINDS, watchSortActiveKey, watchSortSwitchHalves,
   // CAS-613: auto-notify's own decision surface. recomputeFound is the wire-adjacent entry point (it reads
   // cascades/MOVIES and writes notify), exposed the same way movingData is above; notify/entryFor let a test
   // seed and read the per-film arming state directly; watchPrefs is exposed through a getter/setter (like

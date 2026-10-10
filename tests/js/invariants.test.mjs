@@ -1334,19 +1334,41 @@ test("CAS-727 AC2(c)/(d)/AC3-in-miniature: earned is fixed at admission — a fi
   }
 });
 
-test("CAS-727 AC2(e): a score below every marker is admitted (via pin) but placed nowhere", () => {
+test("CAS-1233: a score below every marker is admitted (via pin) but still falls back to the agent's earliest followed window, not nowhere", () => {
   const film = scoredUnwatchedFilm(["upcoming"]);
   const id = film.tmdb_id;
   const savedStatus = film.status;
   // 101 is above the 0-100 scale on every axis cascadeScore can return, so no real score ever clears it —
-  // simpler than reasoning about the film's own score value, and just as much "below every marker".
+  // but every window still carries a real (non-null) marker, so the agent still FOLLOWS all three. Per
+  // CAS-1233, "below every marker" is no longer "nowhere" — a listed film always gets a Watch On, so this
+  // now lands on Cinema (the earliest followed window an Upcoming film can stand at).
   const cId = seedMarkerCascade({ in_cinema: 101, rent: 101, stream: 101 });
   try {
     pinFilm(id, cId);
     withWatchPrefs(PLACEMENT_WATCH_PREFS, () => { E.recomputeFound(); });
     const e = E.notify[id];
+    assert.equal(e.wins.in_cinema, true, "CAS-1233: below every marker still falls back to the earliest followed window");
+    assert.equal(e.winsSource.in_cinema, "auto");
+  } finally {
+    delete E.notify[id];
+    unseedCascade(cId);
+    film.status = savedStatus;
+  }
+});
+
+test("CAS-1233: an agent that follows no window at all (every marker Off) still admits a pinned film but genuinely places it nowhere", () => {
+  const film = scoredUnwatchedFilm(["upcoming"]);
+  const id = film.tmdb_id;
+  const savedStatus = film.status;
+  // No overrides: seedMarkerCascade defaults every marker to null (Off) — the one case CAS-1233's fallback
+  // cannot invent a window for, since the agent follows nothing at all.
+  const cId = seedMarkerCascade({});
+  try {
+    pinFilm(id, cId);
+    withWatchPrefs(PLACEMENT_WATCH_PREFS, () => { E.recomputeFound(); });
+    const e = E.notify[id];
     const picked = !!(e && e.wins && Object.values(e.wins).some(Boolean));
-    assert.ok(!picked, "a film that clears no marker must get no Watch On value, even though the pin admits it");
+    assert.ok(!picked, "an agent following no window at all has nowhere to fall back to");
   } finally {
     delete E.notify[id];
     unseedCascade(cId);
@@ -1451,20 +1473,23 @@ test("CAS-731 AC2: the placement split (including unplaced) sums to the listing 
   }
 });
 
-test("CAS-731 AC2: a listed film with no Watch On value is counted as unplaced, not dropped", () => {
+test("CAS-731 AC2/CAS-1233: a listed film is never 'unplaced' any more as long as the agent follows at least one window", () => {
   const { film, restore } = pickScoredFilm(["upcoming"], { listable: true });
   const id = film.tmdb_id;
-  // 101 is above the 0-100 scale on every axis cascadeScore can return, so the pinned film clears no marker
-  // and gets no Watch On value at all — the "no bucket" case this test exists to check.
+  // 101 is above the 0-100 scale on every axis cascadeScore can return, so the pinned film clears no real
+  // marker — the exact case that used to leave placementSplitHTML's trailing "unplaced" bucket non-empty.
+  // CAS-1233 retired that outcome: autoPlacementFor now always falls back to one of the agent's own
+  // followed windows (Cinema here, the earliest one an Upcoming film can stand at), so the split's real
+  // buckets absorb the film and "unplaced" never fires as long as the agent follows anything at all.
   const cId = seedMarkerCascade({ in_cinema: 101, rent: 101, stream: 101 });
   try {
     pinFilm(id, cId);
     withWatchPrefs(PLACEMENT_WATCH_PREFS, () => {
       E.recomputeFound();
-      assert.equal(E.filmNotifyState(id).key, null, "sanity: a score below every marker leaves no Watch On value");
+      assert.equal(E.filmNotifyState(id).key, "in_cinema", "sanity: CAS-1233's fallback lands the film at Cinema");
       const c = E.cascades.find(x => x.id === cId);
       const html = E.placementSplitHTML(c);
-      assert.match(html, /\b1 unplaced\b/, `expected the unplaced film to surface, not vanish: "${html}"`);
+      assert.doesNotMatch(html, /unplaced/, `expected no unplaced bucket at all: "${html}"`);
       assert.equal(sumPlacementParts(html), E.listedCount(c), `parts must still sum to the headline: "${html}"`);
     });
   } finally {
