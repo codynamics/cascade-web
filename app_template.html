@@ -2561,82 +2561,15 @@
      .scopebar's own — same row shape, one step further down the bar. */
 
   .cascbar.rail .genrefilter{margin:8px 12px 9px}
-  /* ---- CAS-1223: the Watch top area — a stage line (which window a film is at) beside an agent column
-     (which agents picked it), replacing #watchTabs, the Now line and the Occasion/Picked by pills. Tapping
-     a stop still runs through setWatchTab underneath (renderWatchTop/setWatchStage below); the stage split
-     (Upcoming vs In Cinema) is new state layered on top, never a second tab system. */
-  .watchtop{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);column-gap:10px;margin:10px 12px 0}
-  .cascbar.rail .watchtop{margin:10px 12px 0}
+  /* ---- CAS-1247: the Watch top area is now two stage groups (Cinema/Home) and a mood row, replacing the
+     stage/agent-column rail and the sort/search/filter tools row this comment used to describe — see the
+     new CSS block near the end of this stylesheet (renderWatchTop() and the mood sheet, below). ---- */
   .watchtop[hidden]{display:none}
-  /* One row shape for both columns: 26px high, fully rounded, 1px border, the same tinted fill when
-     selected. Stage rows and agent rows sit on the same 30px rhythm and share the block's two edges. */
-  .stagecol{min-width:0;display:flex;flex-direction:column;gap:4px;position:relative}
-  /* The rail: one straight line down the far left, through every dot centre (1px border + 9px padding +
-     half a 9px dot = 14.5px), from the first row's centre to the last row's centre. */
-  .stagecol::before{content:"";position:absolute;left:13.75px;top:13px;bottom:13px;width:1.5px;
-    background:linear-gradient(180deg,var(--upcoming),var(--amber),var(--blue),var(--green));opacity:.7}
-  .stagestop{position:relative;display:flex;align-items:center;gap:8px;width:100%;height:26px;
-    box-sizing:border-box;background:none;border:1px solid transparent;border-radius:999px;
-    padding:0 10px 0 9px;margin:0;color:var(--dim);font-family:inherit;cursor:pointer;text-align:left}
-  .stagestop .gdot{flex:none;box-shadow:0 0 0 3px var(--bg)}
-  .stagestop .stagename{flex:1;min-width:0;font-size:11.5px;font-weight:700;color:var(--dim);
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .stagestop .stagecount{flex:none;font-size:11.5px;font-weight:800;color:var(--faint);line-height:1;
-    font-variant-numeric:tabular-nums}
-  .stagestop.on{border-color:color-mix(in srgb, var(--sgc,var(--brand-blue)) 60%, var(--panel));
-    background:color-mix(in srgb, var(--sgc,var(--brand-blue)) 14%, var(--bg))}
-  .stagestop.on .gdot{box-shadow:none}
-  .stagestop.on .stagecount,.stagestop.on .stagename{color:#fff}
-  .stagestop.on[data-stage="upcoming"]{--sgc:var(--upcoming)}
-  .stagestop.on[data-stage="in_cinema"]{--sgc:var(--amber)}
-  .stagestop.on[data-stage="premium"]{--sgc:var(--purple)}
-  .stagestop.on[data-stage="rent"]{--sgc:var(--blue)}
-  .stagestop.on[data-stage="stream"]{--sgc:var(--green)}
-  .stagestop:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-  .agentcol{min-width:0;display:flex;flex-direction:column;gap:4px}
-  .watchagentrow{display:flex;align-items:center;gap:7px;width:100%;height:26px;box-sizing:border-box;
-    background:none;border:1px solid transparent;border-radius:999px;padding:0 10px 0 3px;margin:0;
-    color:var(--ink);font-family:inherit;cursor:pointer;text-align:left}
-  .watchagentrow.agrank-1{--rt:var(--agrank-1)}
-  .watchagentrow.agrank-2{--rt:var(--agrank-2)}
-  .watchagentrow.agrank-3{--rt:var(--agrank-3)}
-  .watchagentrow.agrank-4{--rt:var(--agrank-4)}
-  .watchagentrow.agrank-5{--rt:var(--agrank-5)}
-  .watchagentrow.agrank-6{--rt:var(--agrank-6)}
-  /* The Agents screen's own icon tile and rank tint (.agrow.agrank-N .agicon), at this row's size. */
-  .watchagentrow .agicon{width:18px;height:18px;border-radius:6px;font-size:11px;
-    background:color-mix(in srgb, var(--rt,var(--brand-blue)) 22%, var(--panel));
-    border:1px solid color-mix(in srgb, var(--rt,var(--brand-blue)) 55%, var(--panel))}
-  .watchagentname{flex:1;min-width:0;font-size:11.5px;font-weight:700;color:var(--ink);overflow:hidden;
-    text-overflow:ellipsis;white-space:nowrap}
-  .watchagentrow.on{border-color:color-mix(in srgb, var(--rt,var(--brand-blue)) 60%, var(--panel));
-    background:color-mix(in srgb, var(--rt,var(--brand-blue)) 14%, var(--bg))}
-  .watchagentrow:not(.on) .agicon{filter:grayscale(1);opacity:.55}
-  .watchagentrow:not(.on) .watchagentname{color:var(--faint);font-weight:600}
-  .watchagentrow:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-  /* ---- CAS-1223: the tools row under the stage/agent block — the two-way sort switch, search and
-     filter — replacing the standalone sort button and the old search/filter pair's old position. ---- */
-  .watchtools{display:flex;gap:8px;margin:10px 12px 0;align-items:stretch}
-  .cascbar.rail .watchtools{margin:10px 12px 0}
-  .watchtools[hidden]{display:none}
-  .sortswitch{flex:1;min-width:0;display:flex;align-items:stretch;height:34px;border-radius:10px;
-    border:1px solid var(--line);background:var(--panel2);overflow:hidden;padding:3px;box-sizing:border-box}
-  .sortglyph{flex:0 0 auto;display:flex;align-items:center;padding:0 7px 0 5px;font-size:12px;color:var(--faint)}
-  .sortswitchopt{flex:1;min-width:0;background:none;border:0;color:var(--dim);font-family:inherit;
-    font-size:11.5px;font-weight:600;cursor:pointer;padding:0 6px;overflow:hidden;text-overflow:ellipsis;
-    white-space:nowrap;border-radius:7px}
-  .sortswitchopt.on{background:var(--brand-blue);color:#fff;font-weight:700}
   /* The stage line names the stage and carries its count, so the first stage heading above the list goes. */
   #groups > .group:first-child > .grouphead:not(.sub){display:none}
-  .sortswitchopt:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
-  /* ---- CAS-718: the Watch control bar's search field and its Filters sheet — replaces the scope bar's
-     three pills and the genre row's own standalone home above. Same on-colour (--brand-blue) as the tabs/
-     old scope bar, for the same reason: these are chrome belonging to the Find/Watch chip. ---- */
+  /* CAS-1247: Watch's own search box and Filters sheet are gone — .watchsearchwrap/its .search/.searchclear
+     stay, since Find's own search box (#findSearchWrap, renderFindScreen()) is still built from them. */
   .watchsearchwrap{display:flex;align-items:center;gap:8px;margin:9px 12px 0}
-  .cascbar.rail .watchsearchwrap{margin:8px 12px 0}
-  /* CAS-1223: the clear (×) is positioned against the field alone, not the whole row — the close button
-     added below sits outside that field, as its own flex item, so the two never overlap. */
-  .watchsearchfield{flex:1;min-width:0;position:relative;display:flex;align-items:center}
   .watchsearchwrap .search{padding:9px 32px 9px 12px;font-size:14px}
   .watchsearchwrap .searchclear{width:24px;height:24px}
   /* CAS-840: OCCASION + PICKED BY — two-line pills sharing the row's spare width (flex:1 1 0), replacing
@@ -2668,36 +2601,10 @@
   .popt.on{background:rgba(76,125,255,.16);color:#cddcff;font-weight:800}
   .popt:hover{color:var(--ink)}
   .popt:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
-  .watchiconbtn{position:relative;flex:0 0 auto;width:40px;display:grid;place-items:center;border-radius:10px;
-    border:1px solid var(--line);background:var(--panel2);color:var(--dim);cursor:pointer;padding:0}
-  .watchiconbtn svg{width:16px;height:16px;display:block}
-  /* CAS-960: 40px visible box (unchanged) widened to Apple HIG's 44x44pt minimum tap target. */
-  .watchiconbtn::after{content:"";position:absolute;inset:-2px}
-  /* CAS-769 gave these elements a `display` in their own class while relying on the `hidden`
-     attribute to remove them — and a bare [hidden] loses to a class rule, exactly as .cascsearch[hidden]
-     (~1268) and .stephdr/.stepnav[hidden] (~2790) already had to restate. Without this, the search box
-     never hides when the occasion pill appears: it keeps flex:1 and squeezes the pill down to nothing.
-     CAS-840: .pickerwrap sets no `display` of its own, so it needs no entry here — a bare [hidden]
-     already beats the browser default. */
-  .watchsearchwrap[hidden],.watchiconbtn[hidden]{display:none}
-  .watchiconbtn:active{opacity:.75}
-  .watchiconbtn:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
-  /* CAS-822: Filters drops its text label (icon only), so the button now shares .watchiconbtn's fixed
-     40px square box — put on the element via a second class in the markup — leaving .watchfilterbtn
-     itself only the badge anchor and the .on tint/border, both layered on top of that shared box. */
-  .watchfilterbtn{position:relative}
-  .watchfilterbtn.on{border-color:var(--brand-blue);color:#cddcff;background:rgba(76,125,255,.16)}
-  .wfbadge{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;border-radius:9px;
-    background:var(--brand-blue);color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;padding:0 3px}
-  .watchactivefilters{margin:8px 12px 0;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
-    scrollbar-width:none}
-  /* CAS-839: .chips sets display:flex, so a bare [hidden] loses to it — the same trap .watchsearchwrap[hidden]
-     (~2683), .cascsearch[hidden] (~1286) and .stephdr[hidden] (~2840) already had to restate. */
-  .watchactivefilters[hidden]{display:none}
-  .watchactivefilters::-webkit-scrollbar{display:none}
-  .watchactivefilters .chip{flex:0 0 auto;display:flex;align-items:center;gap:6px;
-    background:rgba(76,125,255,.16);border-color:rgba(76,125,255,.5);color:#cddcff}
-  .watchactivefilters .linkbtn.clearall{flex:0 0 auto;padding:6px 4px}
+  /* CAS-769/CAS-839: .chips and this wrap both set display:flex, so a bare [hidden] loses to the class —
+     same restatement as .cascsearch[hidden] (~1268) and .stephdr/.stepnav[hidden] (~2790). Find's own
+     #findSearchWrap (renderFindScreen()) is the one surviving user of .watchsearchwrap. */
+  .watchsearchwrap[hidden]{display:none}
   /* No existing component here is a true bottom sheet — .modal/.sharpstep are full-viewport, .cpop is a
      small anchored popover — so this introduces its own slide-up/scrim mechanics. */
   .wsheetscrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:59;opacity:0;pointer-events:none;
@@ -3596,6 +3503,76 @@
     color:#fff!important}
   .hdr-actions .modechip.active .mclabel{font-weight:700}
   .hdr-actions .modechip.ag.active .mcicon{color:#fff}
+  /* ==== WATCH TOP: TWO STAGE GROUPS, MOODS, AND A BAR THAT COLLAPSES ON SCROLL (Lee, 2026-10-10) ====
+     Replaces the stage line + agent column (CAS-1223/1226) and the tools row (sort switch, search, filter).
+     The selected stage and the selected mood use the same --sel-bg / --sel-bd as the selected nav item. */
+  .watchtop{display:block;margin:10px 12px 0}
+  .cascbar.rail .watchtop{margin:10px 12px 0}
+  .stgroups{display:flex;gap:8px;align-items:stretch}
+  .stgrp{min-width:0;border:1px solid var(--line);border-radius:12px;padding:5px;background:rgba(255,255,255,.025)}
+  .stgrplbl{font:700 9px/1 var(--font-body);letter-spacing:.9px;text-transform:uppercase;color:var(--faint);
+    padding:2px 5px 6px}
+  .stsegs{display:flex;gap:4px}
+  /* flex-basis auto, not 0: a longer name (Now showing) takes a wider button, so no name overhangs its own box */
+  .stgroups .stagestop{flex:1 1 auto;min-width:0;width:auto;height:40px;border-radius:8px;border:1px solid transparent;
+    background:none;color:var(--dim);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:4px;padding:0 5px;text-align:center}
+  .stgroups .stagestop .stagename{flex:none;font:600 12px/1 var(--font-body);color:inherit;overflow:visible}
+  .stgroups .stagestop .stagecount{flex:none;display:flex;align-items:center;gap:4px;font:600 11px/1 var(--font-body);
+    color:var(--faint)}
+  .stgroups .stagestop .gdot{width:6px;height:6px;border-radius:50%;flex:none;box-shadow:none}
+  .stgroups .stagestop.on{background:var(--sel-bg);border-color:var(--sel-bd);color:#fff}
+  .stgroups .stagestop.on .stagename{font-weight:700;color:#fff}
+  .stgroups .stagestop.on .stagecount{color:var(--dim)}
+  /* phones narrower than 380px: the four stage names still fit on one line */
+  @media (max-width:379px){
+    .stgrp{padding:4px}
+    .stsegs{gap:2px}
+    .stgroups .stagestop{padding:0 3px}
+    .stgroups .stagestop .stagename{font-size:11px;letter-spacing:-.1px}
+  }
+  /* moods: one row, one selected at a time */
+  .moodrow{display:flex;gap:6px;margin-top:9px;overflow-x:auto;scrollbar-width:none;align-items:center}
+  .moodrow::-webkit-scrollbar{display:none}
+  .moodchip{flex:none;height:34px;padding:0 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
+    color:var(--dim);font:600 12.5px/1 var(--font-body);display:flex;align-items:center;gap:7px;cursor:pointer;
+    white-space:nowrap}
+  .moodchip.on{background:var(--sel-bg);border-color:var(--sel-bd);color:#fff;font-weight:700;padding-right:9px}
+  .moodchip .moodedit{display:none;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.14);
+    align-items:center;justify-content:center}
+  .moodchip.on .moodedit{display:flex}
+  .moodchip .moodedit svg{width:12px;height:12px}
+  .moodadd{flex:none;height:34px;padding:0 12px;border-radius:10px;border:1px dashed #4a5263;background:none;
+    color:var(--dim);font:600 12.5px/1 var(--font-body);cursor:pointer;white-space:nowrap}
+  .moodchip:focus-visible,.moodadd:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  /* the collapsed bar: one slim row in place of the stages and moods once the list has scrolled */
+  #wtMini{display:none}
+  #cascbar.wtcollapsed:not(.wtopen) #watchTop{display:none}
+  #cascbar.wtcollapsed:not(.wtopen) #wtMini{display:flex;height:38px;align-items:center;gap:8px;padding:0 14px;
+    font:600 12.5px/1 var(--font-body);color:var(--ink);cursor:pointer;border-bottom:1px solid var(--line)}
+  #wtMini .gdot{width:7px;height:7px;border-radius:50%;flex:none}
+  #wtMini .wtsep{color:var(--faint)}
+  #wtMini .wtmood{color:var(--dim)}
+  #wtMini .wtchev{margin-left:auto;color:var(--faint);font-size:11px}
+  #cascbar.wtcollapsed.wtopen{box-shadow:0 22px 30px -14px rgba(0,0,0,.85);padding-bottom:12px;
+    border-bottom:1px solid var(--line)}
+  /* the mood sheet's own fields, above the sections the Filters sheet already has */
+  .mfinput{width:100%;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--ink);font:600 15px var(--font-body);padding:0 12px;box-sizing:border-box}
+  .mfseg{display:flex;gap:4px;border:1px solid var(--line);border-radius:10px;padding:4px}
+  .mfseg button{flex:1 1 0;height:34px;border-radius:7px;border:1px solid transparent;background:none;
+    color:var(--dim);font:600 12px/1 var(--font-body);white-space:nowrap;padding:0 2px}
+  .mfseg button.on{background:var(--sel-bg);border-color:var(--sel-bd);color:#fff}
+  .mfseg button:disabled{color:var(--faint);opacity:.7}
+  .mfseg small{display:block;font:500 9px/1 var(--font-body);margin-top:3px}
+  .mfrow{display:flex;align-items:center;justify-content:space-between;margin-top:14px;
+    font:600 13px/1.2 var(--font-body);color:var(--ink)}
+  .mftog{width:42px;height:24px;border-radius:999px;background:var(--line);position:relative;flex:none;
+    border:none;padding:0;cursor:pointer}
+  .mftog i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff}
+  .mftog.on{background:var(--sel-bd)}
+  .mftog.on i{left:21px}
+  #watchSheet .chip.on{background:var(--sel-bg);border-color:var(--sel-bd)}
 </style>
 </head>
 <body>
@@ -3753,44 +3730,12 @@
   <div class="cascbar blue" id="cascbar">
     <!-- CAS-371: the "AGENTS" heading is gone — the agent box is the first thing in the bar now, so
          everything below it sits that much higher. -->
-    <!-- CAS-1223: the stage line (which window a film is at) beside the agent column (which agents picked
-         it) — replaces #watchTabs, the Now line (#jumpBar/#listCtl) and the Occasion/Picked by pills.
-         renderWatchTop() below fills this in; setWatchStage still calls setWatchTab underneath it. -->
+    <!-- CAS-1247: the Watch top area is now two stage groups (Cinema/Home) plus a mood row, replacing the
+         old stage+agent rail and the sort-switch/search/Filters tools row this comment used to describe.
+         renderWatchTop() fills #watchTop in; #wtMini is the one-row summary shown once the list has scrolled
+         (the collapse behaviour lives in the scroll listener near the bottom of this script). -->
+    <div id="wtMini" role="button" tabindex="0" aria-label="Show stages and moods"></div>
     <div class="watchtop" id="watchTop"></div>
-    <!-- CAS-1223: the tools row — a two-way sort switch, search and Filters — replaces the standalone sort
-         button and moves search/Filters down here from the old .watchctl row. Swaps for #watchSearchWrap
-         below while a search is open (renderWatchCtl). -->
-    <div class="watchtools" id="watchTools">
-      <div class="sortswitch" id="watchSortSwitch" role="group" aria-label="Sort">
-        <span class="sortglyph" aria-hidden="true">⇅</span>
-        <button type="button" class="sortswitchopt" id="watchSortCinema" aria-pressed="false"
-                onclick="PICKER_KINDS.sort.pick('cinema')">Release date</button>
-        <button type="button" class="sortswitchopt" id="watchSortCascade" aria-pressed="false"
-                onclick="PICKER_KINDS.sort.pick('cascade')">Cascade score</button>
-      </div>
-      <button type="button" class="watchiconbtn" id="watchSearchBtn" aria-label="Search all your films"
-              onclick="openWatchSearch()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-          stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.4"/><path d="M15.8 15.8 20 20"/></svg>
-      </button>
-      <!-- Same funnel mark as ICON.filter (svgIcon()) — hardcoded here since this markup is static HTML,
-           not a JS template string, so ${ICON.filter} could never have evaluated. -->
-      <button type="button" class="watchfilterbtn watchiconbtn" id="watchFilterBtn" aria-haspopup="dialog" aria-expanded="false"
-              aria-controls="watchSheet" aria-label="Filters" title="Filters" onclick="openWatchSheet()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-             stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.2 5.4h15.6l-6 7.2v6l-3.6 1.8v-7.8z"/></svg>
-        <span class="wfbadge" id="watchFilterBadge" hidden>0</span>
-      </button>
-    </div>
-    <div class="watchsearchwrap" id="watchSearchWrap" hidden>
-      <div class="watchsearchfield">
-        <input id="watchSearchInput" class="search" type="text" inputmode="search" autocomplete="off"
-               placeholder="Search all your films" aria-label="Search all your films">
-        <button class="searchclear" id="watchSearchClear" aria-label="Clear search" type="button" hidden>×</button>
-      </div>
-      <button type="button" class="watchiconbtn watchsearchclose" id="watchSearchCloseBtn"
-              aria-label="Close search" onclick="clearWatchSearch()">×</button>
-    </div>
     <!-- CAS-1223: the standalone sort button is gone from Watch — kept only as inert state (hidden, never
          focused) so syncSortCtl's own #sort option lookup is untouched. -->
     <button type="button" class="sortctl ca-btn x" id="sortCtl" aria-haspopup="listbox" aria-expanded="false"
@@ -3807,8 +3752,6 @@
       <option value="popularity">Most anticipated</option>
       <option value="title">Title A–Z</option>
     </select>
-    <!-- CAS-718: one chip per active (non-default) sheet section, each clearing just that section. -->
-    <div class="chips watchactivefilters" id="watchActiveFilters" role="group" aria-label="Active filters" hidden></div>
     <!-- CAS-863: the watch-list card row (#cascStrip, retired as a browsing concept since CAS-718) and the
          watch-list model it browsed are gone. #cascSearch stays — it's still used by Manage Agents'
          single-agent preview (restoreCascadeSearch(), openCascade()). -->
@@ -3819,20 +3762,21 @@
     </div>
     <div id="cascDetail"></div>
   </div>
-  <!-- CAS-718: the Filters sheet — Watched + Styles, the two working pieces of filtering carried over from
-       the old scope bar/genre row. CAS-719 added "Picked by"; "Current status"/agent narrowing are
-       separate follow-on tickets and are deliberately not here. Slides up from the bottom over a scrim;
-       position:fixed so its place in the DOM doesn't matter. -->
+  <!-- CAS-1247: the Filters sheet is now the Mood sheet — a saved bundle of order + agents + the Availability/
+       Picked by/Watched/Styles/Also show/Badges sections this sheet already had. Title and footer buttons are
+       repainted by renderMoodSheet() per mood/new-mood; the scrim/Escape/close-button discard wiring is
+       unchanged from the Filters sheet it replaces. Slides up from the bottom over a scrim; position:fixed so
+       its place in the DOM doesn't matter. -->
   <div class="wsheetscrim" id="watchSheetScrim" onclick="closeWatchSheet()"></div>
-  <div class="wsheet" id="watchSheet" role="dialog" aria-modal="true" aria-label="Filters">
+  <div class="wsheet" id="watchSheet" role="dialog" aria-modal="true" aria-label="Mood">
     <div class="wsheethead">
-      <h3>Filters</h3>
+      <h3 id="watchSheetTitle">Mood</h3>
       <button type="button" class="wsheetclose" aria-label="Close" onclick="closeWatchSheet()">×</button>
     </div>
     <div class="wsheetbody" id="watchSheetBody"></div>
     <div class="wsheetfoot">
-      <button type="button" class="ebtn ghost" onclick="clearAllWatchFilters()">Clear all</button>
-      <button type="button" class="donebtn" id="watchSheetShowBtn" onclick="closeWatchSheet()">Show results</button>
+      <button type="button" class="ebtn ghost" id="moodDeleteBtn" onclick="handleMoodDeleteBtn()">Delete mood</button>
+      <button type="button" class="donebtn" id="moodSaveBtn" onclick="saveMoodFromSheet()">Save mood</button>
     </div>
   </div>
   <!-- ONE listing (CAS-134, and now literally one: CAS-150 removed the New / All scopes). It is everything
@@ -6242,21 +6186,11 @@ function watchSortActiveKey(){
   const tabDflt = watchTab==="in_cinema" ? "availability" : DEFAULT_SORT;
   return sortPicked ? filt.sort : tabDflt;
 }
-// CAS-1240: the switch's two halves, each carrying the direction arrow that matches what the list actually
-// does when that half is the one selected. Release date reads soonest-first (↑) on the in_cinema tab
-// (Upcoming and In Cinema both live under it) and newest-first (↓) on every released tab (Rent/Stream/
-// Premium) — Cascade score is always highest-first (↓), the one direction the "cascade" sort ever produces.
-function watchSortSwitchHalves(){
-  const key=watchSortActiveKey();
-  const cinemaOn=key==="cinema"||key==="availability", cascadeOn=key==="cascade";
-  return {
-    cinema: {on:cinemaOn, label: cinemaOn ? `Release date ${watchTab==="in_cinema"?"↑":"↓"}` : "Release date"},
-    cascade: {on:cascadeOn, label: cascadeOn ? "Cascade score ↓" : "Cascade score"},
-  };
-}
 // CAS-1181: PICKER_KINDS.sort's pick() is what changes filt.sort now (the popover replaced the invisible
 // <select>); this just repaints the icon button around it — a tooltip naming the current order, and the
 // active-dot for "you're off the default". The select itself stays only as inert state for the lookup below.
+// CAS-1247: the visible two-way switch this used to also repaint (#watchSortCinema/#watchSortCascade) is
+// gone — moods set filt.sort/sortPicked now (applyMoodToState) — so this is back to just the tooltip/dot.
 function syncSortCtl(){
   // CAS-566: sortCtl only lives inside whichever card is .is-active (deckSync's reparenting) — with zero
   // agents there is no such card, so it sits detached (not in the document) until one exists again, and
@@ -6265,14 +6199,6 @@ function syncSortCtl(){
   const opt=$("sort").querySelector(`option[value="${filt.sort}"]`);
   $("sortCtl").title="Order: "+(opt?opt.textContent:"");
   $("sortDot").hidden=!sortPicked;   // CAS-819: dot reflects an explicit pick, not just "off DEFAULT_SORT"
-  // CAS-1223/CAS-1240: the visible two-way switch in the tools row — only two of SORT_OPTS' eight values
-  // have a half here, so a pick from the Filters sheet's own full "Sort by" list (any of the other six)
-  // correctly leaves neither half filled. Each half's own label (not just its "on" state) comes from
-  // watchSortSwitchHalves() too, so the direction arrow never drifts from what's actually selected.
-  const cinBtn=$("watchSortCinema"), casBtn=$("watchSortCascade");
-  const halves=watchSortSwitchHalves();
-  if(cinBtn){ cinBtn.classList.toggle("on",halves.cinema.on); cinBtn.setAttribute("aria-pressed",String(halves.cinema.on)); cinBtn.textContent=halves.cinema.label; }
-  if(casBtn){ casBtn.classList.toggle("on",halves.cascade.on); casBtn.setAttribute("aria-pressed",String(halves.cascade.on)); casBtn.textContent=halves.cascade.label; }
 }
 $("imdbMin").oninput=e=>{filt.imdb=+e.target.value;$("imdbVal").textContent=filt.imdb?filt.imdb.toFixed(1)+"+":"Any";render();};
 $("rtMin").oninput=e=>{filt.rt=+e.target.value;$("rtVal").textContent=filt.rt?filt.rt+"%+":"Any";render();};
@@ -9534,40 +9460,53 @@ function watchStageCountFor(stop){
   watchTab=savedTab; watchCinemaStage=savedStage;
   return n;
 }
-// CAS-1223: the stage line (left) + agent lozenges (right) — replaces renderWatchTabs' old header tray.
-// Agent inclusion (watchAgentOff below) is one shared Set now, not per-tab, so it needs no tab/stage swap.
 // CAS-1226: the agent lozenge row's own order — every agent, ranked, no overflow slice ("+N more" is
-// gone) — pulled out so a test can assert "every agent shows" directly, without the DOM write the harness
-// below can't capture.
+// gone). The lozenge row itself is retired (CAS-1247), but the mood sheet's own Agents section (C5) still
+// orders its chips this way, so the pure function stays.
 function watchTopAgentsRanked(){ return [...cascades].sort(cascadeOrderCmp); }
+// CAS-1247: the Watch top area is now two stage groups (Cinema/Home) plus a mood row — replaces the old
+// stage+agent rail (CAS-1223/1226). A group's flex is the sum, over its own stops, of the wider of 8 or the
+// stop's own (possibly renamed) label length, so neither group's buttons ever overhang their own box.
+const STAGE_GROUP_FLEX = label => Math.max(8, label.length);
 function renderWatchTop(){
   const el=$("watchTop"); if(!el) return;
   const stops=watchStageStopsNow();
   if(!stops.length){ el.hidden=true; el.innerHTML=""; return; }
   el.hidden=false;
   const curKey = watchTab==="in_cinema" ? watchCinemaStage : watchTab;
-  const stageHTML=stops.map(s=>{
+  // "In Cinema"'s stop label becomes "Now showing" here and in #wtMini only — the section heading in the
+  // list itself (LISTING_ORDER's own group header) is untouched.
+  const stopLabel = s => s.key==="in_cinema" ? "Now showing" : s.label;
+  const stopHTML = s => {
     const on=s.key===curKey;
     return `<button type="button" class="stagestop${on?" on":""}" data-stage="${s.key}"
         aria-pressed="${on}" onclick="setWatchStage('${s.key}')">
-      <span class="gdot ${s.dot}" aria-hidden="true"></span>
-      <span class="stagename">${esc(s.label)}</span>
-      <span class="stagecount">${watchStageCountFor(s)}</span>
+      <span class="stagename">${esc(stopLabel(s))}</span>
+      <span class="stagecount"><span class="gdot ${s.dot}" aria-hidden="true"></span>${watchStageCountFor(s)}</span>
     </button>`;
+  };
+  const groupHTML = (label, groupStops) => {
+    if(!groupStops.length) return "";
+    const flex=groupStops.reduce((n,s)=>n+STAGE_GROUP_FLEX(stopLabel(s)), 0);
+    return `<div class="stgrp" style="flex:${flex} 1 0">
+      <div class="stgrplbl">${esc(label)}</div>
+      <div class="stsegs" role="group" aria-label="${escA(label)} stages">${groupStops.map(stopHTML).join("")}</div>
+    </div>`;
+  };
+  const cinemaStops=stops.filter(s=>s.tabKey==="in_cinema");
+  const homeStops=stops.filter(s=>s.tabKey!=="in_cinema");
+  const stageHTML=`<div class="stgroups">${groupHTML("Cinema", cinemaStops)}${groupHTML("Home", homeStops)}</div>`;
+  const moods=watchMoodsList();
+  const moodHTML=moods.map(m=>{
+    const on=m.id===watchMoodSel;
+    return `<button type="button" class="moodchip${on?" on":""}" data-mood="${escA(m.id)}" aria-pressed="${on}"
+        onclick="onMoodChipTap('${escA(m.id)}')">${esc(m.name)}<span class="moodedit" aria-hidden="true">${MOOD_EDIT_SVG}</span></button>`;
   }).join("");
-  const ranked=watchTopAgentsRanked();
-  const agentHTML=ranked.map(c=>{
-    const on=!watchAgentOff.has(c.id);
-    const rank=cascadeRankTint(c);
-    return `<button type="button" class="watchagentrow${rank?` agrank-${rank}`:""}${on?" on":""}"
-        data-id="${escA(c.id)}" aria-pressed="${on}"
-        aria-label="${escA((on?"Remove ":"Include ")+c.name+" in Watch")}" onclick="toggleWatchAgent('${escA(c.id)}')">
-      <span class="agicon" aria-hidden="true">${c.icon}</span>
-      <span class="watchagentname">${esc(c.name)}</span>
-    </button>`;
-  }).join("");
-  el.innerHTML = `<div class="stagecol" role="tablist" aria-label="Stage">${stageHTML}</div>
-    <div class="agentcol">${agentHTML}</div>`;
+  const addHTML = moods.length>=5 ? "" : `<button type="button" class="moodadd" id="moodAddBtn" onclick="openMoodSheetForNew()">+ Mood</button>`;
+  el.innerHTML = `${stageHTML}<div class="moodrow" role="group" aria-label="Mood">${moodHTML}${addHTML}</div>`;
+  // Keeps #wtMini's own text honest immediately after a stage/mood change, independent of the next scroll
+  // event — the collapse listener itself (defined later in this script) only ever touches it on scroll.
+  if(typeof wtRefreshMini==="function") wtRefreshMini();
 }
 // CAS-718: the search box's placeholder/value follow whichever tab is active — restoring the raw text you
 // left in THAT tab (not the lowercased match term, so casing/whitespace survive a tab switch) is the same
@@ -9584,40 +9523,9 @@ window.setWatchOccasion = id => {
   watchOccasion = (!id || id==="All") ? null : id;
   render();
 };
-// CAS-769: whether the search box is expanded over the occasion row right now — never persisted, and
-// separate from `watchSearch`/`watchSearchRaw` (the actual typed term), which this never touches.
-let watchSearchOpen = false;
-window.openWatchSearch = () => {
-  watchSearchOpen = true;
-  renderWatchCtl();
-  const inp=$("watchSearchInput"); if(inp) inp.focus();
-};
-// A search left empty and then tapped away from collapses back to the icon — the same "dismiss" the
-// clear button gives you when there's text to clear.
-function closeWatchSearchIfEmpty(){
-  const inp=$("watchSearchInput");
-  if(watchSearchOpen && inp && !inp.value){ watchSearchOpen=false; renderWatchCtl(); }
-}
-// CAS-1223: the Occasion/Picked by pills this used to repaint are gone from Watch (Picked by is still a
-// Filters-sheet section, renderWatchSheet's own job). All that's left is the search field's own text/clear
-// state and swapping it for the tools row (#watchTools) while search is open — the search button itself
-// moved into that row (openWatchSearch/clearWatchSearch, unchanged).
-function renderWatchCtl(){
-  const inp=$("watchSearchInput");
-  if(inp){
-    // CAS-1180 Part D: the placeholder once named the current tab ("Search Streaming") because that's all
-    // the box ever searched; it now reaches every tab/window, so the one fixed placeholder says that
-    // honestly rather than naming whichever tab happens to be open.
-    inp.placeholder = "Search all your films";
-    const raw=watchSearchRaw[watchTab];
-    if(inp.value!==raw) inp.value=raw;
-  }
-  const clr=$("watchSearchClear");
-  if(clr){ const has=!!(inp && inp.value); clr.hidden=!has; clr.classList.toggle("show", has); }
-  const tools=$("watchTools"), searchWrap=$("watchSearchWrap");
-  if(tools) tools.hidden=watchSearchOpen;
-  if(searchWrap) searchWrap.hidden=!watchSearchOpen;
-}
+// CAS-1247: Watch's own search box (and the occasion row it floated over) is gone — Find is where search
+// lives now. watchSearch/watchSearchRaw stay (applyMoodToState keeps them cleared; the pipeline below still
+// reads them, always empty) so neither watchVisibleRows() nor watchNavKey() needs a special case for it.
 // CAS-714/CAS-718: which genres are toggled OFF (hidden) in each Watch tab's own view — session-only, one
 // Set per tab. Never persisted and never written back to any cascade's own stored c.genre: this only
 // narrows what a render puts on screen. Now rendered inside the Filters sheet's own Styles section
@@ -9837,10 +9745,12 @@ window.toggleWatchAgent = id => {
 // CAS-1222: in-memory default now — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
 // ever populates this away from the signed-out "every tab ON" default, straight off the account's own
 // user_prefs.view.mineOnly field.
+// CAS-1247: no longer independently persisted — removed saveWatchMineOnly() and the view.mineOnly
+// adoption in loadUserPrefs() (C4). mineOnly now rides inside whichever mood is applied/saved; a person
+// who had switched it off gets it back on once (accepted — see the ticket's own C4 note).
 const watchMineOnly = {in_cinema:true, premium:true, rent:true, stream:true};
-function saveWatchMineOnly(){ pushViewField("mineOnly", {...watchMineOnly}); }
 const watchMineOnlyOn = () => watchMineOnly[watchTab];
-function setWatchMineOnly(v){ watchMineOnly[watchTab]=!!v; saveWatchMineOnly(); }
+function setWatchMineOnly(v){ watchMineOnly[watchTab]=!!v; }
 window.toggleWatchMineOnly = () => { setWatchMineOnly(!watchMineOnlyOn()); render(); };
 // CAS-857: the active-filter chip's clear — scrolls back to the top once the wider list has laid out.
 window.enableWatchMineOnly = () => { setWatchMineOnly(true); render(); scrollWatchListingToTop(); };
@@ -9868,20 +9778,6 @@ const watchHeldOpen = {in_cinema:new Set(), premium:new Set(), rent:new Set(), s
 function settleWatchHeldOpen(){
   Object.keys(watchHeldOpen).forEach(k=>watchHeldOpen[k].clear());
 }
-let watchSearchRenderT = null;
-window.setWatchSearch = raw => {
-  watchSearchRaw[watchTab]=raw;
-  watchSearch[watchTab]=raw.trim().toLowerCase();
-  const clr=$("watchSearchClear"); if(clr){ clr.hidden=!raw; clr.classList.toggle("show", !!raw); }
-  clearTimeout(watchSearchRenderT);
-  watchSearchRenderT=setTimeout(render, 150);   // CAS-514: debounce the heavy re-render, not the echo
-};
-window.clearWatchSearch = () => {
-  $("watchSearchInput").value="";
-  setWatchSearch("");
-  watchSearchOpen=false;   // CAS-769: clearing collapses the expanded box back to the icon
-  render();
-};
 window.toggleWatchWatched = key => {
   const set=watchWatchedSel[watchTab];
   set.has(key) ? set.delete(key) : set.add(key);
@@ -9895,35 +9791,186 @@ window.toggleWatchBadge = key => {
   render();
 };
 window.clearAllWatchBadge = () => { watchBadgeSel[watchTab].clear(); render(); scrollWatchListingToTop(); };   // CAS-857
-window.clearAllWatchFilters = () => {
-  watchSearchRaw[watchTab]=""; watchSearch[watchTab]="";
-  watchPickedBy[watchTab]="all";
-  watchWatchedSel[watchTab].clear();
-  watchGenreOff[watchTab].clear();
-  watchBadgeSel[watchTab].clear();
-  // CAS-1235: same as the Also-show section's own clear — back to default, not empty.
-  watchAlsoShow[watchTab]=new Set(WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
-  // CAS-1144: "cleared" means the narrowing no longer applies, not reset-to-default — mineOnly's own
-  // default is ON (CAS-753), which still narrows, so clearing it here means OFF.
-  setWatchMineOnly(false);
-  watchOccasion=null;
+
+// ==== CAS-1247: MOODS — a named, saved bundle of order + agents + every Filters-sheet section, replacing
+// the sort switch, search, Filters button and agent lozenges. Up to five; one selected at a time. ====
+// C2: the two defaults, in memory, used whenever the account has saved none yet. Never written to
+// view.moods by themselves — only as part of the whole list, the first time a person saves or deletes one.
+const MOOD_DEFAULTS = [
+  {id:"top", name:"Top scores", order:"score", top:true},
+  {id:"releases", name:"Releases", order:"release", top:false},
+];
+const moodDefaultFieldsNow = () => ({
+  agentsOff:[], mineOnly:true, pickedBy:"all", watched:[], stylesOff:[], badges:[], alsoShow:null,
+});
+function moodDefaultsNow(){ return MOOD_DEFAULTS.map(m=>({...m, ...moodDefaultFieldsNow()})); }
+let watchMoods = moodDefaultsNow();
+// C2: the selected mood is view.mood if it names a mood that exists, otherwise the first.
+let watchMoodSel = watchMoods[0].id;
+function watchMoodsList(){ return watchMoods; }
+function currentMood(){ return watchMoods.find(m=>m.id===watchMoodSel) || watchMoods[0]; }
+const MOOD_EDIT_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>`;
+// C3: copies one mood's values into the state the pipeline already reads — the only place any of that
+// state changes now. Applied at boot (below, from the in-memory defaults), again whenever loadUserPrefs()
+// adopts view.moods/view.mood, when a mood is selected, and when one is saved.
+function applyMoodToState(mood){
+  watchAgentOff.clear();
+  (mood.agentsOff||[]).forEach(id=>watchAgentOff.add(id));
+  WATCH_LEVEL_KEYS.forEach(tab=>{
+    watchPickedBy[tab]=mood.pickedBy||"all";
+    watchWatchedSel[tab]=new Set(mood.watched||[]);
+    watchGenreOff[tab]=new Set(mood.stylesOff||[]);
+    watchBadgeSel[tab]=new Set(mood.badges||[]);
+    watchMineOnly[tab]=mood.mineOnly!==false;
+    watchSearch[tab]=""; watchSearchRaw[tab]="";
+    if(tab!=="in_cinema"){
+      // A saved mood's alsoShow[tab] is an array (possibly empty — "explicitly nothing widened" is a real,
+      // distinct state from the default) whenever alsoShow itself isn't null; only null means "use default".
+      const hasSaved = mood.alsoShow && Array.isArray(mood.alsoShow[tab]);
+      watchAlsoShow[tab]=new Set(hasSaved ? mood.alsoShow[tab] : (WATCH_ALSO_SHOW_DEFAULT[tab]||[]));
+    }
+  });
+  // C3: order:"score" does exactly what tapping Cascade score did; order:"release" does exactly what
+  // tapping Release date did. sortPicked is always true on Watch now (one flat run, no agent lanes).
+  filt.sort = mood.order==="release" ? "cinema" : "cascade";
+  sortPicked = true;
+}
+applyMoodToState(currentMood());   // C3: applied at boot, from the in-memory defaults
+window.setWatchMood = id => {
+  const mood=watchMoods.find(m=>m.id===id); if(!mood || id===watchMoodSel) return;
+  watchMoodSel=id;
+  applyMoodToState(mood);
+  pushViewField("mood", id);   // C4: selecting a different mood
+  logEvent("watch_mood", {action:"select"});
   render();
-  scrollWatchListingToTop();   // CAS-857
+  scrollWatchListingToTop();
 };
+// C5: tapping the selected mood's own chip opens the sheet for it; tapping a different chip selects it.
+window.onMoodChipTap = id => { id===watchMoodSel ? openMoodSheetFor(id) : setWatchMood(id); };
+
+// ---- The mood sheet's own draft — nothing below writes watchMoods/the live watch* state until Save. ----
+let moodDraft = null;
+let moodDeleteArmed = false;
+let moodDeleteArmTimer = null;
+function moodDraftFrom(mood){
+  return {
+    editingId: mood ? mood.id : null,
+    name: mood ? mood.name : "",
+    order: mood ? mood.order : "score",
+    top: mood ? !!mood.top : false,
+    agentsOff: new Set(mood ? (mood.agentsOff||[]) : []),
+    mineOnly: mood ? mood.mineOnly!==false : true,
+    pickedBy: mood ? (mood.pickedBy||"all") : "all",
+    watched: new Set(mood ? (mood.watched||[]) : []),
+    stylesOff: new Set(mood ? (mood.stylesOff||[]) : []),
+    badges: new Set(mood ? (mood.badges||[]) : []),
+    alsoShow: mood && mood.alsoShow ? {premium:[...(mood.alsoShow.premium||[])], rent:[...(mood.alsoShow.rent||[])], stream:[...(mood.alsoShow.stream||[])]} : null,
+  };
+}
+window.openMoodSheetFor = id => {
+  const mood=watchMoods.find(m=>m.id===id); if(!mood) return;
+  moodDraft=moodDraftFrom(mood);
+  moodDeleteArmed=false; clearTimeout(moodDeleteArmTimer);
+  openWatchSheet();
+};
+window.openMoodSheetForNew = () => {
+  if(watchMoods.length>=5) return;   // C5: #moodAddBtn is already not written at five, but guard anyway
+  moodDraft=moodDraftFrom(null);
+  moodDeleteArmed=false; clearTimeout(moodDeleteArmTimer);
+  openWatchSheet();
+};
+window.setMoodDraftName = v => { if(moodDraft) moodDraft.name=v; };
+window.toggleMoodDraftAgent = id => { if(!moodDraft) return; moodDraft.agentsOff.has(id)?moodDraft.agentsOff.delete(id):moodDraft.agentsOff.add(id); renderMoodSheetBody(); };
+window.setMoodDraftOrder = key => { if(!moodDraft) return; moodDraft.order=key; renderMoodSheetBody(); };
+window.toggleMoodDraftTop = () => { if(!moodDraft) return; moodDraft.top=!moodDraft.top; renderMoodSheetBody(); };
+window.toggleMoodDraftMineOnly = () => { if(!moodDraft) return; moodDraft.mineOnly=!moodDraft.mineOnly; renderMoodSheetBody(); };
+window.setMoodDraftPickedBy = key => { if(!moodDraft) return; moodDraft.pickedBy=key; renderMoodSheetBody(); };
+window.toggleMoodDraftWatched = key => { if(!moodDraft) return; moodDraft.watched.has(key)?moodDraft.watched.delete(key):moodDraft.watched.add(key); renderMoodSheetBody(); };
+window.toggleMoodDraftGenre = g => { if(!moodDraft) return; moodDraft.stylesOff.has(g)?moodDraft.stylesOff.delete(g):moodDraft.stylesOff.add(g); renderMoodSheetBody(); };
+window.selectAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.stylesOff.clear(); renderMoodSheetBody(); };
+window.clearAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.stylesOff=new Set(watchSheetGenres[watchTab]||[]); renderMoodSheetBody(); };
+window.toggleMoodDraftBadge = key => { if(!moodDraft) return; moodDraft.badges.has(key)?moodDraft.badges.delete(key):moodDraft.badges.add(key); renderMoodSheetBody(); };
+window.toggleMoodDraftAlsoShow = key => {
+  if(!moodDraft) return;
+  if(WATCH_TAB_OWN_STANDING[watchTab]===key) return;   // the tab's own window — not switchable
+  if(!moodDraft.alsoShow) moodDraft.alsoShow={premium:[...WATCH_ALSO_SHOW_DEFAULT.premium], rent:[...WATCH_ALSO_SHOW_DEFAULT.rent], stream:[...WATCH_ALSO_SHOW_DEFAULT.stream]};
+  const set=new Set(moodDraft.alsoShow[watchTab]||[]);
+  set.has(key) ? set.delete(key) : set.add(key);
+  moodDraft.alsoShow[watchTab]=[...set];
+  renderMoodSheetBody();
+};
+// C5: Save — an empty trimmed name saves nothing and focuses the name field; otherwise stores the mood,
+// selects it, closes the sheet and applies it. C4: one pushViewField("moods", ...) always; a second,
+// pushViewField("mood", id), only when the selection actually changed (editing the already-selected mood
+// does not reselect it).
+window.saveMoodFromSheet = () => {
+  const d=moodDraft; if(!d) return;
+  const name=(d.name||"").trim();
+  if(!name){ const inp=$("moodName"); if(inp) inp.focus(); return; }
+  const mood={
+    id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
+    name, order:d.order, top:!!d.top,
+    agentsOff:[...d.agentsOff], mineOnly:!!d.mineOnly, pickedBy:d.pickedBy,
+    watched:[...d.watched], stylesOff:[...d.stylesOff], badges:[...d.badges],
+    alsoShow: d.alsoShow ? {premium:[...(d.alsoShow.premium||[])], rent:[...(d.alsoShow.rent||[])], stream:[...(d.alsoShow.stream||[])]} : null,
+  };
+  const idx=watchMoods.findIndex(m=>m.id===mood.id);
+  const selectionChanged = watchMoodSel!==mood.id;
+  if(idx>=0) watchMoods[idx]=mood; else watchMoods.push(mood);
+  watchMoodSel=mood.id;
+  applyMoodToState(mood);
+  pushViewField("moods", watchMoods.map(m=>({...m})));
+  if(selectionChanged) pushViewField("mood", mood.id);
+  logEvent("watch_mood", {action: d.editingId ? "save" : "create"});
+  closeWatchSheet();
+  render();
+  scrollWatchListingToTop();
+};
+// C5: the footer's left button — "Cancel" (discard) for a new mood; "Delete mood" for an existing one,
+// armed to "Tap again to delete" for 4s by a first tap, disabled when only one mood is left.
+window.handleMoodDeleteBtn = () => {
+  const d=moodDraft; if(!d) return;
+  if(!d.editingId){ closeWatchSheet(); return; }
+  if(watchMoods.length<=1) return;
+  if(!moodDeleteArmed){
+    moodDeleteArmed=true;
+    renderMoodSheetBody();
+    clearTimeout(moodDeleteArmTimer);
+    moodDeleteArmTimer=setTimeout(()=>{ moodDeleteArmed=false; if(moodDraft) renderMoodSheetBody(); }, 4000);
+    return;
+  }
+  clearTimeout(moodDeleteArmTimer);
+  const deletedId=d.editingId;
+  watchMoods=watchMoods.filter(m=>m.id!==deletedId);
+  const selectionChanged = watchMoodSel===deletedId;
+  if(selectionChanged){ watchMoodSel=watchMoods[0].id; applyMoodToState(watchMoods[0]); }
+  pushViewField("moods", watchMoods.map(m=>({...m})));
+  if(selectionChanged) pushViewField("mood", watchMoodSel);
+  logEvent("watch_mood", {action:"delete"});
+  closeWatchSheet();
+  render();
+  if(selectionChanged) scrollWatchListingToTop();
+};
+
+// CAS-1247: the sheet is the mood sheet now — opening it always means editing a specific mood (an existing
+// one, or a fresh draft for "+ Mood"), set by openMoodSheetFor()/openMoodSheetForNew() just before this
+// runs. Closing (scrim/Escape/the × button) always discards: moodDraft is thrown away, nothing is written.
 let watchSheetOpen=false;
 window.openWatchSheet = () => {
   watchSheetOpen=true;
   $("watchSheet").classList.add("open");
   $("watchSheetScrim").classList.add("open");
-  $("watchFilterBtn").setAttribute("aria-expanded","true");
   lockBodyScroll(true);
+  renderMoodSheetBody();
 };
 window.closeWatchSheet = () => {
   watchSheetOpen=false;
   $("watchSheet").classList.remove("open");
   $("watchSheetScrim").classList.remove("open");
-  $("watchFilterBtn").setAttribute("aria-expanded","false");
   lockBodyScroll(false);
+  moodDraft=null;
+  moodDeleteArmed=false;
+  clearTimeout(moodDeleteArmTimer);
 };
 document.addEventListener("keydown", e=>{ if(e.key==="Escape" && watchSheetOpen) closeWatchSheet(); });
 const chipSummary = labels => labels.length<=2 ? labels.join(", ") : `${labels.slice(0,2).join(", ")} +${labels.length-2}`;
@@ -9949,42 +9996,48 @@ function watchFiltersActiveCount(){
   // CAS-1235: Also-show's default is no longer empty — only a DIFFERENCE from WATCH_ALSO_SHOW_DEFAULT counts.
   return (pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(badgeSel.size?1:0)+(watchAlsoShowIsDefault(watchTab)?0:1)+(mineOnly?0:1);
 }
+// CAS-1247: renderWatchSheet(rows, shownCount) is still render()'s own call site (unchanged signature) —
+// it just caches the pipeline's own rows/count for whenever the mood sheet is actually open, since genre/
+// badge-count candidates still come from "the current tab's own current results", exactly as the Filters
+// sheet always read them. The sheet body itself is (re)painted by renderMoodSheetBody(), driven by
+// `moodDraft` — a working copy nothing reads until Save, so toggling inside the sheet never moves the list
+// or its counts behind it (AC6).
+let watchSheetLastRows = [];
+let watchSheetLastShownCount = 0;
 function renderWatchSheet(rows, shownCount){
-  const genreOff=watchGenreOff[watchTab];
+  watchSheetLastRows = rows;
+  watchSheetLastShownCount = shownCount;
+  if(moodDraft) renderMoodSheetBody();
+}
+function renderMoodSheetBody(){
+  const d=moodDraft; if(!d) return;
+  const rows=watchSheetLastRows;
   const genres=[...new Set(rows.flatMap(m=>m.genres||[]))].sort();
   watchSheetGenres[watchTab]=genres;
-  const watchedSel=watchWatchedSel[watchTab];
-  const badgeSel=watchBadgeSel[watchTab];
-  const pickedBy=watchPickedBySafe(watchTab);
-  const alsoShowSet=watchAlsoShow[watchTab];
-  // CAS-753: default is ON, so — unlike every set/off field above — it counts as a deviation when it's OFF.
-  const mineOnly=watchMineOnlyOn();
-  const activeCount=watchFiltersActiveCount();
-  const badge=$("watchFilterBadge");
-  if(badge){ badge.hidden=activeCount===0; badge.textContent=activeCount; }
-  const filterBtn=$("watchFilterBtn"); if(filterBtn) filterBtn.classList.toggle("on", activeCount>0);
-  const watchedHTML=REVIEW_STEPS.map(v=>{
-    const on=watchedSel.has(v.key);
-    return `<button type="button" class="chip${on?" on":""}" style="--wwc:${v.cd}" aria-pressed="${on}"
-      onclick="toggleWatchWatched('${v.key}')">${esc(v.lbl)}</button>`;
+  const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "Mood" : "New mood";
+  const sheet=$("watchSheet"); if(sheet) sheet.setAttribute("aria-label", d.editingId ? "Mood" : "New mood");
+  const agentsHTML=watchTopAgentsRanked().map(c=>{
+    const on=!d.agentsOff.has(c.id);
+    return `<button type="button" class="chip${on?" on":""}" data-agent="${escA(c.id)}" aria-pressed="${on}"
+      onclick="toggleMoodDraftAgent('${escA(c.id)}')">${esc(c.name)}</button>`;
   }).join("");
-  // CAS-1181: single-select, same chip markup as the other sheet rows — setWatchPickedBy(key) assigns
-  // outright rather than toggling, so this and the search-bar pill (PICKER_KINDS.pickedby) always agree.
+  const watchedHTML=REVIEW_STEPS.map(v=>{
+    const on=d.watched.has(v.key);
+    return `<button type="button" class="chip${on?" on":""}" style="--wwc:${v.cd}" aria-pressed="${on}"
+      onclick="toggleMoodDraftWatched('${v.key}')">${esc(v.lbl)}</button>`;
+  }).join("");
   const pickedByHTML=PICKED_BY_OPTS.map(o=>{
-    const on=o.key===pickedBy;
+    const on=o.key===d.pickedBy;
     return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
-      onclick="setWatchPickedBy('${o.key}')">${esc(o.label)}</button>`;
+      onclick="setMoodDraftPickedBy('${o.key}')">${esc(o.label)}</button>`;
   }).join("");
   const stylesHTML=genres.length ? genres.map(g=>{
-    const on=!genreOff.has(g);
+    const on=!d.stylesOff.has(g);
     return `<button type="button" class="chip gen${on?" on":""}" aria-pressed="${on}"
-      onclick="toggleWatchGenre('${escA(g)}')">${esc(g)}</button>`;
+      onclick="toggleMoodDraftGenre('${escA(g)}')">${esc(g)}</button>`;
   }).join("") : `<p class="unone">No styles in this tab yet.</p>`;
-  // CAS-823: a fixed four chips, not derived from `rows` (which is already narrowed to the tab's own
-  // standing plus whatever's already widened) — the counts instead come from watchAlsoShowPool(), the wider
-  // Watch-On-only pool, so a window not yet switched on still shows what switching it on would cost.
-  // Cinema has no Also-show section: its own standing test is untouched by this ticket (filmMatchesWatchTab).
   const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
+  const alsoShowSet = watchTab==="in_cinema" ? new Set() : new Set((d.alsoShow && d.alsoShow[watchTab]) || WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
   const alsoShowPool = watchTab==="in_cinema" ? [] : watchAlsoShowPool();
   const alsoShowHTML = watchTab==="in_cinema" ? "" : ALSO_SHOW_WINDOWS.map(w=>{
     const isOwn = w.key===ownStanding;
@@ -9992,27 +10045,15 @@ function renderWatchSheet(rows, shownCount){
     const count = alsoShowPool.filter(m=>primaryStatus(m)===w.key).length;
     return `<button type="button" class="chip alsochip${on?" on":""}" style="--wwc:${w.cd}"
       aria-pressed="${on}"${isOwn?" disabled aria-disabled=\"true\"":""}
-      ${isOwn?"":`onclick="toggleWatchAlsoShow('${w.key}')"`}>
+      ${isOwn?"":`onclick="toggleMoodDraftAlsoShow('${w.key}')"`}>
       <span class="gdot ${w.key}" aria-hidden="true"></span>${esc(w.label)}<span class="jn">${count}</span>${isOwn?`<span class="alwaystag">always</span>`:""}</button>`;
   }).join("");
-  // CAS-1223: moved in from the tools row's own two-way switch (Release date/Cascade score) — this is the
-  // full eight-option list, so every SORT_OPTS entry stays reachable even though the switch only ever shows
-  // two of them. Same chip pattern/pick() as Picked by; syncSortCtl (called by PICKER_KINDS.sort.pick)
-  // keeps the switch's own on-state honest whichever of the eight gets chosen here.
-  const sortByHTML=SORT_OPTS.map(o=>{
-    const on=o.key===filt.sort;
-    return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
-      onclick="PICKER_KINDS.sort.pick('${o.key}')">${esc(o.label)}</button>`;
-  }).join("");
-  // CAS-1234: counts come from `rows` — the same pre-Picked-by/Styles/Watched/Also-show pool Styles' own
-  // genre chips above are built from — so a badge nobody's picked yet still shows what picking it would
-  // cost (the "a toggled-off option stays offerable" rule CAS-718's comment names).
   const badgeHTML=BADGE_FILTER_OPTS.map(opt=>{
     const b=TENT_BADGE[opt.key];
-    const on=badgeSel.has(opt.key);
+    const on=d.badges.has(opt.key);
     const count=rows.filter(m=>scaleTier(m)===opt.key).length;
     return `<button type="button" class="badgeopt${on?" on":""}" aria-pressed="${on}"
-      onclick="toggleWatchBadge('${opt.key}')">
+      onclick="toggleMoodDraftBadge('${opt.key}')">
       <span class="badgeoptrow"><span class="badgeopticon" aria-hidden="true">${b.ico}</span>
       <b>${esc(b.label)}</b><span class="jn">${count}</span></span>
       <span class="badgeoptdesc">${esc(opt.descriptor())}</span></button>`;
@@ -10020,15 +10061,33 @@ function renderWatchSheet(rows, shownCount){
   const body=$("watchSheetBody");
   if(body) body.innerHTML=`
     <div class="wsheetsec">
-      <div class="wsheethd"><span>Availability</span></div>
-      <div class="switch wsheetswitch${mineOnly?" on":""}" id="watchMineOnlySwitch" role="switch"
-        aria-checked="${mineOnly}" onclick="toggleWatchMineOnly()">
-        <span>Show only available on my services</span><span class="knob"></span>
-      </div>
+      <div class="wsheethd"><span>Name</span></div>
+      <input id="moodName" class="mfinput" type="text" maxlength="18" placeholder="Friday night" autocomplete="off"
+        value="${escA(d.name)}" oninput="setMoodDraftName(this.value)">
     </div>
     <div class="wsheetsec">
-      <div class="wsheethd"><span>Sort by</span></div>
-      <div class="chips">${sortByHTML}</div>
+      <div class="wsheethd"><span>Agents</span></div>
+      <div class="chips">${agentsHTML}</div>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Order</span></div>
+      <div class="mfseg" role="group" aria-label="Order">
+        <button type="button" data-order="release" aria-pressed="${d.order==="release"}" class="${d.order==="release"?"on":""}"
+          onclick="setMoodDraftOrder('release')">Release date</button>
+        <button type="button" data-order="score" aria-pressed="${d.order==="score"}" class="${d.order==="score"?"on":""}"
+          onclick="setMoodDraftOrder('score')">Cascade score</button>
+        <button type="button" disabled>Match<small>coming</small></button>
+      </div>
+      <div class="mfrow"><span>Only the best 10 on each stage</span>
+        <button type="button" id="moodTop" class="mftog${d.top?" on":""}" role="switch" aria-checked="${d.top}"
+          aria-label="Only the best 10 on each stage" onclick="toggleMoodDraftTop()"><i></i></button></div>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Availability</span></div>
+      <div class="switch wsheetswitch${d.mineOnly?" on":""}" id="watchMineOnlySwitch" role="switch"
+        aria-checked="${d.mineOnly}" onclick="toggleMoodDraftMineOnly()">
+        <span>Show only available on my services</span><span class="knob"></span>
+      </div>
     </div>
     <div class="wsheetsec">
       <div class="wsheethd"><span>Picked by</span></div>
@@ -10041,8 +10100,8 @@ function renderWatchSheet(rows, shownCount){
     <div class="wsheetsec">
       <div class="wsheethd"><span>Styles</span>
         <span class="wsheetlinks">
-          <button type="button" class="linkbtn" onclick="selectAllWatchStyles()">Select all</button>
-          <button type="button" class="linkbtn" onclick="clearAllWatchStyles()">Clear all</button>
+          <button type="button" class="linkbtn" onclick="selectAllMoodDraftStyles()">Select all</button>
+          <button type="button" class="linkbtn" onclick="clearAllMoodDraftStyles()">Clear all</button>
         </span>
       </div>
       <div class="chips">${stylesHTML}</div>
@@ -10055,28 +10114,11 @@ function renderWatchSheet(rows, shownCount){
       <div class="wsheethd"><span>Badges</span></div>
       <div class="badgeopts">${badgeHTML}</div>
     </div>`;
-  const showBtn=$("watchSheetShowBtn");
-  if(showBtn) showBtn.textContent = shownCount ? `Show ${shownCount} film${shownCount===1?"":"s"}` : "No films match";
-  const chips=[];
-  if(!mineOnly) chips.push({label:"All services", clear:"enableWatchMineOnly()"});
-  if(pickedBy!=="all") chips.push({label:PICKED_BY_OPTS.find(o=>o.key===pickedBy).label,
-    clear:"clearWatchPickedBy()"});
-  if(watchedSel.size) chips.push({label:chipSummary(REVIEW_STEPS.filter(v=>watchedSel.has(v.key)).map(v=>v.lbl)),
-    clear:"clearAllWatchWatched()"});
-  if(genreOff.size) chips.push({label:chipSummary([...genreOff]), clear:"clearAllWatchStyles()"});
-  // CAS-1235: only a difference from the (no-longer-empty) default counts as an active filter here.
-  if(!watchAlsoShowIsDefault(watchTab)) chips.push({label:chipSummary(ALSO_SHOW_WINDOWS.filter(w=>alsoShowSet.has(w.key)).map(w=>w.label)),
-    clear:"clearWatchAlsoShow()"});
-  if(badgeSel.size) chips.push({label:chipSummary(BADGE_FILTER_OPTS.filter(o=>badgeSel.has(o.key)).map(o=>TENT_BADGE[o.key].label)),
-    clear:"clearAllWatchBadge()"});
-  // CAS-1223: a switched-off agent reads directly off its own lozenge in #watchTop now, so the active-filter
-  // row no longer duplicates it as a chip (section 4 of the ticket).
-  const bar=$("watchActiveFilters"); if(!bar) return;
-  if(!chips.length){ bar.hidden=true; bar.innerHTML=""; return; }
-  bar.hidden=false;
-  bar.innerHTML=chips.map(c=>`<button type="button" class="chip" onclick="${c.clear}">
-      ${esc(c.label)} <span aria-hidden="true">×</span></button>`).join("")
-    + `<button type="button" class="linkbtn clearall" onclick="clearAllWatchFilters()">Clear all</button>`;
+  const delBtn=$("moodDeleteBtn");
+  if(delBtn){
+    if(!d.editingId){ delBtn.textContent="Cancel"; delBtn.disabled=false; }
+    else { delBtn.textContent = moodDeleteArmed ? "Tap again to delete" : "Delete mood"; delBtn.disabled = watchMoods.length<=1; }
+  }
 }
 // CAS-863: scopeRows() (the pre-CAS-721 pool, gating on the retired watch-list model's own ymFeedMatches)
 // is gone — it had no callers left once the List Editor went with the rest of that model, and every live
@@ -10133,6 +10175,18 @@ function watchVisibleRows(){
   const mineOnly=watchMineOnlyOn();
   if(mineOnly) rows=rows.filter(m=>!HOME_KEYS.includes(primaryStatus(m)) || matchesServices(m, primaryStatus(m)));
   if(wsearch) rows=watchSearchRows(wsearch);
+  // C3: a mood with "only the best 10" keeps the ten highest cascadeScore(m) rows — a film with no score
+  // ranks below every scored film, ties go to the lower tmdb_id, and a film held open from a verdict just
+  // set is always kept regardless of rank. watchStageCountFor reads this same `rows`, so the list and the
+  // stage counts can never disagree.
+  if(currentMood().top){
+    const ranked=[...rows].sort((a,b)=>{
+      const diff=cascadeScore(b)-cascadeScore(a);
+      return diff!==0 ? diff : a.tmdb_id-b.tmdb_id;
+    });
+    const keep=new Set(ranked.slice(0,10).map(m=>m.tmdb_id));
+    rows=rows.filter(m=>keep.has(m.tmdb_id) || heldThisTab.has(m.tmdb_id));
+  }
   return {rows, preSheetRows, preMineOnlyRows, mineOnly};
 }
 // CAS-933: the one landing-tab decision, shared by boot and the end of onboarding. Cinema only when it
@@ -11599,12 +11653,6 @@ function restoreCascadeSearch(){
 }
 $("cascSearchInput").oninput=e=>setSearchTerm(e.target.value);
 $("cascSearchClose").onclick=()=>closeCascadeSearch();
-// CAS-718: the tab's own search box — separate from filt.search/#cascSearchInput above (still used by
-// Manage Agents' single-agent preview via openCascade()/restoreCascadeSearch()), so the two can never
-// compound on the live Watch screen.
-$("watchSearchInput").oninput=e=>setWatchSearch(e.target.value);
-$("watchSearchInput").onblur=closeWatchSearchIfEmpty;   // CAS-769: dismissing an empty box collapses it
-$("watchSearchClear").onclick=()=>clearWatchSearch();
 
 // ---- CAS-382/CAS-642: per-agent watch-priority tier memory (Manage Agents' single-agent preview) -----
 // CAS-863: its own control (the deck's funnel icon) went with the rest of the retired rail — the only
@@ -11740,7 +11788,7 @@ function watchMineOnlyDeadEndHTML(){
   return `<div class="empty">
     <div class="emoji">📺</div>
     <div class="eh">This scope is on and you haven't picked any services yet, so nothing qualifies.</div>
-    <div class="ep">Pick the ones you actually have, or turn off "Show only available on my services" in Filters.</div>
+    <div class="ep">Pick the ones you actually have, or turn off "Show only available on my services" in this mood.</div>
     <div class="ebtns">${pickServicesCTA()}</div>
   </div>`;
 }
@@ -11835,7 +11883,7 @@ function emptyResultsHTML(){
       return `<div class="empty">
         <div class="emoji">🔍</div>
         <div class="eh">No titles match the current selections</div>
-        <div class="ebtns"><button class="ebtn" onclick="clearAllWatchFilters()"><span>Clear filters</span>
+        <div class="ebtns"><button class="ebtn" onclick="openMoodSheetFor('${escA(watchMoodSel)}')"><span>Edit this mood</span>
           <b>→ ${n} film${n===1?"":"s"}</b></button></div>
       </div>`;
     }
@@ -19796,6 +19844,10 @@ function watchNavKey(){
     [...watchAlsoShow[watchTab]].sort(),
     watchMineOnlyOn(),
     watchOccasion,
+    // CAS-1247: the selected mood and its own "top 10" cut — every other mood field a mood switch changes
+    // (agents/pickedBy/watched/styles/badges/alsoShow/mineOnly/order) is already one of the fields above.
+    watchMoodSel,
+    currentMood().top,
   ]);
 }
 // CAS-1236: forces the NEXT render() to run a full rebuild regardless of watchNavKey() — for the handful
@@ -19869,7 +19921,6 @@ function render(){
   const shown=rows.filter(m=>!taggedOut(m));
   const stubbed=rows.length-shown.length;
   renderWatchTop();
-  renderWatchCtl();
   renderWatchSheet(preSheetRows, shown.length);
   renderCascadeBar(rows.length);
   syncSortCtl();   // CAS-321: keeps the sort pill's label/dot honest even when filt.sort changed elsewhere
@@ -20141,6 +20192,12 @@ function filmInWatchRows(m){
   if(watchBadgeSel[watchTab].size && !filmMatchesBadgeFilter(m)) return false;
   if(!filmMatchesWatchedFilter(m) && !watchHeldOpen[watchTab].has(m.tmdb_id)) return false;
   if(watchMineOnlyOn() && HOME_KEYS.includes(primaryStatus(m)) && !matchesServices(m, primaryStatus(m))) return false;
+  // CAS-1247: "top 10" is a cross-film cut, not a per-film predicate — a held-open film is always kept
+  // (matching watchVisibleRows() above), otherwise fall back to the real pipeline's own output rather than
+  // hand-duplicating a rank computation that could drift from it.
+  if(currentMood().top && !watchHeldOpen[watchTab].has(m.tmdb_id)){
+    return watchVisibleRows().rows.some(r=>r.tmdb_id===m.tmdb_id);
+  }
   return true;
 }
 function fastPatchFindRow(id){
@@ -20195,6 +20252,68 @@ function trimFoot(){
   footPad.style.height = need ? need+"px" : "";
 }
 addEventListener("scroll", trimFoot, {passive:true});
+// CAS-1247 C6: the Watch top bar (stage groups + moods) collapses to one slim row (#wtMini) once the list
+// has scrolled, and re-opens in place on a tap — without moving the list underneath it either way. This
+// listener only ever toggles classes, sets #cascbar's own compensating margin, and fills #wtMini; it never
+// calls render().
+let wtCollapseMarginPx = 0;
+let wtOpenAtScrollY = null;
+function wtRefreshMini(){
+  const mini=$("wtMini"); if(!mini) return;
+  const curKey = watchTab==="in_cinema" ? watchCinemaStage : watchTab;
+  const stop = watchStageStopsNow().find(s=>s.key===curKey);
+  const stageName = stop ? (stop.key==="in_cinema" ? "Now showing" : stop.label) : "";
+  mini.innerHTML = `<span class="gdot ${stop?stop.dot:""}" aria-hidden="true"></span><span>${esc(stageName)}</span>`
+    + `<span class="wtsep">·</span><span class="wtmood">${esc(currentMood().name)}</span><span class="wtchev">Change ▾</span>`;
+}
+function wtEnterCollapsed(bar){
+  const fullH=bar.offsetHeight;
+  bar.classList.add("wtcollapsed");
+  wtRefreshMini();
+  const shortH=bar.offsetHeight;
+  wtCollapseMarginPx = Math.max(0, fullH-shortH);
+  bar.style.marginBottom = wtCollapseMarginPx+"px";
+}
+function wtLeaveCollapsed(bar){
+  bar.classList.remove("wtcollapsed","wtopen");
+  bar.style.marginBottom = "";
+  wtOpenAtScrollY = null;
+}
+function onWatchTopScroll(){
+  const bar=$("cascbar"); if(!bar) return;
+  const y=window.scrollY;
+  const collapsed=bar.classList.contains("wtcollapsed");
+  if(y>30){
+    if(!collapsed) wtEnterCollapsed(bar);
+    else if(bar.classList.contains("wtopen") && wtOpenAtScrollY!=null && Math.abs(y-wtOpenAtScrollY)>40){
+      bar.classList.remove("wtopen");
+      bar.style.marginBottom = wtCollapseMarginPx+"px";
+      wtOpenAtScrollY = null;
+    }
+  } else if(collapsed){
+    wtLeaveCollapsed(bar);
+  }
+}
+addEventListener("scroll", onWatchTopScroll, {passive:true});
+window.toggleWatchTopMini = () => {
+  const bar=$("cascbar"); if(!bar || !bar.classList.contains("wtcollapsed")) return;
+  if(bar.classList.contains("wtopen")){
+    bar.classList.remove("wtopen");
+    bar.style.marginBottom = wtCollapseMarginPx+"px";
+    wtOpenAtScrollY = null;
+  } else {
+    bar.classList.add("wtopen");
+    bar.style.marginBottom = "";
+    wtOpenAtScrollY = window.scrollY;
+  }
+};
+{
+  const mini=$("wtMini");
+  if(mini){
+    mini.addEventListener("click", toggleWatchTopMini);
+    mini.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleWatchTopMini(); } });
+  }
+}
 // Repaint, and leave the film's row exactly where it was on screen — then animate it between the height it
 // had and the height it now has, so the change reads as a shrink (or an unfold) rather than a swap. Under
 // prefers-reduced-motion it lands at its new height instantly, still without moving.
@@ -22265,9 +22384,14 @@ function acctFetchKeepalive(init){
         activeIds = Array.isArray(v.activeMulti) ? v.activeMulti.filter(id=>typeof id==="string") : (activeId?[activeId]:[]);
         reconcileActiveIds();
       }
-      if(v.mineOnly && typeof v.mineOnly==="object"){
-        for(const k in watchMineOnly) if(typeof v.mineOnly[k]==="boolean") watchMineOnly[k]=v.mineOnly[k];
+      // CAS-1247: view.mineOnly is retired (C4) — mineOnly now rides inside whichever mood is adopted
+      // below. C2: view.moods/view.mood adopted together, falling back to the in-memory defaults when the
+      // account has saved none yet; applyMoodToState makes the adopted mood the live state, same as boot.
+      if(Array.isArray(v.moods) && v.moods.length){
+        watchMoods = v.moods.slice(0, 5).map(m=>({...moodDefaultFieldsNow(), ...m}));
       }
+      watchMoodSel = (typeof v.mood==="string" && watchMoods.some(m=>m.id===v.mood)) ? v.mood : watchMoods[0].id;
+      applyMoodToState(currentMood());
       if(typeof v.tutorialSeen==="boolean") tutorialSeenFlag = v.tutorialSeen;
       // CAS-1222: a bump queued before this load resolved is replayed ON TOP of the account's real count,
       // never trusting this session's bare local default — see bumpReviewPromptSessionCount's own comment.

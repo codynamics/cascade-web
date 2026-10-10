@@ -430,10 +430,9 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   // never picks any — leaving it on empties the Premium tab regardless of what's actually available there,
   // which is a different feature's default doing its job, not this test's own concern. Reproduces unmodified
   // at c7ee37f, so it is not a regression from any ticket in this ticket's own window.
-  await page.locator("#watchFilterBtn").click();
-  const mineOnlySwitch = page.locator("#watchMineOnlySwitch");
-  if(await mineOnlySwitch.getAttribute("aria-checked") === "true") await mineOnlySwitch.click();
-  await page.locator(".wsheetclose").click();
+  // CAS-1247: mineOnly is now a mood field, not a standalone Filters-sheet switch — flip it the same direct
+  // way disableMineOnlyOnCurrentTab() (below in this file) does, rather than through the mood sheet's UI.
+  await page.evaluate(() => { setWatchMineOnly(false); render(); });
   // CAS-897: the Premium tab's own real availability data decides which film lands in it — the .ctl.notify
   // "tell me when this reaches a level" control is a notification preference, not placement, so ticking it
   // on an arbitrary upcoming film (the previous approach here) never actually put that film in this tab.
@@ -1044,10 +1043,10 @@ test("Watch Cinema tab leads with Upcoming; the Streaming tab does not (CAS-750)
 // CAS-1180: setOpinion() clears every Watch On rung the moment a verdict is given, so a watched film's
 // filmNotifyState(id).key is always empty — filmMatchesWatchTab used to key off that same (now-empty)
 // value, so a verdict film could never again pass a non-Cinema tab's scope test, however its own Watched
-// chip was set. AC1 and AC3 check it is back, as the existing stub, in the sort's own place, once its chip
-// is on. AC4-6 check the search box (Part D) widens to every tab/window, ignores the other filters while it
-// holds text, and that clearing it restores exactly what was showing right before.
-test("CAS-1180: a watched film shows as a stub when its own chip is on, and search finds it across tabs (AC1, AC3-6)", async ({ page }) => {
+// chip was set. AC4-6 (the search box widening past tab/window and clearing restoring the prior rows)
+// tested Watch's own search box, which CAS-1247 removed from Watch entirely (Find is where search lives
+// now) — gone with it, per that ticket's own instruction, rather than left pointed at a dead control.
+test("CAS-1180: a watched film shows as a stub when its own chip is on (AC1, AC3)", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
@@ -1075,10 +1074,10 @@ test("CAS-1180: a watched film shows as a stub when its own chip is on, and sear
   await settleListing(page);
   await expect(page.locator(`#card-${filmId}`)).toHaveCount(0);
 
-  // Switch the Enjoyed chip on for this tab.
-  await page.locator("#watchFilterBtn").click();
-  await page.locator("#watchSheetBody .chip", { hasText: "Enjoyed" }).click();
-  await page.locator(".wsheetclose").click();
+  // Switch the Enjoyed chip on for this tab — CAS-1247: Watched is now a mood-sheet-draft field, not a
+  // standalone Filters-sheet chip; drive the live state directly, the same idiom this test already uses
+  // for watchGenreOff a few lines below, rather than opening/saving a mood over it.
+  await page.evaluate(() => { watchWatchedSel[watchTab].add("enjoyed"); render(); });
   await settleListing(page);
 
   // AC3: it renders as the existing stub, in the sort's own place.
@@ -1094,56 +1093,11 @@ test("CAS-1180: a watched film shows as a stub when its own chip is on, and sear
   expect(order.renderedIdx).toBeGreaterThanOrEqual(0);
   expect(order.renderedIdx).toBe(order.expectedIdx);
 
-  // Switch the chip back off (AC4 needs search, not the chip, to be what's finding the film) and pick a
-  // second film from a different tab whose style gets switched off here — proving search reaches past both.
-  await page.locator("#watchFilterBtn").click();
-  await page.locator("#watchSheetBody .chip", { hasText: "Enjoyed" }).click();
-  const setup = await page.evaluate((id) => {
-    const film = MOVIES.find(m => m.tmdb_id === id);
-    const donor = MOVIES.find(m => primaryStatus(m) === "rental" && cascades.some(c => listedBy(m, c)));
-    // Setting watchGenreOff directly, unlike the chip taps above, doesn't go through a UI handler that
-    // calls render() itself — without this, beforeSearchIds below gets captured from the stale render that
-    // predates the exclusion, so AC6's later (correctly-filtered) snapshot looks like it lost two films.
-    if(donor){ watchGenreOff[watchTab].add((donor.genres || [])[0] || "Action"); render(); }
-    return {
-      term: film.title.slice(0, Math.min(5, film.title.length)).toLowerCase(),
-      donorId: donor ? donor.tmdb_id : null,
-      donorTerm: donor ? donor.title.slice(0, Math.min(5, donor.title.length)).toLowerCase() : null,
-    };
-  }, filmId);
-  await page.locator(".wsheetclose").click();
+  // Switch the chip back off — same direct idiom as switching it on above — and confirm the film drops out
+  // of the list again, the mirror of AC1/AC3's "on" case.
+  await page.evaluate(() => { watchWatchedSel[watchTab].delete("enjoyed"); render(); });
   await settleListing(page);
   await expect(page.locator(`#card-${filmId}`)).toHaveCount(0);
-
-  const beforeSearchIds = await page.locator("#groups .card, #groups .stub").evaluateAll(els => els.map(el => el.id));
-
-  // CAS-1223: the search field is no longer in the tools row by default — tapping the search button swaps
-  // the row for it (openWatchSearch, unchanged underneath).
-  await page.locator("#watchTools #watchSearchBtn").click();
-  const input = page.locator("#watchSearchInput");
-  await expect(input).toHaveAttribute("placeholder", "Search all your films");
-
-  // AC4: typing part of its title finds the watched film, as a stub, with no Watched chip on.
-  await input.fill(setup.term);
-  await page.waitForTimeout(250);   // CAS-514's own 150ms debounce
-  await expect(page.locator(`#card-${filmId}`)).toBeVisible();
-  await expect(page.locator(`#card-${filmId}`)).toHaveClass(/stub/);
-
-  // AC5: search also finds a film belonging to a different tab, with a style switched off here.
-  if(setup.donorId){
-    await input.fill(setup.donorTerm);
-    await page.waitForTimeout(250);
-    await expect(page.locator(`#card-${setup.donorId}`)).toBeVisible();
-  }
-
-  // AC6: clearing the search box restores exactly the rows that were showing right before it.
-  // clearWatchSearch() renders immediately and then again off its own already-scheduled debounce, which
-  // restarts the listing's chunked card fill — a bare timeout can catch that mid-stream, so wait for the
-  // count to settle the same way every earlier step in this test already does.
-  await page.locator("#watchSearchClear").click();
-  await settleListing(page);
-  const afterIds = await page.locator("#groups .card, #groups .stub").evaluateAll(els => els.map(el => el.id));
-  expect(afterIds.sort()).toEqual(beforeSearchIds.sort());
 });
 
 test("CAS-740 AC4: a signed-in user whose account already holds agents is never left in the onboarding flow", async ({ page }) => {

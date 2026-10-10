@@ -333,6 +333,10 @@ test("cascade score: the Watch bar's own pick (#sort) reaches In Cinema via list
   const ac = { kind: "cinema" };
   const sortBefore = E.filt.sort;
   try{
+    // CAS-1247: sortPicked now starts true (a mood is applied at boot, and a mood always picks an order) —
+    // explicitly false it here first to recreate the "nothing picked" premise this half of the test is
+    // actually about, independent of whatever Watch's own boot-time mood currently sets it to.
+    E.setSortPicked(false);
     const byDefault = [...E.listingGroups(films, ac).flatMap(({ items }) => [...items]).map(m => m.title)];
     assert.deepEqual(byDefault, ["Moana", "Motor City", "Spider-Man: Brand New Day"],
       `with nothing picked, the list should still read oldest cinema date first — got ${byDefault.join(", ")}`);

@@ -98,12 +98,13 @@ test.describe("CAS-960 axe scan — zero serious/critical on the five named surf
 
 // CAS-960 AC: "every element with role=radio, role=switch or class chip that can be selected also carries
 // the matching aria-checked or aria-pressed, and the value changes when it is toggled" — a concrete
-// round-trip on two real controls from the Watch Filters sheet (a role=switch div and an aria-pressed
+// round-trip on two real controls from the Watch mood sheet (a role=switch div and an aria-pressed
 // chip button), not a blind DOM-wide click sweep (this app has disabled/decorative chips too — see
-// renderWatchSheet's alsoShowHTML "always" chip — that a generic sweep would misfire on).
+// renderMoodSheetBody's alsoShowHTML "always" chip — that a generic sweep would misfire on).
 test("switches and pressed chips announce and update their state (CAS-960 AC4)", async ({ page }) => {
   await reachListing(page);
-  await page.locator("#watchFilterBtn").click();
+  // CAS-1247: the Filters button/badge are gone — the selected mood's own chip opens the sheet now.
+  await page.locator(".moodchip.on").click();
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
   const sw = page.locator("#watchMineOnlySwitch");
