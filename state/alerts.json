@@ -20514,5 +20514,13 @@
     "lost_window": "upcoming",
     "label": "Upcoming",
     "detected": "2026-10-09"
+  },
+  {
+    "tmdb_id": 388399,
+    "title": "Patriots Day",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-10"
   }
 ]
