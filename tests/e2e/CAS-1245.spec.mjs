@@ -44,9 +44,10 @@ test("CAS-1245: collapsed Watch card — poster fills, no glow, outline only on 
     expect(certStyle.backgroundColor).toBe("rgba(0, 0, 0, 0)");
   }
 
-  // AC3: the Cascade score carries no outline — it's information, not a control.
+  // AC3: the Cascade score carries no outline — it's information, not a control. CAS-1253 put a second,
+  // hidden .qscore chip in the title (.tq) once Match took that spot, so pick whichever chip is visible.
   const qscoreBorderTopColor = await firstCard.evaluate(card => {
-    const q = card.querySelector(".qscore");
+    const q = [...card.querySelectorAll(".qscore")].find(el => getComputedStyle(el).display !== "none");
     return q ? getComputedStyle(q).borderTopColor : null;
   });
   if(qscoreBorderTopColor) expect(qscoreBorderTopColor).toBe("rgba(0, 0, 0, 0)");
