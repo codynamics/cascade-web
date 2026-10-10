@@ -3580,6 +3580,30 @@
     .stsegs{gap:2px}
     .stgroups .stagestop{padding:0 3px}
   }
+  /* ==== SERVICE ANALYSIS: THE FILMS BEHIND EACH NUMBER, AND LOG IN / SIGN UP LINKS (Lee, 2026-10-11) ====
+     An outline means you can tap it, the same rule as the Watch cards: the links and the list button are
+     outlined; the film names in a list are plain text. */
+  .svcrow.svcq{display:block;padding:0;overflow:hidden}
+  .svcq .svctap{display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px 8px;background:none;border:0;
+    color:inherit;font:inherit;text-align:left;cursor:pointer}
+  .svcq .svctap[disabled]{cursor:default}
+  .svcq .svcacts{display:flex;align-items:center;gap:6px;padding:0 12px 11px;flex-wrap:wrap}
+  .svcq .svclink,.svcq .svcsee{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:8px;
+    border:1px solid rgba(255,255,255,.32);background:rgba(255,255,255,.04);color:var(--ink);
+    font:600 11.5px/1 var(--font-body);text-decoration:none;cursor:pointer;white-space:nowrap}
+  .svcq .svclink i{font-style:normal;color:var(--faint);font-size:10px}
+  .svcq .svcsee{margin-left:auto}
+  .svcq .svcsee .chev{display:inline-block;transition:transform .15s;color:var(--faint);font-size:10px}
+  .svcq.open .svcsee{background:var(--sel-bg);border-color:var(--sel-bd)}
+  .svcq.open .svcsee .chev{transform:rotate(180deg)}
+  .svcq .svclist{display:none;border-top:1px solid var(--line);padding:10px 12px 12px;background:rgba(0,0,0,.18)}
+  .svcq.open .svclist{display:block}
+  .svcq .svclisthd{font:600 11.5px/1.45 var(--font-body);color:var(--dim);margin-bottom:7px}
+  .svcq .svclist ol{list-style:none;margin:0;padding:0;columns:1}
+  .svcq .svclist li{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid rgba(255,255,255,.05);
+    font:500 13px/1.3 var(--font-body);color:var(--ink)}
+  .svcq .svclist li:first-child{border-top:0}
+  .svcq .svclist li span{color:var(--faint);font-size:11.5px;flex:none}
 </style>
 </head>
 <body>
@@ -12465,6 +12489,40 @@ function svcAdviceFilms(){
 }
 // One entry per canonical service (svcCanon), never a raw provider string — "Netflix" and "Netflix Standard
 // with Ads" are the same row everywhere on this screen.
+const SVC_LINKS = {
+  "Netflix": {web:"https://www.netflix.com/au/", app:"https://apps.apple.com/au/app/id363590051"},
+  "Amazon Prime Video": {web:"https://www.primevideo.com/", app:"https://apps.apple.com/au/app/id545519333"},
+  "Disney Plus": {web:"https://www.disneyplus.com/en-au", app:"https://apps.apple.com/au/app/id1446075923"},
+  "Stan": {web:"https://www.stan.com.au", app:"https://apps.apple.com/au/app/id948095331"},
+  "HBO Max": {web:"https://www.hbomax.com/au/en", app:"https://apps.apple.com/au/app/id1666653815"},
+  "BINGE": {web:"https://binge.com.au/", app:"https://apps.apple.com/au/app/id1486598248"},
+  "Foxtel Now": {web:"https://www.foxtel.com.au/now", app:"https://apps.apple.com/au/app/id569457984"},
+  "Paramount Plus": {web:"https://www.paramountplus.com/", app:"https://apps.apple.com/au/app/id1340650234"},
+  "Apple TV": {web:"https://tv.apple.com/au", app:"https://apps.apple.com/au/app/id1174078549"},
+  "SBS On Demand": {web:"https://www.sbs.com.au/ondemand/", app:"https://apps.apple.com/au/app/id542090992"},
+  "ABC iview": {web:"https://iview.abc.net.au/", app:"https://apps.apple.com/au/app/id401778175"},
+  "7plus": {web:"https://7plus.com.au", app:"https://apps.apple.com/au/app/id1119404646"},
+  "9Now": {web:"https://www.9now.com.au/", app:"https://apps.apple.com/au/app/id542088539"},
+  "10": {web:"https://10.com.au/", app:"https://apps.apple.com/au/app/id409289742"},
+  "Tubi TV": {web:"https://tubitv.com/", app:"https://apps.apple.com/au/app/id886445756"},
+  "Plex": {web:"https://www.plex.tv/", app:"https://apps.apple.com/au/app/id383457673"},
+  "MUBI": {web:"https://mubi.com/", app:"https://apps.apple.com/au/app/id626148774"},
+  "DocPlay": {web:"https://www.docplay.com/", app:"https://apps.apple.com/au/app/id1154765738"},
+  "Shudder": {web:"https://www.shudder.com/", app:"https://apps.apple.com/au/app/id919790315"},
+  "BritBox": {web:"https://www.britbox.com", app:"https://apps.apple.com/au/app/id1206838907"},
+  "Crunchyroll": {web:"https://www.crunchyroll.com/", app:"https://apps.apple.com/au/app/id329913454"},
+  "AMC+": {web:"https://www.amcplus.com/countries/australia", app:"https://apps.apple.com/au/app/id1578728899"},
+  "Beamafilm": {web:"https://beamafilm.com/", app:"https://apps.apple.com/au/app/id1454610892"},
+  "Hoopla": {web:"https://www.hoopladigital.com.au/", app:"https://apps.apple.com/au/app/id580643740"},
+  "YouTube Premium": {web:"https://www.youtube.com/premium", app:"https://apps.apple.com/au/app/id544007664"},
+  "Hayu": {web:"https://www.hayu.com/", app:"https://apps.apple.com/au/app/id1052817340"},
+  "Kanopy": {web:"https://www.kanopy.com/", app:"https://apps.apple.com/au/app/id1205614510"},
+  "Zee5": {web:"https://www.zee5.com/", app:"https://apps.apple.com/au/app/id743691886"},
+};
+// CAS-1250: look a service up by canonical, folded name on both sides, so a billing-variant or spelling
+// quirk the feed sends still lands on the same link entry.
+const svcLinksByFold = new Map(Object.entries(SVC_LINKS).map(([k,v])=>[svcFold(svcCanon(k)), v]));
+const svcLinksFor = svc => svcLinksByFold.get(svcFold(svcCanon(svc)));
 // CAS-1124: this is a STREAMING service analysis — the headline population is filmSvc (films with at least
 // one sub/free offer), not the full svcAdviceFilms() population, which also carries films no streaming
 // service can ever cover (in cinemas, unreleased, rent/buy-only). Counting those in the total made the
@@ -12475,10 +12533,11 @@ function serviceAdvice(){
   const popTotal=pop.length;
 
   const filmSvc=new Map();   // tmdb_id -> Set(canon services that sub/free-cover it)
+  const filmById=new Map();  // tmdb_id -> film object (CAS-1250: the lists behind each count)
   pop.forEach(e=>{
     const offers=dedupOffers(e.m.offers||[]);
     const svcSet=new Set(offers.filter(o=>o.type==="sub"||o.type==="free").map(o=>svcCanon(o.service)));
-    if(svcSet.size) filmSvc.set(e.m.tmdb_id, svcSet);
+    if(svcSet.size){ filmSvc.set(e.m.tmdb_id, svcSet); filmById.set(e.m.tmdb_id, e.m); }
   });
   const total=filmSvc.size;
 
@@ -12506,19 +12565,23 @@ function serviceAdvice(){
     const e=svcTotals.get(svc);
     const films=e?e.films:new Set();
     let onlyHere=0;
+    const onlyHereFilms=[];
     films.forEach(id=>{
       const owned=[...filmSvc.get(id)].filter(s=>mySvcs.has(s));
-      if(owned.length===1) onlyHere++;   // no OTHER service the user has also carries this one
+      if(owned.length===1){ onlyHere++; onlyHereFilms.push(filmById.get(id)); }   // no OTHER service the user has also carries this one
     });
-    return {svc, total:films.size, human:e?e.human.size:0, onlyHere};
+    onlyHereFilms.sort((a,b)=>a.title.localeCompare(b.title));
+    return {svc, total:films.size, human:e?e.human.size:0, onlyHere, onlyHereFilms};
   });
 
   const worth=[...svcTotals.entries()]
     .filter(([svc])=>!mySvcs.has(svc))
     .map(([svc,e])=>{
       let marginal=0;
-      e.films.forEach(id=>{ if(![...filmSvc.get(id)].some(s=>mySvcs.has(s))) marginal++; });
-      return {svc, total:e.films.size, marginal};
+      const marginalFilms=[];
+      e.films.forEach(id=>{ if(![...filmSvc.get(id)].some(s=>mySvcs.has(s))){ marginal++; marginalFilms.push(filmById.get(id)); } });
+      marginalFilms.sort((a,b)=>a.title.localeCompare(b.title));
+      return {svc, total:e.films.size, marginal, marginalFilms};
     })
     // CAS-866: a service that adds nothing you don't already have isn't "worth adding" — omitted rather than
     // ranked last, so the section only ever names services actually worth a look.
@@ -12531,6 +12594,19 @@ function serviceAdvice(){
 }
 let svcRankBy="most";   // "most" | "least" — resets to the default every time the screen opens (AC3)
 window.svcSetRank=mode=>{ if(svcRankBy===mode) return; svcRankBy=mode; renderSvcAnalysis(); };
+// CAS-1250: which services' film lists are open, by canonical svc name — a module-level Set rather than
+// per-row state so several can be open at once and survive a re-render (rank switch, another toggle).
+// openSvcAnalysis() clears it; nothing else does, so it also survives a Most films / Least impact switch.
+const svcListOpen = new Set();
+window.svcToggleList=svc=>{
+  const el=$("svcAnalysis"), top = el ? el.scrollTop : 0;
+  const open = !svcListOpen.has(svc);
+  if(open) svcListOpen.add(svc); else svcListOpen.delete(svc);
+  renderSvcAnalysis();
+  if(el) el.scrollTop = top;   // re-rendering must not move the page
+  logEvent("svc_list_toggled", {svc, open});
+};
+window.svcLinkOpened=(svc, kind)=>{ logEvent("svc_link_opened", {svc, kind}); };   // link still opens normally
 // Row markup is IDENTICAL between the two sort modes — only which figure sits in the big right-hand slot
 // changes (AC3: "without adding, removing or changing any figure other than the headline one"). Both the
 // total and the "only here" count are always stated in the row body regardless of which is the headline.
@@ -12539,22 +12615,68 @@ function svcRowHTML(e, mode){
     ? `<span class="svcnum${e.onlyHere===0?" zero":""}">${e.onlyHere}</span><span class="svcnumlbl">you'd lose</span>`
     : `<span class="svcnum">${e.total}</span><span class="svcnumlbl">films</span>`;
   const only = e.onlyHere===0 ? "none only here" : `${e.onlyHere} only here`;
-  return `<div class="svcrow">
-    <div class="svcmain">
-      <span class="svcname">${esc(svcName(e.svc))}</span>
-      <div class="svcwhy">${e.total} film${e.total===1?"":"s"} — <b>${e.human} you chose</b> · ${only}</div>
-      ${e.onlyHere===0?'<span class="svcfree">free to drop</span>':""}
+  const name=svcName(e.svc), links=svcLinksFor(e.svc), open=svcListOpen.has(e.svc), n=e.onlyHere;
+  const loginLink = links&&links.web
+    ? `<a class="svclink" href="${safeUrl(links.web)}" target="_blank" rel="noopener" onclick="svcLinkOpened('${escA(e.svc)}','login')">Log in <i>↗</i></a>` : "";
+  if(n===0){
+    return `<div class="svcrow svcq">
+      <button type="button" class="svctap" disabled>
+        <div class="svcmain">
+          <span class="svcname">${esc(name)}</span>
+          <div class="svcwhy">${e.total} film${e.total===1?"":"s"} — <b>${e.human} you chose</b> · ${only}</div>
+          <span class="svcfree">free to drop</span>
+        </div>
+        <div class="svcheadline">${headline}</div>
+      </button>
+      ${loginLink?`<div class="svcacts">${loginLink}</div>`:""}
+    </div>`;
+  }
+  const heading = n===1
+    ? `Drop ${esc(name)} and you lose this one. No other service you have carries it.`
+    : `Drop ${esc(name)} and you lose these ${n}. No other service you have carries them.`;
+  return `<div class="svcrow svcq${open?" open":""}">
+    <button type="button" class="svctap" onclick="svcToggleList('${escA(e.svc)}')">
+      <div class="svcmain">
+        <span class="svcname">${esc(name)}</span>
+        <div class="svcwhy">${e.total} film${e.total===1?"":"s"} — <b>${e.human} you chose</b> · ${only}</div>
+      </div>
+      <div class="svcheadline">${headline}</div>
+    </button>
+    <div class="svcacts">
+      ${loginLink}
+      <button type="button" class="svcsee" aria-expanded="${open}" onclick="svcToggleList('${escA(e.svc)}')">${n} you'd lose <span class="chev">▾</span></button>
     </div>
-    <div class="svcheadline">${headline}</div>
+    ${open?`<div class="svclist">
+      <div class="svclisthd">${heading}</div>
+      <ol>${e.onlyHereFilms.map(m=>`<li>${esc(m.title)}<span>${esc(String(m.year||""))}</span></li>`).join("")}</ol>
+    </div>`:""}
   </div>`;
 }
 function svcWorthRowHTML(e){
-  return `<div class="svcrow">
-    <div class="svcmain">
-      <span class="svcname">${esc(svcName(e.svc))}</span>
-      <div class="svcwhy">${e.total} film${e.total===1?"":"s"} — ${e.marginal} you can't get anywhere you subscribe</div>
+  const name=svcName(e.svc), links=svcLinksFor(e.svc), open=svcListOpen.has(e.svc), n=e.marginal;
+  const heading = n===1
+    ? `Add ${esc(name)} and you gain this one. Nothing you have now carries it.`
+    : `Add ${esc(name)} and you gain these ${n}. Nothing you have now carries them.`;
+  const signUpLink = links&&links.web
+    ? `<a class="svclink" href="${safeUrl(links.web)}" target="_blank" rel="noopener" onclick="svcLinkOpened('${escA(e.svc)}','signup')">Sign up <i>↗</i></a>` : "";
+  const appStoreLink = links&&links.app
+    ? `<a class="svclink" href="${safeUrl(links.app)}" target="_blank" rel="noopener" onclick="svcLinkOpened('${escA(e.svc)}','appstore')">App Store <i>↗</i></a>` : "";
+  return `<div class="svcrow svcq${open?" open":""}">
+    <button type="button" class="svctap" onclick="svcToggleList('${escA(e.svc)}')">
+      <div class="svcmain">
+        <span class="svcname">${esc(name)}</span>
+        <div class="svcwhy">${e.total} film${e.total===1?"":"s"} — ${e.marginal} you can't get anywhere you subscribe</div>
+      </div>
+      <div class="svcheadline"><span class="svcnum plus">+${e.marginal}</span><span class="svcnumlbl">new to you</span></div>
+    </button>
+    <div class="svcacts">
+      ${signUpLink}${appStoreLink}
+      <button type="button" class="svcsee" aria-expanded="${open}" onclick="svcToggleList('${escA(e.svc)}')">${n} you'd gain <span class="chev">▾</span></button>
     </div>
-    <div class="svcheadline"><span class="svcnum plus">+${e.marginal}</span><span class="svcnumlbl">new to you</span></div>
+    ${open?`<div class="svclist">
+      <div class="svclisthd">${heading}</div>
+      <ol>${e.marginalFilms.map(m=>`<li>${esc(m.title)}<span>${esc(String(m.year||""))}</span></li>`).join("")}</ol>
+    </div>`:""}
   </div>`;
 }
 function renderSvcAnalysis(){
@@ -12616,6 +12738,7 @@ function renderSvcAnalysis(){
 }
 window.openSvcAnalysis=()=>{
   svcRankBy="most";
+  svcListOpen.clear();   // the screen always opens with every list closed
   renderSvcAnalysis();
   $("svcAnalysis").scrollTop=0;
   $("svcAnalysis").classList.add("open"); lockBodyScroll(true);
