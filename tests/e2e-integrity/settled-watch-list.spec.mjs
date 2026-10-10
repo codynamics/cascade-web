@@ -109,8 +109,12 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
   await waitForAccountLoads(page);
 
   // CAS-1247: the default mood (Top scores) now caps each stage at its best 10 — too short for this
-  // test's "at least 20" premise regardless of roster size. Releases carries no such cap.
-  await page.evaluate(() => { setWatchTab("stream"); window.setWatchMood("releases"); render(); });
+  // test's "at least 20" premise regardless of roster size. Releases carries no such cap. setWatchTab and
+  // setWatchMood each already call render() internally — a trailing explicit render() here bumps renderGen
+  // a second time in the same tick, before fillListChunked's requestAnimationFrame-deferred remainder
+  // (anything past its first 36-item batch) ever gets to run, so that remainder's gen!==renderGen guard
+  // (CAS-129) abandons it outright. No extra render() call needed or safe to add.
+  await page.evaluate(() => { setWatchTab("stream"); window.setWatchMood("releases"); });
   await settleListing(page);
 
   const before = await page.evaluate(() => ({
@@ -160,7 +164,8 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
     "the new film must not appear until the next navigation").toBe(false);
 
   // Switching stage away and back is a real navigation — the new film must now be listed and counted.
-  await page.evaluate(() => { setWatchTab("in_cinema"); render(); setWatchTab("stream"); render(); });
+  // setWatchTab already renders internally (see the setWatchMood comment above) — no trailing render() here.
+  await page.evaluate(() => { setWatchTab("in_cinema"); setWatchTab("stream"); });
   await settleListing(page);
 
   expect(await page.evaluate((id) => !!document.getElementById(`card-${id}`), newFilmId),
