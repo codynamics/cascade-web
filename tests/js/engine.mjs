@@ -125,7 +125,6 @@ if(typeof window.CascadeAuth === "undefined"){
 }
 ;globalThis.__ENGINE__ = {
   MOVIES, CASCADE, STATUS_LABEL, SHOWABLE_N,
-  get __lupCalls(){ return globalThis.__lupCalls || []; },
   // CAS-1241 Part A: acctFetchKeepalive is the pure cap check the account-sync client's fetch wrapper (the
   // auth module, a separate <script type="module"> this harness doesn't load) calls by name off window —
   // exported directly here since it's a plain top-level function in the classic script, not window-only.

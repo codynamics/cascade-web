@@ -5432,11 +5432,16 @@ let activeIds = [];
 // safety net that runs after every cascades reload) and must never push: two devices each reconciling
 // around a load in flight must never race each other to overwrite the account's real selection with a
 // transient local fallback.
-function setActive(id){
+// CAS-1243: push defaults true for every real tap, but afterSignIn()'s own "arrival lands on the first
+// agent" call is a boot/load outcome, not something the person did — it passes push:false so neither this
+// nor openCascade's own forwarded call writes anything.
+function setActive(id, push=true){
   activeId=id||firstAgentId();
   activeIds = activeId ? [activeId] : [];
-  pushViewField("active", activeId);
-  pushViewField("activeMulti", [...activeIds]);
+  if(push){
+    pushViewField("active", activeId);
+    pushViewField("activeMulti", [...activeIds]);
+  }
 }
 const activeCascade = () => cascades.find(c=>c.id===activeId) || null;
 // CAS-566/R2/R7: land on the stored agent(s) if they still exist; otherwise every agent, once there are
@@ -11414,14 +11419,14 @@ function applyCascade(c){
 }
 // Opening is idempotent: landing a card in the deck's centre IS selecting it, so this can be called
 // with the already-open Cascade. Closing is the centre card's × — never a side-effect of selection.
-window.openCascade=id=>{
+window.openCascade=(id, push=true)=>{
   // CAS-134: moving to another cascade is leaving this one's list, so its held stubs settle now — a film you
   // answered under one agent must not turn up as a stub on another agent's New list.
   // CAS-634: "already open" now also has to mean nothing ELSE is selected — an id matching activeId can
   // still be riding alongside other agents in activeIds, and this is the single-select entry point (Manage
   // Agents, sign-in landing), so it always has to collapse back down to just this one.
   const c=cascades.find(x=>x.id===id); if(!c || (activeId===id && activeIds.length===1)) return;
-  setActive(id); settleFoundView(); settleWatchHeldOpen(); applyCascade(c); restoreCascadeSearch();
+  setActive(id, push); settleFoundView(); settleWatchHeldOpen(); applyCascade(c); restoreCascadeSearch();
   $("groups").classList.add("listloading");     // CAS-421: held blurred till the new agent's list is ready
   closeFilterPanel(); restoreCascadeWatchTiers(); render();
   logEvent("cascade_opened", {key:c.template||"custom"});
@@ -19747,7 +19752,6 @@ function reconcilePatchSettledList(){
     row.replaceWith(fresh);
   });
   updatePrefSwitch(); updatePrefBtn(); updateUxSwitch();
-  markFoundSeen();
 }
 function render(){
   renderCallCount++;
@@ -19821,7 +19825,6 @@ function render(){
       : emptyResultsHTML();
     renderJumpBar();          // CAS-275: no sections, so no jump rail — and no stale one left behind
     syncHeaderHeight();       // CAS-761: the empty states above can still change #cascbar's height
-    markFoundSeen();
     listReady();
     return;
   }
@@ -19883,8 +19886,6 @@ function render(){
   // the user was actually looking at kept its previous HTML — a new agent only appeared after a reload.
   // render() already runs on every one of those paths, so re-render the layer here if it is open.
   if($("agentsScreen")?.classList.contains("open")) renderAgentsScreen();
-  // You are looking at it — so the next visit's "since you last looked" counts from here.
-  markFoundSeen();
 }
 // ---- CAS-275: jump to a section --------------------------------------------------------------------
 // The listing is sectioned by availability window and can run to the whole catalogue, so "take me to the
@@ -20193,9 +20194,14 @@ let reviewPromptAskedVer = null;
 // straight off this session's bare local default (0+1) would stomp every other session's count the
 // moment it lands, the exact "never write before this device's own load has resolved" hazard CAS-1218
 // exists to prevent elsewhere. Queued instead: loadUserPrefs (the account-sync IIFE, below) applies this
-// session's +1 ON TOP of whatever the account answers with, the first time it resolves this boot, and
-// pushes that — never a bare local count.
+// session's +1 ON TOP of whatever the account answers with, the first time it resolves this boot — never
+// a bare local count.
 let reviewSessionBumpPending = false;
+// CAS-1243: loadUserPrefs computes the replayed count (above) but must not push it itself — a load never
+// writes (CAS-1218). This flag marks "this device holds a replayed count the account hasn't seen yet";
+// flushReviewSessionsIfPending() is the one place that ever clears it and sends the write, fired only once
+// the page is actually hidden, never from the load/boot path itself.
+let reviewSessionsPushPending = false;
 // One count per page load (called alongside app_open, below) — "a few sessions" means a few separate
 // visits, not a few actions within one.
 function bumpReviewPromptSessionCount(){
@@ -20204,6 +20210,18 @@ function bumpReviewPromptSessionCount(){
   return reviewPromptSessionsCount;
 }
 function reviewPromptSessionCount(){ return reviewPromptSessionsCount; }
+// CAS-1243 (F2b): the account write reviewSessionBumpPending's replay used to make from inside
+// loadUserPrefs() itself — a load/boot path, which must never write (CAS-1218). Fired instead from the
+// page-hidden path (real visitors) or directly by a test (the read-only seam this ticket asks for) —
+// either way, at most one push per page load: the guard flag is cleared the instant it fires.
+function flushReviewSessionsIfPending(){
+  if(!reviewSessionsPushPending) return;
+  reviewSessionsPushPending = false;
+  pushViewField("reviewSessions", reviewPromptSessionsCount);
+}
+// Real visitors: document.hidden true is the one signal that fires reliably before the tab actually goes
+// away, so this is where the deferred write actually leaves the device.
+document.addEventListener("visibilitychange", () => { if(document.hidden) flushReviewSessionsIfPending(); });
 function reviewPromptAskedVersion(){ return reviewPromptAskedVer; }
 function markReviewPromptAsked(ver){
   reviewPromptAskedVer = String(ver);
@@ -20430,8 +20448,11 @@ function afterSignIn(){
     // unfiltered despite activeId being correct. openCascade()'s own "already active, do nothing" guard
     // would hit that exact case, so clear activeId first to force it through setActive + applyCascade +
     // the switcher highlight + the repaint.
+    // CAS-1243: this is arrival at a load's own outcome, not a tap — push:false so landing on the first
+    // agent (on every sign-in/boot, including an already-fully-populated account) never writes active/
+    // activeMulti; see setActive's own comment.
     activeId=null;
-    openCascade(cascades[0].id);
+    openCascade(cascades[0].id, false);
     logEvent("signin_returning",{cascades:cascades.length});
     applyDeepLink();   // CAS-962: arrival, same as the boot path's "onboarding already seen" branch
     applyPendingPushAlert();   // CAS-1206: same arrival moment, for a held push tap
@@ -20447,58 +20468,10 @@ function afterSignIn(){
   flowStart();
 }
 
-// ---- Re-engagement: what Cascade found while you weren't looking (CAS-69) ------------------------------
-// "Cascade found 3 for you since you last looked" has to be TRUE, so it is measured, not asserted: we store
-// the Found list as it stood the last time you looked at it (a boot, or opening the Found list), and the line
-// only fires on ids that weren't in it. First run seeds the snapshot and says nothing — there is no "last
-// time" to compare against, and greeting a new user with news would be the fabrication this guardrail is for.
-// Deliberately NOT "while you were away": a Cascade you created five minutes ago also finds films, and you
-// weren't away. "Since you last looked" is the claim the data can actually support.
-// CAS-1222: in-memory only now — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
-// ever adopts a real answer, straight off the account's own user_prefs.view.seenFound field; starts null
-// ("no answer yet") rather than reading a device snapshot, same as every other migrated field.
-let seenFound = null;
-// CAS-1222: markFoundSeen() runs on every render() (CAS-70 freshness: the screen painting IS the "looking
-// at it" moment) — a render is exactly "a load/render/recompute/poll" CAS-1218 says must never write, so
-// unlike a real tap this needed its own diff guard, the same shape trackFirstFound/trackAdmitDrift already
-// use, rather than pushing the account every single repaint. seenFoundSig tracks the signature of what was
-// last PUSHED (or silently adopted — see loadUserPrefs' own seenFound branch), never written before this
-// device's own user_prefs load has resolved, same "never stomp before the account has had its say" hazard
-// admitDrift/reviewSessions guard against elsewhere.
-let seenFoundSig = null;
-// CAS-1241 (B5): loadUserPrefs' own first-run branch below anchors seenFoundSig to `found` AS IT STANDS AT
-// LOAD TIME — before fireAccountFanout's explicit recomputeFound() call (CAS-1241 B4) has run the account's
-// first real admission sweep. A brand-new account's draft agents admit their first matches in THAT sweep, so
-// anchoring before it leaves seenFoundSig stale the instant the sweep finishes, and the very next render()'s
-// markFoundSeen() reads every one of those first-sweep admissions as genuine "news" and pushes — exactly the
-// fabricated-greeting case this silent seed exists to prevent. Set true by that branch, cleared by
-// fireAccountFanout once it re-anchors AFTER its own recomputeFound() call, right before the render() that
-// would otherwise see the diff and push.
-let seenFoundNeedsReanchor = false;
-function markFoundSeen(){
-  seenFound = new Set(found);
-  const sig = JSON.stringify([...seenFound].sort((a,b)=>a-b));
-  if(sig === seenFoundSig) return;
-  seenFoundSig = sig;
-  if(window.CascadePersistence && window.CascadePersistence.userPrefsReady){
-    pushViewFieldDebounced("seenFound", [...seenFound]);
-  }
-}
-
 // Boot: a Cascade left open on the last visit reopens with its filters applied.
 const booted=activeCascade();
 if(booted){ applyCascade(booted); }
 render();
-// CAS-287 removed the "found N since you last looked" banner, so nothing reads this comparison at boot any
-// more — seeding the snapshot is kept purely because a never-seeded account must not read every film in
-// the catalogue as new the moment it DOES get a reader again. A guest device (no account will ever answer)
-// seeds immediately, same as before this ticket; a signed-in device's own first-ever seed happens inside
-// loadUserPrefs, just below, so a real device migrating onto this build doesn't re-seed over whatever the
-// account already remembers. accountActive() itself isn't callable yet this early in boot (CAS-517's same
-// problem — see cascadesReady/movingReady above) so this reads the same synchronous device flag they do.
-let hadAccountAtLastBoot=false;
-try{ hadAccountAtLastBoot = localStorage.getItem("cascade_had_account")==="1"; }catch(e){}
-if(!hadAccountAtLastBoot && !seenFound) markFoundSeen();
 // A shared link takes precedence over first-run onboarding — they arrived to look at a specific radar.
 const openedShared = openSharedFromURL();
 // CAS-940: one app_open per page load, ahead of the onboarding routing decision below — plat/ver/ret/onb/acq
@@ -20594,7 +20567,7 @@ else if(dedupedN)
 
 // CAS-1241 Part A: whether an account-sync request may carry keepalive:true. The Fetch standard rejects a
 // keepalive request once its body, plus whatever else is in flight, exceeds a 64 KiB cap — CAS-1222's
-// merge_user_prefs_view can carry tens of KB for an account with a broad agent (admitDrift/seenFound), well
+// merge_user_prefs_view can carry tens of KB for an account with a broad agent (admitDrift), well
 // past that cap on its own, and a rejected keepalive request reads to supabase-js as status 0, jamming the
 // whole queue behind it (isTransient(0) retries forever, sendQueue() never moves past it). A large write
 // doesn't need keepalive anyway: the acctOp queue itself is persisted and re-sent on the next boot, so a
@@ -21135,20 +21108,11 @@ function acctFetchKeepalive(init){
     // (CAS-1236) is still false until agentFilmsReady flips below, and render() returns before ever
     // calling recomputeFound() while that's the case (every render() call this whole fan-out has made so
     // far, from each load's own .finally(), hit the same gate and returned early). Without a direct call,
-    // every admission this derivation surfaces — and the seenFound/admitDrift bookkeeping recomputeFound
+    // every admission this derivation surfaces — and the admitDrift bookkeeping recomputeFound
     // drives — is discovered only on the NEXT render() below, the one just AFTER agentFilmsReady flips
     // true: the flush just below finds nothing queued yet, agentFilmsReady flips, and only then does this
     // device's real admission sweep start sending — exactly the AC4/AC5 write-after-settled leak.
     recomputeFound();
-    // CAS-1241 (B5): loadUserPrefs' first-run branch anchored seenFoundSig to `found` as it stood BEFORE
-    // the recompute just above ran this account's first real admission sweep — re-anchor now, after it,
-    // so the render() just below reads no diff and markFoundSeen() stays silent on a brand-new account's
-    // own genuine first finds, same as it already does for a returning account's saved snapshot.
-    if(seenFoundNeedsReanchor){
-      seenFoundNeedsReanchor = false;
-      seenFound = new Set(found);
-      seenFoundSig = JSON.stringify([...seenFound].sort((a,b)=>a-b));
-    }
     if(typeof render==="function") render();
     // CAS-1224: the real agent_films flush, moved here from loadAgentFilms' own .finally() above — this
     // recompute just ran against cascades/watchPrefs that applyWatchPrefsToCascades() only just finished
@@ -21223,9 +21187,8 @@ function acctFetchKeepalive(init){
     // is reset directly, same reasoning as taste/watchPrefs/notifyPrefs just above.
     activeId=null; activeIds=[];
     for(const k in watchMineOnly) watchMineOnly[k]=true;
-    seenFound=null;
     tutorialSeenFlag=false;
-    reviewPromptSessionsCount=0; reviewSessionBumpPending=false; reviewPromptAskedVer=null;
+    reviewPromptSessionsCount=0; reviewSessionBumpPending=false; reviewSessionsPushPending=false; reviewPromptAskedVer=null;
     Object.assign(agentState, loadAgentState());
     Object.keys(admitDrift).forEach(k=>delete admitDrift[k]); admitDriftSaved=null;
     // CAS-656: nothing left to be disconnected from — clear any failure this device carried from its last
@@ -22229,32 +22192,15 @@ function acctFetchKeepalive(init){
       if(v.mineOnly && typeof v.mineOnly==="object"){
         for(const k in watchMineOnly) if(typeof v.mineOnly[k]==="boolean") watchMineOnly[k]=v.mineOnly[k];
       }
-      if(Array.isArray(v.seenFound)){
-        seenFound = new Set(v.seenFound);
-        seenFoundSig = JSON.stringify([...seenFound].sort((a,b)=>a-b));
-      } else {
-        // CAS-1222: no device has EVER saved this account's snapshot — same first-run seed rule boot used
-        // before this field moved onto the account (see the "Boot:" block's own comment, above). Seeds
-        // straight from markFoundSeen()'s own signature logic, but never through markFoundSeen() itself —
-        // that would push, and a load (this is one) must never write (CAS-1218); the guest-boot pre-seed
-        // above ran before any account was known, so its signature is not this account's real baseline and
-        // must not suppress the genuine first push once real content loads (hence no `!seenFound` guard —
-        // this branch always re-anchors the signature to THIS account's load, not to whichever device booted).
-        seenFound = new Set(found);
-        seenFoundSig = JSON.stringify([...seenFound].sort((a,b)=>a-b));
-        // CAS-1241 (B5): `found` here is whatever this session already had BEFORE this fan-out's own
-        // admission sweep — fireAccountFanout re-anchors again once that sweep (recomputeFound()) has
-        // actually run, so this account's genuine first finds aren't read as "news" either.
-        seenFoundNeedsReanchor = true;
-      }
       if(typeof v.tutorialSeen==="boolean") tutorialSeenFlag = v.tutorialSeen;
       // CAS-1222: a bump queued before this load resolved is replayed ON TOP of the account's real count,
       // never trusting this session's bare local default — see bumpReviewPromptSessionCount's own comment.
-      (globalThis.__lupCalls=(globalThis.__lupCalls||[])).push(reviewSessionBumpPending);
+      // CAS-1243 (F2b): computed here, but the write itself is deferred to flushReviewSessionsIfPending()
+      // (page-hidden) — a load must never write (CAS-1218).
       if(reviewSessionBumpPending){
         reviewSessionBumpPending = false;
         reviewPromptSessionsCount = (typeof v.reviewSessions==="number" ? v.reviewSessions : 0) + 1;
-        pushViewField("reviewSessions", reviewPromptSessionsCount);
+        reviewSessionsPushPending = true;
       } else if(typeof v.reviewSessions==="number"){
         reviewPromptSessionsCount = v.reviewSessions;
       }
@@ -22270,7 +22216,7 @@ function acctFetchKeepalive(init){
       // that still update the signature without pushing. Left unsynced here, the very next trackAdmitDrift()
       // call (render() just below re-runs it) would compare the just-adopted value against that stale
       // pre-load signature and push a spurious "reconcile" the moment this load resolves, even with no
-      // genuine edit — the same hazard seenFound's own silent-reseed (above) exists to avoid.
+      // genuine edit.
       if(v.admitDrift && typeof v.admitDrift==="object"){
         Object.keys(admitDrift).forEach(k=>delete admitDrift[k]);
         Object.assign(admitDrift, v.admitDrift);
@@ -22381,6 +22327,11 @@ function acctFetchKeepalive(init){
                                 pushViewField, pushViewFieldDebounced, flushViewPatch,
                                 get VIEW_DEBOUNCE_MS(){ return VIEW_DEBOUNCE_MS; },
                                 set VIEW_DEBOUNCE_MS(v){ VIEW_DEBOUNCE_MS=v; },
+                                // CAS-1243 (F2b/AC3): the review-session count's own write is deferred to the
+                                // page-hidden moment (real visitors) rather than loadUserPrefs — this is the
+                                // read-only seam a test fires directly instead of a real visibilitychange
+                                // event, the same convention flushViewPatch above gives the view-field debounce.
+                                flushReviewSessionsIfPending,
                                 // CAS-740: read/write, same shape as filmWatchReady/agentFilmsReady above —
                                 // so a test can drive user_prefs' own "the account hasn't answered yet" gate
                                 // directly, the same way fireAccountFanout drives it for real.

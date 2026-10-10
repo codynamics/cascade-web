@@ -66,6 +66,11 @@ test("AC2: a reconcile that changes nothing on the server calls render() zero ti
   // itself — only reconcileOnReturn ever calls reconcileCascadesOnReturn), so the SECOND call below is the
   // one actually measuring "nothing changed".
   await page.evaluate(() => window.CascadePersistence.reconcileOnReturn());
+  // CAS-1243 (F3): this warm-up reconcile's own first-ever pollCatalogue() fetch (this device holds no
+  // catalogue hash yet) can still be in flight when the counter below resets — its landing render() then
+  // falls inside the measured pass, reading as a false positive. Wait for that poll to actually settle
+  // first; render()/pollCatalogue() themselves are unchanged.
+  await page.waitForFunction(() => typeof catalogueHash === "string" && catalogueHash.length > 0, { timeout: 30_000 });
   await page.waitForTimeout(500);
 
   const firstCardId = await page.evaluate(() => document.querySelector("#groups [id^='card-']")?.id);
@@ -119,15 +124,19 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
     return document.getElementById(`card-${id}`).getBoundingClientRect().top;
   }, card20Id);
 
-  const newFilmId = await page.evaluate((cascadeId) => {
-    const donor = MOVIES.find(m => m.tmdb_id > 0);
+  const newFilmId = await page.evaluate(({ cascadeId, donorId }) => {
+    // CAS-1243 (F4): the clone must itself match Streaming's own scope (mine-only, Netflix-only per this
+    // test's seeded services) — cloning an arbitrary catalogue title can land on one whose offers never
+    // include stream at all, which fails matchesServices() regardless of the Watch On override set below.
+    // Cloning a film the list is already showing guarantees it does.
+    const donor = MOVIES.find(m => m.tmdb_id === donorId);
     const id = -1236100001;
     MOVIES.push({ ...donor, tmdb_id: id, status: ["included_streaming"], cinema_date: null });
     notify[id] = { source: "auto", cascadeIds: [cascadeId], pinnedTo: [cascadeId], notIn: [],
       wins: { in_cinema: false, premium: false, rent: false, stream: true }, winsSource: { stream: "manual" } };
     render();
     return id;
-  }, agent.id);
+  }, { cascadeId: agent.id, donorId: Number(before.ids[0]) });
 
   const after = await page.evaluate((id20) => ({
     count: document.querySelectorAll("#groups [id^='card-']").length,

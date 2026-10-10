@@ -177,9 +177,17 @@ test("CAS-1222: a session bump queued before load resolves is replayed on top of
     await settle();
 
     assert.equal(E.reviewPromptSessionCount(), 8, "replayed as the account's 7 plus this session's own +1");
+    // CAS-1243: loadUserPrefs (a load) computes the replayed count but must never push it itself — a
+    // load/boot path must never write (CAS-1218). The write is deferred to the page-hidden path.
+    assert.equal(client.rpcCalls.filter(c => c.name === "merge_user_prefs_view").length, 0,
+      "loadUserPrefs itself must push nothing — only its own page-hidden seam may");
+
+    E.CascadePersistence.flushReviewSessionsIfPending();
+    await settle();
+
     const mergeCalls = client.rpcCalls.filter(c => c.name === "merge_user_prefs_view");
     const pushed = mergeCalls.find(c => typeof c.params.p_patch.reviewSessions === "number");
-    assert.ok(pushed, "the replayed count must actually be pushed, not just held locally");
+    assert.ok(pushed, "the replayed count must actually be pushed once the page-hidden seam fires");
     assert.equal(pushed.params.p_patch.reviewSessions, 8);
   } finally {
     signOut(E);
@@ -192,7 +200,8 @@ test("CAS-1222: a SECOND loadUserPrefs this session, with nothing pending, simpl
   signIn(E, client);
   try{
     // loadEngine()'s own boot already set the pending-replay flag (see the previous test) — this first
-    // load is what a real boot's own fireAccountFanout consumes it with, pushing the replayed count.
+    // load is what a real boot's own fireAccountFanout consumes it with, computing the replayed count.
+    // CAS-1243: the write itself is deferred to the page-hidden path now, so this load alone pushes nothing.
     await E.CascadePersistence.loadUserPrefs();
     await settle();
     client.rpcCalls.length = 0;

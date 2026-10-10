@@ -114,8 +114,16 @@ test("CAS-969 AC4: the session count itself survives a reload the same way — a
 
     assert.equal(E2.reviewPromptSessionCount(), 3,
       "AC4: a reload must accumulate on top of the account's real count, not restart from this device's own 1");
+    // CAS-1243: loadUserPrefs (a load) computes the accumulated count but must never push it itself — the
+    // write is deferred to the page-hidden path, fired here through its own read-only seam.
+    assert.equal(client2.rpcCalls.filter(c => c.name === "merge_user_prefs_view").length, 0,
+      "loadUserPrefs itself must push nothing — only its own page-hidden seam may");
+
+    E2.CascadePersistence.flushReviewSessionsIfPending();
+    await settle();
+
     const pushed = client2.rpcCalls.find(c => c.name === "merge_user_prefs_view" && "reviewSessions" in c.params.p_patch);
-    assert.ok(pushed, "the accumulated count must actually reach the account");
+    assert.ok(pushed, "the accumulated count must actually reach the account once the page-hidden seam fires");
     assert.equal(pushed.params.p_patch.reviewSessions, 3);
   } finally { signOut(E2); }
 });
