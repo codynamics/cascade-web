@@ -1825,6 +1825,13 @@ test("CAS-919: a collapsed card's score row has no Cascade cell and no Pop cell,
   // means the patch below can itself push this card across the onboarded agent's marker, so force every
   // window's marker to Off first.
   await page.evaluate(() => { WATCH_LEVEL_KEYS.forEach(k => { cascades[0].watchMarkers[k] = 0; }); });
+  // CAS-1247: zeroing every marker above (so the floor can never react to the low scores this test sets)
+  // also lifts the agent's own score gate, which widens Upcoming's scope from a handful of high-buzz films
+  // to nearly all of them. The default mood (Top scores) caps each stage at its best 10 — against this
+  // widened scope, patching the first card's score down to 4.0/40 can drop it far enough to fall out of
+  // that cap, silently no-oping fastPatchFindRow (same "film left the list" shape CAS-750/CAS-823 named
+  // above, just via the cap rather than m.status). Releases carries no cap, so select it first.
+  await page.locator('.moodchip[data-mood="releases"]').click();
 
   const cards = page.locator("#groups .card");
   const card = cards.first();
@@ -1866,6 +1873,10 @@ test("CAS-900: collapsed-card score row is 12px/11px type with People/Critics la
   // marker to Off so blending ratings into an upcoming film's score can't itself move this card across
   // the onboarded agent's own marker.
   await page.evaluate(() => { WATCH_LEVEL_KEYS.forEach(k => { cascades[0].watchMarkers[k] = 0; }); });
+  // CAS-1247: see the sibling "no Cascade cell and no Pop cell" test above — zeroing every marker widens
+  // Upcoming's scope enough that patching this card's score down to 4.0/40 can drop it out of the default
+  // mood's top-10-per-stage cap, silently no-oping fastPatchFindRow. Releases carries no cap.
+  await page.locator('.moodchip[data-mood="releases"]').click();
 
   const cards = page.locator("#groups .card");
   const card = cards.first();
