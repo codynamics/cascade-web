@@ -5,10 +5,10 @@
 // STREAM-kind agent (the stream lane was never known to be broken; it's covered so a future regression on
 // either lane is caught the same way).
 import { test, expect } from "@playwright/test";
-import { toShortlist, finishFlow, toListing, openAgentsScreenFromMenu } from "./helpers.mjs";
+import { toShortlist, finishFlow, toListing, openAgentsScreenFromNav } from "./helpers.mjs";
 
 async function openFirstAgentBriefing(page){
-  await openAgentsScreenFromMenu(page);
+  await openAgentsScreenFromNav(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
   await page.locator(".ag-edit").first().click();
   await expect(page.locator("#onbCinemaRelease")).toBeVisible();

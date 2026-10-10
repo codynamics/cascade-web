@@ -3572,6 +3572,30 @@
   /* Watched carries the same outline as the other two action buttons */
   .card:not(.expanded) .ctl.watch .cmini{border-color:var(--brand-blue)}
   .card:not(.expanded) .ctl.watch .clab.dim{color:var(--dim)}
+  /* ==== HEADER: FOUR NAV ITEMS, MENU ON THE RIGHT, NO LOGO OR DATE (Lee, 2026-10-10) ====
+     --sel-bg / --sel-bd are the ONE selected style ("violet haze") shared by the nav, the Watch stages and
+     the moods. The logo and the update date are hidden, not removed: their elements stay in the markup so
+     nothing that writes to them breaks. The saving dot is all that is left of .brand-ident, and it sits on
+     the menu button's top-left corner. */
+  :root{--sel-bg:rgba(124,92,255,.20);--sel-bd:rgba(140,112,255,.62)}
+  .brandrow{gap:6px;position:relative}
+  .brand-ident .brandlockup,.brand-ident .updated{display:none}
+  .brand-ident{position:absolute;right:29px;top:1px;margin:0;pointer-events:none;z-index:1}
+  .brand-ident .updated-row{gap:0}
+  .navmenu-wrap{order:9}
+  .navmenu{left:auto;right:0}
+  #navMenuBtn{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .hdr-actions{flex:1 1 auto;margin-left:0;display:flex!important;gap:5px;min-width:0}
+  .hdr-actions .modechip{flex:1 1 0;min-width:0;width:auto;padding:0 2px;gap:3px;flex-direction:column;
+    border-radius:10px;background:var(--panel)!important;border:1px solid var(--line)!important;
+    box-shadow:none!important;color:var(--dim)!important}
+  .hdr-actions .modechip .mcicon{width:16px;height:16px}
+  .hdr-actions .modechip .mclabel{font:600 10.5px/1 var(--font-body);letter-spacing:.1px}
+  .hdr-actions .modechip.ag .mcicon{color:var(--dim)}
+  .hdr-actions .modechip.active{background:var(--sel-bg)!important;border-color:var(--sel-bd)!important;
+    color:#fff!important}
+  .hdr-actions .modechip.active .mclabel{font-weight:700}
+  .hdr-actions .modechip.ag.active .mcicon{color:#fff}
 </style>
 </head>
 <body>
@@ -3600,21 +3624,18 @@
 <div class="phone">
   <header>
     <div class="brandrow">
-      <!-- CAS-1185: the hamburger menu leads the header row now — far left, ahead of the logo — instead of
-           trailing the nav chips. Agents moved out of the chip row into the menu's own first item, so this
-           wrap now opens the menu directly off the row's leading edge (see .navmenu's left:0, below). -->
+      <!-- CAS-1246: the hamburger menu moves to the far right of the header row, ahead of nothing — the
+           four nav chips (Watch, Alerts, Find, Agents) lead the row now, and the menu opens off its own
+           trailing edge (see .navmenu's right:0, below). -->
       <div class="navmenu-wrap">
         <div class="iconbtn" id="navMenuBtn" title="Menu" role="button" tabindex="0" aria-haspopup="true"
              aria-expanded="false" aria-controls="navMenu" aria-label="Menu" onclick="toggleNavMenu(event)">☰
           <span class="navcountbadge" id="navMenuDot" style="display:none" aria-hidden="true"></span>
         </div>
         <div class="navmenu" id="navMenu" role="menu" aria-label="Menu">
-          <!-- CAS-1185: Agents leads the menu, in a group of its own — it's a main nav destination (it used
-               to be the header's own first chip), not one of the day-to-day items below the divider. -->
-          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('agents')">Agents</button>
           <!-- CAS-886: Invites leads the day-to-day group — the top-of-list slot Notifications held before
                CAS-636 folded that surface into Moving, and the position the design image gives Invites now. -->
-          <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('invites')">Invites
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('invites')">Invites
             <span class="navitem-badge" id="invitesNavBadge" style="display:none">0</span></button>
           <!-- CAS-928: Friends sits directly below Invites, the slot the design image gives it. -->
           <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('friends')">Friends</button>
@@ -3693,6 +3714,19 @@
           </svg>
           <span class="mclabel mclabel-full">Find</span>
           <span class="mclabel mclabel-short">Find</span>
+        </div>
+        <!-- Agents is a main nav destination again, the fourth item (Lee, 2026-10-10). -->
+        <div class="modechip ag" id="agentsBtn" title="Agents" role="button" tabindex="0"
+             aria-pressed="false" aria-label="Agents" onclick="openAgentsScreen()">
+          <svg class="mcicon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+            <rect x="4.5" y="8" width="15" height="11" rx="3"/>
+            <path d="M12 4.5V8"/>
+            <circle cx="12" cy="3.6" r="1.1"/>
+            <path d="M9.3 13.2v1.6M14.7 13.2v1.6"/>
+          </svg>
+          <span class="mclabel mclabel-full">Agents</span>
+          <span class="mclabel mclabel-short">Agents</span>
         </div>
       </div>
     </div>
@@ -17787,18 +17821,20 @@ window.setMovingWindow=(key)=>{
   renderMovingScreen(true);
 };
 window.openAgentsScreen=()=>{
-  // CAS-1185: reached from the menu's "Agents" item now, not a header chip — there is no chip of its own to
-  // light any more (this screen is a layer on top of the Watch listing, not a different mode of the bar).
+  // CAS-1246: Agents is a header chip again (#agentsBtn), reached from the nav row directly — lit the same
+  // way #movingBtn lights for Alerts.
   if($("movingScreen").classList.contains("open")) closeMovingScreen();
   if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186: mutually exclusive with Find too
   renderAgentsScreen();
   $("agentsScreen").scrollTop=0;
   $("agentsScreen").classList.add("open"); lockBodyScroll(true);
+  $("agentsBtn").classList.add("active"); $("agentsBtn").setAttribute("aria-pressed","true");
   syncWatchChip();
   logEvent("agents_screen_opened",{count:cascades.length});
 };
 window.closeAgentsScreen=()=>{
   $("agentsScreen").classList.remove("open"); lockBodyScroll(false);
+  $("agentsBtn").classList.remove("active"); $("agentsBtn").setAttribute("aria-pressed","false");
   syncWatchChip();
 };
 // CAS-636: Moving — the alert feed made visible. Same open/close shape as Agents (mutually exclusive with
@@ -19227,11 +19263,10 @@ function markTutorialSeen(){ tutorialSeenFlag=true; pushViewField("tutorialSeen"
 // card below, which had drifted from shipped behaviour (Moving's rolling window, the 5pm Sydney alert
 // time). Anchors are real listing controls: the agent rail the ticket names doesn't exist in this build
 // (agents are a vertical reorderable list, not a rail).
-// CAS-1185: Agents left the header for the menu's first item, so the opening card now anchors to the
-// hamburger (#navMenuBtn) that holds it, not a chip that no longer exists.
+// CAS-1246: Agents is back as a header chip (#agentsBtn), so the opening card anchors there again.
 function tutorialCardDefs(){
   return [
-    {sel:"#navMenuBtn", text:"Your agents live in this menu. Each one watches for a different kind of film, all the time, so you don't have to."},
+    {sel:"#agentsBtn", text:"Your agents live here. Each one watches for a different kind of film, all the time, so you don't have to."},
     {sel:"#groups .card .r-scores", text:"Two numbers: what people thought, and what critics thought. Your agent only speaks up when a film clears the bar you set."},
     {sel:"#groups .card .ctl.notify", text:"Films move — cinema, then rent, then streaming. Your agent follows each one and tells you when it reaches a window you actually use."},
     {sel:"#movingBtn", text:"Alerts shows what your agents have found for you — Today, Week, 2 weeks or Month. It opens on Today."},

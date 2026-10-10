@@ -8,7 +8,7 @@ import { test, expect } from "@playwright/test";
 import { toShortlist, finishFlow, toListing } from "./helpers.mjs";
 
 const CARD_TEXT = [
-  "Your agents live in this menu. Each one watches for a different kind of film, all the time, so you don't have to.",
+  "Your agents live here. Each one watches for a different kind of film, all the time, so you don't have to.",
   "Two numbers: what people thought, and what critics thought. Your agent only speaks up when a film clears the bar you set.",
   "Films move — cinema, then rent, then streaming. Your agent follows each one and tells you when it reaches a window you actually use.",
   "Alerts shows what your agents have found for you — Today, Week, 2 weeks or Month. It opens on Today.",

@@ -34,11 +34,6 @@ for(const width of [390, 430]){
       const docFits = await page.evaluate(() =>
         document.documentElement.scrollWidth <= document.documentElement.clientWidth);
       expect(docFits).toBe(true);
-
-      if(width === 430){
-        const updatedFits = await page.locator("#updated").evaluate(el => el.scrollWidth <= el.clientWidth);
-        expect(updatedFits).toBe(true);
-      }
     });
   });
 }

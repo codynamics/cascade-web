@@ -9,7 +9,7 @@ import {
   admin, createTestUser, seedCascades, liveCascades, testEmail,
   gotoIntegrityFresh, signInFromSplash,
 } from "./helpers.mjs";
-import { settleListing, openAgentsScreenFromMenu } from "../e2e/helpers.mjs";
+import { settleListing, openAgentsScreenFromNav } from "../e2e/helpers.mjs";
 
 const OBSERVATION_KEYS = ["cascade_cascades", "cascade_watched", "cascade_disliked", "cascade_blocked",
   "cascade_indifferent", "cascade_wow", "cascade_enjoyed", "cascade_notify", "cascade_watch_known",
@@ -46,7 +46,7 @@ test("AC1: sign in, edit an agent, mark a film Watched, switch a service, open A
   await waitForAccountLoads(page);
 
   // Edit an agent through the real Agents-screen rename flow (CAS-934: closing the hub is what commits).
-  await openAgentsScreenFromMenu(page);
+  await openAgentsScreenFromNav(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
   await page.locator(`.agrow[data-id="${agent.id}"] .ag-edit`).click();
   await page.locator(".eapenc").click();
