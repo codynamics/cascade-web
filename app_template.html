@@ -20220,8 +20220,14 @@ function flushReviewSessionsIfPending(){
   pushViewField("reviewSessions", reviewPromptSessionsCount);
 }
 // Real visitors: document.hidden true is the one signal that fires reliably before the tab actually goes
-// away, so this is where the deferred write actually leaves the device.
-document.addEventListener("visibilitychange", () => { if(document.hidden) flushReviewSessionsIfPending(); });
+// away, so this is where the deferred write actually leaves the device. Deferred one macrotask rather than
+// called straight from the handler: a hidden firing because the tab is merely backgrounding still has a live
+// document, so the setTimeout(0) below runs practically at once; a hidden firing because THIS device is
+// navigating away (a reload, in particular — reconcile-on-return.spec.mjs's own AC4/AC5 drives exactly that
+// as its "a delayed boot" case) tears the document's realm down before that macrotask ever gets a turn, so
+// the push never leaves — nothing lost, since the next boot's own loadUserPrefs() replays this session's +1
+// on top of whatever count the account answers with and queues its own, later flush.
+document.addEventListener("visibilitychange", () => { if(document.hidden) setTimeout(flushReviewSessionsIfPending, 0); });
 function reviewPromptAskedVersion(){ return reviewPromptAskedVer; }
 function markReviewPromptAsked(ver){
   reviewPromptAskedVer = String(ver);
