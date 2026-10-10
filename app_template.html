@@ -20266,17 +20266,31 @@ function wtRefreshMini(){
   mini.innerHTML = `<span class="gdot ${stop?stop.dot:""}" aria-hidden="true"></span><span>${esc(stageName)}</span>`
     + `<span class="wtsep">·</span><span class="wtmood">${esc(currentMood().name)}</span><span class="wtchev">Change ▾</span>`;
 }
+// Measuring shortH forces a layout flush while the bar is shrunk but not yet margin-compensated — if the
+// page is scrolled to (or past) what is, for that one instant, a shorter document, the browser clamps
+// scrollY down to fit before the very next line restores the margin and the taller height. Clamping only
+// moves scrollY down, never back up once the margin is restored, so without this the jump-straight-to-the-
+// bottom case (not a gradual scroll past the 30px threshold) permanently loses a few px of scroll position.
+function wtPreservingScrollY(fn){
+  const y=window.scrollY;
+  fn();
+  if(window.scrollY!==y) window.scrollTo(window.scrollX, y);
+}
 function wtEnterCollapsed(bar){
-  const fullH=bar.offsetHeight;
-  bar.classList.add("wtcollapsed");
-  wtRefreshMini();
-  const shortH=bar.offsetHeight;
-  wtCollapseMarginPx = Math.max(0, fullH-shortH);
-  bar.style.marginBottom = wtCollapseMarginPx+"px";
+  wtPreservingScrollY(() => {
+    const fullH=bar.offsetHeight;
+    bar.classList.add("wtcollapsed");
+    wtRefreshMini();
+    const shortH=bar.offsetHeight;
+    wtCollapseMarginPx = Math.max(0, fullH-shortH);
+    bar.style.marginBottom = wtCollapseMarginPx+"px";
+  });
 }
 function wtLeaveCollapsed(bar){
-  bar.classList.remove("wtcollapsed","wtopen");
-  bar.style.marginBottom = "";
+  wtPreservingScrollY(() => {
+    bar.classList.remove("wtcollapsed","wtopen");
+    bar.style.marginBottom = "";
+  });
   wtOpenAtScrollY = null;
 }
 function onWatchTopScroll(){
