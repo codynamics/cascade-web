@@ -121,10 +121,17 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
     .toBeGreaterThanOrEqual(20);
 
   const card20Id = before.ids[19];
-  const card20Top = await page.evaluate((id) => {
+  await page.evaluate((id) => {
     document.getElementById(`card-${id}`).scrollIntoView({ block: "start" });
-    return document.getElementById(`card-${id}`).getBoundingClientRect().top;
   }, card20Id);
+  // CAS-1247 C6: scrolling past 30px now collapses #watchTop to #wtMini on a deferred `scroll` event, with
+  // a compensating margin applied once that handler runs — not synchronously inside scrollIntoView(). Give
+  // it a tick to settle so the baseline below is read in the same (settled) state as the post-render
+  // measurement, rather than racing the collapse and reading a transient mid-compensation position.
+  await page.waitForTimeout(100);
+  const card20Top = await page.evaluate((id) =>
+    document.getElementById(`card-${id}`).getBoundingClientRect().top
+  , card20Id);
 
   const newFilmId = await page.evaluate(({ cascadeId, donorId }) => {
     // CAS-1243 (F4): the clone must itself match Streaming's own scope (mine-only, Netflix-only per this
