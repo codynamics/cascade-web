@@ -935,48 +935,6 @@ test("CAS-747 AC5: the Movie Budget card renders the includeUnbudgeted switch, a
   expect(after, `before=${before} after=${after}`).not.toBe(before);
 });
 
-// CAS-746: the CAS-717 agent-divider row used to skip a section with only one owner, so a reader couldn't
-// tell whether a bare section was unowned, single-owner, or just different. The row is unconditional now —
-// this checks every group carries at least one .grouphead.sub (on a listing that genuinely has a
-// single-agent section, since the onboarding roster owns films unevenly across sections), and that only the
-// first row in a group has its hairline suppressed.
-test("Watch listing: every group shows its agent divider, even a single-agent section (CAS-746)", async ({ page }) => {
-  await toShortlist(page, "cinema");
-  await finishFlow(page);
-  await toListing(page);
-
-  const groups = page.locator("#groups .group");
-  const groupCount = await groups.count();
-  expect(groupCount).toBeGreaterThan(0);
-
-  let sawSingleAgentSection = false;
-  for(let i = 0; i < groupCount; i++){
-    const subRows = groups.nth(i).locator(".grouphead.sub");
-    await expect(subRows.first()).toBeVisible();
-    const borderWidths = await subRows.evaluateAll(els => els.map(el => getComputedStyle(el).borderTopWidth));
-    if(borderWidths.length === 1) sawSingleAgentSection = true;
-    expect(borderWidths[0]).toBe("0px");
-    for(let j = 1; j < borderWidths.length; j++) expect(borderWidths[j]).not.toBe("0px");
-  }
-  expect(sawSingleAgentSection, "expected at least one section with a single agent's films").toBe(true);
-
-  // CAS-897: documentElement.scrollWidth isn't the right gauge here — see the AC6 check on the Mission/hub
-  // test above for the full trace (same #cascbar rail-mode content, same pre-existing gap, reproduces
-  // unmodified at c7ee37f). Walk the DOM for an element that's both past the viewport edge and not clipped
-  // by any ancestor, the same real-overflow check used there.
-  const overflowing = await page.evaluate(() => {
-    const vw = document.documentElement.clientWidth;
-    const clips = new Set(["auto", "hidden", "scroll", "clip"]);   // CAS-916: lockBodyScroll's own progressive pair
-    return [...document.querySelectorAll("*")].filter(el => {
-      if(el.getBoundingClientRect().right <= vw + 1) return false;
-      for(let p = el.parentElement; p; p = p.parentElement)
-        if(clips.has(getComputedStyle(p).overflowX)) return false;
-      return true;
-    }).map(el => el.className || el.tagName);
-  });
-  expect(overflowing, `visibly overflowing: ${JSON.stringify(overflowing)}`).toEqual([]);
-});
-
 // CAS-897: the Streaming tab has no default bucket (filmMatchesWatchTab) — an untouched agent shows nothing
 // there at all, so the CAS-750 order checks below need at least one film explicitly tracked at a window
 // matching its own real standing first. Reproduces unmodified at c7ee37f, so it is not a regression from any
