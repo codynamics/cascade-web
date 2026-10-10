@@ -3535,6 +3535,43 @@
     border-radius:11px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;
     text-shadow:0 1px 2px rgba(10,14,26,.55)}
   .buildgate button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  /* ==== CALMER COLLAPSED CARD (Lee, 2026-10-10) ================================
+     One rule runs through this block: on a collapsed card an OUTLINE means you can tap it.
+     Tappable, so outlined: the badge, Budget, the service picker and the three action buttons.
+     Not tappable, so no outline: certificate, language, score, awards marks, the cinema lozenge.
+     Nothing glows; "recently changed" is a small gold dot inside the lozenge instead. */
+  /* the poster fills the card's height */
+  .card:not(.expanded) .poster{height:100%;aspect-ratio:auto;border-radius:0}
+  /* certificate and language are plain text */
+  .card:not(.expanded) .cert{background:none;border:none;padding:0;color:var(--faint);font-weight:700;font-size:11px}
+  .card:not(.expanded) .culttag{background:none;border:none;padding:0}
+  /* the badge and Budget are buttons: outlined */
+  .card:not(.expanded) .tentbadge{font-size:0!important;background:rgba(255,255,255,.04)!important;
+    border:1px solid rgba(255,255,255,.32)!important;border-radius:7px!important;padding:3px 8px 3px 7px!important;
+    box-shadow:none!important}
+  .card:not(.expanded) .tentbadge b{font-size:11px;color:var(--ink);font-weight:700}
+  .card:not(.expanded) .tentbadge b::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:#f5d675;margin-right:5px;vertical-align:1px}
+  .card:not(.expanded) button.m.muted{padding:3px 8px!important;background:rgba(255,255,255,.04)!important;
+    border:1px solid rgba(255,255,255,.32)!important;border-radius:7px!important}
+  .card:not(.expanded) .mrow.r-cinfo{align-items:center;gap:7px!important}
+  /* score and awards marks are information: no outline */
+  .card:not(.expanded) .qscore{border-color:transparent}
+  .card:not(.expanded) .oscmark{border-color:transparent!important}
+  /* the cinema lozenge is a label: a borderless pill. The service picker keeps its outline. */
+  .card:not(.expanded) .cap[class*="w-cin-"]{border-color:transparent!important;border-radius:999px!important;
+    padding:1px 10px!important}
+  /* nothing glows; a recently changed lozenge keeps its own outline colour and gains a gold dot */
+  .card:not(.expanded) .cap.recent{box-shadow:none!important}
+  .card:not(.expanded) .cap.recent.w-pvod{border-color:rgba(164,134,240,.65)!important}
+  .card:not(.expanded) .cap.recent.w-rental{border-color:rgba(90,169,240,.7)!important}
+  .card:not(.expanded) .cap.recent.w-included_streaming{border-color:rgba(72,199,142,.65)!important}
+  .card:not(.expanded) .cap.recent .capwin::before{content:"";width:6px;height:6px;border-radius:50%;
+    background:#ffd54a;flex:none}
+  .card:not(.expanded) .ctl .cmini{box-shadow:none!important}
+  /* Watched carries the same outline as the other two action buttons */
+  .card:not(.expanded) .ctl.watch .cmini{border-color:var(--brand-blue)}
+  .card:not(.expanded) .ctl.watch .clab.dim{color:var(--dim)}
 </style>
 </head>
 <body>
@@ -19713,6 +19750,7 @@ let renderCallCount = 0;
 function watchNavKey(){
   return JSON.stringify([
     watchTab,
+    watchCinemaStage,
     [...watchAgentOff].sort(),
     sortPicked, filt.sort,
     watchSearch[watchTab]||"",
@@ -19720,6 +19758,7 @@ function watchNavKey(){
     [...watchGenreOff[watchTab]].sort(),
     [...watchWatchedSel[watchTab]].sort(),
     [...watchBadgeSel[watchTab]].sort(),
+    [...watchAlsoShow[watchTab]].sort(),
     watchMineOnlyOn(),
     watchOccasion,
   ]);
@@ -22425,7 +22464,7 @@ function acctFetchKeepalive(init){
                                 // used to leave CAS-1231's list empty forever, not just its end result.
                                 get renderCallCount(){ return renderCallCount; },
                                 set renderCallCount(v){ renderCallCount=v; },
-                                markWatchNavigated,
+                                markWatchNavigated, watchNavKey,
                                 get watchListFilled(){ return watchListFilled; },
                                 // CAS-488: the catalogue-refresh seam and its busy-check, exposed the same way.
                                 pollCatalogue, catalogueUIBusy,
