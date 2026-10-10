@@ -19010,7 +19010,12 @@ function membShowCodeState(email){
   // directly above it, so the same scroll reveals both.
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     const scr=$("membScreen"), btn=document.querySelector(".membcta");
-    if(scr && btn && typeof btn.scrollIntoView==="function") btn.scrollIntoView({block:"end"});
+    if(!(scr && btn && typeof btn.scrollIntoView==="function")) return;
+    btn.scrollIntoView({block:"end"});
+    // CAS-1242: WebKit's own "end" alignment can still leave the button's bottom edge a sub-pixel
+    // past the screen's (observed ~0.08px, CAS-1169 AC3) — round that stray fraction back in.
+    const over = btn.getBoundingClientRect().bottom - scr.getBoundingClientRect().bottom;
+    if(over > 0) scr.scrollTop += Math.ceil(over);
   }));
 }
 // B9: back to State A — email editable and focused, code step gone, countdown stopped, both errors clear.
