@@ -162,9 +162,12 @@ test("AC1: B's own reconcile sends zero non-select calls once A's verdict lands,
     // CAS-1222's admitDrift tracking (out of scope for this ticket — see its own "do not re-raise" note)
     // legitimately prunes and re-pushes once `found` changes, which adopting A's verdict here also causes —
     // a real, pre-existing write unrelated to the seenFound/active/activeMulti/reviewSessions ones this
-    // ticket is about, so it is excluded from this count rather than silencing the AC.
+    // ticket is about, so it is excluded from this count rather than silencing the AC. CAS-1243 round 2:
+    // riderReviewSessionsOnto rides reviewSessions onto whichever merge_user_prefs_view write fires next,
+    // which can legitimately be this very admitDrift flush rather than a more obviously "user" one — tolerate
+    // it riding along too.
     const isOutOfScopeAdmitDriftPush = c => c.kind === "rpc" && c.table === "merge_user_prefs_view"
-      && c.params && Object.keys(c.params.p_patch || {}).every(k => k === "admitDrift");
+      && c.params && Object.keys(c.params.p_patch || {}).every(k => k === "admitDrift" || k === "reviewSessions");
     const nonSelect = callsB.filter(c => c.kind !== "select" && !isOutOfScopeAdmitDriftPush(c));
     assert.deepEqual(nonSelect, [], `B's own reconcile must send zero calls that are not selects (besides CAS-1222's own out-of-scope admitDrift prune): ${JSON.stringify(nonSelect)}`);
   } finally {
@@ -213,7 +216,7 @@ test("AC2: once every ready flag first reads true, no merge_user_prefs_view call
   }
 });
 
-test("AC3: firing the page-hidden path once sends exactly one reviewSessions push; a second time sends nothing", async () => {
+test("AC3 round 2: reviewSessions rides piggyback on the next real user-action view write; a second write carries no key", async () => {
   const userId = "cas1243-ac3-user";
   const calls = [];
   const tables = { user_prefs: [{ user_id: userId, view: { reviewSessions: 6 } }] };
@@ -226,17 +229,32 @@ test("AC3: firing the page-hidden path once sends exactly one reviewSessions pus
 
     await E.CascadePersistence.loadUserPrefs();
     assert.equal(E.reviewPromptSessionCount(), 7, "replayed as the account's 6 plus this session's own +1");
+
+    // No user action for 3s: round 1's page-hidden trigger is gone (it fired on an unloading document too,
+    // which is a reload, not a user action — see riderReviewSessionsOnto's own comment). There is no seam
+    // left to "fire" here either way: engine.mjs's document stub swallows every addEventListener call, so
+    // this harness never could register (or replay) a real visibilitychange listener — the only guarantee
+    // that matters is that production code no longer attaches one for reviewSessions, confirmed by
+    // inspection rather than a runtime call.
+    await new Promise(r => setTimeout(r, 3000));
     assert.equal(calls.filter(c => c.kind === "rpc" && c.table === "merge_user_prefs_view").length, 0,
-      "loadUserPrefs (a load) must not push the replayed count itself");
+      "no user action, no view write — reviewSessions must not leave the device on its own");
 
-    E.CascadePersistence.flushReviewSessionsIfPending();
-    E.CascadePersistence.flushReviewSessionsIfPending();   // firing it again must send nothing more
-
+    E.setActive("a0000000-0000-4000-8000-000000000097");
+    await waitUntil(() => E.CascadeAccountStore.queue.length === 0);   // sendQueue's own reentrancy guard
     const mergeCalls = calls.filter(c => c.kind === "rpc" && c.table === "merge_user_prefs_view");
-    assert.equal(mergeCalls.length, 1, "exactly one push, even though the page-hidden seam fired twice");
-    assert.deepEqual(Object.keys(mergeCalls[0].params.p_patch), ["reviewSessions"],
-      "the patch's only key must be reviewSessions");
-    assert.equal(mergeCalls[0].params.p_patch.reviewSessions, 7, "the account's stored count plus this session's +1");
+    assert.ok(mergeCalls.length >= 1, "setActive's own active/activeMulti writes must have gone out");
+    const withReviewSessions = mergeCalls.filter(c => "reviewSessions" in c.params.p_patch);
+    assert.equal(withReviewSessions.length, 1, "reviewSessions must appear in exactly one of setActive's patches");
+    assert.equal(withReviewSessions[0].params.p_patch.reviewSessions, 7, "the account's stored count plus this session's +1");
+
+    calls.length = 0;
+    E.setActive("a0000000-0000-4000-8000-000000000096");
+    await waitUntil(() => E.CascadeAccountStore.queue.length === 0);
+    const secondMergeCalls = calls.filter(c => c.kind === "rpc" && c.table === "merge_user_prefs_view");
+    assert.ok(secondMergeCalls.length >= 1, "the second setActive's own writes must also have gone out");
+    assert.ok(secondMergeCalls.every(c => !("reviewSessions" in c.params.p_patch)),
+      "a second user view write this session must carry no reviewSessions key — already consumed");
   } finally {
     signOut(E);
   }

@@ -20197,10 +20197,16 @@ let reviewPromptAskedVer = null;
 // session's +1 ON TOP of whatever the account answers with, the first time it resolves this boot — never
 // a bare local count.
 let reviewSessionBumpPending = false;
-// CAS-1243: loadUserPrefs computes the replayed count (above) but must not push it itself — a load never
-// writes (CAS-1218). This flag marks "this device holds a replayed count the account hasn't seen yet";
-// flushReviewSessionsIfPending() is the one place that ever clears it and sends the write, fired only once
-// the page is actually hidden, never from the load/boot path itself.
+// CAS-1243 round 2: loadUserPrefs computes the replayed count (above) but must not push it itself — a load
+// never writes (CAS-1218). This flag marks "this device holds a replayed count the account hasn't seen
+// yet"; pushViewField/flushViewPatch below are the only places that ever clear it, riding it in as one extra
+// key on the next REAL merge_user_prefs_view write a user action already causes. There is deliberately no
+// page-hidden/visibilitychange trigger for it any more — round 1 tried that, but `hidden` also fires on a
+// document that's navigating away (a reload in particular — reconcile-on-return.spec.mjs's own AC4/AC5
+// drives exactly that as its "a delayed boot" case), which made every reload after a settled boot send this
+// exact write with no user action behind it. If the person makes no view-field change this page load, this
+// session's +1 is simply not saved — accepted loss; the next boot's own loadUserPrefs() replays it on top of
+// whatever count the account answers with by then.
 let reviewSessionsPushPending = false;
 // One count per page load (called alongside app_open, below) — "a few sessions" means a few separate
 // visits, not a few actions within one.
@@ -20210,24 +20216,6 @@ function bumpReviewPromptSessionCount(){
   return reviewPromptSessionsCount;
 }
 function reviewPromptSessionCount(){ return reviewPromptSessionsCount; }
-// CAS-1243 (F2b): the account write reviewSessionBumpPending's replay used to make from inside
-// loadUserPrefs() itself — a load/boot path, which must never write (CAS-1218). Fired instead from the
-// page-hidden path (real visitors) or directly by a test (the read-only seam this ticket asks for) —
-// either way, at most one push per page load: the guard flag is cleared the instant it fires.
-function flushReviewSessionsIfPending(){
-  if(!reviewSessionsPushPending) return;
-  reviewSessionsPushPending = false;
-  pushViewField("reviewSessions", reviewPromptSessionsCount);
-}
-// Real visitors: document.hidden true is the one signal that fires reliably before the tab actually goes
-// away, so this is where the deferred write actually leaves the device. Deferred one macrotask rather than
-// called straight from the handler: a hidden firing because the tab is merely backgrounding still has a live
-// document, so the setTimeout(0) below runs practically at once; a hidden firing because THIS device is
-// navigating away (a reload, in particular — reconcile-on-return.spec.mjs's own AC4/AC5 drives exactly that
-// as its "a delayed boot" case) tears the document's realm down before that macrotask ever gets a turn, so
-// the push never leaves — nothing lost, since the next boot's own loadUserPrefs() replays this session's +1
-// on top of whatever count the account answers with and queues its own, later flush.
-document.addEventListener("visibilitychange", () => { if(document.hidden) setTimeout(flushReviewSessionsIfPending, 0); });
 function reviewPromptAskedVersion(){ return reviewPromptAskedVer; }
 function markReviewPromptAsked(ver){
   reviewPromptAskedVer = String(ver);
@@ -22074,11 +22062,19 @@ function acctFetchKeepalive(init){
   // own path) would let whichever push lands second clobber the first device's field. Both helpers below
   // route through merge_user_prefs_view (migration 0009) instead, which merges the patch INTO whatever
   // `view` already holds, server-side, in the write itself, so write order never matters.
+  // CAS-1243 round 2: the one place both merge_user_prefs_view senders below ride reviewSessionsPushPending
+  // onto a patch a user action already built, rather than ever sending a write of its own. Mutates `patch`
+  // in place and clears the flag, so a second write this page load (the flag already consumed) carries no
+  // reviewSessions key.
+  function riderReviewSessionsOnto(patch){
+    if(reviewSessionsPushPending){ reviewSessionsPushPending=false; patch.reviewSessions=reviewPromptSessionsCount; }
+    return patch;
+  }
   function pushViewField(key, value){
     if(!accountActive()) return;
     const owner=uid(); if(!owner) return;
     return window.CascadeAccountStore.acctOp({ table:"merge_user_prefs_view", kind:"rpc",
-      fields:{ p_patch:{ [key]:value } }, onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
+      fields:{ p_patch:riderReviewSessionsOnto({ [key]:value }) }, onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
   }
   // CAS-1222 Change 4: the invite draft's own writes (saveAgentState) and trackAdmitDrift's own GC pass
   // both land here — a burst of either within VIEW_DEBOUNCE_MS merges into ONE rpc call naming every field
@@ -22091,7 +22087,7 @@ function acctFetchKeepalive(init){
     if(!Object.keys(patch).length || !accountActive()) return;
     const owner=uid(); if(!owner) return;
     return window.CascadeAccountStore.acctOp({ table:"merge_user_prefs_view", kind:"rpc",
-      fields:{ p_patch:patch }, onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
+      fields:{ p_patch:riderReviewSessionsOnto(patch) }, onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
   }
   function pushViewFieldDebounced(key, value){
     if(!accountActive()) return;
@@ -22201,8 +22197,8 @@ function acctFetchKeepalive(init){
       if(typeof v.tutorialSeen==="boolean") tutorialSeenFlag = v.tutorialSeen;
       // CAS-1222: a bump queued before this load resolved is replayed ON TOP of the account's real count,
       // never trusting this session's bare local default — see bumpReviewPromptSessionCount's own comment.
-      // CAS-1243 (F2b): computed here, but the write itself is deferred to flushReviewSessionsIfPending()
-      // (page-hidden) — a load must never write (CAS-1218).
+      // CAS-1243 round 2: computed here, but the write itself rides piggyback on the next real view-field
+      // write a user action causes (riderReviewSessionsOnto) — a load must never write (CAS-1218).
       if(reviewSessionBumpPending){
         reviewSessionBumpPending = false;
         reviewPromptSessionsCount = (typeof v.reviewSessions==="number" ? v.reviewSessions : 0) + 1;
@@ -22333,11 +22329,6 @@ function acctFetchKeepalive(init){
                                 pushViewField, pushViewFieldDebounced, flushViewPatch,
                                 get VIEW_DEBOUNCE_MS(){ return VIEW_DEBOUNCE_MS; },
                                 set VIEW_DEBOUNCE_MS(v){ VIEW_DEBOUNCE_MS=v; },
-                                // CAS-1243 (F2b/AC3): the review-session count's own write is deferred to the
-                                // page-hidden moment (real visitors) rather than loadUserPrefs — this is the
-                                // read-only seam a test fires directly instead of a real visibilitychange
-                                // event, the same convention flushViewPatch above gives the view-field debounce.
-                                flushReviewSessionsIfPending,
                                 // CAS-740: read/write, same shape as filmWatchReady/agentFilmsReady above —
                                 // so a test can drive user_prefs' own "the account hasn't answered yet" gate
                                 // directly, the same way fireAccountFanout drives it for real.

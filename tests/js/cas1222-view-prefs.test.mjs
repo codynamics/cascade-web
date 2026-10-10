@@ -177,17 +177,19 @@ test("CAS-1222: a session bump queued before load resolves is replayed on top of
     await settle();
 
     assert.equal(E.reviewPromptSessionCount(), 8, "replayed as the account's 7 plus this session's own +1");
-    // CAS-1243: loadUserPrefs (a load) computes the replayed count but must never push it itself — a
-    // load/boot path must never write (CAS-1218). The write is deferred to the page-hidden path.
+    // CAS-1243 round 2: loadUserPrefs (a load) computes the replayed count but must never push it itself —
+    // a load/boot path must never write (CAS-1218). The write rides piggyback on the next real user-action
+    // view write instead (there is no page-hidden trigger any more — that fires on an unloading document
+    // too, which is a reload, not a user action).
     assert.equal(client.rpcCalls.filter(c => c.name === "merge_user_prefs_view").length, 0,
-      "loadUserPrefs itself must push nothing — only its own page-hidden seam may");
+      "loadUserPrefs itself must push nothing — only a real user-action view write may");
 
-    E.CascadePersistence.flushReviewSessionsIfPending();
+    E.setActive("a0000000-0000-4000-8000-000000000099");
     await settle();
 
     const mergeCalls = client.rpcCalls.filter(c => c.name === "merge_user_prefs_view");
     const pushed = mergeCalls.find(c => typeof c.params.p_patch.reviewSessions === "number");
-    assert.ok(pushed, "the replayed count must actually be pushed once the page-hidden seam fires");
+    assert.ok(pushed, "the replayed count must ride piggyback on the next real user-action view write");
     assert.equal(pushed.params.p_patch.reviewSessions, 8);
   } finally {
     signOut(E);
