@@ -10,7 +10,7 @@
 import { test, expect } from "@playwright/test";
 import {
   admin, createTestUser, seedCascades, testEmail,
-  gotoIntegrityFresh, signInFromSplash, recordRestRequests,
+  gotoIntegrityFresh, signInFromSplash, recordRestRequests, seedUserPrefs,
 } from "./helpers.mjs";
 import { settleListing } from "../e2e/helpers.mjs";
 
@@ -93,6 +93,10 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
   const email = testEmail("cas1236-ac3");
   const user = await createTestUser(email);
   const agent = await seedWideOpenAgent(user.id);
+  // CAS-1241 (B3): Streaming is mine-only by default (watchMineOnly) — a seeded account with no services
+  // picked lists nothing there regardless of what the wide-open agent matches, which is a test setup gap,
+  // not the settled-list mechanism this test is actually about.
+  await seedUserPrefs(user.id, { sub_services: ["Netflix"] });
 
   await gotoIntegrityFresh(page);
   await signInFromSplash(page, email);
@@ -166,10 +170,12 @@ test("AC4: changing a listed film's Watch On leaves its card on the current stag
   const filmId = await page.evaluate(() => document.querySelector("#groups [id^='card-']")?.id.slice(5));
   expect(filmId, "the seeded wide-open agent must list at least one film on Upcoming").toBeTruthy();
 
+  // CAS-1241 (B1): Watch On is single-select (CAS-716) — ticking Streaming by hand clears Cinema too, the
+  // way a real tap on the Watch On picker does. Poking notify[id].wins.stream directly (as this used to)
+  // left Cinema still true, so filmNotifyState(id).key read back "in_cinema", not "stream" — a test bug,
+  // not an app bug. window.toggleFilmOpt is the real chokepoint the picker itself calls.
   await page.evaluate((id) => {
-    const e = notify[id];
-    e.wins = e.wins || {}; e.winsSource = e.winsSource || {};
-    e.wins.stream = true; e.winsSource.stream = "manual";
+    window.toggleFilmOpt(Number(id), "stream");
     render();
   }, filmId);
 

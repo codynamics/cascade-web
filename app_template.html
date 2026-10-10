@@ -20461,6 +20461,15 @@ let seenFound = null;
 // device's own user_prefs load has resolved, same "never stomp before the account has had its say" hazard
 // admitDrift/reviewSessions guard against elsewhere.
 let seenFoundSig = null;
+// CAS-1241 (B5): loadUserPrefs' own first-run branch below anchors seenFoundSig to `found` AS IT STANDS AT
+// LOAD TIME — before fireAccountFanout's explicit recomputeFound() call (CAS-1241 B4) has run the account's
+// first real admission sweep. A brand-new account's draft agents admit their first matches in THAT sweep, so
+// anchoring before it leaves seenFoundSig stale the instant the sweep finishes, and the very next render()'s
+// markFoundSeen() reads every one of those first-sweep admissions as genuine "news" and pushes — exactly the
+// fabricated-greeting case this silent seed exists to prevent. Set true by that branch, cleared by
+// fireAccountFanout once it re-anchors AFTER its own recomputeFound() call, right before the render() that
+// would otherwise see the diff and push.
+let seenFoundNeedsReanchor = false;
 function markFoundSeen(){
   seenFound = new Set(found);
   const sig = JSON.stringify([...seenFound].sort((a,b)=>a-b));
@@ -20577,6 +20586,25 @@ if(filmId!=null) openFilmPage(filmId);
 if(didReset) toast("🧹 Local state cleared — this is a clean first run.");
 else if(dedupedN)
   toast(`🧹 Cleaned up ${dedupedN} duplicate Cascade${dedupedN===1?"":"s"} — ${dedupedN===1?"it was an identical copy":"they were identical copies"} finding the same films twice.`);
+
+// CAS-1241 Part A: whether an account-sync request may carry keepalive:true. The Fetch standard rejects a
+// keepalive request once its body, plus whatever else is in flight, exceeds a 64 KiB cap — CAS-1222's
+// merge_user_prefs_view can carry tens of KB for an account with a broad agent (admitDrift/seenFound), well
+// past that cap on its own, and a rejected keepalive request reads to supabase-js as status 0, jamming the
+// whole queue behind it (isTransient(0) retries forever, sendQueue() never moves past it). A large write
+// doesn't need keepalive anyway: the acctOp queue itself is persisted and re-sent on the next boot, so a
+// request this big surviving a frozen/closed tab mid-flight was never the guarantee keepalive bought here —
+// only the small, routine account-sync rows CAS-1035 wrote this for actually need it. A plain top-level
+// function declaration (not inside the IIFE below), which a classic script hoists onto the shared global —
+// so the auth module's own fetch wrapper (a separate <script type="module">, further down, sharing that
+// global but not this script's own let/const bindings) can call it by bare name with no window. prefix.
+const KEEPALIVE_MAX_BODY_BYTES = 8000;
+function acctFetchKeepalive(init){
+  const body = init && init.body;
+  if(body===undefined || body===null) return true;
+  if(typeof body!=="string") return false;
+  return new TextEncoder().encode(body).length <= KEEPALIVE_MAX_BODY_BYTES;
+}
 
 // ============================================================================
 // Per-account Cascade persistence (CAS-83 / spec 26771457 §3-§4)
@@ -21098,9 +21126,27 @@ else if(dedupedN)
       const landingTab = pickLandingWatchTab();
       if(landingTab !== watchTab) watchTab = landingTab;
     }
+    // CAS-1241 (B4/B5): render() cannot be trusted to run recomputeFound() here — accountFanoutSettled()
+    // (CAS-1236) is still false until agentFilmsReady flips below, and render() returns before ever
+    // calling recomputeFound() while that's the case (every render() call this whole fan-out has made so
+    // far, from each load's own .finally(), hit the same gate and returned early). Without a direct call,
+    // every admission this derivation surfaces — and the seenFound/admitDrift bookkeeping recomputeFound
+    // drives — is discovered only on the NEXT render() below, the one just AFTER agentFilmsReady flips
+    // true: the flush just below finds nothing queued yet, agentFilmsReady flips, and only then does this
+    // device's real admission sweep start sending — exactly the AC4/AC5 write-after-settled leak.
+    recomputeFound();
+    // CAS-1241 (B5): loadUserPrefs' first-run branch anchored seenFoundSig to `found` as it stood BEFORE
+    // the recompute just above ran this account's first real admission sweep — re-anchor now, after it,
+    // so the render() just below reads no diff and markFoundSeen() stays silent on a brand-new account's
+    // own genuine first finds, same as it already does for a returning account's saved snapshot.
+    if(seenFoundNeedsReanchor){
+      seenFoundNeedsReanchor = false;
+      seenFound = new Set(found);
+      seenFoundSig = JSON.stringify([...seenFound].sort((a,b)=>a-b));
+    }
     if(typeof render==="function") render();
     // CAS-1224: the real agent_films flush, moved here from loadAgentFilms' own .finally() above — this
-    // render just ran against cascades/watchPrefs that applyWatchPrefsToCascades() only just finished
+    // recompute just ran against cascades/watchPrefs that applyWatchPrefsToCascades() only just finished
     // deriving, which can surface a match recomputeFound's EARLIER pass (loadAgentFilms' own .finally,
     // before this derivation had run) never saw. Flushing there and flipping agentFilmsReady before this
     // point left exactly that late admission unflushed while every e2e-integrity "fan-out has settled"
@@ -22191,10 +22237,15 @@ else if(dedupedN)
         // this branch always re-anchors the signature to THIS account's load, not to whichever device booted).
         seenFound = new Set(found);
         seenFoundSig = JSON.stringify([...seenFound].sort((a,b)=>a-b));
+        // CAS-1241 (B5): `found` here is whatever this session already had BEFORE this fan-out's own
+        // admission sweep — fireAccountFanout re-anchors again once that sweep (recomputeFound()) has
+        // actually run, so this account's genuine first finds aren't read as "news" either.
+        seenFoundNeedsReanchor = true;
       }
       if(typeof v.tutorialSeen==="boolean") tutorialSeenFlag = v.tutorialSeen;
       // CAS-1222: a bump queued before this load resolved is replayed ON TOP of the account's real count,
       // never trusting this session's bare local default — see bumpReviewPromptSessionCount's own comment.
+      (globalThis.__lupCalls=(globalThis.__lupCalls||[])).push(reviewSessionBumpPending);
       if(reviewSessionBumpPending){
         reviewSessionBumpPending = false;
         reviewPromptSessionsCount = (typeof v.reviewSessions==="number" ? v.reviewSessions : 0) + 1;
@@ -23002,12 +23053,16 @@ else if(dedupedN)
       // reachable to construct the client that signs a user in.
       const createClient = window.supabase && window.supabase.createClient;
       if (typeof createClient !== 'function') throw new Error('Supabase client library not loaded');
-      // CAS-1035: every request this client makes carries keepalive:true, so a push already under way
-      // survives the page being frozen (backgrounded, or the tab closing) instead of being killed
-      // mid-flight. The payloads here are small account-sync rows, well inside keepalive's request size
-      // limit.
+      // CAS-1035: a small request carries keepalive:true, so a push already under way survives the page
+      // being frozen (backgrounded, or the tab closing) instead of being killed mid-flight. CAS-1241: the
+      // Fetch standard rejects a keepalive request once its body (plus whatever else is in flight) passes
+      // a 64 KiB cap, and CAS-1222's merge_user_prefs_view can carry tens of KB for a broad agent — well
+      // past it. acctFetchKeepalive (the classic script above — a plain top-level function declaration,
+      // so it's reachable here by name off the shared global, no window. prefix needed) decides per
+      // request; a write too big for keepalive doesn't need it anyway, since the acctOp queue is
+      // persisted and re-sent on the next boot regardless.
       supa = api.client = createClient(url, key, {
-        global: { fetch: (input, init) => fetch(input, { ...(init||{}), keepalive: true }) }
+        global: { fetch: (input, init) => fetch(input, { ...(init||{}), keepalive: acctFetchKeepalive(init) }) }
       });   // defaults: persistSession + detectSessionInUrl
     } catch(err){
       console.warn('Cascade: Supabase client unavailable — staying in guest mode.', err);

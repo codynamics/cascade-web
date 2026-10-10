@@ -103,13 +103,20 @@ test("CAS-1099 AC1: completing membership issues exactly one complete_membership
   // CAS-1222: finishing onboarding lands you on the first agent you just built — a real, deliberate
   // consequence of THIS user action (same setActive() chokepoint a rail tap drives), not a load/render
   // side effect — so completing membership now ALSO carries that selection onto the account, as two
-  // merge_user_prefs_view rpc calls (active, activeMulti) behind the one complete_membership call. What
-  // this AC actually guards against — a direct insert/upsert to cascades/user_prefs/notify_prefs bypassing
-  // the one RPC — is asserted below instead of a literal rpc-call allowlist.
+  // merge_user_prefs_view rpc calls (active, activeMulti) behind the one complete_membership call.
+  // CAS-1241 (B4): a third, pre-existing, unrelated view-field push (reviewSessions — bumpReviewPromptSessionCount
+  // fires on every boot, loadUserPrefs() has carried its +1 since before this ticket) used to win a race
+  // against sendQueue()'s own "already sending, do nothing" guard often enough to still be sitting unsent
+  // in the queue by the time this test's own await returned. B4's fix (fireAccountFanout now awaits its
+  // admission sweep properly before declaring itself settled) closes exactly that class of gap, so this
+  // pending write now reliably lands inside the same window too — not a new write this ticket adds, just
+  // one this ticket stops leaving stranded. What this AC actually guards against — a direct insert/upsert
+  // to cascades/user_prefs/notify_prefs bypassing the one RPC — is asserted below instead of a literal
+  // rpc-call allowlist.
   const rpcNames = client.rpcCalls.map(c => c.name);
   assert.equal(rpcNames[0], "complete_membership", "the first and only membership call must be complete_membership");
-  assert.deepEqual(rpcNames.slice(1).sort(), ["merge_user_prefs_view", "merge_user_prefs_view"],
-    "the only other calls allowed are the two view-field pushes landing on the first agent");
+  assert.deepEqual(rpcNames.slice(1).sort(), ["merge_user_prefs_view", "merge_user_prefs_view", "merge_user_prefs_view"],
+    "the only other calls allowed are the view-field pushes landing on the first agent (active, activeMulti) and this session's review-prompt count (reviewSessions)");
   assert.equal(client.writes.cascades.length, 0, "no direct insert/upsert to cascades");
   assert.equal(client.writes.user_prefs.length, 0, "no direct insert/upsert to user_prefs");
   assert.equal(client.writes.notify_prefs.length, 0, "no direct insert/upsert to notify_prefs");
