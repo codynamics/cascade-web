@@ -19713,6 +19713,7 @@ let renderCallCount = 0;
 function watchNavKey(){
   return JSON.stringify([
     watchTab,
+    watchCinemaStage,
     [...watchAgentOff].sort(),
     sortPicked, filt.sort,
     watchSearch[watchTab]||"",
@@ -19720,6 +19721,7 @@ function watchNavKey(){
     [...watchGenreOff[watchTab]].sort(),
     [...watchWatchedSel[watchTab]].sort(),
     [...watchBadgeSel[watchTab]].sort(),
+    [...watchAlsoShow[watchTab]].sort(),
     watchMineOnlyOn(),
     watchOccasion,
   ]);
@@ -22425,7 +22427,7 @@ function acctFetchKeepalive(init){
                                 // used to leave CAS-1231's list empty forever, not just its end result.
                                 get renderCallCount(){ return renderCallCount; },
                                 set renderCallCount(v){ renderCallCount=v; },
-                                markWatchNavigated,
+                                markWatchNavigated, watchNavKey,
                                 get watchListFilled(){ return watchListFilled; },
                                 // CAS-488: the catalogue-refresh seam and its busy-check, exposed the same way.
                                 pollCatalogue, catalogueUIBusy,
