@@ -1032,7 +1032,7 @@ test("CAS-1180: a watched film shows as a stub when its own chip is on (AC1, AC3
   // test's old immediate-removal expectation — see those tickets' "do not re-raise" note) — switch stage
   // away and back first, the same idiom CAS-1236's own AC4 test (settled-watch-list.spec.mjs) uses to force
   // the rebuild that actually drops the film.
-  await page.locator(".stagestop", { hasText: "Cinema" }).click();
+  await page.locator(".stagestop", { hasText: "Upcoming" }).click();
   await settleListing(page);
   await page.locator(".stagestop", { hasText: "Streaming" }).click();
   await settleListing(page);
