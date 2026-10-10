@@ -403,11 +403,10 @@ export async function bootAlreadySignedIn(page, { supabaseScript, resolveFnName,
   if(readyFlagExpr) await page.waitForFunction(readyFlagExpr, null, { timeout: 30_000 });
 }
 
-/** CAS-1185: Agents left the header's own chip for the menu's first item — reach it via Menu -> Agents,
- * matching how a person actually gets there now. */
-export async function openAgentsScreenFromMenu(page){
-  await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "Agents" }).click();
+/** CAS-1246: Agents is a header chip again — reach it via a single tap on #agentsBtn, matching how a
+ * person actually gets there now. */
+export async function openAgentsScreenFromNav(page){
+  await page.locator("#agentsBtn").click();
 }
 /** CAS-1126: "Where & when you'll watch" left the top menu for the new Settings screen — reach it via
  * Menu -> Settings -> the row, matching how a person actually gets there now. */

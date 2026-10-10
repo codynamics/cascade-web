@@ -27,7 +27,7 @@ import {
   admin, createTestUser, seedCascades, liveCascades, liveNotifyPrefs, testEmail,
   gotoIntegrityFresh, signInFromSplash, signOutFromAccount, signInDirect, fetchOtp, emailHasAccount,
 } from "./helpers.mjs";
-import { settleListing, finishFlow, walkToServices, openAgentsScreenFromMenu } from "../e2e/helpers.mjs";
+import { settleListing, finishFlow, walkToServices, openAgentsScreenFromNav } from "../e2e/helpers.mjs";
 
 function idsOf(rows){ return rows.map(r => r.id).slice().sort(); }
 
@@ -155,7 +155,7 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
     // Rename through the real Agents-screen edit flow (Edit → the hub's rename pencil → the name step),
     // then back out twice — closing the hub is what commits (briefClose → briefCommit → commitDraft →
     // saveCascades()), there is no separate Save button (CAS-934).
-    await openAgentsScreenFromMenu(pageA);
+    await openAgentsScreenFromNav(pageA);
     await expect(pageA.locator("#agentsScreen")).toHaveClass(/open/);
     await pageA.locator(`.agrow[data-id="${seededAgent.id}"] .ag-edit`).click();
     await pageA.locator(".eapenc").click();

@@ -3,7 +3,7 @@
 // at the engine/monitor level (tests/js/cas1198-alerts-switch.test.mjs, monitor/tests/test_matching.py's
 // AlertsOffGateTests) — this file covers the two Playwright ACs the ticket names explicitly.
 import { test, expect } from "@playwright/test";
-import { toShortlist, finishFlow, toListing, openAgentsScreenFromMenu } from "./helpers.mjs";
+import { toShortlist, finishFlow, toListing, openAgentsScreenFromNav } from "./helpers.mjs";
 
 async function buildOnboardedAccount(page){
   await toShortlist(page, "cinema");
@@ -21,7 +21,7 @@ const agentRow = (page, name) => page.locator("#agentsScreen .agrow", { has: pag
 
 test("CAS-1198 AC6: the Agents screen shows Alerts on for Massive Movies, and not for Personal Favs", async ({ page }) => {
   await buildOnboardedAccount(page);
-  await openAgentsScreenFromMenu(page);
+  await openAgentsScreenFromNav(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
 
   await expect(agentRow(page, "Massive Movies").locator(".agwho")).toContainText("🔔 Alerts on");
@@ -34,7 +34,7 @@ test("CAS-1198 AC6: the Agents screen shows Alerts on for Massive Movies, and no
 
 test("CAS-1198 AC5: the Edit Agent page's ALERTS section sits between Occasions and WHAT IT LOOKS FOR, toggles, survives Back/reopen, and has no horizontal overflow", async ({ page }) => {
   await buildOnboardedAccount(page);
-  await openAgentsScreenFromMenu(page);
+  await openAgentsScreenFromNav(page);
   await agentRow(page, "Personal Favs").locator(".ag-edit").click();
   await expect(page.locator(".osh.eahn")).toHaveText("Personal Favs");   // CAS-531: the page header IS the name
 
