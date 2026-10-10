@@ -108,7 +108,9 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
   await settleListing(page);
   await waitForAccountLoads(page);
 
-  await page.evaluate(() => { setWatchTab("stream"); render(); });
+  // CAS-1247: the default mood (Top scores) now caps each stage at its best 10 — too short for this
+  // test's "at least 20" premise regardless of roster size. Releases carries no such cap.
+  await page.evaluate(() => { setWatchTab("stream"); window.setWatchMood("releases"); render(); });
   await settleListing(page);
 
   const before = await page.evaluate(() => ({

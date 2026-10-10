@@ -232,6 +232,9 @@ test("Watch listing scroll position survives a long scroll to the bottom and bac
     await page.locator("#onbStepInner .osback").click();
     await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
   }
+  // The loop above leaves #agentsScreen open (the real "+ Add" flow returns there so a person can add
+  // another preset) — it covers the mood chip below, so close it before interacting with Watch top.
+  await page.evaluate(() => window.closeAgentsScreen());
   // CAS-1247: the default mood (Top scores) now caps each stage at its best 10 — too short to scroll
   // meaningfully regardless of roster size. Releases carries no such cap, so select it for this scroll test.
   await page.locator('.moodchip[data-mood="releases"]').click();
