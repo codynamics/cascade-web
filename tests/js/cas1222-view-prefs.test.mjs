@@ -114,7 +114,10 @@ test("CAS-1222: deleting the selected agent pushes the corrected active/activeMu
   }
 });
 
-test("CAS-1222: toggling my-services-only pushes the whole per-tab object under one key", async () => {
+test("CAS-1222: toggling my-services-only is a live, session-only flip — pushes nothing on its own", async () => {
+  // CAS-1247: view.mineOnly is retired (removed saveWatchMineOnly()) — mineOnly now rides inside whichever
+  // mood is saved. toggleWatchMineOnly (still a live test-convenience mutator, used elsewhere by
+  // cas1234-badge-filter.test.mjs) just flips the in-memory value now; it pushes nothing by itself.
   const E = loadEngine();
   const client = makeFakeClient(selectUserPrefsRow(null));
   signIn(E, client);
@@ -123,14 +126,8 @@ test("CAS-1222: toggling my-services-only pushes the whole per-tab object under 
     E.window.toggleWatchMineOnly();
     await settle();
 
-    // toggleWatchMineOnly's own render() also settles the Found view, which marks it seen (CAS-70,
-    // unrelated to this change) — filtering by key, not by total call count, since that push is real and
-    // expected, just not what this test is about.
-    const mergeCalls = client.rpcCalls.filter(c => c.name === "merge_user_prefs_view");
-    const mineOnlyCalls = mergeCalls.filter(c => c.params.p_patch.mineOnly);
-    assert.equal(mineOnlyCalls.length, 1);
-    assert.equal(mineOnlyCalls[0].params.p_patch.mineOnly.stream, false, "stream's switch just flipped off");
-    assert.equal(mineOnlyCalls[0].params.p_patch.mineOnly.rent, true, "every other tab is untouched");
+    const mineOnlyCalls = client.rpcCalls.filter(c => c.name === "merge_user_prefs_view" && c.params.p_patch.mineOnly);
+    assert.equal(mineOnlyCalls.length, 0, "AC: mineOnly must never be pushed as its own view field any more");
   } finally {
     E.window.toggleWatchMineOnly();   // restore the default before the next test
     signOut(E);
@@ -279,11 +276,12 @@ test("CAS-1222: loadUserPrefs adopts every view field, leaving an unanswered fie
     user_id: "cas1222-test-user",
     view: {
       active: idB, activeMulti: [idB],
-      mineOnly: { stream: false },
       tutorialSeen: true,
       agent: { invited: true },
       admitDrift: { [filmId]: true },
       // seenFound/reviewSessions/reviewAskedVer deliberately absent — "no device has saved this yet".
+      // CAS-1247: view.mineOnly is retired — mineOnly now rides inside view.moods/view.mood instead,
+      // covered by cas1247's own tests.
     },
   };
   const client = makeFakeClient(selectUserPrefsRow(row));
@@ -299,7 +297,6 @@ test("CAS-1222: loadUserPrefs adopts every view field, leaving an unanswered fie
 
     assert.equal(E.activeId, idB);
     assert.deepEqual([...E.activeIds], [idB]);
-    assert.equal(E.watchMineOnlyOn(), false, "stream's mineOnly was adopted off");
     assert.equal(E.tutorialSeen(), true);
     assert.equal(E.agentState.invited, true);
     assert.equal(E.admitDrift[filmId], true);

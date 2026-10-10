@@ -71,14 +71,15 @@ test("CAS-753 AC1/AC2: default on hides a film only on an unpicked service; the 
   await expect(page.locator(`#card-${FILM_OFF}`)).toHaveCount(0);
   const before = Number(await page.locator('#groups .group[data-g="included_streaming"] .gcount').textContent());
 
-  // AC2: the Filters dialog's own toggle (styled like the sheet's other rows) restores the hidden film,
-  // and the section count moves to match.
-  await page.locator("#watchFilterBtn").click();
+  // AC2: the mood sheet's own toggle (styled like the sheet's other rows) restores the hidden film, and the
+  // section count moves to match — CAS-1247: it's a draft now, so it takes a Save, not just a close, to
+  // actually apply (closing without saving discards, by design — see cas1247's own AC6).
+  await page.locator(".moodchip.on").click();
   const sw = page.locator("#watchMineOnlySwitch");
   await expect(sw).toHaveClass(/\bon\b/);
   await sw.click();
   await expect(sw).not.toHaveClass(/\bon\b/);
-  await page.locator(".wsheetclose").click();
+  await page.locator("#moodSaveBtn").click();
 
   await expect(page.locator(`#card-${FILM_OFF}`)).toBeVisible();
   const after = Number(await page.locator('#groups .group[data-g="included_streaming"] .gcount').textContent());

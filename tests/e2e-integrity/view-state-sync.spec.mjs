@@ -3,9 +3,13 @@
 // merge_user_prefs_view (migration 0009) so two devices changing different fields at the same moment both
 // land, rather than whichever push reaches the account second clobbering the first. Drives the real app
 // against the local Supabase stack, same convention as server-first.spec.mjs/device-storage.spec.mjs.
-// window.setActive/window.toggleWatchMineOnly/markTutorialSeen are driven directly as test-convenience
-// chokepoints, the same style server-first.spec.mjs/device-storage.spec.mjs already use for
-// window.setOpinion(...) — there is no dedicated UI control under test here, just the account round trip.
+// window.setActive/markTutorialSeen are driven directly as test-convenience chokepoints, the same style
+// server-first.spec.mjs/device-storage.spec.mjs already use for window.setOpinion(...) — there is no
+// dedicated UI control under test here, just the account round trip.
+// CAS-1247: view.mineOnly is retired — window.toggleWatchMineOnly() is now a live, session-only flip that
+// persists nothing on its own. AC1/AC4 below drive mineOnly's actual persisted path instead: saving the
+// selected mood with mineOnly off (openMoodSheetFor/toggleMoodDraftMineOnly/saveMoodFromSheet), the same
+// save a person tapping "Save mood" in the sheet triggers.
 import { test, expect } from "@playwright/test";
 import {
   admin, createTestUser, seedCascades, testEmail,
@@ -49,7 +53,12 @@ test("AC1: A selects an agent and sets Streaming mine-only off; B reconciles and
     await Promise.all([waitForAccountLoads(pageA), waitForAccountLoads(pageB)]);
 
     await pageA.evaluate((id) => window.setActive(id), agentB.id);
-    await pageA.evaluate(() => { window.setWatchTab("stream"); window.toggleWatchMineOnly(); });
+    await pageA.evaluate(() => {
+      window.setWatchTab("stream");
+      window.openMoodSheetFor(watchMoodSel);
+      window.toggleMoodDraftMineOnly();
+      window.saveMoodFromSheet();
+    });
     await pageA.evaluate(() => window.CascadeAccountStore.sendQueue());
     await expect.poll(() => pageA.evaluate(() => window.CascadeAccountStore.queue.length), { timeout: 15_000 }).toBe(0);
 
@@ -116,7 +125,12 @@ test("AC4: A changes the selected agent while B changes Streaming mine-only at t
 
     await Promise.all([
       pageA.evaluate((id) => window.setActive(id), agentB.id),
-      pageB.evaluate(() => { window.setWatchTab("stream"); window.toggleWatchMineOnly(); }),
+      pageB.evaluate(() => {
+        window.setWatchTab("stream");
+        window.openMoodSheetFor(watchMoodSel);
+        window.toggleMoodDraftMineOnly();
+        window.saveMoodFromSheet();
+      }),
     ]);
     await Promise.all([
       pageA.evaluate(() => window.CascadeAccountStore.sendQueue()),
@@ -126,8 +140,11 @@ test("AC4: A changes the selected agent while B changes Streaming mine-only at t
     await expect.poll(() => pageB.evaluate(() => window.CascadeAccountStore.queue.length), { timeout: 15_000 }).toBe(0);
 
     await expect.poll(async () => {
+      // The edited mood was already the selected one, so saving it pushes only "moods", never "mood" (C4) —
+      // this fresh account never had any mood saved before this test, so "some saved mood has mineOnly off"
+      // is an unambiguous signal of the save having landed, without depending on v.mood being set at all.
       const v = await viewRow(user.id);
-      return v.active === agentB.id && v.mineOnly && v.mineOnly.stream === false;
+      return v.active === agentB.id && Array.isArray(v.moods) && v.moods.some(m => m.mineOnly === false);
     }, { timeout: 15_000 }).toBe(true);
   } finally {
     await ctxA.close();

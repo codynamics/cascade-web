@@ -42,7 +42,7 @@ test("CAS-1144 AC1/AC3: no agent tracking the tab names the real reason and offe
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
 });
 
-test("CAS-1144 AC2/AC3: a Watch filter hiding everything prices an honest Clear filters, not legacy relax buttons", async ({ page }) => {
+test("CAS-1144 AC2/AC3: a Watch filter hiding everything prices an honest Edit this mood, not legacy relax buttons", async ({ page }) => {
   const cascadeId = await toWatchScreen(page, "stream");
   // Same synthetic-film-past-deriveStatus technique cas753.spec.mjs uses: pinned straight to the agent and
   // armed manually, so it is admitted and placed on Streaming with no dependence on real catalogue taste
@@ -58,11 +58,10 @@ test("CAS-1144 AC2/AC3: a Watch filter hiding everything prices an honest Clear 
   await settleListing(page);
   await expect(page.locator(`#card-${FILM_ID}`)).toBeVisible();
 
-  // CAS-1223: the search field is no longer shown by default — tapping the search button swaps the tools
-  // row for it (openWatchSearch, unchanged underneath).
-  await page.locator("#watchSearchBtn").click();
-  await page.fill("#watchSearchInput", "zzznomatch1144");
-  await page.waitForTimeout(250);   // CAS-514's debounced render picking up the new search text
+  // CAS-1247: Watch's own search box is gone — narrow everything out with a mood-level filter instead (a
+  // Badges selection the synthetic film's own scaleTier never matches), same "hides everything" setup this
+  // test used search for before.
+  await page.evaluate(() => { watchBadgeSel[watchTab].add("landmark"); render(); });
   await settleListing(page);
 
   const empty = page.locator("#groups .empty");
@@ -70,11 +69,13 @@ test("CAS-1144 AC2/AC3: a Watch filter hiding everything prices an honest Clear 
   await expect(empty).not.toContainText(/Drop the|Look beyond my services/);
   const btn = empty.locator(".ebtn");
   await expect(btn).toHaveCount(1);
-  await expect(btn).toContainText("Clear filters");
+  await expect(btn).toContainText("Edit this mood");
   const n = Number((await btn.locator("b").textContent()).replace(/\D+/g, ""));
   expect(n).toBeGreaterThan(0);
 
+  // CAS-1247: the button opens the mood sheet for editing now, rather than clearing in place — confirm it
+  // opens on the draft that's actually narrowing the list (the Badges selection just set above).
   await btn.click();
-  await settleListing(page);
-  await expect(page.locator("#groups .card, #groups .stub")).toHaveCount(n);
+  await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+  await expect(page.locator("#watchSheetBody .badgeopt.on")).toHaveCount(1);
 });
