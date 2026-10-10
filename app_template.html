@@ -3604,6 +3604,67 @@
     font:500 13px/1.3 var(--font-body);color:var(--ink)}
   .svcq .svclist li:first-child{border-top:0}
   .svcq .svclist li span{color:var(--faint);font-size:11.5px;flex:none}
+
+  /* ==== YOUR TASTE: THE PAGE AND ITS CARD ON THE AGENTS SCREEN (Lee, 2026-10-11) ====
+     Teal rgb(45,212,191) means the person goes for it, orange rgb(240,136,58) means they avoid it. The pair
+     was checked for colour-blind separation; a + or a minus sign backs it up on strong squares. */
+  .tastecard{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:0 0 12px;padding:12px 13px;border-radius:14px;
+    border:1px solid var(--sel-bd);background:var(--sel-bg);color:var(--ink);font:inherit;cursor:pointer}
+  .tastecard .tcmini{display:grid;grid-template-columns:repeat(4,9px);gap:2px;flex:none}
+  .tastecard .tcmini i{width:9px;height:9px;border-radius:2px;background:rgba(255,255,255,.1)}
+  .tastecard .tct{flex:1;min-width:0}
+  .tastecard .tct b{display:block;font:700 14px/1.2 var(--font-body)}
+  .tastecard .tct span{display:block;font:500 12px/1.4 var(--font-body);color:var(--dim);margin-top:3px}
+  .tastecard .tcgo{color:var(--dim);font-size:16px}
+  .tstats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:4px 0 4px}
+  .tstat{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 10px 9px;min-width:0}
+  .tstat b{display:block;font:800 19px/1.1 var(--font-body);color:var(--ink)}
+  .tstat span{display:block;font:600 10.5px/1.3 var(--font-body);color:var(--faint);margin-top:4px}
+  .tnote{font:500 12px/1.5 var(--font-body);color:var(--dim);margin:0 0 9px}
+  .tmap{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px 9px 11px}
+  .tgrid{display:grid;gap:3px;align-items:center}
+  .tgrid .th{font:700 9px/1 var(--font-body);letter-spacing:.2px;color:var(--faint);text-align:center;padding-bottom:3px}
+  .tgrid .th.all{color:var(--dim)}
+  .tgrid .tr{font:600 11.5px/1.1 var(--font-body);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:4px}
+  .tgrid .tr small{font:500 10px/1 var(--font-body);color:var(--faint);margin-left:4px}
+  .tcell{position:relative;aspect-ratio:1;border-radius:6px;border:0;padding:0;background:rgba(255,255,255,.045);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font:800 10px/1 var(--font-body);color:rgba(255,255,255,.92)}
+  .tcell.none{background:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);cursor:default}
+  .tcell.sel{outline:2px solid #fff;outline-offset:1px}
+  .tcell.allc{border-radius:50%}
+  .tlegend{display:flex;align-items:center;gap:7px;margin-top:10px;font:600 10.5px/1 var(--font-body);color:var(--faint)}
+  .tlegend .ramp{display:flex;gap:2px}
+  .tlegend .ramp i{width:14px;height:9px;border-radius:2px}
+  .tlegend .sp{margin-left:auto}
+  .tdetail{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+  .tdetail h4{margin:0;font:700 13.5px/1.25 var(--font-body);color:var(--ink)}
+  .tdetail .tlean{font:600 12px/1.4 var(--font-body);color:var(--dim);margin-top:3px}
+  .tdetail ul{list-style:none;margin:8px 0 0;padding:0}
+  .tdetail li{display:flex;align-items:center;gap:8px;padding:4px 0;font:500 12.5px/1.3 var(--font-body);color:var(--ink)}
+  .tdetail li .vd{width:8px;height:8px;border-radius:50%;flex:none}
+  .tdetail li .vl{margin-left:auto;color:var(--faint);font-size:11px;flex:none}
+  .tstrip{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:12px 12px 10px}
+  .tstrip .tshead{font:700 13.5px/1.3 var(--font-body);color:var(--ink)}
+  .tstrip .tshead b{color:#5fe0cf}
+  .tplot{position:relative;height:100px;margin:12px 2px 4px}
+  .tplot .band{position:absolute;top:0;bottom:0;background:rgba(45,212,191,.13);border-left:1px solid rgba(45,212,191,.55);border-right:1px solid rgba(45,212,191,.55)}
+  .tplot .mid{position:absolute;left:0;right:0;top:51px;height:1px;background:var(--line)}
+  .tplot .pt{position:absolute;width:8px;height:8px;border-radius:50%;margin:-4px 0 0 -4px;box-shadow:0 0 0 1.5px var(--panel2)}
+  .taxis{display:flex;justify-content:space-between;font:600 9.5px/1 var(--font-body);color:var(--faint);margin:0 2px}
+  .tages{display:grid;grid-template-columns:auto 1fr auto;gap:6px 9px;align-items:center;margin-top:2px}
+  .tages .al{font:700 11.5px/1 var(--font-body);color:var(--ink)}
+  .tages .ab{display:flex;height:9px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.05);gap:2px}
+  .tages .ab i{display:block;height:100%}
+  .tages .an{font:600 10.5px/1 var(--font-body);color:var(--faint);white-space:nowrap}
+  .tfeed{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:4px 12px}
+  .tfeed .tf{display:flex;align-items:center;gap:9px;padding:9px 0;border-top:1px solid rgba(255,255,255,.05)}
+  .tfeed .tf:first-child{border-top:0}
+  .tfeed .vd{width:9px;height:9px;border-radius:50%;flex:none}
+  .tfeed .ft{flex:1;min-width:0}
+  .tfeed .ft b{display:block;font:600 12.5px/1.25 var(--font-body);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tfeed .ft span{display:block;font:500 11px/1.3 var(--font-body);color:var(--faint);margin-top:2px}
+  .tfeed .mv{font:700 11px/1 var(--font-body);flex:none}
+  .tfeed .mv.up{color:#5fe0cf} .tfeed .mv.dn{color:#f3a063}
 </style>
 </head>
 <body>
@@ -4208,6 +4269,13 @@
      menu (CAS-345), its permanent entry point. -->
 <div class="uscreen" id="svcAnalysis" role="dialog" aria-modal="true" aria-label="Service analysis">
   <div class="uwrap" id="svcAnalysisBody"></div>
+</div>
+
+<!-- YOUR TASTE (CAS-1252) — what tasteProfile() (CAS-1251) says the person goes for, drawn here and nowhere
+     else. Body rendered by renderTasteScreen(). Reached from its own card at the top of the Agents screen;
+     opens on top of Agents rather than replacing it, same as Service analysis above. -->
+<div class="uscreen" id="tasteScreen" role="dialog" aria-modal="true" aria-label="Your taste">
+  <div class="uwrap" id="tasteBody"></div>
 </div>
 
 <!-- LANGUAGES (CAS-532, split into its own destination CAS-562) — the one language setting that applies
@@ -9155,6 +9223,7 @@ function advanceClock(){
   TODAY = now;
   rederiveStatuses();
   agMetricsCache.clear();   // CAS-867: "last find Nd ago" and the recent-find count move with the clock alone
+  _tasteProfileCache = null;   // CAS-1251: the learned score range reads cascadeScore(m), which moves with the clock too
   return true;
 }
 async function pollCatalogue(){
@@ -10748,6 +10817,358 @@ function cascadeScoreSourcesText(m){
   return wmQScoreSourcesText(m);
 }
 
+// ---- Taste profile (CAS-1251): what your verdicts say you go for, and a Match number for any film -------
+// Lee, 10-11 Oct 2026, approved on the design board 11 Oct. Calculation only — nothing here draws or stores
+// anything; it reads straight off the six verdict sets already in memory (opinionOf) and the user_films
+// rows the account store already holds (every verdict, including "notfor", lands there — see filmRows()).
+// _tasteProfileCache is cleared at the same five places agMetricsCache.clear() already is: a verdict
+// changing, a catalogue swap, the clock moving on, and a sign-out or a sync — the same things that can
+// change which films even count.
+const TASTE_WEIGHTS = {wow:1.5, liked:1.25, enjoyed:1, soso:-0.5, disliked:-1, notfor:-1};
+const TASTE_K = 4;
+const tasteConf = n => n / (n + TASTE_K);
+let _tasteProfileCache = null;
+function _tasteVerdictAt(id){
+  const store = window.CascadeAccountStore;
+  const rows = store && store.acctStore && store.acctStore.user_films;
+  const row = rows && rows.find(r => String(r.movie_id) === String(id));
+  return (row && row.updated_at != null) ? row.updated_at : null;
+}
+function tasteProfile(){
+  if(_tasteProfileCache) return _tasteProfileCache;
+  const counted = [];
+  const ids = new Set(watched); blocked.forEach(id => ids.add(id));
+  ids.forEach(id => {
+    const kind = opinionOf(id); if(!kind) return;
+    const m = MOVIES.find(x => x.tmdb_id === id);
+    if(!m || !(m.genres && m.genres.length)) return;
+    counted.push({id, kind, w: TASTE_WEIGHTS[kind], m, p: m.genres[0], S: m.genres.slice(1), at: _tasteVerdictAt(id)});
+  });
+  const byAt = (a, b) => (b.at==null?Infinity:new Date(b.at).getTime()) - (a.at==null?Infinity:new Date(a.at).getTime());
+
+  const overall = {sum:0, n:0};
+  counted.forEach(v => { overall.sum += v.w; overall.n += 1; });
+  overall.lean = overall.sum / (overall.n + TASTE_K);
+
+  const styles = {}, pairs = {}, ages = {};
+  counted.forEach(v => {
+    const sty = styles[v.p] || (styles[v.p] = {sum:0, n:0, films:[]});
+    sty.sum += v.w; sty.n += 1; sty.films.push(v);
+    v.S.forEach(s => {
+      const key = v.p + "|" + s;
+      const pr = pairs[key] || (pairs[key] = {primary:v.p, other:s, sum:0, n:0, films:[]});
+      pr.sum += v.w; pr.n += 1; pr.films.push(v);
+    });
+    if(v.m.age_rating){
+      const a = ages[v.m.age_rating] || (ages[v.m.age_rating] = {for:0, against:0});
+      if(v.w > 0) a.for += 1; else a.against += 1;
+    }
+  });
+  const filmsOut = list => list.slice().sort(byAt).map(v => ({id:v.id, verdict:v.kind}));
+  Object.values(styles).forEach(s => {
+    s.lean = (s.sum + TASTE_K*overall.lean) / (s.n + TASTE_K);
+    s.conf = tasteConf(s.n);
+    s.films = filmsOut(s.films);
+  });
+  Object.values(pairs).forEach(pr => {
+    const sLean = styles[pr.primary].lean;
+    pr.lean = (pr.sum + TASTE_K*sLean) / (pr.n + TASTE_K);
+    pr.conf = tasteConf(pr.n);
+    pr.films = filmsOut(pr.films);
+  });
+
+  const scores = counted.filter(v => v.w > 0 && cascadeScore(v.m) > 0)
+                         .map(v => cascadeScore(v.m)).sort((a,b) => a-b);
+  const scoreCount = scores.length;
+  const range = scoreCount >= 5
+    ? [scores[Math.round(0.15*(scoreCount-1))], scores[Math.round(0.85*(scoreCount-1))]]
+    : null;
+
+  const latest = counted.slice().sort(byAt).map(v => ({id:v.id, verdict:v.kind, at:v.at}));
+
+  const profile = {n: overall.n, overall: {sum:overall.sum, n:overall.n, lean:overall.lean}, styles, pairs, range, ages, latest};
+  _tasteProfileCache = profile;
+  return profile;
+}
+// Match for a film not yet judged — null when there isn't enough evidence to say anything (CAS-1251).
+function tasteMatch(m){
+  if(!(m.genres && m.genres.length)) return null;
+  const T = tasteProfile();
+  if(T.n < 5) return null;
+  const p = m.genres[0], S = m.genres.slice(1);
+  const sty = T.styles[p];
+  const styleLean = sty ? sty.lean : T.overall.lean;
+  const styleN = sty ? sty.n : 0;
+  const taste = S.length
+    ? S.reduce((sum, s) => sum + (T.pairs[p+"|"+s] ? T.pairs[p+"|"+s].lean : styleLean), 0) / S.length
+    : styleLean;
+  const sc = cascadeScore(m);
+  let fit = 0;
+  if(T.range && sc > 0){
+    const [lo, hi] = T.range;
+    if(sc >= lo && sc <= hi) fit = 0.15;
+    else{
+      const distance = sc < lo ? lo - sc : sc - hi;
+      fit = -Math.min(0.3, distance/40);
+    }
+  }
+  const value = Math.max(1, Math.min(99, Math.round(50 + 42*taste + 40*fit)));
+  const conf = Math.max(tasteConf(styleN), 0.45*tasteConf(T.overall.n));
+  const level = conf < 0.4 ? 1 : conf < 0.65 ? 2 : 3;
+  return {value, conf, level};
+}
+
+// ---- Your taste: the page and its card on the Agents screen (CAS-1252) ---------------------------------
+// Draws tasteProfile() (CAS-1251); stores and writes nothing. tasteSelPrimary/tasteSelOther is the style
+// map's selected square, reset to null on every open so renderStyleMapSection() re-picks the default.
+const TASTE_SHORT = {
+  "Action":"Act", "Adventure":"Adv", "Animation":"Ani", "Comedy":"Com", "Crime":"Cri", "Documentary":"Doc",
+  "Drama":"Dra", "Family":"Fam", "Fantasy":"Fan", "History":"His", "Horror":"Hor", "Music":"Mus",
+  "Mystery":"Mys", "Romance":"Rom", "Science Fiction":"Sci", "Thriller":"Thr", "War":"War", "Western":"Wes",
+  "TV Movie":"TV"
+};
+const tasteShortName = style => TASTE_SHORT[style] || style.slice(0, 3);
+// Shared by a style's All square and a pairing's square alike — both carry {lean, n, conf}.
+function tasteColor(data){
+  const mag = Math.min(1, Math.abs(data.lean) / 0.75);
+  const alpha = Math.round((0.16 + 0.74*mag) * (0.35 + 0.65*data.conf) * 100) / 100;
+  return data.lean >= 0 ? `rgba(45,212,191,${alpha})` : `rgba(240,136,58,${alpha})`;
+}
+// Rows: T.styles by n desc (ties A–Z), 9 at most. Columns: other-styles paired with those rows, ranked by
+// total verdicts across them (ties A–Z), 8 at most. best = the shown pairing with the most verdicts, the
+// style map's default selection, falling back to the top row's All square when no pairing is shown at all.
+function tasteStyleMapData(T){
+  const rows = Object.entries(T.styles)
+    .sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0]))
+    .slice(0, 9).map(e => e[0]);
+  const colTotals = {};
+  rows.forEach(p => Object.values(T.pairs).filter(pr => pr.primary === p).forEach(pr => {
+    colTotals[pr.other] = (colTotals[pr.other] || 0) + pr.n;
+  }));
+  const cols = Object.keys(colTotals)
+    .sort((a, b) => colTotals[b] - colTotals[a] || a.localeCompare(b))
+    .slice(0, 8);
+  if(!rows.length) return {rows, cols, best: null};
+  let best = null;
+  rows.forEach(p => cols.forEach(o => {
+    const pr = T.pairs[p + "|" + o];
+    if(pr && pr.n > 0 && (!best || pr.n > best.n)) best = {primary: p, other: o, n: pr.n};
+  }));
+  if(!best) best = {primary: rows[0], other: null, n: T.styles[rows[0]].n};
+  return {rows, cols, best};
+}
+let tasteSelPrimary = null, tasteSelOther = null;
+function tasteCellHTML(primary, other, data, isAll){
+  const sign = data.n >= 3 ? (data.lean >= 0.3 ? "+" : data.lean <= -0.3 ? "−" : "") : "";
+  const sel = tasteSelPrimary === primary && tasteSelOther === (other || null);
+  const label = isAll
+    ? `${primary}: ${data.n} verdict${data.n === 1 ? "" : "s"}`
+    : `${primary} with ${other}: ${data.n} verdict${data.n === 1 ? "" : "s"}`;
+  const otherArg = other ? `'${escA(other)}'` : "null";
+  return `<button type="button" class="tcell${isAll ? " allc" : ""}${sel ? " sel" : ""}" style="background:${tasteColor(data)}"
+    aria-label="${escA(label)}" onclick="tasteSel('${escA(primary)}',${otherArg})">${sign}</button>`;
+}
+function tasteDetailHTML(primary, other, data){
+  const heading = other ? `${esc(primary)} + ${esc(other)}` : `${esc(primary)} (all)`;
+  const n = data.n;
+  const words = n < 3 ? "too few verdicts to say yet"
+    : data.lean >= 0.45 ? "you strongly go for these"
+    : data.lean >= 0.15 ? "you lean towards these"
+    : data.lean > -0.15 ? "no clear lean"
+    : data.lean > -0.4 ? "you lean away from these"
+    : "you strongly avoid these";
+  const tally = REVIEW_STEPS.map(s => {
+    const c = data.films.filter(f => f.verdict === s.key).length;
+    return c ? `${c} ${s.lbl}` : null;
+  }).filter(Boolean).join(" · ");
+  const shown = data.films.slice(0, 6);
+  const filmsHTML = shown.map(f => {
+    const m = MOVIES.find(x => x.tmdb_id === f.id);
+    const step = REVIEW_STEPS.find(s => s.key === f.verdict);
+    return `<li><span class="vd" style="background:${step ? step.cd : ""}"></span>${esc(m ? m.title : "")}<span class="vl">${esc(step ? step.lbl : "")}</span></li>`;
+  }).join("");
+  const more = data.films.length > 6 ? `<div class="advfoot" style="margin-top:6px">and ${data.films.length - 6} more</div>` : "";
+  return `<div class="tdetail">
+    <h4>${heading}</h4>
+    <div class="tlean">${n} verdict${n === 1 ? "" : "s"}: ${words}.<br>${tally}</div>
+    <ul>${filmsHTML}</ul>
+    ${more}
+  </div>`;
+}
+function renderStyleMapSection(T){
+  const {rows, cols, best} = tasteStyleMapData(T);
+  if(tasteSelPrimary === null){ tasteSelPrimary = best.primary; tasteSelOther = best.other; }
+  const headerHTML = `<span></span><span class="th all">All</span>`
+    + cols.map(c => `<span class="th">${esc(tasteShortName(c))}</span>`).join("");
+  const rowsHTML = rows.map(primary => {
+    const sty = T.styles[primary];
+    const allCell = tasteCellHTML(primary, null, sty, true);
+    const otherCells = cols.map(other => {
+      const pr = T.pairs[primary + "|" + other];
+      return (pr && pr.n > 0) ? tasteCellHTML(primary, other, pr, false) : `<span class="tcell none"></span>`;
+    }).join("");
+    return `<span class="tr">${esc(primary)}<small>${sty.n}</small></span>${allCell}${otherCells}`;
+  }).join("");
+  const data = tasteSelOther ? T.pairs[tasteSelPrimary + "|" + tasteSelOther] : T.styles[tasteSelPrimary];
+  return `
+    <div class="flabel">Style map</div>
+    <p class="tnote">Down the side is a film's first style; across the top, its other styles. Tap a square to see the films behind it.</p>
+    <div class="tmap">
+      <div class="tgrid" style="grid-template-columns:minmax(0,92px) repeat(${1 + cols.length},1fr)">${headerHTML}${rowsHTML}</div>
+      <div class="tlegend"><span>avoid</span><span class="ramp"><i style="background:rgba(240,136,58,0.85)"></i><i style="background:rgba(240,136,58,0.46)"></i><i style="background:rgba(255,255,255,.08)"></i><i style="background:rgba(45,212,191,0.46)"></i><i style="background:rgba(45,212,191,0.85)"></i></span><span>go for</span><span class="sp">fainter = fewer verdicts</span></div>
+      ${tasteDetailHTML(tasteSelPrimary, tasteSelOther, data)}
+    </div>`;
+}
+window.tasteSel = (primary, other) => {
+  const el = $("tasteScreen"), top = el ? el.scrollTop : 0;
+  tasteSelPrimary = primary; tasteSelOther = other || null;
+  renderTasteScreen();
+  if(el) el.scrollTop = top;   // re-rendering must not move the page
+};
+// Axis: 40 to 100 in 15 columns of 4 points, a score under 40 goes in the first column. scorePct() places a
+// continuous score (a range boundary) on the same 0–100 scale the discrete columns use.
+const scorePct = s => Math.max(0, Math.min(100, ((s - 40) / 60) * 100));
+function renderScoresSection(T){
+  const pts = T.latest.map(v => {
+    const m = MOVIES.find(x => x.tmdb_id === v.id);
+    return m ? {score: cascadeScore(m), w: TASTE_WEIGHTS[v.verdict]} : null;
+  }).filter(p => p && p.score > 0);
+  const byCol = {};
+  pts.forEach(p => {
+    const b = p.score < 40 ? 0 : Math.min(14, Math.floor((p.score - 40) / 4));
+    const col = byCol[b] || (byCol[b] = {up: [], down: []});
+    (p.w > 0 ? col.up : col.down).push(p);
+  });
+  let up = 1, down = 1;
+  Object.values(byCol).forEach(c => { up = Math.max(up, c.up.length); down = Math.max(down, c.down.length); });
+  const line = up*9 + 6, plotH = (up+down)*9 + 12;
+  const dotsHTML = Object.keys(byCol).map(b => {
+    const left = ((Number(b) + 0.5) * 4) / 60 * 100;
+    const col = byCol[b];
+    const up2 = col.up.map((p, i) => `<span class="pt" style="left:${left}%;top:${line - 8 - i*9}px;background:rgb(45,212,191)"></span>`).join("");
+    const dn = col.down.map((p, i) => `<span class="pt" style="left:${left}%;top:${line + 8 + i*9}px;background:rgb(240,136,58)"></span>`).join("");
+    return up2 + dn;
+  }).join("");
+  const bandHTML = T.range
+    ? `<span class="band" style="left:${scorePct(T.range[0])}%;width:${scorePct(T.range[1]) - scorePct(T.range[0])}%"></span>` : "";
+  const heading = T.range
+    ? `Films you enjoy usually score <b>${T.range[0]}&ndash;${T.range[1]}</b> on Cascade.`
+    : `Not enough verdicts yet to see a range.`;
+  return `
+    <div class="flabel">Scores you enjoy</div>
+    <div class="tstrip">
+      <div class="tshead">${heading}</div>
+      <div class="tplot" style="height:${plotH}px"><span class="mid" style="top:${line}px"></span>${bandHTML}${dotsHTML}</div>
+      <div class="taxis"><span>40 or less</span><span>55</span><span>70</span><span>85</span><span>100</span></div>
+      <div class="tlegend" style="margin-top:9px"><span class="ramp"><i style="background:rgb(45,212,191)"></i></span><span>enjoyed, above the line</span><span class="ramp" style="margin-left:8px"><i style="background:rgb(240,136,58)"></i></span><span>didn't, below</span></div>
+    </div>`;
+}
+const TASTE_AGE_ORDER = ["G", "PG", "M", "MA 15+", "R 18+"];
+function renderAgesSection(T){
+  const rows = TASTE_AGE_ORDER.filter(a => T.ages[a]);
+  if(!rows.length) return "";
+  const maxTotal = Math.max(...rows.map(a => T.ages[a].for + T.ages[a].against));
+  const rowsHTML = rows.map(a => {
+    const d = T.ages[a];
+    const forPct = d.for / maxTotal * 100, againstPct = d.against / maxTotal * 100;
+    return `<span class="al">${esc(a)}</span><span class="ab"><i style="width:${forPct}%;background:rgb(45,212,191)"></i><i style="width:${againstPct}%;background:rgb(240,136,58)"></i></span><span class="an">${d.for} for · ${d.against} against</span>`;
+  }).join("");
+  return `
+    <div class="flabel">Age ratings</div>
+    <div class="tstrip"><div class="tages">${rowsHTML}</div></div>`;
+}
+function renderLatestSection(T){
+  const rows = T.latest.slice(0, 6).map(v => {
+    const m = MOVIES.find(x => x.tmdb_id === v.id);
+    const step = REVIEW_STEPS.find(s => s.key === v.verdict);
+    const styles = (m && m.genres) || [];
+    const extra = styles.length > 1 ? ` + ${esc(styles.slice(1, 3).join(", "))}` : "";
+    const w = TASTE_WEIGHTS[v.verdict];
+    return `<div class="tf"><span class="vd" style="background:${step ? step.cd : ""}"></span>
+      <span class="ft"><b>${esc(m ? m.title : "")}</b><span>${esc(step ? step.lbl : "")} · ${esc(styles[0] || "")}${extra}</span></span>
+      <span class="mv ${w > 0 ? "up" : "dn"}">${w > 0 ? "▲" : "▼"} ${esc(styles[0] || "")}</span></div>`;
+  }).join("");
+  return `
+    <div class="flabel">Latest verdicts, and what each one moved</div>
+    <div class="tfeed">${rows}</div>
+    <div class="advfoot" style="margin-top:10px">Worked out on this device from your own verdicts. Nothing here changes an agent unless you say so.</div>`;
+}
+function tasteStatsHTML(T){
+  if(T.n === 0){
+    return `<div class="tstats">
+      <div class="tstat"><b>0</b><span>verdicts so far</span></div>
+      <div class="tstat"><b>&ndash;</b><span>your strongest pairing</span></div>
+      <div class="tstat"><b>&ndash;</b><span>what you avoid most</span></div>
+    </div>`;
+  }
+  let bestPair = null;
+  Object.values(T.pairs).forEach(pr => {
+    if(pr.n >= 3 && (!bestPair || pr.lean*pr.conf > bestPair.lean*bestPair.conf)) bestPair = pr;
+  });
+  const pairText = (bestPair && bestPair.lean > 0) ? `${tasteShortName(bestPair.primary)} + ${tasteShortName(bestPair.other)}` : "–";
+  let worstName = null, worstStyle = null;
+  Object.entries(T.styles).forEach(([name, s]) => {
+    if(s.n >= 3 && (!worstStyle || s.lean < worstStyle.lean)){ worstStyle = s; worstName = name; }
+  });
+  const avoidText = (worstStyle && worstStyle.lean < 0) ? worstName : "–";
+  return `<div class="tstats">
+    <div class="tstat"><b>${T.n}</b><span>verdicts so far</span></div>
+    <div class="tstat"><b>${esc(pairText)}</b><span>your strongest pairing</span></div>
+    <div class="tstat"><b>${esc(avoidText)}</b><span>what you avoid most</span></div>
+  </div>`;
+}
+function renderTasteScreen(){
+  const el = $("tasteBody"); if(!el) return;
+  const T = tasteProfile();
+  const head = `
+    <div class="ostop"><button class="osback" type="button" onclick="closeTasteScreen()" aria-label="Back">←</button><h2 class="osh">Your taste</h2></div>
+    <p class="ossub">What your verdicts say you go for. Every Wow, Enjoyed, So-so, Disliked and Never moves it.</p>`;
+  const stats = tasteStatsHTML(T);
+  if(T.n === 0){
+    el.innerHTML = `${head}${stats}
+      <p class="tnote">Give a verdict on a film you've watched, or say Never to one you wouldn't, and your map starts here.</p>`;
+    return;
+  }
+  el.innerHTML = `${head}${stats}
+    ${renderStyleMapSection(T)}
+    ${renderScoresSection(T)}
+    ${renderAgesSection(T)}
+    ${renderLatestSection(T)}`;
+}
+function tasteCardHTML(){
+  const T = tasteProfile(), n = T.n;
+  const {rows, cols} = tasteStyleMapData(T);
+  const miniRows = rows.slice(0, 4), miniCols = cols.slice(0, 3);
+  const cells = [];
+  for(let r = 0; r < 4; r++){
+    const primary = miniRows[r];
+    for(let c = 0; c < 4; c++){
+      if(!primary){ cells.push("<i></i>"); continue; }
+      if(c === 0){ cells.push(`<i style="background:${tasteColor(T.styles[primary])}"></i>`); continue; }
+      const other = miniCols[c - 1];
+      const pr = other ? T.pairs[primary + "|" + other] : null;
+      cells.push((pr && pr.n > 0) ? `<i style="background:${tasteColor(pr)}"></i>` : "<i></i>");
+    }
+  }
+  const line = n === 0
+    ? "No verdicts yet. Give a verdict on a film and your taste map starts here."
+    : `${n} verdict${n === 1 ? "" : "s"} so far. See what Cascade has learned about what you go for.`;
+  return `<button type="button" class="tastecard" onclick="openTasteScreen()">
+    <span class="tcmini">${cells.join("")}</span>
+    <span class="tct"><b>Your taste</b><span>${esc(line)}</span></span>
+    <span class="tcgo">›</span>
+  </button>`;
+}
+window.openTasteScreen = () => {
+  tasteSelPrimary = null; tasteSelOther = null;
+  renderTasteScreen();
+  $("tasteScreen").scrollTop = 0;
+  $("tasteScreen").classList.add("open"); lockBodyScroll(true);
+  syncWatchChip();
+  logEvent("taste_opened", {verdicts: tasteProfile().n});
+};
+window.closeTasteScreen = () => { $("tasteScreen").classList.remove("open"); lockBodyScroll(false); syncWatchChip(); };
+
 // One badge per film: Landmark is its own axis (kept, unchanged, AC5) and outranks the ladder, exactly as
 // its priority in this function always has. Below Landmark, the badge IS the ladder band — nothing else.
 function scaleTier(m){
@@ -11360,7 +11781,7 @@ window.showScaleInfer=id=>{ const m=MOVIES.find(x=>x.tmdb_id===id); if(m) toast(
 // one that just booted. CAS-748 reuses this same hook for _wmReleasedScoreVals rather than adding a second,
 // separate clearing mechanism. CAS-867: agMetricsCache (declared further down, with agentMetrics) reuses it
 // too — a catalogue swap can change which films an agent lists without touching that agent's own signature.
-function invalidateComputeCaches(){ _scaleInferCache.clear(); _awardRankCache.clear(); _wmReleasedScoreVals = null; agMetricsCache.clear(); }
+function invalidateComputeCaches(){ _scaleInferCache.clear(); _awardRankCache.clear(); _wmReleasedScoreVals = null; agMetricsCache.clear(); _tasteProfileCache = null; }
 // ---- Buzz (CAS-145, ladder replaced by CAS-678) --------------------------------
 // How much a film is being talked about right now, off the TMDB popularity figure the pipeline already
 function matchesCriteria(m,c,ignoreBlocked,ignoreScoreGate){
@@ -17578,6 +17999,7 @@ function renderAgentsScreen(){
     <div class="agshdr"><h2 class="osh">Agents</h2><span class="agshdr-r"><span class="agscount">${n} agent${n===1?"":"s"}</span>
       <button type="button" class="ag-add ca-btn" onclick="newCascade()" aria-label="Add agent" title="Add agent">+ Add</button></span></div>
     <p class="ossub">Every agent you have, and what each one is set to look for.</p>
+    ${tasteCardHTML()}
     <div class="aglist" id="agList" role="list" aria-label="Your agents, in deck order">
       ${rows || `<p class="unone">No agents yet.</p>`}
     </div>`;
@@ -20073,6 +20495,7 @@ function render(){
   renderListChrome();
   updatePrefSwitch(); updatePrefBtn(); updateUxSwitch(); refreshSetupMeters();
   if($("svcAnalysis").classList.contains("open")) renderSvcAnalysis();
+  if($("tasteScreen").classList.contains("open")) renderTasteScreen();
   // Smart defaults: label the apply control with its payoff, not a bare "Done".
   $("filtersDone").textContent = ux.on
     ? (shown.length ? `Show ${shown.length} film${shown.length===1?"":"s"}` : "No films match")
@@ -20605,6 +21028,7 @@ function maybeRequestReview(){
 // and the full card comes back. Persisted immediately, so it survives a reload.
 window.setOpinion=(id,kind)=>{
   agMetricsCache.clear();   // CAS-867: this flips taggedOut(id) for every agent that lists this film
+  _tasteProfileCache = null;   // CAS-1251: the verdict just changed, so the counted set has too
   const was=opinionOf(id), on=was!==kind, wasFound=found.has(id);
   // Read the film's freshness BEFORE the answer changes it, so the 🆕 chip on the stub doesn't flicker off
   // under the tap. (The ORDER can't move at all now — availability section, then date, see byTimeline.)
@@ -21507,6 +21931,7 @@ function acctFetchKeepalive(init){
     watched.clear(); disliked.clear(); blocked.clear(); indifferent.clear(); wowed.clear(); enjoyed.clear();
     Object.keys(notify).forEach(id=>delete notify[id]);
     agMetricsCache.clear();   // CAS-867: a cleared verdict set can flip taggedOut() too
+    _tasteProfileCache = null;   // CAS-1251: same reason — a signed-out device has no verdicts to count
     // Every other in-memory domain a signed-in session could have populated, back to its fresh-device
     // default — the wipe above already means re-reading each of these from localStorage would land on the
     // same default anyway, but resetting directly avoids re-parsing keys that no longer exist.
@@ -21731,6 +22156,7 @@ function acctFetchKeepalive(init){
       if(r.status==="enjoyed")  enjoyed.add(id);
     });
     agMetricsCache.clear();   // CAS-867: a synced verdict can flip taggedOut() same as a local one can
+    _tasteProfileCache = null;   // CAS-1251: a synced verdict changes the counted set same as a local one can
     recomputeFound();
     // CAS-1236: skip the repaint (not the merge above) when this is byte-identical to the last rows this
     // device applied for this table — a reconcile pull that changed nothing must draw nothing.
