@@ -19848,6 +19848,18 @@ function watchNavKey(){
     // (agents/pickedBy/watched/styles/badges/alsoShow/mineOnly/order) is already one of the fields above.
     watchMoodSel,
     currentMood().top,
+    // CAS-1248: the tabs a Where & when switch actually leaves enabled — watchTab alone (above) says which
+    // one is SELECTED, not which ones EXIST, so switching a window off/on never showed up here even though
+    // watchStageStopsNow()/watchScopeRows() both derive their stops/scope from this same list.
+    watchTabsNow().map(t=>t.key),
+    // CAS-1248: the services matchesServices() tests the mine-only filter against — toggling a ⚙️ service
+    // chip changes neither prefs.on (watchMineOnlyOn() above is a different, per-mood switch) nor anything
+    // else already fingerprinted here.
+    [...prefs.sub].sort(), [...prefs.store].sort(),
+    // CAS-1248: each mood's own id/name, in order — every other mood field is already copied into one of
+    // the fields above by applyMoodToState() the moment a mood is selected or saved, so only identity
+    // (added/removed/reordered/renamed) needs its own entry.
+    watchMoods.map(m=>[m.id, m.name]),
   ]);
 }
 // CAS-1236: forces the NEXT render() to run a full rebuild regardless of watchNavKey() — for the handful
