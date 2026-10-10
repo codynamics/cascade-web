@@ -261,6 +261,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // survive — CAS-724's legacyMissionFloorDefault still reads them for a cinema agent's one-time
   // scoreFloor migration.
   cascadeScore, cascadeScoreSourcesText, isPreRelease, buzzPctlOf, pctRankOf,
+  // CAS-1251: tasteProfile/tasteMatch are the taste-profile calculation (style leans and a Match number,
+  // built from the verdict sets above and cascadeScore) — exported directly so a test can call them without
+  // a real account store or a real catalogue of verdicts.
+  tasteProfile, tasteMatch,
   // CAS-919: wmQScoreSourcesText is wmQScore's own text, exported so a test can assert the blended
   // cascadeScoreSourcesText's Watchmode half directly.
   wmQScoreSourcesText,

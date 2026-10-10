@@ -9155,6 +9155,7 @@ function advanceClock(){
   TODAY = now;
   rederiveStatuses();
   agMetricsCache.clear();   // CAS-867: "last find Nd ago" and the recent-find count move with the clock alone
+  _tasteProfileCache = null;   // CAS-1251: the learned score range reads cascadeScore(m), which moves with the clock too
   return true;
 }
 async function pollCatalogue(){
@@ -10748,6 +10749,107 @@ function cascadeScoreSourcesText(m){
   return wmQScoreSourcesText(m);
 }
 
+// ---- Taste profile (CAS-1251): what your verdicts say you go for, and a Match number for any film -------
+// Lee, 10-11 Oct 2026, approved on the design board 11 Oct. Calculation only — nothing here draws or stores
+// anything; it reads straight off the six verdict sets already in memory (opinionOf) and the user_films
+// rows the account store already holds (every verdict, including "notfor", lands there — see filmRows()).
+// _tasteProfileCache is cleared at the same five places agMetricsCache.clear() already is: a verdict
+// changing, a catalogue swap, the clock moving on, and a sign-out or a sync — the same things that can
+// change which films even count.
+const TASTE_WEIGHTS = {wow:1.5, liked:1.25, enjoyed:1, soso:-0.5, disliked:-1, notfor:-1};
+const TASTE_K = 4;
+const tasteConf = n => n / (n + TASTE_K);
+let _tasteProfileCache = null;
+function _tasteVerdictAt(id){
+  const store = window.CascadeAccountStore;
+  const rows = store && store.acctStore && store.acctStore.user_films;
+  const row = rows && rows.find(r => String(r.movie_id) === String(id));
+  return (row && row.updated_at != null) ? row.updated_at : null;
+}
+function tasteProfile(){
+  if(_tasteProfileCache) return _tasteProfileCache;
+  const counted = [];
+  const ids = new Set(watched); blocked.forEach(id => ids.add(id));
+  ids.forEach(id => {
+    const kind = opinionOf(id); if(!kind) return;
+    const m = MOVIES.find(x => x.tmdb_id === id);
+    if(!m || !(m.genres && m.genres.length)) return;
+    counted.push({id, kind, w: TASTE_WEIGHTS[kind], m, p: m.genres[0], S: m.genres.slice(1), at: _tasteVerdictAt(id)});
+  });
+  const byAt = (a, b) => (b.at==null?Infinity:new Date(b.at).getTime()) - (a.at==null?Infinity:new Date(a.at).getTime());
+
+  const overall = {sum:0, n:0};
+  counted.forEach(v => { overall.sum += v.w; overall.n += 1; });
+  overall.lean = overall.sum / (overall.n + TASTE_K);
+
+  const styles = {}, pairs = {}, ages = {};
+  counted.forEach(v => {
+    const sty = styles[v.p] || (styles[v.p] = {sum:0, n:0, films:[]});
+    sty.sum += v.w; sty.n += 1; sty.films.push(v);
+    v.S.forEach(s => {
+      const key = v.p + "|" + s;
+      const pr = pairs[key] || (pairs[key] = {primary:v.p, other:s, sum:0, n:0, films:[]});
+      pr.sum += v.w; pr.n += 1; pr.films.push(v);
+    });
+    if(v.m.age_rating){
+      const a = ages[v.m.age_rating] || (ages[v.m.age_rating] = {for:0, against:0});
+      if(v.w > 0) a.for += 1; else a.against += 1;
+    }
+  });
+  const filmsOut = list => list.slice().sort(byAt).map(v => ({id:v.id, verdict:v.kind}));
+  Object.values(styles).forEach(s => {
+    s.lean = (s.sum + TASTE_K*overall.lean) / (s.n + TASTE_K);
+    s.conf = tasteConf(s.n);
+    s.films = filmsOut(s.films);
+  });
+  Object.values(pairs).forEach(pr => {
+    const sLean = styles[pr.primary].lean;
+    pr.lean = (pr.sum + TASTE_K*sLean) / (pr.n + TASTE_K);
+    pr.conf = tasteConf(pr.n);
+    pr.films = filmsOut(pr.films);
+  });
+
+  const scores = counted.filter(v => v.w > 0 && cascadeScore(v.m) > 0)
+                         .map(v => cascadeScore(v.m)).sort((a,b) => a-b);
+  const scoreCount = scores.length;
+  const range = scoreCount >= 5
+    ? [scores[Math.round(0.15*(scoreCount-1))], scores[Math.round(0.85*(scoreCount-1))]]
+    : null;
+
+  const latest = counted.slice().sort(byAt).map(v => ({id:v.id, verdict:v.kind, at:v.at}));
+
+  const profile = {n: overall.n, overall: {sum:overall.sum, n:overall.n, lean:overall.lean}, styles, pairs, range, ages, latest};
+  _tasteProfileCache = profile;
+  return profile;
+}
+// Match for a film not yet judged — null when there isn't enough evidence to say anything (CAS-1251).
+function tasteMatch(m){
+  if(!(m.genres && m.genres.length)) return null;
+  const T = tasteProfile();
+  if(T.n < 5) return null;
+  const p = m.genres[0], S = m.genres.slice(1);
+  const sty = T.styles[p];
+  const styleLean = sty ? sty.lean : T.overall.lean;
+  const styleN = sty ? sty.n : 0;
+  const taste = S.length
+    ? S.reduce((sum, s) => sum + (T.pairs[p+"|"+s] ? T.pairs[p+"|"+s].lean : styleLean), 0) / S.length
+    : styleLean;
+  const sc = cascadeScore(m);
+  let fit = 0;
+  if(T.range && sc > 0){
+    const [lo, hi] = T.range;
+    if(sc >= lo && sc <= hi) fit = 0.15;
+    else{
+      const distance = sc < lo ? lo - sc : sc - hi;
+      fit = -Math.min(0.3, distance/40);
+    }
+  }
+  const value = Math.max(1, Math.min(99, Math.round(50 + 42*taste + 40*fit)));
+  const conf = Math.max(tasteConf(styleN), 0.45*tasteConf(T.overall.n));
+  const level = conf < 0.4 ? 1 : conf < 0.65 ? 2 : 3;
+  return {value, conf, level};
+}
+
 // One badge per film: Landmark is its own axis (kept, unchanged, AC5) and outranks the ladder, exactly as
 // its priority in this function always has. Below Landmark, the badge IS the ladder band — nothing else.
 function scaleTier(m){
@@ -11360,7 +11462,7 @@ window.showScaleInfer=id=>{ const m=MOVIES.find(x=>x.tmdb_id===id); if(m) toast(
 // one that just booted. CAS-748 reuses this same hook for _wmReleasedScoreVals rather than adding a second,
 // separate clearing mechanism. CAS-867: agMetricsCache (declared further down, with agentMetrics) reuses it
 // too — a catalogue swap can change which films an agent lists without touching that agent's own signature.
-function invalidateComputeCaches(){ _scaleInferCache.clear(); _awardRankCache.clear(); _wmReleasedScoreVals = null; agMetricsCache.clear(); }
+function invalidateComputeCaches(){ _scaleInferCache.clear(); _awardRankCache.clear(); _wmReleasedScoreVals = null; agMetricsCache.clear(); _tasteProfileCache = null; }
 // ---- Buzz (CAS-145, ladder replaced by CAS-678) --------------------------------
 // How much a film is being talked about right now, off the TMDB popularity figure the pipeline already
 function matchesCriteria(m,c,ignoreBlocked,ignoreScoreGate){
@@ -20605,6 +20707,7 @@ function maybeRequestReview(){
 // and the full card comes back. Persisted immediately, so it survives a reload.
 window.setOpinion=(id,kind)=>{
   agMetricsCache.clear();   // CAS-867: this flips taggedOut(id) for every agent that lists this film
+  _tasteProfileCache = null;   // CAS-1251: the verdict just changed, so the counted set has too
   const was=opinionOf(id), on=was!==kind, wasFound=found.has(id);
   // Read the film's freshness BEFORE the answer changes it, so the 🆕 chip on the stub doesn't flicker off
   // under the tap. (The ORDER can't move at all now — availability section, then date, see byTimeline.)
@@ -21507,6 +21610,7 @@ function acctFetchKeepalive(init){
     watched.clear(); disliked.clear(); blocked.clear(); indifferent.clear(); wowed.clear(); enjoyed.clear();
     Object.keys(notify).forEach(id=>delete notify[id]);
     agMetricsCache.clear();   // CAS-867: a cleared verdict set can flip taggedOut() too
+    _tasteProfileCache = null;   // CAS-1251: same reason — a signed-out device has no verdicts to count
     // Every other in-memory domain a signed-in session could have populated, back to its fresh-device
     // default — the wipe above already means re-reading each of these from localStorage would land on the
     // same default anyway, but resetting directly avoids re-parsing keys that no longer exist.
@@ -21731,6 +21835,7 @@ function acctFetchKeepalive(init){
       if(r.status==="enjoyed")  enjoyed.add(id);
     });
     agMetricsCache.clear();   // CAS-867: a synced verdict can flip taggedOut() same as a local one can
+    _tasteProfileCache = null;   // CAS-1251: a synced verdict changes the counted set same as a local one can
     recomputeFound();
     // CAS-1236: skip the repaint (not the merge above) when this is byte-identical to the last rows this
     // device applied for this table — a reconcile pull that changed nothing must draw nothing.
