@@ -9198,7 +9198,17 @@ function trackAdmitDrift(){
   Object.keys(admitDrift).forEach(id=>{ if(!found.has(+id)) delete admitDrift[id]; });
   const s=JSON.stringify(admitDrift);
   if(s===admitDriftSaved) return;
+  // Only a key ADDED since the last save is worth a write: that is the user's own agent edit (the scoped
+  // exception described above). The line above also REMOVES keys whenever a film leaves `found`, and a film
+  // leaves `found` when a verdict arrives from another device on reconcile, with nobody touching this one.
+  // Pushing that removal made a reconciling device write to the account (reconcile-on-return AC1, seen
+  // intermittently because the push is debounced). A removal alone is never pushed: every device drops the
+  // same dead keys for itself on load, and the next real addition carries the cleaned set up with it.
+  let prev=null;
+  try{ prev = admitDriftSaved ? JSON.parse(admitDriftSaved) : null; }catch(e){ prev=null; }
+  const added = !prev || Object.keys(admitDrift).some(k=>!(k in prev));
   admitDriftSaved=s;
+  if(!added) return;
   // CAS-1222: never push before this device's own user_prefs load has resolved at least once this boot —
   // `admitDrift` starts empty, before cascades/agent_films have even loaded, so a push off that bare
   // in-memory default would stomp the account's real history the instant it lands (the same "never write

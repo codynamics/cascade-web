@@ -308,3 +308,42 @@ test("CAS-1222: loadUserPrefs adopts every view field, leaving an unanswered fie
     signOut(E);
   }
 });
+
+// A film leaves `found` when a verdict is given, and a verdict can arrive from another device on reconcile
+// with nobody touching this one. trackAdmitDrift drops that film's key locally, but removing a key is not
+// the user's own agent edit and must not be written back: reconcile sends no writes (CAS-1219). A key that
+// is ADDED is still written, and carries the cleaned set with it.
+test("trackAdmitDrift: a key removed because its film left found is not pushed; a key added still is", async () => {
+  const E = loadEngine();
+  const client = makeFakeClient(selectUserPrefsRow(null));
+  signIn(E, client);
+  const CP = E.CascadePersistence;
+  const x = E.MOVIES[0].tmdb_id, y = E.MOVIES[1].tmdb_id;
+  const merges = () => client.rpcCalls.filter(c => c.name === "merge_user_prefs_view");
+  const savedFound = [...E.found];
+  try{
+    CP.userPrefsReady = true;
+    Object.keys(E.admitDrift).forEach(k => delete E.admitDrift[k]);
+    E.found.clear(); E.found.add(x); E.found.add(y);
+
+    E.admitDrift[x] = true;                       // an addition: one write
+    E.trackAdmitDrift(); await CP.flushViewPatch(); await settle();
+    assert.equal(merges().length, 1, "a key added must be pushed");
+    assert.deepEqual(Object.keys(merges()[0].params.p_patch.admitDrift), [String(x)]);
+    client.rpcCalls.length = 0;
+
+    E.found.delete(x);                            // x leaves found: dropped locally, nothing written
+    E.trackAdmitDrift(); await CP.flushViewPatch(); await settle();
+    assert.equal(E.admitDrift[x], undefined, "the key of a film no longer found is dropped locally");
+    assert.equal(merges().length, 0, "a removal alone must not be pushed");
+
+    E.admitDrift[y] = true;                       // the next addition carries the cleaned set
+    E.trackAdmitDrift(); await CP.flushViewPatch(); await settle();
+    assert.equal(merges().length, 1, "the next key added must be pushed");
+    assert.deepEqual(Object.keys(merges()[0].params.p_patch.admitDrift), [String(y)]);
+  } finally {
+    Object.keys(E.admitDrift).forEach(k => delete E.admitDrift[k]);
+    E.found.clear(); savedFound.forEach(id => E.found.add(id));
+    signOut(E);
+  }
+});
