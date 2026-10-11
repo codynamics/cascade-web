@@ -165,6 +165,10 @@ if(typeof window.CascadeAuth === "undefined"){
   get watchCinemaStage(){ return watchCinemaStage; },
   setWatchCinemaStage(v){ watchCinemaStage = v; },
   watchWatchedSel, watchGenreOff, watchSearch, filmMatchesWatchedFilter, filmMatchesWatchTab,
+  // CAS-1256: filmPassesStylesOff is the Mood/Filters Styles-off predicate itself (a film shows when ANY
+  // of its styles is switched on, matching the agent rule CAS-1147 set) — exported so a test can assert
+  // it directly rather than only through watchVisibleRows()'s combined filter chain.
+  filmPassesStylesOff,
   // CAS-1234: watchBadgeSel (by reference, same convention as watchWatchedSel/watchGenreOff above) plus the
   // predicate render() filters through and the sheet's own option list (icon/label come from TENT_BADGE,
   // already exported below — BADGE_FILTER_OPTS carries only the key and its live descriptor), so a test can
