@@ -83,7 +83,7 @@ test("CAS-1254 AC2: tasteProfile and tasteMatch stay honest against the 60-verdi
     assert.equal(round4(T.styles.Action.lean), 0.9091);
 
     const cases = [
-      [["Crime","Thriller","Horror"], [56, 0.0000, 1]],
+      [["Crime","Thriller","Horror"], [65, 0.2121, 1]],
       [["Music","Documentary"], [56, 0.0000, 1]],
       [["Animation"], [42, 0.3333, 1]],
       [["War"], [74, 0.4286, 2]],

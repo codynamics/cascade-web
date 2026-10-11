@@ -7050,6 +7050,9 @@ function savingsHTML(offers, canExpand){
 // being a separate block above them) so all three share the same .clbl column and wrap the same way.
 function creditsHTML(m, inCard){
   const rows=[];
+  const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
+  const why = signedIn ? matchWhyHTML(m) : "";
+  if(why) rows.push(`<div class="credit"><span class="clbl">Match</span><span class="cval">${why}</span></div>`);
   const aw=awardsBreakdownHTML(m); if(aw) rows.push(aw);
   if(m.director) rows.push(`<div class="credit"><span class="clbl">Director</span><span class="cval">${esc(m.director)}</span></div>`);
   if((m.cast||[]).length) rows.push(`<div class="credit"><span class="clbl">Cast</span><span class="cval">${esc(m.cast.join(", "))}</span></div>`);
@@ -10904,7 +10907,7 @@ function tasteProfile(){
     const kind = opinionOf(id); if(!kind) return;
     const m = MOVIES.find(x => x.tmdb_id === id);
     if(!m || !(m.genres && m.genres.length)) return;
-    counted.push({id, kind, w: TASTE_WEIGHTS[kind], m, p: m.genres[0], S: m.genres.slice(1), at: _tasteVerdictAt(id)});
+    counted.push({id, kind, w: TASTE_WEIGHTS[kind], m, G: [...new Set(m.genres)], at: _tasteVerdictAt(id)});
   });
   const byAt = (a, b) => (b.at==null?Infinity:new Date(b.at).getTime()) - (a.at==null?Infinity:new Date(a.at).getTime());
 
@@ -10914,12 +10917,15 @@ function tasteProfile(){
 
   const styles = {}, pairs = {}, ages = {};
   counted.forEach(v => {
-    const sty = styles[v.p] || (styles[v.p] = {sum:0, n:0, films:[]});
-    sty.sum += v.w; sty.n += 1; sty.films.push(v);
-    v.S.forEach(s => {
-      const key = v.p + "|" + s;
-      const pr = pairs[key] || (pairs[key] = {primary:v.p, other:s, sum:0, n:0, films:[]});
-      pr.sum += v.w; pr.n += 1; pr.films.push(v);
+    v.G.forEach(g => {
+      const sty = styles[g] || (styles[g] = {sum:0, n:0, films:[]});
+      sty.sum += v.w; sty.n += 1; sty.films.push(v);
+      v.G.forEach(h => {
+        if(h === g) return;
+        const key = g + "|" + h;
+        const pr = pairs[key] || (pairs[key] = {primary:g, other:h, sum:0, n:0, films:[]});
+        pr.sum += v.w; pr.n += 1; pr.films.push(v);
+      });
     });
     if(v.m.age_rating){
       const a = ages[v.m.age_rating] || (ages[v.m.age_rating] = {for:0, against:0});
@@ -10933,7 +10939,7 @@ function tasteProfile(){
     s.films = filmsOut(s.films);
   });
   Object.values(pairs).forEach(pr => {
-    const sLean = styles[pr.primary].lean;
+    const sLean = (styles[pr.primary].lean + styles[pr.other].lean) / 2;
     pr.lean = (pr.sum + TASTE_K*sLean) / (pr.n + TASTE_K);
     pr.conf = tasteConf(pr.n);
     pr.films = filmsOut(pr.films);
@@ -10957,13 +10963,20 @@ function tasteMatch(m){
   if(!(m.genres && m.genres.length)) return null;
   const T = tasteProfile();
   if(T.n < 5) return null;
-  const p = m.genres[0], S = m.genres.slice(1);
-  const sty = T.styles[p];
-  const styleLean = sty ? sty.lean : 0;
-  const styleN = sty ? sty.n : 0;
-  const taste = S.length
-    ? S.reduce((sum, s) => sum + (T.pairs[p+"|"+s] ? T.pairs[p+"|"+s].lean : styleLean), 0) / S.length
-    : styleLean;
+  const G = [...new Set(m.genres)];
+  const leanOf = g => T.styles[g] ? T.styles[g].lean : 0;
+  const nOf = g => T.styles[g] ? T.styles[g].n : 0;
+  let taste;
+  if(G.length === 1) taste = leanOf(G[0]);
+  else{
+    let sum = 0, count = 0;
+    for(let i = 0; i < G.length; i++) for(let j = i+1; j < G.length; j++){
+      const pr = T.pairs[G[i]+"|"+G[j]];
+      sum += pr ? pr.lean : (leanOf(G[i]) + leanOf(G[j])) / 2;
+      count += 1;
+    }
+    taste = sum / count;
+  }
   const sc = cascadeScore(m);
   let fit = 0;
   if(T.range && sc > 0){
@@ -10975,9 +10988,26 @@ function tasteMatch(m){
     }
   }
   const value = Math.max(1, Math.min(99, Math.round(50 + 42*taste + 40*fit)));
-  const conf = tasteConf(styleN);
+  const conf = G.reduce((sum, g) => sum + tasteConf(nOf(g)), 0) / G.length;
   const level = conf < 0.4 ? 1 : conf < 0.65 ? 2 : 3;
-  return {value, conf, level};
+  const basis = G.map(g => ({style: g, n: nOf(g)})).sort((a, b) => b.n - a.n);
+  return {value, conf, level, basis};
+}
+// The words behind a Match, for the open card's Match row: which of the film's styles the person has
+// judged, and how many verdicts each. "" when there is no Match to explain.
+function matchWhyHTML(m){
+  const t = tasteMatch(m);
+  if(!t) return "";
+  const known = t.basis.filter(b => b.n > 0), none = t.basis.filter(b => b.n === 0);
+  const join = (list, word) => list.length <= 1 ? list.join("") : list.slice(0, -1).join(", ") + " " + word + " " + list[list.length-1];
+  if(!known.length) return `<b>${t.value}</b>, an early guess. You haven't judged a ${join(none.map(b => esc(b.style)), "or")} film yet.`;
+  const top = known.slice(0, 3).map(b => `${b.n} ${esc(b.style)}`), rest = known.length - 3;
+  const noun = (known.length === 1 && known[0].n === 1) ? "film" : "films";
+  let s = rest > 0
+    ? `<b>${t.value}</b>, from your verdicts on ${top.join(", ")} and ${rest} more style${rest === 1 ? "" : "s"}.`
+    : `<b>${t.value}</b>, from your verdicts on ${join(top, "and")} ${noun}.`;
+  if(none.length) s += ` None yet on ${join(none.map(b => esc(b.style)), "or")}.`;
+  return s;
 }
 
 // ---- Your taste: the page and its card on the Agents screen (CAS-1252) ---------------------------------
@@ -10996,20 +11026,15 @@ function tasteColor(data){
   const alpha = Math.round((0.16 + 0.74*mag) * (0.35 + 0.65*data.conf) * 100) / 100;
   return data.lean >= 0 ? `rgba(45,212,191,${alpha})` : `rgba(240,136,58,${alpha})`;
 }
-// Rows: T.styles by n desc (ties A–Z), 9 at most. Columns: other-styles paired with those rows, ranked by
-// total verdicts across them (ties A–Z), 8 at most. best = the shown pairing with the most verdicts, the
-// style map's default selection, falling back to the top row's All square when no pairing is shown at all.
+// Rows: every style in T.styles, by n desc (ties A–Z), no cap. Columns: the first 8 of those rows, so a
+// square is "films that carry both styles" and the square where a style meets itself is empty. best = the
+// shown pairing with the most verdicts, the style map's default selection, falling back to the top row's
+// All square when no pairing is shown at all.
 function tasteStyleMapData(T){
   const rows = Object.entries(T.styles)
     .sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0]))
-    .slice(0, 9).map(e => e[0]);
-  const colTotals = {};
-  rows.forEach(p => Object.values(T.pairs).filter(pr => pr.primary === p).forEach(pr => {
-    colTotals[pr.other] = (colTotals[pr.other] || 0) + pr.n;
-  }));
-  const cols = Object.keys(colTotals)
-    .sort((a, b) => colTotals[b] - colTotals[a] || a.localeCompare(b))
-    .slice(0, 8);
+    .map(e => e[0]);
+  const cols = rows.slice(0, 8);
   if(!rows.length) return {rows, cols, best: null};
   let best = null;
   rows.forEach(p => cols.forEach(o => {
@@ -11074,7 +11099,7 @@ function renderStyleMapSection(T){
   const data = tasteSelOther ? T.pairs[tasteSelPrimary + "|" + tasteSelOther] : T.styles[tasteSelPrimary];
   return `
     <div class="flabel">Style map</div>
-    <p class="tnote">Down the side is a film's first style; across the top, its other styles. Tap a square to see the films behind it.</p>
+    <p class="tnote">Each row is a style, counting every film you've judged that has it. Across the top: the same films' other styles. Tap a square to see the films behind it.</p>
     <div class="tmap">
       <div class="tgrid" style="grid-template-columns:minmax(0,92px) repeat(${1 + cols.length},1fr)">${headerHTML}${rowsHTML}</div>
       <div class="tlegend"><span>avoid</span><span class="ramp"><i style="background:rgba(240,136,58,0.85)"></i><i style="background:rgba(240,136,58,0.46)"></i><i style="background:rgba(255,255,255,.08)"></i><i style="background:rgba(45,212,191,0.46)"></i><i style="background:rgba(45,212,191,0.85)"></i></span><span>go for</span><span class="sp">fainter = fewer verdicts</span></div>
@@ -11148,7 +11173,7 @@ function renderLatestSection(T){
     const w = TASTE_WEIGHTS[v.verdict];
     return `<div class="tf"><span class="vd" style="background:${step ? step.cd : ""}"></span>
       <span class="ft"><b>${esc(m ? m.title : "")}</b><span>${esc(step ? step.lbl : "")} · ${esc(styles[0] || "")}${extra}</span></span>
-      <span class="mv ${w > 0 ? "up" : "dn"}">${w > 0 ? "▲" : "▼"} ${esc(styles[0] || "")}</span></div>`;
+      <span class="mv ${w > 0 ? "up" : "dn"}">${w > 0 ? "▲" : "▼"} ${esc(styles[0] || "")}${styles.length > 1 ? ` +${styles.length - 1}` : ""}</span></div>`;
   }).join("");
   return `
     <div class="flabel">Latest verdicts, and what each one moved</div>
@@ -11200,14 +11225,14 @@ function renderTasteScreen(){
 function tasteCardHTML(){
   const T = tasteProfile(), n = T.n;
   const {rows, cols} = tasteStyleMapData(T);
-  const miniRows = rows.slice(0, 4), miniCols = cols.slice(0, 3);
+  const miniRows = rows.slice(0, 4);
   const cells = [];
   for(let r = 0; r < 4; r++){
     const primary = miniRows[r];
     for(let c = 0; c < 4; c++){
       if(!primary){ cells.push("<i></i>"); continue; }
       if(c === 0){ cells.push(`<i style="background:${tasteColor(T.styles[primary])}"></i>`); continue; }
-      const other = miniCols[c - 1];
+      const other = rows.filter(x => x !== primary)[c - 1];
       const pr = other ? T.pairs[primary + "|" + other] : null;
       cells.push((pr && pr.n > 0) ? `<i style="background:${tasteColor(pr)}"></i>` : "<i></i>");
     }
