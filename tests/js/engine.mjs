@@ -547,7 +547,7 @@ if(typeof window.CascadeAuth === "undefined"){
   // recomputeFound, never reassigned) so a test can seed/read it the same way firstFound above is. filt/
   // passes/RELAXERS are the Find screen's own filter registry — the "New" filter this ticket adds rides the
   // same seam the existing "recent" filter does, so a test can assert it's registered there directly.
-  filmIsNew, admitDrift, filt, passes, RELAXERS, filtSnapshot, filtRestore,
+  filmIsNew, admitDrift, trackAdmitDrift, filt, passes, RELAXERS, filtSnapshot, filtRestore,
   // CAS-764: the stub navigator, by reference — so a test can flip .onLine the same way a real device
   // going offline would, and assert the acct banner (which reads navigator.onLine directly) responds.
   navigator,
