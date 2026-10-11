@@ -2565,8 +2565,12 @@
      stage/agent-column rail and the sort/search/filter tools row this comment used to describe — see the
      new CSS block near the end of this stylesheet (renderWatchTop() and the mood sheet, below). ---- */
   .watchtop[hidden]{display:none}
-  /* The stage line names the stage and carries its count, so the first stage heading above the list goes. */
-  #groups > .group:first-child > .grouphead:not(.sub){display:none}
+  /* The stage line names the stage and carries its count, so the first stage heading above the list goes —
+     unless that first section is an earlier stage's (films tagged for this stage that have not arrived yet),
+     which always says what it is. */
+  #groups > .group:first-child:not(.early) > .grouphead:not(.sub){display:none}
+  /* The stage's own section when nothing has arrived in it yet: its heading still shows, with one line. */
+  .group.ownempty .ownnone{padding:0 12px 20px;font:500 12.5px/1.45 var(--font-body);color:var(--faint)}
   /* CAS-1247: Watch's own search box and Filters sheet are gone — .watchsearchwrap/its .search/.searchclear
      stay, since Find's own search box (#findSearchWrap, renderFindScreen()) is still built from them. */
   .watchsearchwrap{display:flex;align-items:center;gap:8px;margin:9px 12px 0}
@@ -9551,6 +9555,18 @@ function ensureWatchTab(){
   const tabs=watchTabsNow();
   if(tabs.length && !tabs.some(t=>t.key===watchTab)) watchTab=tabs[0].key;
 }
+// Where a stage tap lands. A Home stage with earlier-stage sections above its own, and films in its own:
+// the top of its own section, heading just under the bar, so the earlier stages are a scroll up away.
+// Anything else (a Cinema stage, a Home stage with nothing above its own section or nothing in it yet, an
+// empty list): the very top of the page. Either way the landing is instant — the list was just replaced,
+// so there is nothing to animate from.
+function landWatchList(){
+  const first=document.querySelector("#groups .group");
+  const ownG=WATCH_TAB_OWN_STANDING[watchTab];
+  const own=ownG ? document.querySelector(`#groups .group[data-g="${ownG}"]`) : null;
+  if(own && own!==first && !own.classList.contains("ownempty")){ jumpToSection(ownG, {instant:true}); return; }
+  window.scrollTo(0, 0);
+}
 window.setWatchTab = key => {
   landingTabPendingAccountData = false;   // CAS-1224: a real tap always wins over a late re-pick
   if(watchTab===key) return;
@@ -9558,7 +9574,7 @@ window.setWatchTab = key => {
   watchTab=key;
   logEvent("watch_tab", {tab: key, from});
   render();
-  jumpToSection(WATCH_TAB_SCROLL_TARGET[key]);
+  landWatchList();
 };
 // CAS-1223: which half of the Cinema tab is on screen — "upcoming" or "in_cinema". watchTab itself stays
 // exactly as before (still just the four WATCH_LEVEL_KEYS values) so every existing per-tab dict
@@ -9599,6 +9615,7 @@ window.setWatchStage = key => {
     watchCinemaStage=key;
     logEvent("watch_tab", {tab:key, from});
     render();
+    landWatchList();
     return;
   }
   // CAS-1238: the tapped stage is already the selected one — no tab/stage change, so no re-render; just
@@ -20383,21 +20400,17 @@ function cascadeRankTint(c){
   const idx=sorted.findIndex(x=>x.id===c.id);
   return idx<0 ? null : (idx%6)+1;
 }
-// CAS-1235: a plain stage name for an earlier-stage section showing under another tab's default widening —
-// distinct from STATUS_LABEL (whose pvod/rental entries carry a price suffix meant for that status's OWN
-// tab heading) and from ALSO_SHOW_WINDOWS' own labels (written for the Filters sheet's chips, not a listing
-// heading).
-const ALSO_SHOW_STAGE_LABEL = {upcoming:"Upcoming", in_cinema:"In Cinema", rental:"Rental", included_streaming:"Streaming"};
-// CAS-1235: the short tab name a widened-in section's heading reads "set to watch on <...>" — Cinema needs
-// no entry: it carries no Also-show section (filmMatchesWatchTab's "in_cinema" branch never widens), so
-// watchGroupHeading below never reaches this map for that tab.
-const WATCH_TAB_ON_LABEL = {premium:"Premium", rent:"Rent", stream:"Stream"};
-// CAS-1235: render()'s own group heading — STATUS_LABEL[g] unchanged for the tab's own section (Cinema
-// included), or "<stage> · set to watch on <tab>" for an earlier-stage section the tab's default (or a
-// manually widened) Also-show window pulled in.
+// A section heading in the Watch list. On a Home stage (Rental, Streaming, Premium) the stage's own section
+// is headed with the stage's name, exactly as its button reads; an earlier stage's section, holding films
+// tagged for this stage that have not arrived yet, reads "<where they are now>, tagged for <this stage>"
+// (Lee, 2026-10-11; replaces CAS-1235's "<stage> · set to watch on <tab>"). The Cinema stages are unchanged.
+const WATCH_EARLY_STAGE_LABEL = {upcoming:"Upcoming", opening_week:"In cinema now", in_cinema:"In cinema now",
+                                 pvod:"Premium", rental:"Rental", included_streaming:"Streaming"};
+const watchIsEarlySection = g => watchTab!=="in_cinema" && g!==WATCH_TAB_OWN_STANDING[watchTab];
 function watchGroupHeading(g){
-  if(watchTab==="in_cinema" || g===WATCH_TAB_OWN_STANDING[watchTab]) return STATUS_LABEL[g];
-  return `${ALSO_SHOW_STAGE_LABEL[g]} · set to watch on ${WATCH_TAB_ON_LABEL[watchTab]}`;
+  if(watchTab==="in_cinema") return STATUS_LABEL[g];
+  if(!watchIsEarlySection(g)) return WATCH_TAB_LABEL[watchTab];
+  return `${WATCH_EARLY_STAGE_LABEL[g]||STATUS_LABEL[g]}, tagged for ${WATCH_TAB_LABEL[watchTab]}`;
 }
 // Splits a status section's already agent-sorted `items` (filmOwnerOrder is listingGroups' primary sort
 // key, so one agent's films already run contiguously) into per-owner runs, in the same order.
@@ -20635,7 +20648,7 @@ function render(){
     // CAS-682: a tagged-out film still renders here, as a stub — a row you can see and count, not a hidden
     // exclusion — so the header counts every item, matching what fillListChunked below actually streams.
     const live=items.length;
-    const grp=document.createElement("div"); grp.className="group"; grp.dataset.g=g;
+    const grp=document.createElement("div"); grp.className="group"+(watchIsEarlySection(g)?" early":""); grp.dataset.g=g;
     grp.innerHTML=`<div class="grouphead"><span class="gdot ${g}"></span>${watchGroupHeading(g)}
       <span class="gcount">${live}</span></div>`;
     wrap.appendChild(grp);
@@ -20663,6 +20676,16 @@ function render(){
       fillListChunked(listEl, block.items, renderGen, isFresh, oneListDone);
     });
   });
+  // A Home stage whose own section holds nothing yet still gets that section's heading, after the earlier
+  // stages' sections, so a tap on the stage always has its own heading to land on.
+  const ownG=WATCH_TAB_OWN_STANDING[watchTab];
+  if(ownG && !sections.some(s=>s.g===ownG)){
+    const grp=document.createElement("div"); grp.className="group ownempty"; grp.dataset.g=ownG;
+    grp.innerHTML=`<div class="grouphead"><span class="gdot ${ownG}"></span>${watchGroupHeading(ownG)}
+      <span class="gcount">0</span></div>
+      <div class="ownnone">Nothing in ${WATCH_TAB_LABEL[watchTab]} yet. The films tagged for it are listed above until they arrive.</div>`;
+    wrap.appendChild(grp);
+  }
   renderJumpBar();     // after the groups exist — it is built FROM them, never from a fixed menu
   syncHeaderHeight();  // CAS-761: tabs/filters/jump bar above are all part of #cascbar's measured height
   // CAS-1066: the Agents screen is a layer on top of home and was rendered only by openAgentsScreen(), so
@@ -20760,7 +20783,7 @@ function jumpOccludedBottom(chromeId){
 // occluding chrome, and #movingScreen as the scroller, since that screen is its own fixed overflow-y:auto
 // box (CAS-852) rather than sharing the page's own scroll the way the Watch listing does.
 window.jumpToSection = (k, opts) => {
-  const {groupsSel="#groups .group", chromeId="cascbar", scrollerId=null} = opts||{};
+  const {groupsSel="#groups .group", chromeId="cascbar", scrollerId=null, instant=false} = opts||{};
   const scroller = scrollerId ? document.getElementById(scrollerId) : window;
   if(!scroller) return;
   // How far the section's heading still has to travel to sit just clear of the sticky chrome.
@@ -20771,7 +20794,7 @@ window.jumpToSection = (k, opts) => {
   const first=delta(); if(first===null) return;
   // CAS-1238: honour prefers-reduced-motion for the jump itself, same gate REDUCE_MOTION already applies
   // to card animations elsewhere — the settle corrections below are already instant.
-  scroller.scrollBy({top:first, behavior: REDUCE_MOTION.matches ? "auto" : "smooth"});
+  scroller.scrollBy({top:first, behavior: (instant || REDUCE_MOTION.matches) ? "auto" : "smooth"});
   let tries=0;
   const settle=()=>{
     const d=delta();
@@ -20779,7 +20802,7 @@ window.jumpToSection = (k, opts) => {
     scroller.scrollBy(0,d);
     setTimeout(settle,80);
   };
-  setTimeout(settle,420);                                    // let the smooth scroll have its run first
+  setTimeout(settle, instant ? 60 : 420);                    // let the smooth scroll have its run first
   logEvent("jump_to_section",{key:k});
 };
 // CAS-857: after any action that removes/narrows a filter, the list can change shape (get longer) under a

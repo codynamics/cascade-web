@@ -46,7 +46,7 @@ function withStreamWatchOn(film, fn){
   }
 }
 
-test("CAS-1235 AC1: a film with Watch On = Streaming whose primaryStatus is in_cinema appears on the Streaming tab by default, under 'In Cinema · set to watch on Stream', ahead of the Streaming section", () => {
+test("CAS-1235 AC1: a film with Watch On = Streaming whose primaryStatus is in_cinema appears on the Streaming tab by default, under 'In cinema now, tagged for Streaming', ahead of the Streaming section", () => {
   const owner = broadCascade("cas1235-ac1", 0);
   E.cascades.push(owner);
   // recomputeFound() auto-places every OTHER listed film's Watch On too — needed so the Streaming tab's own
@@ -62,8 +62,8 @@ test("CAS-1235 AC1: a film with Watch On = Streaming whose primaryStatus is in_c
       assert.ok(rows.some(m => m.tmdb_id === film.tmdb_id),
         "AC1: an in-cinema film whose Watch On is Streaming must appear on the Streaming tab by default");
 
-      assert.equal(E.watchGroupHeading("in_cinema"), "In Cinema · set to watch on Stream",
-        "AC1: the earlier-stage section's heading must read '<stage> · set to watch on <tab>'");
+      assert.equal(E.watchGroupHeading("in_cinema"), "In cinema now, tagged for Streaming",
+        "AC1: the earlier-stage section's heading must read '<where they are now>, tagged for <stage>'");
 
       const groups = E.listingGroups(rows, null);
       const order = groups.map(g => g.g);
