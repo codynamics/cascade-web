@@ -100,13 +100,21 @@ test("CAS-1254 AC2: tasteProfile and tasteMatch stay honest against the 60-verdi
 
 test("CAS-1254 AC3: matchBadgeHTML carries the right certainty class and bar count", () => {
   withTasteFixture(ac2Assignments(), () => {
+    // The badge is filled with the style map's own colour: teal for a Match of 50 or more, orange under 50,
+    // dark ink on a strong fill. Certainty still shows as c1/c2/c3 and the bar count.
     const early = E.matchBadgeHTML(scoredFilm(["Crime","Thriller","Horror"], 80));
-    assert.match(early, /qhero c1/);
+    assert.match(early, /class="qhero lean for c1" style="background:rgba\(45,212,191,0\.25\)"/);
     assert.equal((early.match(/class="on"/g) || []).length, 1);
 
     const sure = E.matchBadgeHTML(scoredFilm(["Action"], 80));
-    assert.match(sure, /qhero c3/);
+    assert.match(sure, /class="qhero lean for ink c3" style="background:rgba\(45,212,191,0\.85\)"/);
     assert.equal((sure.match(/class="on"/g) || []).length, 3);
+
+    const against = E.matchBadgeHTML(scoredFilm(["Animation"], 80));
+    assert.match(against, /class="qhero lean against c1" style="background:rgba\(240,136,58,/);
+
+    // No verdict on any of the film's styles: no badge at all.
+    assert.equal(E.matchBadgeHTML(scoredFilm(["Music","Documentary"], 80)), "");
   });
 });
 

@@ -108,39 +108,58 @@ test("CAS-1255 AC3: every judged style gets its own row and pairing, no cap", ()
     assert.equal(round4(T.pairs["Comedy|Family"].lean), -0.5556);
     assert.equal(T.pairs["Action|Crime"], undefined);
 
-    const { rows, cols, best } = E.tasteStyleMapData(T);
+    // The style map lists every judged style down the side AND across the top, both A to Z, so every
+    // pairing has a square. `top` keeps the most-judged-first order for the small grid on the Agents card.
+    const { rows, cols, top, best } = E.tasteStyleMapData(T);
     assert.deepEqual([...rows], [
+      "Action", "Adventure", "Animation", "Comedy", "Crime", "Drama", "Family", "History", "Thriller", "Western",
+    ]);
+    assert.deepEqual([...cols], [...rows]);
+    assert.deepEqual([...top], [
       "Action", "Thriller", "Crime", "Drama", "History", "Adventure", "Animation", "Comedy", "Family", "Western",
     ]);
-    assert.deepEqual([...cols], [...rows].slice(0, 8));
     assert.deepEqual({ primary: best.primary, other: best.other, n: best.n }, { primary: "Action", other: "Thriller", n: 6 });
   });
 });
 
 test("CAS-1255 AC3: tasteMatch and matchWhyHTML for unjudged films against the fixture", () => {
   withTasteFixture(ac3Assignments(), () => {
+    // The Match row: the number, one chip per style of the film (its style-map colour and verdict count),
+    // then a sentence on the film's Cascade score. `plain` drops the tags so the words can be compared.
+    const plain = s => s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const SUITS = "Scores 80 on Cascade, which suits you: films you enjoy usually score 80 or more.";
     const cases = [
-      [["Crime","Thriller","Horror"], [71, 0.3667, 1],
-        "<b>71</b>, from your verdicts on 6 Thriller and 4 Crime films. None yet on Horror."],
-      [["Music","Documentary"], [56, 0.0000, 1],
-        "<b>56</b>, an early guess. You haven't judged a Music or Documentary film yet."],
-      [["Animation","Family","Comedy","Adventure"], [33, 0.3333, 1],
-        "<b>33</b>, from your verdicts on 2 Animation, 2 Family, 2 Comedy and 1 more style."],
-      [["Western"], [64, 0.2000, 1],
-        "<b>64</b>, from your verdicts on 1 Western film."],
-      [["Action","Thriller"], [91, 0.6000, 2],
-        "<b>91</b>, from your verdicts on 6 Action and 6 Thriller films."],
-      [["Drama","Crime","History"], [88, 0.5000, 2],
-        "<b>88</b>, from your verdicts on 4 Drama, 4 Crime and 4 History films."],
-      [["Action","Crime"], [79, 0.5500, 2],
-        "<b>79</b>, from your verdicts on 6 Action and 4 Crime films."],
+      [["Crime","Thriller","Horror"], 80, [71, 0.3667, 1],
+        `71 , from your verdicts on films with its styles: Thriller 6 Crime 4 Horror 0 ${SUITS}`],
+      [["Music","Documentary"], 80, [56, 0.0000, 1],
+        "None yet. You haven't judged a Music or Documentary film."],
+      [["Animation","Family","Comedy","Adventure"], 80, [33, 0.3333, 1],
+        `33 , from your verdicts on films with its styles: Animation 2 Family 2 Comedy 2 Adventure 2 ${SUITS}`],
+      [["Western"], 80, [64, 0.2000, 1],
+        `64 , from your verdicts on films with its styles: Western 1 ${SUITS}`],
+      [["Action","Thriller"], 80, [91, 0.6000, 2],
+        `91 , from your verdicts on films with its styles: Action 6 Thriller 6 ${SUITS}`],
+      [["Drama","Crime","History"], 80, [88, 0.5000, 2],
+        `88 , from your verdicts on films with its styles: Drama 4 Crime 4 History 4 ${SUITS}`],
+      [["Action","Crime"], 80, [79, 0.5500, 2],
+        `79 , from your verdicts on films with its styles: Action 6 Crime 4 ${SUITS}`],
+      // Below the range lowers the Match and says so; above the range is not held against the film.
+      [["Action","Thriller"], 60, [73, 0.6000, 2],
+        "73 , from your verdicts on films with its styles: Action 6 Thriller 6 Scores 60 on Cascade, below the 80 or more you usually enjoy, which lowers it."],
+      [["Action","Thriller"], 95, [91, 0.6000, 2],
+        "91 , from your verdicts on films with its styles: Action 6 Thriller 6 Scores 95 on Cascade, which suits you: films you enjoy usually score 80 or more."],
     ];
-    cases.forEach(([genres, expected, sentence]) => {
-      const m = scoredFilm(genres, 80);
+    cases.forEach(([genres, score, expected, sentence]) => {
+      const m = scoredFilm(genres, score);
       const match = E.tasteMatch(m);
       assert.deepEqual([match.value, round4(match.conf), match.level], expected, genres.join(", "));
-      assert.equal(E.matchWhyHTML(m), sentence, genres.join(", "));
+      assert.equal(plain(E.matchWhyHTML(m)), sentence, genres.join(", "));
     });
+
+    // Chips carry the style map's own colour for that style; a style with no verdicts has an empty chip.
+    const why = E.matchWhyHTML(scoredFilm(["Crime","Thriller","Horror"], 80));
+    assert.ok(why.includes('<span class="mwhy"><i style="background:rgba(45,212,191,0.56)"></i>Thriller <small>6</small></span>'));
+    assert.ok(why.includes('<span class="mwhy none"><i></i>Horror <small>0</small></span>'));
   });
 });
 
@@ -175,7 +194,11 @@ test("CAS-1255 AC4: creditsHTML carries a Match row above Director only when sig
 
 test("CAS-1255 AC5: the built index.html carries the new style-map note, not the old one", () => {
   const html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
-  const needle = "Each row is a style, counting every film you've judged that has it.";
+  const needle = "Styles run A to Z, down the side and across the top.";
   assert.equal(html.split(needle).length - 1, 1, `${needle} must appear exactly once`);
   assert.ok(!html.includes("Down the side is a film's first style"));
+  assert.ok(!html.includes("Each row is a style, counting every film"));
+  // The grid scrolls sideways with the style names held in place.
+  assert.equal(html.split(".tscroll{overflow-x:auto;").length - 1, 1);
+  assert.equal(html.split('<div class="tscroll"><div class="tgrid" style="grid-template-columns:92px repeat(').length - 1, 1);
 });
