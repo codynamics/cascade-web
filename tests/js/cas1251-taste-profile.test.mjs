@@ -135,7 +135,8 @@ test("CAS-1251 AC3: forcing the learned range onto the AC1 fixture's leans repro
     const filmA = scoredFilm(["Action","Thriller","Crime"], 90);
     const filmB = scoredFilm(["Horror"], 50);
     const filmC = scoredFilm(["Western"], 72);
-    assert.equal(E.tasteMatch(filmA).value, 60);
+    // filmA scores 90, above the forced range: scoring above the range is not held against a film.
+    assert.equal(E.tasteMatch(filmA).value, 71);
     assert.equal(E.tasteMatch(filmB).value, 24);
     assert.equal(E.tasteMatch(filmC).value, 56);
   });

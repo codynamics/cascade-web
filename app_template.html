@@ -3713,6 +3713,29 @@
   .qhero.c2{background:rgba(124,92,255,.40)}
   .qhero.c1{background:rgba(124,92,255,.13);color:#cfc4ff}
   .qhero.c1 small{color:rgba(207,196,255,.72)}
+  /* ==== STYLE MAP SCROLLS SIDEWAYS; MATCH TAKES THE MAP'S COLOURS (Lee, 2026-10-11) ====================
+     The style map now holds every judged style across the top as well as down the side, so it scrolls
+     sideways with the style names held in place. The Match badge on a card is filled with the same teal or
+     orange a square on the map would be: teal for a film you are likely to go for, orange for one you are
+     likely to avoid, stronger as the evidence grows. A film with no evidence has no badge. */
+  .tscroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px}
+  .tscroll::-webkit-scrollbar{display:none}
+  .tscroll .tgrid{width:max-content}
+  .tscroll .tgrid .tr,.tscroll .tgrid .tc0{position:sticky;left:0;z-index:2;background:var(--panel2);align-self:stretch}
+  .tscroll .tgrid .tr{line-height:26px;box-shadow:8px 0 8px -8px rgba(0,0,0,.7)}
+  .qhero.lean,.qhero.lean.c1{color:#fff}
+  .qhero.lean small,.qhero.lean.c1 small{color:rgba(255,255,255,.82)}
+  .qhero.lean.ink.for,.qhero.lean.ink.for small{color:#04221d}
+  .qhero.lean.ink.against,.qhero.lean.ink.against small{color:#2b1503}
+  .qhero.lean.ink .mbars i{background:rgba(0,0,0,.24)}
+  .qhero.lean.ink .mbars i.on{background:currentColor}
+  .ctop.hasmatch.nomatch .title,.ctop.hasmatch.nomatch .metaline{padding-right:0}
+  .mwhyrow{display:flex;flex-wrap:wrap;gap:5px 6px;margin:7px 0 6px}
+  .mwhy{display:inline-flex;align-items:center;gap:6px;padding:4px 8px 4px 6px;border-radius:8px;background:rgba(255,255,255,.05);
+    font:600 12px/1.2 var(--font-body);color:var(--ink);white-space:nowrap}
+  .mwhy i{width:12px;height:12px;border-radius:3px;flex:none}
+  .mwhy.none i{box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+  .mwhy small{font:500 11px/1 var(--font-body);color:var(--faint)}
 </style>
 </head>
 <body>
@@ -6654,9 +6677,12 @@ function qScoreHTML(m, extraClass=""){
 const MATCH_SURE_TEXT = {1:"early guess", 2:"getting there", 3:"sure"};
 function matchBadgeHTML(m){
   const t = tasteMatch(m);
-  if(!t) return `<span class="qhero c0" title="Match appears once you have given 5 verdicts." aria-label="Match not available yet"><b>&ndash;</b><span class="hl"><small>Match</small></span></span>`;
+  if(!t || t.conf === 0) return "";
   const bars = [1,2,3].map(i => `<i${i<=t.level?' class="on"':''}></i>`).join("");
-  return `<span class="qhero c${t.level}" title="Match ${t.value}. Cascade's estimate of how much you'll like this, from your own verdicts." aria-label="Match ${t.value}, ${MATCH_SURE_TEXT[t.level]}"><b>${t.value}</b><span class="hl"><small>Match</small><span class="mbars" aria-hidden="true">${bars}</span></span></span>`;
+  const bg = tasteColor({lean: (t.value - 50) / 42, conf: t.conf});
+  const alpha = parseFloat(bg.slice(bg.lastIndexOf(",") + 1));
+  const side = t.value >= 50 ? "for" : "against";
+  return `<span class="qhero lean ${side}${alpha >= 0.6 ? " ink" : ""} c${t.level}" style="background:${bg}" title="Match ${t.value}. Cascade's estimate of how much you'll like this, from your own verdicts." aria-label="Match ${t.value}, ${MATCH_SURE_TEXT[t.level]}"><b>${t.value}</b><span class="hl"><small>Match</small><span class="mbars" aria-hidden="true">${bars}</span></span></span>`;
 }
 function sortMoviesBy(a,b,key){
   switch(key){
@@ -8189,11 +8215,12 @@ function cardTopHTML(m){
   // row, keep it beside the title instead; see the "MATCH ON CARDS" CSS for which chip each card shows).
   // Signed out (the shared film page, onboarding) the card draws exactly as it always has.
   const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  const titleScore = signedIn ? qScoreHTML(m, "tq") + matchBadgeHTML(m) : qScoreHTML(m);
+  const matchBadge = signedIn ? matchBadgeHTML(m) : "";
+  const titleScore = signedIn ? qScoreHTML(m, "tq") + matchBadge : qScoreHTML(m);
   const rowScore = signedIn ? qScoreHTML(m, "rown") : "";
   // CAS-179: one grid, one order — title · genres·language · synopsis · money · scores · awards, with
   // the poster spanning down to the scores row and the scale badge tucked under it beside the awards.
-  return `<div class="ctop${signedIn?" hasmatch":""}">
+  return `<div class="ctop${signedIn?" hasmatch":""}${signedIn && !matchBadge?" nomatch":""}">
       <!-- CAS-276: the tombstone is the POSTER, and nothing else. -->
       <div class="ptomb">
         <div class="poster"${posterAttr}>${play}</div>
@@ -11005,11 +11032,9 @@ function tasteMatch(m){
   let fit = 0;
   if(T.range && sc > 0){
     const [lo, hi] = T.range;
-    if(sc >= lo && sc <= hi) fit = 0.15;
-    else{
-      const distance = sc < lo ? lo - sc : sc - hi;
-      fit = -Math.min(0.3, distance/40);
-    }
+    // At or above the bottom of the range the person usually enjoys: a small lift. Below it: a penalty that
+    // grows with the distance. Scoring ABOVE the range is never held against a film.
+    fit = sc >= lo ? 0.15 : -Math.min(0.3, (lo - sc)/40);
   }
   const value = Math.max(1, Math.min(99, Math.round(50 + 42*taste + 40*fit)));
   const conf = G.reduce((sum, g) => sum + tasteConf(nOf(g)), 0) / G.length;
@@ -11022,16 +11047,21 @@ function tasteMatch(m){
 function matchWhyHTML(m){
   const t = tasteMatch(m);
   if(!t) return "";
-  const known = t.basis.filter(b => b.n > 0), none = t.basis.filter(b => b.n === 0);
+  const T = tasteProfile();
   const join = (list, word) => list.length <= 1 ? list.join("") : list.slice(0, -1).join(", ") + " " + word + " " + list[list.length-1];
-  if(!known.length) return `<b>${t.value}</b>, an early guess. You haven't judged a ${join(none.map(b => esc(b.style)), "or")} film yet.`;
-  const top = known.slice(0, 3).map(b => `${b.n} ${esc(b.style)}`), rest = known.length - 3;
-  const noun = (known.length === 1 && known[0].n === 1) ? "film" : "films";
-  let s = rest > 0
-    ? `<b>${t.value}</b>, from your verdicts on ${top.join(", ")} and ${rest} more style${rest === 1 ? "" : "s"}.`
-    : `<b>${t.value}</b>, from your verdicts on ${join(top, "and")} ${noun}.`;
-  if(none.length) s += ` None yet on ${join(none.map(b => esc(b.style)), "or")}.`;
-  return s;
+  if(t.conf === 0) return `None yet. You haven't judged a ${join(t.basis.map(b => esc(b.style)), "or")} film.`;
+  const chips = t.basis.map(b => {
+    const s = T.styles[b.style];
+    return `<span class="mwhy${s ? "" : " none"}"><i${s ? ` style="background:${tasteColor(s)}"` : ""}></i>${esc(b.style)} <small>${b.n}</small></span>`;
+  }).join("");
+  const sc = cascadeScore(m);
+  let fit = "";
+  if(T.range && sc > 0){
+    fit = sc >= T.range[0]
+      ? `Scores ${sc} on Cascade, which suits you: films you enjoy usually score ${T.range[0]} or more.`
+      : `Scores ${sc} on Cascade, below the ${T.range[0]} or more you usually enjoy, which lowers it.`;
+  }
+  return `<b>${t.value}</b>, from your verdicts on films with its styles:<span class="mwhyrow">${chips}</span>${fit}`;
 }
 
 // ---- Your taste: the page and its card on the Agents screen (CAS-1252) ---------------------------------
@@ -11055,18 +11085,19 @@ function tasteColor(data){
 // shown pairing with the most verdicts, the style map's default selection, falling back to the top row's
 // All square when no pairing is shown at all.
 function tasteStyleMapData(T){
-  const rows = Object.entries(T.styles)
+  const top = Object.entries(T.styles)
     .sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0]))
     .map(e => e[0]);
-  const cols = rows.slice(0, 8);
-  if(!rows.length) return {rows, cols, best: null};
+  const rows = Object.keys(T.styles).sort((a, b) => a.localeCompare(b));
+  const cols = rows;
+  if(!rows.length) return {rows, cols, top, best: null};
   let best = null;
   rows.forEach(p => cols.forEach(o => {
     const pr = T.pairs[p + "|" + o];
     if(pr && pr.n > 0 && (!best || pr.n > best.n)) best = {primary: p, other: o, n: pr.n};
   }));
   if(!best) best = {primary: rows[0], other: null, n: T.styles[rows[0]].n};
-  return {rows, cols, best};
+  return {rows, cols, top, best};
 }
 let tasteSelPrimary = null, tasteSelOther = null;
 function tasteCellHTML(primary, other, data, isAll){
@@ -11109,7 +11140,7 @@ function tasteDetailHTML(primary, other, data){
 function renderStyleMapSection(T){
   const {rows, cols, best} = tasteStyleMapData(T);
   if(tasteSelPrimary === null){ tasteSelPrimary = best.primary; tasteSelOther = best.other; }
-  const headerHTML = `<span></span><span class="th all">All</span>`
+  const headerHTML = `<span class="tc0"></span><span class="th all">All</span>`
     + cols.map(c => `<span class="th">${esc(tasteShortName(c))}</span>`).join("");
   const rowsHTML = rows.map(primary => {
     const sty = T.styles[primary];
@@ -11123,9 +11154,9 @@ function renderStyleMapSection(T){
   const data = tasteSelOther ? T.pairs[tasteSelPrimary + "|" + tasteSelOther] : T.styles[tasteSelPrimary];
   return `
     <div class="flabel">Style map</div>
-    <p class="tnote">Each row is a style, counting every film you've judged that has it. Across the top: the same films' other styles. Tap a square to see the films behind it.</p>
+    <p class="tnote">Styles run A to Z, down the side and across the top. A square is the films you've judged that have both. Swipe the grid sideways for more, and tap a square to see its films.</p>
     <div class="tmap">
-      <div class="tgrid" style="grid-template-columns:minmax(0,92px) repeat(${1 + cols.length},1fr)">${headerHTML}${rowsHTML}</div>
+      <div class="tscroll"><div class="tgrid" style="grid-template-columns:92px repeat(${1 + cols.length},26px)">${headerHTML}${rowsHTML}</div></div>
       <div class="tlegend"><span>avoid</span><span class="ramp"><i style="background:rgba(240,136,58,0.85)"></i><i style="background:rgba(240,136,58,0.46)"></i><i style="background:rgba(255,255,255,.08)"></i><i style="background:rgba(45,212,191,0.46)"></i><i style="background:rgba(45,212,191,0.85)"></i></span><span>go for</span><span class="sp">fainter = fewer verdicts</span></div>
       ${tasteDetailHTML(tasteSelPrimary, tasteSelOther, data)}
     </div>`;
@@ -11248,7 +11279,7 @@ function renderTasteScreen(){
 }
 function tasteCardHTML(){
   const T = tasteProfile(), n = T.n;
-  const {rows, cols} = tasteStyleMapData(T);
+  const rows = tasteStyleMapData(T).top;
   const miniRows = rows.slice(0, 4);
   const cells = [];
   for(let r = 0; r < 4; r++){
