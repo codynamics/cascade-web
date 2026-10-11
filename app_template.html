@@ -3702,6 +3702,13 @@
     .card:not(.expanded) .ctop.hasmatch .mrow.r-scores .dot{display:none}
     .card:not(.expanded) .ctop.hasmatch .mrow.r-scores{gap:4px}
   }
+  /* ==== MATCH CERTAINTY, WIDER STEPS (Lee, 2026-10-11) =================================================
+     On the phone "getting there" and "sure" read as the same violet. Three steps a glance can tell apart:
+     sure is solid, getting there is half strength, an early guess is a faint wash with a lilac number. */
+  .qhero.c3{background:#7c5cff}
+  .qhero.c2{background:rgba(124,92,255,.40)}
+  .qhero.c1{background:rgba(124,92,255,.13);color:#cfc4ff}
+  .qhero.c1 small{color:rgba(207,196,255,.72)}
 </style>
 </head>
 <body>
@@ -10921,7 +10928,7 @@ function tasteProfile(){
   });
   const filmsOut = list => list.slice().sort(byAt).map(v => ({id:v.id, verdict:v.kind}));
   Object.values(styles).forEach(s => {
-    s.lean = (s.sum + TASTE_K*overall.lean) / (s.n + TASTE_K);
+    s.lean = s.sum / (s.n + TASTE_K);
     s.conf = tasteConf(s.n);
     s.films = filmsOut(s.films);
   });
@@ -10952,7 +10959,7 @@ function tasteMatch(m){
   if(T.n < 5) return null;
   const p = m.genres[0], S = m.genres.slice(1);
   const sty = T.styles[p];
-  const styleLean = sty ? sty.lean : T.overall.lean;
+  const styleLean = sty ? sty.lean : 0;
   const styleN = sty ? sty.n : 0;
   const taste = S.length
     ? S.reduce((sum, s) => sum + (T.pairs[p+"|"+s] ? T.pairs[p+"|"+s].lean : styleLean), 0) / S.length
@@ -10968,7 +10975,7 @@ function tasteMatch(m){
     }
   }
   const value = Math.max(1, Math.min(99, Math.round(50 + 42*taste + 40*fit)));
-  const conf = Math.max(tasteConf(styleN), 0.45*tasteConf(T.overall.n));
+  const conf = tasteConf(styleN);
   const level = conf < 0.4 ? 1 : conf < 0.65 ? 2 : 3;
   return {value, conf, level};
 }

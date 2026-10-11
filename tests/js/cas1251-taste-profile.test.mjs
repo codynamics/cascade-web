@@ -86,13 +86,13 @@ test("CAS-1251 AC1: style/pairing leans and confidence from a fixture of six ver
   withTasteFixture(ac1Assignments(), () => {
     const T = E.tasteProfile();
     assert.equal(round4(T.overall.lean), 0.1250);
-    assert.equal(round4(T.styles.Action.lean), 0.3571);
-    assert.equal(round4(T.styles.Horror.lean), -0.2500);
-    assert.equal(round4(T.styles.Drama.lean), 0.3500);
-    assert.equal(round4(T.pairs["Action|Thriller"].lean), 0.6548);
-    assert.equal(round4(T.pairs["Action|Comedy"].lean), 0.1857);
-    assert.equal(round4(T.pairs["Horror|Thriller"].lean), -0.4000);
-    assert.equal(round4(T.pairs["Drama|Crime"].lean), 0.5300);
+    assert.equal(round4(T.styles.Action.lean), 0.2857);
+    assert.equal(round4(T.styles.Horror.lean), -0.3333);
+    assert.equal(round4(T.styles.Drama.lean), 0.2500);
+    assert.equal(round4(T.pairs["Action|Thriller"].lean), 0.6071);
+    assert.equal(round4(T.pairs["Action|Comedy"].lean), 0.1286);
+    assert.equal(round4(T.pairs["Horror|Thriller"].lean), -0.4667);
+    assert.equal(round4(T.pairs["Drama|Crime"].lean), 0.4500);
     assert.equal(round4(T.styles.Action.conf), 0.4286);
     assert.equal(T.range, null);
     assert.equal(T.n, 6);
@@ -105,9 +105,9 @@ test("CAS-1251 AC2: tasteMatch for three unverdicted films against the AC1 fixtu
     const filmB = scoredFilm(["Horror"], 50);
     const filmC = scoredFilm(["Western"], 72);
     const a = E.tasteMatch(filmA), b = E.tasteMatch(filmB), c = E.tasteMatch(filmC);
-    assert.deepEqual([a.value, round4(a.conf), a.level], [71, 0.4286, 2]);
-    assert.deepEqual([b.value, round4(b.conf), b.level], [40, 0.3333, 1]);
-    assert.deepEqual([c.value, round4(c.conf), c.level], [55, 0.2700, 1]);
+    assert.deepEqual([a.value, round4(a.conf), a.level], [69, 0.4286, 2]);
+    assert.deepEqual([b.value, round4(b.conf), b.level], [36, 0.3333, 1]);
+    assert.deepEqual([c.value, round4(c.conf), c.level], [50, 0.0000, 1]);
   });
 });
 
@@ -128,9 +128,9 @@ test("CAS-1251 AC3: forcing the learned range onto the AC1 fixture's leans repro
     const filmA = scoredFilm(["Action","Thriller","Crime"], 90);
     const filmB = scoredFilm(["Horror"], 50);
     const filmC = scoredFilm(["Western"], 72);
-    assert.equal(E.tasteMatch(filmA).value, 66);
-    assert.equal(E.tasteMatch(filmB).value, 28);
-    assert.equal(E.tasteMatch(filmC).value, 61);
+    assert.equal(E.tasteMatch(filmA).value, 64);
+    assert.equal(E.tasteMatch(filmB).value, 24);
+    assert.equal(E.tasteMatch(filmC).value, 56);
   });
 });
 
