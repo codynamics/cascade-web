@@ -20541,5 +20541,25 @@
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
     "detected": "2026-10-11"
+  },
+  {
+    "tmdb_id": 412090,
+    "title": "Jolly LLB 2",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Amazon Prime Video",
+      "Amazon Prime Video with Ads"
+    ],
+    "detected": "2026-10-12"
+  },
+  {
+    "tmdb_id": 412090,
+    "title": "Jolly LLB 2",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-10-12"
   }
 ]
