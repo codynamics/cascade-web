@@ -6677,12 +6677,14 @@ function qScoreHTML(m, extraClass=""){
 const MATCH_SURE_TEXT = {1:"early guess", 2:"getting there", 3:"sure"};
 function matchBadgeHTML(m){
   const t = tasteMatch(m);
-  if(!t || t.conf === 0) return "";
-  const bars = [1,2,3].map(i => `<i${i<=t.level?' class="on"':''}></i>`).join("");
+  if(!t) return "";
+  // CAS-1260: tasteMatch no longer returns a level; the badge keeps its three steps from conf until CAS-1261.
+  const level = t.conf < 0.4 ? 1 : t.conf < 0.65 ? 2 : 3;
+  const bars = [1,2,3].map(i => `<i${i<=level?' class="on"':''}></i>`).join("");
   const bg = tasteColor({lean: (t.value - 50) / 42, conf: t.conf});
   const alpha = parseFloat(bg.slice(bg.lastIndexOf(",") + 1));
   const side = t.value >= 50 ? "for" : "against";
-  return `<span class="qhero lean ${side}${alpha >= 0.6 ? " ink" : ""} c${t.level}" style="background:${bg}" title="Match ${t.value}. Cascade's estimate of how much you'll like this, from your own verdicts." aria-label="Match ${t.value}, ${MATCH_SURE_TEXT[t.level]}"><b>${t.value}</b><span class="hl"><small>Match</small><span class="mbars" aria-hidden="true">${bars}</span></span></span>`;
+  return `<span class="qhero lean ${side}${alpha >= 0.6 ? " ink" : ""} c${level}" style="background:${bg}" title="Match ${t.value}. Cascade's estimate of how much you'll like this, from your own verdicts." aria-label="Match ${t.value}, ${MATCH_SURE_TEXT[level]}"><b>${t.value}</b><span class="hl"><small>Match</small><span class="mbars" aria-hidden="true">${bars}</span></span></span>`;
 }
 function sortMoviesBy(a,b,key){
   switch(key){
@@ -7080,9 +7082,6 @@ function savingsHTML(offers, canExpand){
 // being a separate block above them) so all three share the same .clbl column and wrap the same way.
 function creditsHTML(m, inCard){
   const rows=[];
-  const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  const why = signedIn ? matchWhyHTML(m) : "";
-  if(why) rows.push(`<div class="credit"><span class="clbl">Match</span><span class="cval">${why}</span></div>`);
   const aw=awardsBreakdownHTML(m); if(aw) rows.push(aw);
   if(m.director) rows.push(`<div class="credit"><span class="clbl">Director</span><span class="cval">${esc(m.director)}</span></div>`);
   if((m.cast||[]).length) rows.push(`<div class="credit"><span class="clbl">Cast</span><span class="cval">${esc(m.cast.join(", "))}</span></div>`);
@@ -11015,63 +11014,40 @@ function tasteProfile(){
 
   const latest = counted.slice().sort(byAt).map(v => ({id:v.id, verdict:v.kind, at:v.at}));
 
-  const profile = {n: overall.n, overall: {sum:overall.sum, n:overall.n, lean:overall.lean}, styles, pairs, range, ages, latest};
+  // CAS-1260: tasteMatch() reads every judged film with its styles.
+  const judged = counted.map(v => ({id:v.id, kind:v.kind, G:v.G}));
+  const profile = {n: overall.n, overall: {sum:overall.sum, n:overall.n, lean:overall.lean}, styles, pairs, range, ages, latest, judged};
   _tasteProfileCache = profile;
   return profile;
 }
-// Match for a film not yet judged — null when there isn't enough evidence to say anything (CAS-1251).
+// CAS-1260, You (Match v2, Lee 2026-10-14): how much this person is likely to like a film they have not
+// judged, from their own verdicts only. Each verdict is a score out of 100 (MATCH_VERDICT_SCORE). The
+// "combination films" are the judged films that share at least two of this film's styles (one, if the
+// film has only one style), each weighted by overlap = shared styles / all styles of the two films.
+// You = 80% the overlap-weighted average of the combination films + 20% the plain average of every judged
+// film carrying this film's headline (first) style (the combination average alone if there is none).
+// Nothing is pulled towards 50 while evidence builds; the Cascade score plays no part. null when no
+// combination film exists. conf = overlap sum / (overlap sum + 3): one exact-match film 0.25, three 0.5.
+const MATCH_VERDICT_SCORE = {wow:100, liked:91, enjoyed:83, soso:34, disliked:17, notfor:17};
 function tasteMatch(m){
   if(!(m.genres && m.genres.length)) return null;
   const T = tasteProfile();
-  if(T.n < 5) return null;
-  const G = [...new Set(m.genres)];
-  const leanOf = g => T.styles[g] ? T.styles[g].lean : 0;
-  const nOf = g => T.styles[g] ? T.styles[g].n : 0;
-  let taste;
-  if(G.length === 1) taste = leanOf(G[0]);
-  else{
-    let sum = 0, count = 0;
-    for(let i = 0; i < G.length; i++) for(let j = i+1; j < G.length; j++){
-      const pr = T.pairs[G[i]+"|"+G[j]];
-      sum += pr ? pr.lean : (leanOf(G[i]) + leanOf(G[j])) / 2;
-      count += 1;
+  const G = [...new Set(m.genres)], head = G[0], need = G.length === 1 ? 1 : 2;
+  let wSum = 0, sSum = 0, films = 0, hSum = 0, hN = 0;
+  T.judged.forEach(v => {
+    if(v.id === m.tmdb_id) return;
+    const shared = G.filter(g => v.G.includes(g)).length;
+    const score = MATCH_VERDICT_SCORE[v.kind];
+    if(shared >= need){
+      const overlap = shared / new Set([...G, ...v.G]).size;
+      wSum += overlap; sSum += overlap * score; films += 1;
     }
-    taste = sum / count;
-  }
-  const sc = cascadeScore(m);
-  let fit = 0;
-  if(T.range && sc > 0){
-    const [lo, hi] = T.range;
-    // At or above the bottom of the range the person usually enjoys: a small lift. Below it: a penalty that
-    // grows with the distance. Scoring ABOVE the range is never held against a film.
-    fit = sc >= lo ? 0.15 : -Math.min(0.3, (lo - sc)/40);
-  }
-  const value = Math.max(1, Math.min(99, Math.round(50 + 42*taste + 40*fit)));
-  const conf = G.reduce((sum, g) => sum + tasteConf(nOf(g)), 0) / G.length;
-  const level = conf < 0.4 ? 1 : conf < 0.65 ? 2 : 3;
-  const basis = G.map(g => ({style: g, n: nOf(g)})).sort((a, b) => b.n - a.n);
-  return {value, conf, level, basis};
-}
-// The words behind a Match, for the open card's Match row: which of the film's styles the person has
-// judged, and how many verdicts each. "" when there is no Match to explain.
-function matchWhyHTML(m){
-  const t = tasteMatch(m);
-  if(!t) return "";
-  const T = tasteProfile();
-  const join = (list, word) => list.length <= 1 ? list.join("") : list.slice(0, -1).join(", ") + " " + word + " " + list[list.length-1];
-  if(t.conf === 0) return `None yet. You haven't judged a ${join(t.basis.map(b => esc(b.style)), "or")} film.`;
-  const chips = t.basis.map(b => {
-    const s = T.styles[b.style];
-    return `<span class="mwhy${s ? "" : " none"}"><i${s ? ` style="background:${tasteColor(s)}"` : ""}></i>${esc(b.style)} <small>${b.n}</small></span>`;
-  }).join("");
-  const sc = cascadeScore(m);
-  let fit = "";
-  if(T.range && sc > 0){
-    fit = sc >= T.range[0]
-      ? `Scores ${sc} on Cascade, which suits you: films you enjoy usually score ${T.range[0]} or more.`
-      : `Scores ${sc} on Cascade, below the ${T.range[0]} or more you usually enjoy, which lowers it.`;
-  }
-  return `<b>${t.value}</b>, from your verdicts on films with its styles:<span class="mwhyrow">${chips}</span>${fit}`;
+    if(v.G.includes(head)){ hSum += score; hN += 1; }
+  });
+  if(!films) return null;
+  const combo = sSum / wSum, main = hN ? hSum / hN : combo;
+  const value = Math.max(1, Math.min(99, Math.round(0.8 * combo + 0.2 * main)));
+  return {value, conf: wSum / (wSum + 3), films};
 }
 
 // ---- Your taste: the page and its card on the Agents screen (CAS-1252) ---------------------------------

@@ -106,15 +106,20 @@ test("CAS-1251 AC1: style/pairing leans and confidence from a fixture of six ver
   });
 });
 
-test("CAS-1251 AC2: tasteMatch for three unverdicted films against the AC1 fixture", () => {
+test("CAS-1260 AC1: You (tasteMatch) against the AC1 fixture — 80% combination films, 20% headline style", () => {
   withTasteFixture(ac1Assignments(), () => {
-    const filmA = scoredFilm(["Action","Thriller","Crime"], 90);
-    const filmB = scoredFilm(["Horror"], 50);
-    const filmC = scoredFilm(["Western"], 72);
-    const a = E.tasteMatch(filmA), b = E.tasteMatch(filmB), c = E.tasteMatch(filmC);
-    assert.deepEqual([a.value, round4(a.conf), a.level], [65, 0.3524, 1]);
-    assert.deepEqual([b.value, round4(b.conf), b.level], [36, 0.3333, 1]);
-    assert.deepEqual([c.value, round4(c.conf), c.level], [50, 0.0000, 1]);
+    const v = genres => { const t = E.tasteMatch(scoredFilm(genres, 70)); return t ? [t.value, round4(t.conf), t.films] : null; };
+    // Two Action+Thriller films share two styles (overlap 2/3 each): (100 + 83) / 2 = 91.5. Headline Action
+    // films (Wow, Enjoyed, So-so) average 72.3. 0.8 x 91.5 + 0.2 x 72.3 = 87.7.
+    assert.deepEqual(v(["Action","Thriller","Crime"]), [88, 0.3077, 2]);
+    // One style only: every judged film carrying it is a combination film (Never 17, Disliked 17).
+    assert.deepEqual(v(["Horror"]), [17, 0.3333, 2]);
+    // Horror+Thriller (Disliked) is the only combination film: 17; headline Thriller films 100, 83, 17 average 66.7.
+    assert.deepEqual(v(["Thriller","Horror"]), [27, 0.25, 1]);
+    // One judged film is enough.
+    assert.deepEqual(v(["Comedy"]), [34, 0.1429, 1]);
+    // No judged film shares the combination: no You at all.
+    assert.equal(E.tasteMatch(scoredFilm(["Western"], 70)), null);
   });
 });
 
@@ -128,29 +133,20 @@ test("CAS-1251 AC3: the learned range is the 15th-85th percentile of positively-
   });
 });
 
-test("CAS-1251 AC3: forcing the learned range onto the AC1 fixture's leans reproduces the three Match values", () => {
+test("CAS-1260 AC2: You ignores the Cascade score — the same film at 40 and at 95 gets the same You", () => {
   withTasteFixture(ac1Assignments(), () => {
-    const T = E.tasteProfile();
-    T.range = [64, 85];   // force — tasteMatch() reads back this same cached object, AC1's leans untouched
-    const filmA = scoredFilm(["Action","Thriller","Crime"], 90);
-    const filmB = scoredFilm(["Horror"], 50);
-    const filmC = scoredFilm(["Western"], 72);
-    // filmA scores 90, above the forced range: scoring above the range is not held against a film.
-    assert.equal(E.tasteMatch(filmA).value, 71);
-    assert.equal(E.tasteMatch(filmB).value, 24);
-    assert.equal(E.tasteMatch(filmC).value, 56);
+    assert.equal(E.tasteMatch(scoredFilm(["Action","Thriller","Crime"], 40)).value, 88);
+    assert.equal(E.tasteMatch(scoredFilm(["Action","Thriller","Crime"], 95)).value, 88);
   });
 });
 
-test("CAS-1251 AC4: tasteMatch needs at least five counted verdicts overall", () => {
-  const probe = { genres:["Action"], status:["included_streaming"] };
-  const four = [0,1,2,3].map(() => scoredFilm(["Action"], 70));
-  withTasteFixture(four.map(m => [m, "enjoyed"]), () => {
-    assert.equal(E.tasteMatch(probe), null, "four counted verdicts must not be enough");
-  });
-  const five = [0,1,2,3,4].map(() => scoredFilm(["Action"], 70));
-  withTasteFixture(five.map(m => [m, "enjoyed"]), () => {
-    assert.notEqual(E.tasteMatch(probe), null, "five counted verdicts must be enough for a film with genres");
+test("CAS-1260 AC3: You needs one combination film, not a count of verdicts overall", () => {
+  const probe = { tmdb_id: 90009999, genres:["Action"], status:["included_streaming"] };
+  withTasteFixture([], () => { assert.equal(E.tasteMatch(probe), null, "no verdicts: no You"); });
+  const one = [scoredFilm(["Action"], 70)];
+  withTasteFixture(one.map(m => [m, "enjoyed"]), () => {
+    const t = E.tasteMatch(probe);
+    assert.deepEqual([t.value, round4(t.conf), t.films], [83, 0.25, 1]);
   });
 });
 

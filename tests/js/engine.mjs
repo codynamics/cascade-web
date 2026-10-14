@@ -269,7 +269,7 @@ if(typeof window.CascadeAuth === "undefined"){
   // built from the verdict sets above and cascadeScore) — exported directly so a test can call them without
   // a real account store or a real catalogue of verdicts. CAS-1254: matchBadgeHTML is the Match badge's own
   // render, exported so a test can assert its certainty class/bars directly.
-  tasteProfile, tasteMatch, matchBadgeHTML, matchWhyHTML, tasteStyleMapData, creditsHTML,
+  tasteProfile, tasteMatch, matchBadgeHTML, tasteStyleMapData, creditsHTML,
   // CAS-919: wmQScoreSourcesText is wmQScore's own text, exported so a test can assert the blended
   // cascadeScoreSourcesText's Watchmode half directly.
   wmQScoreSourcesText,
