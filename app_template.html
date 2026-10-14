@@ -3778,6 +3778,43 @@
   /* with People and Critics gone, an awards mark and a badge share one line, so a badge no longer wraps */
   .card:not(.expanded) .ctop.hasmatch .mrow.r-scores{flex-wrap:nowrap}
   .card:not(.expanded) .ctop.hasmatch .mrow.r-scores .condbadge{flex-basis:auto}
+  /* ==== CAS-1263: CRISPER, ROOMIER YOU AND PUBLIC; QUIETER ACTION BUTTONS; RELEASE LINE BACK (Lee, 2026-10-15)
+     You and Public grow to 44x34 with more room inside. No opacity anywhere (a faded layer blurred the text):
+     You's confidence is its fill strength, three clear steps, and its number is always solid white. Public is
+     information, so it carries no outline, only a faint fill; on a card an outline means you can tap it. The
+     closed card's three action buttons are plain outlines with no colour fill; yellow when a person chose it
+     (a Watch On or an agent picked by hand, or a verdict given). The closed card shows
+     a plain line between the release date and the service lozenge again (no dots; the service name keeps its room). */
+  .ctop.hasmatch .title,.ctop.hasmatch .metaline,
+  .ctop.hasmatch.nomatch .title,.ctop.hasmatch.nomatch .metaline{padding-right:54px}
+  .card:not(.expanded) .ctop.hasmatch .synopsis{padding-right:54px}
+  .qyou,.qpub{width:44px;height:34px;border-radius:8px;gap:3px;padding:2px 0 0;-webkit-font-smoothing:antialiased}
+  .qyou b,.qpub b{font:800 15px/1 var(--font-body)}
+  .qyou small,.qpub small{font:700 7.5px/1 var(--font-body);letter-spacing:.4px;opacity:1}
+  .qyou{top:0;color:#fff}
+  .qyou small{color:#fff}
+  .qyou.for.c3{background:#138c7d}
+  .qyou.for.c2{background:rgba(19,140,125,.5)}
+  .qyou.for.c1{background:rgba(19,140,125,.14)}
+  .qyou.against.c3{background:#b65a1c}
+  .qyou.against.c2{background:rgba(182,90,28,.5)}
+  .qyou.against.c1{background:rgba(182,90,28,.14)}
+  .qpub{border:0;background:rgba(255,255,255,.07)}
+  .qpub small{color:var(--dim)}
+  .qpub.intitle{top:40px}
+  .card:not(.expanded) .wline{display:block;flex:1 1 0;min-width:0;margin:0}
+  .card:not(.expanded) .wline:last-of-type{min-width:9px}
+  .card:not(.expanded) .avail2{gap:0}
+  .card:not(.expanded) .avail2 > .reldate{margin-right:3px}
+  .card:not(.expanded) .avail2 > .cap{margin-left:0;flex:0 1 auto;padding:1px 6px;gap:3px}
+  .card:not(.expanded) .ctl .cmini .cfill{display:none}
+  .card:not(.expanded) .ctl .cmini,.card:not(.expanded) .ctl.watch .cmini,
+  .card:not(.expanded) .ctl.notify.wsrc-auto .cmini,.card:not(.expanded) .ctl.casc.csrc-auto .cmini{
+    background:transparent;border:1px solid rgba(255,255,255,.32)}
+  .card:not(.expanded) .ctl .cmini .clab{color:var(--ink);font-weight:600}
+  .card:not(.expanded) .ctl .cmini .clab.dim{color:var(--dim);font-weight:500}
+  .card:not(.expanded) .ctl.notify.wsrc-manual .cmini,.card:not(.expanded) .ctl.casc.csrc-manual .cmini,
+  .card:not(.expanded) .ctl.watch:has(.clab:not(.dim)) .cmini{border-color:#ffd54a}
 </style>
 </head>
 <body>
@@ -6717,12 +6754,15 @@ function qScoreHTML(m, extraClass=""){
 // card. You (tasteMatch) is solid, green at 50 and over and orange below, and fades with confidence; the
 // number fades with it and is always white. Public (the Cascade score) is see-through with an outline and
 // always sits in the same place, under where You goes. No You when tasteMatch(m) is null.
-const youOpacity = conf => Math.max(0.3, Math.min(1, conf / 0.75));
+// CAS-1263: confidence shows as three clearly different fill strengths, not a continuous opacity (which
+// blurred the text and left most films looking alike): c1 early read (conf under 0.5, under ~3 matching
+// films), c2 building (under 0.75), c3 sure. The number is always solid white.
+const youLevel = conf => conf < 0.5 ? 1 : conf < 0.75 ? 2 : 3;
 function matchBadgeHTML(m){
   const t = tasteMatch(m);
   if(!t) return "";
   const side = t.value >= 50 ? "for" : "against";
-  return `<span class="qyou ${side}" style="opacity:${youOpacity(t.conf).toFixed(2)}" title="You ${t.value}. Cascade's read of how much you'll like this, from your own verdicts on films like it." aria-label="You ${t.value}"><b>${t.value}</b><small>You</small></span>`;
+  return `<span class="qyou ${side} c${youLevel(t.conf)}" title="You ${t.value}. Cascade's read of how much you'll like this, from your own verdicts on films like it." aria-label="You ${t.value}"><b>${t.value}</b><small>You</small></span>`;
 }
 function publicLozengeHTML(m, extraClass=""){
   const cls = extraClass ? " "+extraClass : "";

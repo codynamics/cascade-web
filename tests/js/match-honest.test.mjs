@@ -100,15 +100,16 @@ test("CAS-1254 AC2: tasteProfile and tasteMatch stay honest against the 60-verdi
   });
 });
 
-test("CAS-1261 AC1: the You lozenge — green at 50 and over, orange below, white number, fading with confidence", () => {
+test("CAS-1263 AC1: the You lozenge — green at 50 and over, orange below, white number, three fill steps from confidence, no opacity", () => {
   withTasteFixture(ac2Assignments(), () => {
+    // conf: Action 0.9302 -> c3; War 0.5 -> c2; Animation 0.4 -> c1.
     const sure = E.matchBadgeHTML(scoredFilm(["Action"], 80));
-    assert.match(sure, /^<span class="qyou for" style="opacity:1\.00" /);
+    assert.match(sure, /^<span class="qyou for c3" title=/);
     assert.ok(sure.includes("<b>83</b><small>You</small>"));
-    const war = E.matchBadgeHTML(scoredFilm(["War"], 80));
-    assert.match(war, /class="qyou for" style="opacity:0\.67"/);
+    assert.ok(!sure.includes("opacity"));
+    assert.match(E.matchBadgeHTML(scoredFilm(["War"], 80)), /^<span class="qyou for c2" /);
     const against = E.matchBadgeHTML(scoredFilm(["Animation"], 80));
-    assert.match(against, /class="qyou against" style="opacity:0\.53"/);
+    assert.match(against, /^<span class="qyou against c1" /);
     assert.ok(!against.includes("mbars"));
     assert.equal(E.matchBadgeHTML(scoredFilm(["Music","Documentary"], 80)), "");
   });
