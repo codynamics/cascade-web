@@ -3736,6 +3736,48 @@
   .mwhy i{width:12px;height:12px;border-radius:3px;flex:none}
   .mwhy.none i{box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
   .mwhy small{font:500 11px/1 var(--font-body);color:var(--faint)}
+  /* ==== CAS-1261: YOU AND PUBLIC; PEOPLE AND CRITICS ON THE OPEN CARD ONLY (Lee, 2026-10-14) ==========
+     Signed in, the top-right column of a card holds two identical 42x26 lozenges: You (solid, green at 50
+     and over, orange below, fading with confidence, white number) and under it Public (the Cascade score,
+     see-through with an outline). Public always sits in the same place, whether or not You is shown. The
+     closed card drops People and Critics and shows two lines of the synopsis; the open card keeps People,
+     Critics and Public on its row. The service lozenge sits at the right of the release row. */
+  .ctop.hasmatch .title,.ctop.hasmatch .metaline,
+  .ctop.hasmatch.nomatch .title,.ctop.hasmatch.nomatch .metaline{padding-right:50px}
+  .card.expanded .ctop.hasmatch.nomatch .title,.card.expanded .ctop.hasmatch.nomatch .metaline{padding-right:0}
+  .qyou,.qpub{box-sizing:border-box;width:42px;height:26px;border-radius:7px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:2px;flex:none}
+  .qyou b,.qpub b{font:800 13px/1 var(--font-body)}
+  .qyou small,.qpub small{font:700 6.2px/1 var(--font-body);letter-spacing:.2px;text-transform:uppercase}
+  .qyou{position:absolute;top:2px;right:0;color:#fff}
+  .qyou small{color:rgba(255,255,255,.85)}
+  .qyou.for{background:#138c7d}
+  .qyou.against{background:#b65a1c}
+  .qpub{background:transparent;border:1px solid rgba(255,255,255,.2);color:#c3c9d4}
+  .qpub small{opacity:.8}
+  .qpub.hi{color:#8fe0b4;border-color:rgba(72,199,142,.55)}
+  .qpub.mid{color:#bcdcff;border-color:rgba(90,169,240,.5)}
+  .qpub.none{color:var(--faint)}
+  .qpub.intitle{position:absolute;top:32px;right:0}
+  .card.expanded .qpub.intitle{display:none}
+  .card:not(.expanded) .qpub.inrow{display:none}
+  .ctop.hasmatch .mrow.r-scores .qpub.inrow{order:2;margin-left:auto}
+  .card:not(.expanded) .ctop.hasmatch .mrow.r-scores > .m{display:none}
+  .card:not(.expanded) .ctop.hasmatch .mrow.r-scores:not(:has(.oscmark,.condbadge,.attrib)){display:none}
+  .card:not(.expanded) .ctop.hasmatch{grid-template-areas:"title" "meta" "syn" "scores"}
+  .card:not(.expanded) .ctop.hasmatch .synopsis{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;
+    margin:2px 0 0;padding-right:50px;font-size:12.5px;line-height:1.4;color:var(--dim)}
+  .card:not(.expanded) .avail2{width:100%}
+  .card:not(.expanded) .avail2 > .cap{margin-left:auto}
+  /* off-screen placeholder heights for the signed-in closed card (see CAS-1036 for why the authored value is
+     smaller than the real height): plain 200px real, with an awards mark 219px, with a badge or a cinema-info row 227px, measured at 390x844 */
+  .card:not(.expanded):has(.ctop.hasmatch){contain-intrinsic-size:auto 177px}
+  .card:not(.expanded):not(.densescores):has(.ctop.hasmatch .r-scores .oscmark){contain-intrinsic-size:auto 194px}
+  .card:not(.expanded).densescores:has(.ctop.hasmatch){contain-intrinsic-size:auto 200px}
+  .card.cinfo:not(.expanded):has(.ctop.hasmatch){contain-intrinsic-size:auto 200px}
+  /* with People and Critics gone, an awards mark and a badge share one line, so a badge no longer wraps */
+  .card:not(.expanded) .ctop.hasmatch .mrow.r-scores{flex-wrap:nowrap}
+  .card:not(.expanded) .ctop.hasmatch .mrow.r-scores .condbadge{flex-basis:auto}
 </style>
 </head>
 <body>
@@ -6671,18 +6713,22 @@ function qScoreHTML(m, extraClass=""){
   if(q<0) return `<span class="qscore none${cls}" title="Not enough agreement to score this yet">&ndash;</span>`;
   return `<span class="qscore ${q>=85?"hi":q>=70?"mid":"lo"}${cls}" title="Cascade score &mdash; ${escA(cascadeScoreSourcesText(m))}">${q}</span>`;
 }
-// CAS-1253: the Match badge — top right of a signed-in card. tasteMatch(m) (CAS-1251) returns null when
-// there isn't yet enough evidence; otherwise {value, level} drive the number and the signal-bar count.
-// Certainty is colour strength (qhero.c1/c2/c3) plus bars — the number itself never fades.
-const MATCH_SURE_TEXT = {1:"early guess", 2:"getting there", 3:"sure"};
+// CAS-1261, You and Public (Lee, 2026-10-14): two identical lozenges in the top-right column of a signed-in
+// card. You (tasteMatch) is solid, green at 50 and over and orange below, and fades with confidence; the
+// number fades with it and is always white. Public (the Cascade score) is see-through with an outline and
+// always sits in the same place, under where You goes. No You when tasteMatch(m) is null.
+const youOpacity = conf => Math.max(0.3, Math.min(1, conf / 0.75));
 function matchBadgeHTML(m){
   const t = tasteMatch(m);
-  if(!t || t.conf === 0) return "";
-  const bars = [1,2,3].map(i => `<i${i<=t.level?' class="on"':''}></i>`).join("");
-  const bg = tasteColor({lean: (t.value - 50) / 42, conf: t.conf});
-  const alpha = parseFloat(bg.slice(bg.lastIndexOf(",") + 1));
+  if(!t) return "";
   const side = t.value >= 50 ? "for" : "against";
-  return `<span class="qhero lean ${side}${alpha >= 0.6 ? " ink" : ""} c${t.level}" style="background:${bg}" title="Match ${t.value}. Cascade's estimate of how much you'll like this, from your own verdicts." aria-label="Match ${t.value}, ${MATCH_SURE_TEXT[t.level]}"><b>${t.value}</b><span class="hl"><small>Match</small><span class="mbars" aria-hidden="true">${bars}</span></span></span>`;
+  return `<span class="qyou ${side}" style="opacity:${youOpacity(t.conf).toFixed(2)}" title="You ${t.value}. Cascade's read of how much you'll like this, from your own verdicts on films like it." aria-label="You ${t.value}"><b>${t.value}</b><small>You</small></span>`;
+}
+function publicLozengeHTML(m, extraClass=""){
+  const cls = extraClass ? " "+extraClass : "";
+  const q = cascadeScore(m);
+  if(q<0) return `<span class="qpub none${cls}" title="Not enough agreement to score this yet"><b>&ndash;</b><small>Public</small></span>`;
+  return `<span class="qpub ${q>=85?"hi":q>=70?"mid":"lo"}${cls}" title="Public &mdash; ${escA(cascadeScoreSourcesText(m))}"><b>${q}</b><small>Public</small></span>`;
 }
 function sortMoviesBy(a,b,key){
   switch(key){
@@ -7080,9 +7126,6 @@ function savingsHTML(offers, canExpand){
 // being a separate block above them) so all three share the same .clbl column and wrap the same way.
 function creditsHTML(m, inCard){
   const rows=[];
-  const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  const why = signedIn ? matchWhyHTML(m) : "";
-  if(why) rows.push(`<div class="credit"><span class="clbl">Match</span><span class="cval">${why}</span></div>`);
   const aw=awardsBreakdownHTML(m); if(aw) rows.push(aw);
   if(m.director) rows.push(`<div class="credit"><span class="clbl">Director</span><span class="cval">${esc(m.director)}</span></div>`);
   if((m.cast||[]).length) rows.push(`<div class="credit"><span class="clbl">Cast</span><span class="cval">${esc(m.cast.join(", "))}</span></div>`);
@@ -8216,8 +8259,8 @@ function cardTopHTML(m){
   // Signed out (the shared film page, onboarding) the card draws exactly as it always has.
   const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
   const matchBadge = signedIn ? matchBadgeHTML(m) : "";
-  const titleScore = signedIn ? qScoreHTML(m, "tq") + matchBadge : qScoreHTML(m);
-  const rowScore = signedIn ? qScoreHTML(m, "rown") : "";
+  const titleScore = signedIn ? matchBadge + publicLozengeHTML(m, "intitle") : qScoreHTML(m);
+  const rowScore = signedIn ? publicLozengeHTML(m, "inrow") : "";
   // CAS-179: one grid, one order — title · genres·language · synopsis · money · scores · awards, with
   // the poster spanning down to the scores row and the scale badge tucked under it beside the awards.
   return `<div class="ctop${signedIn?" hasmatch":""}${signedIn && !matchBadge?" nomatch":""}">
@@ -10302,7 +10345,7 @@ function renderMoodSheetBody(){
           onclick="setMoodDraftOrder('release')">Release date</button>
         <button type="button" data-order="score" aria-pressed="${d.order==="score"}" class="${d.order==="score"?"on":""}"
           onclick="setMoodDraftOrder('score')">Cascade score</button>
-        <button type="button" disabled>Match<small>coming</small></button>
+        <button type="button" disabled>You<small>coming</small></button>
       </div>
       <div class="mfrow"><span>Only the best 10 on each stage</span>
         <button type="button" id="moodTop" class="mftog${d.top?" on":""}" role="switch" aria-checked="${d.top}"
@@ -11015,63 +11058,40 @@ function tasteProfile(){
 
   const latest = counted.slice().sort(byAt).map(v => ({id:v.id, verdict:v.kind, at:v.at}));
 
-  const profile = {n: overall.n, overall: {sum:overall.sum, n:overall.n, lean:overall.lean}, styles, pairs, range, ages, latest};
+  // CAS-1260: tasteMatch() reads every judged film with its styles.
+  const judged = counted.map(v => ({id:v.id, kind:v.kind, G:v.G}));
+  const profile = {n: overall.n, overall: {sum:overall.sum, n:overall.n, lean:overall.lean}, styles, pairs, range, ages, latest, judged};
   _tasteProfileCache = profile;
   return profile;
 }
-// Match for a film not yet judged — null when there isn't enough evidence to say anything (CAS-1251).
+// CAS-1260, You (Match v2, Lee 2026-10-14): how much this person is likely to like a film they have not
+// judged, from their own verdicts only. Each verdict is a score out of 100 (MATCH_VERDICT_SCORE). The
+// "combination films" are the judged films that share at least two of this film's styles (one, if the
+// film has only one style), each weighted by overlap = shared styles / all styles of the two films.
+// You = 80% the overlap-weighted average of the combination films + 20% the plain average of every judged
+// film carrying this film's headline (first) style (the combination average alone if there is none).
+// Nothing is pulled towards 50 while evidence builds; the Cascade score plays no part. null when no
+// combination film exists. conf = overlap sum / (overlap sum + 3): one exact-match film 0.25, three 0.5.
+const MATCH_VERDICT_SCORE = {wow:100, liked:91, enjoyed:83, soso:34, disliked:17, notfor:17};
 function tasteMatch(m){
   if(!(m.genres && m.genres.length)) return null;
   const T = tasteProfile();
-  if(T.n < 5) return null;
-  const G = [...new Set(m.genres)];
-  const leanOf = g => T.styles[g] ? T.styles[g].lean : 0;
-  const nOf = g => T.styles[g] ? T.styles[g].n : 0;
-  let taste;
-  if(G.length === 1) taste = leanOf(G[0]);
-  else{
-    let sum = 0, count = 0;
-    for(let i = 0; i < G.length; i++) for(let j = i+1; j < G.length; j++){
-      const pr = T.pairs[G[i]+"|"+G[j]];
-      sum += pr ? pr.lean : (leanOf(G[i]) + leanOf(G[j])) / 2;
-      count += 1;
+  const G = [...new Set(m.genres)], head = G[0], need = G.length === 1 ? 1 : 2;
+  let wSum = 0, sSum = 0, films = 0, hSum = 0, hN = 0;
+  T.judged.forEach(v => {
+    if(v.id === m.tmdb_id) return;
+    const shared = G.filter(g => v.G.includes(g)).length;
+    const score = MATCH_VERDICT_SCORE[v.kind];
+    if(shared >= need){
+      const overlap = shared / new Set([...G, ...v.G]).size;
+      wSum += overlap; sSum += overlap * score; films += 1;
     }
-    taste = sum / count;
-  }
-  const sc = cascadeScore(m);
-  let fit = 0;
-  if(T.range && sc > 0){
-    const [lo, hi] = T.range;
-    // At or above the bottom of the range the person usually enjoys: a small lift. Below it: a penalty that
-    // grows with the distance. Scoring ABOVE the range is never held against a film.
-    fit = sc >= lo ? 0.15 : -Math.min(0.3, (lo - sc)/40);
-  }
-  const value = Math.max(1, Math.min(99, Math.round(50 + 42*taste + 40*fit)));
-  const conf = G.reduce((sum, g) => sum + tasteConf(nOf(g)), 0) / G.length;
-  const level = conf < 0.4 ? 1 : conf < 0.65 ? 2 : 3;
-  const basis = G.map(g => ({style: g, n: nOf(g)})).sort((a, b) => b.n - a.n);
-  return {value, conf, level, basis};
-}
-// The words behind a Match, for the open card's Match row: which of the film's styles the person has
-// judged, and how many verdicts each. "" when there is no Match to explain.
-function matchWhyHTML(m){
-  const t = tasteMatch(m);
-  if(!t) return "";
-  const T = tasteProfile();
-  const join = (list, word) => list.length <= 1 ? list.join("") : list.slice(0, -1).join(", ") + " " + word + " " + list[list.length-1];
-  if(t.conf === 0) return `None yet. You haven't judged a ${join(t.basis.map(b => esc(b.style)), "or")} film.`;
-  const chips = t.basis.map(b => {
-    const s = T.styles[b.style];
-    return `<span class="mwhy${s ? "" : " none"}"><i${s ? ` style="background:${tasteColor(s)}"` : ""}></i>${esc(b.style)} <small>${b.n}</small></span>`;
-  }).join("");
-  const sc = cascadeScore(m);
-  let fit = "";
-  if(T.range && sc > 0){
-    fit = sc >= T.range[0]
-      ? `Scores ${sc} on Cascade, which suits you: films you enjoy usually score ${T.range[0]} or more.`
-      : `Scores ${sc} on Cascade, below the ${T.range[0]} or more you usually enjoy, which lowers it.`;
-  }
-  return `<b>${t.value}</b>, from your verdicts on films with its styles:<span class="mwhyrow">${chips}</span>${fit}`;
+    if(v.G.includes(head)){ hSum += score; hN += 1; }
+  });
+  if(!films) return null;
+  const combo = sSum / wSum, main = hN ? hSum / hN : combo;
+  const value = Math.max(1, Math.min(99, Math.round(0.8 * combo + 0.2 * main)));
+  return {value, conf: wSum / (wSum + 3), films};
 }
 
 // ---- Your taste: the page and its card on the Agents screen (CAS-1252) ---------------------------------
@@ -20019,7 +20039,7 @@ function markTutorialSeen(){ tutorialSeenFlag=true; pushViewField("tutorialSeen"
 function tutorialCardDefs(){
   return [
     {sel:"#agentsBtn", text:"Your agents live here. Each one watches for a different kind of film, all the time, so you don't have to."},
-    {sel:"#groups .card .r-scores", text:"Two numbers: what people thought, and what critics thought. Your agent only speaks up when a film clears the bar you set."},
+    {sel:"#groups .card .qpub.intitle", text:"Public is what everyone thought of a film. Once you've given a few verdicts, You shows how much you're likely to enjoy it. Your agent only speaks up when a film clears the bar you set."},
     {sel:"#groups .card .ctl.notify", text:"Films move — cinema, then rent, then streaming. Your agent follows each one and tells you when it reaches a window you actually use."},
     {sel:"#movingBtn", text:"Alerts shows what your agents have found for you — Today, Week, 2 weeks or Month. It opens on Today."},
   ];

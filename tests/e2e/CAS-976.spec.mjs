@@ -8,7 +8,7 @@ import { toShortlist, finishFlow, toListing } from "./helpers.mjs";
 
 const CARD_TEXT = [
   "Your agents live here. Each one watches for a different kind of film, all the time, so you don't have to.",
-  "Two numbers: what people thought, and what critics thought. Your agent only speaks up when a film clears the bar you set.",
+  "Public is what everyone thought of a film. Once you've given a few verdicts, You shows how much you're likely to enjoy it. Your agent only speaks up when a film clears the bar you set.",
   "Films move — cinema, then rent, then streaming. Your agent follows each one and tells you when it reaches a window you actually use.",
   "Alerts shows what your agents have found for you — Today, Week, 2 weeks or Month. It opens on Today.",
   "You're set. Nothing more to do today — your agents report at 5pm.",
@@ -65,7 +65,7 @@ test("CAS-976: the spotlight sits over the current card's own anchor, and follow
   // (tutorialResolveAnchor's own comment, app_template.html) — a plain .first() can resolve to one of
   // those on a real roster and return a null boundingBox. The app's own anchor resolution already skips
   // a hidden match; mirror that here with :visible so the anchor is the same element the tour itself used.
-  const anchor = page.locator("#groups .card .r-scores:visible").first();
+  const anchor = page.locator("#groups .card .qpub.intitle:visible").first();
   const anchorBox = await anchor.boundingBox();
   let holeBox = await page.locator("#tutHole").boundingBox();
   expect(Math.abs(holeBox.x - anchorBox.x)).toBeLessThan(12);

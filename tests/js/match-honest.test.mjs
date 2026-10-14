@@ -82,40 +82,42 @@ test("CAS-1254 AC2: tasteProfile and tasteMatch stay honest against the 60-verdi
     assert.equal(round4(T.styles.Animation.lean), -0.3333);
     assert.equal(round4(T.styles.Action.lean), 0.9091);
 
+    // CAS-1260: You counts only films sharing the combination; Cascade score plays no part.
     const cases = [
-      [["Crime","Thriller","Horror"], [65, 0.2121, 1]],
-      [["Music","Documentary"], [56, 0.0000, 1]],
-      [["Animation"], [42, 0.3333, 1]],
-      [["War"], [74, 0.4286, 2]],
-      [["Horror"], [83, 0.6364, 2]],
-      [["Drama"], [84, 0.6667, 3]],
-      [["Action"], [94, 0.9091, 3]],
+      [["Animation"], [17, 0.4, 2]],
+      [["War"], [83, 0.5, 3]],
+      [["Horror"], [83, 0.7, 7]],
+      [["Drama"], [83, 0.7273, 8]],
+      [["Action"], [83, 0.9302, 40]],
     ];
     cases.forEach(([genres, expected]) => {
       const m = E.tasteMatch(scoredFilm(genres, 80));
-      assert.deepEqual([m.value, round4(m.conf), m.level], expected, genres.join(", "));
+      assert.deepEqual([m.value, round4(m.conf), m.films], expected, genres.join(", "));
     });
+    // No judged film shares two of these styles (every fixture film has one style): no You.
+    assert.equal(E.tasteMatch(scoredFilm(["Crime","Thriller","Horror"], 80)), null);
+    assert.equal(E.tasteMatch(scoredFilm(["Music","Documentary"], 80)), null);
   });
 });
 
-test("CAS-1254 AC3: matchBadgeHTML carries the right certainty class and bar count", () => {
+test("CAS-1261 AC1: the You lozenge — green at 50 and over, orange below, white number, fading with confidence", () => {
   withTasteFixture(ac2Assignments(), () => {
-    // The badge is filled with the style map's own colour: teal for a Match of 50 or more, orange under 50,
-    // dark ink on a strong fill. Certainty still shows as c1/c2/c3 and the bar count.
-    const early = E.matchBadgeHTML(scoredFilm(["Crime","Thriller","Horror"], 80));
-    assert.match(early, /class="qhero lean for c1" style="background:rgba\(45,212,191,0\.25\)"/);
-    assert.equal((early.match(/class="on"/g) || []).length, 1);
-
     const sure = E.matchBadgeHTML(scoredFilm(["Action"], 80));
-    assert.match(sure, /class="qhero lean for ink c3" style="background:rgba\(45,212,191,0\.85\)"/);
-    assert.equal((sure.match(/class="on"/g) || []).length, 3);
-
+    assert.match(sure, /^<span class="qyou for" style="opacity:1\.00" /);
+    assert.ok(sure.includes("<b>83</b><small>You</small>"));
+    const war = E.matchBadgeHTML(scoredFilm(["War"], 80));
+    assert.match(war, /class="qyou for" style="opacity:0\.67"/);
     const against = E.matchBadgeHTML(scoredFilm(["Animation"], 80));
-    assert.match(against, /class="qhero lean against c1" style="background:rgba\(240,136,58,/);
-
-    // No verdict on any of the film's styles: no badge at all.
+    assert.match(against, /class="qyou against" style="opacity:0\.53"/);
+    assert.ok(!against.includes("mbars"));
     assert.equal(E.matchBadgeHTML(scoredFilm(["Music","Documentary"], 80)), "");
   });
+});
+
+test("CAS-1261 AC2: the Public lozenge carries the Cascade score in its tier colour", () => {
+  assert.ok(E.publicLozengeHTML(scoredFilm(["Action"], 90), "intitle").startsWith('<span class="qpub hi intitle"'));
+  assert.ok(E.publicLozengeHTML(scoredFilm(["Action"], 75), "inrow").startsWith('<span class="qpub mid inrow"'));
+  assert.ok(E.publicLozengeHTML(scoredFilm(["Action"], 60)).includes("<b>60</b><small>Public</small>"));
 });
 
 test("CAS-1254 AC4: the built index.html carries the wider certainty steps, after the old rules", () => {

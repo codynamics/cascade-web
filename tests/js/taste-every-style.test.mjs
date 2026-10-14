@@ -122,70 +122,35 @@ test("CAS-1255 AC3: every judged style gets its own row and pairing, no cap", ()
   });
 });
 
-test("CAS-1255 AC3: tasteMatch and matchWhyHTML for unjudged films against the fixture", () => {
+test("CAS-1260 AC6: You for unjudged films against the every-style fixture", () => {
   withTasteFixture(ac3Assignments(), () => {
-    // The Match row: the number, one chip per style of the film (its style-map colour and verdict count),
-    // then a sentence on the film's Cascade score. `plain` drops the tags so the words can be compared.
-    const plain = s => s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    const SUITS = "Scores 80 on Cascade, which suits you: films you enjoy usually score 80 or more.";
     const cases = [
-      [["Crime","Thriller","Horror"], 80, [71, 0.3667, 1],
-        `71 , from your verdicts on films with its styles: Thriller 6 Crime 4 Horror 0 ${SUITS}`],
-      [["Music","Documentary"], 80, [56, 0.0000, 1],
-        "None yet. You haven't judged a Music or Documentary film."],
-      [["Animation","Family","Comedy","Adventure"], 80, [33, 0.3333, 1],
-        `33 , from your verdicts on films with its styles: Animation 2 Family 2 Comedy 2 Adventure 2 ${SUITS}`],
-      [["Western"], 80, [64, 0.2000, 1],
-        `64 , from your verdicts on films with its styles: Western 1 ${SUITS}`],
-      [["Action","Thriller"], 80, [91, 0.6000, 2],
-        `91 , from your verdicts on films with its styles: Action 6 Thriller 6 ${SUITS}`],
-      [["Drama","Crime","History"], 80, [88, 0.5000, 2],
-        `88 , from your verdicts on films with its styles: Drama 4 Crime 4 History 4 ${SUITS}`],
-      [["Action","Crime"], 80, [79, 0.5500, 2],
-        `79 , from your verdicts on films with its styles: Action 6 Crime 4 ${SUITS}`],
-      // Below the range lowers the Match and says so; above the range is not held against the film.
-      [["Action","Thriller"], 60, [73, 0.6000, 2],
-        "73 , from your verdicts on films with its styles: Action 6 Thriller 6 Scores 60 on Cascade, below the 80 or more you usually enjoy, which lowers it."],
-      [["Action","Thriller"], 95, [91, 0.6000, 2],
-        "91 , from your verdicts on films with its styles: Action 6 Thriller 6 Scores 95 on Cascade, which suits you: films you enjoy usually score 80 or more."],
+      [["Animation","Family","Comedy","Adventure"], [17, 0.4, 2]],
+      [["Western"], [83, 0.25, 1]],
+      [["Action","Thriller"], [83, 0.6667, 6]],
+      [["Drama","Crime","History"], [83, 0.5714, 4]],
+      [["Thriller","Comedy","Action"], [83, 0.5714, 6]],
     ];
-    cases.forEach(([genres, score, expected, sentence]) => {
-      const m = scoredFilm(genres, score);
-      const match = E.tasteMatch(m);
-      assert.deepEqual([match.value, round4(match.conf), match.level], expected, genres.join(", "));
-      assert.equal(plain(E.matchWhyHTML(m)), sentence, genres.join(", "));
+    cases.forEach(([genres, expected]) => {
+      const t = E.tasteMatch(scoredFilm(genres, 80));
+      assert.deepEqual([t.value, round4(t.conf), t.films], expected, genres.join(", "));
     });
-
-    // Chips carry the style map's own colour for that style; a style with no verdicts has an empty chip.
-    const why = E.matchWhyHTML(scoredFilm(["Crime","Thriller","Horror"], 80));
-    assert.ok(why.includes('<span class="mwhy"><i style="background:rgba(45,212,191,0.56)"></i>Thriller <small>6</small></span>'));
-    assert.ok(why.includes('<span class="mwhy none"><i></i>Horror <small>0</small></span>'));
+    // Sharing only one style with every judged film is not a combination: no You.
+    assert.equal(E.tasteMatch(scoredFilm(["Crime","Thriller","Horror"], 80)), null);
+    assert.equal(E.tasteMatch(scoredFilm(["Action","Crime"], 80)), null);
+    assert.equal(E.tasteMatch(scoredFilm(["Music","Documentary"], 80)), null);
   });
 });
 
-test("CAS-1255 AC3: matchWhyHTML is empty when there isn't enough evidence for a Match at all", () => {
-  const four = [0,1,2,3].map(() => scoredFilm(["Action"], 70));
-  withTasteFixture(four.map(m => [m, "enjoyed"]), () => {
-    const probe = scoredFilm(["Action"], 70);
-    assert.equal(E.tasteMatch(probe), null);
-    assert.equal(E.matchWhyHTML(probe), "");
-  });
-});
-
-test("CAS-1255 AC4: creditsHTML carries a Match row above Director only when signed in", () => {
+test("CAS-1260 AC7: the open card has no Match row, signed in or out", () => {
   withTasteFixture(ac3Assignments(), () => {
     const m = scoredFilm(["Drama","Crime","History"], 80);
     m.director = "A Director";
     try{
       setSignedIn(true);
-      const signedInHTML = E.creditsHTML(m, true);
-      const matchMatches = signedInHTML.match(/<span class="clbl">Match<\/span>/g) || [];
-      assert.equal(matchMatches.length, 1);
-      assert.ok(signedInHTML.indexOf('<span class="clbl">Match</span>') < signedInHTML.indexOf('<span class="clbl">Director</span>'));
-
-      setSignedIn(false);
-      const signedOutHTML = E.creditsHTML(m, true);
-      assert.ok(!signedOutHTML.includes('<span class="clbl">Match</span>'));
+      const html = E.creditsHTML(m, true);
+      assert.ok(!html.includes('<span class="clbl">Match</span>'));
+      assert.ok(html.includes('<span class="clbl">Director</span>'));
     } finally {
       setSignedIn(false);
     }
