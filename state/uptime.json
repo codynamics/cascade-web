@@ -1,65 +1,67 @@
 {
-  "lastRun": "2026-10-14T17:18:24.710Z",
-  "consecutiveReds": 0,
+  "lastRun": "2026-10-14T18:18:33.852Z",
+  "consecutiveReds": 1,
   "slowConsecutiveReds": 0,
-  "fastRedNames": [],
-  "lastAlertedRedNames": null,
-  "lastAlertAt": "2026-09-18T22:17:49.627Z",
+  "fastRedNames": [
+    "daily_refresh_fresh"
+  ],
+  "lastAlertedRedNames": "daily_refresh_fresh",
+  "lastAlertAt": "2026-10-14T18:18:33.852Z",
   "signupAccountsPending": 13,
   "checks": [
     {
       "name": "site_up",
       "ok": true,
-      "ms": 887,
+      "ms": 916,
       "detail": "HTTP 200, version 1.0.0"
     },
     {
       "name": "movies_json",
       "ok": true,
-      "ms": 1182,
+      "ms": 573,
       "detail": "5987 record(s), parses."
     },
     {
       "name": "supabase_canary",
       "ok": true,
-      "ms": 2533,
+      "ms": 3720,
       "detail": "4 agent(s), 1 admitted film(s), film_watch read OK."
     },
     {
       "name": "signup",
       "ok": true,
-      "ms": 879,
-      "detail": "created and removed lee+probe-1791998301863@codynamics.com.au via delete_my_account."
+      "ms": 1845,
+      "detail": "created and removed lee+probe-1792001907576@codynamics.com.au via delete_my_account."
     },
     {
       "name": "orphan_probe_accounts",
       "ok": true,
-      "ms": 196,
+      "ms": 326,
       "detail": "no probe account older than 2h."
     },
     {
       "name": "usage_events_insert",
       "ok": true,
-      "ms": 521,
+      "ms": 780,
       "detail": "HTTP 201"
     },
     {
       "name": "pages_head",
       "ok": true,
-      "ms": 214,
+      "ms": 220,
       "detail": "HEAD https://cascade-web-3x1.pages.dev/ -> HTTP 200"
     },
     {
       "name": "daily_refresh_fresh",
-      "ok": true,
-      "ms": 691,
-      "detail": "last \"Daily refresh\" commit 11.3h ago (floor 30h)."
+      "ok": false,
+      "ms": 1794,
+      "detail": "GET commits -> HTTP 500"
     },
     {
       "name": "alerts_ran",
       "ok": true,
-      "ms": 346,
-      "detail": "last successful alerts.yml run 11.3h ago (floor 30h)."
+      "ms": 345,
+      "detail": "last successful alerts.yml run 12.3h ago (floor 30h)."
     }
   ]
 }
