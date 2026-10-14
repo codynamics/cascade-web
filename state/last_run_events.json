@@ -1,1 +1,65 @@
-[]
+[
+  {
+    "tmdb_id": 840430,
+    "title": "The Holdovers",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-14"
+  },
+  {
+    "tmdb_id": 614930,
+    "title": "Teenage Mutant Ninja Turtles: Mutant Mayhem",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-14"
+  },
+  {
+    "tmdb_id": 1387382,
+    "title": "Hunting Season",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "HBO Max"
+    ],
+    "detected": "2026-10-14"
+  },
+  {
+    "tmdb_id": 1387382,
+    "title": "Hunting Season",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-10-14"
+  },
+  {
+    "tmdb_id": 603206,
+    "title": "Dream Horse",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-14"
+  },
+  {
+    "tmdb_id": 460064,
+    "title": "Edie",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Amazon Prime Video",
+      "Amazon Prime Video with Ads"
+    ],
+    "detected": "2026-10-14"
+  },
+  {
+    "tmdb_id": 460064,
+    "title": "Edie",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-10-14"
+  }
+]
