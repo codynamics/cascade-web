@@ -289,6 +289,38 @@ test("Watch listing rows' off-screen placeholder height matches their real heigh
   expect(maxDiff, `placeholder→real height mismatches sampled: ${JSON.stringify(diffs)}`).toBeLessThan(10);
 });
 
+// CAS-1261: the same placeholder check for a SIGNED-IN closed card, which since CAS-1261 carries the You and
+// Public lozenges and two lines of synopsis instead of People/Critics, so it is a different height from the
+// signed-out card the test above samples. accountActive() is stubbed true so cardHTML() draws the signed-in card.
+test("Signed-in collapsed cards' off-screen placeholder height matches their real height (CAS-1261)", async ({ page }) => {
+  await freshApp(page);
+  const diffs = await page.evaluate(async () => {
+    const round = n => Math.round(n * 100) / 100;
+    window.CascadePersistence.accountActive = () => true;
+    const container = document.createElement("div");
+    container.id = "groups";
+    document.body.appendChild(container);
+    const sample = MOVIES.filter(m => m && m.tmdb_id).slice(0, 300);
+    container.innerHTML = sample.map(m => cardHTML(m)).join("");
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const rows = [...container.querySelectorAll(".card:not(.expanded)")]
+      .filter(el => el.getBoundingClientRect().top > window.innerHeight * 2);
+    const sampled = rows.filter((_, i) => i % 15 === 0).slice(0, 12);
+    const out = [];
+    for(const el of sampled){
+      const before = round(el.getBoundingClientRect().height);
+      el.scrollIntoView({ block: "center" });
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      out.push(round(Math.abs(el.getBoundingClientRect().height - before)));
+    }
+    container.remove();
+    return out;
+  });
+  expect(diffs.length).toBeGreaterThan(5);
+  const maxDiff = Math.max(...diffs);
+  expect(maxDiff, `placeholder→real height mismatches sampled: ${JSON.stringify(diffs)}`).toBeLessThan(10);
+});
+
 // CAS-1214: the test above only samples every 15th off-screen row, so it caught today's one real offender
 // (a cinfo card whose r-cinfo row carries a badge, Budget AND Gross — see denseCinfo in cardHTML) only by
 // the luck of which index landed in the sample. This test covers every cinfo row (every film for which
@@ -1793,6 +1825,10 @@ test("CAS-919: the score row reads Watchmode fields as People/Critics, a missing
 
   await expect(page.locator(`#card-${id} .r-wmscores`)).toHaveCount(0);
 
+  // CAS-1261: People and Critics show on the open card only, so open it before reading the row.
+  await page.evaluate((filmId) => toggleExpand(filmId), id);
+  await expect(page.locator(`#card-${id}`)).toHaveClass(/expanded/);
+
   const scoresRow = page.locator(`#card-${id} .mrow.r-scores`);
   await expect(scoresRow).toBeVisible();
   const peopleCell = scoresRow.locator(".m", { hasText: "People" });
@@ -1853,6 +1889,13 @@ test("CAS-919: a collapsed card's score row has no Cascade cell and no Pop cell,
   const card2 = page.locator(`#card-${id}`);
   await expect(card2).not.toHaveClass(/expanded/);
 
+  // CAS-1261: the closed card carries the Public lozenge and no People/Critics cells; the open card shows them.
+  await expect(card2.locator(".title .qpub.intitle")).toBeVisible();
+  await expect(card2.locator(".title .qpub.intitle")).toContainText("Public");
+  await expect(card2.locator(".mrow.r-scores .m", { hasText: "People" })).toBeHidden();
+  await page.evaluate((filmId) => toggleExpand(filmId), id);
+  await expect(card2).toHaveClass(/expanded/);
+
   const scoresRow = card2.locator(".mrow.r-scores");
   await expect(scoresRow).toBeVisible();
   await expect(card2.locator(".mrow.r-wmscores")).toHaveCount(0);
@@ -1860,11 +1903,12 @@ test("CAS-919: a collapsed card's score row has no Cascade cell and no Pop cell,
   await expect(scoresRow.locator(".m", { hasText: "Pop" })).toHaveCount(0);
   await expect(scoresRow.locator(".m", { hasText: "People" })).toBeVisible();
   await expect(scoresRow.locator(".m", { hasText: "Critics" })).toBeVisible();
+  await expect(scoresRow.locator(".qpub.inrow")).toBeVisible();
 });
 
-// CAS-900 (kept, re-targeted for CAS-919): the collapsed-card score row is 12px cells/values and 11px
-// labels, now over the single People/Critics row rather than two rows.
-test("CAS-900: collapsed-card score row is 12px/11px type with People/Critics labels", async ({ page }) => {
+// CAS-1261 (replaces CAS-900's 12px/11px collapsed-row check): signed in, the closed card no longer shows
+// People and Critics — two lines of synopsis take their place — and the open card shows them.
+test("CAS-1261: the closed card hides People/Critics and shows the synopsis; the open card shows People/Critics", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
@@ -1896,11 +1940,19 @@ test("CAS-900: collapsed-card score row is 12px/11px type with People/Critics la
   const cardEl = page.locator(`#card-${id}`);
   await expect(cardEl).not.toHaveClass(/expanded/);
 
+  await expect(cardEl.locator(".mrow.r-scores .m", { hasText: "People" })).toBeHidden();
+  await expect(cardEl.locator(".mrow.r-scores .m", { hasText: "Critics" })).toBeHidden();
+  const syn = cardEl.locator(".ctop .synopsis");
+  if(await syn.count()){
+    await expect(syn).toBeVisible();
+    // two lines at most: the clamp holds the box under three lines of its own line-height
+    expect(await syn.evaluate(el => el.getBoundingClientRect().height < parseFloat(getComputedStyle(el).lineHeight) * 2.5)).toBe(true);
+  }
+
+  await page.evaluate((filmId) => toggleExpand(filmId), id);
+  await expect(cardEl).toHaveClass(/expanded/);
   const scoresRow = cardEl.locator(".mrow.r-scores");
   await expect(scoresRow).toBeVisible();
-
-  expect(await scoresRow.locator(".m").first().evaluate(el => getComputedStyle(el).fontSize)).toBe("12px");
-  expect(await scoresRow.locator(".lab").first().evaluate(el => getComputedStyle(el).fontSize)).toBe("11px");
 
   const rowText = await scoresRow.innerText();
   expect(rowText).toContain("People");

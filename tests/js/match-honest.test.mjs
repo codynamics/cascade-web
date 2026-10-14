@@ -100,18 +100,24 @@ test("CAS-1254 AC2: tasteProfile and tasteMatch stay honest against the 60-verdi
   });
 });
 
-test("CAS-1260 AC4: until CAS-1261, the badge keeps its three steps, now taken from You's confidence", () => {
+test("CAS-1261 AC1: the You lozenge — green at 50 and over, orange below, white number, fading with confidence", () => {
   withTasteFixture(ac2Assignments(), () => {
-    // conf 0.9302 -> step 3; conf 0.5 -> step 2; conf 0.4 -> step 2 (under 0.4 is step 1).
     const sure = E.matchBadgeHTML(scoredFilm(["Action"], 80));
-    assert.match(sure, /class="qhero lean for ink c3" style="background:rgba\(45,212,191,0\.86\)"/);
-    assert.equal((sure.match(/class="on"/g) || []).length, 3);
+    assert.match(sure, /^<span class="qyou for" style="opacity:1\.00" /);
+    assert.ok(sure.includes("<b>83</b><small>You</small>"));
     const war = E.matchBadgeHTML(scoredFilm(["War"], 80));
-    assert.match(war, /class="qhero lean for ink c2" style="background:rgba\(45,212,191,0\.61\)"/);
+    assert.match(war, /class="qyou for" style="opacity:0\.67"/);
     const against = E.matchBadgeHTML(scoredFilm(["Animation"], 80));
-    assert.match(against, /class="qhero lean against c2" style="background:rgba\(240,136,58,0\.55\)"/);
+    assert.match(against, /class="qyou against" style="opacity:0\.53"/);
+    assert.ok(!against.includes("mbars"));
     assert.equal(E.matchBadgeHTML(scoredFilm(["Music","Documentary"], 80)), "");
   });
+});
+
+test("CAS-1261 AC2: the Public lozenge carries the Cascade score in its tier colour", () => {
+  assert.ok(E.publicLozengeHTML(scoredFilm(["Action"], 90), "intitle").startsWith('<span class="qpub hi intitle"'));
+  assert.ok(E.publicLozengeHTML(scoredFilm(["Action"], 75), "inrow").startsWith('<span class="qpub mid inrow"'));
+  assert.ok(E.publicLozengeHTML(scoredFilm(["Action"], 60)).includes("<b>60</b><small>Public</small>"));
 });
 
 test("CAS-1254 AC4: the built index.html carries the wider certainty steps, after the old rules", () => {
