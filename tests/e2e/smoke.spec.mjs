@@ -954,6 +954,18 @@ test("CAS-747 AC5: the Movie Budget card renders the includeUnbudgeted switch, a
   await toListing(page);
   await openFirstAgentMission(page);
 
+  // CAS-1262: whether today's catalogue holds a film this agent lists that has no budget, no takings and no
+  // inference is a daily-data coincidence (on 14 Oct 2026 it held none, so the count stayed 14 both ways and
+  // the gate went red). Plant one: a clone of a released film this agent already lists, with its budget and
+  // takings removed, so the switch always has exactly the film it governs to move.
+  await page.evaluate(() => {
+    const c = {...onbApply()};
+    const donor = MOVIES.find(m => !m._fixture && watchesFilm(m, c) && !isPreRelease(m) && (m.budget || m.worldwide_gross || 0) >= 1000000);
+    if(!donor) throw new Error("test setup: no released, budgeted film on this agent to clone");
+    MOVIES.push({...donor, tmdb_id: 900000747, title: "CAS-1262 unbudgeted fixture", budget: null, worldwide_gross: null, _fixture: true});
+    invalidateComputeCaches();
+  });
+
   const sw = page.locator("#onbIncludeUnbudgeted");
   await expect(sw).toBeVisible();
   await expect(sw).not.toHaveClass(/on/);   // default stays off (item 3 of the ticket)
