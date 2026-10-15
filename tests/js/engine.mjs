@@ -518,6 +518,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // in this file, instead of by reference.
   get watchMoods(){ return watchMoods; },
   get watchMoodSel(){ return watchMoodSel; },
+  // CAS-1264: applyMoodToState/moodDefaultFieldsNow — plain top-level functions, exported directly so a
+  // test can drive the real order:"you" -> filt.sort translation (signed-in vs signed-out) instead of
+  // re-deriving it by hand.
+  applyMoodToState, moodDefaultFieldsNow,
   // CAS-602: the bell's own moment-copy lookup, so a test can assert a monitor moment key can never
   // render as its raw string (see REAL_MOMENT_SAID's own use at the ntfrow render site).
   REAL_MOMENT_SAID,

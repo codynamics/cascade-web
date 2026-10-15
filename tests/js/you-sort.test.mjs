@@ -1,15 +1,12 @@
-// CAS-1264: the Watch listing's Order popover gains a "You score" sort (sortMoviesBy key "you"), and the
-// existing "cascade" entry's label becomes "Public score" (the key itself is unchanged). This covers the
-// comparator (AC1), the two option lists agreeing with each other (AC2), and the pre-release eligibility
-// set (AC3). The signed-in/signed-out popover behaviour (AC4) is e2e, in tests/e2e/smoke.spec.mjs.
+// CAS-1264: the mood sheet's Order row gains a live "You" segment (sortMoviesBy key "you"), and the
+// existing "Cascade score" segment is relabelled "Public" (the key itself, "cascade", is unchanged). This
+// covers the comparator and PRE_RELEASE_SORTS membership (AC1) and the order:"you" -> filt.sort
+// translation, signed-in vs signed-out (AC2). The mood sheet's own Order row and the "best 10" ranking
+// (AC3/AC4) are e2e, in tests/e2e/smoke.spec.mjs.
 import test from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { loadEngine } from "./engine.mjs";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const E = loadEngine();
 
 // ---- fixture building, same approach as tests/js/match-honest.test.mjs -----------------------------
@@ -95,26 +92,30 @@ test("CAS-1264 AC1: sortMoviesBy(\"you\") ranks higher You first, no-You last, t
   });
 });
 
-test("CAS-1264 AC2: SORT_OPTS and the #sort select both list You score immediately before Public score", () => {
-  const i = E.SORT_OPTS.findIndex(o => o.key === "you");
-  assert.notEqual(i, -1, "SORT_OPTS must carry a \"you\" entry");
-  assert.equal(E.SORT_OPTS[i].label, "You score");
-  assert.equal(E.SORT_OPTS[i + 1].key, "cascade");
-  assert.equal(E.SORT_OPTS[i + 1].label, "Public score");
-
-  const html = fs.readFileSync(path.join(ROOT, "app_template.html"), "utf8");
-  const select = html.match(/<select id="sort"[^>]*>([\s\S]*?)<\/select>/);
-  assert.ok(select, "#sort select must exist in app_template.html");
-  const youTag = '<option value="you">You score</option>';
-  const pubTag = '<option value="cascade">Public score</option>';
-  const youAt = select[1].indexOf(youTag);
-  const pubAt = select[1].indexOf(pubTag);
-  assert.notEqual(youAt, -1, "#sort must carry a you option");
-  assert.notEqual(pubAt, -1, "#sort's cascade option must now read Public score");
-  assert.equal(select[1].slice(youAt + youTag.length, pubAt).trim(), "",
-    "You score must sit immediately before Public score in #sort");
+test("CAS-1264 AC1: PRE_RELEASE_SORTS includes you", () => {
+  assert.ok(E.PRE_RELEASE_SORTS.has("you"));
 });
 
-test("CAS-1264 AC3: PRE_RELEASE_SORTS includes you", () => {
-  assert.ok(E.PRE_RELEASE_SORTS.has("you"));
+// setSignedIn mirrors tests/js/invariants.test.mjs's own helper: flip the real CascadeAuth fields
+// accountActive() reads (client() && uid()), rather than a stand-in predicate, so this exercises the same
+// check applyMoodToState's own signed-in branch runs.
+function setSignedIn(signedIn){
+  const auth = E.CascadeAuth;
+  auth.enabled = signedIn;
+  auth.client = signedIn ? {} : null;
+  auth.session = signedIn ? { user: { id: "cas1264-test-user" } } : null;
+}
+
+test("CAS-1264 AC2: applyMoodToState maps order:\"you\" to filt.sort=\"you\" signed in, \"cascade\" signed out", () => {
+  try{
+    setSignedIn(true);
+    E.applyMoodToState({ ...E.moodDefaultFieldsNow(), order: "you" });
+    assert.equal(E.filt.sort, "you");
+
+    setSignedIn(false);
+    E.applyMoodToState({ ...E.moodDefaultFieldsNow(), order: "you" });
+    assert.equal(E.filt.sort, "cascade");
+  } finally {
+    setSignedIn(false);
+  }
 });

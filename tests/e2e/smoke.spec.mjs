@@ -2044,6 +2044,85 @@ test("CAS-1264: the Order popover lists You score only when signed in, and picki
   expect(values[0]).toBeGreaterThanOrEqual(values[1]);
 });
 
+// CAS-1264 AC3/AC4: the mood sheet's Order row (replacing the disabled "You / coming" placeholder) gains a
+// live You segment, signed-in only, and picking it has to actually resort the real listing — not just the
+// comparator in isolation (tests/js/you-sort.test.mjs covers that).
+test("CAS-1264 AC3: the mood sheet's Order row reads Release date / Public / You, and You sorts the listing", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  // toShortlist() boots via freshAppSignedIn() (CAS-1110) — a real signed-in session, so accountActive()
+  // is already true and the You segment is live.
+  const moodId = await page.evaluate(() => watchMoodSel);
+  await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
+  await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+
+  const labels = (await page.locator(".mfseg button").allTextContents()).map(t => t.trim());
+  expect(labels).toEqual(["Release date", "Public", "You"]);
+  expect(labels.some(t => t.includes("coming"))).toBe(false);
+  await page.evaluate(() => window.closeWatchSheet());
+
+  // Give two films in the first rendered status section a real, distinct You value off a real donor
+  // elsewhere in the catalogue sharing enough of their genres — same technique as CAS-1261's placeholder
+  // test and the old Order-popover version of this check (above in this file).
+  const seeded = await page.evaluate(() => {
+    const onScreen = [...document.querySelectorAll("#groups .card")]
+      .map(el => MOVIES.find(m => m.tmdb_id === Number(el.id.replace("card-", ""))))
+      .filter(Boolean);
+    if(!onScreen.length) return { ok:false, reason:"no cards on screen" };
+    const firstGroup = primaryStatus(onScreen[0]);
+    const sameGroup = onScreen.filter(m => primaryStatus(m) === firstGroup);
+    function donorFor(cand, used){
+      const G = [...new Set(cand.genres || [])];
+      if(!G.length) return null;
+      const need = G.length === 1 ? 1 : 2;
+      return MOVIES.find(v => v.tmdb_id !== cand.tmdb_id && !used.has(v.tmdb_id) && v.genres &&
+        G.filter(g => v.genres.includes(g)).length >= need);
+    }
+    const used = new Set();
+    const picks = [];
+    for(const cand of sameGroup){
+      if(picks.length >= 2) break;
+      if(used.has(cand.tmdb_id)) continue;
+      const donor = donorFor(cand, used);
+      if(!donor) continue;
+      used.add(cand.tmdb_id); used.add(donor.tmdb_id);
+      picks.push({ donor: donor.tmdb_id });
+    }
+    if(picks.length < 2) return { ok:false, reason:`only ${picks.length} donor(s) found in ${sameGroup.length} same-group cards` };
+    watched.add(picks[0].donor); wowed.add(picks[0].donor);
+    watched.add(picks[1].donor); disliked.add(picks[1].donor);
+    invalidateComputeCaches();
+    render();
+    return { ok:true };
+  });
+  expect(seeded.ok, seeded.reason).toBe(true);
+
+  await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
+  await page.locator('.mfseg button[data-order="you"]').click();
+  await page.locator("#moodSaveBtn").click();
+  await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
+
+  const values = await page.evaluate(() => [...document.querySelectorAll("#groups .card:not(.expanded)")]
+    .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null));
+  expect(values[0], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
+  expect(values[1], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
+  expect(values[0]).toBeGreaterThanOrEqual(values[1]);
+});
+
+test("CAS-1264 AC4: the mood sheet's You segment is disabled when signed out", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  // Same shallow stub as the signed-out half of the old Order-popover test (above in this file).
+  await page.evaluate(() => { window.CascadePersistence.accountActive = () => false; });
+  const moodId = await page.evaluate(() => watchMoodSel);
+  await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
+  await expect(page.locator('.mfseg button[data-order="you"]')).toBeDisabled();
+});
+
 // CAS-765 AC7: the silent guest-mode drop is gone. If the vendored client library ever fails to define
 // window.supabase.createClient — forced here by serving a broken bundle in place of the real one — the
 // failure must be visible on screen, not just a console.warn no user will ever read.

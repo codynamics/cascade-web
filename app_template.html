@@ -10170,7 +10170,10 @@ function applyMoodToState(mood){
   });
   // C3: order:"score" does exactly what tapping Cascade score did; order:"release" does exactly what
   // tapping Release date did. sortPicked is always true on Watch now (one flat run, no agent lanes).
-  filt.sort = mood.order==="release" ? "cinema" : "cascade";
+  // CAS-1264: order:"you" only means anything signed in (tasteMatch needs an account's own verdicts) —
+  // signed out it falls back to "cascade", same as every other You-dependent UI in this file.
+  const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
+  filt.sort = mood.order==="release" ? "cinema" : (mood.order==="you" && signedIn) ? "you" : "cascade";
   sortPicked = true;
 }
 applyMoodToState(currentMood());   // C3: applied at boot, from the in-memory defaults
@@ -10415,8 +10418,9 @@ function renderMoodSheetBody(){
         <button type="button" data-order="release" aria-pressed="${d.order==="release"}" class="${d.order==="release"?"on":""}"
           onclick="setMoodDraftOrder('release')">Release date</button>
         <button type="button" data-order="score" aria-pressed="${d.order==="score"}" class="${d.order==="score"?"on":""}"
-          onclick="setMoodDraftOrder('score')">Cascade score</button>
-        <button type="button" disabled>You<small>coming</small></button>
+          onclick="setMoodDraftOrder('score')">Public</button>
+        <button type="button" data-order="you" aria-pressed="${d.order==="you"}" class="${d.order==="you"?"on":""}"
+          ${(window.CascadePersistence && window.CascadePersistence.accountActive())?"":"disabled"} onclick="setMoodDraftOrder('you')">You</button>
       </div>
       <div class="mfrow"><span>Only the best 10 on each stage</span>
         <button type="button" id="moodTop" class="mftog${d.top?" on":""}" role="switch" aria-checked="${d.top}"
@@ -10519,8 +10523,12 @@ function watchVisibleRows(){
   // ranks below every scored film, ties go to the lower tmdb_id, and a film held open from a verdict just
   // set is always kept regardless of rank. watchStageCountFor reads this same `rows`, so the list and the
   // stage counts can never disagree.
+  // CAS-1264: a mood ordered by You (signed in) keeps its best-10 by that same You-then-Public comparison
+  // instead, so the kept set agrees with the order the list is actually shown in.
+  const rankByYou = currentMood().order==="you" && !!(window.CascadePersistence && window.CascadePersistence.accountActive());
   if(currentMood().top){
     const ranked=[...rows].sort((a,b)=>{
+      if(rankByYou) return sortMoviesBy(a,b,"you");
       const diff=cascadeScore(b)-cascadeScore(a);
       return diff!==0 ? diff : a.tmdb_id-b.tmdb_id;
     });
