@@ -1981,6 +1981,11 @@ test("CAS-1264: the Order popover lists You score only when signed in, and picki
   await toListing(page);
 
   // Signed out: no You score entry, and the old Cascade score entry now reads Public score.
+  // toShortlist() boots via freshAppSignedIn() (CAS-1110) — a REAL signed-in Supabase session, not a
+  // guest one — so accountActive() is already true here. Stub it false to get the guest-mode popover,
+  // the same shallow technique the signed-in placeholder test (above in this file) uses in the other
+  // direction, rather than relying on a "signed out by default" assumption that no longer holds.
+  await page.evaluate(() => { window.CascadePersistence.accountActive = () => false; });
   await page.evaluate(() => window.togglePickerFor("sort", document.getElementById("sortCtl")));
   await expect(page.locator(".cpop.pickpop .popt", { hasText: "You score" })).toHaveCount(0);
   await expect(page.locator(".cpop.pickpop .popt", { hasText: "Public score" })).toBeVisible();
