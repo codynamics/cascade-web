@@ -2228,16 +2228,20 @@ test("CAS-1267: Edit Agent opens on Basic, Advanced reveals the rest and collaps
   for(const label of ["Movie Budget", "Awards", "How far back"])
     await expect(page.locator(".reqcard", { hasText: label })).toBeVisible();
 
+  // The first agent (onb_massive) starts with alerts ON (normCascade), so read the state rather than assume it.
+  const alertsWasOn = await page.locator("#onbAlertsOn").evaluate(el => el.classList.contains("on"));
   await page.locator("#onbAlertsOn").click();
-  await expect(page.locator("#onbAlertsOn")).toHaveClass(/on/);
+  await expect(page.locator("#onbAlertsOn")).toHaveAttribute("aria-checked", String(!alertsWasOn));
 
-  await page.locator("#onbStep .osback").click();
+  // Scoped to #onbStepInner: gotoStep's dual-pane slide leaves the outgoing step's .osback in the DOM too.
+  await expect(page.locator("#onbStepInner .osback")).toBeVisible();
+  await page.locator("#onbStepInner .osback").click();
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
 
   await openFirstAgentMission(page);
   await expect(page.locator("#onbAdvancedBtn")).toContainText("Advanced");
   await expect(page.locator("#onbAlertsOn")).toBeHidden();
-  await expect(page.locator("#onbAlertsOn")).toHaveClass(/on/);   // the value set before Back was kept
+  await expect(page.locator("#onbAlertsOn")).toHaveAttribute("aria-checked", String(!alertsWasOn));   // the value set before Back was kept
 });
 
 // ---- CAS-1269: the Style screen becomes the taste-map grid ----------------------------------------------
@@ -2272,9 +2276,12 @@ test("CAS-1269 AC1: the Styles card and suggestions panel flag a taste disagreem
   await toListing(page);
   await openFirstAgentMission(page);
   await page.evaluate(() => { onbFlow.draft.genre = []; onbFlow.draft.exclude = []; onbFlow.draft.pairs = {}; });
-  // Science Fiction + Animation strongly negative (3 Never) on an agent that (genre:[], above) lists every
-  // style, Science Fiction included.
-  await pushTasteFixture(page, 1, ["Science Fiction", "Animation"], "notfor", 3);
+  // Only the PAIR may be strong: 6 Wow on each style alone and 5 Never on the pair give each style
+  // lean (9-5)/(11+4) = 0.27 (under the 0.3 bar, so neither style flags) and the pair
+  // lean (-5 + 4*0.27)/(5+4) = -0.44 (strong, and listed via genre:[] above) -> exactly one flag.
+  await pushTasteFixture(page, 11, ["Science Fiction"], "wow", 6);
+  await pushTasteFixture(page, 12, ["Animation"], "wow", 6);
+  await pushTasteFixture(page, 1, ["Science Fiction", "Animation"], "notfor", 5);
   await page.evaluate(() => renderOnbStep("briefing"));
 
   await expect(page.locator(".osdial.cardbtn", { hasText: "Styles" }))
@@ -2305,9 +2312,11 @@ test("CAS-1269 AC2: Skip on a style writes exclude, Neither clears both, and Bac
   expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBeNull();
 
   const agentId = await page.evaluate(() => onbFlow.draft.id);
-  await page.locator("#onbStep .osback").click();   // Style -> Briefing
+  await expect(page.locator("#onbStepInner .osback")).toBeVisible();
+  await page.locator("#onbStepInner .osback").click();   // Style -> Briefing
   await expect(page.locator(".osdial.cardbtn", { hasText: "Styles" })).toBeVisible();
-  await page.locator("#onbStep .osback").click();   // Briefing -> commits and closes
+  await expect(page.locator("#onbStepInner .osback")).toBeVisible();
+  await page.locator("#onbStepInner .osback").click();   // Briefing -> commits and closes
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
   const saved = await page.evaluate(id => cascades.find(c => c.id === id), agentId);
   expect(saved.exclude || []).not.toContain("Action");
@@ -2329,5 +2338,6 @@ test("CAS-1269 AC3: the Your taste switch recolours the grid with tasteColor()",
   await expect(actionCell).toBeVisible();
   const bg = await actionCell.evaluate(el => el.style.background);
   const expected = await page.evaluate(() => tasteColor(tasteProfile().styles.Action));
-  expect(bg).toBe(expected);
+  // The browser re-serialises inline colours with spaces after the commas; compare without whitespace.
+  expect(bg.replace(/\s+/g, "")).toBe(expected.replace(/\s+/g, ""));
 });
