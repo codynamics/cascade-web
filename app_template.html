@@ -11400,21 +11400,16 @@ function renderTasteScreen(){
     ${renderAgesSection(T)}
     ${renderLatestSection(T)}`;
 }
+// Your taste card icon (Lee, 2026-10-15): the card's icon is a FIXED picture, not drawn from the account's data — a live
+// mini grid of a person's four most-judged styles came out all one teal for anyone with a clear taste. The
+// pattern is the top-left corner of a real style map (lee+c21's), brightened: B bright teal, G mid teal,
+// D faint teal, O orange, o faint orange, E empty.
+const TASTE_ICON_PATTERN = ["BEBG", "BBEO", "oGOE", "OBDo"];
+const TASTE_ICON_FILL = {B:"#2dd4bf", G:"rgba(45,212,191,.62)", D:"rgba(45,212,191,.32)",
+  O:"rgba(240,136,58,.7)", o:"rgba(240,136,58,.38)", E:"rgba(255,255,255,.08)"};
 function tasteCardHTML(){
-  const T = tasteProfile(), n = T.n;
-  const rows = tasteStyleMapData(T).top;
-  const miniRows = rows.slice(0, 4);
-  const cells = [];
-  for(let r = 0; r < 4; r++){
-    const primary = miniRows[r];
-    for(let c = 0; c < 4; c++){
-      if(!primary){ cells.push("<i></i>"); continue; }
-      if(c === 0){ cells.push(`<i style="background:${tasteColor(T.styles[primary])}"></i>`); continue; }
-      const other = rows.filter(x => x !== primary)[c - 1];
-      const pr = other ? T.pairs[primary + "|" + other] : null;
-      cells.push((pr && pr.n > 0) ? `<i style="background:${tasteColor(pr)}"></i>` : "<i></i>");
-    }
-  }
+  const n = tasteProfile().n;
+  const cells = TASTE_ICON_PATTERN.join("").split("").map(k => `<i style="background:${TASTE_ICON_FILL[k]}"></i>`);
   const line = n === 0
     ? "No verdicts yet. Give a verdict on a film and your taste map starts here."
     : `${n} verdict${n === 1 ? "" : "s"} so far. See what Cascade has learned about what you go for.`;
