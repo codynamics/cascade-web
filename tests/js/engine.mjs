@@ -134,6 +134,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // drive the real comparison rather than re-implementing it.
   filmByMovieId: mid => MOVIES.find(x => String(x.tmdb_id) === String(mid)),
   matchesCriteria, countCriteria, watchCount, watchesFilm, matchesTaste, listedBy, listWindowOK,
+  // CAS-1268: pairVerdict is the agent style-combination gate matchesCriteria now applies ahead of its
+  // own exclude/genre checks — exported so a test can assert "out"/"in"/null directly, the same reason
+  // awardsListOK below is exported alongside matchesCriteria rather than only through its combined effect.
+  pairVerdict,
   listedCount, onbShownCount,
   // CAS-780: awardsListOK is listedBy's own extra Awards check (no pre-release exemption, unlike
   // matchesCriteria's) — exported so a test can name it directly as the reason a followed pre-release film

@@ -11615,6 +11615,26 @@ function normCascade(c, opts){
     c.kind = (st.length && !st.some(w=>["upcoming","opening_week","in_cinema"].includes(w))) ? "stream" : "cinema";
   }
   c.exclude = c.exclude||[];                 // [] = skip nothing (what every pre-existing Cascade meant)
+  // CAS-1268: a combination of two styles, keyed "A|B" (A<B) to "+" (list) or "-" (skip) — missing means
+  // "follow its styles". A bad entry (wrong key shape, an unknown style, a style paired with itself, the
+  // two names out of A-Z order, or a value that isn't "+"/"-") is dropped rather than carried along inert,
+  // the same discipline c.occasions above applies to a stale id. ALL_GENRES, not ONB_GENRES, because this
+  // runs on every template at load time (CASCADE_TEMPLATES.forEach below) before ONB_GENRES exists yet —
+  // same style set, just not yet sorted by popularity.
+  {
+    const srcPairs = (c.pairs && typeof c.pairs==="object") ? c.pairs : {};
+    const outPairs = {};
+    for(const k in srcPairs){
+      const v = srcPairs[k];
+      if(v!=="+" && v!=="-") continue;
+      const parts = k.split("|");
+      if(parts.length!==2) continue;
+      const [a,b] = parts;
+      if(a>=b || !ALL_GENRES.includes(a) || !ALL_GENRES.includes(b)) continue;
+      outPairs[k] = v;
+    }
+    c.pairs = outPairs;
+  }
   c.culture = c.culture||[];                 // [] = any origin
   c.year = c.year||[];                       // [] = any year; mirrors filt.year, so the Filters panel shows it too
   c.imdb = c.imdb||0; c.rt = c.rt||0;
@@ -11832,7 +11852,7 @@ const cascadeOrderCmp = (a,b) => (a.order??1e9)-(b.order??1e9)
 // on the first pass after this ships, the same "news about the agent, not the film" treatment CAS-715's
 // admitDrift already gives a hand-edited agent (see recomputeFound's own cascadeDrift comment).
 const GENRE_RULE_V = 2;
-const cascSigOf = c => JSON.stringify([c.name, c.status, c.genre, c.exclude, c.age, c.culture, c.year,
+const cascSigOf = c => JSON.stringify([c.name, c.status, c.genre, c.exclude, c.pairs||{}, c.age, c.culture, c.year,
   c.imdb, c.rt, c.awards, c.budget, c.includeUnbudgeted, c.includeUnrated, c.tentpole,
   c.selCrowd||0, c.selCritScore||0, c.selAwards||0, c.selScale||0, c.selBuzz||0, !!c.selOr, c.yearsBack||0,
   GENRE_RULE_V,
@@ -12052,6 +12072,25 @@ window.showScaleInfer=id=>{ const m=MOVIES.find(x=>x.tmdb_id===id); if(m) toast(
 // separate clearing mechanism. CAS-867: agMetricsCache (declared further down, with agentMetrics) reuses it
 // too — a catalogue swap can change which films an agent lists without touching that agent's own signature.
 function invalidateComputeCaches(){ _scaleInferCache.clear(); _awardRankCache.clear(); _wmReleasedScoreVals = null; agMetricsCache.clear(); _tasteProfileCache = null; _tasteMatchCache.clear(); }
+// CAS-1268: an agent's style combination — two different styles set together to "+" (list) or "-"
+// (skip), keyed "A|B" with A<B. Returns "out" the instant any matching pair is set "-" (a skip beats
+// a list at the same level, so order of discovery never matters), "in" once every matching pair has
+// been seen and at least one was "+", or null when no pair of the film's styles has an entry at all —
+// the "follow its styles" case matchesCriteria falls through to its own exclude/genre gates for.
+function pairVerdict(m,c){
+  const pairs=c.pairs||{};
+  const g=m.genres||[];
+  let sawPlus=false;
+  for(let i=0;i<g.length;i++){
+    for(let j=i+1;j<g.length;j++){
+      const a=g[i]<g[j]?g[i]:g[j], b=g[i]<g[j]?g[j]:g[i];
+      const v=pairs[a+"|"+b];
+      if(v==="-") return "out";
+      if(v==="+") sawPlus=true;
+    }
+  }
+  return sawPlus ? "in" : null;
+}
 // ---- Buzz (CAS-145, ladder replaced by CAS-678) --------------------------------
 // How much a film is being talked about right now, off the TMDB popularity figure the pipeline already
 function matchesCriteria(m,c,ignoreBlocked,ignoreScoreGate){
@@ -12080,12 +12119,20 @@ function matchesCriteria(m,c,ignoreBlocked,ignoreScoreGate){
   // CAS-854: "upcoming" means coming to cinemas — an agent that never watches cinema isn't waiting for that
   // arrival, so a pre-release film only becomes its news once it reaches a window that agent actually watches.
   if(ps==="upcoming" && !windowUsable(c,"in_cinema")) return false;
-  if((c.exclude||[]).length && (m.genres||[]).some(g=>c.exclude.includes(g))) return false;   // skip beats match
   // CAS-182: cleared means cleared. A dimension holding null admits nothing, so the count says 0 rather
   // than quietly reverting to the whole catalogue behind a screen of switched-off chips.
-  if(c.genre===null || c.age===null) return false;
-  // CAS-1147: ANY of the film's styles counts, not only the first — Lee's decision, 2026-10-02.
-  if(c.genre.length && !(m.genres||[]).some(g=>c.genre.includes(g))) return false;
+  if(c.age===null) return false;
+  // CAS-1268: a combination beats its styles. "out" rejects regardless of what the styles alone would
+  // say; "in" clears both style gates below, including c.genre===null; null (no pair of this film's
+  // styles is set) falls through to the unchanged CAS-1147/CAS-182 style gates.
+  const pairVer=pairVerdict(m,c);
+  if(pairVer==="out") return false;
+  if(pairVer!=="in"){
+    if((c.exclude||[]).length && (m.genres||[]).some(g=>c.exclude.includes(g))) return false;   // skip beats match
+    if(c.genre===null) return false;
+    // CAS-1147: ANY of the film's styles counts, not only the first — Lee's decision, 2026-10-02.
+    if(c.genre.length && !(m.genres||[]).some(g=>c.genre.includes(g))) return false;
+  }
   // CAS-744: includeUnrated was wired to ratingOK (the IMDb bar) only — this gate never read it, so the
   // escape hatch did nothing for a film with no age_rating at all (m.age_rating null/""), which is the
   // norm for an unreleased film rather than the exception. Same shape as ratingOK just above: below/outside
@@ -12698,7 +12745,7 @@ function commitDraft(){
   }
   const c=isNew ? {id:cascadeNewId()} : cascades.find(x=>x.id===draft.id);
   Object.assign(c, {name, icon:draft.icon, template:draft.template, status:draft.status, genre:draft.genre,
-    exclude:draft.exclude,
+    exclude:draft.exclude, pairs:{...draft.pairs},
     age:draft.age, culture:draft.culture, year:draft.year, imdb:draft.imdb, rt:draft.rt,
     ratingStop:draft.ratingStop, includeUnrated:draft.includeUnrated,
     budget:draft.budget, includeUnbudgeted:draft.includeUnbudgeted, tentpole:draft.tentpole,

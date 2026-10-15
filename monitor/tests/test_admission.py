@@ -194,5 +194,25 @@ class UpcomingCinemaGate(unittest.TestCase):
                       "an upcoming film was excluded even though the agent's Cinema window is usable")
 
 
+class StylePairs(unittest.TestCase):
+    """(f) CAS-1268: a "-" style combination beats a film's individual styles — a film an agent would
+    otherwise list for carrying a listed style must still be rejected once that style is paired with
+    another of the film's styles at "-". Drives the real admit_shim.mjs path, not a re-derivation."""
+
+    def test_minus_pair_blocks_a_film_its_own_style_would_otherwise_admit(self):
+        movie = {"tmdb_id": "999901268", "title": "CAS-1268 Pair Test Film",
+                 "genres": ["Science Fiction", "Animation"],
+                 "age_rating": "M", "language": "en", "status": ["rental"],
+                 "imdb_rating": 7.0, "imdb_votes": 5000, "wm_user_rating": 7.5, "wm_critic_score": 70,
+                 "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}]}
+        cascade = {"id": "c-1268-pair", "user_id": "u-1268",
+                  "criteria": {"genre": ["Science Fiction"],
+                               "pairs": {"Animation|Science Fiction": "-"},
+                               "watchMarkers": dict(_OPEN)}}
+        admission = compute_admission([cascade], {"today": [movie]})
+        self.assertNotIn("999901268", admission["c-1268-pair"]["today"],
+                         "a film carrying a '-' paired combination was admitted — a skip beats a list")
+
+
 if __name__ == "__main__":
     unittest.main()
