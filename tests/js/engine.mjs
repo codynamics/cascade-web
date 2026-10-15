@@ -258,6 +258,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // CAS-920: critScore (the one recorded critics figure, now Watchmode's wm_critic_score) so a test can
   // assert it independently rather than re-deriving it from wmQScore's output alone.
   critScore, sortMoviesBy, ratingOf,
+  // CAS-1264: SORT_OPTS/PRE_RELEASE_SORTS so a test can assert the You-score sort option and its
+  // pre-release eligibility directly, the same way it drives sortMoviesBy itself.
+  SORT_OPTS, PRE_RELEASE_SORTS,
   // CAS-695: the Cascade score's own basis switch (cascadeScore/cascadeScoreSourcesText, dispatching on
   // isPreRelease) and the buzz-percentile accessor it used to dispatch to before CAS-919 — exported
   // independently so a test can assert each stage rather than only the combined qScoreHTML output.

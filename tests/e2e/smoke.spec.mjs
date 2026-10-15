@@ -1973,6 +1973,77 @@ test("CAS-1261: the closed card hides People/Critics and shows the synopsis; the
   expect(rowText).not.toContain("WM");
 });
 
+// CAS-1264 AC4: the Order popover gains a You score entry, signed-in only — picking it has to actually
+// resort the real listing, not just the comparator in isolation (tests/js/you-sort.test.mjs covers that).
+test("CAS-1264: the Order popover lists You score only when signed in, and picking it sorts by You descending", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  // Signed out: no You score entry, and the old Cascade score entry now reads Public score.
+  // toShortlist() boots via freshAppSignedIn() (CAS-1110) — a REAL signed-in Supabase session, not a
+  // guest one — so accountActive() is already true here. Stub it false to get the guest-mode popover,
+  // the same shallow technique the signed-in placeholder test (above in this file) uses in the other
+  // direction, rather than relying on a "signed out by default" assumption that no longer holds.
+  await page.evaluate(() => { window.CascadePersistence.accountActive = () => false; });
+  await page.evaluate(() => window.togglePickerFor("sort", document.getElementById("sortCtl")));
+  await expect(page.locator(".cpop.pickpop .popt", { hasText: "You score" })).toHaveCount(0);
+  await expect(page.locator(".cpop.pickpop .popt", { hasText: "Public score" })).toBeVisible();
+  await page.evaluate(() => closePickerPop());
+
+  // CAS-1261's own placeholder test (above in this file) stubs the account this same shallow way.
+  await page.evaluate(() => { window.CascadePersistence.accountActive = () => true; });
+
+  // Give two films in the FIRST rendered status section a real, distinct You value off a real donor
+  // elsewhere in the catalogue sharing enough of their genres — mutating real catalogue data rather than
+  // fabricating an untracked stand-in, the same reasoning CAS-897/CAS-1030's trackAStreamingFilm (above in
+  // this file) already gives. Restricted to one section because the sort only ever orders WITHIN a status
+  // section, never across the Watch listing's own fixed section order (CAS-750/CAS-754).
+  const seeded = await page.evaluate(() => {
+    const onScreen = [...document.querySelectorAll("#groups .card")]
+      .map(el => MOVIES.find(m => m.tmdb_id === Number(el.id.replace("card-", ""))))
+      .filter(Boolean);
+    if(!onScreen.length) return { ok:false, reason:"no cards on screen" };
+    const firstGroup = primaryStatus(onScreen[0]);
+    const sameGroup = onScreen.filter(m => primaryStatus(m) === firstGroup);
+    function donorFor(cand, used){
+      const G = [...new Set(cand.genres || [])];
+      if(!G.length) return null;
+      const need = G.length === 1 ? 1 : 2;
+      return MOVIES.find(v => v.tmdb_id !== cand.tmdb_id && !used.has(v.tmdb_id) && v.genres &&
+        G.filter(g => v.genres.includes(g)).length >= need);
+    }
+    const used = new Set();
+    const picks = [];
+    for(const cand of sameGroup){
+      if(picks.length >= 2) break;
+      if(used.has(cand.tmdb_id)) continue;
+      const donor = donorFor(cand, used);
+      if(!donor) continue;
+      used.add(cand.tmdb_id); used.add(donor.tmdb_id);
+      picks.push({ donor: donor.tmdb_id });
+    }
+    if(picks.length < 2) return { ok:false, reason:`only ${picks.length} donor(s) found in ${sameGroup.length} same-group cards` };
+    watched.add(picks[0].donor); wowed.add(picks[0].donor);
+    watched.add(picks[1].donor); disliked.add(picks[1].donor);
+    invalidateComputeCaches();
+    render();
+    return { ok:true };
+  });
+  expect(seeded.ok, seeded.reason).toBe(true);
+
+  await page.evaluate(() => window.togglePickerFor("sort", document.getElementById("sortCtl")));
+  const youOpt = page.locator(".cpop.pickpop .popt", { hasText: "You score" });
+  await expect(youOpt).toBeVisible();
+  await youOpt.click();
+
+  const values = await page.evaluate(() => [...document.querySelectorAll("#groups .card:not(.expanded)")]
+    .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null));
+  expect(values[0], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
+  expect(values[1], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
+  expect(values[0]).toBeGreaterThanOrEqual(values[1]);
+});
+
 // CAS-765 AC7: the silent guest-mode drop is gone. If the vendored client library ever fails to define
 // window.supabase.createClient — forced here by serving a broken bundle in place of the real one — the
 // failure must be visible on screen, not just a console.warn no user will ever read.

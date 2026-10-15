@@ -1,0 +1,120 @@
+// CAS-1264: the Watch listing's Order popover gains a "You score" sort (sortMoviesBy key "you"), and the
+// existing "cascade" entry's label becomes "Public score" (the key itself is unchanged). This covers the
+// comparator (AC1), the two option lists agreeing with each other (AC2), and the pre-release eligibility
+// set (AC3). The signed-in/signed-out popover behaviour (AC4) is e2e, in tests/e2e/smoke.spec.mjs.
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { loadEngine } from "./engine.mjs";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const E = loadEngine();
+
+// ---- fixture building, same approach as tests/js/match-honest.test.mjs -----------------------------
+function ratingForScore(target){
+  let lo = 0, hi = 100;
+  for(let i = 0; i < 60; i++){
+    const mid = (lo + hi) / 2;
+    if(Math.round(E.wmScaled(mid)) < target) lo = mid; else hi = mid;
+  }
+  let v = hi;
+  for(let i = 0; i < 2000 && Math.round(E.wmScaled((v/10)*10)) !== target; i++) v += 0.01;
+  return v / 10;
+}
+// Comfortably clear of every real catalogue tmdb_id (max ~1.77M), same reasoning as match-honest's own fixture ids.
+let _nextFixtureId = 90100001;
+function scoredFilm(genres, score){
+  const id = _nextFixtureId++;
+  const m = { tmdb_id:id, title:`You-sort fixture ${id}`, genres, status:["included_streaming"],
+    wm_critic_score:null, wm_user_rating: ratingForScore(score), _fixture:true };
+  const got = E.cascadeScore(m);
+  if(got !== score) throw new Error(`test setup: fixture ${id} cascadeScore computed ${got}, expected ${score}`);
+  return m;
+}
+function withTasteFixture(assignments, fn){
+  const saved = {
+    watched: new Set(E.watched), disliked: new Set(E.disliked), indifferent: new Set(E.indifferent),
+    wowed: new Set(E.wowed), enjoyed: new Set(E.enjoyed), blocked: new Set(E.blocked),
+  };
+  E.watched.clear(); E.disliked.clear(); E.indifferent.clear(); E.wowed.clear(); E.enjoyed.clear(); E.blocked.clear();
+  const films = assignments.map(([m]) => m);
+  films.forEach(m => E.MOVIES.push(m));
+  assignments.forEach(([m, kind]) => {
+    if(kind === "notfor"){ E.blocked.add(m.tmdb_id); return; }
+    E.watched.add(m.tmdb_id);
+    if(kind === "disliked") E.disliked.add(m.tmdb_id);
+    if(kind === "soso") E.indifferent.add(m.tmdb_id);
+    if(kind === "wow") E.wowed.add(m.tmdb_id);
+    if(kind === "enjoyed") E.enjoyed.add(m.tmdb_id);
+  });
+  E.invalidateComputeCaches();
+  try{ return fn(films); }
+  finally{
+    films.forEach(m => { const i = E.MOVIES.indexOf(m); if(i !== -1) E.MOVIES.splice(i, 1); });
+    E.watched.clear(); saved.watched.forEach(id => E.watched.add(id));
+    E.disliked.clear(); saved.disliked.forEach(id => E.disliked.add(id));
+    E.indifferent.clear(); saved.indifferent.forEach(id => E.indifferent.add(id));
+    E.wowed.clear(); saved.wowed.forEach(id => E.wowed.add(id));
+    E.enjoyed.clear(); saved.enjoyed.forEach(id => E.enjoyed.add(id));
+    E.blocked.clear(); saved.blocked.forEach(id => E.blocked.add(id));
+    E.invalidateComputeCaches();
+  }
+}
+
+test("CAS-1264 AC1: sortMoviesBy(\"you\") ranks higher You first, no-You last, ties by cascade score", () => {
+  // Action/Comedy combination judged films give a candidate sharing them a You of exactly 80; Drama/Crime
+  // gives exactly 40 (see the ticket's worked arithmetic in the commit this test ships with).
+  const j1 = scoredFilm(["Action","Comedy"], 80);
+  const j2 = scoredFilm(["Action","Horror"], 80);
+  const j3 = scoredFilm(["Action","Thriller"], 80);
+  const j4 = scoredFilm(["Drama","Crime"], 80);
+  const j5 = scoredFilm(["Drama","Western"], 80);
+
+  withTasteFixture([
+    [j1, "enjoyed"], [j2, "enjoyed"], [j3, "soso"],
+    [j4, "soso"], [j5, "liked"],
+  ], () => {
+    const c80 = scoredFilm(["Action","Comedy"], 70);
+    const c40 = scoredFilm(["Drama","Crime"], 65);
+    const cNull = scoredFilm(["Documentary"], 60);
+    assert.equal(E.tasteMatch(c80).value, 80);
+    assert.equal(E.tasteMatch(c40).value, 40);
+    assert.equal(E.tasteMatch(cNull), null);
+
+    const order = [cNull, c40, c80].sort((a, b) => E.sortMoviesBy(a, b, "you"));
+    assert.deepEqual(order.map(m => m.tmdb_id), [c80.tmdb_id, c40.tmdb_id, cNull.tmdb_id]);
+
+    // Two films with equal You fall back to cascadeScore descending.
+    const tieHi = scoredFilm(["Action","Comedy"], 90);
+    const tieLo = scoredFilm(["Action","Comedy"], 55);
+    assert.equal(E.tasteMatch(tieHi).value, E.tasteMatch(tieLo).value);
+    const tieOrder = [tieLo, tieHi].sort((a, b) => E.sortMoviesBy(a, b, "you"));
+    assert.deepEqual(tieOrder.map(m => m.tmdb_id), [tieHi.tmdb_id, tieLo.tmdb_id]);
+  });
+});
+
+test("CAS-1264 AC2: SORT_OPTS and the #sort select both list You score immediately before Public score", () => {
+  const i = E.SORT_OPTS.findIndex(o => o.key === "you");
+  assert.notEqual(i, -1, "SORT_OPTS must carry a \"you\" entry");
+  assert.equal(E.SORT_OPTS[i].label, "You score");
+  assert.equal(E.SORT_OPTS[i + 1].key, "cascade");
+  assert.equal(E.SORT_OPTS[i + 1].label, "Public score");
+
+  const html = fs.readFileSync(path.join(ROOT, "app_template.html"), "utf8");
+  const select = html.match(/<select id="sort"[^>]*>([\s\S]*?)<\/select>/);
+  assert.ok(select, "#sort select must exist in app_template.html");
+  const youTag = '<option value="you">You score</option>';
+  const pubTag = '<option value="cascade">Public score</option>';
+  const youAt = select[1].indexOf(youTag);
+  const pubAt = select[1].indexOf(pubTag);
+  assert.notEqual(youAt, -1, "#sort must carry a you option");
+  assert.notEqual(pubAt, -1, "#sort's cascade option must now read Public score");
+  assert.equal(select[1].slice(youAt + youTag.length, pubAt).trim(), "",
+    "You score must sit immediately before Public score in #sort");
+});
+
+test("CAS-1264 AC3: PRE_RELEASE_SORTS includes you", () => {
+  assert.ok(E.PRE_RELEASE_SORTS.has("you"));
+});
