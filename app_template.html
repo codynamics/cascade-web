@@ -2150,6 +2150,16 @@
   .osdial.cardbtn:hover{border-color:var(--accent)}
   .osdial.cardbtn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   .osdial.cardbtn .dc{position:absolute;top:14px;right:14px;color:var(--faint);font-size:16px}
+  /* CAS-1267: the Advanced button that reveals Edit Agent's non-Basic controls — a plain outline, not the
+     filled .osdial card shape, so it reads as a toggle rather than another setting. */
+  .osadv{display:block;width:100%;text-align:left;cursor:pointer;font:inherit;color:inherit;
+    margin-top:13px;padding:13px 40px 13px 14px;border-radius:14px;position:relative;
+    border:1px solid rgba(255,255,255,.32);background:rgba(255,255,255,.04)}
+  .osadv:hover{border-color:var(--accent)}
+  .osadv:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .osadv .osadvtitle{display:block;font-weight:700;font-size:14.5px;color:var(--ink)}
+  .osadv .osadvsub{display:block;margin-top:2px;font-size:12px;color:var(--faint)}
+  .osadv .osadvchev{position:absolute;top:14px;right:14px;color:var(--faint);font-size:16px}
   /* CAS-1128: the filled portion of the score track is the brand gradient now — no more per-window colour on
      the bar (CAS-1113's "neutral slider"), and no window colour on the handle either; which windows are ON
      lives entirely in the pills below. .msntrackwrap carries top margin for the score label floating above
@@ -15036,7 +15046,8 @@ const onbFlow = {draft:null, name:ONB_DEFAULT_NAME, defaultName:ONB_DEFAULT_NAME
                  barTouched:false, barAutoRelaxed:null,   // CAS-158 first-open state
                  watch:{},                                 // CAS-160 viewing windows: {lane: [optKey,…]}
                  answers:null,                             // CAS-626: the briefing screens' own roster answers
-                 workingAgents:null, reportStats:null};    // CAS-629: S5's committed roster, S6/S7's shared N/M/K
+                 workingAgents:null, reportStats:null,     // CAS-629: S5's committed roster, S6/S7's shared N/M/K
+                 briefAdvancedOpen:false};                 // CAS-1267: Edit Agent's Advanced section, reset by briefOpen
 
 // ---- Agent settings: the windows this agent's TYPE has (CAS-160, rebuilt by CAS-228) --------------------
 // CAS-160 made availability the user's choice rather than a property of the preset. It modelled that as three
@@ -16850,25 +16861,37 @@ const SHARP_STEPS = {
       const nNew = onbFlow.draft ? newlyAddedCount(onbApply()) : 0;
       // The name row is gone — CAS-531 #1 moved it into the page header (see renderOnbStep's key==="briefing"
       // branch), so a rename opens the identical "name" spoke this row used to.
+      // CAS-1267: Basic is Styles, Cascade score and Age rating — what Lee judges a commercial product's
+      // settings screen should open on. Everything else (Occasions, Alerts, Budget, Awards, How far back,
+      // cinema release) moves into a collapsed Advanced section, rendered but `hidden` so wire() still binds
+      // every control whichever state the section is in.
+      const advOpen = !!onbFlow.briefAdvancedOpen;
       return `<p class="ossub">Reconfigure this agent here.${nNew ? ` <b>${nNew}</b> newly added film${nNew===1?"":"s"} in its list right now.` : ""}</p>
-        ${occasionsCardHTML()}
-        <div class="usec">ALERTS</div>
-        <div class="switch mini" id="onbAlertsOn" role="switch">
-          <span>🔔 Alert me about this agent's films
-            <small style="color:var(--faint)">— by email, in the app and on your phone</small></span>
-          <span class="knob"></span></div>
         <div class="usec">WHAT IT LOOKS FOR</div>
         ${stylesCardHTML()}
         ${msnScoreCardHTML()}
         <div class="usec">REQUIREMENTS — EVERY FILM MUST CLEAR ALL OF THESE</div>
-        ${budgetCardHTML()}
-        ${awardsCardHTML()}
         ${ageRatingCardHTML()}
-        ${yearsCardHTML()}
-        <div class="switch mini" id="onbCinemaRelease" role="switch">
-          <span>🎬 Had a cinema release
-            <small style="color:var(--faint)">— an AU cinema (not limited) release, at any point</small></span>
-          <span class="knob"></span></div>
+        <button type="button" class="osadv" id="onbAdvancedBtn" aria-expanded="${advOpen}" onclick="briefToggleAdvanced()">
+          <span class="osadvtitle">${advOpen ? "Hide advanced" : "Advanced"}</span>
+          ${advOpen ? "" : `<span class="osadvsub">Alerts, occasions, budget, awards, how far back, cinema release</span>`}
+          <span class="osadvchev">${advOpen ? "⌄" : "›"}</span>
+        </button>
+        <div id="onbAdvancedSection"${advOpen ? "" : " hidden"}>
+          ${occasionsCardHTML()}
+          <div class="usec">ALERTS</div>
+          <div class="switch mini" id="onbAlertsOn" role="switch">
+            <span>🔔 Alert me about this agent's films
+              <small style="color:var(--faint)">— by email, in the app and on your phone</small></span>
+            <span class="knob"></span></div>
+          ${budgetCardHTML()}
+          ${awardsCardHTML()}
+          ${yearsCardHTML()}
+          <div class="switch mini" id="onbCinemaRelease" role="switch">
+            <span>🎬 Had a cinema release
+              <small style="color:var(--faint)">— an AU cinema (not limited) release, at any point</small></span>
+            <span class="knob"></span></div>
+        </div>
         <!-- CAS-642 W2b: the service-status scope (CAS-635 N3a) spoke moved off this screen — it is a
              statement about a WATCH LIST, not about what this agent is allowed to find. briefToggleSvc stays
              defined: onboarding's own S3/S4 sequence (CAS-628/629) still routes a new agent's draft through
@@ -17911,6 +17934,7 @@ function briefOpen(id, from){
   // axis) has to read and, on Save, re-write the SAME global answer every other agent carries, or a save
   // would freeze this one agent's status back onto whatever it happened to open with.
   onbFlow.watch = JSON.parse(JSON.stringify(watchPrefs));
+  onbFlow.briefAdvancedOpen = false;   // CAS-1267: Advanced is always collapsed on open
   $("onbStep").classList.add("open"); lockBodyScroll(true);
   logEvent("briefing_opened",{id});
   gotoStep("briefing","none");
@@ -17919,6 +17943,12 @@ function briefOpen(id, from){
 // linear onboarding flow uses, so behaviour and styling always match. It used to divert to the older
 // standalone Preferences modal, which had drifted out of sync (no alphabetised chips, no lead/"more" rows).
 window.briefGo=step=>{ logEvent("briefing_row",{step}); gotoStep(step,"fwd"); };
+// CAS-1267: Advanced stays open through repaints of the same Briefing visit (renderOnbStep re-runs body()
+// on every control change) but is never persisted — briefOpen resets it on every open.
+window.briefToggleAdvanced=()=>{
+  onbFlow.briefAdvancedOpen = !onbFlow.briefAdvancedOpen;
+  renderOnbStep("briefing");
+};
 // CAS-635 N3a: a tap flips one window's service scope in place — no sub-screen, no navigation, same
 // draft/flags the flow's own onbApply() reads back out on Save.
 window.briefToggleSvc=key=>{

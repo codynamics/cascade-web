@@ -966,6 +966,9 @@ test("CAS-747 AC5: the Movie Budget card renders the includeUnbudgeted switch, a
     invalidateComputeCaches();
   });
 
+  // CAS-1267: Movie Budget moved into the Advanced section, collapsed by default.
+  await page.locator("#onbAdvancedBtn").click();
+
   const sw = page.locator("#onbIncludeUnbudgeted");
   await expect(sw).toBeVisible();
   await expect(sw).not.toHaveClass(/on/);   // default stays off (item 3 of the ticket)
@@ -2190,4 +2193,46 @@ test("CAS-1266: the Your taste card icon is a fixed 16-cell grid", async ({ page
   await expect(cells).toHaveCount(16);
   await expect(cells.nth(0)).toHaveCSS("background-color", "rgb(45, 212, 191)");
   await expect(cells.nth(7)).toHaveCSS("background-color", "rgba(240, 136, 58, 0.7)");
+});
+
+// CAS-1267: Edit Agent opens on Basic — Styles, Cascade score and Age rating — with everything else behind
+// a collapsed Advanced section, so the screen a non-technical person opens reads as a handful of settings,
+// not nine at once.
+test("CAS-1267: Edit Agent opens on Basic, Advanced reveals the rest and collapses again on reopen", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await openFirstAgentMission(page);
+
+  // AC1: Basic is visible, Advanced's own controls are not.
+  await expect(page.locator(".osdial.cardbtn", { hasText: "Styles" })).toBeVisible();
+  await expect(page.locator(".msntrackwrap")).toBeVisible();
+  await expect(page.locator("#ageRatingCard")).toBeVisible();
+  const advBtn = page.locator("#onbAdvancedBtn");
+  await expect(advBtn).toContainText("Advanced");
+  await expect(page.locator("#onbAlertsOn")).toBeHidden();
+  await expect(page.locator("#onbCinemaRelease")).toBeHidden();
+  await expect(page.locator(".osdial.cardbtn", { hasText: "Occasions" })).toBeHidden();
+  for(const label of ["Movie Budget", "Awards", "How far back"])
+    await expect(page.locator(".reqcard", { hasText: label })).toBeHidden();
+
+  // AC2: tapping Advanced reveals all six, and the button reads "Hide advanced".
+  await advBtn.click();
+  await expect(advBtn).toHaveText("Hide advanced");
+  await expect(page.locator(".osdial.cardbtn", { hasText: "Occasions" })).toBeVisible();
+  await expect(page.locator("#onbAlertsOn")).toBeVisible();
+  await expect(page.locator("#onbCinemaRelease")).toBeVisible();
+  for(const label of ["Movie Budget", "Awards", "How far back"])
+    await expect(page.locator(".reqcard", { hasText: label })).toBeVisible();
+
+  await page.locator("#onbAlertsOn").click();
+  await expect(page.locator("#onbAlertsOn")).toHaveClass(/on/);
+
+  await page.locator("#onbStep .osback").click();
+  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+
+  await openFirstAgentMission(page);
+  await expect(page.locator("#onbAdvancedBtn")).toContainText("Advanced");
+  await expect(page.locator("#onbAlertsOn")).toBeHidden();
+  await expect(page.locator("#onbAlertsOn")).toHaveClass(/on/);   // the value set before Back was kept
 });
