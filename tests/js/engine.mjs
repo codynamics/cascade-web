@@ -319,7 +319,7 @@ if(typeof window.CascadeAuth === "undefined"){
   AGENT_WINDOWS, agentWindows, watchToStatuses, listToStatuses, migrateWatch,
   MISSION_DIALS, MISSION_DIALS_USED, missionRest, missionKind, laneCrit,
   axisCountsNow, genreCountsNow,
-  onbApply, onbCount, pickStarter, flowStart, flowStop, FLOWS,
+  onbApply, onbCount, pickStarter, flowStart, flowStop, FLOWS, stepSkipped,
   // CAS-1080: the v2 onboarding answers default and its four-agent generator, plus the shared
   // reveal-time cap they solve against — exported so a test can build a real onboarding roster
   // from a fixed answer set and assert watchCount() against the cap directly.

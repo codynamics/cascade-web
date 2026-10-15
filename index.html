@@ -13820,7 +13820,7 @@ const HELP_ARTICLES = [
    body:"Alerts is where Cascade tells you what's happened lately, split into two kinds of row. New is a film's first appearance for a given agent — something it's never found before. Changed is everything else: a film the agent already had, that's now moved to a different window. A film is never counted as both at once.\n\nYou choose how far back to look — Today, Week, 2 weeks or Month — and Alerts shows only what falls inside that window, measured back from right now. Every row names the agent that actually owns the film today, so nothing is shown under an agent that no longer has it."},
   {slug:"notifications", title:"Notifications",
    summary:"Exactly what will reach you, by which channel, and when the daily report runs.",
-   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Service tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for Massive Movies and off for every other agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
+   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Service tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for your first agent and off for every other agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
   {slug:"your-account-and-data", title:"Your account and data",
    summary:"What is stored, where, and how to delete it.",
    body:`Signed out, everything Cascade knows about you — your agents, what you've watched, your preferences — is stored only on this device, in this browser or app install. Nothing about it reaches anywhere else.\n\nSigned in, that same information is mirrored to your account so it's there again on another device you sign into. Signing out doesn't erase it — it's still on your account, waiting for you to sign back in.\n\nDeleting your account is on the Account screen itself: type DELETE to confirm, and it permanently removes your agents, everything they've found for you, what you've marked watched, your invites and friends, your notification history and your sign-in — there's nothing left to undo.${MEMBERSHIP_ENABLED ? " It doesn't cancel an active App Store subscription, which you'll need to manage separately." : ""}`},
@@ -14722,7 +14722,8 @@ function onbAnswersSave(a){ onbAnswers = a; }
 // ONB_AGENTS/buildOnbAgents (the old per-answer recipe table) and obStripHTML/obLastKeys (the old
 // roster strip) are gone — CAS-911 retired them once FLOWS below stopped calling either.
 function onbAnswersV2Default(){
-  return {cinema:null, rent:null, styles:[], selScale:0, ages:["M","MA 15+"],
+  return {cinema:null, rent:null, styles:[], ages:["M","MA 15+"],
+          cinemaAges:["M","MA 15+","R 18+"],
           partner:null, partnerDiff:null, partnerStyles:[], kids:null, kidAges:["G","PG"],
           services:[]};
 }
@@ -14817,7 +14818,8 @@ function onbMassiveCritV2(ans, s){
     kind: ans.cinema==="yes" ? "cinema" : "stream",
     watchMarkers: marks,
     status: ["upcoming","opening_week","in_cinema","pvod","rental","included_streaming"],
-    genre: [], exclude: [], age: ["M","MA 15+","R 18+"], includeUnrated: true, yearsBack: 3, selBuzz: 1,
+    genre: [], exclude: [], age: ans.cinema==="yes" ? ans.cinemaAges : ["M","MA 15+","R 18+"],
+    includeUnrated: true, yearsBack: 3, selBuzz: 1,
     selCrowd: 0, selCritScore: 0, selAwards: 0, selScale: 0, cinemaReleaseOnly: true,
     myServices: {pvod:false, rental:false, included_streaming:false},
     watchWindows: ww,
@@ -14854,7 +14856,7 @@ function onbFamilyCritV2(ans, s){
 // order follows array position: Massive Movies is rank 0, and is therefore the default owner of a
 // contested film — deliberate, not incidental.
 const ONB_AGENTS_V2 = [
-  {key:"onb_massive", icon:"🎬", name:"Massive Movies", who:"me", when:a=>true,
+  {key:"onb_massive", icon:"🎬", name: ans=>ans.cinema==="yes" ? "In Cinema" : "Massive Movies", who:"me", when:a=>true,
    build(ans){ const r = onbAgentCapSolveV2(onbMassiveCritV2, ans, 85); return onbMassiveCritV2(ans, r.score); }},
 
   {key:"onb_favs", icon:"⭐", name:"Personal Favs", who:"me", when:a=>true,
@@ -14878,7 +14880,7 @@ function buildOnbAgentsV2(a){
   let order=0;
   return ONB_AGENTS_V2.filter(r => { try{ return !!r.when(ans); }catch(e){ return false; } }).map(r => {
     const c = r.build(ans);
-    c.template = r.key; c.icon = r.icon; c.name = r.name; c.who = r.who;
+    c.template = r.key; c.icon = r.icon; c.name = typeof r.name==="function" ? r.name(ans) : r.name; c.who = r.who;
     c.sort = DEFAULT_SORT; c.budget = 0;
     c.order = order++;
     // CAS-1143: every onboarding recipe already builds its deliberate window shape (BIG-window-onward
@@ -17547,7 +17549,7 @@ const SHARP_STEPS = {
     progress: 7,
     body(){
       return `<div class="obwrap">
-  <h2 class="obhd">First, we'll build you a <span class="obhi">Massive Movies</span> agent.</h2>
+  <h2 class="obhd">First, we'll build you an agent for the <span class="obhi">biggest movies</span> of the year.</h2>
   <p class="obintrotext">It watches for the biggest movies of each year — the ones with the highest Cascade scores — and tells you the moment one lands at the movies or on your preferred streaming services.</p>
 </div>`;
     },
@@ -17575,9 +17577,37 @@ const SHARP_STEPS = {
       });
     },
   },
-  v2_rent: {
+  // CAS-1270: only walked when ans.cinema==="yes" — the budget question it replaces is gone outright
+  // (people aren't equipped to answer it; the score-solve keeps the list at a good size regardless).
+  v2_cinema_ages: {
     noAgent: true, noSkip: true,
     progress: 20,
+    skip: ans => ans.cinema !== "yes",
+    blocked: ans => !ans.cinemaAges.length,
+    body(){
+      return `<div class="obwrap"><h2 class="obhd">Which age ratings do you want to see at the cinema?</h2></div>
+        <div class="chips" id="obCinemaAgesChips"></div>`;
+    },
+    wire(){
+      onbFlow.answersV2=onbAnswersV2Load();
+      const ans=onbFlow.answersV2;
+      const box=$("obCinemaAgesChips");
+      if(box){
+        box.innerHTML="";
+        AGE_LEVELS.forEach(a=>{
+          box.appendChild(obGenChip(a, ans.cinemaAges.includes(a), ()=>{
+            const i=ans.cinemaAges.indexOf(a);
+            i<0 ? ans.cinemaAges.push(a) : ans.cinemaAges.splice(i,1);
+            onbAnswersV2Save(ans);
+            renderOnbStep("v2_cinema_ages");
+          }));
+        });
+      }
+    },
+  },
+  v2_rent: {
+    noAgent: true, noSkip: true,
+    progress: 27,
     blocked: ans => ans.rent==null,
     body(){
       const ans = onbFlow.answersV2 || onbAnswersV2Default();
@@ -17599,7 +17629,7 @@ const SHARP_STEPS = {
   },
   v2_handoff: {
     noAgent: true, noSkip: true,
-    progress: 33,
+    progress: 40,
     body(){
       return `<div class="obwrap">
   <h2 class="obhd">… next, an agent to find your <span class="obhi">personal favourite movies</span>.</h2>
@@ -17610,7 +17640,7 @@ const SHARP_STEPS = {
   },
   v2_styles: {
     noAgent: true, noSkip: true,
-    progress: 40,
+    progress: 47,
     body(){
       return `<div class="obwrap"><h2 class="obhd">What are your favourite styles of movie?</h2></div>
         <p class="ossub">Pick as many as you like.</p><div class="chips" id="obStylesChips"></div>`;
@@ -17629,48 +17659,6 @@ const SHARP_STEPS = {
             renderOnbStep("v2_styles");
           }));
         });
-      }
-    },
-  },
-  // CAS-910 Change 2: budgetCardHTML()'s own control (CONT_DIALS.scale/SCALE_REF/.vslider/scaleReadout),
-  // minus the ALL WINDOWS scope chip and the "budget isn't known yet" switch — both confuse a first-run
-  // user with no mental model of windows yet. Built by hand rather than via reqCardHTML/budgetCardHTML
-  // themselves, since neither takes an option to omit either piece — everything else about the control
-  // (the dial state, the ladder, the readout) is theirs, unchanged.
-  v2_budget: {
-    noAgent: true, noSkip: true,
-    progress: 47,
-    body(){
-      onbFlow.answersV2 = onbFlow.answersV2 || onbAnswersV2Load();
-      onbFlow.scaleVal = onbFlow.answersV2.selScale || 0;
-      const cont=CONT_DIALS.scale, v=cont.get(), marks=cont.marks(v);
-      const slider=`<div class="vslider">
-          <div class="vtrack"><div class="vfillbar" style="width:${cont.pos(v)}%"></div></div>
-          <div class="vnotches">${marks.map(mk=>`<span class="vnotch ${mk.lit?"lit":""}" style="left:${mk.pos}%"></span>`).join("")}</div>
-          <input type="range" id="onbDial_scale" min="${cont.min}" max="${cont.max}" step="${cont.step}"
-                 value="${cont.rawOf(v)}" aria-label="${escA(cont.aria)}">
-        </div>
-        <div class="vlabels stag">${marks.map((mk,i)=>`<button type="button" class="vsnap ${mk.lit?"on":""} ${i%2?"lo":""}" data-snap="${mk.snap}"
-          style="left:${mk.pos}%;transform:${mk.pos<=0?"translateX(0)":mk.pos>=100?"translateX(-100%)":"translateX(-50%)"}">${esc(mk.label)}${mk.sub?`<small>${esc(mk.sub)}</small>`:""}</button>`).join("")}</div>`;
-      return `<div class="obwrap"><h2 class="obhd">Do you go for big Budget Movies?</h2></div>
-      <div class="osdial reqcard">
-        <div class="osdh"><span class="em">🎬</span><span class="dl">Movie Budget</span></div>
-        <p class="oscap">How big the film is — budget or worldwide gross.</p>
-        <p class="reqval" id="reqBudgetVal">${esc(cont.read(v))}</p>
-        ${slider}
-      </div>`;
-    },
-    wire(){
-      onbFlow.answersV2=onbAnswersV2Load();
-      wireReqCards();
-      const persist=()=>{
-        onbFlow.answersV2.selScale = onbFlow.scaleVal||0;
-        onbAnswersV2Save(onbFlow.answersV2);
-      };
-      const r=$("onbDial_scale");
-      if(r){
-        r.addEventListener("input", persist);
-        r.closest(".osdial").querySelectorAll(".vsnap[data-snap]").forEach(b=>b.addEventListener("click", persist));
       }
     },
   },
@@ -17846,7 +17834,7 @@ const SHARP_STEPS = {
   // Not listed in FLOWS: the cutover (wiring these in, retiring the old sequence) is CAS-911.
   v2_massive: {
     noAgent: true, noSkip: true,
-    progress: 27,
+    progress: 33,
     body(){
       const c=buildOnbAgentsV2(onbFlow.answersV2).find(a=>a.template==="onb_massive");
       return c ? onbAgentRevealHTML(c, 1, "Your first agent",
@@ -18016,11 +18004,11 @@ let onbStepKey=null;
 // (v2_cinema itself is the only lane-flavoured question now). The old briefing1/briefing2/together/
 // services/working/report sequence is retired below along with the v1-only helpers it alone called.
 const FLOWS = {
-  cinema: ["v2_about","v2_intro","v2_cinema","v2_rent","v2_massive","v2_handoff",
-           "v2_styles","v2_budget","v2_ages","v2_favs",
+  cinema: ["v2_about","v2_intro","v2_cinema","v2_cinema_ages","v2_rent","v2_massive","v2_handoff",
+           "v2_styles","v2_ages","v2_favs",
            "v2_partner","v2_date","v2_kids","v2_family","v2_services","v2_done"],
-  stream: ["v2_about","v2_intro","v2_cinema","v2_rent","v2_massive","v2_handoff",
-           "v2_styles","v2_budget","v2_ages","v2_favs",
+  stream: ["v2_about","v2_intro","v2_cinema","v2_cinema_ages","v2_rent","v2_massive","v2_handoff",
+           "v2_styles","v2_ages","v2_favs",
            "v2_partner","v2_date","v2_kids","v2_family","v2_services","v2_done"],
 };
 const flowList    = () => FLOWS[flowKind] || FLOWS.cinema;

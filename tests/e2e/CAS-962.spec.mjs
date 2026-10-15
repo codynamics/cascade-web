@@ -33,18 +33,21 @@ async function walkOnboarding(page, { kids = "no" } = {}){
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");                       // v2_intro
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");                       // v2_intro (CAS-1270)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
   await expect(page.locator("#obCinemaOpts")).toBeVisible();                                 // v2_cinema
   await page.locator('#obCinemaOpts .obopt[data-val="yes"]').click();
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
+  await expect(page.locator("#obCinemaAgesChips")).toBeVisible();                             // v2_cinema_ages (CAS-1270)
+  await ctaLocator(page).click();
+  await page.waitForTimeout(120);
   await expect(page.locator("#obRentOpts")).toBeVisible();                                   // v2_rent
   await page.locator('#obRentOpts .obopt[data-val="yes"]').click();
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  for(const marker of ["v2_massive", "v2_handoff", "v2_styles", "v2_budget", "v2_ages", "v2_favs"]){
+  for(const marker of ["v2_massive", "v2_handoff", "v2_styles", "v2_ages", "v2_favs"]){
     await ctaLocator(page).click();
     await page.waitForTimeout(120);
   }
