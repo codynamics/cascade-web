@@ -2150,6 +2150,16 @@
   .osdial.cardbtn:hover{border-color:var(--accent)}
   .osdial.cardbtn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   .osdial.cardbtn .dc{position:absolute;top:14px;right:14px;color:var(--faint);font-size:16px}
+  /* CAS-1267: the Advanced button that reveals Edit Agent's non-Basic controls — a plain outline, not the
+     filled .osdial card shape, so it reads as a toggle rather than another setting. */
+  .osadv{display:block;width:100%;text-align:left;cursor:pointer;font:inherit;color:inherit;
+    margin-top:13px;padding:13px 40px 13px 14px;border-radius:14px;position:relative;
+    border:1px solid rgba(255,255,255,.32);background:rgba(255,255,255,.04)}
+  .osadv:hover{border-color:var(--accent)}
+  .osadv:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .osadv .osadvtitle{display:block;font-weight:700;font-size:14.5px;color:var(--ink)}
+  .osadv .osadvsub{display:block;margin-top:2px;font-size:12px;color:var(--faint)}
+  .osadv .osadvchev{position:absolute;top:14px;right:14px;color:var(--faint);font-size:16px}
   /* CAS-1128: the filled portion of the score track is the brand gradient now — no more per-window colour on
      the bar (CAS-1113's "neutral slider"), and no window colour on the handle either; which windows are ON
      lives entirely in the pills below. .msntrackwrap carries top margin for the score label floating above
@@ -3636,6 +3646,11 @@
   .tcell.none{background:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);cursor:default}
   .tcell.sel{outline:2px solid #fff;outline-offset:1px}
   .tcell.allc{border-radius:50%}
+  /* CAS-1269: a flagged cell (the Style screen's own taste-disagreement ring) sits alongside .sel's white
+     outline rather than replacing it — both can show on the same cell at once. */
+  .tcell.flag{box-shadow:0 0 0 2px #ffd27a}
+  .tcell.flag::after{content:"!";position:absolute;top:-5px;right:-5px;width:13px;height:13px;border-radius:50%;
+    background:#ffd27a;color:#2b1503;font:800 9px/13px var(--font-body);text-align:center}
   .tlegend{display:flex;align-items:center;gap:7px;margin-top:10px;font:600 10.5px/1 var(--font-body);color:var(--faint)}
   .tlegend .ramp{display:flex;gap:2px}
   .tlegend .ramp i{width:14px;height:9px;border-radius:2px}
@@ -3647,6 +3662,20 @@
   .tdetail li{display:flex;align-items:center;gap:8px;padding:4px 0;font:500 12.5px/1.3 var(--font-body);color:var(--ink)}
   .tdetail li .vd{width:8px;height:8px;border-radius:50%;flex:none}
   .tdetail li .vl{margin-left:auto;color:var(--faint);font-size:11px;flex:none}
+  /* ==== CAS-1269: the Style screen's suggestions panel and its own "This agent" legend swatches ======== */
+  .tsugg{border:1px solid rgba(255,210,122,.35);background:rgba(255,210,122,.07);border-radius:14px;
+    padding:12px 14px;margin-bottom:12px}
+  .tsugg h4{margin:0;font:700 13.5px/1.3 var(--font-body);color:#ffd27a}
+  .tsuggrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(255,210,122,.18)}
+  .tsuggtext{flex:1;min-width:0}
+  .tsuggtext b{display:block;font:600 12.5px/1.3 var(--font-body);color:var(--ink)}
+  .tsuggtext span{display:block;font:500 11px/1.3 var(--font-body);color:var(--faint);margin-top:1px}
+  .tsuggbtn{flex:none;padding:7px 11px;border-radius:8px;border:1px solid rgba(255,210,122,.4);
+    background:rgba(255,210,122,.12);color:#ffd27a;font:700 12px/1 var(--font-body)}
+  .tsuggmore{font:600 11px/1.3 var(--font-body);color:var(--faint);padding-top:8px}
+  .tlegend.tlegend-agent{flex-wrap:wrap;row-gap:5px}
+  .tlegend-agent .lg{display:inline-flex;align-items:center;gap:4px}
+  .tlegend-agent .lg i{width:10px;height:10px;border-radius:3px;display:inline-block;flex:none}
   .tstrip{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:12px 12px 10px}
   .tstrip .tshead{font:700 13.5px/1.3 var(--font-body);color:var(--ink)}
   .tstrip .tshead b{color:#5fe0cf}
@@ -11233,15 +11262,21 @@ function tasteCellHTML(primary, other, data, isAll){
   return `<button type="button" class="tcell${isAll ? " allc" : ""}${sel ? " sel" : ""}" style="background:${tasteColor(data)}"
     aria-label="${escA(label)}" onclick="tasteSel('${escA(primary)}',${otherArg})">${sign}</button>`;
 }
+// Shared by the Your taste detail block and CAS-1269's Style screen (suggestions panel + its own cell
+// detail) — the one place taste lean turns into words, so the two screens never describe the same number
+// two different ways.
+function tasteLeanWords(n, lean){
+  return n < 3 ? "too few verdicts to say yet"
+    : lean >= 0.45 ? "you strongly go for these"
+    : lean >= 0.15 ? "you lean towards these"
+    : lean > -0.15 ? "no clear lean"
+    : lean > -0.4 ? "you lean away from these"
+    : "you strongly avoid these";
+}
 function tasteDetailHTML(primary, other, data){
   const heading = other ? `${esc(primary)} + ${esc(other)}` : `${esc(primary)} (all)`;
   const n = data.n;
-  const words = n < 3 ? "too few verdicts to say yet"
-    : data.lean >= 0.45 ? "you strongly go for these"
-    : data.lean >= 0.15 ? "you lean towards these"
-    : data.lean > -0.15 ? "no clear lean"
-    : data.lean > -0.4 ? "you lean away from these"
-    : "you strongly avoid these";
+  const words = tasteLeanWords(n, data.lean);
   const tally = REVIEW_STEPS.map(s => {
     const c = data.films.filter(f => f.verdict === s.key).length;
     return c ? `${c} ${s.lbl}` : null;
@@ -11605,6 +11640,26 @@ function normCascade(c, opts){
     c.kind = (st.length && !st.some(w=>["upcoming","opening_week","in_cinema"].includes(w))) ? "stream" : "cinema";
   }
   c.exclude = c.exclude||[];                 // [] = skip nothing (what every pre-existing Cascade meant)
+  // CAS-1268: a combination of two styles, keyed "A|B" (A<B) to "+" (list) or "-" (skip) — missing means
+  // "follow its styles". A bad entry (wrong key shape, an unknown style, a style paired with itself, the
+  // two names out of A-Z order, or a value that isn't "+"/"-") is dropped rather than carried along inert,
+  // the same discipline c.occasions above applies to a stale id. ALL_GENRES, not ONB_GENRES, because this
+  // runs on every template at load time (CASCADE_TEMPLATES.forEach below) before ONB_GENRES exists yet —
+  // same style set, just not yet sorted by popularity.
+  {
+    const srcPairs = (c.pairs && typeof c.pairs==="object") ? c.pairs : {};
+    const outPairs = {};
+    for(const k in srcPairs){
+      const v = srcPairs[k];
+      if(v!=="+" && v!=="-") continue;
+      const parts = k.split("|");
+      if(parts.length!==2) continue;
+      const [a,b] = parts;
+      if(a>=b || !ALL_GENRES.includes(a) || !ALL_GENRES.includes(b)) continue;
+      outPairs[k] = v;
+    }
+    c.pairs = outPairs;
+  }
   c.culture = c.culture||[];                 // [] = any origin
   c.year = c.year||[];                       // [] = any year; mirrors filt.year, so the Filters panel shows it too
   c.imdb = c.imdb||0; c.rt = c.rt||0;
@@ -11822,7 +11877,7 @@ const cascadeOrderCmp = (a,b) => (a.order??1e9)-(b.order??1e9)
 // on the first pass after this ships, the same "news about the agent, not the film" treatment CAS-715's
 // admitDrift already gives a hand-edited agent (see recomputeFound's own cascadeDrift comment).
 const GENRE_RULE_V = 2;
-const cascSigOf = c => JSON.stringify([c.name, c.status, c.genre, c.exclude, c.age, c.culture, c.year,
+const cascSigOf = c => JSON.stringify([c.name, c.status, c.genre, c.exclude, c.pairs||{}, c.age, c.culture, c.year,
   c.imdb, c.rt, c.awards, c.budget, c.includeUnbudgeted, c.includeUnrated, c.tentpole,
   c.selCrowd||0, c.selCritScore||0, c.selAwards||0, c.selScale||0, c.selBuzz||0, !!c.selOr, c.yearsBack||0,
   GENRE_RULE_V,
@@ -12042,6 +12097,25 @@ window.showScaleInfer=id=>{ const m=MOVIES.find(x=>x.tmdb_id===id); if(m) toast(
 // separate clearing mechanism. CAS-867: agMetricsCache (declared further down, with agentMetrics) reuses it
 // too — a catalogue swap can change which films an agent lists without touching that agent's own signature.
 function invalidateComputeCaches(){ _scaleInferCache.clear(); _awardRankCache.clear(); _wmReleasedScoreVals = null; agMetricsCache.clear(); _tasteProfileCache = null; _tasteMatchCache.clear(); }
+// CAS-1268: an agent's style combination — two different styles set together to "+" (list) or "-"
+// (skip), keyed "A|B" with A<B. Returns "out" the instant any matching pair is set "-" (a skip beats
+// a list at the same level, so order of discovery never matters), "in" once every matching pair has
+// been seen and at least one was "+", or null when no pair of the film's styles has an entry at all —
+// the "follow its styles" case matchesCriteria falls through to its own exclude/genre gates for.
+function pairVerdict(m,c){
+  const pairs=c.pairs||{};
+  const g=m.genres||[];
+  let sawPlus=false;
+  for(let i=0;i<g.length;i++){
+    for(let j=i+1;j<g.length;j++){
+      const a=g[i]<g[j]?g[i]:g[j], b=g[i]<g[j]?g[j]:g[i];
+      const v=pairs[a+"|"+b];
+      if(v==="-") return "out";
+      if(v==="+") sawPlus=true;
+    }
+  }
+  return sawPlus ? "in" : null;
+}
 // ---- Buzz (CAS-145, ladder replaced by CAS-678) --------------------------------
 // How much a film is being talked about right now, off the TMDB popularity figure the pipeline already
 function matchesCriteria(m,c,ignoreBlocked,ignoreScoreGate){
@@ -12070,12 +12144,20 @@ function matchesCriteria(m,c,ignoreBlocked,ignoreScoreGate){
   // CAS-854: "upcoming" means coming to cinemas — an agent that never watches cinema isn't waiting for that
   // arrival, so a pre-release film only becomes its news once it reaches a window that agent actually watches.
   if(ps==="upcoming" && !windowUsable(c,"in_cinema")) return false;
-  if((c.exclude||[]).length && (m.genres||[]).some(g=>c.exclude.includes(g))) return false;   // skip beats match
   // CAS-182: cleared means cleared. A dimension holding null admits nothing, so the count says 0 rather
   // than quietly reverting to the whole catalogue behind a screen of switched-off chips.
-  if(c.genre===null || c.age===null) return false;
-  // CAS-1147: ANY of the film's styles counts, not only the first — Lee's decision, 2026-10-02.
-  if(c.genre.length && !(m.genres||[]).some(g=>c.genre.includes(g))) return false;
+  if(c.age===null) return false;
+  // CAS-1268: a combination beats its styles. "out" rejects regardless of what the styles alone would
+  // say; "in" clears both style gates below, including c.genre===null; null (no pair of this film's
+  // styles is set) falls through to the unchanged CAS-1147/CAS-182 style gates.
+  const pairVer=pairVerdict(m,c);
+  if(pairVer==="out") return false;
+  if(pairVer!=="in"){
+    if((c.exclude||[]).length && (m.genres||[]).some(g=>c.exclude.includes(g))) return false;   // skip beats match
+    if(c.genre===null) return false;
+    // CAS-1147: ANY of the film's styles counts, not only the first — Lee's decision, 2026-10-02.
+    if(c.genre.length && !(m.genres||[]).some(g=>c.genre.includes(g))) return false;
+  }
   // CAS-744: includeUnrated was wired to ratingOK (the IMDb bar) only — this gate never read it, so the
   // escape hatch did nothing for a film with no age_rating at all (m.age_rating null/""), which is the
   // norm for an unreleased film rather than the exception. Same shape as ratingOK just above: below/outside
@@ -12688,7 +12770,7 @@ function commitDraft(){
   }
   const c=isNew ? {id:cascadeNewId()} : cascades.find(x=>x.id===draft.id);
   Object.assign(c, {name, icon:draft.icon, template:draft.template, status:draft.status, genre:draft.genre,
-    exclude:draft.exclude,
+    exclude:draft.exclude, pairs:{...draft.pairs},
     age:draft.age, culture:draft.culture, year:draft.year, imdb:draft.imdb, rt:draft.rt,
     ratingStop:draft.ratingStop, includeUnrated:draft.includeUnrated,
     budget:draft.budget, includeUnbudgeted:draft.includeUnbudgeted, tentpole:draft.tentpole,
@@ -13738,7 +13820,7 @@ const HELP_ARTICLES = [
    body:"Alerts is where Cascade tells you what's happened lately, split into two kinds of row. New is a film's first appearance for a given agent — something it's never found before. Changed is everything else: a film the agent already had, that's now moved to a different window. A film is never counted as both at once.\n\nYou choose how far back to look — Today, Week, 2 weeks or Month — and Alerts shows only what falls inside that window, measured back from right now. Every row names the agent that actually owns the film today, so nothing is shown under an agent that no longer has it."},
   {slug:"notifications", title:"Notifications",
    summary:"Exactly what will reach you, by which channel, and when the daily report runs.",
-   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Service tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for Massive Movies and off for every other agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
+   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Service tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for your first agent and off for every other agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
   {slug:"your-account-and-data", title:"Your account and data",
    summary:"What is stored, where, and how to delete it.",
    body:`Signed out, everything Cascade knows about you — your agents, what you've watched, your preferences — is stored only on this device, in this browser or app install. Nothing about it reaches anywhere else.\n\nSigned in, that same information is mirrored to your account so it's there again on another device you sign into. Signing out doesn't erase it — it's still on your account, waiting for you to sign back in.\n\nDeleting your account is on the Account screen itself: type DELETE to confirm, and it permanently removes your agents, everything they've found for you, what you've marked watched, your invites and friends, your notification history and your sign-in — there's nothing left to undo.${MEMBERSHIP_ENABLED ? " It doesn't cancel an active App Store subscription, which you'll need to manage separately." : ""}`},
@@ -13910,6 +13992,57 @@ const STANDARDS = [
 const GENRE_COUNT={};
 MOVIES.forEach(m=>(m.genres||[]).forEach(g=>{ GENRE_COUNT[g]=(GENRE_COUNT[g]||0)+1; }));
 const ONB_GENRES=[...ALL_GENRES].sort((a,b)=>GENRE_COUNT[b]-GENRE_COUNT[a] || a.localeCompare(b));
+
+// ---- CAS-1269: the Style screen's own grid engine — pure functions over a cascade's genre/exclude/pairs,
+// shared by the live Style screen (SHARP_STEPS.genres, reading dT()/onbFlow.draft) and its unit test. The
+// grid's "effective state" below is a UI/flag-threshold notion only (rule 7) — real admission precedence
+// (pairVerdict, CAS-1268) is untouched and still wins inside matchesCriteria.
+function stylePairKey(a,b){ return a<b ? a+"|"+b : b+"|"+a; }
+// A style's own setting: c.exclude always wins (the same precedence matchesCriteria gives it), "+" is
+// being in the include list (or the list being "all", c.genre===[]), null is neither — not listed, no
+// explicit skip.
+function styleGridState(c,g){
+  if((c.exclude||[]).includes(g)) return "-";
+  const genre=c.genre;
+  if(genre===null) return null;
+  if(!genre.length) return "+";
+  return genre.includes(g) ? "+" : null;
+}
+// A pair's own setting, straight from c.pairs — undefined when neither style of the pair carries one.
+const pairGridOwn = (c,a,b) => (c.pairs||{})[stylePairKey(a,b)];
+// CAS-1269 rule 7's "effective state": a pair's own +/- wins; otherwise either style skipped wins skip,
+// else either style listed wins list, else not listed. A style IS its own effective state (styleGridState).
+function pairGridEffective(c,a,b){
+  const own=pairGridOwn(c,a,b);
+  if(own) return own;
+  const sa=styleGridState(c,a), sb=styleGridState(c,b);
+  if(sa==="-"||sb==="-") return "-";
+  if(sa==="+"||sb==="+") return "+";
+  return null;
+}
+// CAS-1269 rule 7: a style or pair is STRONG when its taste carries n>=3 verdicts and |lean|>=0.3, and
+// FLAGGED when that taste leans one way but the grid's effective state (above) says the other — "loves
+// sci-fi, hates sci-fi animation" while Animation+Science Fiction is still listed. Ordered by |lean| x
+// conf, strongest disagreement first — the suggestions panel's own order.
+function styleGridFlags(c){
+  const T=tasteProfile();
+  const flags=[];
+  const consider=(kind,a,b,data,state)=>{
+    if(data.n<3 || Math.abs(data.lean)<0.3) return;
+    const listed = state==="+";
+    if(!((data.lean<0 && listed) || (data.lean>0 && !listed))) return;
+    flags.push({kind, a, b, lean:data.lean, conf:data.conf, n:data.n, state, want: data.lean>0 ? "+" : "-"});
+  };
+  ONB_GENRES.forEach(g=>{ if(T.styles[g]) consider("style", g, null, T.styles[g], styleGridState(c,g)); });
+  Object.keys(T.pairs).forEach(key=>{
+    const pr=T.pairs[key];
+    if(pr.primary >= pr.other) return;        // T.pairs carries both orders — count each unordered pair once
+    if(!ONB_GENRES.includes(pr.primary) || !ONB_GENRES.includes(pr.other)) return;
+    consider("pair", pr.primary, pr.other, pr, pairGridEffective(c, pr.primary, pr.other));
+  });
+  flags.sort((x,y)=> Math.abs(y.lean)*y.conf - Math.abs(x.lean)*x.conf);
+  return flags;
+}
 
 const onb = {genres:[], standard:"nofuss", exclude:[], name:""};
 let onbStep=0;
@@ -14589,7 +14722,8 @@ function onbAnswersSave(a){ onbAnswers = a; }
 // ONB_AGENTS/buildOnbAgents (the old per-answer recipe table) and obStripHTML/obLastKeys (the old
 // roster strip) are gone — CAS-911 retired them once FLOWS below stopped calling either.
 function onbAnswersV2Default(){
-  return {cinema:null, rent:null, styles:[], selScale:0, ages:["M","MA 15+"],
+  return {cinema:null, rent:null, styles:[], ages:["M","MA 15+"],
+          cinemaAges:["M","MA 15+","R 18+"],
           partner:null, partnerDiff:null, partnerStyles:[], kids:null, kidAges:["G","PG"],
           services:[]};
 }
@@ -14684,7 +14818,8 @@ function onbMassiveCritV2(ans, s){
     kind: ans.cinema==="yes" ? "cinema" : "stream",
     watchMarkers: marks,
     status: ["upcoming","opening_week","in_cinema","pvod","rental","included_streaming"],
-    genre: [], exclude: [], age: ["M","MA 15+","R 18+"], includeUnrated: true, yearsBack: 3, selBuzz: 1,
+    genre: [], exclude: [], age: ans.cinema==="yes" ? ans.cinemaAges : ["M","MA 15+","R 18+"],
+    includeUnrated: true, yearsBack: 3, selBuzz: 1,
     selCrowd: 0, selCritScore: 0, selAwards: 0, selScale: 0, cinemaReleaseOnly: true,
     myServices: {pvod:false, rental:false, included_streaming:false},
     watchWindows: ww,
@@ -14721,7 +14856,7 @@ function onbFamilyCritV2(ans, s){
 // order follows array position: Massive Movies is rank 0, and is therefore the default owner of a
 // contested film — deliberate, not incidental.
 const ONB_AGENTS_V2 = [
-  {key:"onb_massive", icon:"🎬", name:"Massive Movies", who:"me", when:a=>true,
+  {key:"onb_massive", icon:"🎬", name: ans=>ans.cinema==="yes" ? "In Cinema" : "Massive Movies", who:"me", when:a=>true,
    build(ans){ const r = onbAgentCapSolveV2(onbMassiveCritV2, ans, 85); return onbMassiveCritV2(ans, r.score); }},
 
   {key:"onb_favs", icon:"⭐", name:"Personal Favs", who:"me", when:a=>true,
@@ -14745,7 +14880,7 @@ function buildOnbAgentsV2(a){
   let order=0;
   return ONB_AGENTS_V2.filter(r => { try{ return !!r.when(ans); }catch(e){ return false; } }).map(r => {
     const c = r.build(ans);
-    c.template = r.key; c.icon = r.icon; c.name = r.name; c.who = r.who;
+    c.template = r.key; c.icon = r.icon; c.name = typeof r.name==="function" ? r.name(ans) : r.name; c.who = r.who;
     c.sort = DEFAULT_SORT; c.budget = 0;
     c.order = order++;
     // CAS-1143: every onboarding recipe already builds its deliberate window shape (BIG-window-onward
@@ -15036,7 +15171,8 @@ const onbFlow = {draft:null, name:ONB_DEFAULT_NAME, defaultName:ONB_DEFAULT_NAME
                  barTouched:false, barAutoRelaxed:null,   // CAS-158 first-open state
                  watch:{},                                 // CAS-160 viewing windows: {lane: [optKey,…]}
                  answers:null,                             // CAS-626: the briefing screens' own roster answers
-                 workingAgents:null, reportStats:null};    // CAS-629: S5's committed roster, S6/S7's shared N/M/K
+                 workingAgents:null, reportStats:null,     // CAS-629: S5's committed roster, S6/S7's shared N/M/K
+                 briefAdvancedOpen:false};                 // CAS-1267: Edit Agent's Advanced section, reset by briefOpen
 
 // ---- Agent settings: the windows this agent's TYPE has (CAS-160, rebuilt by CAS-228) --------------------
 // CAS-160 made availability the user's choice rather than a property of the preset. It modelled that as three
@@ -16320,10 +16456,17 @@ function stylesCardHTML(){
     : included.length===ONB_GENRES.length ? `All ${ONB_GENRES.length} styles`
     : !included.length ? "No styles match"
     : `${included.length} of ${ONB_GENRES.length} styles`;
+  // CAS-1269 rule 9: a combination set on the grid, and a taste disagreement, are both things this card
+  // has to say up front — the whole reason the grid has its own suggestions panel is that you shouldn't
+  // have to open it to learn a setting fights your own verdicts.
+  const pairCount = Object.keys(dT().pairs||{}).length;
+  const comboSuffix = pairCount ? ` · ${pairCount} combination${pairCount===1?"":"s"} set` : "";
+  const flagCount = styleGridFlags(onbApply()).length;
   const chips = included.map(x=>`<span class="chip gen on">${esc(x)}</span>`).join("");
   return `<button type="button" class="osdial cardbtn" onclick="briefGo('genres')">
     <span class="osdh"><span class="em">🎭</span><span class="dl">Styles</span></span>
-    <p class="reqval">${esc(valueText)}</p>
+    <p class="reqval">${esc(valueText)}${esc(comboSuffix)}</p>
+    ${flagCount ? `<p class="reqval" style="color:#ffd27a;font-weight:600;font-size:12px">! ${flagCount} of these settings disagree with your taste</p>` : ""}
     <div class="chips">${chips || `<span class="eaempty">Nothing qualifies — pick at least one</span>`}</div>
     <span class="dc">›</span></button>`;
 }
@@ -16506,6 +16649,36 @@ const genreExcludeSuffix = () => {
   const ex=[...dExcludeSet()];
   return ex.length ? ` except ${ex.join(", ")}` : "";
 };
+// ---- CAS-1269: the Style screen's own writes — + / − / Neither for a style, + / − / Follow for a pair.
+// A style's new state is built off the currently EFFECTIVE include set (genre resolved against exclude),
+// never off c.genre alone, so setting one style can never silently resurrect another the way a raw
+// genre-array edit could.
+function dEffectiveGenreSet(){
+  const on=dGenreSet(), excl=dExcludeSet();
+  return new Set(ONB_GENRES.filter(x=>on.has(x) && !excl.has(x)));
+}
+function styleGridSetStyle(g, state){
+  const incl=dEffectiveGenreSet(), excl=new Set(dExcludeSet());
+  incl.delete(g); excl.delete(g);
+  if(state==="+") incl.add(g);
+  else if(state==="-") excl.add(g);
+  onbFlow.draft.genre = tbStore(incl, ONB_GENRES);
+  onbFlow.draft.exclude = [...excl];
+}
+function styleGridSetPair(a, b, state){
+  const key=stylePairKey(a,b);
+  const pairs={...(onbFlow.draft.pairs||{})};
+  if(state===null) delete pairs[key];
+  else pairs[key]=state;
+  onbFlow.draft.pairs=pairs;
+}
+// CAS-1269 rule 6: "N films it could list have both / have this style" — the agent's own windows and
+// score, with every style gate (genre/exclude/pairs) cleared, restricted to films carrying the style(s)
+// asked about. Same technique axisCountsNow (CAS-224) already uses: clear the axis, count what's left.
+function styleGridCellCount(styles){
+  const c={...onbApply(), genre:[], exclude:[], pairs:{}};
+  return MOVIES.filter(m=>watchesFilm(m,c) && styles.every(g=>(m.genres||[]).includes(g))).length;
+}
 // Ratings are a LIST, not a range, so each one is independently in or out and a tap means exactly what it
 // looks like. (The taste-baseline accordion keeps its lo..hi band; that is a different control on a
 // different screen, and this one no longer has to pretend a tap is a drag.)
@@ -16740,6 +16913,144 @@ function obGenChip(label, on, onTap){
   b.onclick=onTap;
   return b;
 }
+// ---- CAS-1269: the Style screen's own grid UI — suggestions panel, This agent/Your taste switch, the
+// taste-map grid (reusing its .tmap/.tscroll/.tgrid layout and TASTE_SHORT headers), legend and the
+// selected cell's detail block. styleGridView/styleGridSel are reset by briefGo('genres') on every open,
+// same convention openTasteScreen uses for tasteSelPrimary/tasteSelOther.
+let styleGridView="agent", styleGridSel=null;
+function styleGridSuggestionsHTML(flags){
+  if(!flags.length) return "";
+  const shown=flags.slice(0,3);
+  const rows=shown.map(f=>{
+    const label = f.b ? `${esc(f.a)} + ${esc(f.b)}` : esc(f.a);
+    const stateWord = f.state==="+" ? "listed" : f.state==="-" ? "skipped" : "not listed";
+    const words = esc(tasteLeanWords(f.n, f.lean));
+    const btnLabel = f.want==="+" ? "+ List" : "− Skip";
+    const bArg = f.b ? `'${escA(f.b)}'` : "null";
+    return `<div class="tsuggrow">
+      <div class="tsuggtext"><b>${label}: ${stateWord}</b><span>Your ${f.n} verdict${f.n===1?"":"s"}: ${words}</span></div>
+      <button type="button" class="tsuggbtn" onclick="styleGridApply('${escA(f.a)}',${bArg},'${f.want}')">${btnLabel}</button>
+    </div>`;
+  }).join("");
+  const more = flags.length>3 ? `<div class="tsuggmore">and ${flags.length-3} more, marked ! on the grid</div>` : "";
+  return `<div class="tsugg"><h4>! ${flags.length} of this agent's settings disagree with your taste</h4>${rows}${more}</div>`;
+}
+function styleGridCellHTML(c,T,a,b,flagKeys){
+  const isAll=!b;
+  const flagged=flagKeys.has(isAll?`s:${a}`:`p:${stylePairKey(a,b)}`);
+  const sel=!!(styleGridSel && styleGridSel.a===a && (styleGridSel.b||null)===(b||null));
+  let bg, sign;
+  if(styleGridView==="agent"){
+    const state = isAll ? styleGridState(c,a) : pairGridEffective(c,a,b);
+    const explicit = isAll || !!pairGridOwn(c,a,b);
+    bg = state==="+" ? (explicit ? "#138c7d" : "rgba(45,212,191,.22)")
+       : state==="-" ? (explicit ? "#b65a1c" : "rgba(240,136,58,.22)")
+       : "rgba(255,255,255,.045)";
+    sign = explicit && state==="+" ? "+" : explicit && state==="-" ? "−" : "";
+  } else {
+    const data = isAll ? T.styles[a] : T.pairs[a+"|"+b];
+    if(!data || !data.n){
+      const label = isAll ? a : `${a} with ${b}`;
+      return `<span class="tcell none${isAll?" allc":""}" aria-label="${escA(label)}: no verdicts"></span>`;
+    }
+    bg = tasteColor(data);
+    sign = data.n>=3 ? (data.lean>=0.3?"+":data.lean<=-0.3?"−":"") : "";
+  }
+  const label = isAll ? a : `${a} with ${b}`;
+  const bArg = b ? `'${escA(b)}'` : "null";
+  return `<button type="button" class="tcell${isAll?" allc":""}${sel?" sel":""}${flagged?" flag":""}" style="background:${bg}"
+    aria-label="${escA(label)}" onclick="styleGridTapCell('${escA(a)}',${bArg})">${sign}</button>`;
+}
+function styleGridDetailHTML(c,T,a,b,flagKeys){
+  const isAll=!b;
+  const heading = isAll ? `${esc(a)} (the whole style)` : `${esc(a)} + ${esc(b)}`;
+  const state = isAll ? styleGridState(c,a) : pairGridEffective(c,a,b);
+  const own = isAll ? state : (pairGridOwn(c,a,b) || null);
+  const explicit = isAll || !!pairGridOwn(c,a,b);
+  const stateWord = state==="+" ? "listed" : state==="-" ? "skipped" : "not listed";
+  const becauseOfStyles = !isAll && !explicit && state!==null ? ", because of its styles" : "";
+  const count = styleGridCellCount(isAll ? [a] : [a,b]);
+  const whatLine = isAll
+    ? `${count} film${count===1?"":"s"} it could list have this style.`
+    : `${count} film${count===1?"":"s"} it could list have both.`;
+  const data = isAll ? T.styles[a] : T.pairs[a+"|"+b];
+  const flagged = flagKeys.has(isAll?`s:${a}`:`p:${stylePairKey(a,b)}`);
+  let tasteLine;
+  if(!data || !data.n){
+    tasteLine = `Your taste: no verdicts yet.`;
+  } else {
+    const words = tasteLeanWords(data.n, data.lean);
+    const tally = REVIEW_STEPS.map(s=>{
+      const n=data.films.filter(f=>f.verdict===s.key).length; return n?`${n} ${s.lbl}`:null;
+    }).filter(Boolean).join(" · ");
+    tasteLine = `Your taste: ${data.n} verdict${data.n===1?"":"s"}, ${words}. ${tally}.`;
+  }
+  const tasteLineHTML = esc(tasteLine) + (flagged ? ` <span style="color:#ffd27a">This setting disagrees with it.</span>` : "");
+  const thirdLabel = isAll ? "Neither" : "Follow its styles";
+  const bArg = b ? `'${escA(b)}'` : "null";
+  const btns=[{label:"+ List",v:"+"},{label:"− Skip",v:"-"},{label:thirdLabel,v:null}].map(o=>{
+    const on=own===o.v;
+    const vArg = o.v===null ? "null" : `'${o.v}'`;
+    return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
+      onclick="styleGridApply('${escA(a)}',${bArg},${vArg})">${esc(o.label)}</button>`;
+  }).join("");
+  return `<div class="tdetail">
+    <h4>${heading}</h4>
+    <div class="tlean">This agent: ${esc(stateWord)}${esc(becauseOfStyles)}. ${esc(whatLine)}</div>
+    <div class="tlean">${tasteLineHTML}</div>
+    <div class="tbq tbqmin" style="margin-top:9px">${btns}</div>
+  </div>`;
+}
+function styleGridScreenHTML(){
+  const c=onbApply();
+  const T=tasteProfile();
+  const flags=styleGridFlags(c);
+  const flagKeys=new Set(flags.map(f=>f.kind==="style" ? `s:${f.a}` : `p:${stylePairKey(f.a,f.b)}`));
+  const rows=[...ONB_GENRES].sort((x,y)=>x.localeCompare(y));
+  const switchHTML = `<div class="mfseg" role="group" aria-label="View">
+    <button type="button" aria-pressed="${styleGridView==="agent"}" class="${styleGridView==="agent"?"on":""}"
+      onclick="styleGridSetView('agent')">This agent</button>
+    <button type="button" aria-pressed="${styleGridView==="taste"}" class="${styleGridView==="taste"?"on":""}"
+      onclick="styleGridSetView('taste')">Your taste</button>
+  </div>`;
+  const note = styleGridView==="agent"
+    ? `Tap a circle for a whole style, or a square for two styles together, then choose + to list, − to skip, or leave it to follow the styles. A combination beats its styles.`
+    : `The same grid coloured by your verdicts, exactly as on Your taste. Switch back to compare.`;
+  const headerHTML = `<span class="tc0"></span><span class="th all">All</span>`
+    + rows.map(g=>`<span class="th">${esc(tasteShortName(g))}</span>`).join("");
+  const rowsHTML = rows.map(primary=>{
+    const allCell = styleGridCellHTML(c,T,primary,null,flagKeys);
+    const otherCells = rows.map(other => other===primary
+      ? `<span class="tcell none"></span>`
+      : styleGridCellHTML(c,T,primary,other,flagKeys)).join("");
+    return `<span class="tr">${esc(primary)}</span>${allCell}${otherCells}`;
+  }).join("");
+  const legend = styleGridView==="agent"
+    ? `<div class="tlegend tlegend-agent">
+        <span class="lg"><i style="background:#138c7d"></i>+ list</span>
+        <span class="lg"><i style="background:#b65a1c"></i>− skip</span>
+        <span class="lg"><i style="background:rgba(45,212,191,.22)"></i>listed by its styles</span>
+        <span class="lg"><i style="background:rgba(255,255,255,.045)"></i>not listed</span>
+        <span class="lg">! your taste disagrees</span>
+      </div>`
+    : `<div class="tlegend"><span>avoid</span><span class="ramp"><i style="background:rgba(240,136,58,0.85)"></i><i style="background:rgba(240,136,58,0.46)"></i><i style="background:rgba(255,255,255,.08)"></i><i style="background:rgba(45,212,191,0.46)"></i><i style="background:rgba(45,212,191,0.85)"></i></span><span>go for</span></div>`;
+  const detail = styleGridSel ? styleGridDetailHTML(c,T,styleGridSel.a,styleGridSel.b,flagKeys) : "";
+  return `<p class="ossub">What this agent lists, style by style and in combination.</p>
+    ${styleGridSuggestionsHTML(flags)}
+    ${switchHTML}
+    <p class="tnote">${esc(note)}</p>
+    <div class="tmap">
+      <div class="tscroll"><div class="tgrid" style="grid-template-columns:92px repeat(${1+rows.length},26px)">${headerHTML}${rowsHTML}</div></div>
+      ${legend}
+      ${detail}
+    </div>`;
+}
+window.styleGridSetView = v => { styleGridView=v; renderOnbStep("genres"); };
+window.styleGridTapCell = (a,b) => { styleGridSel={a, b:b||null}; renderOnbStep("genres"); };
+window.styleGridApply = (a,b,state) => {
+  if(b) styleGridSetPair(a,b,state); else styleGridSetStyle(a,state);
+  renderOnbStep("genres");
+};
 // Step registry — each ticket adds one entry. `progress` is the mock's fill %; `body()` builds the control;
 // `wire()` attaches the live control once it's in the DOM.
 const SHARP_STEPS = {
@@ -16850,25 +17161,37 @@ const SHARP_STEPS = {
       const nNew = onbFlow.draft ? newlyAddedCount(onbApply()) : 0;
       // The name row is gone — CAS-531 #1 moved it into the page header (see renderOnbStep's key==="briefing"
       // branch), so a rename opens the identical "name" spoke this row used to.
+      // CAS-1267: Basic is Styles, Cascade score and Age rating — what Lee judges a commercial product's
+      // settings screen should open on. Everything else (Occasions, Alerts, Budget, Awards, How far back,
+      // cinema release) moves into a collapsed Advanced section, rendered but `hidden` so wire() still binds
+      // every control whichever state the section is in.
+      const advOpen = !!onbFlow.briefAdvancedOpen;
       return `<p class="ossub">Reconfigure this agent here.${nNew ? ` <b>${nNew}</b> newly added film${nNew===1?"":"s"} in its list right now.` : ""}</p>
-        ${occasionsCardHTML()}
-        <div class="usec">ALERTS</div>
-        <div class="switch mini" id="onbAlertsOn" role="switch">
-          <span>🔔 Alert me about this agent's films
-            <small style="color:var(--faint)">— by email, in the app and on your phone</small></span>
-          <span class="knob"></span></div>
         <div class="usec">WHAT IT LOOKS FOR</div>
         ${stylesCardHTML()}
         ${msnScoreCardHTML()}
         <div class="usec">REQUIREMENTS — EVERY FILM MUST CLEAR ALL OF THESE</div>
-        ${budgetCardHTML()}
-        ${awardsCardHTML()}
         ${ageRatingCardHTML()}
-        ${yearsCardHTML()}
-        <div class="switch mini" id="onbCinemaRelease" role="switch">
-          <span>🎬 Had a cinema release
-            <small style="color:var(--faint)">— an AU cinema (not limited) release, at any point</small></span>
-          <span class="knob"></span></div>
+        <button type="button" class="osadv" id="onbAdvancedBtn" aria-expanded="${advOpen}" onclick="briefToggleAdvanced()">
+          <span class="osadvtitle">${advOpen ? "Hide advanced" : "Advanced"}</span>
+          ${advOpen ? "" : `<span class="osadvsub">Alerts, occasions, budget, awards, how far back, cinema release</span>`}
+          <span class="osadvchev">${advOpen ? "⌄" : "›"}</span>
+        </button>
+        <div id="onbAdvancedSection"${advOpen ? "" : " hidden"}>
+          ${occasionsCardHTML()}
+          <div class="usec">ALERTS</div>
+          <div class="switch mini" id="onbAlertsOn" role="switch">
+            <span>🔔 Alert me about this agent's films
+              <small style="color:var(--faint)">— by email, in the app and on your phone</small></span>
+            <span class="knob"></span></div>
+          ${budgetCardHTML()}
+          ${awardsCardHTML()}
+          ${yearsCardHTML()}
+          <div class="switch mini" id="onbCinemaRelease" role="switch">
+            <span>🎬 Had a cinema release
+              <small style="color:var(--faint)">— an AU cinema (not limited) release, at any point</small></span>
+            <span class="knob"></span></div>
+        </div>
         <!-- CAS-642 W2b: the service-status scope (CAS-635 N3a) spoke moved off this screen — it is a
              statement about a WATCH LIST, not about what this agent is allowed to find. briefToggleSvc stays
              defined: onboarding's own S3/S4 sequence (CAS-628/629) still routes a new agent's draft through
@@ -16901,51 +17224,14 @@ const SHARP_STEPS = {
   // CAS-182: this screen edits the AGENT's own genres. They lived on the account taste baseline from
   // CAS-146, and CAS-182 brought them back to the agent. Before CAS-188 this screen wrote onbFlow.genresOn,
   // a field onbApply had stopped reading — so it looked like it worked and changed nothing.
+  // CAS-1269: the chips and Select all/Clear all are gone — this is now the taste-map grid, reusing Your
+  // taste's own layout/CSS (.tmap/.tscroll/.tgrid) so a style or a combination of two can be set to list or
+  // skip, with the agent's own settings flagged wherever they disagree with the account's taste verdicts.
   genres: {
     title: "Style",
     progress: 30,
     noAgent: true,
-    body(){
-      return `<p class="ossub">Which genres should your agent draw from?</p>
-        <div class="chips" id="onbStepGenres"></div>
-        <div class="tbq tbqmin">
-          <button type="button" class="q" onclick="flowSetAll('genre',true)">Select all</button>
-          <button type="button" class="q" onclick="flowSetAll('genre',false)">Clear all</button></div>`;
-    },
-    wire(){
-      const box=$("onbStepGenres"); if(!box) return;
-      const on=dGenreSet(), excl=dExcludeSet();
-      // CAS-224: the agent's own numbers, not GENRE_COUNT's catalogue-wide ones.
-      const counts=genreCountsNow();
-      box.innerHTML="";
-      ONB_GENRES.forEach(g=>{
-        // CAS-397: a genre a preset put on `exclude` (Family Movies' Horror/Crime/Romance) was never
-        // subtracted here, so the chip showed it as included while the matcher was still dropping it —
-        // the chip face IS this agent's Style criterion, so it has to read what the matcher reads.
-        const isOn=on.has(g) && !excl.has(g);
-        const c=document.createElement("button");
-        c.type="button";
-        c.className="chip gen"+(isOn?" on":"");
-        c.dataset.chipkey=g;
-        c.setAttribute("aria-pressed", String(isOn));
-        c.innerHTML=`${esc(g)} <span class="chcount" style="opacity:.55">· ${counts[g]||0}</span>`;
-        c.onclick=()=>{
-          // CAS-397: this screen is the one control for the whole genre axis, so a tap resolves BOTH fields —
-          // the include list AND any preset exclude get flattened into the include list alone. Otherwise a
-          // tap on Horror (currently off via exclude) had nothing to turn off, and every other preset-excluded
-          // chip stayed silently excluded until the whole draft was rebuilt some other way.
-          const nowOn=new Set(ONB_GENRES.filter(x=>on.has(x) && !excl.has(x)));
-          isOn ? nowOn.delete(g) : nowOn.add(g);
-          onbFlow.draft.genre = tbStore(new Set(nowOn), ONB_GENRES);
-          onbFlow.draft.exclude = [];
-          renderOnbStep("genres");   // exclude clearing can flip OTHER chips' state too — repaint them all
-        };
-        box.appendChild(c);
-      });
-    },
-    // CAS-224: the chips have to move with everything else on the page, so they repaint from the same
-    // refresh the count and the summary line already go through.
-    refresh(){ paintChipCounts("onbStepGenres", genreCountsNow()); },
+    body(){ return styleGridScreenHTML(); },
   },
   // CAS-560: the "language" step (per-agent Language) is retired along with the field it edited — Language
   // is Preferences-only now (tasteBase.langs). It was already unreachable (never listed in FLOWS, so
@@ -17263,7 +17549,7 @@ const SHARP_STEPS = {
     progress: 7,
     body(){
       return `<div class="obwrap">
-  <h2 class="obhd">First, we'll build you a <span class="obhi">Massive Movies</span> agent.</h2>
+  <h2 class="obhd">First, we'll build you an agent for the <span class="obhi">biggest movies</span> of the year.</h2>
   <p class="obintrotext">It watches for the biggest movies of each year — the ones with the highest Cascade scores — and tells you the moment one lands at the movies or on your preferred streaming services.</p>
 </div>`;
     },
@@ -17291,9 +17577,37 @@ const SHARP_STEPS = {
       });
     },
   },
-  v2_rent: {
+  // CAS-1270: only walked when ans.cinema==="yes" — the budget question it replaces is gone outright
+  // (people aren't equipped to answer it; the score-solve keeps the list at a good size regardless).
+  v2_cinema_ages: {
     noAgent: true, noSkip: true,
     progress: 20,
+    skip: ans => ans.cinema !== "yes",
+    blocked: ans => !ans.cinemaAges.length,
+    body(){
+      return `<div class="obwrap"><h2 class="obhd">Which age ratings do you want to see at the cinema?</h2></div>
+        <div class="chips" id="obCinemaAgesChips"></div>`;
+    },
+    wire(){
+      onbFlow.answersV2=onbAnswersV2Load();
+      const ans=onbFlow.answersV2;
+      const box=$("obCinemaAgesChips");
+      if(box){
+        box.innerHTML="";
+        AGE_LEVELS.forEach(a=>{
+          box.appendChild(obGenChip(a, ans.cinemaAges.includes(a), ()=>{
+            const i=ans.cinemaAges.indexOf(a);
+            i<0 ? ans.cinemaAges.push(a) : ans.cinemaAges.splice(i,1);
+            onbAnswersV2Save(ans);
+            renderOnbStep("v2_cinema_ages");
+          }));
+        });
+      }
+    },
+  },
+  v2_rent: {
+    noAgent: true, noSkip: true,
+    progress: 27,
     blocked: ans => ans.rent==null,
     body(){
       const ans = onbFlow.answersV2 || onbAnswersV2Default();
@@ -17315,7 +17629,7 @@ const SHARP_STEPS = {
   },
   v2_handoff: {
     noAgent: true, noSkip: true,
-    progress: 33,
+    progress: 40,
     body(){
       return `<div class="obwrap">
   <h2 class="obhd">… next, an agent to find your <span class="obhi">personal favourite movies</span>.</h2>
@@ -17326,7 +17640,7 @@ const SHARP_STEPS = {
   },
   v2_styles: {
     noAgent: true, noSkip: true,
-    progress: 40,
+    progress: 47,
     body(){
       return `<div class="obwrap"><h2 class="obhd">What are your favourite styles of movie?</h2></div>
         <p class="ossub">Pick as many as you like.</p><div class="chips" id="obStylesChips"></div>`;
@@ -17345,48 +17659,6 @@ const SHARP_STEPS = {
             renderOnbStep("v2_styles");
           }));
         });
-      }
-    },
-  },
-  // CAS-910 Change 2: budgetCardHTML()'s own control (CONT_DIALS.scale/SCALE_REF/.vslider/scaleReadout),
-  // minus the ALL WINDOWS scope chip and the "budget isn't known yet" switch — both confuse a first-run
-  // user with no mental model of windows yet. Built by hand rather than via reqCardHTML/budgetCardHTML
-  // themselves, since neither takes an option to omit either piece — everything else about the control
-  // (the dial state, the ladder, the readout) is theirs, unchanged.
-  v2_budget: {
-    noAgent: true, noSkip: true,
-    progress: 47,
-    body(){
-      onbFlow.answersV2 = onbFlow.answersV2 || onbAnswersV2Load();
-      onbFlow.scaleVal = onbFlow.answersV2.selScale || 0;
-      const cont=CONT_DIALS.scale, v=cont.get(), marks=cont.marks(v);
-      const slider=`<div class="vslider">
-          <div class="vtrack"><div class="vfillbar" style="width:${cont.pos(v)}%"></div></div>
-          <div class="vnotches">${marks.map(mk=>`<span class="vnotch ${mk.lit?"lit":""}" style="left:${mk.pos}%"></span>`).join("")}</div>
-          <input type="range" id="onbDial_scale" min="${cont.min}" max="${cont.max}" step="${cont.step}"
-                 value="${cont.rawOf(v)}" aria-label="${escA(cont.aria)}">
-        </div>
-        <div class="vlabels stag">${marks.map((mk,i)=>`<button type="button" class="vsnap ${mk.lit?"on":""} ${i%2?"lo":""}" data-snap="${mk.snap}"
-          style="left:${mk.pos}%;transform:${mk.pos<=0?"translateX(0)":mk.pos>=100?"translateX(-100%)":"translateX(-50%)"}">${esc(mk.label)}${mk.sub?`<small>${esc(mk.sub)}</small>`:""}</button>`).join("")}</div>`;
-      return `<div class="obwrap"><h2 class="obhd">Do you go for big Budget Movies?</h2></div>
-      <div class="osdial reqcard">
-        <div class="osdh"><span class="em">🎬</span><span class="dl">Movie Budget</span></div>
-        <p class="oscap">How big the film is — budget or worldwide gross.</p>
-        <p class="reqval" id="reqBudgetVal">${esc(cont.read(v))}</p>
-        ${slider}
-      </div>`;
-    },
-    wire(){
-      onbFlow.answersV2=onbAnswersV2Load();
-      wireReqCards();
-      const persist=()=>{
-        onbFlow.answersV2.selScale = onbFlow.scaleVal||0;
-        onbAnswersV2Save(onbFlow.answersV2);
-      };
-      const r=$("onbDial_scale");
-      if(r){
-        r.addEventListener("input", persist);
-        r.closest(".osdial").querySelectorAll(".vsnap[data-snap]").forEach(b=>b.addEventListener("click", persist));
       }
     },
   },
@@ -17562,7 +17834,7 @@ const SHARP_STEPS = {
   // Not listed in FLOWS: the cutover (wiring these in, retiring the old sequence) is CAS-911.
   v2_massive: {
     noAgent: true, noSkip: true,
-    progress: 27,
+    progress: 33,
     body(){
       const c=buildOnbAgentsV2(onbFlow.answersV2).find(a=>a.template==="onb_massive");
       return c ? onbAgentRevealHTML(c, 1, "Your first agent",
@@ -17732,11 +18004,11 @@ let onbStepKey=null;
 // (v2_cinema itself is the only lane-flavoured question now). The old briefing1/briefing2/together/
 // services/working/report sequence is retired below along with the v1-only helpers it alone called.
 const FLOWS = {
-  cinema: ["v2_about","v2_intro","v2_cinema","v2_rent","v2_massive","v2_handoff",
-           "v2_styles","v2_budget","v2_ages","v2_favs",
+  cinema: ["v2_about","v2_intro","v2_cinema","v2_cinema_ages","v2_rent","v2_massive","v2_handoff",
+           "v2_styles","v2_ages","v2_favs",
            "v2_partner","v2_date","v2_kids","v2_family","v2_services","v2_done"],
-  stream: ["v2_about","v2_intro","v2_cinema","v2_rent","v2_massive","v2_handoff",
-           "v2_styles","v2_budget","v2_ages","v2_favs",
+  stream: ["v2_about","v2_intro","v2_cinema","v2_cinema_ages","v2_rent","v2_massive","v2_handoff",
+           "v2_styles","v2_ages","v2_favs",
            "v2_partner","v2_date","v2_kids","v2_family","v2_services","v2_done"],
 };
 const flowList    = () => FLOWS[flowKind] || FLOWS.cinema;
@@ -17911,6 +18183,7 @@ function briefOpen(id, from){
   // axis) has to read and, on Save, re-write the SAME global answer every other agent carries, or a save
   // would freeze this one agent's status back onto whatever it happened to open with.
   onbFlow.watch = JSON.parse(JSON.stringify(watchPrefs));
+  onbFlow.briefAdvancedOpen = false;   // CAS-1267: Advanced is always collapsed on open
   $("onbStep").classList.add("open"); lockBodyScroll(true);
   logEvent("briefing_opened",{id});
   gotoStep("briefing","none");
@@ -17918,7 +18191,19 @@ function briefOpen(id, from){
 // CAS-343: every Briefing row — including "Streaming services" — opens the same SHARP_STEPS spoke the
 // linear onboarding flow uses, so behaviour and styling always match. It used to divert to the older
 // standalone Preferences modal, which had drifted out of sync (no alphabetised chips, no lead/"more" rows).
-window.briefGo=step=>{ logEvent("briefing_row",{step}); gotoStep(step,"fwd"); };
+window.briefGo=step=>{
+  logEvent("briefing_row",{step});
+  // CAS-1269: the Style screen's own view (This agent/Your taste) and selected grid cell start fresh every
+  // time it's opened, not carried over from the last visit — same reset openTasteScreen does for its map.
+  if(step==="genres"){ styleGridView="agent"; styleGridSel=null; }
+  gotoStep(step,"fwd");
+};
+// CAS-1267: Advanced stays open through repaints of the same Briefing visit (renderOnbStep re-runs body()
+// on every control change) but is never persisted — briefOpen resets it on every open.
+window.briefToggleAdvanced=()=>{
+  onbFlow.briefAdvancedOpen = !onbFlow.briefAdvancedOpen;
+  renderOnbStep("briefing");
+};
 // CAS-635 N3a: a tap flips one window's service scope in place — no sub-screen, no navigation, same
 // draft/flags the flow's own onbApply() reads back out on Save.
 window.briefToggleSvc=key=>{

@@ -138,11 +138,14 @@ async function walkOnboarding(page, onFrame){
   await expect(page.locator(".obhd")).toContainText("Let's get you set up.");
   await ctaLocator(page).click();
   await page.waitForTimeout(SLIDE_SETTLE);
-  await expect(page.locator(".obhd")).toContainText("Massive Movies");
+  await expect(page.locator(".obhd")).toContainText("biggest movies");
   await ctaLocator(page).click();
   await page.waitForTimeout(SLIDE_SETTLE);
   await expect(page.locator("#obCinemaOpts")).toBeVisible();
   await page.locator('#obCinemaOpts .obopt[data-val="yes"]').click();
+  await ctaLocator(page).click();
+  await page.waitForTimeout(SLIDE_SETTLE);
+  await expect(page.locator("#obCinemaAgesChips")).toBeVisible();   // v2_cinema_ages (CAS-1270, cinema yes only)
   await ctaLocator(page).click();
   await page.waitForTimeout(SLIDE_SETTLE);
   await expect(page.locator("#obRentOpts")).toBeVisible();
@@ -165,9 +168,9 @@ async function walkOnboarding(page, onFrame){
   await expect(page.locator("#obStylesChips")).toBeVisible();
   await onFrame("onboarding");
 
-  // v2_styles -> v2_budget -> v2_ages -> v2_favs -> v2_partner: four more Continues with nothing to
+  // v2_styles -> v2_ages -> v2_favs -> v2_partner: three more Continues with nothing to
   // answer on any of them (each has its own default/no-op wiring, same as toShortlist's own loop).
-  for(let i = 0; i < 4; i++){
+  for(let i = 0; i < 3; i++){
     await ctaLocator(page).click();
     await page.waitForTimeout(SLIDE_SETTLE);
   }

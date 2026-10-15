@@ -134,6 +134,15 @@ if(typeof window.CascadeAuth === "undefined"){
   // drive the real comparison rather than re-implementing it.
   filmByMovieId: mid => MOVIES.find(x => String(x.tmdb_id) === String(mid)),
   matchesCriteria, countCriteria, watchCount, watchesFilm, matchesTaste, listedBy, listWindowOK,
+  // CAS-1268: pairVerdict is the agent style-combination gate matchesCriteria now applies ahead of its
+  // own exclude/genre checks — exported so a test can assert "out"/"in"/null directly, the same reason
+  // awardsListOK below is exported alongside matchesCriteria rather than only through its combined effect.
+  pairVerdict,
+  // CAS-1269: the Style screen's own grid engine — stylePairKey/styleGridState/pairGridOwn/pairGridEffective
+  // are the per-cell "effective state" rule 7 flags against, and styleGridFlags is that flag list itself —
+  // exported so a test can assert the flag function directly against a taste fixture, the same reason
+  // pairVerdict is exported alongside matchesCriteria above.
+  stylePairKey, styleGridState, pairGridOwn, pairGridEffective, styleGridFlags,
   listedCount, onbShownCount,
   // CAS-780: awardsListOK is listedBy's own extra Awards check (no pre-release exemption, unlike
   // matchesCriteria's) — exported so a test can name it directly as the reason a followed pre-release film
@@ -273,6 +282,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // a real account store or a real catalogue of verdicts. CAS-1254: matchBadgeHTML is the Match badge's own
   // render, exported so a test can assert its certainty class/bars directly.
   tasteProfile, tasteMatch, matchBadgeHTML, publicLozengeHTML, tasteStyleMapData, creditsHTML,
+  // CAS-1269: tasteLeanWords is tasteDetailHTML's own lean-to-words mapping, pulled out so the Style
+  // screen's suggestions panel and cell detail use the exact same wording — exported so a test can assert
+  // it directly.
+  tasteLeanWords,
   // CAS-919: wmQScoreSourcesText is wmQScore's own text, exported so a test can assert the blended
   // cascadeScoreSourcesText's Watchmode half directly.
   wmQScoreSourcesText,
@@ -306,7 +319,7 @@ if(typeof window.CascadeAuth === "undefined"){
   AGENT_WINDOWS, agentWindows, watchToStatuses, listToStatuses, migrateWatch,
   MISSION_DIALS, MISSION_DIALS_USED, missionRest, missionKind, laneCrit,
   axisCountsNow, genreCountsNow,
-  onbApply, onbCount, pickStarter, flowStart, flowStop, FLOWS,
+  onbApply, onbCount, pickStarter, flowStart, flowStop, FLOWS, stepSkipped,
   // CAS-1080: the v2 onboarding answers default and its four-agent generator, plus the shared
   // reveal-time cap they solve against — exported so a test can build a real onboarding roster
   // from a fixed answer set and assert watchCount() against the cap directly.

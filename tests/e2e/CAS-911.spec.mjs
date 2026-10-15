@@ -21,11 +21,11 @@ async function readCascadeNames(page){
   });
 }
 
-/** Splash through v2_ages — cinema Yes, rent Yes, two styles, the Studio budget stop, ages left at
- * default — landing on v2_favs with its own Continue not yet pressed. The style-chip picks check
- * their own "on" state first rather than blindly clicking, so this is safe to call a second time after
- * a reload has carried onbFlow.answersV2 forward (CAS-910's own "survives a reload" behaviour) without
- * toggling an already-picked chip back off. */
+/** Splash through v2_ages — cinema Yes, confirming the default cinema age ratings, rent Yes, two
+ * styles, ages left at default — landing on v2_favs with its own Continue not yet pressed. The
+ * style-chip picks check their own "on" state first rather than blindly clicking, so this is safe
+ * to call a second time after a reload has carried onbFlow.answersV2 forward (CAS-910's own
+ * "survives a reload" behaviour) without toggling an already-picked chip back off. */
 async function walkToFavs(page){
   await page.locator("#splashCta").click();
   // CAS-1018: scoped to #onbStepInner, not a bare ".obhd" — gotoStep's dual-pane slide leaves the
@@ -33,12 +33,16 @@ async function walkToFavs(page){
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");          // v2_intro
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");          // v2_intro (CAS-1270)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
 
   await expect(page.locator("#obCinemaOpts")).toBeVisible();                      // v2_cinema
   await page.locator('#obCinemaOpts .obopt[data-val="yes"]').click();
+  await ctaLocator(page).click();
+  await page.waitForTimeout(120);
+
+  await expect(page.locator("#obCinemaAgesChips")).toBeVisible();                 // v2_cinema_ages (CAS-1270)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
 
@@ -57,11 +61,6 @@ async function walkToFavs(page){
   for(const chip of [styleChips.nth(0), styleChips.nth(1)]){
     if(!(await chip.evaluate(el => el.classList.contains("on")))) await chip.click();
   }
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-
-  await expect(page.locator(".vsnap")).toHaveCount(5);                            // v2_budget
-  await page.locator(".vsnap", { hasText: "Studio" }).click();
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
 
@@ -127,7 +126,7 @@ test("first run, partner Yes + kids Yes: reaches a 4-agent 'set to work' screen 
   await expect(page.locator("#membScreen.open")).toBeVisible();
 
   const names = await readCascadeNames(page);                                    // AC4
-  expect(names).toEqual(["Massive Movies", "Personal Favs", "Date Night", "Family Movies"]);
+  expect(names).toEqual(["In Cinema", "Personal Favs", "Date Night", "Family Movies"]);   // CAS-1270: cinema Yes
   expect(await page.evaluate(() => localStorage.getItem("cascade_onboarded"))).toBe("1");
   expect(errors).toEqual([]);   // no console error at any screen
 });
@@ -156,7 +155,7 @@ test("first run, partner No + kids No: reaches a 2-agent 'set to work' screen, v
 
   await expect(page.locator("#onbStepInner .obhd")).toContainText("2 agents, set to work.");   // AC3
   const names = await readCascadeNames(page);
-  expect(names).toEqual(["Massive Movies", "Personal Favs"]);
+  expect(names).toEqual(["In Cinema", "Personal Favs"]);   // CAS-1270: cinema Yes
 });
 
 test("reloading mid-flow at v2_favs then completing a fresh run leaves exactly 4 agents, not 8 (CAS-911 AC5)", async ({ page }) => {

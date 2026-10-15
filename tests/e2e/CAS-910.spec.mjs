@@ -23,8 +23,8 @@ async function openStep(page, stepKey, answers = {}){
 }
 
 const ALL_STEPS = [
-  "v2_intro", "v2_cinema", "v2_rent", "v2_handoff", "v2_styles",
-  "v2_budget", "v2_ages", "v2_partner", "v2_kids", "v2_services",
+  "v2_intro", "v2_cinema", "v2_cinema_ages", "v2_rent", "v2_handoff", "v2_styles",
+  "v2_ages", "v2_partner", "v2_kids", "v2_services",
 ];
 
 // CAS-1161: openStep()'s own guest-mode routing 404s config.js on every goto (by design — the same
@@ -64,7 +64,7 @@ test("CAS-1047 AC: v2_cinema's Continue is disabled on arrival via the wired flo
   await page.locator("#splashCta").click();
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about
   await page.locator("#onbStepInner #onbStepCta").click();
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");   // v2_intro
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");   // v2_intro (CAS-1270)
   await page.locator("#onbStepInner #onbStepCta").click();   // slides into v2_cinema
   await expect(page.locator("#obCinemaOpts")).toBeVisible();
   await expect(page.locator("#onbStepInner #onbStepCta")).toBeDisabled();
@@ -79,7 +79,7 @@ test("CAS-1047 AC: flowStart() resets a previous person's saved v2 answers for a
   await freshApp(page);
   await page.evaluate(() => {
     onbAnswersV2Save({
-      cinema: "yes", rent: "yes", styles: ["Comedy"], selScale: 15000000, ages: ["M"],
+      cinema: "yes", rent: "yes", styles: ["Comedy"], ages: ["M"],
       partner: "yes", partnerDiff: "no", partnerStyles: [], kids: "yes", kidAges: ["G"], services: ["Netflix"],
     });
   });
@@ -115,25 +115,16 @@ test("CAS-910 AC: v2_partner stays blocked through Yes alone, and clears once th
   await expect(page.locator("#onbStepCta")).toBeEnabled();
 });
 
-test("CAS-910 AC: v2_budget omits the ALL WINDOWS scope chip and the unbudgeted switch, and carries the app's own ladder labels", async ({ page }) => {
-  await openStep(page, "v2_budget");
-  await expect(page.locator(".reqscope")).toHaveCount(0);
-  await expect(page.getByText(/budget isn't known/i)).toHaveCount(0);
-  const snaps = page.locator(".vsnap");
-  await expect(snaps).toHaveCount(5);
-  const labels = await snaps.evaluateAll(els => els.map(el => el.childNodes[0].textContent.trim()));
-  expect(labels).toEqual(["Off", "Indie", "Studio", "Blockbuster", "Mega"]);
-  const subs = await snaps.evaluateAll(els => els.map(el => el.querySelector("small")?.textContent || ""));
-  expect(subs).toEqual(["", "$1M+", "$15M+", "$100M+", "$250M+"]);
-});
-
-test("CAS-910 AC: dragging the budget dial to position 200 reads Studio · $15M+ and writes answersV2.selScale", async ({ page }) => {
-  await openStep(page, "v2_budget");
-  const dial = page.locator("#onbDial_scale");
-  await dial.evaluate(el => { el.value = "200"; el.dispatchEvent(new Event("input", { bubbles: true })); });
-  await expect(page.locator("#reqBudgetVal")).toHaveText("Studio · $15M+");
-  const selScale = await page.evaluate(() => onbFlow.answersV2.selScale);
-  expect(selScale).toBe(15000000);
+test("CAS-1270 AC: v2_cinema_ages blocks Continue once every chip is switched off, and clears once one is back on", async ({ page }) => {
+  await openStep(page, "v2_cinema_ages");
+  const cta = page.locator("#onbStepCta");
+  await expect(cta).toBeEnabled();   // the default ages (today's Massive Movies ladder) start all on
+  const chips = page.locator("#obCinemaAgesChips .chip.gen");
+  const count = await chips.count();
+  for(let i = 0; i < count; i++) await chips.nth(i).click();
+  await expect(cta).toBeDisabled();
+  await chips.first().click();
+  await expect(cta).toBeEnabled();
 });
 
 // CAS-910 Change 4 named a live, chromed step as the one that exercises paintFlowChrome's own stepLbl

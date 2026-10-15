@@ -172,5 +172,7 @@ test("CAS-1255 AC5: the built index.html carries the new style-map note, not the
   assert.ok(!html.includes("Each row is a style, counting every film"));
   // The grid scrolls sideways with the style names held in place.
   assert.equal(html.split(".tscroll{overflow-x:auto;").length - 1, 1);
-  assert.equal(html.split('<div class="tscroll"><div class="tgrid" style="grid-template-columns:92px repeat(').length - 1, 1);
+  // CAS-1269: the Style screen's own grid reuses this exact markup shape for its taste-map layout, so two
+  // screens carry it now, not one — still an exact count, just a wider one.
+  assert.equal(html.split('<div class="tscroll"><div class="tgrid" style="grid-template-columns:92px repeat(').length - 1, 2);
 });

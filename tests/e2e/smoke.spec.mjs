@@ -59,7 +59,7 @@ test("the app loads and onboarding renders", async ({ page }) => {
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");   // v2_intro (CAS-911)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");   // v2_intro (CAS-1270)
 });
 
 // CAS-911: onboarding generates its roster from the v2 sequence's own four-agent generator
@@ -74,7 +74,7 @@ test("onboarding commits a real, de-duplicated agent roster", async ({ page }) =
   expect(roster.length).toBeGreaterThan(0);
   expect(new Set(roster.map(c => c.id)).size).toBe(roster.length);
   expect(roster.every(c => c.sort === "cascade")).toBe(true);
-  expect(roster.map(c => c.name)).toEqual(["Massive Movies", "Personal Favs"]);
+  expect(roster.map(c => c.name)).toEqual(["In Cinema", "Personal Favs"]);   // CAS-1270: cinema Yes
 });
 
 test("recommendations render as a results list with items", async ({ page }) => {
@@ -966,6 +966,9 @@ test("CAS-747 AC5: the Movie Budget card renders the includeUnbudgeted switch, a
     invalidateComputeCaches();
   });
 
+  // CAS-1267: Movie Budget moved into the Advanced section, collapsed by default.
+  await page.locator("#onbAdvancedBtn").click();
+
   const sw = page.locator("#onbIncludeUnbudgeted");
   await expect(sw).toBeVisible();
   await expect(sw).not.toHaveClass(/on/);   // default stays off (item 3 of the ticket)
@@ -1128,7 +1131,7 @@ test("CAS-740 AC4: a signed-in user whose account already holds agents is never 
   expect(await page.evaluate(() => flowOn)).toBe(true);   // genuinely inside the wizard before the race resolves
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");   // v2_intro (CAS-911) — proves the wizard actually opened
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");   // v2_intro (CAS-1270) — proves the wizard actually opened
 
   // Now let the session restore resolve to an account that already holds an agent.
   await page.evaluate(() => window.__cas740ResolveSession());
@@ -1296,18 +1299,21 @@ async function cas913WalkToShortlist(page){
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Massive Movies");            // v2_intro
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");            // v2_intro (CAS-1270)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
   await expect(page.locator("#obCinemaOpts")).toBeVisible();                      // v2_cinema
   await page.locator('#obCinemaOpts .obopt[data-val="yes"]').click();
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
+  await expect(page.locator("#obCinemaAgesChips")).toBeVisible();                 // v2_cinema_ages (CAS-1270)
+  await ctaLocator(page).click();
+  await page.waitForTimeout(120);
   await expect(page.locator("#obRentOpts")).toBeVisible();                        // v2_rent
   await page.locator('#obRentOpts .obopt[data-val="yes"]').click();
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  for(const marker of ["v2_massive", "v2_handoff", "v2_styles", "v2_budget", "v2_ages", "v2_favs"]){
+  for(const marker of ["v2_massive", "v2_handoff", "v2_styles", "v2_ages", "v2_favs"]){
     await ctaLocator(page).click();
     await page.waitForTimeout(120);
   }
@@ -2190,4 +2196,152 @@ test("CAS-1266: the Your taste card icon is a fixed 16-cell grid", async ({ page
   await expect(cells).toHaveCount(16);
   await expect(cells.nth(0)).toHaveCSS("background-color", "rgb(45, 212, 191)");
   await expect(cells.nth(7)).toHaveCSS("background-color", "rgba(240, 136, 58, 0.7)");
+});
+
+// CAS-1267: Edit Agent opens on Basic — Styles, Cascade score and Age rating — with everything else behind
+// a collapsed Advanced section, so the screen a non-technical person opens reads as a handful of settings,
+// not nine at once.
+test("CAS-1267: Edit Agent opens on Basic, Advanced reveals the rest and collapses again on reopen", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await openFirstAgentMission(page);
+
+  // AC1: Basic is visible, Advanced's own controls are not.
+  await expect(page.locator(".osdial.cardbtn", { hasText: "Styles" })).toBeVisible();
+  await expect(page.locator(".msntrackwrap")).toBeVisible();
+  await expect(page.locator("#ageRatingCard")).toBeVisible();
+  const advBtn = page.locator("#onbAdvancedBtn");
+  await expect(advBtn).toContainText("Advanced");
+  await expect(page.locator("#onbAlertsOn")).toBeHidden();
+  await expect(page.locator("#onbCinemaRelease")).toBeHidden();
+  await expect(page.locator(".osdial.cardbtn", { hasText: "Occasions" })).toBeHidden();
+  for(const label of ["Movie Budget", "Awards", "How far back"])
+    await expect(page.locator(".reqcard", { hasText: label })).toBeHidden();
+
+  // AC2: tapping Advanced reveals all six, and the button reads "Hide advanced".
+  await advBtn.click();
+  await expect(advBtn).toContainText("Hide advanced");
+  await expect(page.locator(".osdial.cardbtn", { hasText: "Occasions" })).toBeVisible();
+  await expect(page.locator("#onbAlertsOn")).toBeVisible();
+  await expect(page.locator("#onbCinemaRelease")).toBeVisible();
+  for(const label of ["Movie Budget", "Awards", "How far back"])
+    await expect(page.locator(".reqcard", { hasText: label })).toBeVisible();
+
+  // The first agent (onb_massive) starts with alerts ON (normCascade), so read the state rather than assume it.
+  const alertsWasOn = await page.locator("#onbAlertsOn").evaluate(el => el.classList.contains("on"));
+  await page.locator("#onbAlertsOn").click();
+  await expect(page.locator("#onbAlertsOn")).toHaveAttribute("aria-checked", String(!alertsWasOn));
+
+  // Scoped to #onbStepInner: gotoStep's dual-pane slide leaves the outgoing step's .osback in the DOM too.
+  await expect(page.locator("#onbStepInner .osback")).toBeVisible();
+  await page.locator("#onbStepInner .osback").click();
+  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+
+  await openFirstAgentMission(page);
+  await expect(page.locator("#onbAdvancedBtn")).toContainText("Advanced");
+  await expect(page.locator("#onbAlertsOn")).toBeHidden();
+  await expect(page.locator("#onbAlertsOn")).toHaveAttribute("aria-checked", String(!alertsWasOn));   // the value set before Back was kept
+});
+
+// ---- CAS-1269: the Style screen becomes the taste-map grid ----------------------------------------------
+// Pushes synthetic, single-purpose verdict films into MOVIES and gives them a real verdict via setOpinion()
+// — the same "mutate MOVIES with a real fixture, not a live-catalogue coincidence" technique the CAS-1214
+// synthetic film above and tests/js/cas1251-taste-profile.test.mjs's own scoredFilm already use. `tag`
+// keeps each call's ids distinct from any other fixture pushed in the same test.
+async function pushTasteFixture(page, tag, genres, kind, n){
+  return page.evaluate(({ tag, genres, kind, n }) => {
+    const ids = [];
+    for(let i = 0; i < n; i++){
+      const id = -1269000 - tag * 100 - i;
+      MOVIES.push({ tmdb_id: id, title: `CAS-1269 fixture ${id}`, genres, status: ["included_streaming"] });
+      setOpinion(id, kind);
+      ids.push(id);
+    }
+    return ids;
+  }, { tag, genres, kind, n });
+}
+// Edit Agent -> Styles card, with a known-clean starting point (every style listed, no combinations, no
+// explicit skips) so each test's own fixture is the only thing that can flag.
+async function openStyleGrid(page){
+  await openFirstAgentMission(page);
+  await page.evaluate(() => { onbFlow.draft.genre = []; onbFlow.draft.exclude = []; onbFlow.draft.pairs = {}; });
+  await page.locator(".osdial.cardbtn", { hasText: "Styles" }).click();
+  await expect(page.locator(".tmap")).toBeVisible();
+}
+
+test("CAS-1269 AC1: the Styles card and suggestions panel flag a taste disagreement, and Skip clears it", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await openFirstAgentMission(page);
+  await page.evaluate(() => { onbFlow.draft.genre = []; onbFlow.draft.exclude = []; onbFlow.draft.pairs = {}; });
+  // Only the PAIR may be strong: 6 Wow on each style alone and 5 Never on the pair give each style
+  // lean (9-5)/(11+4) = 0.27 (under the 0.3 bar, so neither style flags) and the pair
+  // lean (-5 + 4*0.27)/(5+4) = -0.44 (strong, and listed via genre:[] above) -> exactly one flag.
+  await pushTasteFixture(page, 11, ["Science Fiction"], "wow", 6);
+  await pushTasteFixture(page, 12, ["Animation"], "wow", 6);
+  await pushTasteFixture(page, 1, ["Science Fiction", "Animation"], "notfor", 5);
+  await page.evaluate(() => renderOnbStep("briefing"));
+
+  await expect(page.locator(".osdial.cardbtn", { hasText: "Styles" }))
+    .toContainText("! 1 of these settings disagree with your taste");
+
+  await page.locator(".osdial.cardbtn", { hasText: "Styles" }).click();
+  await expect(page.locator(".tsugg")).toContainText("! 1 of this agent's settings disagree with your taste");
+  await expect(page.locator(".tsuggrow")).toContainText("Animation + Science Fiction: listed");
+
+  await page.locator(".tsuggbtn").click();
+  expect(await page.evaluate(() => onbFlow.draft.pairs["Animation|Science Fiction"])).toBe("-");
+  await expect(page.locator(".tsugg")).toHaveCount(0);
+});
+
+test("CAS-1269 AC2: Skip on a style writes exclude, Neither clears both, and Back keeps it", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await openStyleGrid(page);
+
+  await page.locator('.tgrid .tcell.allc[aria-label="Action"]').click();
+  await page.locator(".tdetail button", { hasText: "− Skip" }).click();
+  expect(await page.evaluate(() => onbFlow.draft.exclude)).toContain("Action");
+  expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBe("-");
+
+  await page.locator(".tdetail button", { hasText: "Neither" }).click();
+  expect(await page.evaluate(() => (onbFlow.draft.exclude || []).includes("Action"))).toBe(false);
+  expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBeNull();
+
+  const agentId = await page.evaluate(() => onbFlow.draft.id);
+  await expect(page.locator("#onbStepInner .osback")).toBeVisible();
+  await page.locator("#onbStepInner .osback").click();   // Style -> Briefing
+  await expect(page.locator(".osdial.cardbtn", { hasText: "Styles" })).toBeVisible();
+  await expect(page.locator("#onbStepInner .osback")).toBeVisible();
+  await page.locator("#onbStepInner .osback").click();   // Briefing -> commits and closes
+  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+  const saved = await page.evaluate(id => cascades.find(c => c.id === id), agentId);
+  expect(saved.exclude || []).not.toContain("Action");
+  // commitDraft() copies draft.genre/exclude verbatim (no transform), so the saved reading must match the
+  // draft reading just above — still null. styleGridSetStyle never re-adds a style to the include set on
+  // Neither (dEffectiveGenreSet nets out the current exclude set on purpose, so one style's Neither can
+  // never silently resurrect another's "+" the way a raw genre-array edit could — see its own comment).
+  expect(await page.evaluate(id => styleGridState(cascades.find(c => c.id === id), "Action"), agentId)).toBeNull();
+});
+
+test("CAS-1269 AC3: the Your taste switch recolours the grid with tasteColor()", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await openFirstAgentMission(page);
+  await page.evaluate(() => { onbFlow.draft.genre = []; onbFlow.draft.exclude = []; onbFlow.draft.pairs = {}; });
+  await pushTasteFixture(page, 2, ["Action"], "wow", 3);
+  await page.evaluate(() => renderOnbStep("briefing"));
+  await page.locator(".osdial.cardbtn", { hasText: "Styles" }).click();
+
+  await page.locator(".mfseg button", { hasText: "Your taste" }).click();
+  const actionCell = page.locator('.tgrid .tcell.allc[aria-label="Action"]');
+  await expect(actionCell).toBeVisible();
+  const bg = await actionCell.evaluate(el => el.style.background);
+  const expected = await page.evaluate(() => tasteColor(tasteProfile().styles.Action));
+  // The browser re-serialises inline colours with spaces after the commas; compare without whitespace.
+  expect(bg.replace(/\s+/g, "")).toBe(expected.replace(/\s+/g, ""));
 });

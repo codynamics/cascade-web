@@ -19,12 +19,13 @@ async function buildOnboardedAccount(page){
 // correct; only this helper's own query was too broad to say "on the Agents screen" as its title claims.
 const agentRow = (page, name) => page.locator("#agentsScreen .agrow", { has: page.locator(".agname", { hasText: name }) });
 
-test("CAS-1198 AC6: the Agents screen shows Alerts on for Massive Movies, and not for Personal Favs", async ({ page }) => {
+test("CAS-1198 AC6: the Agents screen shows Alerts on for the first-built agent, and not for Personal Favs", async ({ page }) => {
   await buildOnboardedAccount(page);
   await openAgentsScreenFromNav(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
 
-  await expect(agentRow(page, "Massive Movies").locator(".agwho")).toContainText("🔔 Alerts on");
+  // CAS-1270: cinema Yes (toShortlist's "cinema" kind) renames the onb_massive template "In Cinema".
+  await expect(agentRow(page, "In Cinema").locator(".agwho")).toContainText("🔔 Alerts on");
 
   const favsWho = agentRow(page, "Personal Favs").locator(".agwho");
   // The who-line is only drawn at all when it has something to say (CAS-826) — either no .agwho element
