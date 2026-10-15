@@ -61,8 +61,12 @@ function withTasteFixture(assignments, fn){
 }
 
 test("CAS-1264 AC1: sortMoviesBy(\"you\") ranks higher You first, no-You last, ties by cascade score", () => {
-  // Action/Comedy combination judged films give a candidate sharing them a You of exactly 80; Drama/Crime
-  // gives exactly 40 (see the ticket's worked arithmetic in the commit this test ships with).
+  // Action/Comedy combination judged films give a candidate sharing them a You of exactly 60; Drama/Crime
+  // gives exactly 50 (see the ticket's worked arithmetic in the commit this test ships with).
+  // CAS-1265: c80 avg = 0.8*83 + 0.2*(200/3) = 79.7333; wSum=1,films=1 -> evidence = 50+(79.7333-50)/4 =
+  // 57.4333; boost = 15*ln(2)/ln(31) = 3.0277 -> round(60.4611) = 60.
+  // c40 avg = 0.8*34 + 0.2*(125/2) = 39.7; wSum=1,films=1 -> evidence = 50+(39.7-50)/4 = 47.425;
+  // boost = 3.0277 -> round(50.4527) = 50.
   const j1 = scoredFilm(["Action","Comedy"], 80);
   const j2 = scoredFilm(["Action","Horror"], 80);
   const j3 = scoredFilm(["Action","Thriller"], 80);
@@ -76,8 +80,8 @@ test("CAS-1264 AC1: sortMoviesBy(\"you\") ranks higher You first, no-You last, t
     const c80 = scoredFilm(["Action","Comedy"], 70);
     const c40 = scoredFilm(["Drama","Crime"], 65);
     const cNull = scoredFilm(["Documentary"], 60);
-    assert.equal(E.tasteMatch(c80).value, 80);
-    assert.equal(E.tasteMatch(c40).value, 40);
+    assert.equal(E.tasteMatch(c80).value, 60);
+    assert.equal(E.tasteMatch(c40).value, 50);
     assert.equal(E.tasteMatch(cNull), null);
 
     const order = [cNull, c40, c80].sort((a, b) => E.sortMoviesBy(a, b, "you"));

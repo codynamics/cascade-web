@@ -83,12 +83,20 @@ test("CAS-1254 AC2: tasteProfile and tasteMatch stay honest against the 60-verdi
     assert.equal(round4(T.styles.Action.lean), 0.9091);
 
     // CAS-1260: You counts only films sharing the combination; Cascade score plays no part.
+    // CAS-1265: combo===main===the plain verdict average here (single-style fixtures), so
+    // value = round(evidence + boost) where evidence = 50 + (avg-50)*wSum/(wSum+3), boost =
+    // 15*min(1, ln(1+films)/ln(31)).
+    // Animation: avg=17, wSum=2 -> evidence=50+(17-50)*2/5=36.8; boost=15*ln(3)/ln(31)=4.7988 -> 42
+    // War: avg=83, wSum=3 -> evidence=50+(83-50)*3/6=66.5; boost=15*ln(4)/ln(31)=6.0555 -> 73
+    // Horror: avg=83, wSum=7 -> evidence=50+(83-50)*7/10=73.1; boost=15*ln(8)/ln(31)=9.0832 -> 82
+    // Drama: avg=83, wSum=8 -> evidence=50+(83-50)*8/11=74.0; boost=15*ln(9)/ln(31)=9.5977 -> 84
+    // Action: avg=83, wSum=40 -> evidence=50+(83-50)*40/43=80.6977; boost=15 (ln(41)>ln(31), capped) -> 96
     const cases = [
-      [["Animation"], [17, 0.4, 2]],
-      [["War"], [83, 0.5, 3]],
-      [["Horror"], [83, 0.7, 7]],
-      [["Drama"], [83, 0.7273, 8]],
-      [["Action"], [83, 0.9302, 40]],
+      [["Animation"], [42, 0.4, 2]],
+      [["War"], [73, 0.5, 3]],
+      [["Horror"], [82, 0.7, 7]],
+      [["Drama"], [84, 0.7273, 8]],
+      [["Action"], [96, 0.9302, 40]],
     ];
     cases.forEach(([genres, expected]) => {
       const m = E.tasteMatch(scoredFilm(genres, 80));
@@ -103,9 +111,10 @@ test("CAS-1254 AC2: tasteProfile and tasteMatch stay honest against the 60-verdi
 test("CAS-1263 AC1: the You lozenge — green at 50 and over, orange below, white number, three fill steps from confidence, no opacity", () => {
   withTasteFixture(ac2Assignments(), () => {
     // conf: Action 0.9302 -> c3; War 0.5 -> c2; Animation 0.4 -> c1.
+    // CAS-1265: Action value recomputed above (cases) is 96.
     const sure = E.matchBadgeHTML(scoredFilm(["Action"], 80));
     assert.match(sure, /^<span class="qyou for c3" title=/);
-    assert.ok(sure.includes("<b>83</b><small>You</small>"));
+    assert.ok(sure.includes("<b>96</b><small>You</small>"));
     assert.ok(!sure.includes("opacity"));
     assert.match(E.matchBadgeHTML(scoredFilm(["War"], 80)), /^<span class="qyou for c2" /);
     const against = E.matchBadgeHTML(scoredFilm(["Animation"], 80));
@@ -119,6 +128,47 @@ test("CAS-1261 AC2: the Public lozenge carries the Cascade score in its tier col
   assert.ok(E.publicLozengeHTML(scoredFilm(["Action"], 90), "intitle").startsWith('<span class="qpub hi intitle"'));
   assert.ok(E.publicLozengeHTML(scoredFilm(["Action"], 75), "inrow").startsWith('<span class="qpub mid inrow"'));
   assert.ok(E.publicLozengeHTML(scoredFilm(["Action"], 60)).includes("<b>60</b><small>Public</small>"));
+});
+
+// CAS-1265: formula-C anchors, independently computed (see comment above each value). Judged films'
+// genres exactly equal the candidate's ["Drama","Music"], so every overlap is 1 and main === combo,
+// isolating the evidence-discount + watched-style-boost terms the ticket adds.
+function anchorAssignments(kind, count){
+  const a = [];
+  for(let i = 0; i < count; i++) a.push([scoredFilm(["Drama","Music"], 70), kind]);
+  return a;
+}
+test("CAS-YOUC anchors: evidence discount + watched-style boost", () => {
+  // avg = MATCH_VERDICT_SCORE.wow = 100, wSum = 1
+  // evidence = 50 + (100-50)*1/4 = 62.5; boost = 15*ln(2)/ln(31) = 3.0286 -> round(65.5286) = 66
+  withTasteFixture(anchorAssignments("wow", 1), () => {
+    const m = E.tasteMatch(scoredFilm(["Drama","Music"], 70));
+    assert.deepEqual([m.value, m.films], [66, 1]);
+  });
+  // avg = MATCH_VERDICT_SCORE.liked = 91, wSum = 30
+  // evidence = 50 + (91-50)*30/33 = 87.2727; boost = 15*min(1, ln(31)/ln(31)) = 15 -> round(102.2727), clipped to 99
+  withTasteFixture(anchorAssignments("liked", 30), () => {
+    const m = E.tasteMatch(scoredFilm(["Drama","Music"], 70));
+    assert.deepEqual([m.value, m.films], [99, 30]);
+  });
+  // avg = MATCH_VERDICT_SCORE.notfor = 17, wSum = 10
+  // evidence = 50 + (17-50)*10/13 = 24.6154; boost = 15*ln(11)/ln(31) = 10.4718 -> round(35.0872) = 35
+  withTasteFixture(anchorAssignments("notfor", 10), () => {
+    const m = E.tasteMatch(scoredFilm(["Drama","Music"], 70));
+    assert.deepEqual([m.value, m.films], [35, 10]);
+  });
+  // avg = MATCH_VERDICT_SCORE.enjoyed = 83, wSum = 1
+  // evidence = 50 + (83-50)*1/4 = 58.25; boost = 15*ln(2)/ln(31) = 3.0286 -> round(61.2786) = 61
+  withTasteFixture(anchorAssignments("enjoyed", 1), () => {
+    const m = E.tasteMatch(scoredFilm(["Drama","Music"], 70));
+    assert.deepEqual([m.value, m.films], [61, 1]);
+  });
+  // avg = MATCH_VERDICT_SCORE.liked = 91, wSum = 4
+  // evidence = 50 + (91-50)*4/7 = 73.4286; boost = 15*ln(5)/ln(31) = 7.0329 -> round(80.4615) = 80
+  withTasteFixture(anchorAssignments("liked", 4), () => {
+    const m = E.tasteMatch(scoredFilm(["Drama","Music"], 70));
+    assert.deepEqual([m.value, m.films], [80, 4]);
+  });
 });
 
 test("CAS-1254 AC4: the built index.html carries the wider certainty steps, after the old rules", () => {
