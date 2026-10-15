@@ -2176,3 +2176,18 @@ test("CAS-1063 AC2: the saving indicator never moves the listing, before, during
   await page.waitForFunction(() => !document.getElementById("savingDot").classList.contains("show"));
   expect((await groups.boundingBox()).y).toBe(topBefore);   // drained
 });
+
+// CAS-1266: the Your taste card's icon is a fixed picture (TASTE_ICON_PATTERN/TASTE_ICON_FILL), not drawn
+// live from the account's own data, so this checks the fixed grid rendered, not any particular account's taste.
+test("CAS-1266: the Your taste card icon is a fixed 16-cell grid", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  await openAgentsScreenFromNav(page);
+  await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
+  const cells = page.locator(".tastecard .tcmini i");
+  await expect(cells).toHaveCount(16);
+  await expect(cells.nth(0)).toHaveCSS("background-color", "rgb(45, 212, 191)");
+  await expect(cells.nth(7)).toHaveCSS("background-color", "rgba(240, 136, 58, 0.7)");
+});
