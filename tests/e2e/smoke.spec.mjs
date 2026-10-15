@@ -2320,7 +2320,11 @@ test("CAS-1269 AC2: Skip on a style writes exclude, Neither clears both, and Bac
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
   const saved = await page.evaluate(id => cascades.find(c => c.id === id), agentId);
   expect(saved.exclude || []).not.toContain("Action");
-  expect(await page.evaluate(id => styleGridState(cascades.find(c => c.id === id), "Action"), agentId)).toBe("+");
+  // commitDraft() copies draft.genre/exclude verbatim (no transform), so the saved reading must match the
+  // draft reading just above — still null. styleGridSetStyle never re-adds a style to the include set on
+  // Neither (dEffectiveGenreSet nets out the current exclude set on purpose, so one style's Neither can
+  // never silently resurrect another's "+" the way a raw genre-array edit could — see its own comment).
+  expect(await page.evaluate(id => styleGridState(cascades.find(c => c.id === id), "Action"), agentId)).toBeNull();
 });
 
 test("CAS-1269 AC3: the Your taste switch recolours the grid with tasteColor()", async ({ page }) => {
