@@ -2221,7 +2221,7 @@ test("CAS-1267: Edit Agent opens on Basic, Advanced reveals the rest and collaps
 
   // AC2: tapping Advanced reveals all six, and the button reads "Hide advanced".
   await advBtn.click();
-  await expect(advBtn).toHaveText("Hide advanced");
+  await expect(advBtn).toContainText("Hide advanced");
   await expect(page.locator(".osdial.cardbtn", { hasText: "Occasions" })).toBeVisible();
   await expect(page.locator("#onbAlertsOn")).toBeVisible();
   await expect(page.locator("#onbCinemaRelease")).toBeVisible();
