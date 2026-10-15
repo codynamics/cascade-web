@@ -124,12 +124,19 @@ test("CAS-1255 AC3: every judged style gets its own row and pairing, no cap", ()
 
 test("CAS-1260 AC6: You for unjudged films against the every-style fixture", () => {
   withTasteFixture(ac3Assignments(), () => {
+    // CAS-1265: value = round(evidence + boost), evidence = 50 + (avg-50)*wSum/(wSum+3), boost =
+    // 15*min(1, ln(1+films)/ln(31)). avg = 17 or 83 in every case here (combo === main, as before).
     const cases = [
-      [["Animation","Family","Comedy","Adventure"], [17, 0.4, 2]],
-      [["Western"], [83, 0.25, 1]],
-      [["Action","Thriller"], [83, 0.6667, 6]],
-      [["Drama","Crime","History"], [83, 0.5714, 4]],
-      [["Thriller","Comedy","Action"], [83, 0.5714, 6]],
+      // avg=17, wSum=2 -> evidence=50+(17-50)*2/5=36.8; boost=15*ln(3)/ln(31)=4.7988 -> 42
+      [["Animation","Family","Comedy","Adventure"], [42, 0.4, 2]],
+      // avg=83, wSum=1 -> evidence=50+(83-50)/4=58.25; boost=15*ln(2)/ln(31)=3.0277 -> 61
+      [["Western"], [61, 0.25, 1]],
+      // avg=83, wSum=6 -> evidence=50+(83-50)*6/9=72; boost=15*ln(7)/ln(31)=8.4999 -> 80
+      [["Action","Thriller"], [80, 0.6667, 6]],
+      // avg=83, wSum=4 -> evidence=50+(83-50)*4/7=68.8571; boost=15*ln(5)/ln(31)=7.0302 -> 76
+      [["Drama","Crime","History"], [76, 0.5714, 4]],
+      // avg=83, wSum=4 (6 films @ overlap 2/3) -> same evidence=68.8571; boost=15*ln(7)/ln(31)=8.4999 (films=6) -> 77
+      [["Thriller","Comedy","Action"], [77, 0.5714, 6]],
     ];
     cases.forEach(([genres, expected]) => {
       const t = E.tasteMatch(scoredFilm(genres, 80));

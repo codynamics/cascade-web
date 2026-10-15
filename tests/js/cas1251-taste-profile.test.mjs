@@ -110,14 +110,20 @@ test("CAS-1260 AC1: You (tasteMatch) against the AC1 fixture — 80% combination
   withTasteFixture(ac1Assignments(), () => {
     const v = genres => { const t = E.tasteMatch(scoredFilm(genres, 70)); return t ? [t.value, round4(t.conf), t.films] : null; };
     // Two Action+Thriller films share two styles (overlap 2/3 each): (100 + 83) / 2 = 91.5. Headline Action
-    // films (Wow, Enjoyed, So-so) average 72.3. 0.8 x 91.5 + 0.2 x 72.3 = 87.7.
-    assert.deepEqual(v(["Action","Thriller","Crime"]), [88, 0.3077, 2]);
-    // One style only: every judged film carrying it is a combination film (Never 17, Disliked 17).
-    assert.deepEqual(v(["Horror"]), [17, 0.3333, 2]);
-    // Horror+Thriller (Disliked) is the only combination film: 17; headline Thriller films 100, 83, 17 average 66.7.
-    assert.deepEqual(v(["Thriller","Horror"]), [27, 0.25, 1]);
-    // One judged film is enough.
-    assert.deepEqual(v(["Comedy"]), [34, 0.1429, 1]);
+    // films (Wow, Enjoyed, So-so) average 72.3. 0.8 x 91.5 + 0.2 x 72.3 = 87.6667.
+    // CAS-1265: wSum = 4/3; evidence = 50 + (87.6667-50)*(4/3)/(4/3+3) = 61.5897;
+    // boost = 15*ln(3)/ln(31) = 4.7988 -> round(66.3885) = 66.
+    assert.deepEqual(v(["Action","Thriller","Crime"]), [66, 0.3077, 2]);
+    // One style only: every judged film carrying it is a combination film (Never 17, Disliked 17): avg = 17.
+    // CAS-1265: wSum = 1.5; evidence = 50 + (17-50)*1.5/4.5 = 39; boost = 15*ln(3)/ln(31) = 4.7988 -> round(43.7988) = 44.
+    assert.deepEqual(v(["Horror"]), [44, 0.3333, 2]);
+    // Horror+Thriller (Disliked) is the only combination film: 17; headline Thriller films 100, 83, 17 average
+    // 66.6667; avg = 0.8*17 + 0.2*66.6667 = 26.9333. CAS-1265: wSum = 1; evidence = 50 + (26.9333-50)/4 = 44.2333;
+    // boost = 15*ln(2)/ln(31) = 3.0277 -> round(47.2611) = 47.
+    assert.deepEqual(v(["Thriller","Horror"]), [47, 0.25, 1]);
+    // One judged film is enough: avg = 34. CAS-1265: wSum = 0.5; evidence = 50 + (34-50)*0.5/3.5 = 47.7143;
+    // boost = 15*ln(2)/ln(31) = 3.0277 -> round(50.742) = 51.
+    assert.deepEqual(v(["Comedy"]), [51, 0.1429, 1]);
     // No judged film shares the combination: no You at all.
     assert.equal(E.tasteMatch(scoredFilm(["Western"], 70)), null);
   });
@@ -135,8 +141,9 @@ test("CAS-1251 AC3: the learned range is the 15th-85th percentile of positively-
 
 test("CAS-1260 AC2: You ignores the Cascade score — the same film at 40 and at 95 gets the same You", () => {
   withTasteFixture(ac1Assignments(), () => {
-    assert.equal(E.tasteMatch(scoredFilm(["Action","Thriller","Crime"], 40)).value, 88);
-    assert.equal(E.tasteMatch(scoredFilm(["Action","Thriller","Crime"], 95)).value, 88);
+    // CAS-1265: same 66 as the AC1 "Action,Thriller,Crime" case above — the Cascade score plays no part.
+    assert.equal(E.tasteMatch(scoredFilm(["Action","Thriller","Crime"], 40)).value, 66);
+    assert.equal(E.tasteMatch(scoredFilm(["Action","Thriller","Crime"], 95)).value, 66);
   });
 });
 
@@ -146,7 +153,9 @@ test("CAS-1260 AC3: You needs one combination film, not a count of verdicts over
   const one = [scoredFilm(["Action"], 70)];
   withTasteFixture(one.map(m => [m, "enjoyed"]), () => {
     const t = E.tasteMatch(probe);
-    assert.deepEqual([t.value, round4(t.conf), t.films], [83, 0.25, 1]);
+    // CAS-1265: avg = 83, wSum = 1 -> evidence = 50 + (83-50)/4 = 58.25; boost = 15*ln(2)/ln(31) = 3.0277
+    // -> round(61.2777) = 61.
+    assert.deepEqual([t.value, round4(t.conf), t.films], [61, 0.25, 1]);
   });
 });
 

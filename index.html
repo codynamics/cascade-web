@@ -11148,9 +11148,10 @@ function tasteProfile(){
 // "combination films" are the judged films that share at least two of this film's styles (one, if the
 // film has only one style), each weighted by overlap = shared styles / all styles of the two films.
 // You = 80% the overlap-weighted average of the combination films + 20% the plain average of every judged
-// film carrying this film's headline (first) style (the combination average alone if there is none).
-// Nothing is pulled towards 50 while evidence builds; the Cascade score plays no part. null when no
-// combination film exists. conf = overlap sum / (overlap sum + 3): one exact-match film 0.25, three 0.5.
+// film carrying this film's headline (first) style (the combination average alone if there is none), then
+// (CAS-1265) pulled towards a neutral 50 by how thin the evidence is and boosted by how many films the
+// person has judged in this style combination (saturates at 30 films, +15 max). null when no combination
+// film exists. conf = overlap sum / (overlap sum + 3): one exact-match film 0.25, three 0.5.
 const MATCH_VERDICT_SCORE = {wow:100, liked:91, enjoyed:83, soso:34, disliked:17, notfor:17};
 function tasteMatch(m){
   if(!(m.genres && m.genres.length)) return null;
@@ -11169,7 +11170,10 @@ function tasteMatch(m){
   });
   if(!films) return null;
   const combo = sSum / wSum, main = hN ? hSum / hN : combo;
-  const value = Math.max(1, Math.min(99, Math.round(0.8 * combo + 0.2 * main)));
+  const avg = 0.8 * combo + 0.2 * main;
+  const evidence = 50 + (avg - 50) * wSum / (wSum + 3);
+  const boost = 15 * Math.min(1, Math.log(1 + films) / Math.log(31));
+  const value = Math.max(1, Math.min(99, Math.round(evidence + boost)));
   return {value, conf: wSum / (wSum + 3), films};
 }
 // CAS-1264: sortMoviesBy("you") memoizes tasteMatch per film so sorting a whole list doesn't redo the
