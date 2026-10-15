@@ -138,6 +138,11 @@ if(typeof window.CascadeAuth === "undefined"){
   // own exclude/genre checks — exported so a test can assert "out"/"in"/null directly, the same reason
   // awardsListOK below is exported alongside matchesCriteria rather than only through its combined effect.
   pairVerdict,
+  // CAS-1269: the Style screen's own grid engine — stylePairKey/styleGridState/pairGridOwn/pairGridEffective
+  // are the per-cell "effective state" rule 7 flags against, and styleGridFlags is that flag list itself —
+  // exported so a test can assert the flag function directly against a taste fixture, the same reason
+  // pairVerdict is exported alongside matchesCriteria above.
+  stylePairKey, styleGridState, pairGridOwn, pairGridEffective, styleGridFlags,
   listedCount, onbShownCount,
   // CAS-780: awardsListOK is listedBy's own extra Awards check (no pre-release exemption, unlike
   // matchesCriteria's) — exported so a test can name it directly as the reason a followed pre-release film
@@ -277,6 +282,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // a real account store or a real catalogue of verdicts. CAS-1254: matchBadgeHTML is the Match badge's own
   // render, exported so a test can assert its certainty class/bars directly.
   tasteProfile, tasteMatch, matchBadgeHTML, publicLozengeHTML, tasteStyleMapData, creditsHTML,
+  // CAS-1269: tasteLeanWords is tasteDetailHTML's own lean-to-words mapping, pulled out so the Style
+  // screen's suggestions panel and cell detail use the exact same wording — exported so a test can assert
+  // it directly.
+  tasteLeanWords,
   // CAS-919: wmQScoreSourcesText is wmQScore's own text, exported so a test can assert the blended
   // cascadeScoreSourcesText's Watchmode half directly.
   wmQScoreSourcesText,

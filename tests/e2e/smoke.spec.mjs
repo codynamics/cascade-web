@@ -2236,3 +2236,95 @@ test("CAS-1267: Edit Agent opens on Basic, Advanced reveals the rest and collaps
   await expect(page.locator("#onbAlertsOn")).toBeHidden();
   await expect(page.locator("#onbAlertsOn")).toHaveClass(/on/);   // the value set before Back was kept
 });
+
+// ---- CAS-1269: the Style screen becomes the taste-map grid ----------------------------------------------
+// Pushes synthetic, single-purpose verdict films into MOVIES and gives them a real verdict via setOpinion()
+// — the same "mutate MOVIES with a real fixture, not a live-catalogue coincidence" technique the CAS-1214
+// synthetic film above and tests/js/cas1251-taste-profile.test.mjs's own scoredFilm already use. `tag`
+// keeps each call's ids distinct from any other fixture pushed in the same test.
+async function pushTasteFixture(page, tag, genres, kind, n){
+  return page.evaluate(({ tag, genres, kind, n }) => {
+    const ids = [];
+    for(let i = 0; i < n; i++){
+      const id = -1269000 - tag * 100 - i;
+      MOVIES.push({ tmdb_id: id, title: `CAS-1269 fixture ${id}`, genres, status: ["included_streaming"] });
+      setOpinion(id, kind);
+      ids.push(id);
+    }
+    return ids;
+  }, { tag, genres, kind, n });
+}
+// Edit Agent -> Styles card, with a known-clean starting point (every style listed, no combinations, no
+// explicit skips) so each test's own fixture is the only thing that can flag.
+async function openStyleGrid(page){
+  await openFirstAgentMission(page);
+  await page.evaluate(() => { onbFlow.draft.genre = []; onbFlow.draft.exclude = []; onbFlow.draft.pairs = {}; });
+  await page.locator(".osdial.cardbtn", { hasText: "Styles" }).click();
+  await expect(page.locator(".tmap")).toBeVisible();
+}
+
+test("CAS-1269 AC1: the Styles card and suggestions panel flag a taste disagreement, and Skip clears it", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await openFirstAgentMission(page);
+  await page.evaluate(() => { onbFlow.draft.genre = []; onbFlow.draft.exclude = []; onbFlow.draft.pairs = {}; });
+  // Science Fiction + Animation strongly negative (3 Never) on an agent that (genre:[], above) lists every
+  // style, Science Fiction included.
+  await pushTasteFixture(page, 1, ["Science Fiction", "Animation"], "notfor", 3);
+  await page.evaluate(() => renderOnbStep("briefing"));
+
+  await expect(page.locator(".osdial.cardbtn", { hasText: "Styles" }))
+    .toContainText("! 1 of these settings disagree with your taste");
+
+  await page.locator(".osdial.cardbtn", { hasText: "Styles" }).click();
+  await expect(page.locator(".tsugg")).toContainText("! 1 of this agent's settings disagree with your taste");
+  await expect(page.locator(".tsuggrow")).toContainText("Animation + Science Fiction: listed");
+
+  await page.locator(".tsuggbtn").click();
+  expect(await page.evaluate(() => onbFlow.draft.pairs["Animation|Science Fiction"])).toBe("-");
+  await expect(page.locator(".tsugg")).toHaveCount(0);
+});
+
+test("CAS-1269 AC2: Skip on a style writes exclude, Neither clears both, and Back keeps it", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await openStyleGrid(page);
+
+  await page.locator('.tgrid .tcell.allc[aria-label="Action"]').click();
+  await page.locator(".tdetail button", { hasText: "− Skip" }).click();
+  expect(await page.evaluate(() => onbFlow.draft.exclude)).toContain("Action");
+  expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBe("-");
+
+  await page.locator(".tdetail button", { hasText: "Neither" }).click();
+  expect(await page.evaluate(() => (onbFlow.draft.exclude || []).includes("Action"))).toBe(false);
+  expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBeNull();
+
+  const agentId = await page.evaluate(() => onbFlow.draft.id);
+  await page.locator("#onbStep .osback").click();   // Style -> Briefing
+  await expect(page.locator(".osdial.cardbtn", { hasText: "Styles" })).toBeVisible();
+  await page.locator("#onbStep .osback").click();   // Briefing -> commits and closes
+  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+  const saved = await page.evaluate(id => cascades.find(c => c.id === id), agentId);
+  expect(saved.exclude || []).not.toContain("Action");
+  expect(await page.evaluate(id => styleGridState(cascades.find(c => c.id === id), "Action"), agentId)).toBe("+");
+});
+
+test("CAS-1269 AC3: the Your taste switch recolours the grid with tasteColor()", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await openFirstAgentMission(page);
+  await page.evaluate(() => { onbFlow.draft.genre = []; onbFlow.draft.exclude = []; onbFlow.draft.pairs = {}; });
+  await pushTasteFixture(page, 2, ["Action"], "wow", 3);
+  await page.evaluate(() => renderOnbStep("briefing"));
+  await page.locator(".osdial.cardbtn", { hasText: "Styles" }).click();
+
+  await page.locator(".mfseg button", { hasText: "Your taste" }).click();
+  const actionCell = page.locator('.tgrid .tcell.allc[aria-label="Action"]');
+  await expect(actionCell).toBeVisible();
+  const bg = await actionCell.evaluate(el => el.style.background);
+  const expected = await page.evaluate(() => tasteColor(tasteProfile().styles.Action));
+  expect(bg).toBe(expected);
+});
