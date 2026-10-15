@@ -3988,7 +3988,8 @@
       <option value="cinema">Release date</option>
       <option value="availability">Availability</option>
       <option value="imdb">People rating</option>
-      <option value="cascade">Cascade score</option>
+      <option value="you">You score</option>
+      <option value="cascade">Public score</option>
       <option value="rt">Critics</option>
       <option value="gross">Box office</option>
       <option value="popularity">Most anticipated</option>
@@ -6426,6 +6427,15 @@ function showFoundList(){ settleFoundView(); }
 // own onchange below, cleared wherever filt.sort is assigned from a stored cascade (applyCascade) — never
 // persisted, so a reload starts false same as filt.sort itself starts at DEFAULT_SORT.
 let sortPicked=false;
+// CAS-1264: You only means anything for a signed-in account — everywhere the Watch listing's effective
+// sort key gets resolved (not just where it's picked) has to treat a signed-out "you" exactly as
+// "cascade", so signing out while sorted by You silently lands back on the Public order instead of a key
+// nothing downstream can honour. window.CascadePersistence.accountActive(), not accountActive() by name,
+// for the same reason PICKER_KINDS.sort.items() above the account-sync IIFE can't call it directly either.
+function effectiveSortKey(key){
+  if(key!=="you") return key;
+  return (window.CascadePersistence && window.CascadePersistence.accountActive()) ? key : "cascade";
+}
 // CAS-1240: the switch's own effective key — mirrors listingGroups' own tabDflt/isUserSort derivation
 // exactly (the Cinema tab's default is "availability", every other tab's is DEFAULT_SORT), so the switch
 // can never claim an order the list isn't actually rendered in. Reading raw filt.sort here (the pre-fix
@@ -6433,7 +6443,7 @@ let sortPicked=false;
 // date order.
 function watchSortActiveKey(){
   const tabDflt = watchTab==="in_cinema" ? "availability" : DEFAULT_SORT;
-  return sortPicked ? filt.sort : tabDflt;
+  return effectiveSortKey(sortPicked ? filt.sort : tabDflt);
 }
 // CAS-1181: PICKER_KINDS.sort's pick() is what changes filt.sort now (the popover replaced the invisible
 // <select>); this just repaints the icon button around it — a tooltip naming the current order, and the
@@ -6445,7 +6455,7 @@ function syncSortCtl(){
   // agents there is no such card, so it sits detached (not in the document) until one exists again, and
   // every $() lookup inside it (sort/sortDot are its own children) would otherwise return null.
   if(!sortCtl.isConnected) return;
-  const opt=$("sort").querySelector(`option[value="${filt.sort}"]`);
+  const opt=$("sort").querySelector(`option[value="${effectiveSortKey(filt.sort)}"]`);
   $("sortCtl").title="Order: "+(opt?opt.textContent:"");
   $("sortDot").hidden=!sortPicked;   // CAS-819: dot reflects an explicit pick, not just "off DEFAULT_SORT"
 }
@@ -6772,6 +6782,19 @@ function publicLozengeHTML(m, extraClass=""){
 }
 function sortMoviesBy(a,b,key){
   switch(key){
+    case "you": {
+      // CAS-1264: tasteMatch(m) walks every judged film, so calling it on every comparison (O(n log n)
+      // calls across one sort) redoes the same walk for the same film many times over. _tasteMatchCache
+      // memoizes it per film, cleared at exactly the points tasteProfile() itself goes stale (see
+      // _tasteProfileCache's own comment above tasteProfile()) so a cached value never outlives the
+      // profile it was computed from.
+      const ta=tasteMatchCached(a), tb=tasteMatchCached(b);
+      const va=ta?ta.value:null, vb=tb?tb.value:null;
+      if(va==null && vb==null) return sortMoviesBy(a,b,"cascade");
+      if(va==null) return 1;
+      if(vb==null) return -1;
+      return va!==vb ? vb-va : sortMoviesBy(a,b,"cascade");
+    }
     case "cascade": {
       // CAS-702: the Cascade score sort has to read the same score the card shows (qScoreHTML uses
       // cascadeScore) — wmQScore alone is -1 for every pre-release film, which made this sort a no-op on
@@ -6799,7 +6822,9 @@ function sortMoviesBy(a,b,key){
 // CAS-699: "cascade" joined this set too. It used to be noise here for the same reason IMDb/RT/gross still
 // are — an unreleased film carried none of the sources wmQScore reads. CAS-695 gave every pre-release film a
 // real cinema Cascade score (from buzz, CAS-722), so ranking Upcoming by it is meaningful now, not noise.
-const PRE_RELEASE_SORTS=new Set(["availability","title","cinema","cascade"]);
+// CAS-1264: You joins this set too — tasteMatch(m) only needs genres, same as every other pre-release
+// field it reads, so it's meaningful before a film has any released-world numbers.
+const PRE_RELEASE_SORTS=new Set(["availability","title","cinema","cascade","you"]);
 // CAS-148: the default is the availability timeline, and it ranks every group the same way, Upcoming
 // included. CAS-107's rating order is still there as an explicit choice: rated first, highest first, unrated
 // last, with byRatingDesc falling back to anticipation for the unrated so a group keeps a meaningful order
@@ -9413,6 +9438,7 @@ function advanceClock(){
   rederiveStatuses();
   agMetricsCache.clear();   // CAS-867: "last find Nd ago" and the recent-find count move with the clock alone
   _tasteProfileCache = null;   // CAS-1251: the learned score range reads cascadeScore(m), which moves with the clock too
+  _tasteMatchCache.clear();    // CAS-1264: a stale per-film You value would otherwise outlive this invalidation
   return true;
 }
 async function pollCatalogue(){
@@ -9907,7 +9933,11 @@ const PICKER_KINDS = {
   // popover for the retired Your Movies screen; .ordpop below is that ticket's own leftover CSS, reused
   // rather than duplicated). SORT_OPTS mirrors the hidden #sort select's own option order exactly.
   sort: {
-    items: () => SORT_OPTS,
+    // CAS-1264: You score only means anything for a signed-in account (tasteMatch reads their own
+    // verdicts) — the window.CascadeAuth-backed guard rather than accountActive() by name, same reason
+    // filmPageIsMember() above the account-sync IIFE can't call it directly either.
+    items: () => (window.CascadePersistence && window.CascadePersistence.accountActive())
+      ? SORT_OPTS : SORT_OPTS.filter(o=>o.key!=="you"),
     current: () => filt.sort,
     // CAS-1240: any explicit tap/pick is a genuine pick, full stop. CAS-819's original rule compared the
     // chosen key against DEFAULT_SORT instead, which silently dropped the pick whenever someone chose
@@ -9921,7 +9951,8 @@ const SORT_OPTS = [
   {key:"cinema",         label:"Release date"},
   {key:"availability", label:"Availability"},
   {key:"imdb",          label:"People rating"},
-  {key:"cascade",       label:"Cascade score"},
+  {key:"you",            label:"You score"},
+  {key:"cascade",       label:"Public score"},
   {key:"rt",             label:"Critics"},
   {key:"gross",          label:"Box office"},
   {key:"popularity",    label:"Most anticipated"},
@@ -11133,6 +11164,16 @@ function tasteMatch(m){
   const value = Math.max(1, Math.min(99, Math.round(0.8 * combo + 0.2 * main)));
   return {value, conf: wSum / (wSum + 3), films};
 }
+// CAS-1264: sortMoviesBy("you") memoizes tasteMatch per film so sorting a whole list doesn't redo the
+// same judged-film walk once per comparison — cleared at the exact same points _tasteProfileCache is
+// (the two are never stale relative to each other, since tasteMatch always reads the same tasteProfile()).
+let _tasteMatchCache = new Map();
+function tasteMatchCached(m){
+  if(_tasteMatchCache.has(m.tmdb_id)) return _tasteMatchCache.get(m.tmdb_id);
+  const t = tasteMatch(m);
+  _tasteMatchCache.set(m.tmdb_id, t);
+  return t;
+}
 
 // ---- Your taste: the page and its card on the Agents screen (CAS-1252) ---------------------------------
 // Draws tasteProfile() (CAS-1251); stores and writes nothing. tasteSelPrimary/tasteSelOther is the style
@@ -11993,7 +12034,7 @@ window.showScaleInfer=id=>{ const m=MOVIES.find(x=>x.tmdb_id===id); if(m) toast(
 // one that just booted. CAS-748 reuses this same hook for _wmReleasedScoreVals rather than adding a second,
 // separate clearing mechanism. CAS-867: agMetricsCache (declared further down, with agentMetrics) reuses it
 // too — a catalogue swap can change which films an agent lists without touching that agent's own signature.
-function invalidateComputeCaches(){ _scaleInferCache.clear(); _awardRankCache.clear(); _wmReleasedScoreVals = null; agMetricsCache.clear(); _tasteProfileCache = null; }
+function invalidateComputeCaches(){ _scaleInferCache.clear(); _awardRankCache.clear(); _wmReleasedScoreVals = null; agMetricsCache.clear(); _tasteProfileCache = null; _tasteMatchCache.clear(); }
 // ---- Buzz (CAS-145, ladder replaced by CAS-678) --------------------------------
 // How much a film is being talked about right now, off the TMDB popularity figure the pipeline already
 function matchesCriteria(m,c,ignoreBlocked,ignoreScoreGate){
@@ -20535,7 +20576,7 @@ function listingGroups(rows, ac){
   // defaults to (Rental/Streaming keep DEFAULT_SORT, unchanged) — a user's own explicit pick (isUserSort)
   // still overrides either, exactly as it always has.
   const tabDflt = watchTab==="in_cinema" ? "availability" : DEFAULT_SORT;
-  const sortKey = isUserSort ? filt.sort : tabDflt;
+  const sortKey = effectiveSortKey(isUserSort ? filt.sort : tabDflt);
   return orderFor(watchTab)      // CAS-750/CAS-754: order is the tab's own, not the agent's
     .map(g=>{
       const cmp=sortForKey(g, sortKey, ac && ac.kind==="cinema", isUserSort);
@@ -21247,6 +21288,7 @@ function maybeRequestReview(){
 window.setOpinion=(id,kind)=>{
   agMetricsCache.clear();   // CAS-867: this flips taggedOut(id) for every agent that lists this film
   _tasteProfileCache = null;   // CAS-1251: the verdict just changed, so the counted set has too
+  _tasteMatchCache.clear();    // CAS-1264: same reason — a changed verdict can move any film's You value
   const was=opinionOf(id), on=was!==kind, wasFound=found.has(id);
   // Read the film's freshness BEFORE the answer changes it, so the 🆕 chip on the stub doesn't flicker off
   // under the tap. (The ORDER can't move at all now — availability section, then date, see byTimeline.)
@@ -21360,7 +21402,7 @@ function sanitiseShared(o){
     // tentpole value on a stored agent (the field itself is untouched, just no longer read) — keep the same
     // key set inline so an old link still degrades to a valid value rather than an unrecognised string.
     tentpole:["any","anticipated","blockbuster","bigbudget","landmark"].includes(o.tentpole) ? o.tentpole : "any",
-    sort:["cascade","imdb","rt","gross","popularity","cinema","title"].includes(o.sort) ? o.sort : "cascade",
+    sort:["cascade","imdb","rt","gross","popularity","cinema","title","you"].includes(o.sort) ? o.sort : "cascade",
     includeUnrated:!!o.includeUnrated, includeUnbudgeted:!!o.includeUnbudgeted,
     // Per-window scope survives the trip. `!!o.myServices` would have coerced the object to `true` and
     // normCascade would then switch ALL THREE windows on — a link scoped to Stream arriving scoped to
@@ -22150,6 +22192,7 @@ function acctFetchKeepalive(init){
     Object.keys(notify).forEach(id=>delete notify[id]);
     agMetricsCache.clear();   // CAS-867: a cleared verdict set can flip taggedOut() too
     _tasteProfileCache = null;   // CAS-1251: same reason — a signed-out device has no verdicts to count
+    _tasteMatchCache.clear();    // CAS-1264: same reason — nothing left to cache a You value from
     // Every other in-memory domain a signed-in session could have populated, back to its fresh-device
     // default — the wipe above already means re-reading each of these from localStorage would land on the
     // same default anyway, but resetting directly avoids re-parsing keys that no longer exist.
@@ -22375,6 +22418,7 @@ function acctFetchKeepalive(init){
     });
     agMetricsCache.clear();   // CAS-867: a synced verdict can flip taggedOut() same as a local one can
     _tasteProfileCache = null;   // CAS-1251: a synced verdict changes the counted set same as a local one can
+    _tasteMatchCache.clear();    // CAS-1264: same reason — a synced verdict can move any film's You value too
     recomputeFound();
     // CAS-1236: skip the repaint (not the merge above) when this is byte-identical to the last rows this
     // device applied for this table — a reconcile pull that changed nothing must draw nothing.
