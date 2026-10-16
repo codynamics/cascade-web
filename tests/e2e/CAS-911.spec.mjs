@@ -56,10 +56,12 @@ async function walkToFavs(page){
   await ctaLocator(page).click();   // v2_handoff — intro, nothing to answer
   await page.waitForTimeout(120);
 
-  const styleChips = page.locator("#obStylesChips .chip.gen");                    // v2_styles
-  await expect(styleChips.first()).toBeVisible();
-  for(const chip of [styleChips.nth(0), styleChips.nth(1)]){
-    if(!(await chip.evaluate(el => el.classList.contains("on")))) await chip.click();
+  // CAS-1275: chips replaced by the name+square list shared with Edit Agent — "on" now reads off the
+  // square's own "+" glyph rather than a chip's "on" class.
+  const styleSquares = page.locator("#onbStepInner .sllist .tcell.slsq");         // v2_styles
+  await expect(styleSquares.first()).toBeVisible();
+  for(const sq of [styleSquares.nth(0), styleSquares.nth(1)]){
+    if((await sq.evaluate(el => el.textContent)) !== "+") await sq.click();
   }
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
