@@ -10186,7 +10186,7 @@ function applyMoodToState(mood){
   WATCH_LEVEL_KEYS.forEach(tab=>{
     watchPickedBy[tab]=mood.pickedBy||"all";
     watchWatchedSel[tab]=new Set(mood.watched||[]);
-    watchGenreOff[tab]=new Set(mood.stylesOff||[]);
+    watchGenreOff[tab]=new Set();   // CAS-1273: moods no longer filter by style; mood.stylesOff is ignored
     watchBadgeSel[tab]=new Set(mood.badges||[]);
     watchMineOnly[tab]=mood.mineOnly!==false;
     watchSearch[tab]=""; watchSearchRaw[tab]="";
@@ -10256,6 +10256,9 @@ window.toggleMoodDraftTop = () => { if(!moodDraft) return; moodDraft.top=!moodDr
 window.toggleMoodDraftMineOnly = () => { if(!moodDraft) return; moodDraft.mineOnly=!moodDraft.mineOnly; renderMoodSheetBody(); };
 window.setMoodDraftPickedBy = key => { if(!moodDraft) return; moodDraft.pickedBy=key; renderMoodSheetBody(); };
 window.toggleMoodDraftWatched = key => { if(!moodDraft) return; moodDraft.watched.has(key)?moodDraft.watched.delete(key):moodDraft.watched.add(key); renderMoodSheetBody(); };
+// CAS-1273: the mood sheet's Styles section is gone (Lee: two layers of style settings were too
+// confusing), so nothing calls these three any more. Left in place rather than deleted — Lee is
+// reviewing mood styles later and stylesOff itself still lives on the stored mood shape.
 window.toggleMoodDraftGenre = g => { if(!moodDraft) return; moodDraft.stylesOff.has(g)?moodDraft.stylesOff.delete(g):moodDraft.stylesOff.add(g); renderMoodSheetBody(); };
 window.selectAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.stylesOff.clear(); renderMoodSheetBody(); };
 window.clearAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.stylesOff=new Set(watchSheetGenres[watchTab]||[]); renderMoodSheetBody(); };
@@ -10281,7 +10284,7 @@ window.saveMoodFromSheet = () => {
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
     name, order:d.order, top:!!d.top,
     agentsOff:[...d.agentsOff], mineOnly:!!d.mineOnly, pickedBy:d.pickedBy,
-    watched:[...d.watched], stylesOff:[...d.stylesOff], badges:[...d.badges],
+    watched:[...d.watched], stylesOff:[], badges:[...d.badges],   // CAS-1273: styles no longer saved from the mood sheet
     alsoShow: d.alsoShow ? {premium:[...(d.alsoShow.premium||[])], rent:[...(d.alsoShow.rent||[])], stream:[...(d.alsoShow.stream||[])]} : null,
   };
   const idx=watchMoods.findIndex(m=>m.id===mood.id);
@@ -10403,11 +10406,6 @@ function renderMoodSheetBody(){
     return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
       onclick="setMoodDraftPickedBy('${o.key}')">${esc(o.label)}</button>`;
   }).join("");
-  const stylesHTML=genres.length ? genres.map(g=>{
-    const on=!d.stylesOff.has(g);
-    return `<button type="button" class="chip gen${on?" on":""}" aria-pressed="${on}"
-      onclick="toggleMoodDraftGenre('${escA(g)}')">${esc(g)}</button>`;
-  }).join("") : `<p class="unone">No styles in this tab yet.</p>`;
   const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
   const alsoShowSet = watchTab==="in_cinema" ? new Set() : new Set((d.alsoShow && d.alsoShow[watchTab]) || WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
   const alsoShowPool = watchTab==="in_cinema" ? [] : watchAlsoShowPool();
@@ -10469,15 +10467,6 @@ function renderMoodSheetBody(){
     <div class="wsheetsec">
       <div class="wsheethd"><span>Watched</span></div>
       <div class="chips">${watchedHTML}</div>
-    </div>
-    <div class="wsheetsec">
-      <div class="wsheethd"><span>Styles</span>
-        <span class="wsheetlinks">
-          <button type="button" class="linkbtn" onclick="selectAllMoodDraftStyles()">Select all</button>
-          <button type="button" class="linkbtn" onclick="clearAllMoodDraftStyles()">Clear all</button>
-        </span>
-      </div>
-      <div class="chips">${stylesHTML}</div>
     </div>
     ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Also show</span></div>
