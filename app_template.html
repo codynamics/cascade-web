@@ -3073,6 +3073,9 @@
   .agslbl{flex:0 0 74px;box-sizing:border-box;font-size:10px;text-transform:uppercase;
     letter-spacing:.5px;font-weight:700;color:var(--faint)}
   .agsval{flex:1;min-width:0}
+  /* CAS-1274: the small outlined tag marking a settings row as coming from Advanced, rather than Basic. */
+  .agtag{display:inline-block;margin-left:6px;padding:1px 5px;border-radius:5px;border:1px solid var(--line);
+    font-size:8.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--faint);vertical-align:middle}
   .agdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 1px 0 0}
   /* Still used by watchlistRowHTML (Manage Lists, CAS-591) — the Agents row below stopped using it (CAS-643)
      but this is not a dead selector. */
@@ -3651,6 +3654,17 @@
   .tcell.flag{box-shadow:0 0 0 2px #ffd27a}
   .tcell.flag::after{content:"!";position:absolute;top:-5px;right:-5px;width:13px;height:13px;border-radius:50%;
     background:#ffd27a;color:#2b1503;font:800 9px/13px var(--font-body);text-align:center}
+  /* CAS-1274: the Styles list card — one row per style, a 120px name column next to the same 26px square
+     the grid's first column uses (.tcell, reused here with a fixed size instead of a grid-column width). */
+  .sllist{display:flex;flex-direction:column;gap:5px;margin-top:9px}
+  .slrow{display:flex;align-items:center;gap:10px}
+  .slname{width:120px;flex:none;font:600 13px/1.3 var(--font-body);color:var(--ink);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .slname.faint{color:var(--faint);font-weight:500}
+  .tcell.slsq{width:26px;height:26px;flex:none;aspect-ratio:auto}
+  .slhint{font:500 11.5px/1.4 var(--font-body);color:var(--faint);margin:8px 0 0}
+  .sllink{color:#ffd27a;text-decoration:underline;cursor:pointer}
+  .slmore{margin-top:11px}
   .tlegend{display:flex;align-items:center;gap:7px;margin-top:10px;font:600 10.5px/1 var(--font-body);color:var(--faint)}
   .tlegend .ramp{display:flex;gap:2px}
   .tlegend .ramp i{width:14px;height:9px;border-radius:2px}
@@ -15161,7 +15175,7 @@ const onbFlow = {draft:null, name:ONB_DEFAULT_NAME, defaultName:ONB_DEFAULT_NAME
                  watch:{},                                 // CAS-160 viewing windows: {lane: [optKey,…]}
                  answers:null,                             // CAS-626: the briefing screens' own roster answers
                  workingAgents:null, reportStats:null,     // CAS-629: S5's committed roster, S6/S7's shared N/M/K
-                 briefAdvancedOpen:false};                 // CAS-1267: Edit Agent's Advanced section, reset by briefOpen
+                 briefTab:"basic"};                        // CAS-1274: Edit Agent's Basic|Advanced switch, reset by briefOpen
 
 // ---- Agent settings: the windows this agent's TYPE has (CAS-160, rebuilt by CAS-228) --------------------
 // CAS-160 made availability the user's choice rather than a property of the preset. It modelled that as three
@@ -16438,26 +16452,57 @@ function yearsCardHTML(){
 // still taps straight through to the same genres spoke the old door opened.
 // CAS-936: Age rating's chips are no longer a preview of a door — the door is gone, and tapping a chip here
 // toggles that rating for this agent directly. See ageRatingCardHTML/ageChipToggle below.
-function stylesCardHTML(){
+// CAS-1274: the Styles card's purple chips are replaced by a name+square list, one row per style (A–Z),
+// shared verbatim by onboarding's own styles step (CAS-1275). In Basic the square is live — a tap toggles
+// that style listed/not-listed; in Advanced it's read-only and a More button opens the full grid instead,
+// which is the only place pairs (and the taste-vs-grid comparison) are set.
+function stylesListRowHTML(g, flagKeys, interactive){
+  const state=styleGridState(dT(),g);
+  const flagged=flagKeys.has(`s:${g}`);
+  const bg = state==="+" ? "#138c7d" : state==="-" ? "#b65a1c" : "rgba(255,255,255,.045)";
+  const glyph = state==="+" ? "+" : state==="-" ? "−" : "";
+  const label = state==="+" ? "listed" : state==="-" ? "skipped" : "not listed";
+  const sqClass=`tcell slsq${flagged?" flag":""}`;
+  const sq = interactive
+    ? `<button type="button" class="${sqClass}" style="background:${bg}" aria-label="${escA(g)}: ${label}"
+         onclick="stylesListTap('${escA(g)}')">${glyph}</button>`
+    : `<span class="${sqClass}" style="background:${bg}" aria-label="${escA(g)}: ${label}">${glyph}</span>`;
+  return `<div class="slrow"><span class="slname${state==="+"?"":" faint"}">${esc(g)}</span>${sq}</div>`;
+}
+function stylesListCardHTML(advanced){
   const g=dT().genre, excl=dExcludeSet();
   const included = g===null ? [] : ONB_GENRES.filter(x=>dGenreSet().has(x) && !excl.has(x));
-  const valueText = g===null ? "No styles selected"
-    : included.length===ONB_GENRES.length ? `All ${ONB_GENRES.length} styles`
-    : !included.length ? "No styles match"
-    : `${included.length} of ${ONB_GENRES.length} styles`;
+  const valueText = included.length===ONB_GENRES.length
+    ? `All ${ONB_GENRES.length} styles` : `${included.length} of ${ONB_GENRES.length} styles`;
   // CAS-1269 rule 9: a combination set on the grid, and a taste disagreement, are both things this card
   // has to say up front — the whole reason the grid has its own suggestions panel is that you shouldn't
   // have to open it to learn a setting fights your own verdicts.
   const pairCount = Object.keys(dT().pairs||{}).length;
   const comboSuffix = pairCount ? ` · ${pairCount} combination${pairCount===1?"":"s"} set` : "";
-  const flagCount = styleGridFlags(onbApply()).length;
-  const chips = included.map(x=>`<span class="chip gen on">${esc(x)}</span>`).join("");
-  return `<button type="button" class="osdial cardbtn" onclick="briefGo('genres')">
+  const flags = styleGridFlags(onbApply());
+  const flagKeys = new Set(flags.map(f=>f.kind==="style" ? `s:${f.a}` : `p:${stylePairKey(f.a,f.b)}`));
+  const rows = [...ONB_GENRES].sort((a,b)=>a.localeCompare(b))
+    .map(x=>stylesListRowHTML(x, flagKeys, !advanced)).join("");
+  return `<div class="osdial" id="stylesListCard">
     <span class="osdh"><span class="em">🎭</span><span class="dl">Styles</span></span>
     <p class="reqval">${esc(valueText)}${esc(comboSuffix)}</p>
-    ${flagCount ? `<p class="reqval" style="color:#ffd27a;font-weight:600;font-size:12px">! ${flagCount} of these settings disagree with your taste</p>` : ""}
-    <div class="chips">${chips || `<span class="eaempty">Nothing qualifies — pick at least one</span>`}</div>
-    <span class="dc">›</span></button>`;
+    ${flags.length ? `<p class="reqval" style="color:#ffd27a;font-weight:600;font-size:12px">! ${flags.length} suggested updates from your taste${!advanced ? ` <a href="#" class="sllink" onclick="briefSetTab('advanced');return false">Review</a>` : ""}</p>` : ""}
+    <div class="sllist">${rows}</div>
+    ${(!advanced && pairCount) ? `<p class="slhint">${pairCount} combination${pairCount===1?"":"s"} set — see Advanced</p>` : ""}
+    ${advanced ? `<button type="button" class="osadv slmore" onclick="briefGo('genres')"><span class="osadvtitle">More — combinations of two styles, and how your taste compares ›</span></button>` : ""}
+  </div>`;
+}
+window.stylesListTap = g => {
+  styleGridSetStyle(g, styleGridState(dT(),g)==="+" ? null : "+");
+  renderOnbStep("briefing");
+};
+// CAS-1274: the "Had a cinema release" switch — its own id/wiring is unchanged from CAS-1267
+// (wireCinemaReleaseToggle), only its markup moved so it can render inside SET IN ADVANCED on Basic too.
+function cinemaReleaseSwitchHTML(){
+  return `<div class="switch mini" id="onbCinemaRelease" role="switch">
+    <span>🎬 Had a cinema release
+      <small style="color:var(--faint)">— an AU cinema (not limited) release, at any point</small></span>
+    <span class="knob"></span></div>`;
 }
 function ageRatingChipsHTML(){
   return AGE_LEVELS.map((a,k)=>`<button type="button" class="chip gen${dAgeOn(k)?" on":""}"
@@ -17147,28 +17192,36 @@ const SHARP_STEPS = {
       const d=onbFlow.draft||{};
       // CAS-447: the same "N new" count the deck card carries, read off the SAME live draft this screen's
       // own doors edit (onbApply()) — an unsaved agent (no draft yet) simply has nothing to count.
-      const nNew = onbFlow.draft ? newlyAddedCount(onbApply()) : 0;
+      const c = onbFlow.draft ? onbApply() : {};
+      const nNew = onbFlow.draft ? newlyAddedCount(c) : 0;
       // The name row is gone — CAS-531 #1 moved it into the page header (see renderOnbStep's key==="briefing"
       // branch), so a rename opens the identical "name" spoke this row used to.
-      // CAS-1267: Basic is Styles, Cascade score and Age rating — what Lee judges a commercial product's
-      // settings screen should open on. Everything else (Occasions, Alerts, Budget, Awards, How far back,
-      // cinema release) moves into a collapsed Advanced section, rendered but `hidden` so wire() still binds
-      // every control whichever state the section is in.
-      const advOpen = !!onbFlow.briefAdvancedOpen;
+      // CAS-1274: one Basic|Advanced switch replaces CAS-1267's single collapsible Advanced section. Basic
+      // is Styles, Cascade score and Age rating, plus — only when set — the subset of Advanced settings
+      // agentAdvancedSet() says are in play ("SET IN ADVANCED"). Advanced is everything.
+      const advanced = onbFlow.briefTab==="advanced";
+      const adv = agentAdvancedSet(c);
+      const anySet = adv.budget || adv.awards || adv.years || adv.cinema;
+      const tabsHTML = `<div class="mfseg" role="group" aria-label="Basic or Advanced">
+        <button type="button" id="briefTabBasic" aria-pressed="${!advanced}" class="${!advanced?"on":""}"
+          onclick="briefSetTab('basic')">Basic</button>
+        <button type="button" id="briefTabAdvanced" aria-pressed="${advanced}" class="${advanced?"on":""}"
+          onclick="briefSetTab('advanced')">Advanced</button>
+      </div>`;
       return `<p class="ossub">Reconfigure this agent here.${nNew ? ` <b>${nNew}</b> newly added film${nNew===1?"":"s"} in its list right now.` : ""}</p>
+        ${tabsHTML}
         <div class="usec">WHAT IT LOOKS FOR</div>
-        ${stylesCardHTML()}
+        ${stylesListCardHTML(advanced)}
         ${msnScoreCardHTML()}
         <div class="usec">REQUIREMENTS — EVERY FILM MUST CLEAR ALL OF THESE</div>
         ${ageRatingCardHTML()}
-        <button type="button" class="osadv" id="onbAdvancedBtn" aria-expanded="${advOpen}" onclick="briefToggleAdvanced()">
-          <span class="osadvtitle">${advOpen ? "Hide advanced" : "Advanced"}</span>
-          ${advOpen ? "" : `<span class="osadvsub">Alerts, occasions, budget, awards, how far back, cinema release</span>`}
-          <span class="osadvchev">${advOpen ? "⌄" : "›"}</span>
-        </button>
-        <div id="onbAdvancedSection"${advOpen ? "" : " hidden"}>
+        ${(!advanced && anySet) ? `<div class="usec">SET IN ADVANCED</div>
+          ${adv.budget ? budgetCardHTML() : ""}
+          ${adv.awards ? awardsCardHTML() : ""}
+          ${adv.years ? yearsCardHTML() : ""}
+          ${adv.cinema ? cinemaReleaseSwitchHTML() : ""}` : ""}
+        ${advanced ? `<div class="usec">ADVANCED</div>
           ${occasionsCardHTML()}
-          <div class="usec">ALERTS</div>
           <div class="switch mini" id="onbAlertsOn" role="switch">
             <span>🔔 Alert me about this agent's films
               <small style="color:var(--faint)">— by email, in the app and on your phone</small></span>
@@ -17176,11 +17229,7 @@ const SHARP_STEPS = {
           ${budgetCardHTML()}
           ${awardsCardHTML()}
           ${yearsCardHTML()}
-          <div class="switch mini" id="onbCinemaRelease" role="switch">
-            <span>🎬 Had a cinema release
-              <small style="color:var(--faint)">— an AU cinema (not limited) release, at any point</small></span>
-            <span class="knob"></span></div>
-        </div>
+          ${cinemaReleaseSwitchHTML()}` : ""}
         <!-- CAS-642 W2b: the service-status scope (CAS-635 N3a) spoke moved off this screen — it is a
              statement about a WATCH LIST, not about what this agent is allowed to find. briefToggleSvc stays
              defined: onboarding's own S3/S4 sequence (CAS-628/629) still routes a new agent's draft through
@@ -18172,7 +18221,7 @@ function briefOpen(id, from){
   // axis) has to read and, on Save, re-write the SAME global answer every other agent carries, or a save
   // would freeze this one agent's status back onto whatever it happened to open with.
   onbFlow.watch = JSON.parse(JSON.stringify(watchPrefs));
-  onbFlow.briefAdvancedOpen = false;   // CAS-1267: Advanced is always collapsed on open
+  onbFlow.briefTab = "basic";   // CAS-1274: always opens on Basic
   $("onbStep").classList.add("open"); lockBodyScroll(true);
   logEvent("briefing_opened",{id});
   gotoStep("briefing","none");
@@ -18187,10 +18236,11 @@ window.briefGo=step=>{
   if(step==="genres"){ styleGridView="agent"; styleGridSel=null; }
   gotoStep(step,"fwd");
 };
-// CAS-1267: Advanced stays open through repaints of the same Briefing visit (renderOnbStep re-runs body()
-// on every control change) but is never persisted — briefOpen resets it on every open.
-window.briefToggleAdvanced=()=>{
-  onbFlow.briefAdvancedOpen = !onbFlow.briefAdvancedOpen;
+// CAS-1274: the Basic|Advanced switch replacing CAS-1267's collapsible Advanced section. The chosen tab
+// stays through repaints of the same Briefing visit (renderOnbStep re-runs body() on every control change)
+// but is never persisted — briefOpen resets it to Basic on every open.
+window.briefSetTab=tab=>{
+  onbFlow.briefTab = tab;
   renderOnbStep("briefing");
 };
 // CAS-635 N3a: a tap flips one window's service scope in place — no sub-screen, no navigation, same
@@ -18389,6 +18439,32 @@ function agentAudienceSum(c){
     : (c.yearsBack ? `released in the last ${c.yearsBack} year${c.yearsBack===1?"":"s"}` : "any year");
   return `${ageText}, ${eraText}`;
 }
+// CAS-1274: the age-rating half of agentAudienceSum's sentence, restated as its own Agents-card row
+// ("Age rating") now that Audience is retired. agentAudienceSum itself is untouched — the onboarding
+// reveal (onbAgentRevealHTML) still reads it for its own AUDIENCE row.
+function agentAgeRatingSum(c){
+  return c.age===null ? "No ratings admitted"
+    : (!c.age.length || c.age.length>=AGE_LEVELS.length) ? "Any age"
+    : joinAnd(c.age);
+}
+// CAS-1274: the era half of agentAudienceSum's sentence, restated as the Agents card's "Released" row —
+// only ever shown when agentAdvancedSet(c).years is true, so it never has to cover the "any year" case.
+function agentReleasedSum(c){
+  return (c.year||[]).length
+    ? `In ${joinAnd(c.year.slice().sort().reverse())}`
+    : `In the last ${c.yearsBack} year${c.yearsBack===1?"":"s"}`;
+}
+// CAS-1274: one rule for what counts as "set" in Advanced, shared by the Agents card (the ADVANCED-tagged
+// rows) and Edit Agent's Basic view ("SET IN ADVANCED"). Occasions and Alerts are not part of this —
+// Alerts already shows on the card's who-line.
+function agentAdvancedSet(c){
+  return {
+    budget: !!((c.selScale||0)>0 || (c.budget||0)>0),
+    awards: !!((c.selAwards||0)>0),
+    years:  !!((c.year||[]).length || (c.yearsBack||0)>0),
+    cinema: !!c.cinemaReleaseOnly,
+  };
+}
 
 // CAS-643: who-line labels, keyed on c.who. "kids" is a normCascade-valid value no recipe emits
 // today, but a label is kept for it so a hand-set value never prints "undefined".
@@ -18486,6 +18562,27 @@ function agentMetricsHTML(c){
   const rowB=[last, recentLine].map(s=>`<span class="agmstat">${s}</span>`).join("");
   return `<span class="agmrow a">${rowA}</span><span class="agmrow b">${rowB}</span>`;
 }
+// CAS-1274: the Agents card's settings grid — Styles, Score, Age rating, then one row per Advanced setting
+// agentAdvancedSet(c) says is in play (Budget, Awards, Released, Cinema, in that order), each tagged
+// ADVANCED. Budget/Awards rows reading "Any" never render, since they're gated on being "set" already.
+// Audience is retired — its age half moved to Age rating, its era half to Released.
+function agentSettingsRowsHTML(c){
+  const pairCount=Object.keys(c.pairs||{}).length;
+  const stylesVal=agentStylesSum(c) + (pairCount ? ` · ${pairCount} combination${pairCount===1?"":"s"}` : "");
+  const adv=agentAdvancedSet(c);
+  const advRows=[
+    adv.budget ? ["Budget", agentBudgetSum(c)] : null,
+    adv.awards ? ["Awards", agentAwardsSum(c)] : null,
+    adv.years  ? ["Released", agentReleasedSum(c)] : null,
+    adv.cinema ? ["Cinema", "Had a cinema release"] : null,
+  ].filter(Boolean).map(([lbl,val])=>
+    `<span class="agsrow"><span class="agslbl">${lbl}</span><span class="agsval">${esc(val)}<span class="agtag">ADVANCED</span></span></span>`
+  ).join("");
+  return `<span class="agsrow"><span class="agslbl">Styles</span><span class="agsval">${esc(stylesVal)}</span></span>
+    <span class="agsrow"><span class="agslbl">Score</span><span class="agsval">${agentCascadeSumHTML(c)}</span></span>
+    <span class="agsrow"><span class="agslbl">Age rating</span><span class="agsval">${esc(agentAgeRatingSum(c))}</span></span>
+    ${advRows}`;
+}
 function renderAgentsScreen(){
   const _t664=performance.now();
   const n=cascades.length;
@@ -18514,13 +18611,7 @@ function renderAgentsScreen(){
           <button type="button" class="ag-edit ca-btn" onclick="editAgentRow('${escA(c.id)}')"
               aria-label="Edit ${escA(c.name)}" title="Edit ${escA(c.name)}">Edit</button>
         </span>
-        <span class="agsettings">
-          <span class="agsrow"><span class="agslbl">Styles</span><span class="agsval">${esc(agentStylesSum(c))}</span></span>
-          <span class="agsrow"><span class="agslbl">Score</span><span class="agsval">${agentCascadeSumHTML(c)}</span></span>
-          <span class="agsrow"><span class="agslbl">Budget</span><span class="agsval">${esc(agentBudgetSum(c))}</span></span>
-          <span class="agsrow"><span class="agslbl">Awards</span><span class="agsval">${esc(agentAwardsSum(c))}</span></span>
-          <span class="agsrow"><span class="agslbl">Audience</span><span class="agsval">${esc(agentAudienceSum(c))}</span></span>
-        </span>
+        <span class="agsettings">${agentSettingsRowsHTML(c)}</span>
         <span class="agmetrics">${agentMetricsHTML(c)}</span>
         ${stale
           ? `<span class="agwarn">⚠ nothing newer than 3 weeks — constraints may be too narrow

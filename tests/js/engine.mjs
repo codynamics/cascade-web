@@ -714,6 +714,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // boot-time re-registration path against a stubbed Capacitor global rather than only through
   // the full boot sequence the DOM stub absorbs.
   reRegisterPushIfGranted,
+  // CAS-1274: agentAdvancedSet is the single "what counts as set in Advanced" rule shared by the Agents
+  // card's ADVANCED-tagged rows and Edit Agent's Basic-view "SET IN ADVANCED" section — exported so a test
+  // can assert its four cases directly against fixtures, rather than re-deriving them from rendered HTML.
+  agentAdvancedSet,
 };
 `;
 

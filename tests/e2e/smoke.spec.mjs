@@ -966,8 +966,8 @@ test("CAS-747 AC5: the Movie Budget card renders the includeUnbudgeted switch, a
     invalidateComputeCaches();
   });
 
-  // CAS-1267: Movie Budget moved into the Advanced section, collapsed by default.
-  await page.locator("#onbAdvancedBtn").click();
+  // CAS-1274: Movie Budget is under the Advanced tab, Basic by default.
+  await page.locator("#briefTabAdvanced").click();
 
   const sw = page.locator("#onbIncludeUnbudgeted");
   await expect(sw).toBeVisible();
@@ -2198,33 +2198,34 @@ test("CAS-1266: the Your taste card icon is a fixed 16-cell grid", async ({ page
   await expect(cells.nth(7)).toHaveCSS("background-color", "rgba(240, 136, 58, 0.7)");
 });
 
-// CAS-1267: Edit Agent opens on Basic — Styles, Cascade score and Age rating — with everything else behind
-// a collapsed Advanced section, so the screen a non-technical person opens reads as a handful of settings,
-// not nine at once.
-test("CAS-1267: Edit Agent opens on Basic, Advanced reveals the rest and collapses again on reopen", async ({ page }) => {
+// CAS-1274: Edit Agent opens on Basic — Styles, Cascade score and Age rating, plus any Advanced setting
+// already set — with everything else behind a Basic|Advanced switch (replacing CAS-1267's single
+// collapsible Advanced section), so the screen a non-technical person opens reads as a handful of
+// settings, not nine at once.
+test("CAS-1274: Edit Agent opens on Basic, Advanced reveals the rest, and the switch resets to Basic on reopen", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openFirstAgentMission(page);
 
-  // AC1: Basic is visible, Advanced's own controls are not.
-  await expect(page.locator(".osdial.cardbtn", { hasText: "Styles" })).toBeVisible();
+  // AC2: Basic is visible, Advanced's own controls are not.
+  await expect(page.locator("#stylesListCard")).toBeVisible();
   await expect(page.locator(".msntrackwrap")).toBeVisible();
   await expect(page.locator("#ageRatingCard")).toBeVisible();
-  const advBtn = page.locator("#onbAdvancedBtn");
-  await expect(advBtn).toContainText("Advanced");
+  await expect(page.locator("#briefTabBasic")).toHaveClass(/on/);
   await expect(page.locator("#onbAlertsOn")).toBeHidden();
   await expect(page.locator("#onbCinemaRelease")).toBeHidden();
   await expect(page.locator(".osdial.cardbtn", { hasText: "Occasions" })).toBeHidden();
   for(const label of ["Movie Budget", "Awards", "How far back"])
     await expect(page.locator(".reqcard", { hasText: label })).toBeHidden();
 
-  // AC2: tapping Advanced reveals all six, and the button reads "Hide advanced".
-  await advBtn.click();
-  await expect(advBtn).toContainText("Hide advanced");
+  // AC3: tapping Advanced reveals all six, plus the Styles card's own More button.
+  await page.locator("#briefTabAdvanced").click();
+  await expect(page.locator("#briefTabAdvanced")).toHaveClass(/on/);
   await expect(page.locator(".osdial.cardbtn", { hasText: "Occasions" })).toBeVisible();
   await expect(page.locator("#onbAlertsOn")).toBeVisible();
   await expect(page.locator("#onbCinemaRelease")).toBeVisible();
+  await expect(page.locator(".slmore")).toBeVisible();
   for(const label of ["Movie Budget", "Awards", "How far back"])
     await expect(page.locator(".reqcard", { hasText: label })).toBeVisible();
 
@@ -2239,8 +2240,9 @@ test("CAS-1267: Edit Agent opens on Basic, Advanced reveals the rest and collaps
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
 
   await openFirstAgentMission(page);
-  await expect(page.locator("#onbAdvancedBtn")).toContainText("Advanced");
-  await expect(page.locator("#onbAlertsOn")).toBeHidden();
+  await expect(page.locator("#briefTabBasic")).toHaveClass(/on/);   // always reopens on Basic
+  await expect(page.locator("#onbAlertsOn")).toBeHidden();          // not rendered at all on Basic
+  await page.locator("#briefTabAdvanced").click();
   await expect(page.locator("#onbAlertsOn")).toHaveAttribute("aria-checked", String(!alertsWasOn));   // the value set before Back was kept
 });
 
@@ -2263,10 +2265,12 @@ async function pushTasteFixture(page, tag, genres, kind, n){
 }
 // Edit Agent -> Styles card, with a known-clean starting point (every style listed, no combinations, no
 // explicit skips) so each test's own fixture is the only thing that can flag.
+// CAS-1274: the grid is only reachable through the Styles card's own More button, on the Advanced tab.
 async function openStyleGrid(page){
   await openFirstAgentMission(page);
   await page.evaluate(() => { onbFlow.draft.genre = []; onbFlow.draft.exclude = []; onbFlow.draft.pairs = {}; });
-  await page.locator(".osdial.cardbtn", { hasText: "Styles" }).click();
+  await page.locator("#briefTabAdvanced").click();
+  await page.locator(".slmore").click();
   await expect(page.locator(".tmap")).toBeVisible();
 }
 
@@ -2284,10 +2288,14 @@ test("CAS-1269 AC1: the Styles card and suggestions panel flag a taste disagreem
   await pushTasteFixture(page, 1, ["Science Fiction", "Animation"], "notfor", 5);
   await page.evaluate(() => renderOnbStep("briefing"));
 
-  await expect(page.locator(".osdial.cardbtn", { hasText: "Styles" }))
-    .toContainText("! 1 of these settings disagree with your taste");
+  // CAS-1274: the Styles card's own flag line now reads "suggested updates", and the card itself is no
+  // longer a single button through to the grid — Review (Basic) switches to Advanced, whose Styles card
+  // carries the More button that actually opens it.
+  await expect(page.locator("#stylesListCard")).toContainText("! 1 suggested updates from your taste");
 
-  await page.locator(".osdial.cardbtn", { hasText: "Styles" }).click();
+  await page.locator("#stylesListCard .sllink").click();
+  await expect(page.locator("#briefTabAdvanced")).toHaveClass(/on/);
+  await page.locator(".slmore").click();
   await expect(page.locator(".tsugg")).toContainText("! 1 of this agent's settings disagree with your taste");
   await expect(page.locator(".tsuggrow")).toContainText("Animation + Science Fiction: listed");
 
@@ -2314,7 +2322,7 @@ test("CAS-1269 AC2: Skip on a style writes exclude, Neither clears both, and Bac
   const agentId = await page.evaluate(() => onbFlow.draft.id);
   await expect(page.locator("#onbStepInner .osback")).toBeVisible();
   await page.locator("#onbStepInner .osback").click();   // Style -> Briefing
-  await expect(page.locator(".osdial.cardbtn", { hasText: "Styles" })).toBeVisible();
+  await expect(page.locator("#stylesListCard")).toBeVisible();
   await expect(page.locator("#onbStepInner .osback")).toBeVisible();
   await page.locator("#onbStepInner .osback").click();   // Briefing -> commits and closes
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
@@ -2335,7 +2343,8 @@ test("CAS-1269 AC3: the Your taste switch recolours the grid with tasteColor()",
   await page.evaluate(() => { onbFlow.draft.genre = []; onbFlow.draft.exclude = []; onbFlow.draft.pairs = {}; });
   await pushTasteFixture(page, 2, ["Action"], "wow", 3);
   await page.evaluate(() => renderOnbStep("briefing"));
-  await page.locator(".osdial.cardbtn", { hasText: "Styles" }).click();
+  await page.locator("#briefTabAdvanced").click();
+  await page.locator(".slmore").click();
 
   await page.locator(".mfseg button", { hasText: "Your taste" }).click();
   const actionCell = page.locator('.tgrid .tcell.allc[aria-label="Action"]');
