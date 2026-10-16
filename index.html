@@ -3644,11 +3644,11 @@
   .tgrid .th.all{color:var(--dim)}
   .tgrid .tr{font:600 11.5px/1.1 var(--font-body);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:4px}
   .tgrid .tr small{font:500 10px/1 var(--font-body);color:var(--faint);margin-left:4px}
-  .tcell{position:relative;aspect-ratio:1;border-radius:6px;border:0;padding:0;background:rgba(255,255,255,.045);cursor:pointer;
+  .tcell{position:relative;z-index:1;aspect-ratio:1;border-radius:6px;border:0;padding:0;background:rgba(255,255,255,.045);cursor:pointer;
     display:flex;align-items:center;justify-content:center;font:800 10px/1 var(--font-body);color:rgba(255,255,255,.92)}
   .tcell.none{background:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);cursor:default}
   .tcell.sel{outline:2px solid #fff;outline-offset:1px}
-  .tcell.allc{border-radius:50%}
+  /* CAS-1276: the first column's .allc square is the same 6px radius as every other cell now — no more circle. */
   /* CAS-1269: a flagged cell (the Style screen's own taste-disagreement ring) sits alongside .sel's white
      outline rather than replacing it — both can show on the same cell at once. */
   .tcell.flag{box-shadow:0 0 0 2px #ffd27a}
@@ -3764,7 +3764,9 @@
   .tscroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px}
   .tscroll::-webkit-scrollbar{display:none}
   .tscroll .tgrid{width:max-content}
-  .tscroll .tgrid .tr,.tscroll .tgrid .tc0{position:sticky;left:0;z-index:2;background:var(--panel2);align-self:stretch}
+  /* CAS-1276: above every .tcell (z-index:1) including a flagged cell's ring/badge, so the sticky name
+     column always paints over scrolled cells rather than under them. */
+  .tscroll .tgrid .tr,.tscroll .tgrid .tc0{position:sticky;left:0;z-index:5;background:var(--panel2);align-self:stretch}
   .tscroll .tgrid .tr{line-height:26px;box-shadow:8px 0 8px -8px rgba(0,0,0,.7)}
   .qhero.lean,.qhero.lean.c1{color:#fff}
   .qhero.lean small,.qhero.lean.c1 small{color:rgba(255,255,255,.82)}
@@ -16975,7 +16977,7 @@ function styleGridSuggestionsHTML(flags){
     </div>`;
   }).join("");
   const more = flags.length>3 ? `<div class="tsuggmore">and ${flags.length-3} more, marked ! on the grid</div>` : "";
-  return `<div class="tsugg"><h4>! ${flags.length} of this agent's settings disagree with your taste</h4>${rows}${more}</div>`;
+  return `<div class="tsugg"><h4>! Your verdicts suggest ${flags.length} update${flags.length===1?"":"s"} to this agent</h4>${rows}${more}</div>`;
 }
 function styleGridCellHTML(c,T,a,b,flagKeys){
   const isAll=!b;
@@ -17027,7 +17029,7 @@ function styleGridDetailHTML(c,T,a,b,flagKeys){
     }).filter(Boolean).join(" · ");
     tasteLine = `Your taste: ${data.n} verdict${data.n===1?"":"s"}, ${words}. ${tally}.`;
   }
-  const tasteLineHTML = esc(tasteLine) + (flagged ? ` <span style="color:#ffd27a">This setting disagrees with it.</span>` : "");
+  const tasteLineHTML = esc(tasteLine) + (flagged ? ` <span style="color:#ffd27a">Your taste suggests a change here.</span>` : "");
   const thirdLabel = isAll ? "Neither" : "Follow its styles";
   const bArg = b ? `'${escA(b)}'` : "null";
   const btns=[{label:"+ List",v:"+"},{label:"− Skip",v:"-"},{label:thirdLabel,v:null}].map(o=>{
@@ -17056,7 +17058,7 @@ function styleGridScreenHTML(){
       onclick="styleGridSetView('taste')">Your taste</button>
   </div>`;
   const note = styleGridView==="agent"
-    ? `Tap a circle for a whole style, or a square for two styles together, then choose + to list, − to skip, or leave it to follow the styles. A combination beats its styles.`
+    ? `Tap the first column to cycle a whole style (+ list, − skip, neither), or a square to cycle two styles together (+, −, follow its styles). A combination beats its styles.`
     : `The same grid coloured by your verdicts, exactly as on Your taste. Switch back to compare.`;
   const headerHTML = `<span class="tc0"></span><span class="th all">All</span>`
     + rows.map(g=>`<span class="th">${esc(tasteShortName(g))}</span>`).join("");
@@ -17073,7 +17075,7 @@ function styleGridScreenHTML(){
         <span class="lg"><i style="background:#b65a1c"></i>− skip</span>
         <span class="lg"><i style="background:rgba(45,212,191,.22)"></i>listed by its styles</span>
         <span class="lg"><i style="background:rgba(255,255,255,.045)"></i>not listed</span>
-        <span class="lg">! your taste disagrees</span>
+        <span class="lg">! suggested update</span>
       </div>`
     : `<div class="tlegend"><span>avoid</span><span class="ramp"><i style="background:rgba(240,136,58,0.85)"></i><i style="background:rgba(240,136,58,0.46)"></i><i style="background:rgba(255,255,255,.08)"></i><i style="background:rgba(45,212,191,0.46)"></i><i style="background:rgba(45,212,191,0.85)"></i></span><span>go for</span></div>`;
   const detail = styleGridSel ? styleGridDetailHTML(c,T,styleGridSel.a,styleGridSel.b,flagKeys) : "";
@@ -17087,11 +17089,41 @@ function styleGridScreenHTML(){
       ${detail}
     </div>`;
 }
-window.styleGridSetView = v => { styleGridView=v; renderOnbStep("genres"); };
-window.styleGridTapCell = (a,b) => { styleGridSel={a, b:b||null}; renderOnbStep("genres"); };
+// CAS-1276: every repaint of this screen replaces #onbStepInner wholesale, which would otherwise reset the
+// grid's sideways scroll and the step's own vertical scroll (#onbStep) to the top on every tap. Snapshot both
+// around the repaint and restore them after, so switching views, tapping a cell or applying a suggestion
+// never loses Lee's place in the grid.
+function styleGridRepaint(){
+  const scroller = document.querySelector(".tmap .tscroll");
+  const sl = scroller ? scroller.scrollLeft : 0;
+  const page = $("onbStep");
+  const sy = page ? page.scrollTop : 0;
+  renderOnbStep("genres");
+  const scroller2 = document.querySelector(".tmap .tscroll");
+  if(scroller2) scroller2.scrollLeft = sl;
+  if(page) page.scrollTop = sy;
+}
+window.styleGridSetView = v => { styleGridView=v; styleGridRepaint(); };
+// CAS-1276: in "This agent" view a tap both selects the cell AND cycles its setting — the first column
+// (whole style) walks + list -> - skip -> neither -> + list; a pair square walks follow its styles -> + list
+// -> - skip -> follow its styles. In "Your taste" view a tap only selects, same as before.
+window.styleGridTapCell = (a,b) => {
+  styleGridSel={a, b:b||null};
+  if(styleGridView==="agent"){
+    const c=onbApply();
+    if(b){
+      const own=pairGridOwn(c,a,b)||null;
+      styleGridSetPair(a,b, own==="+" ? "-" : own==="-" ? null : "+");
+    } else {
+      const state=styleGridState(c,a);
+      styleGridSetStyle(a, state==="+" ? "-" : state==="-" ? null : "+");
+    }
+  }
+  styleGridRepaint();
+};
 window.styleGridApply = (a,b,state) => {
   if(b) styleGridSetPair(a,b,state); else styleGridSetStyle(a,state);
-  renderOnbStep("genres");
+  styleGridRepaint();
 };
 // Step registry — each ticket adds one entry. `progress` is the mock's fill %; `body()` builds the control;
 // `wire()` attaches the live control once it's in the DOM.
