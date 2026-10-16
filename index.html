@@ -3839,11 +3839,11 @@
   .qyou{top:0;color:#fff}
   .qyou small{color:#fff}
   .qyou.for.c3{background:#138c7d}
-  .qyou.for.c2{background:rgba(19,140,125,.5)}
-  .qyou.for.c1{background:rgba(19,140,125,.14)}
+  .qyou.for.c2{background:rgba(19,140,125,.3)}
+  .qyou.for.c1{background:rgba(19,140,125,.1)}
   .qyou.against.c3{background:#b65a1c}
-  .qyou.against.c2{background:rgba(182,90,28,.5)}
-  .qyou.against.c1{background:rgba(182,90,28,.14)}
+  .qyou.against.c2{background:rgba(182,90,28,.3)}
+  .qyou.against.c1{background:rgba(182,90,28,.1)}
   .qpub{border:0;background:rgba(255,255,255,.07)}
   .qpub small{color:var(--dim)}
   .qpub.intitle{top:40px}
@@ -6813,11 +6813,55 @@ function qScoreHTML(m, extraClass=""){
 // blurred the text and left most films looking alike): c1 early read (conf under 0.5, under ~3 matching
 // films), c2 building (under 0.75), c3 sure. The number is always solid white.
 const youLevel = conf => conf < 0.5 ? 1 : conf < 0.75 ? 2 : 3;
-function matchBadgeHTML(m){
+// CAS-1277: on the Watch listing, You shows RANK within the list on screen (99 best, 1 weakest), not the
+// absolute tasteMatch value — a 58-97 range with many ties at the top (20 films sharing 95) read as
+// indistinguishable rows. watchYouRanks is rebuilt every Watch render() from the films actually in
+// watchVisibleRows().rows; matchBadgeHTML only reads it when inWatch is true, falling back to the
+// absolute value/level everywhere else (Find, the film page, Alerts, onboarding reveals).
+let watchYouRanks = new Map();
+// Pure rank math (AC1/AC2): `items` are {id, value, conf, tiebreak} — value is tasteMatch(m).value,
+// tiebreak is cascadeScore(m) ("Public"), id is tmdb_id. Sorted by value desc, then tiebreak desc, then id
+// asc — the exact order sortMoviesBy("you") already ranks the list in, so rank 99 reads at the top,
+// falling to 1 at the bottom. Confidence level is relative to THIS list: each item's own conf compared
+// against the list's own lower/upper tercile cut — except under 3 items, too few to cut into thirds,
+// where the absolute youLevel() stands in.
+function rankYouItems(items){
+  const map = new Map();
+  const n = items.length;
+  if(!n) return map;
+  const sorted = items.slice().sort((a, b) => {
+    if(b.value !== a.value) return b.value - a.value;
+    if(b.tiebreak !== a.tiebreak) return b.tiebreak - a.tiebreak;
+    return a.id - b.id;
+  });
+  const confCuts = n >= 3 ? sorted.map(x => x.conf).slice().sort((a, b) => a - b) : null;
+  sorted.forEach((x, r) => {
+    const rank = n === 1 ? 99 : Math.round(99 - 98 * r / (n - 1));
+    const level = confCuts
+      ? (x.conf < confCuts[Math.floor(n / 3)] ? 1 : x.conf < confCuts[Math.floor(2 * n / 3)] ? 2 : 3)
+      : youLevel(x.conf);
+    map.set(x.id, {rank, level, pos: r + 1, total: n});
+  });
+  return map;
+}
+function watchYouRankMap(rows){
+  const items = rows.map(m => {
+    const t = tasteMatchCached(m);
+    return t ? {id: m.tmdb_id, value: t.value, conf: t.conf, tiebreak: cascadeScore(m)} : null;
+  }).filter(Boolean);
+  return rankYouItems(items);
+}
+function matchBadgeHTML(m, inWatch=false){
   const t = tasteMatch(m);
   if(!t) return "";
-  const side = t.value >= 50 ? "for" : "against";
-  return `<span class="qyou ${side} c${youLevel(t.conf)}" title="You ${t.value}. Cascade's read of how much you'll like this, from your own verdicts on films like it." aria-label="You ${t.value}"><b>${t.value}</b><small>You</small></span>`;
+  const r = inWatch ? watchYouRanks.get(m.tmdb_id) : null;
+  const value = r ? r.rank : t.value;
+  const level = r ? r.level : youLevel(t.conf);
+  const side = value >= 50 ? "for" : "against";
+  const title = r
+    ? `You ${value} — #${r.pos} of ${r.total} in this list for you, from your verdicts on films like it.`
+    : `You ${value}. Cascade's read of how much you'll like this, from your own verdicts on films like it.`;
+  return `<span class="qyou ${side} c${level}" title="${title}" aria-label="You ${value}"><b>${value}</b><small>You</small></span>`;
 }
 function publicLozengeHTML(m, extraClass=""){
   const cls = extraClass ? " "+extraClass : "";
@@ -8344,7 +8388,7 @@ function observeLazyPosters(root){
 // age rating and Cascade score, genres/language and the full synopsis, Budget/Gross, People/Critics, badges,
 // Director/Cast. Shared verbatim between cardHTML (below) and the invite/film page (filmPageHTML) so the
 // invite page can never drift from what the card itself shows — one source, not two copies to keep in sync.
-function cardTopHTML(m){
+function cardTopHTML(m, inWatch=false){
   const syn = m.synopsis ? `<p class="synopsis">${esc(m.synopsis)}</p>` : "";
   const cert = m.age_rating ? `<span class="cert ${MATURE.has(m.age_rating)?'mature':''}">${m.age_rating}</span>` : "";
   // CAS-486: a fixture film from the notify-test harness's ?fixtures=1 merge stays visually marked
@@ -8368,7 +8412,7 @@ function cardTopHTML(m){
   // row, keep it beside the title instead; see the "MATCH ON CARDS" CSS for which chip each card shows).
   // Signed out (the shared film page, onboarding) the card draws exactly as it always has.
   const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  const matchBadge = signedIn ? matchBadgeHTML(m) : "";
+  const matchBadge = signedIn ? matchBadgeHTML(m, inWatch) : "";
   const titleScore = signedIn ? matchBadge + publicLozengeHTML(m, "intitle") : qScoreHTML(m);
   const rowScore = signedIn ? publicLozengeHTML(m, "inrow") : "";
   // CAS-179: one grid, one order — title · genres·language · synopsis · money · scores · awards, with
@@ -8401,7 +8445,7 @@ function cardTopHTML(m){
 }
 // One card, the same in both views. The provenance block that used to sit between the synopsis and the badges
 // came out in CAS-100.
-function cardHTML(m, markNew=false, {hideDismiss=false}={}){
+function cardHTML(m, markNew=false, {hideDismiss=false, inWatch=false}={}){
   const id=m.tmdb_id;
   // CAS-110: an estimated title shows no offers and no prices — see savingsHTML.
   let offers=isEstimated(m) ? [] : dedupOffers(m.offers);
@@ -8452,7 +8496,7 @@ function cardHTML(m, markNew=false, {hideDismiss=false}={}){
   // for callers but no longer rendered.)
   return `<div class="card ${expandedSet.has(id)?'expanded':''} ${cinfoCard?'cinfo':''} ${denseScores?'densescores':''} ${denseCinfo?'densecinfo':''}" id="card-${id}">
     <div class="cbody" onclick="cardTap(event,${id})">
-      ${cardTopHTML(m)}
+      ${cardTopHTML(m, inWatch)}
     </div>
     ${bandHTML(m, svcLine)}
     <div class="cfoot">
@@ -20891,7 +20935,7 @@ function fillListChunked(listEl, items, gen, freshFn, onDone){
     if(gen!==renderGen || !listEl.isConnected){ onDone && onDone(); return; }
     let buf=""; const end=Math.min(items.length, i+BATCH);
     for(; i<end; i++){ const m=items[i];
-      buf += taggedOut(m) ? stubHTML(m) : cardHTML(m, freshFn?freshFn(m):false); }
+      buf += taggedOut(m) ? stubHTML(m) : cardHTML(m, freshFn?freshFn(m):false, {inWatch:true}); }
     listEl.insertAdjacentHTML("beforeend", buf);
     observeLazyPosters(listEl);   // CAS-1103: register this batch's new poster tiles, not the whole list again
     if(i<items.length) requestAnimationFrame(step);
@@ -21083,7 +21127,7 @@ function reconcilePatchSettledList(){
     const id=Number(row.id.slice(5)); if(!isFinite(id)) return;
     const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
     const t=document.createElement("template");
-    t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m))).trim();
+    t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m), {inWatch:true})).trim();
     const fresh=t.content.firstElementChild;
     // AC6: a poster that has already loaded (an inline background-image, no data-lazybg left to observe)
     // is carried over onto the fresh node BEFORE the comparison below, so a card whose only "change" is
@@ -21118,6 +21162,10 @@ function render(){
   // (Cascades × titles) and it means membership has exactly one definition, evaluated in exactly one place.
   recomputeFound();
   ensureWatchTab();   // CAS-725: keep the active tab valid before it drives rows/scope-bar below
+  // CAS-1277: rebuilt on every render() (full rebuild or settled reconcile alike) so a tab, mood, sort or
+  // verdict change always re-ranks before any card reads it — a verdict change in particular never touches
+  // watchNavKey(), so it only ever reaches render() through the reconcile branch below.
+  watchYouRanks = watchYouRankMap(watchVisibleRows().rows);
   // CAS-1236: everything above must run even on a settled (non-navigating) pass — recomputeFound is what
   // keeps notify/found/taggedOut honest, and ensureWatchTab can itself force a navigation (a tab that just
   // became invalid) which watchNavKey() (read next) must see.
@@ -21435,7 +21483,7 @@ function fastPatchFindRow(id){
   // film left the list -> let render() handle it
   if(!m || !row || !filmInWatchRows(m)) return false;
   const t=document.createElement("template");
-  t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m))).trim();
+  t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m), {inWatch:true})).trim();
   observeLazyPosters(t.content);   // CAS-1103: this single swapped-in card's own poster tile
   row.replaceWith(t.content.firstElementChild);
   patchFindCounts();
