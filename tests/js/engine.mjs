@@ -549,11 +549,12 @@ if(typeof window.CascadeAuth === "undefined"){
   // test can drive the real order:"you" -> filt.sort translation (signed-in vs signed-out) instead of
   // re-deriving it by hand.
   applyMoodToState, moodDefaultFieldsNow,
-  // CAS-1284: MOOD_DEFAULTS (the five built-in moods, including the three catalogue starters) and
-  // moodBestN/moodBestScore (Best N's own cap-resolution and ranking-score pure functions) — exported so a
-  // test can assert the starter shapes and the blend/legacy-top math directly, rather than only through
-  // watchVisibleRows()'s combined pipeline.
-  MOOD_DEFAULTS, moodBestN, moodBestScore,
+  // CAS-1287: MOOD_DEFAULTS (the five built-in moods, including the three catalogue starters),
+  // moodTopYouN/moodTopPublicN/moodTopYouAvailable/moodTopYouEffectiveN ("Show top"'s own cap-resolution
+  // and You-availability pure functions), and moodShowTopKeep (the selection cut itself) — exported so a
+  // test can assert the starter shapes, the legacy-best/legacy-top math, and the union/threshold selection
+  // directly against small fixture rows, rather than only through watchVisibleRows()'s combined pipeline.
+  MOOD_DEFAULTS, moodTopYouN, moodTopPublicN, moodTopYouAvailable, moodTopYouEffectiveN, moodShowTopKeep,
   // CAS-602: the bell's own moment-copy lookup, so a test can assert a monitor moment key can never
   // render as its raw string (see REAL_MOMENT_SAID's own use at the ntfrow render site).
   REAL_MOMENT_SAID,
