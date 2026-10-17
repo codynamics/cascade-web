@@ -3073,6 +3073,9 @@
   .agslbl{flex:0 0 74px;box-sizing:border-box;font-size:10px;text-transform:uppercase;
     letter-spacing:.5px;font-weight:700;color:var(--faint)}
   .agsval{flex:1;min-width:0}
+  /* CAS-1274: the small outlined tag marking a settings row as coming from Advanced, rather than Basic. */
+  .agtag{display:inline-block;margin-left:6px;padding:1px 5px;border-radius:5px;border:1px solid var(--line);
+    font-size:8.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--faint);vertical-align:middle}
   .agdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 1px 0 0}
   /* Still used by watchlistRowHTML (Manage Lists, CAS-591) — the Agents row below stopped using it (CAS-643)
      but this is not a dead selector. */
@@ -3641,16 +3644,27 @@
   .tgrid .th.all{color:var(--dim)}
   .tgrid .tr{font:600 11.5px/1.1 var(--font-body);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:4px}
   .tgrid .tr small{font:500 10px/1 var(--font-body);color:var(--faint);margin-left:4px}
-  .tcell{position:relative;aspect-ratio:1;border-radius:6px;border:0;padding:0;background:rgba(255,255,255,.045);cursor:pointer;
+  .tcell{position:relative;z-index:1;aspect-ratio:1;border-radius:6px;border:0;padding:0;background:rgba(255,255,255,.045);cursor:pointer;
     display:flex;align-items:center;justify-content:center;font:800 10px/1 var(--font-body);color:rgba(255,255,255,.92)}
   .tcell.none{background:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);cursor:default}
   .tcell.sel{outline:2px solid #fff;outline-offset:1px}
-  .tcell.allc{border-radius:50%}
+  /* CAS-1276: the first column's .allc square is the same 6px radius as every other cell now — no more circle. */
   /* CAS-1269: a flagged cell (the Style screen's own taste-disagreement ring) sits alongside .sel's white
      outline rather than replacing it — both can show on the same cell at once. */
   .tcell.flag{box-shadow:0 0 0 2px #ffd27a}
   .tcell.flag::after{content:"!";position:absolute;top:-5px;right:-5px;width:13px;height:13px;border-radius:50%;
     background:#ffd27a;color:#2b1503;font:800 9px/13px var(--font-body);text-align:center}
+  /* CAS-1274: the Styles list card — one row per style, a 120px name column next to the same 26px square
+     the grid's first column uses (.tcell, reused here with a fixed size instead of a grid-column width). */
+  .sllist{display:flex;flex-direction:column;gap:5px;margin-top:9px}
+  .slrow{display:flex;align-items:center;gap:10px}
+  .slname{width:120px;flex:none;font:600 13px/1.3 var(--font-body);color:var(--ink);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .slname.faint{color:var(--faint);font-weight:500}
+  .tcell.slsq{width:26px;height:26px;flex:none;aspect-ratio:auto}
+  .slhint{font:500 11.5px/1.4 var(--font-body);color:var(--faint);margin:8px 0 0}
+  .sllink{color:#ffd27a;text-decoration:underline;cursor:pointer}
+  .slmore{margin-top:11px}
   .tlegend{display:flex;align-items:center;gap:7px;margin-top:10px;font:600 10.5px/1 var(--font-body);color:var(--faint)}
   .tlegend .ramp{display:flex;gap:2px}
   .tlegend .ramp i{width:14px;height:9px;border-radius:2px}
@@ -3750,7 +3764,9 @@
   .tscroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:4px}
   .tscroll::-webkit-scrollbar{display:none}
   .tscroll .tgrid{width:max-content}
-  .tscroll .tgrid .tr,.tscroll .tgrid .tc0{position:sticky;left:0;z-index:2;background:var(--panel2);align-self:stretch}
+  /* CAS-1276: above every .tcell (z-index:1) including a flagged cell's ring/badge, so the sticky name
+     column always paints over scrolled cells rather than under them. */
+  .tscroll .tgrid .tr,.tscroll .tgrid .tc0{position:sticky;left:0;z-index:5;background:var(--panel2);align-self:stretch}
   .tscroll .tgrid .tr{line-height:26px;box-shadow:8px 0 8px -8px rgba(0,0,0,.7)}
   .qhero.lean,.qhero.lean.c1{color:#fff}
   .qhero.lean small,.qhero.lean.c1 small{color:rgba(255,255,255,.82)}
@@ -3823,11 +3839,11 @@
   .qyou{top:0;color:#fff}
   .qyou small{color:#fff}
   .qyou.for.c3{background:#138c7d}
-  .qyou.for.c2{background:rgba(19,140,125,.5)}
-  .qyou.for.c1{background:rgba(19,140,125,.14)}
+  .qyou.for.c2{background:rgba(19,140,125,.3)}
+  .qyou.for.c1{background:rgba(19,140,125,.1)}
   .qyou.against.c3{background:#b65a1c}
-  .qyou.against.c2{background:rgba(182,90,28,.5)}
-  .qyou.against.c1{background:rgba(182,90,28,.14)}
+  .qyou.against.c2{background:rgba(182,90,28,.3)}
+  .qyou.against.c1{background:rgba(182,90,28,.1)}
   .qpub{border:0;background:rgba(255,255,255,.07)}
   .qpub small{color:var(--dim)}
   .qpub.intitle{top:40px}
@@ -6797,11 +6813,55 @@ function qScoreHTML(m, extraClass=""){
 // blurred the text and left most films looking alike): c1 early read (conf under 0.5, under ~3 matching
 // films), c2 building (under 0.75), c3 sure. The number is always solid white.
 const youLevel = conf => conf < 0.5 ? 1 : conf < 0.75 ? 2 : 3;
-function matchBadgeHTML(m){
+// CAS-1277: on the Watch listing, You shows RANK within the list on screen (99 best, 1 weakest), not the
+// absolute tasteMatch value — a 58-97 range with many ties at the top (20 films sharing 95) read as
+// indistinguishable rows. watchYouRanks is rebuilt every Watch render() from the films actually in
+// watchVisibleRows().rows; matchBadgeHTML only reads it when inWatch is true, falling back to the
+// absolute value/level everywhere else (Find, the film page, Alerts, onboarding reveals).
+let watchYouRanks = new Map();
+// Pure rank math (AC1/AC2): `items` are {id, value, conf, tiebreak} — value is tasteMatch(m).value,
+// tiebreak is cascadeScore(m) ("Public"), id is tmdb_id. Sorted by value desc, then tiebreak desc, then id
+// asc — the exact order sortMoviesBy("you") already ranks the list in, so rank 99 reads at the top,
+// falling to 1 at the bottom. Confidence level is relative to THIS list: each item's own conf compared
+// against the list's own lower/upper tercile cut — except under 3 items, too few to cut into thirds,
+// where the absolute youLevel() stands in.
+function rankYouItems(items){
+  const map = new Map();
+  const n = items.length;
+  if(!n) return map;
+  const sorted = items.slice().sort((a, b) => {
+    if(b.value !== a.value) return b.value - a.value;
+    if(b.tiebreak !== a.tiebreak) return b.tiebreak - a.tiebreak;
+    return a.id - b.id;
+  });
+  const confCuts = n >= 3 ? sorted.map(x => x.conf).slice().sort((a, b) => a - b) : null;
+  sorted.forEach((x, r) => {
+    const rank = n === 1 ? 99 : Math.round(99 - 98 * r / (n - 1));
+    const level = confCuts
+      ? (x.conf < confCuts[Math.floor(n / 3)] ? 1 : x.conf < confCuts[Math.floor(2 * n / 3)] ? 2 : 3)
+      : youLevel(x.conf);
+    map.set(x.id, {rank, level, pos: r + 1, total: n});
+  });
+  return map;
+}
+function watchYouRankMap(rows){
+  const items = rows.map(m => {
+    const t = tasteMatchCached(m);
+    return t ? {id: m.tmdb_id, value: t.value, conf: t.conf, tiebreak: cascadeScore(m)} : null;
+  }).filter(Boolean);
+  return rankYouItems(items);
+}
+function matchBadgeHTML(m, inWatch=false){
   const t = tasteMatch(m);
   if(!t) return "";
-  const side = t.value >= 50 ? "for" : "against";
-  return `<span class="qyou ${side} c${youLevel(t.conf)}" title="You ${t.value}. Cascade's read of how much you'll like this, from your own verdicts on films like it." aria-label="You ${t.value}"><b>${t.value}</b><small>You</small></span>`;
+  const r = inWatch ? watchYouRanks.get(m.tmdb_id) : null;
+  const value = r ? r.rank : t.value;
+  const level = r ? r.level : youLevel(t.conf);
+  const side = value >= 50 ? "for" : "against";
+  const title = r
+    ? `You ${value} — #${r.pos} of ${r.total} in this list for you, from your verdicts on films like it.`
+    : `You ${value}. Cascade's read of how much you'll like this, from your own verdicts on films like it.`;
+  return `<span class="qyou ${side} c${level}" title="${title}" aria-label="You ${value}"><b>${value}</b><small>You</small></span>`;
 }
 function publicLozengeHTML(m, extraClass=""){
   const cls = extraClass ? " "+extraClass : "";
@@ -8328,7 +8388,7 @@ function observeLazyPosters(root){
 // age rating and Cascade score, genres/language and the full synopsis, Budget/Gross, People/Critics, badges,
 // Director/Cast. Shared verbatim between cardHTML (below) and the invite/film page (filmPageHTML) so the
 // invite page can never drift from what the card itself shows — one source, not two copies to keep in sync.
-function cardTopHTML(m){
+function cardTopHTML(m, inWatch=false){
   const syn = m.synopsis ? `<p class="synopsis">${esc(m.synopsis)}</p>` : "";
   const cert = m.age_rating ? `<span class="cert ${MATURE.has(m.age_rating)?'mature':''}">${m.age_rating}</span>` : "";
   // CAS-486: a fixture film from the notify-test harness's ?fixtures=1 merge stays visually marked
@@ -8352,7 +8412,7 @@ function cardTopHTML(m){
   // row, keep it beside the title instead; see the "MATCH ON CARDS" CSS for which chip each card shows).
   // Signed out (the shared film page, onboarding) the card draws exactly as it always has.
   const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  const matchBadge = signedIn ? matchBadgeHTML(m) : "";
+  const matchBadge = signedIn ? matchBadgeHTML(m, inWatch) : "";
   const titleScore = signedIn ? matchBadge + publicLozengeHTML(m, "intitle") : qScoreHTML(m);
   const rowScore = signedIn ? publicLozengeHTML(m, "inrow") : "";
   // CAS-179: one grid, one order — title · genres·language · synopsis · money · scores · awards, with
@@ -8385,7 +8445,7 @@ function cardTopHTML(m){
 }
 // One card, the same in both views. The provenance block that used to sit between the synopsis and the badges
 // came out in CAS-100.
-function cardHTML(m, markNew=false, {hideDismiss=false}={}){
+function cardHTML(m, markNew=false, {hideDismiss=false, inWatch=false}={}){
   const id=m.tmdb_id;
   // CAS-110: an estimated title shows no offers and no prices — see savingsHTML.
   let offers=isEstimated(m) ? [] : dedupOffers(m.offers);
@@ -8436,7 +8496,7 @@ function cardHTML(m, markNew=false, {hideDismiss=false}={}){
   // for callers but no longer rendered.)
   return `<div class="card ${expandedSet.has(id)?'expanded':''} ${cinfoCard?'cinfo':''} ${denseScores?'densescores':''} ${denseCinfo?'densecinfo':''}" id="card-${id}">
     <div class="cbody" onclick="cardTap(event,${id})">
-      ${cardTopHTML(m)}
+      ${cardTopHTML(m, inWatch)}
     </div>
     ${bandHTML(m, svcLine)}
     <div class="cfoot">
@@ -10186,7 +10246,7 @@ function applyMoodToState(mood){
   WATCH_LEVEL_KEYS.forEach(tab=>{
     watchPickedBy[tab]=mood.pickedBy||"all";
     watchWatchedSel[tab]=new Set(mood.watched||[]);
-    watchGenreOff[tab]=new Set(mood.stylesOff||[]);
+    watchGenreOff[tab]=new Set();   // CAS-1273: moods no longer filter by style; mood.stylesOff is ignored
     watchBadgeSel[tab]=new Set(mood.badges||[]);
     watchMineOnly[tab]=mood.mineOnly!==false;
     watchSearch[tab]=""; watchSearchRaw[tab]="";
@@ -10256,6 +10316,9 @@ window.toggleMoodDraftTop = () => { if(!moodDraft) return; moodDraft.top=!moodDr
 window.toggleMoodDraftMineOnly = () => { if(!moodDraft) return; moodDraft.mineOnly=!moodDraft.mineOnly; renderMoodSheetBody(); };
 window.setMoodDraftPickedBy = key => { if(!moodDraft) return; moodDraft.pickedBy=key; renderMoodSheetBody(); };
 window.toggleMoodDraftWatched = key => { if(!moodDraft) return; moodDraft.watched.has(key)?moodDraft.watched.delete(key):moodDraft.watched.add(key); renderMoodSheetBody(); };
+// CAS-1273: the mood sheet's Styles section is gone (Lee: two layers of style settings were too
+// confusing), so nothing calls these three any more. Left in place rather than deleted — Lee is
+// reviewing mood styles later and stylesOff itself still lives on the stored mood shape.
 window.toggleMoodDraftGenre = g => { if(!moodDraft) return; moodDraft.stylesOff.has(g)?moodDraft.stylesOff.delete(g):moodDraft.stylesOff.add(g); renderMoodSheetBody(); };
 window.selectAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.stylesOff.clear(); renderMoodSheetBody(); };
 window.clearAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.stylesOff=new Set(watchSheetGenres[watchTab]||[]); renderMoodSheetBody(); };
@@ -10281,7 +10344,7 @@ window.saveMoodFromSheet = () => {
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
     name, order:d.order, top:!!d.top,
     agentsOff:[...d.agentsOff], mineOnly:!!d.mineOnly, pickedBy:d.pickedBy,
-    watched:[...d.watched], stylesOff:[...d.stylesOff], badges:[...d.badges],
+    watched:[...d.watched], stylesOff:[], badges:[...d.badges],   // CAS-1273: styles no longer saved from the mood sheet
     alsoShow: d.alsoShow ? {premium:[...(d.alsoShow.premium||[])], rent:[...(d.alsoShow.rent||[])], stream:[...(d.alsoShow.stream||[])]} : null,
   };
   const idx=watchMoods.findIndex(m=>m.id===mood.id);
@@ -10403,11 +10466,6 @@ function renderMoodSheetBody(){
     return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
       onclick="setMoodDraftPickedBy('${o.key}')">${esc(o.label)}</button>`;
   }).join("");
-  const stylesHTML=genres.length ? genres.map(g=>{
-    const on=!d.stylesOff.has(g);
-    return `<button type="button" class="chip gen${on?" on":""}" aria-pressed="${on}"
-      onclick="toggleMoodDraftGenre('${escA(g)}')">${esc(g)}</button>`;
-  }).join("") : `<p class="unone">No styles in this tab yet.</p>`;
   const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
   const alsoShowSet = watchTab==="in_cinema" ? new Set() : new Set((d.alsoShow && d.alsoShow[watchTab]) || WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
   const alsoShowPool = watchTab==="in_cinema" ? [] : watchAlsoShowPool();
@@ -10469,15 +10527,6 @@ function renderMoodSheetBody(){
     <div class="wsheetsec">
       <div class="wsheethd"><span>Watched</span></div>
       <div class="chips">${watchedHTML}</div>
-    </div>
-    <div class="wsheetsec">
-      <div class="wsheethd"><span>Styles</span>
-        <span class="wsheetlinks">
-          <button type="button" class="linkbtn" onclick="selectAllMoodDraftStyles()">Select all</button>
-          <button type="button" class="linkbtn" onclick="clearAllMoodDraftStyles()">Clear all</button>
-        </span>
-      </div>
-      <div class="chips">${stylesHTML}</div>
     </div>
     ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Also show</span></div>
@@ -15172,7 +15221,7 @@ const onbFlow = {draft:null, name:ONB_DEFAULT_NAME, defaultName:ONB_DEFAULT_NAME
                  watch:{},                                 // CAS-160 viewing windows: {lane: [optKey,…]}
                  answers:null,                             // CAS-626: the briefing screens' own roster answers
                  workingAgents:null, reportStats:null,     // CAS-629: S5's committed roster, S6/S7's shared N/M/K
-                 briefAdvancedOpen:false};                 // CAS-1267: Edit Agent's Advanced section, reset by briefOpen
+                 briefTab:"basic"};                        // CAS-1274: Edit Agent's Basic|Advanced switch, reset by briefOpen
 
 // ---- Agent settings: the windows this agent's TYPE has (CAS-160, rebuilt by CAS-228) --------------------
 // CAS-160 made availability the user's choice rather than a property of the preset. It modelled that as three
@@ -16449,26 +16498,65 @@ function yearsCardHTML(){
 // still taps straight through to the same genres spoke the old door opened.
 // CAS-936: Age rating's chips are no longer a preview of a door — the door is gone, and tapping a chip here
 // toggles that rating for this agent directly. See ageRatingCardHTML/ageChipToggle below.
-function stylesCardHTML(){
+// CAS-1274: the Styles card's purple chips are replaced by a name+square list, one row per style (A–Z),
+// shared verbatim by onboarding's own styles step (CAS-1275). In Basic the square is live — a tap toggles
+// that style listed/not-listed; in Advanced it's read-only and a More button opens the full grid instead,
+// which is the only place pairs (and the taste-vs-grid comparison) are set.
+// CAS-1275: state/flagged/tapFn are passed in rather than read off the agent draft, so onboarding's own
+// styles step (ans.styles, no skip state, no flags) can call this with its own state instead of a copy.
+function stylesListRowHTML(g, state, flagged, tapFn){
+  const bg = state==="+" ? "#138c7d" : state==="-" ? "#b65a1c" : "rgba(255,255,255,.045)";
+  const glyph = state==="+" ? "+" : state==="-" ? "−" : "";
+  const label = state==="+" ? "listed" : state==="-" ? "skipped" : "not listed";
+  const sqClass=`tcell slsq${flagged?" flag":""}`;
+  const sq = tapFn
+    ? `<button type="button" class="${sqClass}" style="background:${bg}" aria-label="${escA(g)}: ${label}"
+         onclick="${tapFn}('${escA(g)}')">${glyph}</button>`
+    : `<span class="${sqClass}" style="background:${bg}" aria-label="${escA(g)}: ${label}">${glyph}</span>`;
+  return `<div class="slrow"><span class="slname${state==="+"?"":" faint"}">${esc(g)}</span>${sq}</div>`;
+}
+function stylesListCardHTML(advanced){
   const g=dT().genre, excl=dExcludeSet();
   const included = g===null ? [] : ONB_GENRES.filter(x=>dGenreSet().has(x) && !excl.has(x));
-  const valueText = g===null ? "No styles selected"
-    : included.length===ONB_GENRES.length ? `All ${ONB_GENRES.length} styles`
-    : !included.length ? "No styles match"
-    : `${included.length} of ${ONB_GENRES.length} styles`;
+  const valueText = included.length===ONB_GENRES.length
+    ? `All ${ONB_GENRES.length} styles` : `${included.length} of ${ONB_GENRES.length} styles`;
   // CAS-1269 rule 9: a combination set on the grid, and a taste disagreement, are both things this card
   // has to say up front — the whole reason the grid has its own suggestions panel is that you shouldn't
   // have to open it to learn a setting fights your own verdicts.
   const pairCount = Object.keys(dT().pairs||{}).length;
   const comboSuffix = pairCount ? ` · ${pairCount} combination${pairCount===1?"":"s"} set` : "";
-  const flagCount = styleGridFlags(onbApply()).length;
-  const chips = included.map(x=>`<span class="chip gen on">${esc(x)}</span>`).join("");
-  return `<button type="button" class="osdial cardbtn" onclick="briefGo('genres')">
+  const flags = styleGridFlags(onbApply());
+  const flagKeys = new Set(flags.map(f=>f.kind==="style" ? `s:${f.a}` : `p:${stylePairKey(f.a,f.b)}`));
+  const rows = [...ONB_GENRES].sort((a,b)=>a.localeCompare(b))
+    .map(x=>stylesListRowHTML(x, styleGridState(dT(),x), flagKeys.has(`s:${x}`), advanced ? null : "stylesListTap")).join("");
+  return `<div class="osdial" id="stylesListCard">
     <span class="osdh"><span class="em">🎭</span><span class="dl">Styles</span></span>
     <p class="reqval">${esc(valueText)}${esc(comboSuffix)}</p>
-    ${flagCount ? `<p class="reqval" style="color:#ffd27a;font-weight:600;font-size:12px">! ${flagCount} of these settings disagree with your taste</p>` : ""}
-    <div class="chips">${chips || `<span class="eaempty">Nothing qualifies — pick at least one</span>`}</div>
-    <span class="dc">›</span></button>`;
+    ${flags.length ? `<p class="reqval" style="color:#ffd27a;font-weight:600;font-size:12px">! ${flags.length} suggested updates from your taste${!advanced ? ` <a href="#" class="sllink" onclick="briefSetTab('advanced');return false">Review</a>` : ""}</p>` : ""}
+    <div class="sllist">${rows}</div>
+    ${(!advanced && pairCount) ? `<p class="slhint">${pairCount} combination${pairCount===1?"":"s"} set — see Advanced</p>` : ""}
+    ${advanced ? `<button type="button" class="osadv slmore" onclick="briefGo('genres')"><span class="osadvtitle">More — combinations of two styles, and how your taste compares ›</span></button>` : ""}
+  </div>`;
+}
+window.stylesListTap = g => {
+  styleGridSetStyle(g, styleGridState(dT(),g)==="+" ? null : "+");
+  renderOnbStep("briefing");
+};
+// CAS-1275: onboarding's own tap handler — toggles ans.styles directly, same on/off list the chips did.
+window.obStylesListTap = g => {
+  const ans=onbFlow.answersV2;
+  const i=ans.styles.indexOf(g);
+  i<0 ? ans.styles.push(g) : ans.styles.splice(i,1);
+  onbAnswersV2Save(ans);
+  renderOnbStep("v2_styles");
+};
+// CAS-1274: the "Had a cinema release" switch — its own id/wiring is unchanged from CAS-1267
+// (wireCinemaReleaseToggle), only its markup moved so it can render inside SET IN ADVANCED on Basic too.
+function cinemaReleaseSwitchHTML(){
+  return `<div class="switch mini" id="onbCinemaRelease" role="switch">
+    <span>🎬 Had a cinema release
+      <small style="color:var(--faint)">— an AU cinema (not limited) release, at any point</small></span>
+    <span class="knob"></span></div>`;
 }
 function ageRatingChipsHTML(){
   return AGE_LEVELS.map((a,k)=>`<button type="button" class="chip gen${dAgeOn(k)?" on":""}"
@@ -16933,7 +17021,7 @@ function styleGridSuggestionsHTML(flags){
     </div>`;
   }).join("");
   const more = flags.length>3 ? `<div class="tsuggmore">and ${flags.length-3} more, marked ! on the grid</div>` : "";
-  return `<div class="tsugg"><h4>! ${flags.length} of this agent's settings disagree with your taste</h4>${rows}${more}</div>`;
+  return `<div class="tsugg"><h4>! Your verdicts suggest ${flags.length} update${flags.length===1?"":"s"} to this agent</h4>${rows}${more}</div>`;
 }
 function styleGridCellHTML(c,T,a,b,flagKeys){
   const isAll=!b;
@@ -16985,7 +17073,7 @@ function styleGridDetailHTML(c,T,a,b,flagKeys){
     }).filter(Boolean).join(" · ");
     tasteLine = `Your taste: ${data.n} verdict${data.n===1?"":"s"}, ${words}. ${tally}.`;
   }
-  const tasteLineHTML = esc(tasteLine) + (flagged ? ` <span style="color:#ffd27a">This setting disagrees with it.</span>` : "");
+  const tasteLineHTML = esc(tasteLine) + (flagged ? ` <span style="color:#ffd27a">Your taste suggests a change here.</span>` : "");
   const thirdLabel = isAll ? "Neither" : "Follow its styles";
   const bArg = b ? `'${escA(b)}'` : "null";
   const btns=[{label:"+ List",v:"+"},{label:"− Skip",v:"-"},{label:thirdLabel,v:null}].map(o=>{
@@ -17014,7 +17102,7 @@ function styleGridScreenHTML(){
       onclick="styleGridSetView('taste')">Your taste</button>
   </div>`;
   const note = styleGridView==="agent"
-    ? `Tap a circle for a whole style, or a square for two styles together, then choose + to list, − to skip, or leave it to follow the styles. A combination beats its styles.`
+    ? `Tap the first column to cycle a whole style (+ list, − skip, neither), or a square to cycle two styles together (+, −, follow its styles). A combination beats its styles.`
     : `The same grid coloured by your verdicts, exactly as on Your taste. Switch back to compare.`;
   const headerHTML = `<span class="tc0"></span><span class="th all">All</span>`
     + rows.map(g=>`<span class="th">${esc(tasteShortName(g))}</span>`).join("");
@@ -17031,7 +17119,7 @@ function styleGridScreenHTML(){
         <span class="lg"><i style="background:#b65a1c"></i>− skip</span>
         <span class="lg"><i style="background:rgba(45,212,191,.22)"></i>listed by its styles</span>
         <span class="lg"><i style="background:rgba(255,255,255,.045)"></i>not listed</span>
-        <span class="lg">! your taste disagrees</span>
+        <span class="lg">! suggested update</span>
       </div>`
     : `<div class="tlegend"><span>avoid</span><span class="ramp"><i style="background:rgba(240,136,58,0.85)"></i><i style="background:rgba(240,136,58,0.46)"></i><i style="background:rgba(255,255,255,.08)"></i><i style="background:rgba(45,212,191,0.46)"></i><i style="background:rgba(45,212,191,0.85)"></i></span><span>go for</span></div>`;
   const detail = styleGridSel ? styleGridDetailHTML(c,T,styleGridSel.a,styleGridSel.b,flagKeys) : "";
@@ -17045,11 +17133,41 @@ function styleGridScreenHTML(){
       ${detail}
     </div>`;
 }
-window.styleGridSetView = v => { styleGridView=v; renderOnbStep("genres"); };
-window.styleGridTapCell = (a,b) => { styleGridSel={a, b:b||null}; renderOnbStep("genres"); };
+// CAS-1276: every repaint of this screen replaces #onbStepInner wholesale, which would otherwise reset the
+// grid's sideways scroll and the step's own vertical scroll (#onbStep) to the top on every tap. Snapshot both
+// around the repaint and restore them after, so switching views, tapping a cell or applying a suggestion
+// never loses Lee's place in the grid.
+function styleGridRepaint(){
+  const scroller = document.querySelector(".tmap .tscroll");
+  const sl = scroller ? scroller.scrollLeft : 0;
+  const page = $("onbStep");
+  const sy = page ? page.scrollTop : 0;
+  renderOnbStep("genres");
+  const scroller2 = document.querySelector(".tmap .tscroll");
+  if(scroller2) scroller2.scrollLeft = sl;
+  if(page) page.scrollTop = sy;
+}
+window.styleGridSetView = v => { styleGridView=v; styleGridRepaint(); };
+// CAS-1276: in "This agent" view a tap both selects the cell AND cycles its setting — the first column
+// (whole style) walks + list -> - skip -> neither -> + list; a pair square walks follow its styles -> + list
+// -> - skip -> follow its styles. In "Your taste" view a tap only selects, same as before.
+window.styleGridTapCell = (a,b) => {
+  styleGridSel={a, b:b||null};
+  if(styleGridView==="agent"){
+    const c=onbApply();
+    if(b){
+      const own=pairGridOwn(c,a,b)||null;
+      styleGridSetPair(a,b, own==="+" ? "-" : own==="-" ? null : "+");
+    } else {
+      const state=styleGridState(c,a);
+      styleGridSetStyle(a, state==="+" ? "-" : state==="-" ? null : "+");
+    }
+  }
+  styleGridRepaint();
+};
 window.styleGridApply = (a,b,state) => {
   if(b) styleGridSetPair(a,b,state); else styleGridSetStyle(a,state);
-  renderOnbStep("genres");
+  styleGridRepaint();
 };
 // Step registry — each ticket adds one entry. `progress` is the mock's fill %; `body()` builds the control;
 // `wire()` attaches the live control once it's in the DOM.
@@ -17158,28 +17276,36 @@ const SHARP_STEPS = {
       const d=onbFlow.draft||{};
       // CAS-447: the same "N new" count the deck card carries, read off the SAME live draft this screen's
       // own doors edit (onbApply()) — an unsaved agent (no draft yet) simply has nothing to count.
-      const nNew = onbFlow.draft ? newlyAddedCount(onbApply()) : 0;
+      const c = onbFlow.draft ? onbApply() : {};
+      const nNew = onbFlow.draft ? newlyAddedCount(c) : 0;
       // The name row is gone — CAS-531 #1 moved it into the page header (see renderOnbStep's key==="briefing"
       // branch), so a rename opens the identical "name" spoke this row used to.
-      // CAS-1267: Basic is Styles, Cascade score and Age rating — what Lee judges a commercial product's
-      // settings screen should open on. Everything else (Occasions, Alerts, Budget, Awards, How far back,
-      // cinema release) moves into a collapsed Advanced section, rendered but `hidden` so wire() still binds
-      // every control whichever state the section is in.
-      const advOpen = !!onbFlow.briefAdvancedOpen;
+      // CAS-1274: one Basic|Advanced switch replaces CAS-1267's single collapsible Advanced section. Basic
+      // is Styles, Cascade score and Age rating, plus — only when set — the subset of Advanced settings
+      // agentAdvancedSet() says are in play ("SET IN ADVANCED"). Advanced is everything.
+      const advanced = onbFlow.briefTab==="advanced";
+      const adv = agentAdvancedSet(c);
+      const anySet = adv.budget || adv.awards || adv.years || adv.cinema;
+      const tabsHTML = `<div class="mfseg" role="group" aria-label="Basic or Advanced">
+        <button type="button" id="briefTabBasic" aria-pressed="${!advanced}" class="${!advanced?"on":""}"
+          onclick="briefSetTab('basic')">Basic</button>
+        <button type="button" id="briefTabAdvanced" aria-pressed="${advanced}" class="${advanced?"on":""}"
+          onclick="briefSetTab('advanced')">Advanced</button>
+      </div>`;
       return `<p class="ossub">Reconfigure this agent here.${nNew ? ` <b>${nNew}</b> newly added film${nNew===1?"":"s"} in its list right now.` : ""}</p>
+        ${tabsHTML}
         <div class="usec">WHAT IT LOOKS FOR</div>
-        ${stylesCardHTML()}
+        ${stylesListCardHTML(advanced)}
         ${msnScoreCardHTML()}
         <div class="usec">REQUIREMENTS — EVERY FILM MUST CLEAR ALL OF THESE</div>
         ${ageRatingCardHTML()}
-        <button type="button" class="osadv" id="onbAdvancedBtn" aria-expanded="${advOpen}" onclick="briefToggleAdvanced()">
-          <span class="osadvtitle">${advOpen ? "Hide advanced" : "Advanced"}</span>
-          ${advOpen ? "" : `<span class="osadvsub">Alerts, occasions, budget, awards, how far back, cinema release</span>`}
-          <span class="osadvchev">${advOpen ? "⌄" : "›"}</span>
-        </button>
-        <div id="onbAdvancedSection"${advOpen ? "" : " hidden"}>
+        ${(!advanced && anySet) ? `<div class="usec">SET IN ADVANCED</div>
+          ${adv.budget ? budgetCardHTML() : ""}
+          ${adv.awards ? awardsCardHTML() : ""}
+          ${adv.years ? yearsCardHTML() : ""}
+          ${adv.cinema ? cinemaReleaseSwitchHTML() : ""}` : ""}
+        ${advanced ? `<div class="usec">ADVANCED</div>
           ${occasionsCardHTML()}
-          <div class="usec">ALERTS</div>
           <div class="switch mini" id="onbAlertsOn" role="switch">
             <span>🔔 Alert me about this agent's films
               <small style="color:var(--faint)">— by email, in the app and on your phone</small></span>
@@ -17187,11 +17313,7 @@ const SHARP_STEPS = {
           ${budgetCardHTML()}
           ${awardsCardHTML()}
           ${yearsCardHTML()}
-          <div class="switch mini" id="onbCinemaRelease" role="switch">
-            <span>🎬 Had a cinema release
-              <small style="color:var(--faint)">— an AU cinema (not limited) release, at any point</small></span>
-            <span class="knob"></span></div>
-        </div>
+          ${cinemaReleaseSwitchHTML()}` : ""}
         <!-- CAS-642 W2b: the service-status scope (CAS-635 N3a) spoke moved off this screen — it is a
              statement about a WATCH LIST, not about what this agent is allowed to find. briefToggleSvc stays
              defined: onboarding's own S3/S4 sequence (CAS-628/629) still routes a new agent's draft through
@@ -17641,25 +17763,19 @@ const SHARP_STEPS = {
   v2_styles: {
     noAgent: true, noSkip: true,
     progress: 47,
+    // CAS-1275: the same name+square list stylesListCardHTML uses for Edit Agent's Basic Styles card
+    // (CAS-1274), reusing stylesListRowHTML itself rather than a copy so the two cannot drift. Onboarding's
+    // state is ans.styles, not an agent draft — on/off only, no skip state and no flags.
     body(){
+      const ans = onbFlow.answersV2 || onbAnswersV2Default();
+      const rows = [...ONB_GENRES].sort((a,b)=>a.localeCompare(b))
+        .map(g=>stylesListRowHTML(g, ans.styles.includes(g) ? "+" : null, false, "obStylesListTap")).join("");
       return `<div class="obwrap"><h2 class="obhd">What are your favourite styles of movie?</h2></div>
-        <p class="ossub">Pick as many as you like.</p><div class="chips" id="obStylesChips"></div>`;
+        <p class="ossub">Tap the square to add a style. Pick as many as you like.</p>
+        <div class="sllist">${rows}</div>`;
     },
     wire(){
       onbFlow.answersV2=onbAnswersV2Load();
-      const ans=onbFlow.answersV2;
-      const box=$("obStylesChips");
-      if(box){
-        box.innerHTML="";
-        ONB_GENRES.forEach(g=>{
-          box.appendChild(obGenChip(g, ans.styles.includes(g), ()=>{
-            const i=ans.styles.indexOf(g);
-            i<0 ? ans.styles.push(g) : ans.styles.splice(i,1);
-            onbAnswersV2Save(ans);
-            renderOnbStep("v2_styles");
-          }));
-        });
-      }
     },
   },
   v2_ages: {
@@ -18183,7 +18299,7 @@ function briefOpen(id, from){
   // axis) has to read and, on Save, re-write the SAME global answer every other agent carries, or a save
   // would freeze this one agent's status back onto whatever it happened to open with.
   onbFlow.watch = JSON.parse(JSON.stringify(watchPrefs));
-  onbFlow.briefAdvancedOpen = false;   // CAS-1267: Advanced is always collapsed on open
+  onbFlow.briefTab = "basic";   // CAS-1274: always opens on Basic
   $("onbStep").classList.add("open"); lockBodyScroll(true);
   logEvent("briefing_opened",{id});
   gotoStep("briefing","none");
@@ -18198,10 +18314,11 @@ window.briefGo=step=>{
   if(step==="genres"){ styleGridView="agent"; styleGridSel=null; }
   gotoStep(step,"fwd");
 };
-// CAS-1267: Advanced stays open through repaints of the same Briefing visit (renderOnbStep re-runs body()
-// on every control change) but is never persisted — briefOpen resets it on every open.
-window.briefToggleAdvanced=()=>{
-  onbFlow.briefAdvancedOpen = !onbFlow.briefAdvancedOpen;
+// CAS-1274: the Basic|Advanced switch replacing CAS-1267's collapsible Advanced section. The chosen tab
+// stays through repaints of the same Briefing visit (renderOnbStep re-runs body() on every control change)
+// but is never persisted — briefOpen resets it to Basic on every open.
+window.briefSetTab=tab=>{
+  onbFlow.briefTab = tab;
   renderOnbStep("briefing");
 };
 // CAS-635 N3a: a tap flips one window's service scope in place — no sub-screen, no navigation, same
@@ -18400,6 +18517,32 @@ function agentAudienceSum(c){
     : (c.yearsBack ? `released in the last ${c.yearsBack} year${c.yearsBack===1?"":"s"}` : "any year");
   return `${ageText}, ${eraText}`;
 }
+// CAS-1274: the age-rating half of agentAudienceSum's sentence, restated as its own Agents-card row
+// ("Age rating") now that Audience is retired. agentAudienceSum itself is untouched — the onboarding
+// reveal (onbAgentRevealHTML) still reads it for its own AUDIENCE row.
+function agentAgeRatingSum(c){
+  return c.age===null ? "No ratings admitted"
+    : (!c.age.length || c.age.length>=AGE_LEVELS.length) ? "Any age"
+    : joinAnd(c.age);
+}
+// CAS-1274: the era half of agentAudienceSum's sentence, restated as the Agents card's "Released" row —
+// only ever shown when agentAdvancedSet(c).years is true, so it never has to cover the "any year" case.
+function agentReleasedSum(c){
+  return (c.year||[]).length
+    ? `In ${joinAnd(c.year.slice().sort().reverse())}`
+    : `In the last ${c.yearsBack} year${c.yearsBack===1?"":"s"}`;
+}
+// CAS-1274: one rule for what counts as "set" in Advanced, shared by the Agents card (the ADVANCED-tagged
+// rows) and Edit Agent's Basic view ("SET IN ADVANCED"). Occasions and Alerts are not part of this —
+// Alerts already shows on the card's who-line.
+function agentAdvancedSet(c){
+  return {
+    budget: !!((c.selScale||0)>0 || (c.budget||0)>0),
+    awards: !!((c.selAwards||0)>0),
+    years:  !!((c.year||[]).length || (c.yearsBack||0)>0),
+    cinema: !!c.cinemaReleaseOnly,
+  };
+}
 
 // CAS-643: who-line labels, keyed on c.who. "kids" is a normCascade-valid value no recipe emits
 // today, but a label is kept for it so a hand-set value never prints "undefined".
@@ -18497,6 +18640,27 @@ function agentMetricsHTML(c){
   const rowB=[last, recentLine].map(s=>`<span class="agmstat">${s}</span>`).join("");
   return `<span class="agmrow a">${rowA}</span><span class="agmrow b">${rowB}</span>`;
 }
+// CAS-1274: the Agents card's settings grid — Styles, Score, Age rating, then one row per Advanced setting
+// agentAdvancedSet(c) says is in play (Budget, Awards, Released, Cinema, in that order), each tagged
+// ADVANCED. Budget/Awards rows reading "Any" never render, since they're gated on being "set" already.
+// Audience is retired — its age half moved to Age rating, its era half to Released.
+function agentSettingsRowsHTML(c){
+  const pairCount=Object.keys(c.pairs||{}).length;
+  const stylesVal=agentStylesSum(c) + (pairCount ? ` · ${pairCount} combination${pairCount===1?"":"s"}` : "");
+  const adv=agentAdvancedSet(c);
+  const advRows=[
+    adv.budget ? ["Budget", agentBudgetSum(c)] : null,
+    adv.awards ? ["Awards", agentAwardsSum(c)] : null,
+    adv.years  ? ["Released", agentReleasedSum(c)] : null,
+    adv.cinema ? ["Cinema", "Had a cinema release"] : null,
+  ].filter(Boolean).map(([lbl,val])=>
+    `<span class="agsrow"><span class="agslbl">${lbl}</span><span class="agsval">${esc(val)}<span class="agtag">ADVANCED</span></span></span>`
+  ).join("");
+  return `<span class="agsrow"><span class="agslbl">Styles</span><span class="agsval">${esc(stylesVal)}</span></span>
+    <span class="agsrow"><span class="agslbl">Score</span><span class="agsval">${agentCascadeSumHTML(c)}</span></span>
+    <span class="agsrow"><span class="agslbl">Age rating</span><span class="agsval">${esc(agentAgeRatingSum(c))}</span></span>
+    ${advRows}`;
+}
 function renderAgentsScreen(){
   const _t664=performance.now();
   const n=cascades.length;
@@ -18525,13 +18689,7 @@ function renderAgentsScreen(){
           <button type="button" class="ag-edit ca-btn" onclick="editAgentRow('${escA(c.id)}')"
               aria-label="Edit ${escA(c.name)}" title="Edit ${escA(c.name)}">Edit</button>
         </span>
-        <span class="agsettings">
-          <span class="agsrow"><span class="agslbl">Styles</span><span class="agsval">${esc(agentStylesSum(c))}</span></span>
-          <span class="agsrow"><span class="agslbl">Score</span><span class="agsval">${agentCascadeSumHTML(c)}</span></span>
-          <span class="agsrow"><span class="agslbl">Budget</span><span class="agsval">${esc(agentBudgetSum(c))}</span></span>
-          <span class="agsrow"><span class="agslbl">Awards</span><span class="agsval">${esc(agentAwardsSum(c))}</span></span>
-          <span class="agsrow"><span class="agslbl">Audience</span><span class="agsval">${esc(agentAudienceSum(c))}</span></span>
-        </span>
+        <span class="agsettings">${agentSettingsRowsHTML(c)}</span>
         <span class="agmetrics">${agentMetricsHTML(c)}</span>
         ${stale
           ? `<span class="agwarn">⚠ nothing newer than 3 weeks — constraints may be too narrow
@@ -20777,7 +20935,7 @@ function fillListChunked(listEl, items, gen, freshFn, onDone){
     if(gen!==renderGen || !listEl.isConnected){ onDone && onDone(); return; }
     let buf=""; const end=Math.min(items.length, i+BATCH);
     for(; i<end; i++){ const m=items[i];
-      buf += taggedOut(m) ? stubHTML(m) : cardHTML(m, freshFn?freshFn(m):false); }
+      buf += taggedOut(m) ? stubHTML(m) : cardHTML(m, freshFn?freshFn(m):false, {inWatch:true}); }
     listEl.insertAdjacentHTML("beforeend", buf);
     observeLazyPosters(listEl);   // CAS-1103: register this batch's new poster tiles, not the whole list again
     if(i<items.length) requestAnimationFrame(step);
@@ -20969,7 +21127,7 @@ function reconcilePatchSettledList(){
     const id=Number(row.id.slice(5)); if(!isFinite(id)) return;
     const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
     const t=document.createElement("template");
-    t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m))).trim();
+    t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m), {inWatch:true})).trim();
     const fresh=t.content.firstElementChild;
     // AC6: a poster that has already loaded (an inline background-image, no data-lazybg left to observe)
     // is carried over onto the fresh node BEFORE the comparison below, so a card whose only "change" is
@@ -21004,6 +21162,10 @@ function render(){
   // (Cascades × titles) and it means membership has exactly one definition, evaluated in exactly one place.
   recomputeFound();
   ensureWatchTab();   // CAS-725: keep the active tab valid before it drives rows/scope-bar below
+  // CAS-1277: rebuilt on every render() (full rebuild or settled reconcile alike) so a tab, mood, sort or
+  // verdict change always re-ranks before any card reads it — a verdict change in particular never touches
+  // watchNavKey(), so it only ever reaches render() through the reconcile branch below.
+  watchYouRanks = watchYouRankMap(watchVisibleRows().rows);
   // CAS-1236: everything above must run even on a settled (non-navigating) pass — recomputeFound is what
   // keeps notify/found/taggedOut honest, and ensureWatchTab can itself force a navigation (a tab that just
   // became invalid) which watchNavKey() (read next) must see.
@@ -21321,7 +21483,7 @@ function fastPatchFindRow(id){
   // film left the list -> let render() handle it
   if(!m || !row || !filmInWatchRows(m)) return false;
   const t=document.createElement("template");
-  t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m))).trim();
+  t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m), {inWatch:true})).trim();
   observeLazyPosters(t.content);   // CAS-1103: this single swapped-in card's own poster tile
   row.replaceWith(t.content.firstElementChild);
   patchFindCounts();

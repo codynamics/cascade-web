@@ -33,22 +33,22 @@ test("CAS-1198 AC6: the Agents screen shows Alerts on for the first-built agent,
   if(await favsWho.count() > 0) await expect(favsWho).not.toContainText("🔔 Alerts on");
 });
 
-test("CAS-1198 AC5: the Edit Agent page's ALERTS section sits between Occasions and WHAT IT LOOKS FOR, toggles, survives Back/reopen, and has no horizontal overflow", async ({ page }) => {
+test("CAS-1198 AC5: the Edit Agent page's ALERTS switch sits under Occasions inside Advanced, toggles, survives Back/reopen, and has no horizontal overflow", async ({ page }) => {
   await buildOnboardedAccount(page);
   await openAgentsScreenFromNav(page);
   await agentRow(page, "Personal Favs").locator(".ag-edit").click();
   await expect(page.locator(".osh.eahn")).toHaveText("Personal Favs");   // CAS-531: the page header IS the name
 
+  // CAS-1274: Alerts lives under the Advanced tab now, alongside Occasions — not its own collapsible
+  // section with a dedicated "ALERTS" heading.
+  await page.locator("#briefTabAdvanced").click();
   const sectionOrder = await page.evaluate(() => {
     const body = document.querySelector("#onbStepInner");
     const occasions = body.querySelector(".osdial.cardbtn");           // occasionsCardHTML()'s own card
-    const usecs = [...body.querySelectorAll(".usec")].map(e => e.textContent.trim());
-    const alerts = [...body.querySelectorAll(".usec")].find(e => e.textContent.trim() === "ALERTS");
+    const alerts = document.querySelector("#onbAlertsOn");
     const before = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-    return { usecs, occasionsBeforeAlerts: occasions && alerts ? before(occasions, alerts) : false };
+    return { occasionsBeforeAlerts: occasions && alerts ? before(occasions, alerts) : false };
   });
-  expect(sectionOrder.usecs[0]).toBe("ALERTS");
-  expect(sectionOrder.usecs[1]).toBe("WHAT IT LOOKS FOR");
   expect(sectionOrder.occasionsBeforeAlerts).toBe(true);
 
   // Personal Favs is not the onboarding-massive template, so it must open with alerts off.
@@ -71,6 +71,7 @@ test("CAS-1198 AC5: the Edit Agent page's ALERTS section sits between Occasions 
   await page.locator("#onbStepInner .osback").click();
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
   await agentRow(page, "Personal Favs").locator(".ag-edit").click();
+  await page.locator("#briefTabAdvanced").click();
   await expect(page.locator("#onbAlertsOn")).toHaveClass(/on/);
 
   // And the Agents screen marker now follows the saved switch.
