@@ -128,10 +128,9 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
   await page.evaluate((id) => {
     document.getElementById(`card-${id}`).scrollIntoView({ block: "start" });
   }, card20Id);
-  // CAS-1247 C6: scrolling past 30px now collapses #watchTop to #wtMini on a deferred `scroll` event, with
-  // a compensating margin applied once that handler runs — not synchronously inside scrollIntoView(). Give
-  // it a tick to settle so the baseline below is read in the same (settled) state as the post-render
-  // measurement, rather than racing the collapse and reading a transient mid-compensation position.
+  // Give scrollIntoView's own scroll a tick to settle so the baseline below is read in the same settled
+  // state as the post-render measurement, rather than racing it. CAS-1283: the Watch top bar no longer
+  // collapses on scroll (tap-only now), so this is no longer waiting out a collapse transition too.
   await page.waitForTimeout(100);
   const card20Top = await page.evaluate((id) =>
     document.getElementById(`card-${id}`).getBoundingClientRect().top

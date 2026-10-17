@@ -3562,17 +3562,19 @@
   .moodadd{flex:none;height:34px;padding:0 12px;border-radius:10px;border:1px dashed #4a5263;background:none;
     color:var(--dim);font:600 12.5px/1 var(--font-body);cursor:pointer;white-space:nowrap}
   .moodchip:focus-visible,.moodadd:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-  /* the collapsed bar: one slim row in place of the stages and moods once the list has scrolled */
+  /* the collapsed bar: one slim row in place of the stages and moods, toggled only by a tap (CAS-1283) */
   #wtMini{display:none}
-  #cascbar.wtcollapsed:not(.wtopen) #watchTop{display:none}
-  #cascbar.wtcollapsed:not(.wtopen) #wtMini{display:flex;height:38px;align-items:center;gap:8px;padding:0 14px;
+  #cascbar.wtcollapsed #watchTop{display:none}
+  #cascbar.wtcollapsed #wtMini{display:flex;height:38px;align-items:center;gap:8px;padding:0 14px;
     font:600 12.5px/1 var(--font-body);color:var(--ink);cursor:pointer;border-bottom:1px solid var(--line)}
   #wtMini .gdot{width:7px;height:7px;border-radius:50%;flex:none}
   #wtMini .wtsep{color:var(--faint)}
   #wtMini .wtmood{color:var(--dim)}
   #wtMini .wtchev{margin-left:auto;color:var(--faint);font-size:11px}
-  #cascbar.wtcollapsed.wtopen{box-shadow:0 22px 30px -14px rgba(0,0,0,.85);padding-bottom:12px;
-    border-bottom:1px solid var(--line)}
+  /* CAS-1283: the collapse handle — the open bar's own last row, a full-width tap target */
+  #wtHandle{display:flex;align-items:center;justify-content:center;height:22px;color:var(--faint);
+    font-size:12px;cursor:pointer}
+  #cascbar.wtcollapsed #wtHandle{display:none}
   /* the mood sheet's own fields, above the sections the Filters sheet already has */
   .mfinput{width:100%;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);
     color:var(--ink);font:600 15px var(--font-body);padding:0 12px;box-sizing:border-box}
@@ -3638,6 +3640,9 @@
   .tstat b{display:block;font:800 19px/1.1 var(--font-body);color:var(--ink)}
   .tstat span{display:block;font:600 10.5px/1.3 var(--font-body);color:var(--faint);margin-top:4px}
   .tnote{font:500 12px/1.5 var(--font-body);color:var(--dim);margin:0 0 9px}
+  .tnotes{display:grid}
+  .tnotes > .tnote{grid-area:1/1}
+  .tnotes > .tnote.off{visibility:hidden}
   .tmap{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px 9px 11px}
   .tgrid{display:grid;gap:3px;align-items:center}
   .tgrid .th{font:700 9px/1 var(--font-body);letter-spacing:.2px;color:var(--faint);text-align:center;padding-bottom:3px}
@@ -4019,10 +4024,12 @@
          everything below it sits that much higher. -->
     <!-- CAS-1247: the Watch top area is now two stage groups (Cinema/Home) plus a mood row, replacing the
          old stage+agent rail and the sort-switch/search/Filters tools row this comment used to describe.
-         renderWatchTop() fills #watchTop in; #wtMini is the one-row summary shown once the list has scrolled
-         (the collapse behaviour lives in the scroll listener near the bottom of this script). -->
+         renderWatchTop() fills #watchTop in; #wtMini is the one-row summary shown while collapsed.
+         CAS-1283: collapse is tap-only now (via #wtHandle/#wtMini) — scrolling never changes this bar's
+         state (the toggle itself lives near the bottom of this script). -->
     <div id="wtMini" role="button" tabindex="0" aria-label="Show stages and moods"></div>
     <div class="watchtop" id="watchTop"></div>
+    <div id="wtHandle" role="button" tabindex="0" aria-label="Hide stages and moods">▴</div>
     <!-- CAS-1223: the standalone sort button is gone from Watch — kept only as inert state (hidden, never
          focused) so syncSortCtl's own #sort option lookup is untouched. -->
     <button type="button" class="sortctl ca-btn x" id="sortCtl" aria-haspopup="listbox" aria-expanded="false"
@@ -5296,6 +5303,7 @@ const DEVICE_KEY_ALLOWLIST = {
   "cascade_diag": "a session-only diagnostics flag, set by ?diag= in the URL",
   "cascade_had_account": "whether this device was signed in as of its last boot (CAS-517 cold-start gate)",
   "cascade_onboarded": "whether this device has completed onboarding once",
+  "cascade_wt_collapsed": "CAS-1283: whether the Watch top bar (stage groups + moods) is collapsed to #wtMini on this device",
 };
 // CAS-1222 item 5: "the first boot of this build deletes every other cascade_ key" — rather than naming
 // each retired/migrated key by hand (easy to miss one), this sweeps any "cascade_" key NOT in the
@@ -10248,7 +10256,7 @@ function applyMoodToState(mood){
     watchPickedBy[tab]=mood.pickedBy||"all";
     watchWatchedSel[tab]=new Set(mood.watched||[]);
     watchGenreOff[tab]=new Set();   // CAS-1273: moods no longer filter by style; mood.stylesOff is ignored
-    watchBadgeSel[tab]=new Set(mood.badges||[]);
+    watchBadgeSel[tab]=new Set();   // CAS-1281: moods no longer filter by badge; mood.badges is ignored
     watchMineOnly[tab]=mood.mineOnly!==false;
     watchSearch[tab]=""; watchSearchRaw[tab]="";
     if(tab!=="in_cinema"){
@@ -10323,6 +10331,9 @@ window.toggleMoodDraftWatched = key => { if(!moodDraft) return; moodDraft.watche
 window.toggleMoodDraftGenre = g => { if(!moodDraft) return; moodDraft.stylesOff.has(g)?moodDraft.stylesOff.delete(g):moodDraft.stylesOff.add(g); renderMoodSheetBody(); };
 window.selectAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.stylesOff.clear(); renderMoodSheetBody(); };
 window.clearAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.stylesOff=new Set(watchSheetGenres[watchTab]||[]); renderMoodSheetBody(); };
+// CAS-1281: the mood sheet's Badges section is gone (Lee: it worked as a legend, not a filter people
+// actually wanted — see the new Help article instead), so nothing calls this any more. Left in place
+// rather than deleted — moodDraft.badges still lives on the draft shape and the stored mood shape.
 window.toggleMoodDraftBadge = key => { if(!moodDraft) return; moodDraft.badges.has(key)?moodDraft.badges.delete(key):moodDraft.badges.add(key); renderMoodSheetBody(); };
 window.toggleMoodDraftAlsoShow = key => {
   if(!moodDraft) return;
@@ -10345,7 +10356,7 @@ window.saveMoodFromSheet = () => {
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
     name, order:d.order, top:!!d.top,
     agentsOff:[...d.agentsOff], mineOnly:!!d.mineOnly, pickedBy:d.pickedBy,
-    watched:[...d.watched], stylesOff:[], badges:[...d.badges],   // CAS-1273: styles no longer saved from the mood sheet
+    watched:[...d.watched], stylesOff:[], badges:[],   // CAS-1273: styles no longer saved from the mood sheet; CAS-1281: nor are badges
     alsoShow: d.alsoShow ? {premium:[...(d.alsoShow.premium||[])], rent:[...(d.alsoShow.rent||[])], stream:[...(d.alsoShow.stream||[])]} : null,
   };
   const idx=watchMoods.findIndex(m=>m.id===mood.id);
@@ -10479,16 +10490,6 @@ function renderMoodSheetBody(){
       ${isOwn?"":`onclick="toggleMoodDraftAlsoShow('${w.key}')"`}>
       <span class="gdot ${w.key}" aria-hidden="true"></span>${esc(w.label)}<span class="jn">${count}</span>${isOwn?`<span class="alwaystag">always</span>`:""}</button>`;
   }).join("");
-  const badgeHTML=BADGE_FILTER_OPTS.map(opt=>{
-    const b=TENT_BADGE[opt.key];
-    const on=d.badges.has(opt.key);
-    const count=rows.filter(m=>scaleTier(m)===opt.key).length;
-    return `<button type="button" class="badgeopt${on?" on":""}" aria-pressed="${on}"
-      onclick="toggleMoodDraftBadge('${opt.key}')">
-      <span class="badgeoptrow"><span class="badgeopticon" aria-hidden="true">${b.ico}</span>
-      <b>${esc(b.label)}</b><span class="jn">${count}</span></span>
-      <span class="badgeoptdesc">${esc(opt.descriptor())}</span></button>`;
-  }).join("");
   const body=$("watchSheetBody");
   if(body) body.innerHTML=`
     <div class="wsheetsec">
@@ -10532,11 +10533,7 @@ function renderMoodSheetBody(){
     ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Also show</span></div>
       <div class="chips">${alsoShowHTML}</div>
-    </div>`}
-    <div class="wsheetsec">
-      <div class="wsheethd"><span>Badges</span></div>
-      <div class="badgeopts">${badgeHTML}</div>
-    </div>`;
+    </div>`}`;
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
     if(!d.editingId){ delBtn.textContent="Cancel"; delBtn.disabled=false; }
@@ -13850,6 +13847,10 @@ const HELP_ARTICLES = [
   {slug:"the-score", title:"The score",
    summary:"People and Critics, where each comes from, and that it is one figure on one scale.",
    body:"Every film in Cascade carries one Cascade score, from 0 to 100 — not two separate numbers you have to weigh against each other.\n\nOnce a film is released — including PVOD, rental and streaming — that score is built from two things: what people who watched it thought (People), and what critics thought (Critics). When both exist, the score blends them; when only one does, the score is that one alone.\n\nBefore a film opens in cinemas there's usually nothing to review yet, so its score is built from how much it's being talked about instead — its buzz. If it already carries a People or Critics score — say, from an overseas release — the score blends that in with buzz rather than running on buzz alone. Once it's in cinemas, the same rule carries on: if a People or Critics score exists, the score blends it in with buzz rather than switching over to it outright. Either way it lands on the same 0-100 scale, so a marker you set once means the same thing whether the film is still upcoming or already out."},
+  {slug:"badges", title:"Badges",
+   summary:"What Landmark, Must-see, Blockbuster and Anticipated mean on a film card.",
+   body:"A film carries at most one badge. It marks how big or talked-about the film is right now — not your own taste.\n\n"
+     + BADGE_FILTER_OPTS.map(opt=>`${TENT_BADGE[opt.key].ico} ${TENT_BADGE[opt.key].label} — ${opt.descriptor()}`).join("\n\n")},
   {slug:"setting-the-bar", title:"Setting the bar",
    summary:"Markers per window, the single admission floor, and that moving a marker re-places films immediately.",
    body:"Each window an agent tracks — Cinema, Premium, Rent, Stream — can carry its own marker: a minimum score for a film to be listed once it reaches that window. But your agent doesn't re-test a film against a fresh marker every time it moves on — it's admitted the moment it clears the lowest marker among every window you're tracking, and stays admitted from there. Markers still decide where a film is placed: the earliest window you've given a marker is where an agent judges a film in, while a later window you're tracking but haven't marked just carries it forward once it's already admitted.\n\nYou can set a window's marker to Off, which lists everything that reaches that window regardless of score. Turning a window off entirely, so it's never tracked at all, isn't something an agent decides for itself — that's set account-wide, in Service tracking.\n\nDrag a marker and Cascade re-checks every film your agent has already found against the new bar straight away — no refresh needed. A film that no longer clears it drops from the agent's list; one that now does appears. (A film you've set Watch On for yourself by hand is protected from this — see “Watch On and overrides”.)"},
@@ -14083,7 +14084,6 @@ function styleGridFlags(c){
     if(!((data.lean<0 && listed) || (data.lean>0 && !listed))) return;
     flags.push({kind, a, b, lean:data.lean, conf:data.conf, n:data.n, state, want: data.lean>0 ? "+" : "-"});
   };
-  ONB_GENRES.forEach(g=>{ if(T.styles[g]) consider("style", g, null, T.styles[g], styleGridState(c,g)); });
   Object.keys(T.pairs).forEach(key=>{
     const pr=T.pairs[key];
     if(pr.primary >= pr.other) return;        // T.pairs carries both orders — count each unordered pair once
@@ -17102,9 +17102,10 @@ function styleGridScreenHTML(){
     <button type="button" aria-pressed="${styleGridView==="taste"}" class="${styleGridView==="taste"?"on":""}"
       onclick="styleGridSetView('taste')">Your taste</button>
   </div>`;
-  const note = styleGridView==="agent"
-    ? `Tap the first column to cycle a whole style (+ list, − skip, neither), or a square to cycle two styles together (+, −, follow its styles). A combination beats its styles.`
-    : `The same grid coloured by your verdicts, exactly as on Your taste. Switch back to compare.`;
+  const notesHTML = `<div class="tnotes">
+      <p class="tnote${styleGridView==="agent"?"":" off"}">Tap the first column to cycle a whole style (+ list, − skip, neither), or a square to cycle two styles together (+, −, follow its styles). A combination beats its styles.</p>
+      <p class="tnote${styleGridView==="taste"?"":" off"}">The same grid coloured by your verdicts, exactly as on Your taste. Switch back to compare.</p>
+    </div>`;
   const headerHTML = `<span class="tc0"></span><span class="th all">All</span>`
     + rows.map(g=>`<span class="th">${esc(tasteShortName(g))}</span>`).join("");
   const rowsHTML = rows.map(primary=>{
@@ -17127,7 +17128,7 @@ function styleGridScreenHTML(){
   return `<p class="ossub">What this agent lists, style by style and in combination.</p>
     ${styleGridSuggestionsHTML(flags)}
     ${switchHTML}
-    <p class="tnote">${esc(note)}</p>
+    ${notesHTML}
     <div class="tmap">
       <div class="tscroll"><div class="tgrid" style="grid-template-columns:92px repeat(${1+rows.length},26px)">${headerHTML}${rowsHTML}</div></div>
       ${legend}
@@ -21531,12 +21532,19 @@ function trimFoot(){
   footPad.style.height = need ? need+"px" : "";
 }
 addEventListener("scroll", trimFoot, {passive:true});
-// CAS-1247 C6: the Watch top bar (stage groups + moods) collapses to one slim row (#wtMini) once the list
-// has scrolled, and re-opens in place on a tap — without moving the list underneath it either way. This
-// listener only ever toggles classes, sets #cascbar's own compensating margin, and fills #wtMini; it never
-// calls render().
+// CAS-1283: the Watch top bar (stage groups + moods) stays open regardless of scroll — only a tap on its
+// own handle (#wtHandle) collapses it to one slim row (#wtMini), and a tap on that row reopens it, without
+// moving the list underneath it either way. The chosen state is remembered per device (localStorage) so a
+// reload boots straight into it. Neither path ever calls render(); they only toggle classes, set #cascbar's
+// own compensating margin, and fill #wtMini.
+const WT_COLLAPSE_KEY = "cascade_wt_collapsed";
+function wtStoredCollapsed(){
+  try{ return localStorage.getItem(WT_COLLAPSE_KEY)==="1"; }catch(e){ return false; }
+}
+function wtStoreCollapsed(v){
+  try{ localStorage.setItem(WT_COLLAPSE_KEY, v?"1":"0"); }catch(e){}
+}
 let wtCollapseMarginPx = 0;
-let wtOpenAtScrollY = null;
 function wtRefreshMini(){
   const mini=$("wtMini"); if(!mini) return;
   const curKey = watchTab==="in_cinema" ? watchCinemaStage : watchTab;
@@ -21548,8 +21556,8 @@ function wtRefreshMini(){
 // Measuring shortH forces a layout flush while the bar is shrunk but not yet margin-compensated — if the
 // page is scrolled to (or past) what is, for that one instant, a shorter document, the browser clamps
 // scrollY down to fit before the very next line restores the margin and the taller height. Clamping only
-// moves scrollY down, never back up once the margin is restored, so without this the jump-straight-to-the-
-// bottom case (not a gradual scroll past the 30px threshold) permanently loses a few px of scroll position.
+// moves scrollY down, never back up once the margin is restored, so without this a collapse/expand tap while
+// scrolled near the very bottom of the page could permanently lose a few px of scroll position.
 function wtPreservingScrollY(fn){
   const y=window.scrollY;
   fn();
@@ -21564,48 +21572,31 @@ function wtEnterCollapsed(bar){
     wtCollapseMarginPx = Math.max(0, fullH-shortH);
     bar.style.marginBottom = wtCollapseMarginPx+"px";
   });
+  syncHeaderHeight();
 }
 function wtLeaveCollapsed(bar){
   wtPreservingScrollY(() => {
-    bar.classList.remove("wtcollapsed","wtopen");
+    bar.classList.remove("wtcollapsed");
     bar.style.marginBottom = "";
   });
-  wtOpenAtScrollY = null;
+  syncHeaderHeight();
 }
-function onWatchTopScroll(){
-  const bar=$("cascbar"); if(!bar) return;
-  const y=window.scrollY;
-  const collapsed=bar.classList.contains("wtcollapsed");
-  if(y>30){
-    if(!collapsed) wtEnterCollapsed(bar);
-    else if(bar.classList.contains("wtopen") && wtOpenAtScrollY!=null && Math.abs(y-wtOpenAtScrollY)>40){
-      bar.classList.remove("wtopen");
-      bar.style.marginBottom = wtCollapseMarginPx+"px";
-      wtOpenAtScrollY = null;
-    }
-  } else if(collapsed){
-    wtLeaveCollapsed(bar);
-  }
-}
-addEventListener("scroll", onWatchTopScroll, {passive:true});
 window.toggleWatchTopMini = () => {
-  const bar=$("cascbar"); if(!bar || !bar.classList.contains("wtcollapsed")) return;
-  if(bar.classList.contains("wtopen")){
-    bar.classList.remove("wtopen");
-    bar.style.marginBottom = wtCollapseMarginPx+"px";
-    wtOpenAtScrollY = null;
-  } else {
-    bar.classList.add("wtopen");
-    bar.style.marginBottom = "";
-    wtOpenAtScrollY = window.scrollY;
-  }
+  const bar=$("cascbar"); if(!bar) return;
+  const collapsed=bar.classList.contains("wtcollapsed");
+  if(collapsed) wtLeaveCollapsed(bar); else wtEnterCollapsed(bar);
+  wtStoreCollapsed(!collapsed);
 };
 {
-  const mini=$("wtMini");
-  if(mini){
-    mini.addEventListener("click", toggleWatchTopMini);
-    mini.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleWatchTopMini(); } });
-  }
+  const mini=$("wtMini"), handle=$("wtHandle"), bar=$("cascbar");
+  const wireTap = el => {
+    if(!el) return;
+    el.addEventListener("click", toggleWatchTopMini);
+    el.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleWatchTopMini(); } });
+  };
+  wireTap(mini);
+  wireTap(handle);
+  if(bar && wtStoredCollapsed()) bar.classList.add("wtcollapsed");
 }
 // Repaint, and leave the film's row exactly where it was on screen — then animate it between the height it
 // had and the height it now has, so the change reads as a shrink (or an unfold) rather than a swap. Under
