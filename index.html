@@ -6833,55 +6833,17 @@ function qScoreHTML(m, extraClass=""){
 // blurred the text and left most films looking alike): c1 early read (conf under 0.5, under ~3 matching
 // films), c2 building (under 0.75), c3 sure. The number is always solid white.
 const youLevel = conf => conf < 0.5 ? 1 : conf < 0.75 ? 2 : 3;
-// CAS-1277: on the Watch listing, You shows RANK within the list on screen (99 best, 1 weakest), not the
-// absolute tasteMatch value — a 58-97 range with many ties at the top (20 films sharing 95) read as
-// indistinguishable rows. watchYouRanks is rebuilt every Watch render() from the films actually in
-// watchVisibleRows().rows; matchBadgeHTML only reads it when inWatch is true, falling back to the
-// absolute value/level everywhere else (Find, the film page, Alerts, onboarding reveals).
-let watchYouRanks = new Map();
-// Pure rank math (AC1/AC2): `items` are {id, value, conf, tiebreak} — value is tasteMatch(m).value,
-// tiebreak is cascadeScore(m) ("Public"), id is tmdb_id. Sorted by value desc, then tiebreak desc, then id
-// asc — the exact order sortMoviesBy("you") already ranks the list in, so rank 99 reads at the top,
-// falling to 1 at the bottom. Confidence level is relative to THIS list: each item's own conf compared
-// against the list's own lower/upper tercile cut — except under 3 items, too few to cut into thirds,
-// where the absolute youLevel() stands in.
-function rankYouItems(items){
-  const map = new Map();
-  const n = items.length;
-  if(!n) return map;
-  const sorted = items.slice().sort((a, b) => {
-    if(b.value !== a.value) return b.value - a.value;
-    if(b.tiebreak !== a.tiebreak) return b.tiebreak - a.tiebreak;
-    return a.id - b.id;
-  });
-  const confCuts = n >= 3 ? sorted.map(x => x.conf).slice().sort((a, b) => a - b) : null;
-  sorted.forEach((x, r) => {
-    const rank = n === 1 ? 99 : Math.round(99 - 98 * r / (n - 1));
-    const level = confCuts
-      ? (x.conf < confCuts[Math.floor(n / 3)] ? 1 : x.conf < confCuts[Math.floor(2 * n / 3)] ? 2 : 3)
-      : youLevel(x.conf);
-    map.set(x.id, {rank, level, pos: r + 1, total: n});
-  });
-  return map;
-}
-function watchYouRankMap(rows){
-  const items = rows.map(m => {
-    const t = tasteMatchCached(m);
-    return t ? {id: m.tmdb_id, value: t.value, conf: t.conf, tiebreak: cascadeScore(m)} : null;
-  }).filter(Boolean);
-  return rankYouItems(items);
-}
-function matchBadgeHTML(m, inWatch=false){
+// CAS-1293: the Watch listing shows the same absolute tasteMatch(m).value everywhere now — no in-list rank.
+// Removed CAS-1277's watchYouRanks/rankYouItems/watchYouRankMap along with it.
+function matchBadgeHTML(m){
   const t = tasteMatch(m);
   if(!t) return "";
-  const r = inWatch ? watchYouRanks.get(m.tmdb_id) : null;
-  const value = r ? r.rank : t.value;
-  const level = r ? r.level : youLevel(t.conf);
-  const side = value >= 50 ? "for" : "against";
-  const title = r
-    ? `You ${value} — #${r.pos} of ${r.total} in this list for you, from your verdicts on films like it.`
-    : `You ${value}. Cascade's read of how much you'll like this, from your own verdicts on films like it.`;
-  return `<span class="qyou ${side} c${level}" title="${title}" aria-label="You ${value}"><b>${value}</b><small>You</small></span>`;
+  const level = youLevel(t.conf);
+  const side = t.value >= 50 ? "for" : "against";
+  const pub = cascadeScore(m);
+  const adj = t.value - pub;
+  const title = `You ${t.value} — Public ${pub}, adjusted ${adj>=0?"+":""}${adj} by your verdicts on films with these style combinations.`;
+  return `<span class="qyou ${side} c${level}" title="${title}" aria-label="You ${t.value}"><b>${t.value}</b><small>You</small></span>`;
 }
 function publicLozengeHTML(m, extraClass=""){
   const cls = extraClass ? " "+extraClass : "";
@@ -8432,7 +8394,7 @@ function cardTopHTML(m, inWatch=false){
   // row, keep it beside the title instead; see the "MATCH ON CARDS" CSS for which chip each card shows).
   // Signed out (the shared film page, onboarding) the card draws exactly as it always has.
   const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  const matchBadge = signedIn ? matchBadgeHTML(m, inWatch) : "";
+  const matchBadge = signedIn ? matchBadgeHTML(m) : "";
   const titleScore = signedIn ? matchBadge + publicLozengeHTML(m, "intitle") : qScoreHTML(m);
   const rowScore = signedIn ? publicLozengeHTML(m, "inrow") : "";
   // CAS-179: one grid, one order — title · genres·language · synopsis · money · scores · awards, with
@@ -11513,6 +11475,14 @@ function tasteProfile(){
     pr.conf = tasteConf(pr.n);
     pr.films = filmsOut(pr.films);
   });
+  // CAS-1293: the person's baseline lean across their own style combinations, feeding youScore()'s own
+  // smoothing — the n-weighted mean of pr.lean over each unordered pair once (pr.primary < pr.other skips
+  // the mirrored "h|g" entry pairs always carries alongside "g|h").
+  let pairBaseSum = 0, pairBaseN = 0;
+  Object.values(pairs).forEach(pr => {
+    if(pr.primary < pr.other && pr.n > 0){ pairBaseSum += pr.lean * pr.n; pairBaseN += pr.n; }
+  });
+  const pairBaseline = pairBaseN ? pairBaseSum / pairBaseN : 0;
 
   const scores = counted.filter(v => v.w > 0 && cascadeScore(v.m) > 0)
                          .map(v => cascadeScore(v.m)).sort((a,b) => a-b);
@@ -11525,42 +11495,44 @@ function tasteProfile(){
 
   // CAS-1260: tasteMatch() reads every judged film with its styles.
   const judged = counted.map(v => ({id:v.id, kind:v.kind, G:v.G}));
-  const profile = {n: overall.n, overall: {sum:overall.sum, n:overall.n, lean:overall.lean}, styles, pairs, range, ages, latest, judged};
+  const profile = {n: overall.n, overall: {sum:overall.sum, n:overall.n, lean:overall.lean}, styles, pairs, pairBaseline, range, ages, latest, judged};
   _tasteProfileCache = profile;
   return profile;
 }
-// CAS-1260, You (Match v2, Lee 2026-10-14): how much this person is likely to like a film they have not
-// judged, from their own verdicts only. Each verdict is a score out of 100 (MATCH_VERDICT_SCORE). The
-// "combination films" are the judged films that share at least two of this film's styles (one, if the
-// film has only one style), each weighted by overlap = shared styles / all styles of the two films.
-// You = 80% the overlap-weighted average of the combination films + 20% the plain average of every judged
-// film carrying this film's headline (first) style (the combination average alone if there is none), then
-// (CAS-1265) pulled towards a neutral 50 by how thin the evidence is and boosted by how many films the
-// person has judged in this style combination (saturates at 30 films, +15 max). null when no combination
-// film exists. conf = overlap sum / (overlap sum + 3): one exact-match film 0.25, three 0.5.
-const MATCH_VERDICT_SCORE = {wow:100, liked:91, enjoyed:83, soso:34, disliked:17, notfor:17};
+// CAS-1293, You v3 (Lee, 18 Oct): the film's Public score (cascadeScore), adjusted by the person's track
+// record on the film's style COMBINATIONS (whole styles are deliberately excluded — agents already choose
+// those). youScore() is the pure arithmetic, unit-tested directly: each relevant pair's lean is smoothed
+// towards the person's own cross-pair baseline (one TASTE_K=4 smoothing, not towards a neutral 0), the
+// n-weighted average of those leans minus the baseline is the signal `d`, and `d` is scaled asymmetrically
+// (down harder than up — Lee's choice, 18 Oct; do not re-raise) onto the Public score. Replaces CAS-1260/
+// 1265's formula C.
+function youScore({pub, pairs, b}){
+  let s = 0, n = 0;
+  pairs.forEach(r => {
+    const lean = (r.sum + TASTE_K*b) / (r.n + TASTE_K);
+    s += lean * r.n; n += r.n;
+  });
+  const d = n ? s/n - b : 0;
+  const adj = d < 0 ? 45*d : 20*d;
+  const value = Math.max(1, Math.min(99, Math.round(pub + adj)));
+  return {value, adj, n};
+}
 function tasteMatch(m){
   if(!(m.genres && m.genres.length)) return null;
   const T = tasteProfile();
-  const G = [...new Set(m.genres)], head = G[0], need = G.length === 1 ? 1 : 2;
-  let wSum = 0, sSum = 0, films = 0, hSum = 0, hN = 0;
-  T.judged.forEach(v => {
-    if(v.id === m.tmdb_id) return;
-    const shared = G.filter(g => v.G.includes(g)).length;
-    const score = MATCH_VERDICT_SCORE[v.kind];
-    if(shared >= need){
-      const overlap = shared / new Set([...G, ...v.G]).size;
-      wSum += overlap; sSum += overlap * score; films += 1;
+  if(T.n === 0) return null;
+  const pub = cascadeScore(m);
+  if(pub < 0) return null;
+  const G = [...new Set(m.genres)];
+  const pairs = [];
+  for(let i = 0; i < G.length; i++){
+    for(let j = i+1; j < G.length; j++){
+      const pr = T.pairs[G[i]+"|"+G[j]];
+      if(pr && pr.n > 0) pairs.push({sum: pr.sum, n: pr.n});
     }
-    if(v.G.includes(head)){ hSum += score; hN += 1; }
-  });
-  if(!films) return null;
-  const combo = sSum / wSum, main = hN ? hSum / hN : combo;
-  const avg = 0.8 * combo + 0.2 * main;
-  const evidence = 50 + (avg - 50) * wSum / (wSum + 3);
-  const boost = 15 * Math.min(1, Math.log(1 + films) / Math.log(31));
-  const value = Math.max(1, Math.min(99, Math.round(evidence + boost)));
-  return {value, conf: wSum / (wSum + 3), films};
+  }
+  const {value, n} = youScore({pub, pairs, b: T.pairBaseline});
+  return {value, conf: n / (n + TASTE_K), films: n};
 }
 // CAS-1264: sortMoviesBy("you") memoizes tasteMatch per film so sorting a whole list doesn't redo the
 // same judged-film walk once per comparison — cleared at the exact same points _tasteProfileCache is
@@ -21486,10 +21458,6 @@ function render(){
   // (Cascades × titles) and it means membership has exactly one definition, evaluated in exactly one place.
   recomputeFound();
   ensureWatchTab();   // CAS-725: keep the active tab valid before it drives rows/scope-bar below
-  // CAS-1277: rebuilt on every render() (full rebuild or settled reconcile alike) so a tab, mood, sort or
-  // verdict change always re-ranks before any card reads it — a verdict change in particular never touches
-  // watchNavKey(), so it only ever reaches render() through the reconcile branch below.
-  watchYouRanks = watchYouRankMap(watchVisibleRows().rows);
   // CAS-1236: everything above must run even on a settled (non-navigating) pass — recomputeFound is what
   // keeps notify/found/taggedOut honest, and ensureWatchTab can itself force a navigation (a tab that just
   // became invalid) which watchNavKey() (read next) must see.

@@ -122,30 +122,31 @@ test("CAS-1255 AC3: every judged style gets its own row and pairing, no cap", ()
   });
 });
 
-test("CAS-1260 AC6: You for unjudged films against the every-style fixture", () => {
+test("CAS-1293: You for unjudged films against the every-style fixture", () => {
   withTasteFixture(ac3Assignments(), () => {
-    // CAS-1265: value = round(evidence + boost), evidence = 50 + (avg-50)*wSum/(wSum+3), boost =
-    // 15*min(1, ln(1+films)/ln(31)). avg = 17 or 83 in every case here (combo === main, as before).
+    // CAS-1293: value = clamp(round(Public + adj)), adj built from every judged PAIR among the
+    // candidate's (deduped) styles, each pair's lean smoothed towards T.pairBaseline (here 0.2458).
     const cases = [
-      // avg=17, wSum=2 -> evidence=50+(17-50)*2/5=36.8; boost=15*ln(3)/ln(31)=4.7988 -> 42
-      [["Animation","Family","Comedy","Adventure"], [42, 0.4, 2]],
-      // avg=83, wSum=1 -> evidence=50+(83-50)/4=58.25; boost=15*ln(2)/ln(31)=3.0277 -> 61
-      [["Western"], [61, 0.25, 1]],
-      // avg=83, wSum=6 -> evidence=50+(83-50)*6/9=72; boost=15*ln(7)/ln(31)=8.4999 -> 80
-      [["Action","Thriller"], [80, 0.6667, 6]],
-      // avg=83, wSum=4 -> evidence=50+(83-50)*4/7=68.8571; boost=15*ln(5)/ln(31)=7.0302 -> 76
-      [["Drama","Crime","History"], [76, 0.5714, 4]],
-      // avg=83, wSum=4 (6 films @ overlap 2/3) -> same evidence=68.8571; boost=15*ln(7)/ln(31)=8.4999 (films=6) -> 77
-      [["Thriller","Comedy","Action"], [77, 0.5714, 6]],
+      [["Animation","Family","Comedy","Adventure"], [61, 0.75, 12]],
+      [["Action","Thriller"], [89, 0.6, 6]],
+      [["Drama","Crime","History"], [88, 0.75, 12]],
+      // Only the Action|Thriller pair among these three styles was ever judged together: same evidence
+      // as the ["Action","Thriller"] case above, since Thriller|Comedy and Action|Comedy never were.
+      [["Thriller","Comedy","Action"], [89, 0.6, 6]],
     ];
     cases.forEach(([genres, expected]) => {
       const t = E.tasteMatch(scoredFilm(genres, 80));
       assert.deepEqual([t.value, round4(t.conf), t.films], expected, genres.join(", "));
     });
-    // Sharing only one style with every judged film is not a combination: no You.
-    assert.equal(E.tasteMatch(scoredFilm(["Crime","Thriller","Horror"], 80)), null);
-    assert.equal(E.tasteMatch(scoredFilm(["Action","Crime"], 80)), null);
-    assert.equal(E.tasteMatch(scoredFilm(["Music","Documentary"], 80)), null);
+    // A single judged style (Western) or no shared style pair at all: no pair evidence, so no
+    // adjustment — You falls back to the film's own Public score, unlike formula C's "no You" null.
+    assert.deepEqual(
+      [E.tasteMatch(scoredFilm(["Western"], 80)).value, E.tasteMatch(scoredFilm(["Western"], 80)).films],
+      [80, 0]
+    );
+    assert.equal(E.tasteMatch(scoredFilm(["Crime","Thriller","Horror"], 80)).value, 80);
+    assert.equal(E.tasteMatch(scoredFilm(["Action","Crime"], 80)).value, 80);
+    assert.equal(E.tasteMatch(scoredFilm(["Music","Documentary"], 80)).value, 80);
   });
 });
 

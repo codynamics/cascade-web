@@ -286,8 +286,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // CAS-1251: tasteProfile/tasteMatch are the taste-profile calculation (style leans and a Match number,
   // built from the verdict sets above and cascadeScore) — exported directly so a test can call them without
   // a real account store or a real catalogue of verdicts. CAS-1254: matchBadgeHTML is the Match badge's own
-  // render, exported so a test can assert its certainty class/bars directly.
-  tasteProfile, tasteMatch, matchBadgeHTML, publicLozengeHTML, tasteStyleMapData, creditsHTML,
+  // render, exported so a test can assert its certainty class/bars directly. CAS-1293: youScore is the pure
+  // You-v3 arithmetic behind tasteMatch, exported so a test can assert it directly against the ticket's own
+  // worked fixtures.
+  tasteProfile, tasteMatch, youScore, matchBadgeHTML, publicLozengeHTML, tasteStyleMapData, creditsHTML,
   // CAS-1289: renderStyleMapSection is the Style map card's own render, and tasteSelPrimary/tasteSelOther
   // (module-level lets, same reassignment pattern as watchTab above) are the cell it's currently showing
   // detail for -- exported through getters/setters so a test can seed a stale selection (left over from a
@@ -296,14 +298,6 @@ if(typeof window.CascadeAuth === "undefined"){
   get tasteSelPrimary(){ return tasteSelPrimary; },
   get tasteSelOther(){ return tasteSelOther; },
   setTasteSel(primary, other){ tasteSelPrimary = primary; tasteSelOther = other; },
-  // CAS-1277: rankYouItems is the pure rank/confidence-level math (over plain {id,value,conf,tiebreak}
-  // items) behind the Watch listing's list-relative You lozenge, exported so a test can assert the
-  // ticket's own worked fixtures directly; watchYouRankMap is the thin film-fixture wrapper around it.
-  // watchYouRanks is reassigned wholesale every render(), so it's exposed through a getter/setter like
-  // watchTab elsewhere in this file.
-  rankYouItems, watchYouRankMap,
-  get watchYouRanks(){ return watchYouRanks; },
-  setWatchYouRanks(v){ watchYouRanks = v; },
   // CAS-1269: tasteLeanWords is tasteDetailHTML's own lean-to-words mapping, pulled out so the Style
   // screen's suggestions panel and cell detail use the exact same wording — exported so a test can assert
   // it directly.

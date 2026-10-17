@@ -103,29 +103,31 @@ test("CAS-1251 AC1: style/pairing leans and confidence from a fixture of six ver
     assert.equal(T.styles.Crime.n, 1);
     assert.equal(round4(T.pairs["Thriller|Action"].lean), round4(T.pairs["Action|Thriller"].lean));
     assert.equal(Object.keys(T.pairs).length, 8);
+    // CAS-1293: the person's baseline lean across their own style combinations — the n-weighted mean of
+    // pr.lean over each unordered pair once (Action|Thriller n=2, Action|Comedy n=1, Horror|Thriller n=1,
+    // Crime|Drama n=1 — same lean value as Drama|Crime above, by the symmetry CAS-1255 AC3 already
+    // asserts): (0.5833*2 + -0.0257*1 + -0.2476*1 + 0.4500*1) / 5 = 0.2687.
+    assert.equal(round4(T.pairBaseline), 0.2687);
   });
 });
 
-test("CAS-1260 AC1: You (tasteMatch) against the AC1 fixture — 80% combination films, 20% headline style", () => {
+test("CAS-1293: You (tasteMatch) against the AC1 fixture — Public adjusted by the candidate's judged style pairs", () => {
   withTasteFixture(ac1Assignments(), () => {
     const v = genres => { const t = E.tasteMatch(scoredFilm(genres, 70)); return t ? [t.value, round4(t.conf), t.films] : null; };
-    // Two Action+Thriller films share two styles (overlap 2/3 each): (100 + 83) / 2 = 91.5. Headline Action
-    // films (Wow, Enjoyed, So-so) average 72.3. 0.8 x 91.5 + 0.2 x 72.3 = 87.6667.
-    // CAS-1265: wSum = 4/3; evidence = 50 + (87.6667-50)*(4/3)/(4/3+3) = 61.5897;
-    // boost = 15*ln(3)/ln(31) = 4.7988 -> round(66.3885) = 66.
-    assert.deepEqual(v(["Action","Thriller","Crime"]), [66, 0.3077, 2]);
-    // One style only: every judged film carrying it is a combination film (Never 17, Disliked 17): avg = 17.
-    // CAS-1265: wSum = 1.5; evidence = 50 + (17-50)*1.5/4.5 = 39; boost = 15*ln(3)/ln(31) = 4.7988 -> round(43.7988) = 44.
-    assert.deepEqual(v(["Horror"]), [44, 0.3333, 2]);
-    // Horror+Thriller (Disliked) is the only combination film: 17; headline Thriller films 100, 83, 17 average
-    // 66.6667; avg = 0.8*17 + 0.2*66.6667 = 26.9333. CAS-1265: wSum = 1; evidence = 50 + (26.9333-50)/4 = 44.2333;
-    // boost = 15*ln(2)/ln(31) = 3.0277 -> round(47.2611) = 47.
-    assert.deepEqual(v(["Thriller","Horror"]), [47, 0.25, 1]);
-    // One judged film is enough: avg = 34. CAS-1265: wSum = 0.5; evidence = 50 + (34-50)*0.5/3.5 = 47.7143;
-    // boost = 15*ln(2)/ln(31) = 3.0277 -> round(50.742) = 51.
-    assert.deepEqual(v(["Comedy"]), [51, 0.1429, 1]);
-    // No judged film shares the combination: no You at all.
-    assert.equal(E.tasteMatch(scoredFilm(["Western"], 70)), null);
+    // Only Action|Thriller (n=2, sum=2.5) among the three pairs {Action,Thriller},{Action,Crime},
+    // {Thriller,Crime} was ever judged. lean=(2.5+4*0.2687)/6=0.5958; d=0.5958-0.2687=0.3271;
+    // adj=20*0.3271=6.54 -> round(70+6.54)=77.
+    assert.deepEqual(v(["Action","Thriller","Crime"]), [77, 0.3333, 2]);
+    // A single judged style, with no judged partner, forms no pair: no adjustment at all, not "no You" —
+    // You falls back to the film's own Public score.
+    assert.deepEqual(v(["Horror"]), [70, 0, 0]);
+    // Horror|Thriller is the only pair here (n=1, sum=-1). lean=(-1+4*0.2687)/5=0.0149;
+    // d=0.0149-0.2687=-0.2537; adj=45*-0.2537=-11.42 -> round(70-11.42)=59.
+    assert.deepEqual(v(["Thriller","Horror"]), [59, 0.2, 1]);
+    // Comedy alone forms no pair either.
+    assert.deepEqual(v(["Comedy"]), [70, 0, 0]);
+    // No judged style at all: still no pair, same fallback to Public.
+    assert.deepEqual(v(["Western"]), [70, 0, 0]);
   });
 });
 
@@ -139,23 +141,24 @@ test("CAS-1251 AC3: the learned range is the 15th-85th percentile of positively-
   });
 });
 
-test("CAS-1260 AC2: You ignores the Cascade score — the same film at 40 and at 95 gets the same You", () => {
+test("CAS-1293: You tracks the Cascade score as its base, by design — same combination, different Public, clamped at the ceiling", () => {
   withTasteFixture(ac1Assignments(), () => {
-    // CAS-1265: same 66 as the AC1 "Action,Thriller,Crime" case above — the Cascade score plays no part.
-    assert.equal(E.tasteMatch(scoredFilm(["Action","Thriller","Crime"], 40)).value, 66);
-    assert.equal(E.tasteMatch(scoredFilm(["Action","Thriller","Crime"], 95)).value, 66);
+    // CAS-1293 replaces CAS-1260/1265's "You ignores the Cascade score" — You v3 is the Public score
+    // itself, adjusted: the Action|Thriller pair's adj here is a fixed +6.54 (see the AC1 test above), so
+    // a lower Public simply shifts the result down, and a high enough Public clamps at 99.
+    assert.equal(E.tasteMatch(scoredFilm(["Action","Thriller","Crime"], 40)).value, 47);
+    assert.equal(E.tasteMatch(scoredFilm(["Action","Thriller","Crime"], 95)).value, 99);
   });
 });
 
-test("CAS-1260 AC3: You needs one combination film, not a count of verdicts overall", () => {
+test("CAS-1293: You needs both a Public score and a judged style pair, not just a count of verdicts", () => {
   const probe = { tmdb_id: 90009999, genres:["Action"], status:["included_streaming"] };
-  withTasteFixture([], () => { assert.equal(E.tasteMatch(probe), null, "no verdicts: no You"); });
+  withTasteFixture([], () => { assert.equal(E.tasteMatch(probe), null, "no verdicts logged at all: no You"); });
   const one = [scoredFilm(["Action"], 70)];
   withTasteFixture(one.map(m => [m, "enjoyed"]), () => {
-    const t = E.tasteMatch(probe);
-    // CAS-1265: avg = 83, wSum = 1 -> evidence = 50 + (83-50)/4 = 58.25; boost = 15*ln(2)/ln(31) = 3.0277
-    // -> round(61.2777) = 61.
-    assert.deepEqual([t.value, round4(t.conf), t.films], [61, 0.25, 1]);
+    // The probe itself carries no wm rating, so cascadeScore(probe) is -1 — no Public score, so still no
+    // You, even though the person has since logged a verdict on the same (single) style.
+    assert.equal(E.tasteMatch(probe), null, "no Public score on the probe itself: still no You");
   });
 });
 
