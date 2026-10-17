@@ -1102,7 +1102,11 @@ test("CAS-1180: a watched film shows as a stub when its own chip is on (AC1, AC3
   await expect(stub).toHaveClass(/stub/);
   const order = await page.evaluate((id) => {
     const rendered = [...document.querySelectorAll("#groups .card, #groups .stub")].map(el => el.id.replace("card-", ""));
-    const rows = watchScopeRows().filter(m => filmMatchesWatchedFilter(m) || watchHeldOpen[watchTab].has(m.tmdb_id));
+    // CAS-1284 Change 2: watchVisibleRows().rows is the real pipeline's own output (already includes the
+    // watched filter and the Best N cut, whose ranking can shift on every verdict once a taste profile
+    // exists) — read that directly rather than re-deriving a filter chain that drifts from it, the same
+    // idiom filmInWatchRows itself uses.
+    const rows = watchVisibleRows().rows;
     const expected = listingGroups(rows, activeCascade()).flatMap(s => s.items.map(m => String(m.tmdb_id)));
     return { renderedIdx: rendered.indexOf(String(id)), expectedIdx: expected.indexOf(String(id)) };
   }, filmId);
@@ -2069,7 +2073,9 @@ test("CAS-1264 AC3: the mood sheet's Order row reads Release date / Public / You
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
-  const labels = (await page.locator(".mfseg button").allTextContents()).map(t => t.trim());
+  // CAS-1284 added its own "From" and "Show" .mfseg segments to the sheet, so scope to the Order one by
+  // its aria-label rather than grabbing every .mfseg button on the page.
+  const labels = (await page.locator('.mfseg[aria-label="Order"] button').allTextContents()).map(t => t.trim());
   expect(labels).toEqual(["Release date", "Public", "You"]);
   expect(labels.some(t => t.includes("coming"))).toBe(false);
   await page.evaluate(() => window.closeWatchSheet());
