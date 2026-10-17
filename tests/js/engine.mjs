@@ -174,6 +174,9 @@ if(typeof window.CascadeAuth === "undefined"){
   get watchCinemaStage(){ return watchCinemaStage; },
   setWatchCinemaStage(v){ watchCinemaStage = v; },
   watchWatchedSel, watchGenreOff, watchSearch, filmMatchesWatchedFilter, filmMatchesWatchTab,
+  // CAS-1284: watchPickedBy (by reference, same convention as watchGenreOff above) — exported so a test
+  // can assert a catalogue mood ignores it (Change 1) by setting a real non-"all" value directly.
+  watchPickedBy,
   // CAS-1256: filmPassesStylesOff is the Mood/Filters Styles-off predicate itself (a film shows when ANY
   // of its styles is switched on, matching the agent rule CAS-1147 set) — exported so a test can assert
   // it directly rather than only through watchVisibleRows()'s combined filter chain.
@@ -543,6 +546,11 @@ if(typeof window.CascadeAuth === "undefined"){
   // test can drive the real order:"you" -> filt.sort translation (signed-in vs signed-out) instead of
   // re-deriving it by hand.
   applyMoodToState, moodDefaultFieldsNow,
+  // CAS-1284: MOOD_DEFAULTS (the five built-in moods, including the three catalogue starters) and
+  // moodBestN/moodBestScore (Best N's own cap-resolution and ranking-score pure functions) — exported so a
+  // test can assert the starter shapes and the blend/legacy-top math directly, rather than only through
+  // watchVisibleRows()'s combined pipeline.
+  MOOD_DEFAULTS, moodBestN, moodBestScore,
   // CAS-602: the bell's own moment-copy lookup, so a test can assert a monitor moment key can never
   // render as its raw string (see REAL_MOMENT_SAID's own use at the ntfrow render site).
   REAL_MOMENT_SAID,
