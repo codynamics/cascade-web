@@ -1,8 +1,10 @@
 // CAS-1284: three catalogue-wide starter moods (Action, Imagine, Fun) replace agent-scoped membership with
-// "every film in MOVIES standing in the current stage" (source:"catalogue"), Best N replaces the old
-// boolean "top 10" switch, and Styles are back in the mood sheet (reversing CAS-1273). These tests drive
-// the pure pipeline functions directly — watchScopeRows/watchVisibleRows/moodBestN/moodBestScore and the
-// MOOD_DEFAULTS shape itself — the same technique cas1235/cas1256's own mood tests already use.
+// "every film in MOVIES standing in the current stage" (source:"catalogue"), and Styles are back in the
+// mood sheet (reversing CAS-1273).
+// CAS-1287: Best N's single `best` field is replaced by "Show top" — two independent counts, topYou and
+// topPublic, combined with OR (moodShowTopKeep). These tests drive the pure pipeline functions directly —
+// watchScopeRows/watchVisibleRows/moodShowTopKeep/moodTopYouN/moodTopPublicN and the MOOD_DEFAULTS shape
+// itself — the same technique cas1235/cas1256's own mood tests already use.
 //
 // A note on assert.deepEqual here: the engine runs in its own vm realm (engine.mjs), so an array built by
 // calling .map()/.filter() directly on an engine-exported array (MOOD_DEFAULTS, MOVIES, a watchMoods getter
@@ -17,9 +19,10 @@ import { loadEngine } from "./engine.mjs";
 function freshCatalogueMood(E, overrides){
   // mineOnly:false by default — CAS-753's mine-only default would otherwise hide every row the guest
   // harness has no configured service for, which is not what these tests are about (mood-styles-any.test.mjs
-  // notes the same reach-past).
+  // notes the same reach-past). topYou:null (signed out in most of these tests, so it would be forced Off
+  // regardless) / topPublic:30 approximates CAS-1284's old best:30 default for a signed-out run.
   return { ...E.moodDefaultFieldsNow(), id:"t-catalogue", name:"Test", source:"catalogue", order:"score",
-    best:30, mineOnly:false, ...overrides };
+    topYou:null, topPublic:30, mineOnly:false, ...overrides };
 }
 // Selects `mood` as the live mood for the duration of `fn`, restoring the previous selection afterwards.
 // watchMoods/watchMoodSel are both reassigned wholesale elsewhere in the engine, so — like
@@ -36,8 +39,29 @@ function withMood(E, mood, fn){
     E.window.setWatchMood(savedSel);
   }
 }
+// CAS-1287: saves/clears/restores every verdict set moodShowTopKeep's own ranking (tasteMatch/taggedOut)
+// can read, so a test can build a small, fully-controlled taste profile off one or two donor films without
+// any real-catalogue verdict leaking in or a test's own donors outliving it.
+function withCleanVerdicts(E, fn){
+  const saved = {
+    watched: new Set(E.watched), disliked: new Set(E.disliked), indifferent: new Set(E.indifferent),
+    wowed: new Set(E.wowed), enjoyed: new Set(E.enjoyed), blocked: new Set(E.blocked),
+  };
+  E.watched.clear(); E.disliked.clear(); E.indifferent.clear(); E.wowed.clear(); E.enjoyed.clear(); E.blocked.clear();
+  E.invalidateComputeCaches();
+  try { return fn(); }
+  finally {
+    E.watched.clear(); saved.watched.forEach(id => E.watched.add(id));
+    E.disliked.clear(); saved.disliked.forEach(id => E.disliked.add(id));
+    E.indifferent.clear(); saved.indifferent.forEach(id => E.indifferent.add(id));
+    E.wowed.clear(); saved.wowed.forEach(id => E.wowed.add(id));
+    E.enjoyed.clear(); saved.enjoyed.forEach(id => E.enjoyed.add(id));
+    E.blocked.clear(); saved.blocked.forEach(id => E.blocked.add(id));
+    E.invalidateComputeCaches();
+  }
+}
 
-test("CAS-1284 Change 5: MOOD_DEFAULTS carries the three catalogue starters, after Top scores/Releases, five in total", () => {
+test("CAS-1284 Change 5 / CAS-1287 Change 1: MOOD_DEFAULTS carries the three catalogue starters, after Top scores/Releases, five in total", () => {
   const E = loadEngine();
   const ids = [...E.MOOD_DEFAULTS].map(m => m.id);
   assert.deepEqual(ids, ["top", "releases", "action", "imagine", "fun"]);
@@ -46,7 +70,8 @@ test("CAS-1284 Change 5: MOOD_DEFAULTS carries the three catalogue starters, aft
   for(const [id, keep] of Object.entries(starters)){
     const mood = [...E.MOOD_DEFAULTS].find(m => m.id === id);
     assert.equal(mood.source, "catalogue", `${id}: source must be catalogue`);
-    assert.equal(mood.best, 30, `${id}: best must be 30`);
+    assert.equal(mood.topYou, 20, `${id}: topYou must be 20`);
+    assert.equal(mood.topPublic, 10, `${id}: topPublic must be 10`);
     assert.equal(mood.order, "you", `${id}: order must be you`);
     assert.equal(mood.mineOnly, true, `${id}: mineOnly must be true`);
     assert.deepEqual([...mood.watched].sort(), ["liked", "wow"], `${id}: watched must be wow+liked`);
@@ -55,6 +80,12 @@ test("CAS-1284 Change 5: MOOD_DEFAULTS carries the three catalogue starters, aft
     allGenres.filter(g => !keep.includes(g)).forEach(g =>
       assert.ok(offSet.has(g), `${id}: ${g} must be OFF (in stylesOff)`));
   }
+  const top = [...E.MOOD_DEFAULTS].find(m => m.id === "top");
+  assert.equal(top.topYou, null, "Top scores: topYou must be Off");
+  assert.equal(top.topPublic, 10, "Top scores: topPublic must be 10 (the old top:true cap)");
+  const releases = [...E.MOOD_DEFAULTS].find(m => m.id === "releases");
+  assert.equal(releases.topYou, null, "Releases: topYou must be Off");
+  assert.equal(releases.topPublic, null, "Releases: topPublic must be Off");
 });
 
 test("CAS-1284 Change 5: moodDefaultsNow() keeps each starter's own mineOnly/watched/stylesOff rather than the generic defaults clobbering them", () => {
@@ -67,21 +98,47 @@ test("CAS-1284 Change 5: moodDefaultsNow() keeps each starter's own mineOnly/wat
   assert.ok(imagine.stylesOff.length > 0, "imagine must carry a real stylesOff list, not the empty default");
 });
 
-test("CAS-1284 Change 2: moodBestN resolves best over legacy top, and an explicit null (All) is respected", () => {
+test("CAS-1287 AC5 / Change 1: moodTopPublicN resolves topPublic over legacy best over legacy top; moodTopYouN never falls back", () => {
   const E = loadEngine();
-  assert.equal(E.moodBestN({ best: 30 }), 30);
-  assert.equal(E.moodBestN({ best: null }), null, "an explicit All must not fall back to top");
-  assert.equal(E.moodBestN({ top: true }), 10, "AC6: a legacy top:true mood with no best field reads as best:10");
-  assert.equal(E.moodBestN({ top: false }), null, "a legacy top:false mood with no best field reads as All");
-  assert.equal(E.moodBestN({ best: 20, top: true }), 20, "best always wins once the mood carries the field");
+  assert.equal(E.moodTopPublicN({ topPublic: 30 }), 30);
+  assert.equal(E.moodTopPublicN({ topPublic: null }), null, "an explicit Off on the new field must not fall back");
+  assert.equal(E.moodTopPublicN({ best: 30 }), 30, "AC5: legacy best:N reads as topPublic:N");
+  assert.equal(E.moodTopPublicN({ best: null }), null, "legacy best:null (All) reads as topPublic Off, not a fall-through to top");
+  assert.equal(E.moodTopPublicN({ top: true }), 10, "AC5: legacy top:true with no best/topPublic field reads as topPublic:10");
+  assert.equal(E.moodTopPublicN({ top: false }), null, "a legacy top:false mood with no best/topPublic field reads as Off");
+  assert.equal(E.moodTopPublicN({ topPublic: 20, best: 30, top: true }), 20, "topPublic always wins once the mood carries the field");
+  assert.equal(E.moodTopYouN({ topYou: 20 }), 20);
+  assert.equal(E.moodTopYouN({}), null, "a mood that never carried topYou has no legacy fallback — it simply reads as Off");
 });
 
-test("CAS-1284 Change 2: moodBestScore blends You+Public signed in with a taste profile, falls back to cascadeScore otherwise", () => {
+test("CAS-1287: moodTopYouAvailable/moodTopYouEffectiveN are Off unless signed in with a real taste profile", () => {
   const E = loadEngine();
-  const m = [...E.MOVIES].find(x => E.cascadeScore(x) >= 0);
-  assert.ok(m, "setup: a scored film must exist in the harness catalogue");
-  // Signed out (or signed in with no verdicts yet): plain cascadeScore.
-  assert.equal(E.moodBestScore(m), E.cascadeScore(m));
+  const auth = E.CascadeAuth;
+  const saved = { enabled: auth.enabled, client: auth.client, session: auth.session };
+  try{
+    auth.enabled = false; auth.client = null; auth.session = null;
+    assert.equal(E.moodTopYouAvailable(), false, "signed out: unavailable");
+    assert.equal(E.moodTopYouEffectiveN({ topYou: 20 }), null, "signed out: topYou reads as Off regardless of the mood");
+
+    withCleanVerdicts(E, () => {
+      auth.enabled = true; auth.client = {}; auth.session = { user: { id: "cas1287-availability-test" } };
+      assert.equal(E.moodTopYouAvailable(), false, "signed in with no verdicts yet: still unavailable");
+      assert.equal(E.moodTopYouEffectiveN({ topYou: 20 }), null);
+
+      const donorId = 90400201;
+      E.MOVIES.push({ tmdb_id: donorId, genres: ["Action"], status: ["included_streaming"], _fixture: true });
+      try{
+        E.watched.add(donorId); E.enjoyed.add(donorId); E.invalidateComputeCaches();
+        assert.equal(E.moodTopYouAvailable(), true, "signed in with a real verdict: available");
+        assert.equal(E.moodTopYouEffectiveN({ topYou: 20 }), 20);
+      } finally {
+        const i = E.MOVIES.findIndex(m => m.tmdb_id === donorId); if(i !== -1) E.MOVIES.splice(i, 1);
+      }
+    });
+  } finally {
+    auth.enabled = saved.enabled; auth.client = saved.client; auth.session = saved.session;
+    E.invalidateComputeCaches();
+  }
 });
 
 test("CAS-1284 Change 1: a catalogue mood's pool is every film standing in the current stage, agents ignored entirely", () => {
@@ -113,7 +170,7 @@ test("CAS-1284 Change 1: Picked by never narrows a catalogue mood's rows", () =>
   const savedPickedBy = E.watchPickedBy.stream;
   try{
     E.setWatchTab("stream");
-    withMood(E, freshCatalogueMood(E, { best: null }), () => {
+    withMood(E, freshCatalogueMood(E, { topYou: null, topPublic: null }), () => {
       E.watchPickedBy.stream = "manual";   // a real, narrow Picked by value (PICKED_BY_OPTS' "Me")
       const { rows } = E.watchVisibleRows();
       const expected = [...E.MOVIES].filter(m => E.primaryStatus(m) === "included_streaming" && E.showable(m) && E.passesTasteBase(m));
@@ -126,26 +183,94 @@ test("CAS-1284 Change 1: Picked by never narrows a catalogue mood's rows", () =>
   }
 });
 
-test("CAS-1284 Change 2: Best N keeps exactly the top N rows by moodBestScore, ties broken on tmdb_id", () => {
+test("CAS-1287 AC3: Show top with both topYou and topPublic Off keeps every row of the pool", () => {
   const E = loadEngine();
-  const savedTab = E.watchTab;
-  try{
-    E.setWatchTab("stream");
-    withMood(E, freshCatalogueMood(E, { best: 5 }), () => {
-      const { rows } = E.watchVisibleRows();
-      const pool = [...E.MOVIES].filter(m => E.primaryStatus(m) === "included_streaming" && E.showable(m) && E.passesTasteBase(m));
-      assert.ok(pool.length > 5, "setup: the pool must exceed the cap to actually test the cut");
-      const ranked = [...pool].sort((a, b) => {
-        const diff = E.moodBestScore(b) - E.moodBestScore(a);
-        return diff !== 0 ? diff : a.tmdb_id - b.tmdb_id;
+  withMood(E, { ...E.moodDefaultFieldsNow(), id:"t-showtop-off", name:"Test", order:"score", topYou:null, topPublic:null }, () => {
+    const rows = [
+      { tmdb_id: 1, genres: [], status: ["included_streaming"] },
+      { tmdb_id: 2, genres: [], status: ["included_streaming"] },
+      { tmdb_id: 3, genres: [], status: ["included_streaming"] },
+    ];
+    const kept = E.moodShowTopKeep(rows, new Set());
+    assert.deepEqual(kept.map(m => m.tmdb_id), [1, 2, 3]);
+  });
+});
+
+test("CAS-1287 AC1/Change 2: Show top keeps exactly the union of the top-N unwatched by You and the top-N unwatched by Public", () => {
+  const E = loadEngine();
+  const auth = E.CascadeAuth;
+  const saved = { enabled: auth.enabled, client: auth.client, session: auth.session };
+  withCleanVerdicts(E, () => {
+    const donorId = 90400301;
+    E.MOVIES.push({ tmdb_id: donorId, genres: ["Action", "Comedy"], status: ["included_streaming"], _fixture: true });
+    try{
+      auth.enabled = true; auth.client = {}; auth.session = { user: { id: "cas1287-ac1-test" } };
+      E.watched.add(donorId); E.wowed.add(donorId); E.invalidateComputeCaches();
+
+      // you1/you2 share the donor's exact genre pair, so tasteMatch gives both a real (positive) You score;
+      // noYou/pub1/pub2/neither share nothing with the donor, so tasteMatch is null for every one of them
+      // (youScore's own -1 fallback). Public (cascadeScore) is wm_user_rating-driven and entirely independent
+      // of genres, so pub1/pub2 can be made the clear top-2 on that axis without touching You at all.
+      const you1 = { tmdb_id: 90400302, genres: ["Action", "Comedy"], status: ["included_streaming"] };
+      const you2 = { tmdb_id: 90400303, genres: ["Action", "Comedy"], status: ["included_streaming"] };
+      const noYou = { tmdb_id: 90400304, genres: ["Documentary"], status: ["included_streaming"] };
+      const pub1 = { tmdb_id: 90400305, genres: ["Documentary"], status: ["included_streaming"], wm_user_rating: 95 };
+      const pub2 = { tmdb_id: 90400306, genres: ["Documentary"], status: ["included_streaming"], wm_user_rating: 85 };
+      const neither = { tmdb_id: 90400307, genres: ["Documentary"], status: ["included_streaming"], wm_user_rating: 5 };
+
+      assert.ok(E.tasteMatch(you1).value > 0, "setup: you1 must get a real You score off the donor");
+      assert.equal(E.tasteMatch(noYou), null, "setup: noYou must share no genre with the donor");
+      assert.ok(E.cascadeScore(pub1) > E.cascadeScore(neither), "setup: pub1 must score clearly higher than neither");
+
+      withMood(E, { ...E.moodDefaultFieldsNow(), id:"t-showtop-ac1", name:"Test", order:"score", topYou:2, topPublic:2 }, () => {
+        const rows = E.moodShowTopKeep([you1, you2, noYou, pub1, pub2, neither], new Set());
+        assert.deepEqual(rows.map(m => m.tmdb_id).sort((a, b) => a - b),
+          [you1, you2, pub1, pub2].map(m => m.tmdb_id).sort((a, b) => a - b));
       });
-      const expectedIds = ranked.slice(0, 5).map(m => m.tmdb_id).sort((a, b) => a - b);
-      assert.equal(rows.length, 5);
-      assert.deepEqual([...rows].map(m => m.tmdb_id).sort((a, b) => a - b), expectedIds);
-    });
-  } finally {
-    E.setWatchTab(savedTab);
-  }
+    } finally {
+      const i = E.MOVIES.findIndex(m => m.tmdb_id === donorId); if(i !== -1) E.MOVIES.splice(i, 1);
+      auth.enabled = saved.enabled; auth.client = saved.client; auth.session = saved.session;
+    }
+  });
+});
+
+test("CAS-1287 AC2/Change 2: a watched row is listed only once its own You (or Public) score meets the kept unwatched list's own threshold", () => {
+  const E = loadEngine();
+  const auth = E.CascadeAuth;
+  const saved = { enabled: auth.enabled, client: auth.client, session: auth.session };
+  withCleanVerdicts(E, () => {
+    const donorId = 90400401;
+    E.MOVIES.push({ tmdb_id: donorId, genres: ["Action", "Comedy"], status: ["included_streaming"], _fixture: true });
+    try{
+      auth.enabled = true; auth.client = {}; auth.session = { user: { id: "cas1287-ac2-test" } };
+      E.watched.add(donorId); E.wowed.add(donorId); E.invalidateComputeCaches();
+
+      const unwatchedHi = { tmdb_id: 90400402, genres: ["Action", "Comedy"], status: ["included_streaming"] };
+      const unwatchedLo = { tmdb_id: 90400403, genres: ["Documentary"], status: ["included_streaming"] };
+      const watchedPass = { tmdb_id: 90400404, genres: ["Action", "Comedy"], status: ["included_streaming"] };
+      const watchedFail = { tmdb_id: 90400405, genres: ["Documentary"], status: ["included_streaming"] };
+      E.watched.add(watchedPass.tmdb_id); E.wowed.add(watchedPass.tmdb_id);
+      E.watched.add(watchedFail.tmdb_id); E.wowed.add(watchedFail.tmdb_id);
+      E.invalidateComputeCaches();
+
+      assert.ok(E.taggedOut(watchedPass) && E.taggedOut(watchedFail), "setup: both must read as watched");
+      const threshold = E.tasteMatch(unwatchedHi).value;
+      assert.equal(E.tasteMatch(watchedPass).value, threshold,
+        "setup: watchedPass shares the exact same genres/donor, so it ties the kept unwatched film's own You score");
+      assert.equal(E.tasteMatch(watchedFail), null, "setup: watchedFail must have no You score at all");
+
+      withMood(E, { ...E.moodDefaultFieldsNow(), id:"t-showtop-ac2", name:"Test", order:"score", topYou:1, topPublic:null }, () => {
+        const rows = E.moodShowTopKeep([unwatchedHi, unwatchedLo, watchedPass, watchedFail], new Set());
+        assert.deepEqual(rows.map(m => m.tmdb_id).sort((a, b) => a - b),
+          [unwatchedHi, watchedPass].map(m => m.tmdb_id).sort((a, b) => a - b),
+          "unwatchedHi stays the real cut, watchedPass is added by the threshold rule, unwatchedLo/watchedFail stay excluded, "
+          + "and neither watched row changes which unwatched row was kept");
+      });
+    } finally {
+      const i = E.MOVIES.findIndex(m => m.tmdb_id === donorId); if(i !== -1) E.MOVIES.splice(i, 1);
+      auth.enabled = saved.enabled; auth.client = saved.client; auth.session = saved.session;
+    }
+  });
 });
 
 test("CAS-1284 Change 3: applyMoodToState restores watchGenreOff from mood.stylesOff (reverses CAS-1273)", () => {
@@ -156,7 +281,7 @@ test("CAS-1284 Change 3: applyMoodToState restores watchGenreOff from mood.style
     const allGenres = [...new Set([...E.MOVIES].flatMap(m => m.genres || []))];
     const keepOnly = ["Comedy"];
     const stylesOff = allGenres.filter(g => !keepOnly.includes(g));
-    withMood(E, freshCatalogueMood(E, { best: null, stylesOff }), () => {
+    withMood(E, freshCatalogueMood(E, { topYou: null, topPublic: null, stylesOff }), () => {
       assert.deepEqual([...E.watchGenreOff.stream].sort(), [...stylesOff].sort(),
         "AC: a mood's own stylesOff must land straight in watchGenreOff for the active tab");
       const { rows } = E.watchVisibleRows();
@@ -206,6 +331,15 @@ test("CAS-1284 Change 6: an existing account's saved moods are provisioned with 
     assert.deepEqual(ids, ["custom-a", "custom-b", "action", "imagine", "fun"],
       "AC4: saved moods keep their order; only the three starters are appended, in MOOD_DEFAULTS order — never Top scores/Releases");
 
+    // CAS-1287 Change 6 piggybacks on this same load: a brand-new account (moodsProvisioned absent, level 0)
+    // runs both steps in one pass, so the just-appended starters already carry topYou:20/topPublic:10
+    // straight off MOOD_DEFAULTS.
+    ["action", "imagine", "fun"].forEach(id => {
+      const mood = [...E.watchMoods].find(m => m.id === id);
+      assert.equal(mood.topYou, 20, `${id}: topYou must be 20`);
+      assert.equal(mood.topPublic, 10, `${id}: topPublic must be 10`);
+    });
+
     // AC4 "reload": a second load, now with moodsProvisioned carried on the row, must never duplicate.
     const reloadRow = { user_id: "cas1284-test-user",
       view: { moods: [...E.watchMoods].map(m => ({ ...m })), moodsProvisioned: 1 } };
@@ -231,6 +365,56 @@ test("CAS-1284 Change 6: an existing account's saved moods are provisioned with 
     await settle();
     assert.ok(![...E.watchMoods].some(m => m.id === "fun"), "AC4: a deleted starter must not be reprovisioned once the flag is set");
     assert.equal(E.watchMoods.length, 4);
+  } finally {
+    auth.enabled = false; auth.client = null; auth.session = null;
+  }
+});
+
+test("CAS-1287 Change 6: an account already carrying the old moodsProvisioned:1 flag gets its three starters' topYou/topPublic set once, to 20/10", async () => {
+  const E = loadEngine();
+  function makeFakeClient(row){
+    function builder(table){
+      const state = { table, kind: "select" };
+      const b = {
+        select(){ return b; }, order(){ return b; }, range(){ return b; },
+        upsert(fields){ state.kind = "upsert"; state.fields = fields; return b; },
+        match(){ return b; },
+        then(resolve){
+          return Promise.resolve().then(() => (table === "user_prefs" && state.kind === "select")
+            ? { data: row ? [row] : [], error: null } : { data: [], error: null }).then(resolve);
+        },
+      };
+      return b;
+    }
+    return { from(table){ return builder(table); }, rpc(){ return Promise.resolve({ data: null, error: null }); } };
+  }
+  const settle = () => new Promise(r => setTimeout(r, 0));
+  // A CAS-1284-era account: the three starters still carry legacy `best`, flagged fully provisioned under
+  // the OLD flag value (1) — step 1 (append) must not touch it, since all three are already present.
+  const row = {
+    user_id: "cas1287-test-user",
+    view: {
+      moods: [
+        { id: "action", name: "Action", source: "catalogue", best: 30, order: "you" },
+        { id: "imagine", name: "Imagine", source: "catalogue", best: 30, order: "you" },
+        { id: "fun", name: "Fun", source: "catalogue", best: 30, order: "you" },
+        { id: "custom-a", name: "Custom A", order: "score" },
+      ],
+      moodsProvisioned: 1,
+    },
+  };
+  const auth = E.CascadeAuth;
+  auth.enabled = true; auth.client = makeFakeClient(row); auth.session = { user: { id: "cas1287-test-user" } };
+  try{
+    await E.CascadePersistence.loadUserPrefs();
+    await settle();
+    const byId = id => [...E.watchMoods].find(m => m.id === id);
+    ["action", "imagine", "fun"].forEach(id => {
+      assert.equal(byId(id).topYou, 20, `${id}: topYou must become 20`);
+      assert.equal(byId(id).topPublic, 10, `${id}: topPublic must become 10`);
+    });
+    assert.equal(byId("custom-a").topYou, undefined, "a non-starter mood must be untouched by the migration");
+    assert.equal(E.watchMoods.length, 4, "no mood is added or removed by this step");
   } finally {
     auth.enabled = false; auth.client = null; auth.session = null;
   }
