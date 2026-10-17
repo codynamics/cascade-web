@@ -10617,6 +10617,9 @@ function watchScopeRows(){
   if(currentMood().source==="catalogue"){
     const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
     return MOVIES.filter(m=>{
+      // The account-level world every agent searches inside (CAS-146/170/560) applies to a catalogue mood too:
+      // a film with nothing to watch, or outside the Languages setting, is never in it.
+      if(!showable(m) || !passesTasteBase(m)) return false;
       const ps=primaryStatus(m);
       const standing = watchTab==="in_cinema" ? (ps==="upcoming" || ps==="opening_week" || ps==="in_cinema") : ps===ownStanding;
       return standing && watchStageMatches(m);
