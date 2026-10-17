@@ -3562,17 +3562,19 @@
   .moodadd{flex:none;height:34px;padding:0 12px;border-radius:10px;border:1px dashed #4a5263;background:none;
     color:var(--dim);font:600 12.5px/1 var(--font-body);cursor:pointer;white-space:nowrap}
   .moodchip:focus-visible,.moodadd:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-  /* the collapsed bar: one slim row in place of the stages and moods once the list has scrolled */
+  /* the collapsed bar: one slim row in place of the stages and moods, toggled only by a tap (CAS-1283) */
   #wtMini{display:none}
-  #cascbar.wtcollapsed:not(.wtopen) #watchTop{display:none}
-  #cascbar.wtcollapsed:not(.wtopen) #wtMini{display:flex;height:38px;align-items:center;gap:8px;padding:0 14px;
+  #cascbar.wtcollapsed #watchTop{display:none}
+  #cascbar.wtcollapsed #wtMini{display:flex;height:38px;align-items:center;gap:8px;padding:0 14px;
     font:600 12.5px/1 var(--font-body);color:var(--ink);cursor:pointer;border-bottom:1px solid var(--line)}
   #wtMini .gdot{width:7px;height:7px;border-radius:50%;flex:none}
   #wtMini .wtsep{color:var(--faint)}
   #wtMini .wtmood{color:var(--dim)}
   #wtMini .wtchev{margin-left:auto;color:var(--faint);font-size:11px}
-  #cascbar.wtcollapsed.wtopen{box-shadow:0 22px 30px -14px rgba(0,0,0,.85);padding-bottom:12px;
-    border-bottom:1px solid var(--line)}
+  /* CAS-1283: the collapse handle — the open bar's own last row, a full-width tap target */
+  #wtHandle{display:flex;align-items:center;justify-content:center;height:22px;color:var(--faint);
+    font-size:12px;cursor:pointer}
+  #cascbar.wtcollapsed #wtHandle{display:none}
   /* the mood sheet's own fields, above the sections the Filters sheet already has */
   .mfinput{width:100%;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);
     color:var(--ink);font:600 15px var(--font-body);padding:0 12px;box-sizing:border-box}
@@ -4022,10 +4024,12 @@
          everything below it sits that much higher. -->
     <!-- CAS-1247: the Watch top area is now two stage groups (Cinema/Home) plus a mood row, replacing the
          old stage+agent rail and the sort-switch/search/Filters tools row this comment used to describe.
-         renderWatchTop() fills #watchTop in; #wtMini is the one-row summary shown once the list has scrolled
-         (the collapse behaviour lives in the scroll listener near the bottom of this script). -->
+         renderWatchTop() fills #watchTop in; #wtMini is the one-row summary shown while collapsed.
+         CAS-1283: collapse is tap-only now (via #wtHandle/#wtMini) — scrolling never changes this bar's
+         state (the toggle itself lives near the bottom of this script). -->
     <div id="wtMini" role="button" tabindex="0" aria-label="Show stages and moods"></div>
     <div class="watchtop" id="watchTop"></div>
+    <div id="wtHandle" role="button" tabindex="0" aria-label="Hide stages and moods">▴</div>
     <!-- CAS-1223: the standalone sort button is gone from Watch — kept only as inert state (hidden, never
          focused) so syncSortCtl's own #sort option lookup is untouched. -->
     <button type="button" class="sortctl ca-btn x" id="sortCtl" aria-haspopup="listbox" aria-expanded="false"
@@ -5299,6 +5303,7 @@ const DEVICE_KEY_ALLOWLIST = {
   "cascade_diag": "a session-only diagnostics flag, set by ?diag= in the URL",
   "cascade_had_account": "whether this device was signed in as of its last boot (CAS-517 cold-start gate)",
   "cascade_onboarded": "whether this device has completed onboarding once",
+  "cascade_wt_collapsed": "CAS-1283: whether the Watch top bar (stage groups + moods) is collapsed to #wtMini on this device",
 };
 // CAS-1222 item 5: "the first boot of this build deletes every other cascade_ key" — rather than naming
 // each retired/migrated key by hand (easy to miss one), this sweeps any "cascade_" key NOT in the
@@ -21527,12 +21532,19 @@ function trimFoot(){
   footPad.style.height = need ? need+"px" : "";
 }
 addEventListener("scroll", trimFoot, {passive:true});
-// CAS-1247 C6: the Watch top bar (stage groups + moods) collapses to one slim row (#wtMini) once the list
-// has scrolled, and re-opens in place on a tap — without moving the list underneath it either way. This
-// listener only ever toggles classes, sets #cascbar's own compensating margin, and fills #wtMini; it never
-// calls render().
+// CAS-1283: the Watch top bar (stage groups + moods) stays open regardless of scroll — only a tap on its
+// own handle (#wtHandle) collapses it to one slim row (#wtMini), and a tap on that row reopens it, without
+// moving the list underneath it either way. The chosen state is remembered per device (localStorage) so a
+// reload boots straight into it. Neither path ever calls render(); they only toggle classes, set #cascbar's
+// own compensating margin, and fill #wtMini.
+const WT_COLLAPSE_KEY = "cascade_wt_collapsed";
+function wtStoredCollapsed(){
+  try{ return localStorage.getItem(WT_COLLAPSE_KEY)==="1"; }catch(e){ return false; }
+}
+function wtStoreCollapsed(v){
+  try{ localStorage.setItem(WT_COLLAPSE_KEY, v?"1":"0"); }catch(e){}
+}
 let wtCollapseMarginPx = 0;
-let wtOpenAtScrollY = null;
 function wtRefreshMini(){
   const mini=$("wtMini"); if(!mini) return;
   const curKey = watchTab==="in_cinema" ? watchCinemaStage : watchTab;
@@ -21544,8 +21556,8 @@ function wtRefreshMini(){
 // Measuring shortH forces a layout flush while the bar is shrunk but not yet margin-compensated — if the
 // page is scrolled to (or past) what is, for that one instant, a shorter document, the browser clamps
 // scrollY down to fit before the very next line restores the margin and the taller height. Clamping only
-// moves scrollY down, never back up once the margin is restored, so without this the jump-straight-to-the-
-// bottom case (not a gradual scroll past the 30px threshold) permanently loses a few px of scroll position.
+// moves scrollY down, never back up once the margin is restored, so without this a collapse/expand tap while
+// scrolled near the very bottom of the page could permanently lose a few px of scroll position.
 function wtPreservingScrollY(fn){
   const y=window.scrollY;
   fn();
@@ -21560,48 +21572,31 @@ function wtEnterCollapsed(bar){
     wtCollapseMarginPx = Math.max(0, fullH-shortH);
     bar.style.marginBottom = wtCollapseMarginPx+"px";
   });
+  syncHeaderHeight();
 }
 function wtLeaveCollapsed(bar){
   wtPreservingScrollY(() => {
-    bar.classList.remove("wtcollapsed","wtopen");
+    bar.classList.remove("wtcollapsed");
     bar.style.marginBottom = "";
   });
-  wtOpenAtScrollY = null;
+  syncHeaderHeight();
 }
-function onWatchTopScroll(){
-  const bar=$("cascbar"); if(!bar) return;
-  const y=window.scrollY;
-  const collapsed=bar.classList.contains("wtcollapsed");
-  if(y>30){
-    if(!collapsed) wtEnterCollapsed(bar);
-    else if(bar.classList.contains("wtopen") && wtOpenAtScrollY!=null && Math.abs(y-wtOpenAtScrollY)>40){
-      bar.classList.remove("wtopen");
-      bar.style.marginBottom = wtCollapseMarginPx+"px";
-      wtOpenAtScrollY = null;
-    }
-  } else if(collapsed){
-    wtLeaveCollapsed(bar);
-  }
-}
-addEventListener("scroll", onWatchTopScroll, {passive:true});
 window.toggleWatchTopMini = () => {
-  const bar=$("cascbar"); if(!bar || !bar.classList.contains("wtcollapsed")) return;
-  if(bar.classList.contains("wtopen")){
-    bar.classList.remove("wtopen");
-    bar.style.marginBottom = wtCollapseMarginPx+"px";
-    wtOpenAtScrollY = null;
-  } else {
-    bar.classList.add("wtopen");
-    bar.style.marginBottom = "";
-    wtOpenAtScrollY = window.scrollY;
-  }
+  const bar=$("cascbar"); if(!bar) return;
+  const collapsed=bar.classList.contains("wtcollapsed");
+  if(collapsed) wtLeaveCollapsed(bar); else wtEnterCollapsed(bar);
+  wtStoreCollapsed(!collapsed);
 };
 {
-  const mini=$("wtMini");
-  if(mini){
-    mini.addEventListener("click", toggleWatchTopMini);
-    mini.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleWatchTopMini(); } });
-  }
+  const mini=$("wtMini"), handle=$("wtHandle"), bar=$("cascbar");
+  const wireTap = el => {
+    if(!el) return;
+    el.addEventListener("click", toggleWatchTopMini);
+    el.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleWatchTopMini(); } });
+  };
+  wireTap(mini);
+  wireTap(handle);
+  if(bar && wtStoredCollapsed()) bar.classList.add("wtcollapsed");
 }
 // Repaint, and leave the film's row exactly where it was on screen — then animate it between the height it
 // had and the height it now has, so the change reads as a shrink (or an unfold) rather than a swap. Under
