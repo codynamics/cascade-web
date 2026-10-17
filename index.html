@@ -5363,6 +5363,7 @@ const opinionOf  = id => blocked.has(id) ? "notfor" : isDisliked(id) ? "disliked
 // opinion toggles) stays unchanged.
 function saveWatchStatus(){}
 const expandedSet = new Set();   // which cards are expanded (session only)
+const stubOpenSet = new Set();   // CAS-1291: which watched stubs are held open as a card (session only)
 
 // ---- The Found list: auto-membership + overrides + provenance (CAS-67) ---------------------------------
 // A Cascade is a standing rule, not a search you harvest by hand — so every film that matches one is ALREADY
@@ -6662,6 +6663,10 @@ function awardsBreakdownHTML(m){
 // undo, in place. Every other filter still removes it outright — a horror film in a comedy radar was never
 // yours to undo. Since CAS-100 your answer alone folds the card; it no longer waits on a View chip.
 const taggedOut = m => !!opinionOf(m.tmdb_id);
+// CAS-1291: whether a watched film should render as its one-line stub right now. Everywhere a card/stub
+// choice is actually rendered uses this (never taggedOut alone), so a tap-opened stub reads as a card in
+// every one of them; every count/filter still reads taggedOut directly, since an opened stub is still watched.
+const showsStub = m => taggedOut(m) && !stubOpenSet.has(m.tmdb_id);
 let ignoreTagged=false;   // set only by passesOrStub(), so the counters that call passes() are unaffected
 // ---- The status gate (CAS-148) -------------------------------------------------
 // A Cascade's window scope is a WATCH scope, not a display filter. A cinema-window Cascade is watching 26
@@ -9348,7 +9353,7 @@ function stubHTML(m){
   const isNever=cur==="notfor";
   const title=op?`${op.lbl} — tap to ${isNever?"undo":"change"}`:"Say what you made of it";
   const onclick=isNever?`setOpinion(${id},'notfor')`:`openWatchPanel(${id},this)`;
-  return `<div class="stub" id="card-${id}">
+  return `<div class="stub" id="card-${id}" onclick="stubTap(event,${id})">
     <span class="stubname">${esc(m.title)}</span>
     <span class="stubwhy">${lbl}</span>
     <span class="actions">
@@ -11081,6 +11086,13 @@ window.cardTap=(e,id)=>{
   // out from under the selection the user was making in the synopsis.
   const sel=window.getSelection && window.getSelection();
   if(sel && !sel.isCollapsed && sel.toString().trim()) return;
+  // CAS-1291: a tap on the full (expanded) card of a stub the user tapped open sends it back to its stub,
+  // rather than just collapsing it — the third tap in stub -> card -> expanded -> stub.
+  if(stubOpenSet.has(id) && expandedSet.has(id)){
+    stubOpenSet.delete(id); expandedSet.delete(id);
+    swapStubCardRows(id);
+    return;
+  }
   toggleExpand(id);
 };
 window.toggleExpand=id=>{
@@ -11107,6 +11119,32 @@ window.toggleExpand=id=>{
     const wtw=c.querySelector(".wtw"), svcBtn=c.querySelector(".svcbtn");
     if(wtw && !on){ wtw.classList.remove("open"); if(svcBtn) svcBtn.classList.remove("open"); }
   });
+};
+// CAS-1291: re-renders every on-screen copy of one film's row (Watch and Moving can each carry their own,
+// CAS-868) as whichever of stub/card showsStub(m) now says it should be, in place — same single-row swap
+// fastPatchFindRow (~21786) already uses, so replacing a short stub with a tall card never moves the row's
+// OWN top: nothing before it in the DOM changed, only what comes after it shifts, same as any other resize
+// below the fold.
+function swapStubCardRows(id){
+  const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return false;
+  const copies=[...document.querySelectorAll(`[id="card-${id}"]`)];
+  if(!copies.length) return false;
+  const html=(showsStub(m) ? stubHTML(m) : cardHTML(m, isFresh(m), {inWatch:true})).trim();
+  copies.forEach(row=>{
+    const t=document.createElement("template");
+    t.innerHTML=html;
+    observeLazyPosters(t.content);
+    row.replaceWith(t.content.firstElementChild);
+  });
+  return true;
+}
+// CAS-1291: a tap on a watched film's stub opens it to the standard card, same as tapping a chevron would
+// elsewhere — the stub's own verdict button (the one existing control it had) keeps its own click handler
+// and must not also trigger this.
+window.stubTap=(e,id)=>{
+  if(e.target.closest('button, a, input, select, textarea, label, [role="button"]')) return;
+  stubOpenSet.add(id);
+  swapStubCardRows(id);
 };
 function activeCount(){
   let n=filt.status.size+filt.year.size+filt.age.size+filt.culture.size+filt.genre.size;
@@ -19303,7 +19341,7 @@ function movingWhyHTML(group){
 // as Watch does, and the full card omits the "Not for this list" control (Moving is not a list, so
 // there is nothing to be not-for) but is otherwise unchanged.
 function movingCardHTML(row){
-  return taggedOut(row.m) ? stubHTML(row.m) : cardHTML(row.m, false, {hideDismiss:true});
+  return showsStub(row.m) ? stubHTML(row.m) : cardHTML(row.m, false, {hideDismiss:true});
 }
 // One why-line per group, above its first card only — the rest of the group's cards carry no why-line
 // of their own, so a run of matching rows says its reason exactly once.
@@ -19487,7 +19525,7 @@ function findRenderMore(){
   const listEl=$("findList"); if(!listEl || findShown>=findRowsCache.length) return;
   const end=Math.min(findRowsCache.length, findShown+FIND_BATCH);
   let buf="";
-  for(let i=findShown; i<end; i++){ const m=findRowsCache[i]; buf += taggedOut(m) ? stubHTML(m) : cardHTML(m, isFresh(m)); }
+  for(let i=findShown; i<end; i++){ const m=findRowsCache[i]; buf += showsStub(m) ? stubHTML(m) : cardHTML(m, isFresh(m)); }
   listEl.insertAdjacentHTML("beforeend", buf);
   observeLazyPosters(listEl);
   findShown=end;
@@ -21214,7 +21252,7 @@ function fillListChunked(listEl, items, gen, freshFn, onDone){
     if(gen!==renderGen || !listEl.isConnected){ onDone && onDone(); return; }
     let buf=""; const end=Math.min(items.length, i+BATCH);
     for(; i<end; i++){ const m=items[i];
-      buf += taggedOut(m) ? stubHTML(m) : cardHTML(m, freshFn?freshFn(m):false, {inWatch:true}); }
+      buf += showsStub(m) ? stubHTML(m) : cardHTML(m, freshFn?freshFn(m):false, {inWatch:true}); }
     listEl.insertAdjacentHTML("beforeend", buf);
     observeLazyPosters(listEl);   // CAS-1103: register this batch's new poster tiles, not the whole list again
     if(i<items.length) requestAnimationFrame(step);
@@ -21413,7 +21451,7 @@ function reconcilePatchSettledList(){
     const id=Number(row.id.slice(5)); if(!isFinite(id)) return;
     const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
     const t=document.createElement("template");
-    t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m), {inWatch:true})).trim();
+    t.innerHTML=(showsStub(m)?stubHTML(m):cardHTML(m, isFresh(m), {inWatch:true})).trim();
     const fresh=t.content.firstElementChild;
     // AC6: a poster that has already loaded (an inline background-image, no data-lazybg left to observe)
     // is carried over onto the fresh node BEFORE the comparison below, so a card whose only "change" is
@@ -21778,7 +21816,7 @@ function fastPatchFindRow(id){
   // film left the list -> let render() handle it
   if(!m || !row || !filmInWatchRows(m)) return false;
   const t=document.createElement("template");
-  t.innerHTML=(taggedOut(m)?stubHTML(m):cardHTML(m, isFresh(m), {inWatch:true})).trim();
+  t.innerHTML=(showsStub(m)?stubHTML(m):cardHTML(m, isFresh(m), {inWatch:true})).trim();
   observeLazyPosters(t.content);   // CAS-1103: this single swapped-in card's own poster tile
   row.replaceWith(t.content.firstElementChild);
   patchFindCounts();
