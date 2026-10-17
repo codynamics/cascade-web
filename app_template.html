@@ -9839,6 +9839,7 @@ function watchStageStopsNow(){
 // in_cinema) already; every other stop only has that mapping via WATCH_TAB_SCROLL_TARGET.
 const watchStageScrollTarget = stop => stop.tabKey==="in_cinema" ? stop.key : WATCH_TAB_SCROLL_TARGET[stop.tabKey];
 window.setWatchStage = key => {
+  landingTabPendingAccountData = false;   // CAS-1280: a real stage tap wins over a late cold-boot re-pick
   const stop=watchStageStopsNow().find(s=>s.key===key); if(!stop) return;
   if(watchTab!==stop.tabKey){
     if(stop.tabKey==="in_cinema") watchCinemaStage=key;
@@ -20719,10 +20720,11 @@ async function membStartWork(viaNewSignup){
   watchTab = pickLandingWatchTab();
   showFoundList();
   render();
-  // CAS-915: reset after the listing has laid out — the Watch listing scrolls the page itself
+  // CAS-915/CAS-1280: land after the listing has laid out — the Watch listing scrolls the page itself
   // (jumpToSection's own scroller:window, CAS-869), and a reset before render() would be undone
-  // by the thousands of nodes the build inserts.
-  window.scrollTo(0,0);
+  // by the thousands of nodes the build inserts. landWatchList() lands on the chosen tab's own
+  // heading rather than always the very top, same rule the boot path and every other landing uses.
+  landWatchList();
   closeMembership();
   // CAS-962: first run has genuinely finished (the roster above is committed) and the membership sheet
   // is out of the way — safe to honour a deep link now, same rule as the boot path's own "onboarding
@@ -21405,8 +21407,7 @@ window.jumpToSection = (k, opts) => {
 // scroll position that no longer suits it, stranding the reader mid-list — return to the first section's
 // heading, once the re-render has laid out, via the exact same offset jumpToSection above uses.
 function scrollWatchListingToTop(){
-  const first=document.querySelector("#groups .group");
-  if(first) jumpToSection(first.dataset.g);
+  landWatchList();   // CAS-1280: one landing rule everywhere — the stage's own heading, not the first section
 }
 // CAS-869: routes each rail to its own jumpToSection options — #jumpBar is the Watch listing (defaults
 // apply), #movingJumpBar is Moving (its own groups/chrome/scroller). A single delegated listener still
@@ -22579,7 +22580,11 @@ function acctFetchKeepalive(init){
     // CAS-1224: redo the cold-boot landing-tab pick now that cascades/watchPrefs hold the account's real
     // answer, not the empty-device default pickLandingWatchTab() saw at boot. Only when the boot-time pick
     // is still pending AND the device is still sitting on whatever it provisionally guessed — a real tap
-    // (setWatchTab) already cleared the flag, and must never be second-guessed by a late correction.
+    // (setWatchTab/setWatchStage) already cleared the flag, and must never be second-guessed by a late
+    // correction. CAS-1280: a late landing must never yank someone already reading either — scrollY is
+    // still exactly 0 only if nothing (the person, or this cold boot itself) has scrolled the page since
+    // it loaded, since nothing before this point ever moves it.
+    const shouldLandAfterFanout = landingTabPendingAccountData && window.scrollY===0;
     if(landingTabPendingAccountData){
       landingTabPendingAccountData = false;
       const landingTab = pickLandingWatchTab();
@@ -22595,6 +22600,7 @@ function acctFetchKeepalive(init){
     // device's real admission sweep start sending — exactly the AC4/AC5 write-after-settled leak.
     recomputeFound();
     if(typeof render==="function") render();
+    if(shouldLandAfterFanout) landWatchList();   // CAS-1280: land once, now that the real listing is up
     // CAS-1224: the real agent_films flush, moved here from loadAgentFilms' own .finally() above — this
     // recompute just ran against cascades/watchPrefs that applyWatchPrefsToCascades() only just finished
     // deriving, which can surface a match recomputeFound's EARLIER pass (loadAgentFilms' own .finally,
