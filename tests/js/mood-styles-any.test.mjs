@@ -131,6 +131,6 @@ test("CAS-1256 AC3: the built index.html calls filmPassesStylesOff 3 times, drop
     "AC3: filmPassesStylesOff(m, genreOff) must be called exactly 3 times");
   assert.equal(count("!(m.genres||[]).some(g=>genreOff.has(g))"), 0,
     "AC3: the old any-style-off rule must be gone");
-  assert.equal(count("const genres=[...new Set(MOVIES.flatMap(m=>m.genres||[]))].sort();"), 1,
-    "AC3: the Mood sheet's style chips must be built from every catalogue style exactly once");
+  assert.equal(count("? [...ONB_GENRES].sort((a,b)=>a.localeCompare(b))"), 1,
+    "AC3 (CAS-1288): the Mood sheet's style chips for Everything must be built from every catalogue style exactly once");
 });
