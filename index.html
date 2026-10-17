@@ -11472,7 +11472,11 @@ function tasteDetailHTML(primary, other, data){
 }
 function renderStyleMapSection(T){
   const {rows, cols, best} = tasteStyleMapData(T);
-  if(tasteSelPrimary === null){ tasteSelPrimary = best.primary; tasteSelOther = best.other; }
+  // CAS-1289: a selection left over from another profile (the monitor's admit_shim drives one page across
+  // accounts; a person can switch accounts too) can name a style or pair this profile doesn't hold — fall
+  // back to this profile's own best, or to no selection when it has none.
+  const selData = () => tasteSelOther ? T.pairs[tasteSelPrimary + "|" + tasteSelOther] : T.styles[tasteSelPrimary];
+  if(tasteSelPrimary === null || !selData()){ tasteSelPrimary = best ? best.primary : null; tasteSelOther = best ? best.other : null; }
   const headerHTML = `<span class="tc0"></span><span class="th all">All</span>`
     + cols.map(c => `<span class="th">${esc(tasteShortName(c))}</span>`).join("");
   const rowsHTML = rows.map(primary => {
@@ -11484,14 +11488,14 @@ function renderStyleMapSection(T){
     }).join("");
     return `<span class="tr">${esc(primary)}<small>${sty.n}</small></span>${allCell}${otherCells}`;
   }).join("");
-  const data = tasteSelOther ? T.pairs[tasteSelPrimary + "|" + tasteSelOther] : T.styles[tasteSelPrimary];
+  const data = tasteSelPrimary === null ? null : selData();
   return `
     <div class="flabel">Style map</div>
     <p class="tnote">Styles run A to Z, down the side and across the top. A square is the films you've judged that have both. Swipe the grid sideways for more, and tap a square to see its films.</p>
     <div class="tmap">
       <div class="tscroll"><div class="tgrid" style="grid-template-columns:92px repeat(${1 + cols.length},26px)">${headerHTML}${rowsHTML}</div></div>
       <div class="tlegend"><span>avoid</span><span class="ramp"><i style="background:rgba(240,136,58,0.85)"></i><i style="background:rgba(240,136,58,0.46)"></i><i style="background:rgba(255,255,255,.08)"></i><i style="background:rgba(45,212,191,0.46)"></i><i style="background:rgba(45,212,191,0.85)"></i></span><span>go for</span><span class="sp">fainter = fewer verdicts</span></div>
-      ${tasteDetailHTML(tasteSelPrimary, tasteSelOther, data)}
+      ${data ? tasteDetailHTML(tasteSelPrimary, tasteSelOther, data) : ""}
     </div>`;
 }
 window.tasteSel = (primary, other) => {

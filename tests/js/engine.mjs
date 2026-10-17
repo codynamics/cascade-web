@@ -288,6 +288,14 @@ if(typeof window.CascadeAuth === "undefined"){
   // a real account store or a real catalogue of verdicts. CAS-1254: matchBadgeHTML is the Match badge's own
   // render, exported so a test can assert its certainty class/bars directly.
   tasteProfile, tasteMatch, matchBadgeHTML, publicLozengeHTML, tasteStyleMapData, creditsHTML,
+  // CAS-1289: renderStyleMapSection is the Style map card's own render, and tasteSelPrimary/tasteSelOther
+  // (module-level lets, same reassignment pattern as watchTab above) are the cell it's currently showing
+  // detail for -- exported through getters/setters so a test can seed a stale selection (left over from a
+  // different account's profile, the admit_shim crash this ticket fixes) and assert the render survives it.
+  renderStyleMapSection,
+  get tasteSelPrimary(){ return tasteSelPrimary; },
+  get tasteSelOther(){ return tasteSelOther; },
+  setTasteSel(primary, other){ tasteSelPrimary = primary; tasteSelOther = other; },
   // CAS-1277: rankYouItems is the pure rank/confidence-level math (over plain {id,value,conf,tiebreak}
   // items) behind the Watch listing's list-relative You lozenge, exported so a test can assert the
   // ticket's own worked fixtures directly; watchYouRankMap is the thin film-fixture wrapper around it.
