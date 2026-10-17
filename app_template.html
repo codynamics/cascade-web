@@ -10232,14 +10232,41 @@ window.clearAllWatchBadge = () => { watchBadgeSel[watchTab].clear(); render(); s
 // the sort switch, search, Filters button and agent lozenges. Up to five; one selected at a time. ====
 // C2: the two defaults, in memory, used whenever the account has saved none yet. Never written to
 // view.moods by themselves — only as part of the whole list, the first time a person saves or deletes one.
+// CAS-1284: three catalogue-wide starters — "what should I watch tonight" — each the whole catalogue (not
+// just what an agent lists) at Best 30 by the You+Public blend, restricted to Wow/Watch Again verdicts and
+// mine-only. stylesOff is built from ALL_GENRES (defined well above, at catalogue-load time) rather than
+// ONB_GENRES (defined much later in the file) — the two name the same set either way, only sorted
+// differently, and "every style except these" doesn't care about order.
+const MOOD_STARTER_STYLES = {
+  action: ["Action", "Crime", "Thriller"],
+  imagine: ["Science Fiction", "Fantasy"],
+  fun: ["Comedy", "Romance"],
+};
+const moodStylesOffKeeping = keep => ALL_GENRES.filter(g=>!keep.includes(g));
+// CAS-1284 Change 6: the ids loadUserPrefs' own provisioning (below) treats as "a starter" — the three new
+// catalogue moods only, never the pre-existing Top scores/Releases defaults.
+const MOOD_STARTER_IDS = Object.keys(MOOD_STARTER_STYLES);
 const MOOD_DEFAULTS = [
   {id:"top", name:"Top scores", order:"score", top:true},
   {id:"releases", name:"Releases", order:"release", top:false},
+  {id:"action", name:"Action", source:"catalogue", best:30, order:"you",
+    stylesOff:moodStylesOffKeeping(MOOD_STARTER_STYLES.action), watched:["wow","liked"], mineOnly:true},
+  {id:"imagine", name:"Imagine", source:"catalogue", best:30, order:"you",
+    stylesOff:moodStylesOffKeeping(MOOD_STARTER_STYLES.imagine), watched:["wow","liked"], mineOnly:true},
+  {id:"fun", name:"Fun", source:"catalogue", best:30, order:"you",
+    stylesOff:moodStylesOffKeeping(MOOD_STARTER_STYLES.fun), watched:["wow","liked"], mineOnly:true},
 ];
 const moodDefaultFieldsNow = () => ({
   agentsOff:[], mineOnly:true, pickedBy:"all", watched:[], stylesOff:[], badges:[], alsoShow:null,
 });
-function moodDefaultsNow(){ return MOOD_DEFAULTS.map(m=>({...m, ...moodDefaultFieldsNow()})); }
+// CAS-1284: defaults spread FIRST, then the mood's own fields — so a starter's explicit mineOnly/watched/
+// stylesOff above actually survive (the reverse order would let moodDefaultFieldsNow() clobber them back to
+// empty, exactly as it does for a saved mood missing a field; loadUserPrefs's own `{...moodDefaultFieldsNow(), ...m}` already uses this order).
+function moodDefaultsNow(){ return MOOD_DEFAULTS.map(m=>({...moodDefaultFieldsNow(), ...m})); }
+// CAS-1284 Change 2: best replaces the old boolean top switch — null/10/20/30/40. A mood whose shape
+// already carries `best` (even null, an explicit "All") always wins; only a mood that has never carried the
+// field at all (every mood saved before this ticket) falls back to its legacy top flag.
+function moodBestN(mood){ return mood.best!==undefined ? mood.best : (mood.top ? 10 : null); }
 let watchMoods = moodDefaultsNow();
 // C2: the selected mood is view.mood if it names a mood that exists, otherwise the first.
 let watchMoodSel = watchMoods[0].id;
@@ -10255,7 +10282,7 @@ function applyMoodToState(mood){
   WATCH_LEVEL_KEYS.forEach(tab=>{
     watchPickedBy[tab]=mood.pickedBy||"all";
     watchWatchedSel[tab]=new Set(mood.watched||[]);
-    watchGenreOff[tab]=new Set();   // CAS-1273: moods no longer filter by style; mood.stylesOff is ignored
+    watchGenreOff[tab]=new Set(mood.stylesOff||[]);   // CAS-1284: reverses CAS-1273 — styles are back
     watchBadgeSel[tab]=new Set();   // CAS-1281: moods no longer filter by badge; mood.badges is ignored
     watchMineOnly[tab]=mood.mineOnly!==false;
     watchSearch[tab]=""; watchSearchRaw[tab]="";
@@ -10295,8 +10322,10 @@ function moodDraftFrom(mood){
   return {
     editingId: mood ? mood.id : null,
     name: mood ? mood.name : "",
+    // CAS-1284 Change 4: a new mood defaults to "My agents" — "missing means agents" (Change 1).
+    source: mood && mood.source==="catalogue" ? "catalogue" : "agents",
     order: mood ? mood.order : "score",
-    top: mood ? !!mood.top : false,
+    best: mood ? moodBestN(mood) : null,   // CAS-1284 Change 2: replaces the old boolean `top`
     agentsOff: new Set(mood ? (mood.agentsOff||[]) : []),
     mineOnly: mood ? mood.mineOnly!==false : true,
     pickedBy: mood ? (mood.pickedBy||"all") : "all",
@@ -10321,13 +10350,15 @@ window.openMoodSheetForNew = () => {
 window.setMoodDraftName = v => { if(moodDraft) moodDraft.name=v; };
 window.toggleMoodDraftAgent = id => { if(!moodDraft) return; moodDraft.agentsOff.has(id)?moodDraft.agentsOff.delete(id):moodDraft.agentsOff.add(id); renderMoodSheetBody(); };
 window.setMoodDraftOrder = key => { if(!moodDraft) return; moodDraft.order=key; renderMoodSheetBody(); };
-window.toggleMoodDraftTop = () => { if(!moodDraft) return; moodDraft.top=!moodDraft.top; renderMoodSheetBody(); };
+// CAS-1284 Change 2: replaces toggleMoodDraftTop — v is null (All) or one of 10/20/30/40.
+window.setMoodDraftBest = v => { if(!moodDraft) return; moodDraft.best=v; renderMoodSheetBody(); };
+// CAS-1284 Change 4: "My agents" (the pre-existing behaviour) or "Everything" (a catalogue-wide pool).
+window.setMoodDraftSource = key => { if(!moodDraft) return; moodDraft.source=key==="catalogue"?"catalogue":"agents"; renderMoodSheetBody(); };
 window.toggleMoodDraftMineOnly = () => { if(!moodDraft) return; moodDraft.mineOnly=!moodDraft.mineOnly; renderMoodSheetBody(); };
 window.setMoodDraftPickedBy = key => { if(!moodDraft) return; moodDraft.pickedBy=key; renderMoodSheetBody(); };
 window.toggleMoodDraftWatched = key => { if(!moodDraft) return; moodDraft.watched.has(key)?moodDraft.watched.delete(key):moodDraft.watched.add(key); renderMoodSheetBody(); };
-// CAS-1273: the mood sheet's Styles section is gone (Lee: two layers of style settings were too
-// confusing), so nothing calls these three any more. Left in place rather than deleted — Lee is
-// reviewing mood styles later and stylesOff itself still lives on the stored mood shape.
+// CAS-1284: reverses CAS-1273 — the mood sheet's Styles section is back (renderMoodSheetBody), so these
+// three are live again.
 window.toggleMoodDraftGenre = g => { if(!moodDraft) return; moodDraft.stylesOff.has(g)?moodDraft.stylesOff.delete(g):moodDraft.stylesOff.add(g); renderMoodSheetBody(); };
 window.selectAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.stylesOff.clear(); renderMoodSheetBody(); };
 window.clearAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.stylesOff=new Set(watchSheetGenres[watchTab]||[]); renderMoodSheetBody(); };
@@ -10354,9 +10385,9 @@ window.saveMoodFromSheet = () => {
   if(!name){ const inp=$("moodName"); if(inp) inp.focus(); return; }
   const mood={
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
-    name, order:d.order, top:!!d.top,
+    name, source:d.source==="catalogue"?"catalogue":"agents", order:d.order, best:d.best,
     agentsOff:[...d.agentsOff], mineOnly:!!d.mineOnly, pickedBy:d.pickedBy,
-    watched:[...d.watched], stylesOff:[], badges:[],   // CAS-1273: styles no longer saved from the mood sheet; CAS-1281: nor are badges
+    watched:[...d.watched], stylesOff:[...d.stylesOff], badges:[],   // CAS-1284: styles saved again; CAS-1281: badges still aren't
     alsoShow: d.alsoShow ? {premium:[...(d.alsoShow.premium||[])], rent:[...(d.alsoShow.rent||[])], stream:[...(d.alsoShow.stream||[])]} : null,
   };
   const idx=watchMoods.findIndex(m=>m.id===mood.id);
@@ -10478,6 +10509,14 @@ function renderMoodSheetBody(){
     return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
       onclick="setMoodDraftPickedBy('${o.key}')">${esc(o.label)}</button>`;
   }).join("");
+  // CAS-1284 Change 3: the Styles section is back — one chip per catalogue style, "on" meaning included
+  // (not in stylesOff), same convention toggleMoodDraftGenre already used while this section was dark.
+  const stylesHTML=genres.map(g=>{
+    const on=!d.stylesOff.has(g);
+    return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
+      onclick="toggleMoodDraftGenre('${escA(g)}')">${esc(g)}</button>`;
+  }).join("");
+  const isCatalogue=d.source==="catalogue";
   const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
   const alsoShowSet = watchTab==="in_cinema" ? new Set() : new Set((d.alsoShow && d.alsoShow[watchTab]) || WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
   const alsoShowPool = watchTab==="in_cinema" ? [] : watchAlsoShowPool();
@@ -10493,14 +10532,23 @@ function renderMoodSheetBody(){
   const body=$("watchSheetBody");
   if(body) body.innerHTML=`
     <div class="wsheetsec">
+      <div class="wsheethd"><span>From</span></div>
+      <div class="mfseg" role="group" aria-label="From">
+        <button type="button" data-source="agents" aria-pressed="${!isCatalogue}" class="${!isCatalogue?"on":""}"
+          onclick="setMoodDraftSource('agents')">My agents</button>
+        <button type="button" data-source="catalogue" aria-pressed="${isCatalogue}" class="${isCatalogue?"on":""}"
+          onclick="setMoodDraftSource('catalogue')">Everything</button>
+      </div>
+    </div>
+    <div class="wsheetsec">
       <div class="wsheethd"><span>Name</span></div>
       <input id="moodName" class="mfinput" type="text" maxlength="18" placeholder="Friday night" autocomplete="off"
         value="${escA(d.name)}" oninput="setMoodDraftName(this.value)">
     </div>
-    <div class="wsheetsec">
+    ${isCatalogue ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Agents</span></div>
       <div class="chips">${agentsHTML}</div>
-    </div>
+    </div>`}
     <div class="wsheetsec">
       <div class="wsheethd"><span>Order</span></div>
       <div class="mfseg" role="group" aria-label="Order">
@@ -10511,9 +10559,14 @@ function renderMoodSheetBody(){
         <button type="button" data-order="you" aria-pressed="${d.order==="you"}" class="${d.order==="you"?"on":""}"
           ${(window.CascadePersistence && window.CascadePersistence.accountActive())?"":"disabled"} onclick="setMoodDraftOrder('you')">You</button>
       </div>
-      <div class="mfrow"><span>Only the best 10 on each stage</span>
-        <button type="button" id="moodTop" class="mftog${d.top?" on":""}" role="switch" aria-checked="${d.top}"
-          aria-label="Only the best 10 on each stage" onclick="toggleMoodDraftTop()"><i></i></button></div>
+      <div class="mfrow"><span>Show</span></div>
+      <div class="mfseg" role="group" aria-label="Show">
+        ${[["all","All",null],[10,"10",10],[20,"20",20],[30,"30",30],[40,"40",40]].map(([key,label,v])=>{
+          const on=d.best===v;
+          return `<button type="button" data-best="${key}" aria-pressed="${on}" class="${on?"on":""}"
+            onclick="setMoodDraftBest(${v===null?"null":v})">${label}</button>`;
+        }).join("")}
+      </div>
     </div>
     <div class="wsheetsec">
       <div class="wsheethd"><span>Availability</span></div>
@@ -10522,13 +10575,22 @@ function renderMoodSheetBody(){
         <span>Show only available on my services</span><span class="knob"></span>
       </div>
     </div>
-    <div class="wsheetsec">
+    ${isCatalogue ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Picked by</span></div>
       <div class="chips">${pickedByHTML}</div>
-    </div>
+    </div>`}
     <div class="wsheetsec">
       <div class="wsheethd"><span>Watched</span></div>
       <div class="chips">${watchedHTML}</div>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Styles</span>
+        <div class="wsheetlinks">
+          <button type="button" class="linkbtn" onclick="selectAllMoodDraftStyles()">Select all</button>
+          <button type="button" class="linkbtn" onclick="clearAllMoodDraftStyles()">Clear all</button>
+        </div>
+      </div>
+      <div class="chips">${stylesHTML}</div>
     </div>
     ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Also show</span></div>
@@ -10548,6 +10610,18 @@ function watchScopeRows(){
   // empty branch (already keyed off rows.length) shows its existing empty state rather than a live listing
   // under a blank strip.
   if(!watchTabsNow().length) return [];
+  // CAS-1284 Change 1: a catalogue mood's pool is every film in MOVIES standing in the current stage —
+  // decided directly off primaryStatus(m), whether or not any agent lists it — not the agent/occasion-based
+  // pool below. Agents-off, occasion and Picked by are all agent-scoped, so none of them apply here; search,
+  // Styles, Watched and mine-only (watchVisibleRows below) still do, unchanged.
+  if(currentMood().source==="catalogue"){
+    const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
+    return MOVIES.filter(m=>{
+      const ps=primaryStatus(m);
+      const standing = watchTab==="in_cinema" ? (ps==="upcoming" || ps==="opening_week" || ps==="in_cinema") : ps===ownStanding;
+      return standing && watchStageMatches(m);
+    });
+  }
   const agentOff=watchAgentOff;
   const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
   // CAS-793: a selected occasion narrows by the FILM'S OWNER (filmOwnerCascade — the single CAS-709 global
@@ -10585,7 +10659,8 @@ function watchVisibleRows(){
   const wsearch=watchSearch[watchTab];
   if(wsearch) rows=rows.filter(m=>m.title.toLowerCase().includes(wsearch));
   const preSheetRows=rows;
-  if(watchPickedBy[watchTab]!=="all") rows=rows.filter(filmMatchesPickedBy);
+  // CAS-1284 Change 1: Picked by is agent-scoped — never applies to a catalogue mood.
+  if(watchPickedBy[watchTab]!=="all" && currentMood().source!=="catalogue") rows=rows.filter(filmMatchesPickedBy);
   const genreOff=watchGenreOff[watchTab];
   if(genreOff.size) rows=rows.filter(m=>filmPassesStylesOff(m, genreOff));
   if(watchBadgeSel[watchTab].size) rows=rows.filter(filmMatchesBadgeFilter);
@@ -10595,20 +10670,19 @@ function watchVisibleRows(){
   const mineOnly=watchMineOnlyOn();
   if(mineOnly) rows=rows.filter(m=>!HOME_KEYS.includes(primaryStatus(m)) || matchesServices(m, primaryStatus(m)));
   if(wsearch) rows=watchSearchRows(wsearch);
-  // C3: a mood with "only the best 10" keeps the ten highest cascadeScore(m) rows — a film with no score
-  // ranks below every scored film, ties go to the lower tmdb_id, and a film held open from a verdict just
-  // set is always kept regardless of rank. watchStageCountFor reads this same `rows`, so the list and the
-  // stage counts can never disagree.
-  // CAS-1264: a mood ordered by You (signed in) keeps its best-10 by that same You-then-Public comparison
-  // instead, so the kept set agrees with the order the list is actually shown in.
-  const rankByYou = currentMood().order==="you" && !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  if(currentMood().top){
+  // CAS-1284 Change 2: Best N replaces "only the best 10" — keeps the top moodBestN(currentMood()) rows by
+  // moodBestScore (the You+Public blend when signed in with a taste profile, cascadeScore alone otherwise),
+  // ties broken on tmdb_id; a film held open from a verdict just set is always kept regardless of rank.
+  // watchStageCountFor reads this same `rows`, so the list and the stage counts can never disagree. The
+  // mood's own Order (filt.sort, set by applyMoodToState) only decides how these KEPT rows are shown — it
+  // plays no part in which ones survive the cut.
+  const bestN = moodBestN(currentMood());
+  if(bestN!=null){
     const ranked=[...rows].sort((a,b)=>{
-      if(rankByYou) return sortMoviesBy(a,b,"you");
-      const diff=cascadeScore(b)-cascadeScore(a);
+      const diff=moodBestScore(b)-moodBestScore(a);
       return diff!==0 ? diff : a.tmdb_id-b.tmdb_id;
     });
-    const keep=new Set(ranked.slice(0,10).map(m=>m.tmdb_id));
+    const keep=new Set(ranked.slice(0,bestN).map(m=>m.tmdb_id));
     rows=rows.filter(m=>keep.has(m.tmdb_id) || heldThisTab.has(m.tmdb_id));
   }
   return {rows, preSheetRows, preMineOnlyRows, mineOnly};
@@ -11261,6 +11335,17 @@ function tasteMatchCached(m){
   const t = tasteMatch(m);
   _tasteMatchCache.set(m.tmdb_id, t);
   return t;
+}
+// CAS-1284 Change 2: Best N's own ranking score — the blend Lee's evidence settled on (50/50 You+Public)
+// once there's a real taste profile to blend with; cascadeScore alone otherwise, including for a film
+// tasteMatch has no combination film for (the same "nothing to blend" case as having no profile at all).
+function moodBestScore(m){
+  const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
+  if(signedIn && tasteProfile().n>0){
+    const t=tasteMatchCached(m);
+    if(t) return 0.5*t.value + 0.5*cascadeScore(m);
+  }
+  return cascadeScore(m);
 }
 
 // ---- Your taste: the page and its card on the Agents screen (CAS-1252) ---------------------------------
@@ -21098,10 +21183,15 @@ function watchNavKey(){
     [...watchAlsoShow[watchTab]].sort(),
     watchMineOnlyOn(),
     watchOccasion,
-    // CAS-1247: the selected mood and its own "top 10" cut — every other mood field a mood switch changes
+    // CAS-1247: the selected mood and its own Best N cut — every other mood field a mood switch changes
     // (agents/pickedBy/watched/styles/badges/alsoShow/mineOnly/order) is already one of the fields above.
+    // CAS-1284: top is now moodBestN's own fallback, so the nav key reads the resolved cut; source is its
+    // own entry too — switching a saved mood between My agents/Everything changes watchScopeRows' whole
+    // pool without touching any field already listed above (agentOff/pickedBy/stylesOff keep whatever
+    // values they already held), so it would otherwise go undetected here.
     watchMoodSel,
-    currentMood().top,
+    moodBestN(currentMood()),
+    currentMood().source==="catalogue",
     // CAS-1248: the tabs a Where & when switch actually leaves enabled — watchTab alone (above) says which
     // one is SELECTED, not which ones EXIST, so switching a window off/on never showed up here even though
     // watchStageStopsNow()/watchScopeRows() both derive their stops/scope from this same list.
@@ -21447,35 +21537,44 @@ function patchFindCounts(){
 // left the list.
 function filmInWatchRows(m){
   if(!watchTabsNow().length) return false;
-  const agentOff=watchAgentOff;
-  const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
-  // CAS-793: same owner-based occasion test as watchScopeRows — see its comment.
-  if(watchOccasion){
-    const owner=filmOwnerCascade(m);
-    if(!owner || !acs.some(c=>c.id===owner.id) || !(owner.occasions||[]).includes(watchOccasion)) return false;
+  // CAS-1284 Change 1: a catalogue mood's pool test — see watchScopeRows's own comment. Agents-off,
+  // occasion and Picked by are all agent-scoped, so none of them apply here.
+  if(currentMood().source==="catalogue"){
+    const ps=primaryStatus(m);
+    const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
+    const standing = watchTab==="in_cinema" ? (ps==="upcoming" || ps==="opening_week" || ps==="in_cinema") : ps===ownStanding;
+    if(!standing || !watchStageMatches(m)) return false;
   } else {
-    // CAS-1226: same "all-agents-on list, minus an off owner, unowned films untouched" rule as
-    // watchScopeRows's identical branch — see its comment.
-    if(!cascades.some(c=>listedBy(m,c))) return false;
-    if(agentOff.size){
+    const agentOff=watchAgentOff;
+    const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
+    // CAS-793: same owner-based occasion test as watchScopeRows — see its comment.
+    if(watchOccasion){
       const owner=filmOwnerCascade(m);
-      if(owner && agentOff.has(owner.id)) return false;
+      if(!owner || !acs.some(c=>c.id===owner.id) || !(owner.occasions||[]).includes(watchOccasion)) return false;
+    } else {
+      // CAS-1226: same "all-agents-on list, minus an off owner, unowned films untouched" rule as
+      // watchScopeRows's identical branch — see its comment.
+      if(!cascades.some(c=>listedBy(m,c))) return false;
+      if(agentOff.size){
+        const owner=filmOwnerCascade(m);
+        if(owner && agentOff.has(owner.id)) return false;
+      }
     }
+    if(!filmMatchesWatchTab(m, watchTab)) return false;
+    if(!watchStageMatches(m)) return false;   // CAS-1223: same Upcoming/In Cinema split watchScopeRows applies
   }
-  if(!filmMatchesWatchTab(m, watchTab)) return false;
-  if(!watchStageMatches(m)) return false;   // CAS-1223: same Upcoming/In Cinema split watchScopeRows applies
   const wsearch=watchSearch[watchTab];
   if(wsearch && !m.title.toLowerCase().includes(wsearch)) return false;
-  if(watchPickedBy[watchTab]!=="all" && !filmMatchesPickedBy(m)) return false;
+  if(watchPickedBy[watchTab]!=="all" && currentMood().source!=="catalogue" && !filmMatchesPickedBy(m)) return false;
   const genreOff=watchGenreOff[watchTab];
   if(!filmPassesStylesOff(m, genreOff)) return false;
   if(watchBadgeSel[watchTab].size && !filmMatchesBadgeFilter(m)) return false;
   if(!filmMatchesWatchedFilter(m) && !watchHeldOpen[watchTab].has(m.tmdb_id)) return false;
   if(watchMineOnlyOn() && HOME_KEYS.includes(primaryStatus(m)) && !matchesServices(m, primaryStatus(m))) return false;
-  // CAS-1247: "top 10" is a cross-film cut, not a per-film predicate — a held-open film is always kept
+  // CAS-1247: Best N is a cross-film cut, not a per-film predicate — a held-open film is always kept
   // (matching watchVisibleRows() above), otherwise fall back to the real pipeline's own output rather than
   // hand-duplicating a rank computation that could drift from it.
-  if(currentMood().top && !watchHeldOpen[watchTab].has(m.tmdb_id)){
+  if(moodBestN(currentMood())!=null && !watchHeldOpen[watchTab].has(m.tmdb_id)){
     return watchVisibleRows().rows.some(r=>r.tmdb_id===m.tmdb_id);
   }
   return true;
@@ -23553,9 +23652,11 @@ function acctFetchKeepalive(init){
   // CAS-1243 round 2: the one place both merge_user_prefs_view senders below ride reviewSessionsPushPending
   // onto a patch a user action already built, rather than ever sending a write of its own. Mutates `patch`
   // in place and clears the flag, so a second write this page load (the flag already consumed) carries no
-  // reviewSessions key.
+  // reviewSessions key. CAS-1284: loadUserPrefs' own one-time starter-mood provisioning rides the same way.
+  let moodsProvisionPending = null;
   function riderReviewSessionsOnto(patch){
     if(reviewSessionsPushPending){ reviewSessionsPushPending=false; patch.reviewSessions=reviewPromptSessionsCount; }
+    if(moodsProvisionPending){ Object.assign(patch, moodsProvisionPending); moodsProvisionPending=null; }
     return patch;
   }
   function pushViewField(key, value){
@@ -23684,6 +23785,19 @@ function acctFetchKeepalive(init){
       // account has saved none yet; applyMoodToState makes the adopted mood the live state, same as boot.
       if(Array.isArray(v.moods) && v.moods.length){
         watchMoods = v.moods.slice(0, 5).map(m=>({...moodDefaultFieldsNow(), ...m}));
+      }
+      // CAS-1284 Change 6: an existing account's saved moods predate the three new catalogue starters —
+      // append any whose id is missing, once (tracked by view.moodsProvisioned), up to the five-mood
+      // maximum, never replacing or renaming a saved mood. A load must never write (CAS-1218), so the
+      // append and the flag ride piggyback on the next real view write instead, through
+      // riderReviewSessionsOnto below (same deferred-write idiom as the reviewSessions replay above it).
+      if(!v.moodsProvisioned){
+        const haveIds=new Set(watchMoods.map(m=>m.id));
+        const missing=MOOD_DEFAULTS.filter(md=>MOOD_STARTER_IDS.includes(md.id) && !haveIds.has(md.id));
+        if(missing.length && watchMoods.length<5){
+          watchMoods=[...watchMoods, ...missing.slice(0, 5-watchMoods.length).map(md=>({...moodDefaultFieldsNow(), ...md}))];
+        }
+        moodsProvisionPending={moods:watchMoods.map(m=>({...m})), moodsProvisioned:1};
       }
       watchMoodSel = (typeof v.mood==="string" && watchMoods.some(m=>m.id===v.mood)) ? v.mood : watchMoods[0].id;
       applyMoodToState(currentMood());
