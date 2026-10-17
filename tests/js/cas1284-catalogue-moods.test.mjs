@@ -95,7 +95,7 @@ test("CAS-1284 Change 1: a catalogue mood's pool is every film standing in the c
     E.cascades.length = 0;
     withMood(E, freshCatalogueMood(E), () => {
       const rows = [...E.watchScopeRows()];
-      const expected = [...E.MOVIES].filter(m => E.primaryStatus(m) === "included_streaming");
+      const expected = [...E.MOVIES].filter(m => E.primaryStatus(m) === "included_streaming" && E.showable(m) && E.passesTasteBase(m));
       assert.ok(expected.length > 0, "setup: the harness catalogue must have streaming films to prove this");
       assert.equal(rows.length, expected.length);
       assert.deepEqual(rows.map(m => m.tmdb_id).sort(), expected.map(m => m.tmdb_id).sort());
@@ -116,7 +116,7 @@ test("CAS-1284 Change 1: Picked by never narrows a catalogue mood's rows", () =>
     withMood(E, freshCatalogueMood(E, { best: null }), () => {
       E.watchPickedBy.stream = "manual";   // a real, narrow Picked by value (PICKED_BY_OPTS' "Me")
       const { rows } = E.watchVisibleRows();
-      const expected = [...E.MOVIES].filter(m => E.primaryStatus(m) === "included_streaming");
+      const expected = [...E.MOVIES].filter(m => E.primaryStatus(m) === "included_streaming" && E.showable(m) && E.passesTasteBase(m));
       assert.ok(expected.length > 0, "setup: the harness catalogue must have streaming films to prove this");
       assert.equal(rows.length, expected.length, "Picked by must be ignored for a catalogue mood");
     });
@@ -133,7 +133,7 @@ test("CAS-1284 Change 2: Best N keeps exactly the top N rows by moodBestScore, t
     E.setWatchTab("stream");
     withMood(E, freshCatalogueMood(E, { best: 5 }), () => {
       const { rows } = E.watchVisibleRows();
-      const pool = [...E.MOVIES].filter(m => E.primaryStatus(m) === "included_streaming");
+      const pool = [...E.MOVIES].filter(m => E.primaryStatus(m) === "included_streaming" && E.showable(m) && E.passesTasteBase(m));
       assert.ok(pool.length > 5, "setup: the pool must exceed the cap to actually test the cut");
       const ranked = [...pool].sort((a, b) => {
         const diff = E.moodBestScore(b) - E.moodBestScore(a);
@@ -160,7 +160,7 @@ test("CAS-1284 Change 3: applyMoodToState restores watchGenreOff from mood.style
       assert.deepEqual([...E.watchGenreOff.stream].sort(), [...stylesOff].sort(),
         "AC: a mood's own stylesOff must land straight in watchGenreOff for the active tab");
       const { rows } = E.watchVisibleRows();
-      const expected = [...E.MOVIES].filter(m => E.primaryStatus(m) === "included_streaming" && (m.genres || []).includes("Comedy"));
+      const expected = [...E.MOVIES].filter(m => E.primaryStatus(m) === "included_streaming" && E.showable(m) && E.passesTasteBase(m) && (m.genres || []).includes("Comedy"));
       assert.ok(expected.length > 0, "setup: a Comedy streaming film must exist in the harness catalogue");
       assert.ok(rows.length > 0, "the Styles filter must not empty the list outright");
       assert.deepEqual([...rows].map(m => m.tmdb_id).sort(), expected.map(m => m.tmdb_id).sort());

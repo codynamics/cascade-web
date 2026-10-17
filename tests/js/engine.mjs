@@ -215,6 +215,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // the file to reach from there) — exported so a test can assert the two never drift apart.
   ANSWER_VALUES,
   normCascade, showable, primaryStatus, inCinemaWindow, isEstimated, deriveStatus, isUpcoming,
+  // CAS-1286: passesTasteBase is the account-level Language gate (CAS-560) — exported alongside showable
+  // above so a test can build the same pool a catalogue mood's own fix now filters through.
+  passesTasteBase,
   // CAS-608: exported so a fixture-based test can assert this agrees with poc_pipeline.py's
   // _offerless_window directly, rather than only indirectly through deriveStatus.
   offerlessWindow,
