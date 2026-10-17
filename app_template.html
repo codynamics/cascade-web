@@ -3638,6 +3638,9 @@
   .tstat b{display:block;font:800 19px/1.1 var(--font-body);color:var(--ink)}
   .tstat span{display:block;font:600 10.5px/1.3 var(--font-body);color:var(--faint);margin-top:4px}
   .tnote{font:500 12px/1.5 var(--font-body);color:var(--dim);margin:0 0 9px}
+  .tnotes{display:grid}
+  .tnotes > .tnote{grid-area:1/1}
+  .tnotes > .tnote.off{visibility:hidden}
   .tmap{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px 9px 11px}
   .tgrid{display:grid;gap:3px;align-items:center}
   .tgrid .th{font:700 9px/1 var(--font-body);letter-spacing:.2px;color:var(--faint);text-align:center;padding-bottom:3px}
@@ -14076,7 +14079,6 @@ function styleGridFlags(c){
     if(!((data.lean<0 && listed) || (data.lean>0 && !listed))) return;
     flags.push({kind, a, b, lean:data.lean, conf:data.conf, n:data.n, state, want: data.lean>0 ? "+" : "-"});
   };
-  ONB_GENRES.forEach(g=>{ if(T.styles[g]) consider("style", g, null, T.styles[g], styleGridState(c,g)); });
   Object.keys(T.pairs).forEach(key=>{
     const pr=T.pairs[key];
     if(pr.primary >= pr.other) return;        // T.pairs carries both orders — count each unordered pair once
@@ -17095,9 +17097,10 @@ function styleGridScreenHTML(){
     <button type="button" aria-pressed="${styleGridView==="taste"}" class="${styleGridView==="taste"?"on":""}"
       onclick="styleGridSetView('taste')">Your taste</button>
   </div>`;
-  const note = styleGridView==="agent"
-    ? `Tap the first column to cycle a whole style (+ list, − skip, neither), or a square to cycle two styles together (+, −, follow its styles). A combination beats its styles.`
-    : `The same grid coloured by your verdicts, exactly as on Your taste. Switch back to compare.`;
+  const notesHTML = `<div class="tnotes">
+      <p class="tnote${styleGridView==="agent"?"":" off"}">Tap the first column to cycle a whole style (+ list, − skip, neither), or a square to cycle two styles together (+, −, follow its styles). A combination beats its styles.</p>
+      <p class="tnote${styleGridView==="taste"?"":" off"}">The same grid coloured by your verdicts, exactly as on Your taste. Switch back to compare.</p>
+    </div>`;
   const headerHTML = `<span class="tc0"></span><span class="th all">All</span>`
     + rows.map(g=>`<span class="th">${esc(tasteShortName(g))}</span>`).join("");
   const rowsHTML = rows.map(primary=>{
@@ -17120,7 +17123,7 @@ function styleGridScreenHTML(){
   return `<p class="ossub">What this agent lists, style by style and in combination.</p>
     ${styleGridSuggestionsHTML(flags)}
     ${switchHTML}
-    <p class="tnote">${esc(note)}</p>
+    ${notesHTML}
     <div class="tmap">
       <div class="tscroll"><div class="tgrid" style="grid-template-columns:92px repeat(${1+rows.length},26px)">${headerHTML}${rowsHTML}</div></div>
       ${legend}

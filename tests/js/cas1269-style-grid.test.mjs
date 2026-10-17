@@ -1,8 +1,10 @@
 // CAS-1269 AC4: styleGridFlags() — the Style screen's suggestions-panel/cell-ring flag rule (rule 7). A
-// style or pair is STRONG when its taste carries n>=3 verdicts and |lean|>=0.3, and FLAGGED when that
-// taste leans one way but the agent's own setting (or, for a pair with no own setting, its derived
-// effective state) says the other. Drives the real shipped engine (tests/js/engine.mjs's loadEngine(),
-// reading the BUILT index.html) directly, never a re-derivation of tasteProfile's/styleGridState's rules.
+// pair is STRONG when its taste carries n>=3 verdicts and |lean|>=0.3, and FLAGGED when that taste leans
+// one way but the agent's own setting (or, for a pair with no own setting, its derived effective state)
+// says the other. Drives the real shipped engine (tests/js/engine.mjs's loadEngine(), reading the BUILT
+// index.html) directly, never a re-derivation of tasteProfile's/styleGridState's rules.
+// CAS-1282: a whole (primary) style never flags any more, however strong the disagreement — only a
+// combination (pair) of two styles does. Which whole styles an agent lists stays the person's own choice.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
@@ -65,15 +67,14 @@ function agentWith(overrides){
 }
 const find = (flags, kind, a, b) => flags.find(f => f.kind === kind && f.a === a && f.b === (b ?? null));
 
-test("CAS-1269 AC4: a strong style flag — listed, taste strongly against", () => {
+test("CAS-1282: a whole style never flags, however strong the disagreement", () => {
   withTasteFixture(fixtureAssignments(), () => {
+    // Horror: listed, taste strongly against (3 Never) — the exact shape rule 7 used to flag "- Skip"
+    // for the style alone. It must now be silent, and no flag of kind "style" may exist at all.
     const c = agentWith({ genre: ["Action", "Horror"] });
     const flags = E.styleGridFlags(c);
-    const f = find(flags, "style", "Horror");
-    assert.ok(f, "Horror must be flagged");
-    assert.equal(f.want, "-");
-    assert.equal(f.n, 3);
-    assert.ok(f.lean < -0.3);
+    assert.equal(find(flags, "style", "Horror"), undefined);
+    assert.ok(flags.every(f => f.kind !== "style"), "no flag may have kind \"style\"");
   });
 });
 
@@ -103,15 +104,13 @@ test("CAS-1269 AC4: a non-strong pair (n=2) never flags, whatever the agent's ow
   });
 });
 
-test("CAS-1269 AC4: an own pair setting beats the derived one for the flag rule too", () => {
+test("CAS-1269 AC4: an own pair setting beats the derived one for the flag rule", () => {
   withTasteFixture(fixtureAssignments(), () => {
     // Comedy/Family both unlisted (derived "not listed"), but the pair itself is explicitly listed — no
-    // disagreement left to flag for the PAIR, even though each style alone still flags on its own.
+    // disagreement left to flag for the PAIR.
     const c = agentWith({ genre: ["Action", "Horror"], pairs: { "Comedy|Family": "+" } });
     const flags = E.styleGridFlags(c);
     assert.equal(find(flags, "pair", "Comedy", "Family"), undefined);
-    assert.ok(find(flags, "style", "Comedy"), "Comedy alone is still flagged");
-    assert.ok(find(flags, "style", "Family"), "Family alone is still flagged");
   });
 });
 
