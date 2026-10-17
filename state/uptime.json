@@ -1,7 +1,7 @@
 {
-  "lastRun": "2026-10-17T17:08:05.251Z",
-  "consecutiveReds": 7,
-  "slowConsecutiveReds": 7,
+  "lastRun": "2026-10-17T17:18:06.431Z",
+  "consecutiveReds": 8,
+  "slowConsecutiveReds": 8,
   "fastRedNames": [],
   "lastAlertedRedNames": "alerts_ran",
   "lastAlertAt": "2026-10-17T13:18:07.464Z",
@@ -10,56 +10,56 @@
     {
       "name": "site_up",
       "ok": true,
-      "ms": 793,
+      "ms": 653,
       "detail": "HTTP 200, version 1.0.0"
     },
     {
       "name": "movies_json",
       "ok": true,
-      "ms": 680,
+      "ms": 623,
       "detail": "5989 record(s), parses."
     },
     {
       "name": "supabase_canary",
       "ok": true,
-      "ms": 2490,
+      "ms": 2867,
       "detail": "4 agent(s), 1 admitted film(s), film_watch read OK."
     },
     {
       "name": "signup",
       "ok": true,
-      "ms": 935,
-      "detail": "created and removed lee+probe-1792256882605@codynamics.com.au via delete_my_account."
+      "ms": 1335,
+      "detail": "created and removed lee+probe-1792257483450@codynamics.com.au via delete_my_account."
     },
     {
       "name": "orphan_probe_accounts",
       "ok": true,
-      "ms": 187,
+      "ms": 260,
       "detail": "no probe account older than 2h."
     },
     {
       "name": "usage_events_insert",
       "ok": true,
-      "ms": 214,
+      "ms": 299,
       "detail": "HTTP 201"
     },
     {
       "name": "pages_head",
       "ok": true,
-      "ms": 392,
+      "ms": 228,
       "detail": "HEAD https://cascade-web-3x1.pages.dev/ -> HTTP 200"
     },
     {
       "name": "daily_refresh_fresh",
       "ok": true,
-      "ms": 542,
-      "detail": "last \"Daily refresh\" commit 20.4h ago (floor 30h)."
+      "ms": 571,
+      "detail": "last \"Daily refresh\" commit 20.6h ago (floor 30h)."
     },
     {
       "name": "alerts_ran",
       "ok": false,
-      "ms": 375,
-      "detail": "last successful alerts.yml run 35.1h ago (floor 30h)."
+      "ms": 287,
+      "detail": "last successful alerts.yml run 35.3h ago (floor 30h)."
     }
   ]
 }
