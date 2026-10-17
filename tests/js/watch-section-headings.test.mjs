@@ -50,7 +50,10 @@ test("CAS-1257 AC3: the built index.html carries the exact landing/heading marku
   assert.equal(count(/#groups > \.group:first-child > \.grouphead:not\(\.sub\)\{display:none\}/g), 0,
     "AC3: the old first-child CSS rule (without :not(.early)) must be gone");
   assert.equal(count(/function landWatchList\(\)\{/g), 1, "AC3: landWatchList() must be defined exactly once");
-  assert.equal(count(/landWatchList\(\);/g), 2, "AC3: landWatchList() must be called exactly twice");
+  // CAS-1280 widened this call count from CAS-1257's original 2 (setWatchTab, setWatchStage) to 5 —
+  // scrollWatchListingToTop(), onboarding's finish, and the account fan-out's late re-land now land by
+  // the same rule too, rather than always jumping to the first section or the very top.
+  assert.equal(count(/landWatchList\(\);/g), 5, "AC3: landWatchList() must be called exactly five times");
   assert.equal(count(/jumpToSection\(WATCH_TAB_SCROLL_TARGET\[key\]\);/g), 0,
     "AC3: the retired jumpToSection(WATCH_TAB_SCROLL_TARGET[key]) call must be gone");
 });
