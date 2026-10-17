@@ -10248,7 +10248,7 @@ function applyMoodToState(mood){
     watchPickedBy[tab]=mood.pickedBy||"all";
     watchWatchedSel[tab]=new Set(mood.watched||[]);
     watchGenreOff[tab]=new Set();   // CAS-1273: moods no longer filter by style; mood.stylesOff is ignored
-    watchBadgeSel[tab]=new Set(mood.badges||[]);
+    watchBadgeSel[tab]=new Set();   // CAS-1281: moods no longer filter by badge; mood.badges is ignored
     watchMineOnly[tab]=mood.mineOnly!==false;
     watchSearch[tab]=""; watchSearchRaw[tab]="";
     if(tab!=="in_cinema"){
@@ -10323,6 +10323,9 @@ window.toggleMoodDraftWatched = key => { if(!moodDraft) return; moodDraft.watche
 window.toggleMoodDraftGenre = g => { if(!moodDraft) return; moodDraft.stylesOff.has(g)?moodDraft.stylesOff.delete(g):moodDraft.stylesOff.add(g); renderMoodSheetBody(); };
 window.selectAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.stylesOff.clear(); renderMoodSheetBody(); };
 window.clearAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.stylesOff=new Set(watchSheetGenres[watchTab]||[]); renderMoodSheetBody(); };
+// CAS-1281: the mood sheet's Badges section is gone (Lee: it worked as a legend, not a filter people
+// actually wanted — see the new Help article instead), so nothing calls this any more. Left in place
+// rather than deleted — moodDraft.badges still lives on the draft shape and the stored mood shape.
 window.toggleMoodDraftBadge = key => { if(!moodDraft) return; moodDraft.badges.has(key)?moodDraft.badges.delete(key):moodDraft.badges.add(key); renderMoodSheetBody(); };
 window.toggleMoodDraftAlsoShow = key => {
   if(!moodDraft) return;
@@ -10345,7 +10348,7 @@ window.saveMoodFromSheet = () => {
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
     name, order:d.order, top:!!d.top,
     agentsOff:[...d.agentsOff], mineOnly:!!d.mineOnly, pickedBy:d.pickedBy,
-    watched:[...d.watched], stylesOff:[], badges:[...d.badges],   // CAS-1273: styles no longer saved from the mood sheet
+    watched:[...d.watched], stylesOff:[], badges:[],   // CAS-1273: styles no longer saved from the mood sheet; CAS-1281: nor are badges
     alsoShow: d.alsoShow ? {premium:[...(d.alsoShow.premium||[])], rent:[...(d.alsoShow.rent||[])], stream:[...(d.alsoShow.stream||[])]} : null,
   };
   const idx=watchMoods.findIndex(m=>m.id===mood.id);
@@ -10479,16 +10482,6 @@ function renderMoodSheetBody(){
       ${isOwn?"":`onclick="toggleMoodDraftAlsoShow('${w.key}')"`}>
       <span class="gdot ${w.key}" aria-hidden="true"></span>${esc(w.label)}<span class="jn">${count}</span>${isOwn?`<span class="alwaystag">always</span>`:""}</button>`;
   }).join("");
-  const badgeHTML=BADGE_FILTER_OPTS.map(opt=>{
-    const b=TENT_BADGE[opt.key];
-    const on=d.badges.has(opt.key);
-    const count=rows.filter(m=>scaleTier(m)===opt.key).length;
-    return `<button type="button" class="badgeopt${on?" on":""}" aria-pressed="${on}"
-      onclick="toggleMoodDraftBadge('${opt.key}')">
-      <span class="badgeoptrow"><span class="badgeopticon" aria-hidden="true">${b.ico}</span>
-      <b>${esc(b.label)}</b><span class="jn">${count}</span></span>
-      <span class="badgeoptdesc">${esc(opt.descriptor())}</span></button>`;
-  }).join("");
   const body=$("watchSheetBody");
   if(body) body.innerHTML=`
     <div class="wsheetsec">
@@ -10532,11 +10525,7 @@ function renderMoodSheetBody(){
     ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Also show</span></div>
       <div class="chips">${alsoShowHTML}</div>
-    </div>`}
-    <div class="wsheetsec">
-      <div class="wsheethd"><span>Badges</span></div>
-      <div class="badgeopts">${badgeHTML}</div>
-    </div>`;
+    </div>`}`;
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
     if(!d.editingId){ delBtn.textContent="Cancel"; delBtn.disabled=false; }
@@ -13850,6 +13839,10 @@ const HELP_ARTICLES = [
   {slug:"the-score", title:"The score",
    summary:"People and Critics, where each comes from, and that it is one figure on one scale.",
    body:"Every film in Cascade carries one Cascade score, from 0 to 100 — not two separate numbers you have to weigh against each other.\n\nOnce a film is released — including PVOD, rental and streaming — that score is built from two things: what people who watched it thought (People), and what critics thought (Critics). When both exist, the score blends them; when only one does, the score is that one alone.\n\nBefore a film opens in cinemas there's usually nothing to review yet, so its score is built from how much it's being talked about instead — its buzz. If it already carries a People or Critics score — say, from an overseas release — the score blends that in with buzz rather than running on buzz alone. Once it's in cinemas, the same rule carries on: if a People or Critics score exists, the score blends it in with buzz rather than switching over to it outright. Either way it lands on the same 0-100 scale, so a marker you set once means the same thing whether the film is still upcoming or already out."},
+  {slug:"badges", title:"Badges",
+   summary:"What Landmark, Must-see, Blockbuster and Anticipated mean on a film card.",
+   body:"A film carries at most one badge. It marks how big or talked-about the film is right now — not your own taste.\n\n"
+     + BADGE_FILTER_OPTS.map(opt=>`${TENT_BADGE[opt.key].ico} ${TENT_BADGE[opt.key].label} — ${opt.descriptor()}`).join("\n\n")},
   {slug:"setting-the-bar", title:"Setting the bar",
    summary:"Markers per window, the single admission floor, and that moving a marker re-places films immediately.",
    body:"Each window an agent tracks — Cinema, Premium, Rent, Stream — can carry its own marker: a minimum score for a film to be listed once it reaches that window. But your agent doesn't re-test a film against a fresh marker every time it moves on — it's admitted the moment it clears the lowest marker among every window you're tracking, and stays admitted from there. Markers still decide where a film is placed: the earliest window you've given a marker is where an agent judges a film in, while a later window you're tracking but haven't marked just carries it forward once it's already admitted.\n\nYou can set a window's marker to Off, which lists everything that reaches that window regardless of score. Turning a window off entirely, so it's never tracked at all, isn't something an agent decides for itself — that's set account-wide, in Service tracking.\n\nDrag a marker and Cascade re-checks every film your agent has already found against the new bar straight away — no refresh needed. A film that no longer clears it drops from the agent's list; one that now does appears. (A film you've set Watch On for yourself by hand is protected from this — see “Watch On and overrides”.)"},
