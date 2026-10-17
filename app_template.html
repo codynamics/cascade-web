@@ -2667,6 +2667,8 @@
   .wsheetfoot{display:flex;gap:10px;padding:12px 16px 14px;border-top:1px solid var(--line);flex:0 0 auto}
   .wsheetfoot .ebtn{flex:0 0 auto;margin:0}
   .wsheetfoot .donebtn{flex:1}
+  .wsheetfoot .moodmovebtn{padding:11px 14px;font-size:16px}
+  .wsheetfoot .moodmovebtn:disabled{opacity:.4;cursor:default}
   /* The listbox keeps its own outline all the way round. Squaring the joined corners only reads as "one
      control" when the panel is exactly as wide as the pill — and it is not: the Watch it panel is wider,
      the Watched panel is offset to stay on screen, and the open edge then reads as a cut-off box. A whole
@@ -3553,8 +3555,11 @@
   .moodrow::-webkit-scrollbar{display:none}
   .moodchip{flex:none;height:34px;padding:0 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
     color:var(--dim);font:600 12.5px/1 var(--font-body);display:flex;align-items:center;gap:7px;cursor:pointer;
-    white-space:nowrap}
+    white-space:nowrap;transition:transform .15s}
   .moodchip.on{background:var(--sel-bg);border-color:var(--sel-bd);color:#fff;font-weight:700;padding-right:9px}
+  /* CAS-1290: press-and-hold lift state — touch-action:none stops the row's own native scroll from fighting
+     the finger once a chip is lifted; wireMoodRowDrag's pointermove still preventDefault()s belt-and-braces. */
+  .moodchip.lifted{transform:scale(1.06);box-shadow:0 6px 18px rgba(0,0,0,.45);z-index:5;position:relative;touch-action:none}
   .moodchip .moodedit{display:none;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.14);
     align-items:center;justify-content:center}
   .moodchip.on .moodedit{display:flex}
@@ -4070,6 +4075,8 @@
     </div>
     <div class="wsheetbody" id="watchSheetBody"></div>
     <div class="wsheetfoot">
+      <button type="button" class="ebtn ghost moodmovebtn" id="moodMoveLeftBtn" aria-label="Move mood left" onclick="moveMoodDraft(-1)" hidden>&#8249;</button>
+      <button type="button" class="ebtn ghost moodmovebtn" id="moodMoveRightBtn" aria-label="Move mood right" onclick="moveMoodDraft(1)" hidden>&#8250;</button>
       <button type="button" class="ebtn ghost" id="moodDeleteBtn" onclick="handleMoodDeleteBtn()">Delete mood</button>
       <button type="button" class="donebtn" id="moodSaveBtn" onclick="saveMoodFromSheet()">Save mood</button>
     </div>
@@ -9928,11 +9935,122 @@ function renderWatchTop(){
     return `<button type="button" class="moodchip${on?" on":""}" data-mood="${escA(m.id)}" aria-pressed="${on}"
         onclick="onMoodChipTap('${escA(m.id)}')">${esc(m.name)}<span class="moodedit" aria-hidden="true">${MOOD_EDIT_SVG}</span></button>`;
   }).join("");
-  const addHTML = moods.length>=5 ? "" : `<button type="button" class="moodadd" id="moodAddBtn" onclick="openMoodSheetForNew()">+ Mood</button>`;
+  const addHTML = moods.length>=MOOD_MAX ? "" : `<button type="button" class="moodadd" id="moodAddBtn" onclick="openMoodSheetForNew()">+ Mood</button>`;
   el.innerHTML = `${stageHTML}<div class="moodrow" role="group" aria-label="Mood">${moodHTML}${addHTML}</div>`;
   // Keeps #wtMini's own text honest immediately after a stage/mood change, independent of the next scroll
   // event — the collapse listener itself (defined later in this script) only ever touches it on scroll.
   if(typeof wtRefreshMini==="function") wtRefreshMini();
+  wireMoodRowDrag(el.querySelector(".moodrow"));
+}
+// CAS-1290: press-and-hold reorder for the mood row's own chips (never #moodAddBtn, which neither moves nor
+// is a drop target). Mirrors wireAgentsDrag's capture-on-child/listen-on-ancestor pattern, but there's no
+// grip here — the press itself has to tell a hold-to-lift from a tap or a horizontal swipe before any drag
+// state exists, so lift is gated behind a timer that a small move or an early release both cancel.
+const MOOD_LIFT_MS = 450, MOOD_LIFT_SLOP = 8, MOOD_EDGE_ZONE = 32, MOOD_EDGE_SPEED = 8;
+function wireMoodRowDrag(row){
+  if(!row) return;
+  let press=null, drag=null, edgeRAF=null;
+  const clearPress=()=>{ if(press) clearTimeout(press.timer); press=null; };
+  const stopEdgeScroll=()=>{ if(edgeRAF){ cancelAnimationFrame(edgeRAF); edgeRAF=null; } };
+  const runEdgeScroll=()=>{
+    edgeRAF=requestAnimationFrame(()=>{
+      if(!drag){ edgeRAF=null; return; }
+      if(drag.edgeDir) row.scrollLeft += drag.edgeDir*MOOD_EDGE_SPEED;
+      runEdgeScroll();
+    });
+  };
+  const applyShift=to=>{
+    const w=drag.widths[drag.from]+drag.gap;
+    drag.chips.forEach((c,i)=>{
+      if(i===drag.from) return;
+      let shift=0;
+      if(drag.from<to && i>drag.from && i<=to) shift=-w;
+      if(drag.from>to && i>=to && i<drag.from) shift=w;
+      c.style.transform = shift ? `translateX(${shift}px)` : "";
+    });
+  };
+  const beginLift=()=>{
+    const chip=press.chip, pointerId=press.pointerId;
+    const chips=[...row.querySelectorAll(".moodchip")];
+    drag={
+      chip, id:pointerId, chips, from:chips.indexOf(chip), to:chips.indexOf(chip),
+      lefts:chips.map(c=>c.offsetLeft), widths:chips.map(c=>c.offsetWidth), gap:6,
+      startX:press.startX, startScrollLeft:row.scrollLeft, edgeDir:0,
+    };
+    row._moodSuppressClick=true;
+    chip.classList.add("lifted");
+    chip.style.transition="none";
+    try{ chip.setPointerCapture(pointerId); }catch(_){}
+    if(navigator.vibrate) navigator.vibrate(10);
+    press=null;
+  };
+  row.querySelectorAll(".moodchip").forEach(chip=>{
+    chip.addEventListener("pointerdown", e=>{
+      if(e.pointerType==="mouse" && e.button!==0) return;
+      clearPress();
+      press={chip, pointerId:e.pointerId, startX:e.clientX, startY:e.clientY, timer:null};
+      press.timer=setTimeout(beginLift, MOOD_LIFT_MS);
+    });
+  });
+  row.addEventListener("pointermove", e=>{
+    if(drag && e.pointerId===drag.id){
+      e.preventDefault();
+      const dx=e.clientX-drag.startX+(row.scrollLeft-drag.startScrollLeft);
+      drag.chip.style.transform=`translateX(${dx}px) scale(1.06)`;
+      const center=drag.lefts[drag.from]+drag.widths[drag.from]/2+dx;
+      let to=0;
+      drag.lefts.forEach((l,i)=>{ if(center>l+drag.widths[i]/2) to=i; });
+      if(to!==drag.to){ drag.to=to; applyShift(to); }
+      const rect=row.getBoundingClientRect();
+      if(e.clientX-rect.left<MOOD_EDGE_ZONE) drag.edgeDir=-1;
+      else if(rect.right-e.clientX<MOOD_EDGE_ZONE) drag.edgeDir=1;
+      else drag.edgeDir=0;
+      if(drag.edgeDir && !edgeRAF) runEdgeScroll();
+      return;
+    }
+    if(press && press.pointerId===e.pointerId){
+      const dx=e.clientX-press.startX, dy=e.clientY-press.startY;
+      if(Math.hypot(dx,dy)>MOOD_LIFT_SLOP) clearPress();
+    }
+  });
+  const endDrag=commit=>{
+    const chip=drag.chip;
+    chip.classList.remove("lifted");
+    chip.style.transform=""; chip.style.transition="";
+    drag.chips.forEach(c=>{ c.style.transform=""; });
+    stopEdgeScroll();
+    if(commit && drag.to!==drag.from){
+      const ids=drag.chips.map(c=>c.dataset.mood);
+      const [moved]=ids.splice(drag.from,1);
+      ids.splice(drag.to,0,moved);
+      commitMoodOrder(ids);
+    }
+    drag=null;
+  };
+  row.addEventListener("pointerup", e=>{
+    if(press && press.pointerId===e.pointerId){ clearPress(); return; }
+    if(drag && e.pointerId===drag.id) endDrag(true);
+  });
+  row.addEventListener("pointercancel", e=>{
+    if(press && press.pointerId===e.pointerId){ clearPress(); return; }
+    if(drag && e.pointerId===drag.id) endDrag(false);
+  });
+  // A lift that ends without a reorder is still not a tap (C5/AC3 only covers a release under MOOD_LIFT_MS):
+  // the native click a button fires on pointerup must be swallowed whenever a lift happened at all.
+  row.addEventListener("click", e=>{
+    if(row._moodSuppressClick){ row._moodSuppressClick=false; e.preventDefault(); e.stopPropagation(); }
+  }, true);
+}
+// Reorders watchMoods to match an id order from a drag drop or a Move left/right tap, persists it the same
+// way Save/Delete already do (one pushViewField("moods", ...)), and repaints the row.
+function commitMoodOrder(idsInOrder){
+  const byId=new Map(watchMoods.map(m=>[m.id,m]));
+  const reordered=idsInOrder.map(id=>byId.get(id)).filter(Boolean);
+  if(reordered.length!==watchMoods.length) return;
+  watchMoods=reordered;
+  pushViewField("moods", watchMoods.map(m=>({...m})));
+  renderWatchTop();
+  logEvent("watch_mood", {action:"reorder"});
 }
 // CAS-718: the search box's placeholder/value follow whichever tab is active — restoring the raw text you
 // left in THAT tab (not the lowercased match term, so casing/whitespace survive a tab switch) is the same
@@ -10282,6 +10400,8 @@ function moodTopYouAvailable(){
   return !!(window.CascadePersistence && window.CascadePersistence.accountActive()) && tasteProfile().n>0;
 }
 function moodTopYouEffectiveN(mood){ return moodTopYouAvailable() ? moodTopYouN(mood) : null; }
+// CAS-1290: raises the CAS-1247 cap of five — every literal 5 that caps the mood row/sheet uses this.
+const MOOD_MAX = 10;
 let watchMoods = moodDefaultsNow();
 // C2: the selected mood is view.mood if it names a mood that exists, otherwise the first.
 let watchMoodSel = watchMoods[0].id;
@@ -10359,7 +10479,7 @@ window.openMoodSheetFor = id => {
   openWatchSheet();
 };
 window.openMoodSheetForNew = () => {
-  if(watchMoods.length>=5) return;   // C5: #moodAddBtn is already not written at five, but guard anyway
+  if(watchMoods.length>=MOOD_MAX) return;   // C5: #moodAddBtn is already not written at the cap, but guard anyway
   moodDraft=moodDraftFrom(null);
   moodDeleteArmed=false; clearTimeout(moodDeleteArmTimer);
   openWatchSheet();
@@ -10384,6 +10504,19 @@ window.clearAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.styles
 // actually wanted — see the new Help article instead), so nothing calls this any more. Left in place
 // rather than deleted — moodDraft.badges still lives on the draft shape and the stored mood shape.
 window.toggleMoodDraftBadge = key => { if(!moodDraft) return; moodDraft.badges.has(key)?moodDraft.badges.delete(key):moodDraft.badges.add(key); renderMoodSheetBody(); };
+// CAS-1290 C5 accessibility equivalent of the chip drag: swaps the mood being edited with its left/right
+// neighbour in watchMoods and writes immediately, same as the drag drop does — there's no draft-only staging
+// for order, since the row itself (behind the sheet) isn't reread until the next commitMoodOrder/render.
+window.moveMoodDraft = dir => {
+  const d=moodDraft; if(!d || !d.editingId) return;
+  const idx=watchMoods.findIndex(m=>m.id===d.editingId);
+  const j=idx+dir;
+  if(idx<0 || j<0 || j>=watchMoods.length) return;
+  const ids=watchMoods.map(m=>m.id);
+  [ids[idx], ids[j]]=[ids[j], ids[idx]];
+  commitMoodOrder(ids);
+  renderMoodSheetBody();
+};
 window.toggleMoodDraftAlsoShow = key => {
   if(!moodDraft) return;
   if(WATCH_TAB_OWN_STANDING[watchTab]===key) return;   // the tab's own window — not switchable
@@ -10633,6 +10766,17 @@ function renderMoodSheetBody(){
   if(delBtn){
     if(!d.editingId){ delBtn.textContent="Cancel"; delBtn.disabled=false; }
     else { delBtn.textContent = moodDeleteArmed ? "Tap again to delete" : "Delete mood"; delBtn.disabled = watchMoods.length<=1; }
+  }
+  // CAS-1290: Move left/right only make sense once there's a saved mood (an editingId) with a position —
+  // a brand-new draft isn't in watchMoods yet.
+  const moveLeftBtn=$("moodMoveLeftBtn"), moveRightBtn=$("moodMoveRightBtn");
+  if(moveLeftBtn && moveRightBtn){
+    const idx=d.editingId ? watchMoods.findIndex(m=>m.id===d.editingId) : -1;
+    moveLeftBtn.hidden = moveRightBtn.hidden = idx<0;
+    if(idx>=0){
+      moveLeftBtn.disabled = idx<=0;
+      moveRightBtn.disabled = idx>=watchMoods.length-1;
+    }
   }
 }
 // CAS-863: scopeRows() (the pre-CAS-721 pool, gating on the retired watch-list model's own ymFeedMatches)
@@ -23834,7 +23978,7 @@ function acctFetchKeepalive(init){
       // below. C2: view.moods/view.mood adopted together, falling back to the in-memory defaults when the
       // account has saved none yet; applyMoodToState makes the adopted mood the live state, same as boot.
       if(Array.isArray(v.moods) && v.moods.length){
-        watchMoods = v.moods.slice(0, 5).map(m=>({...moodDefaultFieldsNow(), ...m}));
+        watchMoods = v.moods.slice(0, MOOD_MAX).map(m=>({...moodDefaultFieldsNow(), ...m}));
       }
       // CAS-1284 Change 6 / CAS-1287 Change 6: an existing account's saved moods predate the three new
       // catalogue starters (step 1, moodsProvisioned reaching 1) and/or predate "Show top" replacing Best N
@@ -23847,8 +23991,8 @@ function acctFetchKeepalive(init){
       if(moodsProvisionedLevel<1){
         const haveIds=new Set(watchMoods.map(m=>m.id));
         const missing=MOOD_DEFAULTS.filter(md=>MOOD_STARTER_IDS.includes(md.id) && !haveIds.has(md.id));
-        if(missing.length && watchMoods.length<5){
-          watchMoods=[...watchMoods, ...missing.slice(0, 5-watchMoods.length).map(md=>({...moodDefaultFieldsNow(), ...md}))];
+        if(missing.length && watchMoods.length<MOOD_MAX){
+          watchMoods=[...watchMoods, ...missing.slice(0, MOOD_MAX-watchMoods.length).map(md=>({...moodDefaultFieldsNow(), ...md}))];
         }
       }
       if(moodsProvisionedLevel<2){
