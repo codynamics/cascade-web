@@ -201,26 +201,45 @@ test("CAS-1287 AC1/Change 2: Show top keeps exactly the union of the top-N unwat
   const auth = E.CascadeAuth;
   const saved = { enabled: auth.enabled, client: auth.client, session: auth.session };
   withCleanVerdicts(E, () => {
-    const donorId = 90400301;
-    E.MOVIES.push({ tmdb_id: donorId, genres: ["Action", "Comedy"], status: ["included_streaming"], _fixture: true });
+    // CAS-1293: You v3 is Public adjusted, so — unlike formula C — a film needs a real Public score to
+    // get a You at all, and a film with no judged style PAIR still gets a You (its own Public, unadjusted)
+    // rather than null. To keep pub1/pub2 topping the Public axis without also topping the You axis
+    // (which would crowd you1/you2 out), pub1/pub2/neither carry a SECOND, two-style donor pool
+    // (Documentary/History) that the person rated consistently worse than their Action/Comedy baseline —
+    // Public stays high (it's an intrinsic wm_user_rating), You comes down with it.
+    const donorA = []; // majority pool: sets the baseline high; Action/Comedy itself only drifts a little off it.
+    for(let i = 0; i < 20; i++){
+      const d = { tmdb_id: 90400310 + i, genres: ["Action", "Comedy"], status: ["included_streaming"], _fixture: true };
+      E.MOVIES.push(d); donorA.push(d);
+    }
+    const donorB = []; // minority pool: judged clearly worse than the baseline above.
+    for(let i = 0; i < 5; i++){
+      const d = { tmdb_id: 90400330 + i, genres: ["Documentary", "History"], status: ["included_streaming"], _fixture: true };
+      E.MOVIES.push(d); donorB.push(d);
+    }
     try{
       auth.enabled = true; auth.client = {}; auth.session = { user: { id: "cas1287-ac1-test" } };
-      E.watched.add(donorId); E.wowed.add(donorId); E.invalidateComputeCaches();
+      donorA.forEach(d => { E.watched.add(d.tmdb_id); E.wowed.add(d.tmdb_id); });
+      donorB.forEach(d => { E.watched.add(d.tmdb_id); E.indifferent.add(d.tmdb_id); });
+      E.invalidateComputeCaches();
 
-      // you1/you2 share the donor's exact genre pair, so tasteMatch gives both a real (positive) You score;
-      // noYou/pub1/pub2/neither share nothing with the donor, so tasteMatch is null for every one of them
-      // (youScore's own -1 fallback). Public (cascadeScore) is wm_user_rating-driven and entirely independent
-      // of genres, so pub1/pub2 can be made the clear top-2 on that axis without touching You at all.
-      const you1 = { tmdb_id: 90400302, genres: ["Action", "Comedy"], status: ["included_streaming"] };
-      const you2 = { tmdb_id: 90400303, genres: ["Action", "Comedy"], status: ["included_streaming"] };
+      // you1/you2 share the majority pool's exact genre pair, so tasteMatch gives both a real You score a
+      // little above their own Public; noYou shares no genre with any donor and carries no Public score
+      // either, so tasteMatch is null (youScore's own -1 fallback). pub1/pub2/neither carry the minority
+      // pair, with cascadeScore (wm_user_rating-driven) ranked 96/88/3 — clear top-2/bottom — but a You
+      // pulled down to 56/48/1 by that pair's own worse-than-baseline record.
+      const you1 = { tmdb_id: 90400302, genres: ["Action", "Comedy"], status: ["included_streaming"], wm_user_rating: 7.0 };
+      const you2 = { tmdb_id: 90400303, genres: ["Action", "Comedy"], status: ["included_streaming"], wm_user_rating: 6.5 };
       const noYou = { tmdb_id: 90400304, genres: ["Documentary"], status: ["included_streaming"] };
-      const pub1 = { tmdb_id: 90400305, genres: ["Documentary"], status: ["included_streaming"], wm_user_rating: 95 };
-      const pub2 = { tmdb_id: 90400306, genres: ["Documentary"], status: ["included_streaming"], wm_user_rating: 85 };
-      const neither = { tmdb_id: 90400307, genres: ["Documentary"], status: ["included_streaming"], wm_user_rating: 5 };
+      const pub1 = { tmdb_id: 90400305, genres: ["Documentary", "History"], status: ["included_streaming"], wm_user_rating: 9.5 };
+      const pub2 = { tmdb_id: 90400306, genres: ["Documentary", "History"], status: ["included_streaming"], wm_user_rating: 8.5 };
+      const neither = { tmdb_id: 90400307, genres: ["Documentary", "History"], status: ["included_streaming"], wm_user_rating: 0.5 };
 
       assert.ok(E.tasteMatch(you1).value > 0, "setup: you1 must get a real You score off the donor");
-      assert.equal(E.tasteMatch(noYou), null, "setup: noYou must share no genre with the donor");
+      assert.equal(E.tasteMatch(noYou), null, "setup: noYou must share no genre with any donor, and has no Public score of its own");
       assert.ok(E.cascadeScore(pub1) > E.cascadeScore(neither), "setup: pub1 must score clearly higher than neither");
+      assert.ok(E.tasteMatch(you1).value > E.tasteMatch(pub1).value && E.tasteMatch(you2).value > E.tasteMatch(pub2).value,
+        "setup: you1/you2 must clearly out-You pub1/pub2, even though pub1/pub2 out-score them on Public");
 
       withMood(E, { ...E.moodDefaultFieldsNow(), id:"t-showtop-ac1", name:"Test", order:"score", topYou:2, topPublic:2 }, () => {
         const rows = E.moodShowTopKeep([you1, you2, noYou, pub1, pub2, neither], new Set());
@@ -228,7 +247,9 @@ test("CAS-1287 AC1/Change 2: Show top keeps exactly the union of the top-N unwat
           [you1, you2, pub1, pub2].map(m => m.tmdb_id).sort((a, b) => a - b));
       });
     } finally {
-      const i = E.MOVIES.findIndex(m => m.tmdb_id === donorId); if(i !== -1) E.MOVIES.splice(i, 1);
+      [...donorA, ...donorB].forEach(d => {
+        const i = E.MOVIES.findIndex(m => m.tmdb_id === d.tmdb_id); if(i !== -1) E.MOVIES.splice(i, 1);
+      });
       auth.enabled = saved.enabled; auth.client = saved.client; auth.session = saved.session;
     }
   });
@@ -245,9 +266,12 @@ test("CAS-1287 AC2/Change 2: a watched row is listed only once its own You (or P
       auth.enabled = true; auth.client = {}; auth.session = { user: { id: "cas1287-ac2-test" } };
       E.watched.add(donorId); E.wowed.add(donorId); E.invalidateComputeCaches();
 
-      const unwatchedHi = { tmdb_id: 90400402, genres: ["Action", "Comedy"], status: ["included_streaming"] };
+      // CAS-1293: unwatchedHi/watchedPass need a real Public score now (You v3 is Public adjusted) —
+      // watchedFail/unwatchedLo keep none, so they stay null exactly as before, just for the "no Public
+      // score" reason rather than "no combination film" (You v3 has no such concept).
+      const unwatchedHi = { tmdb_id: 90400402, genres: ["Action", "Comedy"], status: ["included_streaming"], wm_user_rating: 7.0 };
       const unwatchedLo = { tmdb_id: 90400403, genres: ["Documentary"], status: ["included_streaming"] };
-      const watchedPass = { tmdb_id: 90400404, genres: ["Action", "Comedy"], status: ["included_streaming"] };
+      const watchedPass = { tmdb_id: 90400404, genres: ["Action", "Comedy"], status: ["included_streaming"], wm_user_rating: 7.0 };
       const watchedFail = { tmdb_id: 90400405, genres: ["Documentary"], status: ["included_streaming"] };
       E.watched.add(watchedPass.tmdb_id); E.wowed.add(watchedPass.tmdb_id);
       E.watched.add(watchedFail.tmdb_id); E.wowed.add(watchedFail.tmdb_id);
