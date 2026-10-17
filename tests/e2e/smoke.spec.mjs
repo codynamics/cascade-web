@@ -698,7 +698,9 @@ test("Mission/hub: no Watch On door, marker values in the Mission card, requirem
   await toListing(page);
   await openFirstAgentMission(page);
 
-  // AC5: the three requirement cards' scope chips, in order.
+  // AC5: the three requirement cards' scope chips, in order. CAS-1274: Budget and Awards only render on
+  // Basic when set, so read the chips on Advanced, where all three requirement cards always show.
+  await page.locator("#briefTabAdvanced").click();
   const chips = await page.locator(".reqcard .reqscope").allTextContents();
   expect(chips).toEqual(["ALL WINDOWS", "ONCE RELEASED", "ONCE RELEASED"]);
 
@@ -1067,7 +1069,10 @@ test("CAS-1180: a watched film shows as a stub when its own chip is on (AC1, AC3
   await settleListing(page);
 
   const filmId = await page.evaluate(() => {
-    const film = MOVIES.find(m => primaryStatus(m) === "included_streaming" && cascades.some(c => listedBy(m, c)));
+    // Picked from the rows the Streaming tab actually shows, not any listed streaming film: the default
+    // "Top scores" mood keeps only the best 10 per stage, so a listed film outside that top 10 can never
+    // render, chip or no chip (which is what made this test fail after the 2026-10-16 catalogue refresh).
+    const film = watchVisibleRows().rows.find(m => primaryStatus(m) === "included_streaming");
     setOpinion(film.tmdb_id, "enjoyed");
     watchHeldOpen[watchTab].clear();   // AC1: the held-this-visit hold is cleared — not what keeps it visible
     render();
@@ -2214,9 +2219,13 @@ test("CAS-1274: Edit Agent opens on Basic, Advanced reveals the rest, and the sw
   await expect(page.locator("#ageRatingCard")).toBeVisible();
   await expect(page.locator("#briefTabBasic")).toHaveClass(/on/);
   await expect(page.locator("#onbAlertsOn")).toBeHidden();
-  await expect(page.locator("#onbCinemaRelease")).toBeHidden();
   await expect(page.locator(".osdial.cardbtn", { hasText: "Occasions" })).toBeHidden();
-  for(const label of ["Movie Budget", "Awards", "How far back"])
+  // The first agent (onb_massive) is built with yearsBack 3 and cinemaReleaseOnly on, so CAS-1274 rule 3
+  // shows exactly those two under SET IN ADVANCED on Basic; Budget and Awards are at their defaults, so not.
+  await expect(page.locator("#onbStepInner .usec", { hasText: "SET IN ADVANCED" })).toBeVisible();
+  await expect(page.locator("#onbCinemaRelease")).toBeVisible();
+  await expect(page.locator(".reqcard", { hasText: "How far back" })).toBeVisible();
+  for(const label of ["Movie Budget", "Awards"])
     await expect(page.locator(".reqcard", { hasText: label })).toBeHidden();
 
   // AC3: tapping Advanced reveals all six, plus the Styles card's own More button.
@@ -2296,7 +2305,7 @@ test("CAS-1269 AC1: the Styles card and suggestions panel flag a taste disagreem
   await page.locator("#stylesListCard .sllink").click();
   await expect(page.locator("#briefTabAdvanced")).toHaveClass(/on/);
   await page.locator(".slmore").click();
-  await expect(page.locator(".tsugg")).toContainText("! 1 of this agent's settings disagree with your taste");
+  await expect(page.locator(".tsugg")).toContainText("! Your verdicts suggest 1 update to this agent");   // CAS-1276 wording
   await expect(page.locator(".tsuggrow")).toContainText("Animation + Science Fiction: listed");
 
   await page.locator(".tsuggbtn").click();
