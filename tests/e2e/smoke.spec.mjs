@@ -2070,7 +2070,9 @@ test("CAS-1296 AC1: the mood sheet's first section is Name, and the Order row is
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
-  const firstHeading = await page.locator("#watchSheetBody .wsheetsec").first().locator(".wsheethd").innerText();
+  // .wsheethd's first span is CSS text-transform:uppercase (rendered, so innerText reflects it on
+  // WebKit) — textContent reads the source text, which is what "the first section is Name" means.
+  const firstHeading = await page.locator("#watchSheetBody .wsheetsec").first().locator(".wsheethd").textContent();
   expect(firstHeading.trim()).toBe("Name");
   await expect(page.locator('.mfseg[aria-label="Order"]')).toHaveCount(0);
   await page.evaluate(() => window.closeWatchSheet());
@@ -2197,7 +2199,8 @@ test("CAS-1296 AC4: Releases is pinned first with a divider, and a drag can't mo
   await page.mouse.up();
   await page.waitForTimeout(150);
 
-  expect(await page.evaluate(() => watchMoods.map(m => m.id)[0])).toBe("releases");
+  // renderWatchTop reorders the DISPLAYED chips only (Change 4) — it never reorders the underlying
+  // watchMoods array, so the real assertion is the rendered chip order, not watchMoods[0].id.
   const chipIdsAfter = await page.locator(".moodrow .moodchip").evaluateAll(els => els.map(el => el.dataset.mood));
   expect(chipIdsAfter[0]).toBe("releases");
 });
