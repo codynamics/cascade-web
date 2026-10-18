@@ -21010,5 +21010,13 @@
     "lost_window": "in_cinema",
     "label": "In Cinema",
     "detected": "2026-10-17"
+  },
+  {
+    "tmdb_id": 1284465,
+    "title": "The Death of Robin Hood",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-18"
   }
 ]
