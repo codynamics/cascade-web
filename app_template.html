@@ -3360,9 +3360,9 @@
   /* availability band: one compact line */
   .card:not(.expanded) .bandw{padding:5px 10px}
   .card:not(.expanded) .avail2{min-height:20px}
-  /* Lee, 2026-10-01: the collapsed card shows the Releasing/Released date too (reverses CAS-604's hide). To make
-     room it drops the dot trail, and a cinema-slot capsule drops its own date — the release label already says it. */
-  .card:not(.expanded) .wdot,.card:not(.expanded) .wline{display:none}
+  /* Lee, 2026-10-01: the collapsed card shows the Releasing/Released date too (reverses CAS-604's hide). A
+     cinema-slot capsule drops its own date — the release label already says it. Lee, 2026-10-18: the dot
+     trail is shown on collapsed cards too, the same as the expanded card. */
   .card:not(.expanded) .cap[class*="w-cin-"] .capdate{display:none}
   .card:not(.expanded) .cap{padding:1px 8px;gap:4px;border-radius:8px}
   .card:not(.expanded) .capwin{gap:4px}
@@ -3593,7 +3593,7 @@
   .moodchip:focus-visible,.moodadd:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   /* CAS-1296: the divider after the pinned Releases chip — .moodrow's own gap:6px already gives it the 6px
      margin on each side the spec calls for. */
-  .mooddivider{flex:none;width:1px;height:24px;background:var(--line)}
+  .mooddivider{flex:none;width:2px;height:26px;border-radius:1px;background:#5b6475}
   /* the collapsed bar: one slim row in place of the stages and moods, toggled only by a tap (CAS-1283) */
   #wtMini{display:none}
   #cascbar.wtcollapsed #watchTop{display:none}
