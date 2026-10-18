@@ -1,7 +1,7 @@
 {
-  "lastRun": "2026-10-17T23:18:06.229Z",
-  "consecutiveReds": 15,
-  "slowConsecutiveReds": 15,
+  "lastRun": "2026-10-18T00:03:56.476Z",
+  "consecutiveReds": 16,
+  "slowConsecutiveReds": 16,
   "fastRedNames": [],
   "lastAlertedRedNames": "alerts_ran",
   "lastAlertAt": "2026-10-17T13:18:07.464Z",
@@ -10,31 +10,31 @@
     {
       "name": "site_up",
       "ok": true,
-      "ms": 868,
+      "ms": 761,
       "detail": "HTTP 200, version 1.0.0"
     },
     {
       "name": "movies_json",
       "ok": true,
-      "ms": 484,
+      "ms": 546,
       "detail": "5990 record(s), parses."
     },
     {
       "name": "supabase_canary",
       "ok": true,
-      "ms": 2974,
+      "ms": 3051,
       "detail": "4 agent(s), 1 admitted film(s), film_watch read OK."
     },
     {
       "name": "signup",
       "ok": true,
-      "ms": 1063,
-      "detail": "created and removed lee+probe-1792279083063@codynamics.com.au via delete_my_account."
+      "ms": 1603,
+      "detail": "created and removed lee+probe-1792281832895@codynamics.com.au via delete_my_account."
     },
     {
       "name": "orphan_probe_accounts",
       "ok": true,
-      "ms": 298,
+      "ms": 246,
       "detail": "no probe account older than 2h."
     },
     {
@@ -46,20 +46,20 @@
     {
       "name": "pages_head",
       "ok": true,
-      "ms": 370,
+      "ms": 252,
       "detail": "HEAD https://cascade-web-3x1.pages.dev/ -> HTTP 200"
     },
     {
       "name": "daily_refresh_fresh",
       "ok": true,
-      "ms": 488,
-      "detail": "last \"Daily refresh\" commit 2.5h ago (floor 30h)."
+      "ms": 508,
+      "detail": "last \"Daily refresh\" commit 3.3h ago (floor 30h)."
     },
     {
       "name": "alerts_ran",
       "ok": false,
-      "ms": 262,
-      "detail": "last successful alerts.yml run 41.3h ago (floor 30h)."
+      "ms": 287,
+      "detail": "last successful alerts.yml run 42.0h ago (floor 30h)."
     }
   ]
 }
