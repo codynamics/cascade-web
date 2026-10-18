@@ -98,7 +98,10 @@ test("CAS-1235 AC2: defaults hide the Filters badge; switching one Also-show win
   }
 });
 
-test("CAS-1235 AC4: the Streaming stage count equals the number of cards watchScopeRows() lists for the Streaming tab", () => {
+// CAS-1301 superseded this AC: a stage button now counts only its own section (matching the section
+// heading), not every row the tab's list shows — the "tagged for Streaming" early section the film below
+// is forced into must widen the tab's total without moving the button off the Streaming section's own count.
+test("CAS-1301: the Streaming stage count equals only the Streaming section's own count, not the whole tab's listed total", () => {
   const owner = broadCascade("cas1235-ac4", 0);
   E.cascades.push(owner);
   E.recomputeFound();
@@ -107,11 +110,15 @@ test("CAS-1235 AC4: the Streaming stage count equals the number of cards watchSc
     const film = pickListedInCinemaFilm(owner);
     withStreamWatchOn(film, () => {
       E.setWatchTab("stream");
-      const listed = E.watchVisibleRows().rows.filter(m => !E.taggedOut(m)).length;
+      const { rows } = E.watchVisibleRows();
+      const listed = rows.filter(m => !E.taggedOut(m)).length;
+      const ownSection = E.watchGroupRows(rows, "included_streaming").length;
       const stop = E.watchStageStopsNow().find(s => s.tabKey === "stream");
       assert.ok(stop, "setup: the Streaming tab must have a stage stop");
-      assert.equal(E.watchStageCountFor(stop), listed,
-        "AC4: the Streaming stage count must equal the number of cards the Streaming tab lists");
+      assert.ok(ownSection < listed,
+        "setup: the forced in-cinema film must widen the tab's total beyond the Streaming section's own count");
+      assert.equal(E.watchStageCountFor(stop), ownSection,
+        "CAS-1301: the Streaming stage count must equal only the Streaming section's own count");
     });
   } finally{
     unseedCascade(owner.id);

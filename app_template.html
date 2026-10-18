@@ -9925,15 +9925,25 @@ function watchStageMatches(m){
   const isUpcoming = primaryStatus(m)==="upcoming";
   return watchCinemaStage==="upcoming" ? isUpcoming : !isUpcoming;
 }
-// CAS-1223: a stop's own count — "the number of films the list shows for that stage with the current
-// agents, filters and search applied" — computed by temporarily aiming the real pipeline (watchVisibleRows)
-// at that stop's tab/stage and reading it back, the same save/swap/restore device pickLandingWatchTab
-// already uses rather than a second, parallel counting implementation that could drift from the real one.
+// CAS-1301: the one row-to-group test the button and the section heading both key off, so the two counts
+// can never drift apart again the way Streaming/Rental's button and heading did (button counted the whole
+// list a tab shows, heading counted only its own section).
+function watchGroupRows(rows, g){ return rows.filter(m=>primaryStatus(m)===g); }
+// CAS-1223/CAS-1301: a stop's own count — "the number of films that stop's OWN section heading shows", i.e.
+// only the rows in that stage's own status group(s), via watchGroupRows — never films merely tagged for this
+// stage that are still listed in an earlier stage's section. Computed by temporarily aiming the real
+// pipeline (watchVisibleRows) at that stop's tab/stage and reading the group back, the same save/swap/
+// restore device pickLandingWatchTab already uses rather than a second, parallel counting implementation
+// that could drift from the real one. Cinema stops are unchanged: Upcoming is the "upcoming" group; In
+// Cinema is "opening_week" plus "in_cinema", the same two groups its own section headings split into.
 function watchStageCountFor(stop){
   const savedTab=watchTab, savedStage=watchCinemaStage;
   watchTab=stop.tabKey;
   if(stop.tabKey==="in_cinema") watchCinemaStage = stop.key==="upcoming" ? "upcoming" : "in_cinema";
-  const n=watchVisibleRows().rows.filter(m=>!taggedOut(m)).length;
+  const {rows}=watchVisibleRows();
+  const n = stop.tabKey!=="in_cinema" ? watchGroupRows(rows, WATCH_TAB_OWN_STANDING[stop.tabKey]).length
+    : stop.key==="upcoming" ? watchGroupRows(rows, "upcoming").length
+    : watchGroupRows(rows, "opening_week").length + watchGroupRows(rows, "in_cinema").length;
   watchTab=savedTab; watchCinemaStage=savedStage;
   return n;
 }
@@ -21472,7 +21482,8 @@ function listingGroups(rows, ac){
       // CAS-819: an explicit pick sorts across every agent within a status section — the chosen key leads,
       // agent rank only breaks a tie. With no pick, agent rank still leads and the tab's own sort only
       // breaks ties inside one agent's own films, same order it read before this ticket.
-      return {g, items: rows.filter(m=>primaryStatus(m)===g)
+      // CAS-1301: watchGroupRows is the same row-to-group test watchStageCountFor uses for the stage button.
+      return {g, items: watchGroupRows(rows, g)
         .sort(isUserSort ? (a,b)=>cmp(a,b) || filmOwnerOrder(a)-filmOwnerOrder(b)
                           : (a,b)=>filmOwnerOrder(a)-filmOwnerOrder(b) || cmp(a,b))};
     })
