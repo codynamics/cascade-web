@@ -749,8 +749,9 @@
     background:rgba(10,14,26,.72);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:11px;
     display:grid;place-items:center;text-decoration:none;line-height:1}
   .pplay:hover{border-color:#fff}
-  /* CAS-1295: the star — a tap toggles the shortlist and never opens or expands the card, same corner
-     treatment as .pplay (opposite corner, slightly larger per the ticket's 30px spec). */
+  /* CAS-1295/CAS-1302: the star — a tap toggles the shortlist and never opens or expands the card. It no
+     longer overlays the poster (that covered artwork and titles); .bandstar below places it in the
+     release-timeline row instead, the same position the collapsed stub (.stubstar) already uses. */
   .starbtn{position:absolute;top:6px;left:6px;width:30px;height:30px;border-radius:50%;z-index:1;
     background:rgba(0,0,0,.55);border:none;color:#fff;font-size:16px;line-height:1;
     display:grid;place-items:center;cursor:pointer}
@@ -1175,6 +1176,11 @@
      deliberately recessive dots; the one window that is true right now is the only thing lit. */
   .bandw{background:var(--band);border-top:1px solid var(--line);padding:8px 13px}
   .avail2{display:flex;align-items:center;min-height:30px}
+  /* CAS-1302: the star is the row's last flex child, flex:none like the dots/caps either side of it — the
+     .wline segments (flex:1 1 16px, below) are what shrink to leave it room, same as they already do for
+     each other. Its own box is a static circle now, not the poster overlay .starbtn still defaults to. */
+  .bandstar{position:static;flex:none;margin-left:8px;width:28px;height:28px;border-radius:50%;
+    background:var(--panel);border:1px solid var(--line);color:var(--dim);font-size:15px}
   /* CAS-433: the timeline's own origin label — the film's real release date, ahead of whatever dots follow. */
   .reldate{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;margin-right:9px;line-height:1.2}
   .reldate .rellbl{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
@@ -3575,11 +3581,12 @@
     .stgroups .stagestop .stagename{font-size:11px;letter-spacing:-.1px}
   }
   /* moods: one row, one selected at a time */
-  .moodrow{display:flex;gap:6px;margin-top:9px;overflow-x:auto;scrollbar-width:none;align-items:center}
+  .moodrow{display:flex;gap:6px;margin-top:9px;overflow-x:auto;scrollbar-width:none;align-items:center;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   .moodrow::-webkit-scrollbar{display:none}
   .moodchip{flex:none;height:34px;padding:0 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
     color:var(--dim);font:600 12.5px/1 var(--font-body);display:flex;align-items:center;gap:7px;cursor:pointer;
-    white-space:nowrap;transition:transform .15s}
+    white-space:nowrap;transition:transform .15s;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   .moodchip.on{background:var(--sel-bg);border-color:var(--sel-bd);color:#fff;font-weight:700;padding-right:9px}
   /* CAS-1290: press-and-hold lift state — touch-action:none stops the row's own native scroll from fighting
      the finger once a chip is lifted; wireMoodRowDrag's pointermove still preventDefault()s belt-and-braces. */
@@ -3589,7 +3596,8 @@
   .moodchip.on .moodedit{display:flex}
   .moodchip .moodedit svg{width:12px;height:12px}
   .moodadd{flex:none;height:34px;padding:0 12px;border-radius:10px;border:1px dashed #4a5263;background:none;
-    color:var(--dim);font:600 12.5px/1 var(--font-body);cursor:pointer;white-space:nowrap}
+    color:var(--dim);font:600 12.5px/1 var(--font-body);cursor:pointer;white-space:nowrap;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   .moodchip:focus-visible,.moodadd:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   /* CAS-1296: the divider after the pinned Releases chip — .moodrow's own gap:6px already gives it the 6px
      margin on each side the spec calls for. */
@@ -7177,6 +7185,7 @@ function releaseDateOf(m){
   return wd.pvod || wd.rental || wd.included_streaming || null;
 }
 function bandHTML(m, svcLine){
+  const id=m.tmdb_id;
   const cur=curSlot(m);
   const cin=cinemaState(m);
   const rel=releaseDateOf(m);
@@ -7211,7 +7220,14 @@ function bandHTML(m, svcLine){
   // status and Notify chips, and a miss on either of those landed on it and opened the card — so the
   // gesture that was supposed to answer a question about the film answered a different one instead. The
   // bottom of the card is where the decisions are; only the body above it opens.
-  return `<div class="bandw"><div class="avail2${isEstimated(m)?" est":""}">${relHTML}${segs}</div></div>`;
+  // CAS-1302: the star moved off the poster to the right end of this row, under the score column — the
+  // same position the collapsed stub (.stubstar) already uses. It's the row's last flex child, so the
+  // window capsules/lines shrink to make room the same way they already do for one another.
+  const starOn = isStarred(id);
+  const starBtn = `<button type="button" class="starbtn bandstar${starOn?" on":""}" data-star="${id}" aria-pressed="${starOn}"
+    onclick="event.stopPropagation();toggleStarred(${id})" title="${starOn?"Unstar":"Star"}"
+    aria-label="${starOn?"Unstar":"Star"}">${starOn?"★":"☆"}</button>`;
+  return `<div class="bandw"><div class="avail2${isEstimated(m)?" est":""}">${relHTML}${segs}${starBtn}</div></div>`;
 }
 // CAS-426: the current window's date now reads inline in the capsule above, so it is the only one this
 // line skips — printed as "now" instead of repeating the same date twice. Everything else the strip used
@@ -8451,12 +8467,6 @@ function cardTopHTML(m, inWatch=false){
     ? `<a class="pplay" href="https://www.youtube.com/watch?v=${safeUrl(firstTrailer)}" target="_blank" rel="noopener"
          onclick="event.stopPropagation()" title="Play the trailer" aria-label="${escA("Play the trailer for "+m.title)}">▶</a>`
     : "";
-  // CAS-1295: the star overlays the poster's top-left corner, on every card and the film page (this
-  // function is shared, CAS-1119) — a tap toggles the shortlist and never opens or expands the card.
-  const starOn = isStarred(id);
-  const starBtn = `<button type="button" class="starbtn${starOn?" on":""}" data-star="${id}" aria-pressed="${starOn}"
-    onclick="event.stopPropagation();toggleStarred(${id})" title="${starOn?"Unstar":"Star"}"
-    aria-label="${starOn?"Unstar":"Star"}">${starOn?"★":"☆"}</button>`;
   const badge = scaleBadge(m);
   // CAS-1253: Match replaces the Cascade score at the top right of a card once someone is signed in — the
   // score itself moves to the far right of the People/Critics row (cinema-info cards, which have no such
@@ -8471,7 +8481,7 @@ function cardTopHTML(m, inWatch=false){
   return `<div class="ctop${signedIn?" hasmatch":""}${signedIn && !matchBadge?" nomatch":""}">
       <!-- CAS-276: the tombstone is the POSTER, and nothing else. -->
       <div class="ptomb">
-        <div class="poster"${posterAttr}>${play}${starBtn}</div>
+        <div class="poster"${posterAttr}>${play}</div>
       </div>
       <!-- CAS-373: the title text gets its own span so it (not the badge) is what truncates — the rating
            badge is flex:none and always shows, collapsed or expanded. -->
@@ -9923,15 +9933,25 @@ function watchStageMatches(m){
   const isUpcoming = primaryStatus(m)==="upcoming";
   return watchCinemaStage==="upcoming" ? isUpcoming : !isUpcoming;
 }
-// CAS-1223: a stop's own count — "the number of films the list shows for that stage with the current
-// agents, filters and search applied" — computed by temporarily aiming the real pipeline (watchVisibleRows)
-// at that stop's tab/stage and reading it back, the same save/swap/restore device pickLandingWatchTab
-// already uses rather than a second, parallel counting implementation that could drift from the real one.
+// CAS-1301: the one row-to-group test the button and the section heading both key off, so the two counts
+// can never drift apart again the way Streaming/Rental's button and heading did (button counted the whole
+// list a tab shows, heading counted only its own section).
+function watchGroupRows(rows, g){ return rows.filter(m=>primaryStatus(m)===g); }
+// CAS-1223/CAS-1301: a stop's own count — "the number of films that stop's OWN section heading shows", i.e.
+// only the rows in that stage's own status group(s), via watchGroupRows — never films merely tagged for this
+// stage that are still listed in an earlier stage's section. Computed by temporarily aiming the real
+// pipeline (watchVisibleRows) at that stop's tab/stage and reading the group back, the same save/swap/
+// restore device pickLandingWatchTab already uses rather than a second, parallel counting implementation
+// that could drift from the real one. Cinema stops are unchanged: Upcoming is the "upcoming" group; In
+// Cinema is "opening_week" plus "in_cinema", the same two groups its own section headings split into.
 function watchStageCountFor(stop){
   const savedTab=watchTab, savedStage=watchCinemaStage;
   watchTab=stop.tabKey;
   if(stop.tabKey==="in_cinema") watchCinemaStage = stop.key==="upcoming" ? "upcoming" : "in_cinema";
-  const n=watchVisibleRows().rows.filter(m=>!taggedOut(m)).length;
+  const {rows}=watchVisibleRows();
+  const n = stop.tabKey!=="in_cinema" ? watchGroupRows(rows, WATCH_TAB_OWN_STANDING[stop.tabKey]).length
+    : stop.key==="upcoming" ? watchGroupRows(rows, "upcoming").length
+    : watchGroupRows(rows, "opening_week").length + watchGroupRows(rows, "in_cinema").length;
   watchTab=savedTab; watchCinemaStage=savedStage;
   return n;
 }
@@ -9984,11 +10004,27 @@ function renderWatchTop(){
   const moodHTML = (releasesMood ? moodChipHTML(releasesMood, true)+`<div class="mooddivider" aria-hidden="true"></div>` : "")
     + restMoods.map(m=>moodChipHTML(m, false)).join("");
   const addHTML = moods.length>=MOOD_MAX ? "" : `<button type="button" class="moodadd" id="moodAddBtn" onclick="openMoodSheetForNew()">+ Mood</button>`;
+  // CAS-1300: innerHTML always restarts a fresh .moodrow at scrollLeft 0, so the previous row's position has
+  // to be captured before it's thrown away and reapplied (or adjusted) on the new one below.
+  const prevRow=el.querySelector(".moodrow");
+  const prevScrollLeft=prevRow ? prevRow.scrollLeft : 0;
   el.innerHTML = `${stageHTML}<div class="moodrow" role="group" aria-label="Mood">${moodHTML}${addHTML}</div>`;
   // Keeps #wtMini's own text honest immediately after a stage/mood change, independent of the next scroll
   // event — the collapse listener itself (defined later in this script) only ever touches it on scroll.
   if(typeof wtRefreshMini==="function") wtRefreshMini();
-  wireMoodRowDrag(el.querySelector(".moodrow"));
+  const newRow=el.querySelector(".moodrow");
+  moodRowShowSelected(newRow, prevScrollLeft);
+  wireMoodRowDrag(newRow);
+}
+// CAS-1300: sets .moodrow's own scrollLeft so the selected chip is fully visible, without ever touching the
+// page's scroll position (scrollIntoView is unusable here — it scrolls the page vertically too). If the chip
+// was already visible at the row's previous scrollLeft, that position is kept as-is rather than re-centred.
+function moodRowShowSelected(row, prevScrollLeft){
+  if(!row) return;
+  const chip=row.querySelector(".moodchip.on");
+  if(!chip){ row.scrollLeft=prevScrollLeft||0; return; }
+  const lo=chip.offsetLeft+chip.offsetWidth-row.clientWidth, hi=chip.offsetLeft;
+  row.scrollLeft = lo<=hi ? Math.min(hi, Math.max(lo, prevScrollLeft||0)) : hi;
 }
 // CAS-1290: press-and-hold reorder for the mood row's own chips (never #moodAddBtn, which neither moves nor
 // is a drop target). Mirrors wireAgentsDrag's capture-on-child/listen-on-ancestor pattern, but there's no
@@ -10002,8 +10038,18 @@ function wireMoodRowDrag(row){
   if(!row) return;
   const pinnedChip=row.querySelector(".moodchip.pinned");
   const pinnedId=pinnedChip ? pinnedChip.dataset.mood : null;
-  let press=null, drag=null, edgeRAF=null;
+  let press=null, drag=null, edgeRAF=null, pan=null;
   const clearPress=()=>{ if(press) clearTimeout(press.timer); press=null; };
+  // CAS-1300: desktop mouse support — a vertical wheel pans the row, and a press-and-drag that moves beyond
+  // MOOD_LIFT_SLOP before the lift timer fires pans instead of lifting. Both only when the row overflows;
+  // touch keeps its existing native-scroll behaviour untouched.
+  row.addEventListener("wheel", e=>{
+    if(row.scrollWidth<=row.clientWidth) return;
+    if(e.deltaY && !e.deltaX){
+      e.preventDefault();
+      row.scrollLeft += e.deltaY;
+    }
+  }, {passive:false});
   const stopEdgeScroll=()=>{ if(edgeRAF){ cancelAnimationFrame(edgeRAF); edgeRAF=null; } };
   const runEdgeScroll=()=>{
     edgeRAF=requestAnimationFrame(()=>{
@@ -10041,9 +10087,10 @@ function wireMoodRowDrag(row){
     chip.addEventListener("pointerdown", e=>{
       if(e.pointerType==="mouse" && e.button!==0) return;
       clearPress();
-      press={chip, pointerId:e.pointerId, startX:e.clientX, startY:e.clientY, timer:null};
+      press={chip, pointerId:e.pointerId, pointerType:e.pointerType, startX:e.clientX, startY:e.clientY, timer:null};
       press.timer=setTimeout(beginLift, MOOD_LIFT_MS);
     });
+    chip.addEventListener("contextmenu", e=>e.preventDefault());
   });
   row.addEventListener("pointermove", e=>{
     if(drag && e.pointerId===drag.id){
@@ -10061,9 +10108,20 @@ function wireMoodRowDrag(row){
       if(drag.edgeDir && !edgeRAF) runEdgeScroll();
       return;
     }
+    if(pan && e.pointerId===pan.id){
+      e.preventDefault();
+      row.scrollLeft = pan.startScrollLeft - (e.clientX-pan.startX);
+      return;
+    }
     if(press && press.pointerId===e.pointerId){
       const dx=e.clientX-press.startX, dy=e.clientY-press.startY;
-      if(Math.hypot(dx,dy)>MOOD_LIFT_SLOP) clearPress();
+      if(Math.hypot(dx,dy)>MOOD_LIFT_SLOP){
+        if(press.pointerType==="mouse" && row.scrollWidth>row.clientWidth){
+          pan={id:press.pointerId, startX:e.clientX, startScrollLeft:row.scrollLeft};
+          row._moodSuppressClick=true;
+        }
+        clearPress();
+      }
     }
   });
   const endDrag=commit=>{
@@ -10082,10 +10140,12 @@ function wireMoodRowDrag(row){
   };
   row.addEventListener("pointerup", e=>{
     if(press && press.pointerId===e.pointerId){ clearPress(); return; }
+    if(pan && e.pointerId===pan.id){ pan=null; return; }
     if(drag && e.pointerId===drag.id) endDrag(true);
   });
   row.addEventListener("pointercancel", e=>{
     if(press && press.pointerId===e.pointerId){ clearPress(); return; }
+    if(pan && e.pointerId===pan.id){ pan=null; return; }
     if(drag && e.pointerId===drag.id) endDrag(false);
   });
   // A lift that ends without a reorder is still not a tap (C5/AC3 only covers a release under MOOD_LIFT_MS):
@@ -21430,7 +21490,8 @@ function listingGroups(rows, ac){
       // CAS-819: an explicit pick sorts across every agent within a status section — the chosen key leads,
       // agent rank only breaks a tie. With no pick, agent rank still leads and the tab's own sort only
       // breaks ties inside one agent's own films, same order it read before this ticket.
-      return {g, items: rows.filter(m=>primaryStatus(m)===g)
+      // CAS-1301: watchGroupRows is the same row-to-group test watchStageCountFor uses for the stage button.
+      return {g, items: watchGroupRows(rows, g)
         .sort(isUserSort ? (a,b)=>cmp(a,b) || filmOwnerOrder(a)-filmOwnerOrder(b)
                           : (a,b)=>filmOwnerOrder(a)-filmOwnerOrder(b) || cmp(a,b))};
     })
