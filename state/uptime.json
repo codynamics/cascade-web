@@ -1,7 +1,7 @@
 {
-  "lastRun": "2026-10-17T23:18:06.229Z",
-  "consecutiveReds": 15,
-  "slowConsecutiveReds": 15,
+  "lastRun": "2026-10-18T00:18:08.015Z",
+  "consecutiveReds": 17,
+  "slowConsecutiveReds": 17,
   "fastRedNames": [],
   "lastAlertedRedNames": "alerts_ran",
   "lastAlertAt": "2026-10-17T13:18:07.464Z",
@@ -10,56 +10,56 @@
     {
       "name": "site_up",
       "ok": true,
-      "ms": 868,
+      "ms": 625,
       "detail": "HTTP 200, version 1.0.0"
     },
     {
       "name": "movies_json",
       "ok": true,
-      "ms": 484,
+      "ms": 619,
       "detail": "5990 record(s), parses."
     },
     {
       "name": "supabase_canary",
       "ok": true,
-      "ms": 2974,
+      "ms": 3366,
       "detail": "4 agent(s), 1 admitted film(s), film_watch read OK."
     },
     {
       "name": "signup",
       "ok": true,
-      "ms": 1063,
-      "detail": "created and removed lee+probe-1792279083063@codynamics.com.au via delete_my_account."
+      "ms": 1041,
+      "detail": "created and removed lee+probe-1792282685406@codynamics.com.au via delete_my_account."
     },
     {
       "name": "orphan_probe_accounts",
       "ok": true,
-      "ms": 298,
+      "ms": 253,
       "detail": "no probe account older than 2h."
     },
     {
       "name": "usage_events_insert",
       "ok": true,
-      "ms": 684,
+      "ms": 261,
       "detail": "HTTP 201"
     },
     {
       "name": "pages_head",
       "ok": true,
-      "ms": 370,
+      "ms": 337,
       "detail": "HEAD https://cascade-web-3x1.pages.dev/ -> HTTP 200"
     },
     {
       "name": "daily_refresh_fresh",
       "ok": true,
-      "ms": 488,
-      "detail": "last \"Daily refresh\" commit 2.5h ago (floor 30h)."
+      "ms": 455,
+      "detail": "last \"Daily refresh\" commit 3.5h ago (floor 30h)."
     },
     {
       "name": "alerts_ran",
       "ok": false,
       "ms": 262,
-      "detail": "last successful alerts.yml run 41.3h ago (floor 30h)."
+      "detail": "last successful alerts.yml run 42.3h ago (floor 30h)."
     }
   ]
 }
