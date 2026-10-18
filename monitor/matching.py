@@ -586,15 +586,17 @@ def match(cascades: list, transitions: list, already=None, admission=None, suppr
                     if placement_counts is not None:
                         placement_counts["wrong_window"] = placement_counts.get("wrong_window", 0) + 1
                     continue
-            key = (c["id"], t.movie_id, t.moment)
-            if key in seen:
-                continue
-            seen.add(key)   # guard against two identical Cascades double-firing within one run
-            # CAS-925: attribute the Hit to the film's OWNER, not necessarily `c` (the agent whose
-            # moment just fired) — the de-dupe key above stays on `c["id"]` regardless, so
-            # re-attribution here can neither resurrect an already-sent alert nor suppress a new one.
+            # CAS-1294: resolve the OWNER before the de-dupe check. The ledger's unique constraint
+            # is (cascade_id, movie_id, moment) on the row actually written — notification_row()
+            # always writes `owner["id"]`, never the firing cascade's — so the de-dupe key must be
+            # the same shape, or a different cascade re-attributing to an already-alerted owner
+            # (CAS-925) can never see that owner was already told, and fires a ledger-rejected repeat.
             owner = _resolve_owner(c["user_id"], t.movie_id, cascades_by_user.get(str(c["user_id"]), []),
                                    admission, overrides, rank_of, c["id"]) or c
+            key = (owner["id"], t.movie_id, t.moment)
+            if key in seen:
+                continue
+            seen.add(key)   # guard against two cascades re-attributing to the same owner this run
             owner_criteria = owner.get("criteria") or {}
             by_user.setdefault(c["user_id"], []).append(
                 Hit(user_id=c["user_id"], cascade_id=owner["id"],
@@ -699,14 +701,17 @@ def match_newly_qualified(cascades: list, prev_movies: list, today_movies: list,
                                services=services, price=price, movie=today_record)
             if not service_ok(probe, criteria):
                 continue
-            key = (c["id"], mid, "newly_qualifies")
+            # CAS-1294: key the de-dupe on the OWNER, not the firing cascade — see match()'s own
+            # comment above the equivalent line; the ledger row below is always written under
+            # `owner["id"]`.
+            owner = _resolve_owner(c["user_id"], mid, cascades_by_user.get(str(c["user_id"]), []),
+                                   admission, overrides, rank_of, c["id"]) or c
+            key = (owner["id"], mid, "newly_qualifies")
             if key in seen:
                 continue
             seen.add(key)
             t = Transition(mid, today_record.get("title", ""), "newly_qualifies",
                           services=services, price=price, movie=today_record)
-            owner = _resolve_owner(c["user_id"], mid, cascades_by_user.get(str(c["user_id"]), []),
-                                   admission, overrides, rank_of, c["id"]) or c
             owner_criteria = owner.get("criteria") or {}
             by_user.setdefault(c["user_id"], []).append(
                 Hit(user_id=c["user_id"], cascade_id=owner["id"],
@@ -802,13 +807,16 @@ def match_new_to_agent(cascades: list, prev_movies: list, today_movies: list, pr
                 continue                   # already matched yesterday -> not a first appearance
             if not matches_criteria(mid, c["id"], "today", admission):
                 continue                   # still doesn't match today
-            key = (c["id"], mid, "new_to_agent")
+            # CAS-1294: key the de-dupe on the OWNER, not the firing cascade — see match()'s own
+            # comment above the equivalent line; the ledger row below is always written under
+            # `owner["id"]`.
+            owner = _resolve_owner(c["user_id"], mid, cascades_by_user.get(str(c["user_id"]), []),
+                                   admission, overrides, rank_of, c["id"]) or c
+            key = (owner["id"], mid, "new_to_agent")
             if key in seen:
                 continue
             seen.add(key)
             t = Transition(mid, today_record.get("title", ""), "new_to_agent", movie=today_record)
-            owner = _resolve_owner(c["user_id"], mid, cascades_by_user.get(str(c["user_id"]), []),
-                                   admission, overrides, rank_of, c["id"]) or c
             owner_criteria = owner.get("criteria") or {}
             by_user.setdefault(c["user_id"], []).append(
                 Hit(user_id=c["user_id"], cascade_id=owner["id"],

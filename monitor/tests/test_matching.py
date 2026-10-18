@@ -788,15 +788,19 @@ class OwnerAttributionTests(unittest.TestCase):
         self.assertEqual(len(hits), 1)
         self.assertEqual(hits[0].cascade_id, "c0")
 
-    def test_f_already_suppresses_by_the_firing_id_never_the_owner_id(self):
+    def test_f_already_suppresses_by_the_owner_id_never_the_firing_id(self):
+        # CAS-1294: the ledger row is always written under the OWNER's id (notification_row()
+        # reads Hit.cascade_id, which is always owner["id"]), so the de-dupe check must match
+        # that shape — keying on the firing agent instead let an owner that already has this
+        # exact ledger row get re-alerted (and ledger-rejected) by a different firing agent.
         c0 = self._cascade("c0", 0, moments=())       # owner-to-be; never itself fires
         c2 = self._cascade("c2", 2)                    # the firing agent
         ts = self._transitions()
-        # keyed on the FIRING agent (c2): suppresses the hit entirely.
-        suppressed = self._match([c0, c2], ts, already={("c2", "1", "hits_rent")})
+        # keyed on the OWNER (c0): suppresses the hit entirely, since that's who the row is for.
+        suppressed = self._match([c0, c2], ts, already={("c0", "1", "hits_rent")})
         self.assertEqual(suppressed.get("u1", []), [])
-        # keyed on the OWNER (c0), who never fired: does not suppress anything.
-        unsuppressed = self._match([c0, c2], ts, already={("c0", "1", "hits_rent")})["u1"]
+        # keyed on the firing agent (c2), who never owns the row written: does not suppress.
+        unsuppressed = self._match([c0, c2], ts, already={("c2", "1", "hits_rent")})["u1"]
         self.assertEqual(len(unsuppressed), 1)
         self.assertEqual(unsuppressed[0].cascade_id, "c0")
 
@@ -1076,6 +1080,29 @@ class NewlyQualifiedTests(unittest.TestCase):
         hits = self._match(self._cascade(imdb_bar=7.0), prev, today,
                            suppressed={("u1", "9001")})
         self.assertEqual(hits, {})
+
+    def test_already_suppresses_by_the_owner_id_never_the_firing_id(self):
+        # CAS-1294: the real-world repeat — a hand-pinned owner (c0) never itself crosses the
+        # bar, c2 is the one whose own criteria newly qualifies, but the ledger row is always
+        # written under the OWNER's id. Keying the de-dupe on the firing agent (c2) instead let
+        # this exact (owner, movie, moment) row, already in the ledger, fire again on a later run.
+        prev = [self._movie(6.5)]
+        today = [self._movie(7.5)]
+        c2 = self._cascade(imdb_bar=7.0, cascade_id="c2")[0]
+        c0 = {"id": "c0", "user_id": "u1", "name": "Zero", "active": True,
+              "alert_moments": [], "criteria": _criteria(genre=["Drama"], imdb=7.0)}
+        cascades = [c0, c2]
+        picks = [{"user_id": "u1", "movie_id": "9001", "pinned_to": ["c0"]}]
+        admission = _admit(cascades, today=today, yesterday=prev)
+        # keyed on the OWNER (c0): suppresses the hit entirely.
+        suppressed = match_newly_qualified(cascades, prev, today, admission=admission, picks=picks,
+                                           already={("c0", "9001", "newly_qualifies")})
+        self.assertEqual(suppressed, {})
+        # keyed on the firing agent (c2), who never owns the row written: does not suppress.
+        unsuppressed = match_newly_qualified(cascades, prev, today, admission=admission, picks=picks,
+                                             already={("c2", "9001", "newly_qualifies")})["u1"]
+        self.assertEqual(len(unsuppressed), 1)
+        self.assertEqual(unsuppressed[0].cascade_id, "c0")
 
     def test_service_filter_applies_to_a_streaming_qualification(self):
         prev = [self._movie(6.5, status=("included_streaming",), offers=[])]
