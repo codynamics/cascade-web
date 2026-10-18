@@ -110,16 +110,31 @@ function setSignedIn(signedIn){
   auth.session = signedIn ? { user: { id: "cas1264-test-user" } } : null;
 }
 
-test("CAS-1264 AC2: applyMoodToState maps order:\"you\" to filt.sort=\"you\" signed in, \"cascade\" signed out", () => {
+// CAS-1296: order is no longer a field the mood sheet edits — it's derived (moodOrder) from Show top
+// (topYou/topPublic). A mood with either one set derives "you" (filt.sort="you" signed in, "cascade" out,
+// same mapping as before); a mood with both Off derives "release" (filt.sort="cinema"), the behaviour the
+// Releases mood needs. A stored `order` field (pre-CAS-1296) is ignored either way.
+test("CAS-1296: moodOrder derives \"you\" from topYou/topPublic, ignoring any stored order field", () => {
+  assert.equal(E.moodOrder({ ...E.moodDefaultFieldsNow(), topYou: 20, topPublic: null }), "you");
+  assert.equal(E.moodOrder({ ...E.moodDefaultFieldsNow(), topYou: null, topPublic: 10 }), "you");
+  assert.equal(E.moodOrder({ ...E.moodDefaultFieldsNow(), topYou: null, topPublic: null, order: "you" }), "release");
+});
+
+test("CAS-1296/CAS-1264: applyMoodToState maps the derived \"you\" order to filt.sort=\"you\" signed in, \"cascade\" signed out", () => {
   try{
     setSignedIn(true);
-    E.applyMoodToState({ ...E.moodDefaultFieldsNow(), order: "you" });
+    E.applyMoodToState({ ...E.moodDefaultFieldsNow(), topYou: 20, topPublic: null });
     assert.equal(E.filt.sort, "you");
 
     setSignedIn(false);
-    E.applyMoodToState({ ...E.moodDefaultFieldsNow(), order: "you" });
+    E.applyMoodToState({ ...E.moodDefaultFieldsNow(), topYou: 20, topPublic: null });
     assert.equal(E.filt.sort, "cascade");
   } finally {
     setSignedIn(false);
   }
+});
+
+test("CAS-1296 AC2: a mood with both Show top caps Off derives \"release\" (filt.sort=\"cinema\")", () => {
+  E.applyMoodToState({ ...E.moodDefaultFieldsNow(), topYou: null, topPublic: null });
+  assert.equal(E.filt.sort, "cinema");
 });

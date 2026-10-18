@@ -2590,6 +2590,21 @@
   #groups > .group:first-child:not(.early) > .grouphead:not(.sub){display:none}
   /* The stage's own section when nothing has arrived in it yet: its heading still shows, with one line. */
   .group.ownempty .ownnone{padding:0 12px 20px;font:500 12.5px/1.45 var(--font-body);color:var(--faint)}
+  /* CAS-1298: the Watch list's stage section heading is a banner in the stage's own colour — tinted
+     fill, left accent strip and a count pill — so each stage reads as a clear break in the list. Scoped to
+     #groups top-level headings; the per-agent .grouphead.sub is unchanged. Earlier-stage sections stay quieter. */
+  #groups .group[data-g=upcoming]{--gc:var(--upcoming)} #groups .group[data-g=opening_week]{--gc:var(--open)}
+  #groups .group[data-g=in_cinema]{--gc:var(--amber)} #groups .group[data-g=pvod]{--gc:var(--purple)}
+  #groups .group[data-g=rental]{--gc:var(--blue)} #groups .group[data-g=included_streaming]{--gc:var(--green)}
+  #groups .group{margin-top:18px}
+  #groups .grouphead:not(.sub){margin:0 10px 6px;padding:8px 12px;border-radius:10px;gap:8px;
+    font:800 15px/1.15 var(--font-body);letter-spacing:.1px;color:var(--ink);
+    background:color-mix(in srgb,var(--gc) 16%,var(--bg));border:1px solid color-mix(in srgb,var(--gc) 45%,transparent);
+    box-shadow:inset 3px 0 0 var(--gc)}
+  #groups .grouphead:not(.sub) .gdot{width:9px;height:9px}
+  #groups .grouphead:not(.sub) .gcount{margin-left:auto;padding:2px 8px;border-radius:999px;font:800 12px/1.2 var(--font-body);
+    color:var(--ink);background:color-mix(in srgb,var(--gc) 30%,transparent)}
+  #groups .group.early > .grouphead:not(.sub){font-size:13px;color:var(--dim)}
   /* CAS-1247: Watch's own search box and Filters sheet are gone — .watchsearchwrap/its .search/.searchclear
      stay, since Find's own search box (#findSearchWrap, renderFindScreen()) is still built from them. */
   .watchsearchwrap{display:flex;align-items:center;gap:8px;margin:9px 12px 0}
@@ -3576,6 +3591,9 @@
   .moodadd{flex:none;height:34px;padding:0 12px;border-radius:10px;border:1px dashed #4a5263;background:none;
     color:var(--dim);font:600 12.5px/1 var(--font-body);cursor:pointer;white-space:nowrap}
   .moodchip:focus-visible,.moodadd:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  /* CAS-1296: the divider after the pinned Releases chip — .moodrow's own gap:6px already gives it the 6px
+     margin on each side the spec calls for. */
+  .mooddivider{flex:none;width:1px;height:24px;background:var(--line)}
   /* the collapsed bar: one slim row in place of the stages and moods, toggled only by a tap (CAS-1283) */
   #wtMini{display:none}
   #cascbar.wtcollapsed #watchTop{display:none}
@@ -9954,11 +9972,17 @@ function renderWatchTop(){
   const homeStops=stops.filter(s=>s.tabKey!=="in_cinema");
   const stageHTML=`<div class="stgroups">${groupHTML("Cinema", cinemaStops)}${groupHTML("Home", homeStops)}</div>`;
   const moods=watchMoodsList();
-  const moodHTML=moods.map(m=>{
+  const moodChipHTML=(m, pinned)=>{
     const on=m.id===watchMoodSel;
-    return `<button type="button" class="moodchip${on?" on":""}" data-mood="${escA(m.id)}" aria-pressed="${on}"
+    return `<button type="button" class="moodchip${on?" on":""}${pinned?" pinned":""}" data-mood="${escA(m.id)}" aria-pressed="${on}"
         onclick="onMoodChipTap('${escA(m.id)}')">${esc(m.name)}<span class="moodedit" aria-hidden="true">${MOOD_EDIT_SVG}</span></button>`;
-  }).join("");
+  };
+  // CAS-1296 Change 4: Releases, if the account has one, always renders first — pinned outside the
+  // draggable set, with a divider after it — the rest keep their saved order.
+  const releasesMood=moods.find(m=>m.id==="releases");
+  const restMoods=releasesMood ? moods.filter(m=>m.id!=="releases") : moods;
+  const moodHTML = (releasesMood ? moodChipHTML(releasesMood, true)+`<div class="mooddivider" aria-hidden="true"></div>` : "")
+    + restMoods.map(m=>moodChipHTML(m, false)).join("");
   const addHTML = moods.length>=MOOD_MAX ? "" : `<button type="button" class="moodadd" id="moodAddBtn" onclick="openMoodSheetForNew()">+ Mood</button>`;
   el.innerHTML = `${stageHTML}<div class="moodrow" role="group" aria-label="Mood">${moodHTML}${addHTML}</div>`;
   // Keeps #wtMini's own text honest immediately after a stage/mood change, independent of the next scroll
@@ -9970,9 +9994,14 @@ function renderWatchTop(){
 // is a drop target). Mirrors wireAgentsDrag's capture-on-child/listen-on-ancestor pattern, but there's no
 // grip here — the press itself has to tell a hold-to-lift from a tap or a horizontal swipe before any drag
 // state exists, so lift is gated behind a timer that a small move or an early release both cancel.
+// CAS-1296: the pinned Releases chip (.moodchip.pinned) is excluded the same way #moodAddBtn always was —
+// it never gets a pointerdown listener and never enters `chips`, so it can neither be lifted nor be a drop
+// target; endDrag puts it back at the front of the id list it hands to commitMoodOrder.
 const MOOD_LIFT_MS = 450, MOOD_LIFT_SLOP = 8, MOOD_EDGE_ZONE = 32, MOOD_EDGE_SPEED = 8;
 function wireMoodRowDrag(row){
   if(!row) return;
+  const pinnedChip=row.querySelector(".moodchip.pinned");
+  const pinnedId=pinnedChip ? pinnedChip.dataset.mood : null;
   let press=null, drag=null, edgeRAF=null;
   const clearPress=()=>{ if(press) clearTimeout(press.timer); press=null; };
   const stopEdgeScroll=()=>{ if(edgeRAF){ cancelAnimationFrame(edgeRAF); edgeRAF=null; } };
@@ -9995,7 +10024,7 @@ function wireMoodRowDrag(row){
   };
   const beginLift=()=>{
     const chip=press.chip, pointerId=press.pointerId;
-    const chips=[...row.querySelectorAll(".moodchip")];
+    const chips=[...row.querySelectorAll(".moodchip:not(.pinned)")];
     drag={
       chip, id:pointerId, chips, from:chips.indexOf(chip), to:chips.indexOf(chip),
       lefts:chips.map(c=>c.offsetLeft), widths:chips.map(c=>c.offsetWidth), gap:6,
@@ -10008,7 +10037,7 @@ function wireMoodRowDrag(row){
     if(navigator.vibrate) navigator.vibrate(10);
     press=null;
   };
-  row.querySelectorAll(".moodchip").forEach(chip=>{
+  row.querySelectorAll(".moodchip:not(.pinned)").forEach(chip=>{
     chip.addEventListener("pointerdown", e=>{
       if(e.pointerType==="mouse" && e.button!==0) return;
       clearPress();
@@ -10047,7 +10076,7 @@ function wireMoodRowDrag(row){
       const ids=drag.chips.map(c=>c.dataset.mood);
       const [moved]=ids.splice(drag.from,1);
       ids.splice(drag.to,0,moved);
-      commitMoodOrder(ids);
+      commitMoodOrder(pinnedId ? [pinnedId, ...ids] : ids);
     }
     drag=null;
   };
@@ -10428,6 +10457,11 @@ function moodTopPublicN(mood){
 function moodTopYouAvailable(){
   return !!(window.CascadePersistence && window.CascadePersistence.accountActive()) && tasteProfile().n>0;
 }
+// CAS-1296: Order is no longer a field the sheet edits — with Show top already picking the films, a manual
+// order no longer means anything. The order is derived: either Show top list being on means "by You" (which
+// sortMoviesBy/applyMoodToState fall back to Public for, signed out or no taste); both Off means "by release
+// date", the behaviour the Releases mood needs. A mood's own stored `order` field (pre-CAS-1296) is ignored.
+function moodOrder(mood){ return (moodTopYouN(mood)||moodTopPublicN(mood)) ? "you" : "release"; }
 function moodTopYouEffectiveN(mood){ return moodTopYouAvailable() ? moodTopYouN(mood) : null; }
 // CAS-1290: raises the CAS-1247 cap of five — every literal 5 that caps the mood row/sheet uses this.
 const MOOD_MAX = 10;
@@ -10461,8 +10495,10 @@ function applyMoodToState(mood){
   // tapping Release date did. sortPicked is always true on Watch now (one flat run, no agent lanes).
   // CAS-1264: order:"you" only means anything signed in (tasteMatch needs an account's own verdicts) —
   // signed out it falls back to "cascade", same as every other You-dependent UI in this file.
+  // CAS-1296: the mood's own order field is no longer read — moodOrder(mood) derives it from Show top.
   const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  filt.sort = mood.order==="release" ? "cinema" : (mood.order==="you" && signedIn) ? "you" : "cascade";
+  const ord = moodOrder(mood);
+  filt.sort = ord==="release" ? "cinema" : (ord==="you" && signedIn) ? "you" : "cascade";
   sortPicked = true;
 }
 applyMoodToState(currentMood());   // C3: applied at boot, from the in-memory defaults
@@ -10488,7 +10524,7 @@ function moodDraftFrom(mood){
     name: mood ? mood.name : "",
     // CAS-1284 Change 4: a new mood defaults to "My agents" — "missing means agents" (Change 1).
     source: mood && mood.source==="catalogue" ? "catalogue" : "agents",
-    order: mood ? mood.order : "score",
+    // CAS-1296: order is no longer part of the draft — it's derived (moodOrder) from topYou/topPublic below.
     // CAS-1287 Change 1: topYou/topPublic replace Best N's single `best` field.
     topYou: mood ? moodTopYouN(mood) : null,
     topPublic: mood ? moodTopPublicN(mood) : null,
@@ -10517,7 +10553,6 @@ window.openMoodSheetForNew = () => {
 };
 window.setMoodDraftName = v => { if(moodDraft) moodDraft.name=v; };
 window.toggleMoodDraftAgent = id => { if(!moodDraft) return; moodDraft.agentsOff.has(id)?moodDraft.agentsOff.delete(id):moodDraft.agentsOff.add(id); renderMoodSheetBody(); };
-window.setMoodDraftOrder = key => { if(!moodDraft) return; moodDraft.order=key; renderMoodSheetBody(); };
 // CAS-1287 Change 1: replaces setMoodDraftBest — v is null (Off) or one of 10/20/30/40, one setter per list.
 window.setMoodDraftTopYou = v => { if(!moodDraft) return; moodDraft.topYou=v; renderMoodSheetBody(); };
 window.setMoodDraftTopPublic = v => { if(!moodDraft) return; moodDraft.topPublic=v; renderMoodSheetBody(); };
@@ -10569,7 +10604,7 @@ window.saveMoodFromSheet = () => {
   if(!name){ const inp=$("moodName"); if(inp) inp.focus(); return; }
   const mood={
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
-    name, source:d.source==="catalogue"?"catalogue":"agents", order:d.order,
+    name, source:d.source==="catalogue"?"catalogue":"agents",
     topYou:d.topYou, topPublic:d.topPublic,
     agentsOff:[...d.agentsOff], mineOnly:!!d.mineOnly, pickedBy:d.pickedBy,
     watched:[...d.watched], stylesOff:[...d.stylesOff], badges:[],   // CAS-1284: styles saved again; CAS-1281: badges still aren't
@@ -10720,7 +10755,14 @@ function renderMoodSheetBody(){
       <span class="gdot ${w.key}" aria-hidden="true"></span>${esc(w.label)}<span class="jn">${count}</span>${isOwn?`<span class="alwaystag">always</span>`:""}</button>`;
   }).join("");
   const body=$("watchSheetBody");
+  // CAS-1296: section order is now Name → From → Show top (+ Only starred) → Styles → Agents / Picked by
+  // → Availability → Watched. The Order section is gone — Order is derived (moodOrder), never edited here.
   if(body) body.innerHTML=`
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Name</span></div>
+      <input id="moodName" class="mfinput" type="text" maxlength="18" placeholder="Friday night" autocomplete="off"
+        value="${escA(d.name)}" oninput="setMoodDraftName(this.value)">
+    </div>
     <div class="wsheetsec">
       <div class="wsheethd"><span>From</span></div>
       <div class="mfseg" role="group" aria-label="From">
@@ -10728,26 +10770,6 @@ function renderMoodSheetBody(){
           onclick="setMoodDraftSource('agents')">My agents</button>
         <button type="button" data-source="catalogue" aria-pressed="${isCatalogue}" class="${isCatalogue?"on":""}"
           onclick="setMoodDraftSource('catalogue')">Everything</button>
-      </div>
-    </div>
-    <div class="wsheetsec">
-      <div class="wsheethd"><span>Name</span></div>
-      <input id="moodName" class="mfinput" type="text" maxlength="18" placeholder="Friday night" autocomplete="off"
-        value="${escA(d.name)}" oninput="setMoodDraftName(this.value)">
-    </div>
-    ${isCatalogue ? "" : `<div class="wsheetsec">
-      <div class="wsheethd"><span>Agents</span></div>
-      <div class="chips">${agentsHTML}</div>
-    </div>`}
-    <div class="wsheetsec">
-      <div class="wsheethd"><span>Order</span></div>
-      <div class="mfseg" role="group" aria-label="Order">
-        <button type="button" data-order="release" aria-pressed="${d.order==="release"}" class="${d.order==="release"?"on":""}"
-          onclick="setMoodDraftOrder('release')">Release date</button>
-        <button type="button" data-order="score" aria-pressed="${d.order==="score"}" class="${d.order==="score"?"on":""}"
-          onclick="setMoodDraftOrder('score')">Public</button>
-        <button type="button" data-order="you" aria-pressed="${d.order==="you"}" class="${d.order==="you"?"on":""}"
-          ${(window.CascadePersistence && window.CascadePersistence.accountActive())?"":"disabled"} onclick="setMoodDraftOrder('you')">You</button>
       </div>
     </div>
     <div class="wsheetsec">
@@ -10773,21 +10795,6 @@ function renderMoodSheetBody(){
       </div>
     </div>
     <div class="wsheetsec">
-      <div class="wsheethd"><span>Availability</span></div>
-      <div class="switch wsheetswitch${d.mineOnly?" on":""}" id="watchMineOnlySwitch" role="switch"
-        aria-checked="${d.mineOnly}" onclick="toggleMoodDraftMineOnly()">
-        <span>Show only available on my services</span><span class="knob"></span>
-      </div>
-    </div>
-    ${isCatalogue ? "" : `<div class="wsheetsec">
-      <div class="wsheethd"><span>Picked by</span></div>
-      <div class="chips">${pickedByHTML}</div>
-    </div>`}
-    <div class="wsheetsec">
-      <div class="wsheethd"><span>Watched</span></div>
-      <div class="chips">${watchedHTML}</div>
-    </div>
-    <div class="wsheetsec">
       <div class="wsheethd"><span>Styles</span>
         <div class="wsheetlinks">
           <button type="button" class="linkbtn" onclick="selectAllMoodDraftStyles()">Select all</button>
@@ -10795,6 +10802,25 @@ function renderMoodSheetBody(){
         </div>
       </div>
       <div class="chips">${stylesHTML}</div>
+    </div>
+    ${isCatalogue ? "" : `<div class="wsheetsec">
+      <div class="wsheethd"><span>Agents</span></div>
+      <div class="chips">${agentsHTML}</div>
+    </div>`}
+    ${isCatalogue ? "" : `<div class="wsheetsec">
+      <div class="wsheethd"><span>Picked by</span></div>
+      <div class="chips">${pickedByHTML}</div>
+    </div>`}
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Availability</span></div>
+      <div class="switch wsheetswitch${d.mineOnly?" on":""}" id="watchMineOnlySwitch" role="switch"
+        aria-checked="${d.mineOnly}" onclick="toggleMoodDraftMineOnly()">
+        <span>Show only available on my services</span><span class="knob"></span>
+      </div>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Watched</span></div>
+      <div class="chips">${watchedHTML}</div>
     </div>
     ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Also show</span></div>
@@ -12080,12 +12106,11 @@ function normCascade(c, opts){
   // its windows changed, which is the one thing this ticket explicitly rules out.
   c.includeUnrated = !!c.includeUnrated;
   c.paused = !!c.paused;                      // guest mode (CAS-79): saved on-device but not watching/alerting
-  // CAS-1198: the agent's own Alerts switch, reintroduced after CAS-843 removed the last one. Massive
-  // Movies is the one onboarding agent that starts alerting; every other agent — onboarding, preset or
-  // hand-built — starts quiet until the member switches it on by hand. A stored value (true or false)
-  // is never overwritten, so this only ever fills a GAP, the same guess-vs-real-value discipline as
-  // c.kind just below.
-  if(typeof c.alertsOn!=="boolean") c.alertsOn = (c.template==="onb_massive");
+  // CAS-1198/CAS-1297: the agent's own Alerts switch, reintroduced after CAS-843 removed the last one.
+  // Every agent — onboarding, preset or hand-built — starts alerting by default; the member can still
+  // switch it off by hand. A stored value (true or false) is never overwritten, so this only ever fills
+  // a GAP, the same guess-vs-real-value discipline as c.kind just below.
+  if(typeof c.alertsOn!=="boolean") c.alertsOn = true;
   c.budget = c.budget||0;                    // index into BUDGET_BANDS; 0 = Any
   // CAS-288: the Watch-screen Budget FILTER (budgetOK, just above) never reads this — an unknown budget is
   // excluded whenever a band is set, full stop. CAS-747: selScaleMatch (the Mission Movie Budget requirement)
@@ -14240,7 +14265,7 @@ const HELP_ARTICLES = [
    body:"Alerts is where Cascade tells you what's happened lately, split into two kinds of row. New is a film's first appearance for a given agent — something it's never found before. Changed is everything else: a film the agent already had, that's now moved to a different window. A film is never counted as both at once.\n\nYou choose how far back to look — Today, Week, 2 weeks or Month — and Alerts shows only what falls inside that window, measured back from right now. Every row names the agent that actually owns the film today, so nothing is shown under an agent that no longer has it."},
   {slug:"notifications", title:"Notifications",
    summary:"Exactly what will reach you, by which channel, and when the daily report runs.",
-   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Service tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for your first agent and off for every other agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
+   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Service tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for every agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
   {slug:"your-account-and-data", title:"Your account and data",
    summary:"What is stored, where, and how to delete it.",
    body:`Signed out, everything Cascade knows about you — your agents, what you've watched, your preferences — is stored only on this device, in this browser or app install. Nothing about it reaches anywhere else.\n\nSigned in, that same information is mirrored to your account so it's there again on another device you sign into. Signing out doesn't erase it — it's still on your account, waiting for you to sign back in.\n\nDeleting your account is on the Account screen itself: type DELETE to confirm, and it permanently removes your agents, everything they've found for you, what you've marked watched, your invites and friends, your notification history and your sign-in — there's nothing left to undo.${MEMBERSHIP_ENABLED ? " It doesn't cancel an active App Store subscription, which you'll need to manage separately." : ""}`},

@@ -1,6 +1,6 @@
-// CAS-1198: a per-agent Alerts switch, reintroduced after CAS-843 removed the last one. Massive Movies
-// starts alerting; every other agent — onboarding, preset or hand-built — starts quiet. Same fake-client
-// conventions as cas1193-alert-moments-sync.test.mjs for the AC3 save-path test.
+// CAS-1198/CAS-1297: a per-agent Alerts switch, reintroduced after CAS-843 removed the last one. Every
+// agent — onboarding, preset or hand-built — starts alerting by default. Same fake-client conventions
+// as cas1193-alert-moments-sync.test.mjs for the AC3 save-path test.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
@@ -43,13 +43,13 @@ function seedKnown(E, row){
 }
 const settle = () => new Promise(r => setTimeout(r, 0));
 
-test("AC1: normCascade defaults alertsOn true only for template onb_massive, and keeps a stored value", () => {
+test("AC1: normCascade defaults alertsOn true for every agent, and keeps a stored value", () => {
   const E = loadEngine();
   assert.equal(E.normCascade({ template: "onb_massive" }).alertsOn, true);
-  assert.equal(E.normCascade({ template: "onb_favs" }).alertsOn, false);
-  assert.equal(E.normCascade({}).alertsOn, false);
+  assert.equal(E.normCascade({ template: "onb_favs" }).alertsOn, true);
+  assert.equal(E.normCascade({}).alertsOn, true);
   assert.equal(E.normCascade({ template: "onb_massive", alertsOn: false }).alertsOn, false,
-    "a stored false is never overwritten by the template default");
+    "a stored false is never overwritten by the default");
   assert.equal(E.normCascade({ template: "onb_other", alertsOn: true }).alertsOn, true,
     "a stored true is never overwritten");
 });
