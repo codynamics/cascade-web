@@ -3575,11 +3575,12 @@
     .stgroups .stagestop .stagename{font-size:11px;letter-spacing:-.1px}
   }
   /* moods: one row, one selected at a time */
-  .moodrow{display:flex;gap:6px;margin-top:9px;overflow-x:auto;scrollbar-width:none;align-items:center}
+  .moodrow{display:flex;gap:6px;margin-top:9px;overflow-x:auto;scrollbar-width:none;align-items:center;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   .moodrow::-webkit-scrollbar{display:none}
   .moodchip{flex:none;height:34px;padding:0 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
     color:var(--dim);font:600 12.5px/1 var(--font-body);display:flex;align-items:center;gap:7px;cursor:pointer;
-    white-space:nowrap;transition:transform .15s}
+    white-space:nowrap;transition:transform .15s;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   .moodchip.on{background:var(--sel-bg);border-color:var(--sel-bd);color:#fff;font-weight:700;padding-right:9px}
   /* CAS-1290: press-and-hold lift state — touch-action:none stops the row's own native scroll from fighting
      the finger once a chip is lifted; wireMoodRowDrag's pointermove still preventDefault()s belt-and-braces. */
@@ -3589,7 +3590,8 @@
   .moodchip.on .moodedit{display:flex}
   .moodchip .moodedit svg{width:12px;height:12px}
   .moodadd{flex:none;height:34px;padding:0 12px;border-radius:10px;border:1px dashed #4a5263;background:none;
-    color:var(--dim);font:600 12.5px/1 var(--font-body);cursor:pointer;white-space:nowrap}
+    color:var(--dim);font:600 12.5px/1 var(--font-body);cursor:pointer;white-space:nowrap;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   .moodchip:focus-visible,.moodadd:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   /* CAS-1296: the divider after the pinned Releases chip — .moodrow's own gap:6px already gives it the 6px
      margin on each side the spec calls for. */
@@ -9984,11 +9986,27 @@ function renderWatchTop(){
   const moodHTML = (releasesMood ? moodChipHTML(releasesMood, true)+`<div class="mooddivider" aria-hidden="true"></div>` : "")
     + restMoods.map(m=>moodChipHTML(m, false)).join("");
   const addHTML = moods.length>=MOOD_MAX ? "" : `<button type="button" class="moodadd" id="moodAddBtn" onclick="openMoodSheetForNew()">+ Mood</button>`;
+  // CAS-1300: innerHTML always restarts a fresh .moodrow at scrollLeft 0, so the previous row's position has
+  // to be captured before it's thrown away and reapplied (or adjusted) on the new one below.
+  const prevRow=el.querySelector(".moodrow");
+  const prevScrollLeft=prevRow ? prevRow.scrollLeft : 0;
   el.innerHTML = `${stageHTML}<div class="moodrow" role="group" aria-label="Mood">${moodHTML}${addHTML}</div>`;
   // Keeps #wtMini's own text honest immediately after a stage/mood change, independent of the next scroll
   // event — the collapse listener itself (defined later in this script) only ever touches it on scroll.
   if(typeof wtRefreshMini==="function") wtRefreshMini();
-  wireMoodRowDrag(el.querySelector(".moodrow"));
+  const newRow=el.querySelector(".moodrow");
+  moodRowShowSelected(newRow, prevScrollLeft);
+  wireMoodRowDrag(newRow);
+}
+// CAS-1300: sets .moodrow's own scrollLeft so the selected chip is fully visible, without ever touching the
+// page's scroll position (scrollIntoView is unusable here — it scrolls the page vertically too). If the chip
+// was already visible at the row's previous scrollLeft, that position is kept as-is rather than re-centred.
+function moodRowShowSelected(row, prevScrollLeft){
+  if(!row) return;
+  const chip=row.querySelector(".moodchip.on");
+  if(!chip){ row.scrollLeft=prevScrollLeft||0; return; }
+  const lo=chip.offsetLeft+chip.offsetWidth-row.clientWidth, hi=chip.offsetLeft;
+  row.scrollLeft = lo<=hi ? Math.min(hi, Math.max(lo, prevScrollLeft||0)) : hi;
 }
 // CAS-1290: press-and-hold reorder for the mood row's own chips (never #moodAddBtn, which neither moves nor
 // is a drop target). Mirrors wireAgentsDrag's capture-on-child/listen-on-ancestor pattern, but there's no
@@ -10002,8 +10020,18 @@ function wireMoodRowDrag(row){
   if(!row) return;
   const pinnedChip=row.querySelector(".moodchip.pinned");
   const pinnedId=pinnedChip ? pinnedChip.dataset.mood : null;
-  let press=null, drag=null, edgeRAF=null;
+  let press=null, drag=null, edgeRAF=null, pan=null;
   const clearPress=()=>{ if(press) clearTimeout(press.timer); press=null; };
+  // CAS-1300: desktop mouse support — a vertical wheel pans the row, and a press-and-drag that moves beyond
+  // MOOD_LIFT_SLOP before the lift timer fires pans instead of lifting. Both only when the row overflows;
+  // touch keeps its existing native-scroll behaviour untouched.
+  row.addEventListener("wheel", e=>{
+    if(row.scrollWidth<=row.clientWidth) return;
+    if(e.deltaY && !e.deltaX){
+      e.preventDefault();
+      row.scrollLeft += e.deltaY;
+    }
+  }, {passive:false});
   const stopEdgeScroll=()=>{ if(edgeRAF){ cancelAnimationFrame(edgeRAF); edgeRAF=null; } };
   const runEdgeScroll=()=>{
     edgeRAF=requestAnimationFrame(()=>{
@@ -10041,9 +10069,10 @@ function wireMoodRowDrag(row){
     chip.addEventListener("pointerdown", e=>{
       if(e.pointerType==="mouse" && e.button!==0) return;
       clearPress();
-      press={chip, pointerId:e.pointerId, startX:e.clientX, startY:e.clientY, timer:null};
+      press={chip, pointerId:e.pointerId, pointerType:e.pointerType, startX:e.clientX, startY:e.clientY, timer:null};
       press.timer=setTimeout(beginLift, MOOD_LIFT_MS);
     });
+    chip.addEventListener("contextmenu", e=>e.preventDefault());
   });
   row.addEventListener("pointermove", e=>{
     if(drag && e.pointerId===drag.id){
@@ -10061,9 +10090,20 @@ function wireMoodRowDrag(row){
       if(drag.edgeDir && !edgeRAF) runEdgeScroll();
       return;
     }
+    if(pan && e.pointerId===pan.id){
+      e.preventDefault();
+      row.scrollLeft = pan.startScrollLeft - (e.clientX-pan.startX);
+      return;
+    }
     if(press && press.pointerId===e.pointerId){
       const dx=e.clientX-press.startX, dy=e.clientY-press.startY;
-      if(Math.hypot(dx,dy)>MOOD_LIFT_SLOP) clearPress();
+      if(Math.hypot(dx,dy)>MOOD_LIFT_SLOP){
+        if(press.pointerType==="mouse" && row.scrollWidth>row.clientWidth){
+          pan={id:press.pointerId, startX:e.clientX, startScrollLeft:row.scrollLeft};
+          row._moodSuppressClick=true;
+        }
+        clearPress();
+      }
     }
   });
   const endDrag=commit=>{
@@ -10082,10 +10122,12 @@ function wireMoodRowDrag(row){
   };
   row.addEventListener("pointerup", e=>{
     if(press && press.pointerId===e.pointerId){ clearPress(); return; }
+    if(pan && e.pointerId===pan.id){ pan=null; return; }
     if(drag && e.pointerId===drag.id) endDrag(true);
   });
   row.addEventListener("pointercancel", e=>{
     if(press && press.pointerId===e.pointerId){ clearPress(); return; }
+    if(pan && e.pointerId===pan.id){ pan=null; return; }
     if(drag && e.pointerId===drag.id) endDrag(false);
   });
   // A lift that ends without a reorder is still not a tap (C5/AC3 only covers a release under MOOD_LIFT_MS):
