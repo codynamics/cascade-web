@@ -64,7 +64,8 @@ function withCleanVerdicts(E, fn){
 test("CAS-1284 Change 5 / CAS-1287 Change 1: MOOD_DEFAULTS carries the three catalogue starters, after Top scores/Releases, five in total", () => {
   const E = loadEngine();
   const ids = [...E.MOOD_DEFAULTS].map(m => m.id);
-  assert.deepEqual(ids, ["top", "releases", "action", "imagine", "fun"]);
+  // CAS-1295: Starred is now a sixth default, directly after Releases.
+  assert.deepEqual(ids, ["top", "releases", "starred", "action", "imagine", "fun"]);
   const allGenres = [...new Set([...E.MOVIES].flatMap(m => m.genres || []))];
   const starters = { action: ["Action", "Crime", "Thriller"], imagine: ["Science Fiction", "Fantasy"], fun: ["Comedy", "Romance"] };
   for(const [id, keep] of Object.entries(starters)){
@@ -351,9 +352,11 @@ test("CAS-1284 Change 6: an existing account's saved moods are provisioned with 
     await settle();
 
     const ids = [...E.watchMoods].map(m => m.id);
-    assert.equal(ids.length, 5, "AC4: two saved moods load as five, the three starters appended");
-    assert.deepEqual(ids, ["custom-a", "custom-b", "action", "imagine", "fun"],
-      "AC4: saved moods keep their order; only the three starters are appended, in MOOD_DEFAULTS order — never Top scores/Releases");
+    // CAS-1295: this same load also runs the Starred provisioning step (level<3) — appended last since
+    // this account's saved moods carry no "releases" to anchor it after.
+    assert.equal(ids.length, 6, "AC4: two saved moods load as six, the three starters plus Starred appended");
+    assert.deepEqual(ids, ["custom-a", "custom-b", "action", "imagine", "fun", "starred"],
+      "AC4: saved moods keep their order; the three starters are appended first, in MOOD_DEFAULTS order — never Top scores/Releases — then Starred");
 
     // CAS-1287 Change 6 piggybacks on this same load: a brand-new account (moodsProvisioned absent, level 0)
     // runs both steps in one pass, so the just-appended starters already carry topYou:20/topPublic:10
@@ -374,7 +377,7 @@ test("CAS-1284 Change 6: an existing account's saved moods are provisioned with 
     });
     await E.CascadePersistence.loadUserPrefs();
     await settle();
-    assert.equal(E.watchMoods.length, 5, "a reload with the flag set must not re-provision or duplicate");
+    assert.equal(E.watchMoods.length, 6, "a reload with the flag set must not re-provision or duplicate");
 
     // Delete Fun, then reload with that deletion already reflected server-side — it must not come back.
     const afterDelete = [...E.watchMoods].filter(m => m.id !== "fun");
@@ -388,7 +391,7 @@ test("CAS-1284 Change 6: an existing account's saved moods are provisioned with 
     await E.CascadePersistence.loadUserPrefs();
     await settle();
     assert.ok(![...E.watchMoods].some(m => m.id === "fun"), "AC4: a deleted starter must not be reprovisioned once the flag is set");
-    assert.equal(E.watchMoods.length, 4);
+    assert.equal(E.watchMoods.length, 5);
   } finally {
     auth.enabled = false; auth.client = null; auth.session = null;
   }
@@ -438,7 +441,10 @@ test("CAS-1287 Change 6: an account already carrying the old moodsProvisioned:1 
       assert.equal(byId(id).topPublic, 10, `${id}: topPublic must become 10`);
     });
     assert.equal(byId("custom-a").topYou, undefined, "a non-starter mood must be untouched by the migration");
-    assert.equal(E.watchMoods.length, 4, "no mood is added or removed by this step");
+    // CAS-1295: this load's moodsProvisionedLevel (1) is also <3, so the Starred provisioning step runs
+    // too, appending a fifth mood — the CAS-1287 step itself still adds/removes none of the original four.
+    assert.equal(E.watchMoods.length, 5, "CAS-1287's own step adds/removes none of the original four; Starred is CAS-1295's separate step");
+    assert.ok(byId("starred"), "CAS-1295: Starred is appended by the same load");
   } finally {
     auth.enabled = false; auth.client = null; auth.session = null;
   }

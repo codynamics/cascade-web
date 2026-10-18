@@ -749,6 +749,12 @@
     background:rgba(10,14,26,.72);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:11px;
     display:grid;place-items:center;text-decoration:none;line-height:1}
   .pplay:hover{border-color:#fff}
+  /* CAS-1295: the star — a tap toggles the shortlist and never opens or expands the card, same corner
+     treatment as .pplay (opposite corner, slightly larger per the ticket's 30px spec). */
+  .starbtn{position:absolute;top:6px;left:6px;width:30px;height:30px;border-radius:50%;z-index:1;
+    background:rgba(0,0,0,.55);border:none;color:#fff;font-size:16px;line-height:1;
+    display:grid;place-items:center;cursor:pointer}
+  .starbtn.on{color:#f5c542}
   /* CAS-373: collapsed, the title is ONE line — a long one squeezed the rating badge off it entirely, or
      onto a second line of its own. .titletext takes the ellipsis and the badge is flex:none, so it always
      has room and never wraps. Expanded, the row switches to wrap and the full title is shown (below). */
@@ -1084,6 +1090,9 @@
   .stubwhy{font-size:11.5px;font-weight:700;color:var(--dim);white-space:nowrap;flex-shrink:0}
   .actbtn.stubbtn{width:32px;height:28px;border-radius:9px;flex-shrink:0}
   .actbtn.stubbtn svg{width:16px;height:16px}
+  /* CAS-1295: the stub's own star — same small icon-button size as stubbtn beside it; .stub .actions .ctl
+     (below) already puts it back in flow (position:relative), so only size/radius need restating here. */
+  .stubstar{width:32px;height:28px;border-radius:9px;flex-shrink:0}
   /* CAS-376: the stub's single rating icon reuses the shared .actions/.ctl plumbing (openWatchPanel anchors
      its popup off the nearest .actions) purely so the panel can open here too — none of that construct's own
      row/chip layout applies, so it is pinned back down to just the one icon-sized button. */
@@ -5311,6 +5320,7 @@ const DEVICE_KEY_ALLOWLIST = {
   "cascade_had_account": "whether this device was signed in as of its last boot (CAS-517 cold-start gate)",
   "cascade_onboarded": "whether this device has completed onboarding once",
   "cascade_wt_collapsed": "CAS-1283: whether the Watch top bar (stage groups + moods) is collapsed to #wtMini on this device",
+  "cascade_starred": "CAS-1295: the starred-film shortlist for a signed-out device — there is no account yet to put view.starred on",
 };
 // CAS-1222 item 5: "the first boot of this build deletes every other cascade_ key" — rather than naming
 // each retired/migrated key by hand (easy to miss one), this sweeps any "cascade_" key NOT in the
@@ -5408,6 +5418,40 @@ function saveNotify(){}
 // account's own user_prefs.moving_seen column.
 const movingSeen={};
 function saveMovingSeen(){}
+// ---- Starred films (shortlist) — CAS-1295 -------------------------------------------------------------
+// A per-account set of tmdb_ids, independent of any one mood — "watch this next", not "this mood's pool".
+// Lives in view.starred (merge_user_prefs_view, with the other view fields) signed in; signed out there is
+// no account to put it on yet, so it falls back to localStorage cascade_starred (DEVICE_KEY_ALLOWLIST).
+const starredIds = new Set();
+function loadStarredLocal(){
+  try{
+    const v = JSON.parse(localStorage.getItem("cascade_starred")||"[]");
+    if(Array.isArray(v)) v.forEach(id=>starredIds.add(id));
+  }catch(e){}
+}
+function saveStarredLocal(){
+  try{ localStorage.setItem("cascade_starred", JSON.stringify([...starredIds])); }catch(e){}
+}
+loadStarredLocal();
+const isStarred = id => starredIds.has(id);
+function saveStarred(){
+  if(window.CascadePersistence && window.CascadePersistence.accountActive()) pushViewField("starred", [...starredIds]);
+  else saveStarredLocal();
+}
+window.toggleStarred = id => {
+  starredIds.has(id) ? starredIds.delete(id) : starredIds.add(id);
+  saveStarred();
+  logEvent("star_toggle", {on: starredIds.has(id)});
+  [...document.querySelectorAll(`.starbtn[data-star="${id}"]`)].forEach(b=>{
+    const on=starredIds.has(id);
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on);
+    b.title = on ? "Unstar" : "Star";
+    b.setAttribute("aria-label", on ? "Unstar" : "Star");
+    b.textContent = on ? "★" : "☆";
+  });
+  if(currentMood().starredOnly) render();
+};
 const entryFor = id => notify[id] || (notify[id]={source:"auto", cascadeIds:[], pinnedTo:[], notIn:[]});
 // CAS-279: the two override tests, defined once so the listing, the counts and the Found set cannot disagree
 // about where a film lives. An entry that predates this change has neither array and answers false to both.
@@ -8371,6 +8415,7 @@ function observeLazyPosters(root){
 // Director/Cast. Shared verbatim between cardHTML (below) and the invite/film page (filmPageHTML) so the
 // invite page can never drift from what the card itself shows — one source, not two copies to keep in sync.
 function cardTopHTML(m, inWatch=false){
+  const id=m.tmdb_id;
   const syn = m.synopsis ? `<p class="synopsis">${esc(m.synopsis)}</p>` : "";
   const cert = m.age_rating ? `<span class="cert ${MATURE.has(m.age_rating)?'mature':''}">${m.age_rating}</span>` : "";
   // CAS-486: a fixture film from the notify-test harness's ?fixtures=1 merge stays visually marked
@@ -8388,6 +8433,12 @@ function cardTopHTML(m, inWatch=false){
     ? `<a class="pplay" href="https://www.youtube.com/watch?v=${safeUrl(firstTrailer)}" target="_blank" rel="noopener"
          onclick="event.stopPropagation()" title="Play the trailer" aria-label="${escA("Play the trailer for "+m.title)}">▶</a>`
     : "";
+  // CAS-1295: the star overlays the poster's top-left corner, on every card and the film page (this
+  // function is shared, CAS-1119) — a tap toggles the shortlist and never opens or expands the card.
+  const starOn = isStarred(id);
+  const starBtn = `<button type="button" class="starbtn${starOn?" on":""}" data-star="${id}" aria-pressed="${starOn}"
+    onclick="event.stopPropagation();toggleStarred(${id})" title="${starOn?"Unstar":"Star"}"
+    aria-label="${starOn?"Unstar":"Star"}">${starOn?"★":"☆"}</button>`;
   const badge = scaleBadge(m);
   // CAS-1253: Match replaces the Cascade score at the top right of a card once someone is signed in — the
   // score itself moves to the far right of the People/Critics row (cinema-info cards, which have no such
@@ -8402,7 +8453,7 @@ function cardTopHTML(m, inWatch=false){
   return `<div class="ctop${signedIn?" hasmatch":""}${signedIn && !matchBadge?" nomatch":""}">
       <!-- CAS-276: the tombstone is the POSTER, and nothing else. -->
       <div class="ptomb">
-        <div class="poster"${posterAttr}>${play}</div>
+        <div class="poster"${posterAttr}>${play}${starBtn}</div>
       </div>
       <!-- CAS-373: the title text gets its own span so it (not the badge) is what truncates — the rating
            badge is flex:none and always shows, collapsed or expanded. -->
@@ -9315,10 +9366,16 @@ function stubHTML(m){
   const isNever=cur==="notfor";
   const title=op?`${op.lbl} — tap to ${isNever?"undo":"change"}`:"Say what you made of it";
   const onclick=isNever?`setOpinion(${id},'notfor')`:`openWatchPanel(${id},this)`;
+  // CAS-1295: the same star as the card, before the verdict icon — same storage, same toggle.
+  const starOn=isStarred(id);
+  const starBtn=`<button type="button" class="ctl actbtn stubstar starbtn${starOn?" on":""}" data-star="${id}"
+    aria-pressed="${starOn}" onclick="toggleStarred(${id})" title="${starOn?"Unstar":"Star"}"
+    aria-label="${starOn?"Unstar":"Star"}">${starOn?"★":"☆"}</button>`;
   return `<div class="stub" id="card-${id}" onclick="stubTap(event,${id})">
     <span class="stubname">${esc(m.title)}</span>
     <span class="stubwhy">${lbl}</span>
     <span class="actions">
+      ${starBtn}
       <button type="button" class="ctl actbtn stubbtn${op?" on "+op.key:""}" onclick="${onclick}"
         ${isNever?"":'aria-haspopup="true" aria-expanded="false"'}
         title="${escA(title)}" aria-label="${escA(title)}">${op?ICON[op.ico]:ICON.eye}</button>
@@ -10334,6 +10391,10 @@ const MOOD_STARTER_IDS = Object.keys(MOOD_STARTER_STYLES);
 const MOOD_DEFAULTS = [
   {id:"top", name:"Top scores", order:"score", topYou:null, topPublic:10},
   {id:"releases", name:"Releases", order:"release", topYou:null, topPublic:null},
+  // CAS-1295: the shortlist — every starred film standing on the current stage, watched or not, on any
+  // service (mineOnly:false), across the whole catalogue (not just what an agent lists).
+  {id:"starred", name:"Starred", source:"catalogue", starredOnly:true, topYou:null, topPublic:null,
+    mineOnly:false, watched:REVIEW_STEPS.map(v=>v.key), stylesOff:[]},
   {id:"action", name:"Action", source:"catalogue", topYou:20, topPublic:10, order:"you",
     stylesOff:moodStylesOffKeeping(MOOD_STARTER_STYLES.action), watched:["wow","liked"], mineOnly:true},
   {id:"imagine", name:"Imagine", source:"catalogue", topYou:20, topPublic:10, order:"you",
@@ -10343,6 +10404,7 @@ const MOOD_DEFAULTS = [
 ];
 const moodDefaultFieldsNow = () => ({
   agentsOff:[], mineOnly:true, pickedBy:"all", watched:[], stylesOff:[], badges:[], alsoShow:null,
+  starredOnly:false,
 });
 // CAS-1284: defaults spread FIRST, then the mood's own fields — so a starter's explicit mineOnly/watched/
 // stylesOff above actually survive (the reverse order would let moodDefaultFieldsNow() clobber them back to
@@ -10437,6 +10499,8 @@ function moodDraftFrom(mood){
     stylesOff: new Set(mood ? (mood.stylesOff||[]) : []),
     badges: new Set(mood ? (mood.badges||[]) : []),
     alsoShow: mood && mood.alsoShow ? {premium:[...(mood.alsoShow.premium||[])], rent:[...(mood.alsoShow.rent||[])], stream:[...(mood.alsoShow.stream||[])]} : null,
+    // CAS-1295: "Only starred films" — default off for a new mood, carried over for an existing one.
+    starredOnly: mood ? !!mood.starredOnly : false,
   };
 }
 window.openMoodSheetFor = id => {
@@ -10460,6 +10524,8 @@ window.setMoodDraftTopPublic = v => { if(!moodDraft) return; moodDraft.topPublic
 // CAS-1284 Change 4: "My agents" (the pre-existing behaviour) or "Everything" (a catalogue-wide pool).
 window.setMoodDraftSource = key => { if(!moodDraft) return; moodDraft.source=key==="catalogue"?"catalogue":"agents"; renderMoodSheetBody(); };
 window.toggleMoodDraftMineOnly = () => { if(!moodDraft) return; moodDraft.mineOnly=!moodDraft.mineOnly; renderMoodSheetBody(); };
+// CAS-1295: the "Only starred films" switch, under Show top.
+window.toggleMoodDraftStarredOnly = () => { if(!moodDraft) return; moodDraft.starredOnly=!moodDraft.starredOnly; renderMoodSheetBody(); };
 window.setMoodDraftPickedBy = key => { if(!moodDraft) return; moodDraft.pickedBy=key; renderMoodSheetBody(); };
 window.toggleMoodDraftWatched = key => { if(!moodDraft) return; moodDraft.watched.has(key)?moodDraft.watched.delete(key):moodDraft.watched.add(key); renderMoodSheetBody(); };
 // CAS-1284: reverses CAS-1273 — the mood sheet's Styles section is back (renderMoodSheetBody), so these
@@ -10508,6 +10574,7 @@ window.saveMoodFromSheet = () => {
     agentsOff:[...d.agentsOff], mineOnly:!!d.mineOnly, pickedBy:d.pickedBy,
     watched:[...d.watched], stylesOff:[...d.stylesOff], badges:[],   // CAS-1284: styles saved again; CAS-1281: badges still aren't
     alsoShow: d.alsoShow ? {premium:[...(d.alsoShow.premium||[])], rent:[...(d.alsoShow.rent||[])], stream:[...(d.alsoShow.stream||[])]} : null,
+    starredOnly: !!d.starredOnly,
   };
   const idx=watchMoods.findIndex(m=>m.id===mood.id);
   const selectionChanged = watchMoodSel!==mood.id;
@@ -10700,6 +10767,10 @@ function renderMoodSheetBody(){
         return seg("You", d.topYou, "setMoodDraftTopYou", "Show top You", youDisabled)
           + seg("Public", d.topPublic, "setMoodDraftTopPublic", "Show top Public", false);
       })()}
+      <div class="mfrow"><span>Only starred films</span>
+        <button type="button" class="mftog${d.starredOnly?" on":""}" role="switch" aria-checked="${!!d.starredOnly}"
+          aria-label="Only starred films" onclick="toggleMoodDraftStarredOnly()"><i></i></button>
+      </div>
     </div>
     <div class="wsheetsec">
       <div class="wsheethd"><span>Availability</span></div>
@@ -10817,6 +10888,9 @@ function watchVisibleRows(){
   const mineOnly=watchMineOnlyOn();
   if(mineOnly) rows=rows.filter(m=>!HOME_KEYS.includes(primaryStatus(m)) || matchesServices(m, primaryStatus(m)));
   if(wsearch) rows=watchSearchRows(wsearch);
+  // CAS-1295 Change 3: "Only starred films" narrows before Show top is applied, same spot in the pipeline
+  // as every other mood-level narrowing above.
+  if(currentMood().starredOnly) rows=rows.filter(m=>starredIds.has(m.tmdb_id));
   rows=moodShowTopKeep(rows, heldThisTab);
   return {rows, preSheetRows, preMineOnlyRows, mineOnly};
 }
@@ -12987,6 +13061,15 @@ function watchRowsWithFiltersCleared(){
   return n;
 }
 function emptyResultsHTML(){
+  // CAS-1295 Change 5: a stage with no starred films gets its own honest, specific empty state — ahead of
+  // every other check below, since Starred is catalogue-sourced and not an agent/filter question at all.
+  if(currentMood().starredOnly){
+    return `<div class="empty">
+      <div class="emoji">⭐</div>
+      <div class="eh">No starred films here yet.</div>
+      <div class="ep">Tap ☆ on any film to add it.</div>
+    </div>`;
+  }
   // CAS-566: zero agents is not "this agent's filters matched nothing" — there is no agent, and nothing to
   // price a way out of.
   if(!cascades.length) return "";
@@ -24006,6 +24089,24 @@ function acctFetchKeepalive(init){
       }
       if(moodsProvisionedLevel<2){
         moodsProvisionPending={moods:watchMoods.map(m=>({...m})), moodsProvisioned:2};
+      }
+      // CAS-1295 Change 4: a third provisioning step — an existing account's saved moods predate the
+      // Starred mood; add it once, directly after Releases (or at the end if there's no Releases to anchor
+      // on), within the 10-mood cap. Never resurrected once the account has deleted it, same rule as above.
+      if(moodsProvisionedLevel<3){
+        if(!watchMoods.some(m=>m.id==="starred") && watchMoods.length<MOOD_MAX){
+          const starred={...moodDefaultFieldsNow(), ...MOOD_DEFAULTS.find(md=>md.id==="starred")};
+          const relIdx=watchMoods.findIndex(m=>m.id==="releases");
+          const at=relIdx>=0 ? relIdx+1 : watchMoods.length;
+          watchMoods=[...watchMoods.slice(0,at), starred, ...watchMoods.slice(at)];
+        }
+        moodsProvisionPending={moods:watchMoods.map(m=>({...m})), moodsProvisioned:3};
+      }
+      // CAS-1295 Change 1: view.starred adopted with the other view fields — a genuinely absent (never
+      // saved) array is left alone, same "no answer yet" rule as every other field here (CAS-775).
+      if(Array.isArray(v.starred)){
+        starredIds.clear();
+        v.starred.filter(id=>typeof id==="number").forEach(id=>starredIds.add(id));
       }
       watchMoodSel = (typeof v.mood==="string" && watchMoods.some(m=>m.id===v.mood)) ? v.mood : watchMoods[0].id;
       applyMoodToState(currentMood());
