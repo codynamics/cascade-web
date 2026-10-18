@@ -125,5 +125,56 @@ class SupabaseStoreGetPagesEveryResult(unittest.TestCase):
                 store._get("/widgets?select=*")
 
 
+class FetchNotificationKeysPaging(unittest.TestCase):
+    """CAS-1294 AC3: fetch_notification_keys() must page through the whole ledger, not just the
+    first server-capped page, or an old key beyond the first 1,000 rows reads as absent and a
+    repeat slips past the de-dupe."""
+
+    def test_returns_every_key_when_the_ledger_holds_more_than_1000_rows(self):
+        total_rows = 1137
+        rows = [{"cascade_id": f"c{i}", "movie_id": i, "moment": "hits_rent"}
+                for i in range(total_rows)]
+
+        def fake_urlopen(req, timeout=None):
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(req.full_url).query)
+            offset = int(qs.get("offset", ["0"])[0])
+            page = rows[offset: offset + 1000]
+            end = offset + len(page) - 1 if page else offset - 1
+            return _FakeResponse(page, content_range=f"{offset}-{end}/{total_rows}")
+
+        store = SupabaseStore("https://example.test.invalid", "fake-key")
+        with unittest.mock.patch("monitor.store.urllib.request.urlopen", side_effect=fake_urlopen):
+            keys = store.fetch_notification_keys()
+        self.assertEqual(len(keys), total_rows)
+        self.assertIn((f"c{total_rows - 1}", str(total_rows - 1), "hits_rent"), keys)
+
+
+class InsertNotificationsIsIdempotent(unittest.TestCase):
+    """CAS-1294 AC1: a batch write must never let one row's unique-key conflict take the rest of
+    the batch down with it — PostgREST's own `on_conflict` + `resolution=ignore-duplicates` makes
+    a duplicate row a silent no-op instead of a 409 for the whole POST."""
+
+    def test_on_conflict_and_ignore_duplicates_are_sent_and_the_call_does_not_raise(self):
+        captured = {}
+
+        def fake_urlopen(req, timeout=None):
+            captured["url"] = req.full_url
+            captured["prefer"] = req.get_header("Prefer")
+            return _FakeResponse([])
+
+        store = SupabaseStore("https://example.test.invalid", "fake-key")
+        rows = [
+            {"user_id": "u1", "cascade_id": "c0", "movie_id": "1255833", "moment": "newly_qualifies",
+             "cascade_name": "Cinema movies", "title": "Whalefall"},
+            {"user_id": "u1", "cascade_id": "c0", "movie_id": "2", "moment": "hits_rent",
+             "cascade_name": "Cinema movies", "title": "B"},
+        ]
+        with unittest.mock.patch("monitor.store.urllib.request.urlopen", side_effect=fake_urlopen):
+            written = store.insert_notifications(rows)
+        self.assertEqual(written, 2)
+        self.assertIn("on_conflict=cascade_id,movie_id,moment", captured["url"])
+        self.assertIn("resolution=ignore-duplicates", captured["prefer"])
+
+
 if __name__ == "__main__":
     unittest.main()

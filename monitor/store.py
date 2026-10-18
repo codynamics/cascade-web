@@ -773,14 +773,19 @@ class SupabaseStore:
         return data.get("email") or (data.get("user") or {}).get("email")
 
     def insert_notifications(self, rows) -> int:
+        """CAS-1294: `on_conflict` + `resolution=ignore-duplicates` makes the ledger write
+        idempotent against its own unique (cascade_id, movie_id, moment) constraint — one row
+        that's already there (a repeat slipping past the in-run de-dupe, or a retried run) is
+        silently skipped by PostgREST rather than 409-ing the WHOLE batch, which used to strand
+        every legitimate row alongside it."""
         rows = list(rows)
         if not rows:
             return 0
         data = json.dumps(rows).encode("utf-8")
         req = urllib.request.Request(
-            self._base + "/notifications",
+            self._base + "/notifications?on_conflict=cascade_id,movie_id,moment",
             data=data,
-            headers=self._headers({"Prefer": "return=minimal"}),
+            headers=self._headers({"Prefer": "resolution=ignore-duplicates,return=minimal"}),
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=self._timeout):
