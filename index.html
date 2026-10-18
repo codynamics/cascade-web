@@ -749,8 +749,9 @@
     background:rgba(10,14,26,.72);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:11px;
     display:grid;place-items:center;text-decoration:none;line-height:1}
   .pplay:hover{border-color:#fff}
-  /* CAS-1295: the star — a tap toggles the shortlist and never opens or expands the card, same corner
-     treatment as .pplay (opposite corner, slightly larger per the ticket's 30px spec). */
+  /* CAS-1295/CAS-1302: the star — a tap toggles the shortlist and never opens or expands the card. It no
+     longer overlays the poster (that covered artwork and titles); .bandstar below places it in the
+     release-timeline row instead, the same position the collapsed stub (.stubstar) already uses. */
   .starbtn{position:absolute;top:6px;left:6px;width:30px;height:30px;border-radius:50%;z-index:1;
     background:rgba(0,0,0,.55);border:none;color:#fff;font-size:16px;line-height:1;
     display:grid;place-items:center;cursor:pointer}
@@ -1175,6 +1176,11 @@
      deliberately recessive dots; the one window that is true right now is the only thing lit. */
   .bandw{background:var(--band);border-top:1px solid var(--line);padding:8px 13px}
   .avail2{display:flex;align-items:center;min-height:30px}
+  /* CAS-1302: the star is the row's last flex child, flex:none like the dots/caps either side of it — the
+     .wline segments (flex:1 1 16px, below) are what shrink to leave it room, same as they already do for
+     each other. Its own box is a static circle now, not the poster overlay .starbtn still defaults to. */
+  .bandstar{position:static;flex:none;margin-left:8px;width:28px;height:28px;border-radius:50%;
+    background:var(--panel);border:1px solid var(--line);color:var(--dim);font-size:15px}
   /* CAS-433: the timeline's own origin label — the film's real release date, ahead of whatever dots follow. */
   .reldate{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;margin-right:9px;line-height:1.2}
   .reldate .rellbl{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--faint)}
@@ -7179,6 +7185,7 @@ function releaseDateOf(m){
   return wd.pvod || wd.rental || wd.included_streaming || null;
 }
 function bandHTML(m, svcLine){
+  const id=m.tmdb_id;
   const cur=curSlot(m);
   const cin=cinemaState(m);
   const rel=releaseDateOf(m);
@@ -7213,7 +7220,14 @@ function bandHTML(m, svcLine){
   // status and Notify chips, and a miss on either of those landed on it and opened the card — so the
   // gesture that was supposed to answer a question about the film answered a different one instead. The
   // bottom of the card is where the decisions are; only the body above it opens.
-  return `<div class="bandw"><div class="avail2${isEstimated(m)?" est":""}">${relHTML}${segs}</div></div>`;
+  // CAS-1302: the star moved off the poster to the right end of this row, under the score column — the
+  // same position the collapsed stub (.stubstar) already uses. It's the row's last flex child, so the
+  // window capsules/lines shrink to make room the same way they already do for one another.
+  const starOn = isStarred(id);
+  const starBtn = `<button type="button" class="starbtn bandstar${starOn?" on":""}" data-star="${id}" aria-pressed="${starOn}"
+    onclick="event.stopPropagation();toggleStarred(${id})" title="${starOn?"Unstar":"Star"}"
+    aria-label="${starOn?"Unstar":"Star"}">${starOn?"★":"☆"}</button>`;
+  return `<div class="bandw"><div class="avail2${isEstimated(m)?" est":""}">${relHTML}${segs}${starBtn}</div></div>`;
 }
 // CAS-426: the current window's date now reads inline in the capsule above, so it is the only one this
 // line skips — printed as "now" instead of repeating the same date twice. Everything else the strip used
@@ -8453,12 +8467,6 @@ function cardTopHTML(m, inWatch=false){
     ? `<a class="pplay" href="https://www.youtube.com/watch?v=${safeUrl(firstTrailer)}" target="_blank" rel="noopener"
          onclick="event.stopPropagation()" title="Play the trailer" aria-label="${escA("Play the trailer for "+m.title)}">▶</a>`
     : "";
-  // CAS-1295: the star overlays the poster's top-left corner, on every card and the film page (this
-  // function is shared, CAS-1119) — a tap toggles the shortlist and never opens or expands the card.
-  const starOn = isStarred(id);
-  const starBtn = `<button type="button" class="starbtn${starOn?" on":""}" data-star="${id}" aria-pressed="${starOn}"
-    onclick="event.stopPropagation();toggleStarred(${id})" title="${starOn?"Unstar":"Star"}"
-    aria-label="${starOn?"Unstar":"Star"}">${starOn?"★":"☆"}</button>`;
   const badge = scaleBadge(m);
   // CAS-1253: Match replaces the Cascade score at the top right of a card once someone is signed in — the
   // score itself moves to the far right of the People/Critics row (cinema-info cards, which have no such
@@ -8473,7 +8481,7 @@ function cardTopHTML(m, inWatch=false){
   return `<div class="ctop${signedIn?" hasmatch":""}${signedIn && !matchBadge?" nomatch":""}">
       <!-- CAS-276: the tombstone is the POSTER, and nothing else. -->
       <div class="ptomb">
-        <div class="poster"${posterAttr}>${play}${starBtn}</div>
+        <div class="poster"${posterAttr}>${play}</div>
       </div>
       <!-- CAS-373: the title text gets its own span so it (not the badge) is what truncates — the rating
            badge is flex:none and always shows, collapsed or expanded. -->
