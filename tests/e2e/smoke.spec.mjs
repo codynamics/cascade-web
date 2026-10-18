@@ -2059,30 +2059,33 @@ test("CAS-1264: the Order popover lists You score only when signed in, and picki
   expect(values[0]).toBeGreaterThanOrEqual(values[1]);
 });
 
-// CAS-1264 AC3/AC4: the mood sheet's Order row (replacing the disabled "You / coming" placeholder) gains a
-// live You segment, signed-in only, and picking it has to actually resort the real listing — not just the
-// comparator in isolation (tests/js/you-sort.test.mjs covers that).
-test("CAS-1264 AC3: the mood sheet's Order row reads Release date / Public / You, and You sorts the listing", async ({ page }) => {
+// CAS-1296 Change 1/2: the Order row is gone — a manual order no longer makes sense now that Show top
+// picks the films. Name leads the sheet; Order is derived (moodOrder), never a control a person taps.
+test("CAS-1296 AC1: the mood sheet's first section is Name, and the Order row is gone", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  const moodId = await page.evaluate(() => watchMoodSel);
+  await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
+  await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+
+  const firstHeading = await page.locator("#watchSheetBody .wsheetsec").first().locator(".wsheethd").innerText();
+  expect(firstHeading.trim()).toBe("Name");
+  await expect(page.locator('.mfseg[aria-label="Order"]')).toHaveCount(0);
+  await page.evaluate(() => window.closeWatchSheet());
+});
+
+// CAS-1296 AC2 (you half): Show top You derives moodOrder()==="you" — picking it has to actually resort
+// the real listing, not just the comparator/derivation in isolation (tests/js/you-sort.test.mjs covers
+// those). Same donor-seeding technique the old Order-row version of this check used (CAS-1264).
+test("CAS-1296 AC2: a mood with Show top You set sorts the listing by You, descending", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
 
   // toShortlist() boots via freshAppSignedIn() (CAS-1110) — a real signed-in session, so accountActive()
-  // is already true and the You segment is live.
-  const moodId = await page.evaluate(() => watchMoodSel);
-  await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
-  await expect(page.locator("#watchSheet")).toHaveClass(/open/);
-
-  // CAS-1284 added its own "From" and "Show" .mfseg segments to the sheet, so scope to the Order one by
-  // its aria-label rather than grabbing every .mfseg button on the page.
-  const labels = (await page.locator('.mfseg[aria-label="Order"] button').allTextContents()).map(t => t.trim());
-  expect(labels).toEqual(["Release date", "Public", "You"]);
-  expect(labels.some(t => t.includes("coming"))).toBe(false);
-  await page.evaluate(() => window.closeWatchSheet());
-
-  // Give two films in the first rendered status section a real, distinct You value off a real donor
-  // elsewhere in the catalogue sharing enough of their genres — same technique as CAS-1261's placeholder
-  // test and the old Order-popover version of this check (above in this file).
+  // is already true and the Show top You segment is live.
   const seeded = await page.evaluate(() => {
     const onScreen = [...document.querySelectorAll("#groups .card")]
       .map(el => MOVIES.find(m => m.tmdb_id === Number(el.id.replace("card-", ""))))
@@ -2116,11 +2119,13 @@ test("CAS-1264 AC3: the mood sheet's Order row reads Release date / Public / You
   });
   expect(seeded.ok, seeded.reason).toBe(true);
 
+  const moodId = await page.evaluate(() => watchMoodSel);
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
-  await page.locator('.mfseg button[data-order="you"]').click();
+  await page.locator('.mfseg[aria-label="Show top You"] button[data-top="20"]').click();
   await page.locator("#moodSaveBtn").click();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
 
+  expect(await page.evaluate(() => filt.sort)).toBe("you");
   const values = await page.evaluate(() => [...document.querySelectorAll("#groups .card:not(.expanded)")]
     .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null));
   expect(values[0], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
@@ -2128,16 +2133,73 @@ test("CAS-1264 AC3: the mood sheet's Order row reads Release date / Public / You
   expect(values[0]).toBeGreaterThanOrEqual(values[1]);
 });
 
-test("CAS-1264 AC4: the mood sheet's You segment is disabled when signed out", async ({ page }) => {
+// CAS-1296 AC2 (release half): both Show top caps Off derives moodOrder()==="release" (filt.sort="cinema"),
+// the Releases mood's own behaviour. "+ Mood" starts with both caps Off, so it's a convenient real mood to
+// save and check without disturbing any other mood's saved state.
+test("CAS-1296 AC2: a mood with both Show top caps Off sorts by release date", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
 
-  // Same shallow stub as the signed-out half of the old Order-popover test (above in this file).
-  await page.evaluate(() => { window.CascadePersistence.accountActive = () => false; });
-  const moodId = await page.evaluate(() => watchMoodSel);
-  await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
-  await expect(page.locator('.mfseg button[data-order="you"]')).toBeDisabled();
+  await page.evaluate(() => window.openMoodSheetForNew());
+  await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+  await page.locator("#moodName").fill("Both off");
+  await page.locator("#moodSaveBtn").click();
+  await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
+
+  expect(await page.evaluate(() => filt.sort)).toBe("cinema");
+});
+
+// CAS-1296 Change 3: a new mood ("+ Mood") defaults to From: My agents, every agent on.
+test(`CAS-1296 AC3: "+ Mood" opens with From = My agents and every agent chip on`, async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  await page.evaluate(() => window.openMoodSheetForNew());
+  await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+
+  await expect(page.locator('.mfseg[aria-label="From"] button[data-source="agents"]')).toHaveClass(/on/);
+  const agentStates = await page.locator("#watchSheetBody .chips button[data-agent]")
+    .evaluateAll(els => els.map(el => el.classList.contains("on")));
+  expect(agentStates.length).toBeGreaterThan(0);
+  expect(agentStates.every(Boolean)).toBe(true);
+  await page.evaluate(() => window.closeWatchSheet());
+});
+
+// CAS-1296 Change 4: Releases (the flow view) is pinned leftmost in the mood row, outside the draggable
+// set, with a divider after it — a drag among the rest can rearrange them, but never puts anything before
+// Releases, and Releases itself never lifts.
+test("CAS-1296 AC4: Releases is pinned first with a divider, and a drag can't move it or drop before it", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  const chipIds = await page.locator(".moodrow .moodchip").evaluateAll(els => els.map(el => el.dataset.mood));
+  expect(chipIds[0]).toBe("releases");
+  await expect(page.locator(".moodrow .moodchip").first()).toHaveClass(/pinned/);
+  await expect(page.locator(".moodrow .mooddivider")).toHaveCount(1);
+  const secondChildIsDivider = await page.locator(".moodrow").evaluate(
+    row => row.children[1]?.classList.contains("mooddivider") === true
+  );
+  expect(secondChildIsDivider).toBe(true);
+
+  if(chipIds.length < 2) return;   // nothing else to attempt dragging on this account
+
+  // Press-and-hold the first non-pinned chip (MOOD_LIFT_MS=450ms) and try to drag it past Releases.
+  const second = page.locator(".moodrow .moodchip").nth(1);
+  const box = await second.boundingBox();
+  const rowBox = await page.locator(".moodrow").boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(600);
+  await page.mouse.move(rowBox.x - 40, box.y + box.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+
+  expect(await page.evaluate(() => watchMoods.map(m => m.id)[0])).toBe("releases");
+  const chipIdsAfter = await page.locator(".moodrow .moodchip").evaluateAll(els => els.map(el => el.dataset.mood));
+  expect(chipIdsAfter[0]).toBe("releases");
 });
 
 // CAS-765 AC7: the silent guest-mode drop is gone. If the vendored client library ever fails to define

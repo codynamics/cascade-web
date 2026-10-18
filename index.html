@@ -3576,6 +3576,9 @@
   .moodadd{flex:none;height:34px;padding:0 12px;border-radius:10px;border:1px dashed #4a5263;background:none;
     color:var(--dim);font:600 12.5px/1 var(--font-body);cursor:pointer;white-space:nowrap}
   .moodchip:focus-visible,.moodadd:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  /* CAS-1296: the divider after the pinned Releases chip — .moodrow's own gap:6px already gives it the 6px
+     margin on each side the spec calls for. */
+  .mooddivider{flex:none;width:1px;height:24px;background:var(--line)}
   /* the collapsed bar: one slim row in place of the stages and moods, toggled only by a tap (CAS-1283) */
   #wtMini{display:none}
   #cascbar.wtcollapsed #watchTop{display:none}
@@ -9954,11 +9957,17 @@ function renderWatchTop(){
   const homeStops=stops.filter(s=>s.tabKey!=="in_cinema");
   const stageHTML=`<div class="stgroups">${groupHTML("Cinema", cinemaStops)}${groupHTML("Home", homeStops)}</div>`;
   const moods=watchMoodsList();
-  const moodHTML=moods.map(m=>{
+  const moodChipHTML=(m, pinned)=>{
     const on=m.id===watchMoodSel;
-    return `<button type="button" class="moodchip${on?" on":""}" data-mood="${escA(m.id)}" aria-pressed="${on}"
+    return `<button type="button" class="moodchip${on?" on":""}${pinned?" pinned":""}" data-mood="${escA(m.id)}" aria-pressed="${on}"
         onclick="onMoodChipTap('${escA(m.id)}')">${esc(m.name)}<span class="moodedit" aria-hidden="true">${MOOD_EDIT_SVG}</span></button>`;
-  }).join("");
+  };
+  // CAS-1296 Change 4: Releases, if the account has one, always renders first — pinned outside the
+  // draggable set, with a divider after it — the rest keep their saved order.
+  const releasesMood=moods.find(m=>m.id==="releases");
+  const restMoods=releasesMood ? moods.filter(m=>m.id!=="releases") : moods;
+  const moodHTML = (releasesMood ? moodChipHTML(releasesMood, true)+`<div class="mooddivider" aria-hidden="true"></div>` : "")
+    + restMoods.map(m=>moodChipHTML(m, false)).join("");
   const addHTML = moods.length>=MOOD_MAX ? "" : `<button type="button" class="moodadd" id="moodAddBtn" onclick="openMoodSheetForNew()">+ Mood</button>`;
   el.innerHTML = `${stageHTML}<div class="moodrow" role="group" aria-label="Mood">${moodHTML}${addHTML}</div>`;
   // Keeps #wtMini's own text honest immediately after a stage/mood change, independent of the next scroll
@@ -9970,9 +9979,14 @@ function renderWatchTop(){
 // is a drop target). Mirrors wireAgentsDrag's capture-on-child/listen-on-ancestor pattern, but there's no
 // grip here — the press itself has to tell a hold-to-lift from a tap or a horizontal swipe before any drag
 // state exists, so lift is gated behind a timer that a small move or an early release both cancel.
+// CAS-1296: the pinned Releases chip (.moodchip.pinned) is excluded the same way #moodAddBtn always was —
+// it never gets a pointerdown listener and never enters `chips`, so it can neither be lifted nor be a drop
+// target; endDrag puts it back at the front of the id list it hands to commitMoodOrder.
 const MOOD_LIFT_MS = 450, MOOD_LIFT_SLOP = 8, MOOD_EDGE_ZONE = 32, MOOD_EDGE_SPEED = 8;
 function wireMoodRowDrag(row){
   if(!row) return;
+  const pinnedChip=row.querySelector(".moodchip.pinned");
+  const pinnedId=pinnedChip ? pinnedChip.dataset.mood : null;
   let press=null, drag=null, edgeRAF=null;
   const clearPress=()=>{ if(press) clearTimeout(press.timer); press=null; };
   const stopEdgeScroll=()=>{ if(edgeRAF){ cancelAnimationFrame(edgeRAF); edgeRAF=null; } };
@@ -9995,7 +10009,7 @@ function wireMoodRowDrag(row){
   };
   const beginLift=()=>{
     const chip=press.chip, pointerId=press.pointerId;
-    const chips=[...row.querySelectorAll(".moodchip")];
+    const chips=[...row.querySelectorAll(".moodchip:not(.pinned)")];
     drag={
       chip, id:pointerId, chips, from:chips.indexOf(chip), to:chips.indexOf(chip),
       lefts:chips.map(c=>c.offsetLeft), widths:chips.map(c=>c.offsetWidth), gap:6,
@@ -10008,7 +10022,7 @@ function wireMoodRowDrag(row){
     if(navigator.vibrate) navigator.vibrate(10);
     press=null;
   };
-  row.querySelectorAll(".moodchip").forEach(chip=>{
+  row.querySelectorAll(".moodchip:not(.pinned)").forEach(chip=>{
     chip.addEventListener("pointerdown", e=>{
       if(e.pointerType==="mouse" && e.button!==0) return;
       clearPress();
@@ -10047,7 +10061,7 @@ function wireMoodRowDrag(row){
       const ids=drag.chips.map(c=>c.dataset.mood);
       const [moved]=ids.splice(drag.from,1);
       ids.splice(drag.to,0,moved);
-      commitMoodOrder(ids);
+      commitMoodOrder(pinnedId ? [pinnedId, ...ids] : ids);
     }
     drag=null;
   };
@@ -10428,6 +10442,11 @@ function moodTopPublicN(mood){
 function moodTopYouAvailable(){
   return !!(window.CascadePersistence && window.CascadePersistence.accountActive()) && tasteProfile().n>0;
 }
+// CAS-1296: Order is no longer a field the sheet edits — with Show top already picking the films, a manual
+// order no longer means anything. The order is derived: either Show top list being on means "by You" (which
+// sortMoviesBy/applyMoodToState fall back to Public for, signed out or no taste); both Off means "by release
+// date", the behaviour the Releases mood needs. A mood's own stored `order` field (pre-CAS-1296) is ignored.
+function moodOrder(mood){ return (moodTopYouN(mood)||moodTopPublicN(mood)) ? "you" : "release"; }
 function moodTopYouEffectiveN(mood){ return moodTopYouAvailable() ? moodTopYouN(mood) : null; }
 // CAS-1290: raises the CAS-1247 cap of five — every literal 5 that caps the mood row/sheet uses this.
 const MOOD_MAX = 10;
@@ -10461,8 +10480,10 @@ function applyMoodToState(mood){
   // tapping Release date did. sortPicked is always true on Watch now (one flat run, no agent lanes).
   // CAS-1264: order:"you" only means anything signed in (tasteMatch needs an account's own verdicts) —
   // signed out it falls back to "cascade", same as every other You-dependent UI in this file.
+  // CAS-1296: the mood's own order field is no longer read — moodOrder(mood) derives it from Show top.
   const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  filt.sort = mood.order==="release" ? "cinema" : (mood.order==="you" && signedIn) ? "you" : "cascade";
+  const ord = moodOrder(mood);
+  filt.sort = ord==="release" ? "cinema" : (ord==="you" && signedIn) ? "you" : "cascade";
   sortPicked = true;
 }
 applyMoodToState(currentMood());   // C3: applied at boot, from the in-memory defaults
@@ -10488,7 +10509,7 @@ function moodDraftFrom(mood){
     name: mood ? mood.name : "",
     // CAS-1284 Change 4: a new mood defaults to "My agents" — "missing means agents" (Change 1).
     source: mood && mood.source==="catalogue" ? "catalogue" : "agents",
-    order: mood ? mood.order : "score",
+    // CAS-1296: order is no longer part of the draft — it's derived (moodOrder) from topYou/topPublic below.
     // CAS-1287 Change 1: topYou/topPublic replace Best N's single `best` field.
     topYou: mood ? moodTopYouN(mood) : null,
     topPublic: mood ? moodTopPublicN(mood) : null,
@@ -10517,7 +10538,6 @@ window.openMoodSheetForNew = () => {
 };
 window.setMoodDraftName = v => { if(moodDraft) moodDraft.name=v; };
 window.toggleMoodDraftAgent = id => { if(!moodDraft) return; moodDraft.agentsOff.has(id)?moodDraft.agentsOff.delete(id):moodDraft.agentsOff.add(id); renderMoodSheetBody(); };
-window.setMoodDraftOrder = key => { if(!moodDraft) return; moodDraft.order=key; renderMoodSheetBody(); };
 // CAS-1287 Change 1: replaces setMoodDraftBest — v is null (Off) or one of 10/20/30/40, one setter per list.
 window.setMoodDraftTopYou = v => { if(!moodDraft) return; moodDraft.topYou=v; renderMoodSheetBody(); };
 window.setMoodDraftTopPublic = v => { if(!moodDraft) return; moodDraft.topPublic=v; renderMoodSheetBody(); };
@@ -10569,7 +10589,7 @@ window.saveMoodFromSheet = () => {
   if(!name){ const inp=$("moodName"); if(inp) inp.focus(); return; }
   const mood={
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
-    name, source:d.source==="catalogue"?"catalogue":"agents", order:d.order,
+    name, source:d.source==="catalogue"?"catalogue":"agents",
     topYou:d.topYou, topPublic:d.topPublic,
     agentsOff:[...d.agentsOff], mineOnly:!!d.mineOnly, pickedBy:d.pickedBy,
     watched:[...d.watched], stylesOff:[...d.stylesOff], badges:[],   // CAS-1284: styles saved again; CAS-1281: badges still aren't
@@ -10720,7 +10740,14 @@ function renderMoodSheetBody(){
       <span class="gdot ${w.key}" aria-hidden="true"></span>${esc(w.label)}<span class="jn">${count}</span>${isOwn?`<span class="alwaystag">always</span>`:""}</button>`;
   }).join("");
   const body=$("watchSheetBody");
+  // CAS-1296: section order is now Name → From → Show top (+ Only starred) → Styles → Agents / Picked by
+  // → Availability → Watched. The Order section is gone — Order is derived (moodOrder), never edited here.
   if(body) body.innerHTML=`
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Name</span></div>
+      <input id="moodName" class="mfinput" type="text" maxlength="18" placeholder="Friday night" autocomplete="off"
+        value="${escA(d.name)}" oninput="setMoodDraftName(this.value)">
+    </div>
     <div class="wsheetsec">
       <div class="wsheethd"><span>From</span></div>
       <div class="mfseg" role="group" aria-label="From">
@@ -10728,26 +10755,6 @@ function renderMoodSheetBody(){
           onclick="setMoodDraftSource('agents')">My agents</button>
         <button type="button" data-source="catalogue" aria-pressed="${isCatalogue}" class="${isCatalogue?"on":""}"
           onclick="setMoodDraftSource('catalogue')">Everything</button>
-      </div>
-    </div>
-    <div class="wsheetsec">
-      <div class="wsheethd"><span>Name</span></div>
-      <input id="moodName" class="mfinput" type="text" maxlength="18" placeholder="Friday night" autocomplete="off"
-        value="${escA(d.name)}" oninput="setMoodDraftName(this.value)">
-    </div>
-    ${isCatalogue ? "" : `<div class="wsheetsec">
-      <div class="wsheethd"><span>Agents</span></div>
-      <div class="chips">${agentsHTML}</div>
-    </div>`}
-    <div class="wsheetsec">
-      <div class="wsheethd"><span>Order</span></div>
-      <div class="mfseg" role="group" aria-label="Order">
-        <button type="button" data-order="release" aria-pressed="${d.order==="release"}" class="${d.order==="release"?"on":""}"
-          onclick="setMoodDraftOrder('release')">Release date</button>
-        <button type="button" data-order="score" aria-pressed="${d.order==="score"}" class="${d.order==="score"?"on":""}"
-          onclick="setMoodDraftOrder('score')">Public</button>
-        <button type="button" data-order="you" aria-pressed="${d.order==="you"}" class="${d.order==="you"?"on":""}"
-          ${(window.CascadePersistence && window.CascadePersistence.accountActive())?"":"disabled"} onclick="setMoodDraftOrder('you')">You</button>
       </div>
     </div>
     <div class="wsheetsec">
@@ -10773,21 +10780,6 @@ function renderMoodSheetBody(){
       </div>
     </div>
     <div class="wsheetsec">
-      <div class="wsheethd"><span>Availability</span></div>
-      <div class="switch wsheetswitch${d.mineOnly?" on":""}" id="watchMineOnlySwitch" role="switch"
-        aria-checked="${d.mineOnly}" onclick="toggleMoodDraftMineOnly()">
-        <span>Show only available on my services</span><span class="knob"></span>
-      </div>
-    </div>
-    ${isCatalogue ? "" : `<div class="wsheetsec">
-      <div class="wsheethd"><span>Picked by</span></div>
-      <div class="chips">${pickedByHTML}</div>
-    </div>`}
-    <div class="wsheetsec">
-      <div class="wsheethd"><span>Watched</span></div>
-      <div class="chips">${watchedHTML}</div>
-    </div>
-    <div class="wsheetsec">
       <div class="wsheethd"><span>Styles</span>
         <div class="wsheetlinks">
           <button type="button" class="linkbtn" onclick="selectAllMoodDraftStyles()">Select all</button>
@@ -10795,6 +10787,25 @@ function renderMoodSheetBody(){
         </div>
       </div>
       <div class="chips">${stylesHTML}</div>
+    </div>
+    ${isCatalogue ? "" : `<div class="wsheetsec">
+      <div class="wsheethd"><span>Agents</span></div>
+      <div class="chips">${agentsHTML}</div>
+    </div>`}
+    ${isCatalogue ? "" : `<div class="wsheetsec">
+      <div class="wsheethd"><span>Picked by</span></div>
+      <div class="chips">${pickedByHTML}</div>
+    </div>`}
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Availability</span></div>
+      <div class="switch wsheetswitch${d.mineOnly?" on":""}" id="watchMineOnlySwitch" role="switch"
+        aria-checked="${d.mineOnly}" onclick="toggleMoodDraftMineOnly()">
+        <span>Show only available on my services</span><span class="knob"></span>
+      </div>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Watched</span></div>
+      <div class="chips">${watchedHTML}</div>
     </div>
     ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Also show</span></div>
