@@ -1,7 +1,7 @@
 {
-  "lastRun": "2026-10-18T04:27:20.327Z",
-  "consecutiveReds": 22,
-  "slowConsecutiveReds": 22,
+  "lastRun": "2026-10-18T05:18:00.846Z",
+  "consecutiveReds": 23,
+  "slowConsecutiveReds": 23,
   "fastRedNames": [],
   "lastAlertedRedNames": "alerts_ran",
   "lastAlertAt": "2026-10-18T02:18:06.942Z",
@@ -10,56 +10,56 @@
     {
       "name": "site_up",
       "ok": true,
-      "ms": 774,
+      "ms": 870,
       "detail": "HTTP 200, version 1.0.0"
     },
     {
       "name": "movies_json",
       "ok": true,
-      "ms": 592,
+      "ms": 700,
       "detail": "5990 record(s), parses."
     },
     {
       "name": "supabase_canary",
       "ok": true,
-      "ms": 3382,
+      "ms": 2829,
       "detail": "4 agent(s), 1 admitted film(s), film_watch read OK."
     },
     {
       "name": "signup",
       "ok": true,
-      "ms": 1502,
-      "detail": "created and removed lee+probe-1792297637426@codynamics.com.au via delete_my_account."
+      "ms": 1480,
+      "detail": "created and removed lee+probe-1792300677762@codynamics.com.au via delete_my_account."
     },
     {
       "name": "orphan_probe_accounts",
       "ok": true,
-      "ms": 239,
+      "ms": 277,
       "detail": "no probe account older than 2h."
     },
     {
       "name": "usage_events_insert",
       "ok": true,
-      "ms": 276,
+      "ms": 279,
       "detail": "HTTP 201"
     },
     {
       "name": "pages_head",
       "ok": true,
-      "ms": 205,
+      "ms": 227,
       "detail": "HEAD https://cascade-web-3x1.pages.dev/ -> HTTP 200"
     },
     {
       "name": "daily_refresh_fresh",
       "ok": true,
-      "ms": 381,
-      "detail": "last \"Daily refresh\" commit 7.7h ago (floor 30h)."
+      "ms": 521,
+      "detail": "last \"Daily refresh\" commit 8.5h ago (floor 30h)."
     },
     {
       "name": "alerts_ran",
       "ok": false,
-      "ms": 297,
-      "detail": "last successful alerts.yml run 46.4h ago (floor 30h)."
+      "ms": 299,
+      "detail": "last successful alerts.yml run 47.3h ago (floor 30h)."
     }
   ]
 }
