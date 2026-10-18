@@ -2590,6 +2590,21 @@
   #groups > .group:first-child:not(.early) > .grouphead:not(.sub){display:none}
   /* The stage's own section when nothing has arrived in it yet: its heading still shows, with one line. */
   .group.ownempty .ownnone{padding:0 12px 20px;font:500 12.5px/1.45 var(--font-body);color:var(--faint)}
+  /* CAS-1298: the Watch list's stage section heading is a banner in the stage's own colour — tinted
+     fill, left accent strip and a count pill — so each stage reads as a clear break in the list. Scoped to
+     #groups top-level headings; the per-agent .grouphead.sub is unchanged. Earlier-stage sections stay quieter. */
+  #groups .group[data-g=upcoming]{--gc:var(--upcoming)} #groups .group[data-g=opening_week]{--gc:var(--open)}
+  #groups .group[data-g=in_cinema]{--gc:var(--amber)} #groups .group[data-g=pvod]{--gc:var(--purple)}
+  #groups .group[data-g=rental]{--gc:var(--blue)} #groups .group[data-g=included_streaming]{--gc:var(--green)}
+  #groups .group{margin-top:18px}
+  #groups .grouphead:not(.sub){margin:0 10px 6px;padding:8px 12px;border-radius:10px;gap:8px;
+    font:800 15px/1.15 var(--font-body);letter-spacing:.1px;color:var(--ink);
+    background:color-mix(in srgb,var(--gc) 16%,var(--bg));border:1px solid color-mix(in srgb,var(--gc) 45%,transparent);
+    box-shadow:inset 3px 0 0 var(--gc)}
+  #groups .grouphead:not(.sub) .gdot{width:9px;height:9px}
+  #groups .grouphead:not(.sub) .gcount{margin-left:auto;padding:2px 8px;border-radius:999px;font:800 12px/1.2 var(--font-body);
+    color:var(--ink);background:color-mix(in srgb,var(--gc) 30%,transparent)}
+  #groups .group.early > .grouphead:not(.sub){font-size:13px;color:var(--dim)}
   /* CAS-1247: Watch's own search box and Filters sheet are gone — .watchsearchwrap/its .search/.searchclear
      stay, since Find's own search box (#findSearchWrap, renderFindScreen()) is still built from them. */
   .watchsearchwrap{display:flex;align-items:center;gap:8px;margin:9px 12px 0}
