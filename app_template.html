@@ -2697,8 +2697,6 @@
   .wsheetfoot{display:flex;gap:10px;padding:12px 16px 14px;border-top:1px solid var(--line);flex:0 0 auto}
   .wsheetfoot .ebtn{flex:0 0 auto;margin:0}
   .wsheetfoot .donebtn{flex:1}
-  .wsheetfoot .moodmovebtn{padding:11px 14px;font-size:16px}
-  .wsheetfoot .moodmovebtn:disabled{opacity:.4;cursor:default}
   /* The listbox keeps its own outline all the way round. Squaring the joined corners only reads as "one
      control" when the panel is exactly as wide as the pill — and it is not: the Watch it panel is wider,
      the Watched panel is offset to stay on screen, and the open edge then reads as a cut-off box. A whole
@@ -4110,8 +4108,6 @@
     </div>
     <div class="wsheetbody" id="watchSheetBody"></div>
     <div class="wsheetfoot">
-      <button type="button" class="ebtn ghost moodmovebtn" id="moodMoveLeftBtn" aria-label="Move mood left" onclick="moveMoodDraft(-1)" hidden>&#8249;</button>
-      <button type="button" class="ebtn ghost moodmovebtn" id="moodMoveRightBtn" aria-label="Move mood right" onclick="moveMoodDraft(1)" hidden>&#8250;</button>
       <button type="button" class="ebtn ghost" id="moodDeleteBtn" onclick="handleMoodDeleteBtn()">Delete mood</button>
       <button type="button" class="donebtn" id="moodSaveBtn" onclick="saveMoodFromSheet()">Save mood</button>
     </div>
@@ -10644,19 +10640,6 @@ window.clearAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.styles
 // actually wanted — see the new Help article instead), so nothing calls this any more. Left in place
 // rather than deleted — moodDraft.badges still lives on the draft shape and the stored mood shape.
 window.toggleMoodDraftBadge = key => { if(!moodDraft) return; moodDraft.badges.has(key)?moodDraft.badges.delete(key):moodDraft.badges.add(key); renderMoodSheetBody(); };
-// CAS-1290 C5 accessibility equivalent of the chip drag: swaps the mood being edited with its left/right
-// neighbour in watchMoods and writes immediately, same as the drag drop does — there's no draft-only staging
-// for order, since the row itself (behind the sheet) isn't reread until the next commitMoodOrder/render.
-window.moveMoodDraft = dir => {
-  const d=moodDraft; if(!d || !d.editingId) return;
-  const idx=watchMoods.findIndex(m=>m.id===d.editingId);
-  const j=idx+dir;
-  if(idx<0 || j<0 || j>=watchMoods.length) return;
-  const ids=watchMoods.map(m=>m.id);
-  [ids[idx], ids[j]]=[ids[j], ids[idx]];
-  commitMoodOrder(ids);
-  renderMoodSheetBody();
-};
 window.toggleMoodDraftAlsoShow = key => {
   if(!moodDraft) return;
   if(WATCH_TAB_OWN_STANDING[watchTab]===key) return;   // the tab's own window — not switchable
@@ -10913,17 +10896,6 @@ function renderMoodSheetBody(){
   if(delBtn){
     if(!d.editingId){ delBtn.textContent="Cancel"; delBtn.disabled=false; }
     else { delBtn.textContent = moodDeleteArmed ? "Tap again to delete" : "Delete mood"; delBtn.disabled = watchMoods.length<=1; }
-  }
-  // CAS-1290: Move left/right only make sense once there's a saved mood (an editingId) with a position —
-  // a brand-new draft isn't in watchMoods yet.
-  const moveLeftBtn=$("moodMoveLeftBtn"), moveRightBtn=$("moodMoveRightBtn");
-  if(moveLeftBtn && moveRightBtn){
-    const idx=d.editingId ? watchMoods.findIndex(m=>m.id===d.editingId) : -1;
-    moveLeftBtn.hidden = moveRightBtn.hidden = idx<0;
-    if(idx>=0){
-      moveLeftBtn.disabled = idx<=0;
-      moveRightBtn.disabled = idx>=watchMoods.length-1;
-    }
   }
 }
 // CAS-863: scopeRows() (the pre-CAS-721 pool, gating on the retired watch-list model's own ymFeedMatches)
