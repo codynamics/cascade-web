@@ -319,7 +319,8 @@ def main(argv=None) -> int:
                       for hits in agent_hits.values() for h in hits}
     newly_qualified_hits = match_newly_qualified(cascades, prev_movies, today_movies, already=already,
                                                  admission=admission, excluded=muted,
-                                                 covered=window_covered, picks=picks)
+                                                 covered=window_covered, picks=picks,
+                                                 film_watches=watches, placement_counts=placement_counts)
     for user_id, hits in newly_qualified_hits.items():
         agent_hits.setdefault(user_id, []).extend(hits)
 
@@ -337,9 +338,13 @@ def main(argv=None) -> int:
                      for hits in agent_hits.values() for h in hits}
     new_to_agent_hits = match_new_to_agent(cascades, prev_movies, today_movies, previous_run_start,
                                            already=already, admission=admission, excluded=muted,
-                                           covered=covered_films, picks=picks)
+                                           covered=covered_films, picks=picks,
+                                           film_watches=watches, placement_counts=placement_counts)
     for user_id, hits in new_to_agent_hits.items():
         agent_hits.setdefault(user_id, []).extend(hits)
+    # CAS-1307 AC: the size of the own-Watch-On gate's effect, beside CAS-841's own placement line.
+    print(f"[monitor] own Watch On (CAS-1307): {placement_counts.get('own_watch_on', 0)} "
+          "newly-qualifies/new-to-agent hit(s) suppressed by the film's own placement.")
 
     # CAS-484: a per-film "Watch it" tick is the sole source for every OTHER moment. Run after the
     # agent match so `agent_seen` can carry the (user, movie, moment) pairs `announced` already
