@@ -397,6 +397,58 @@ test("CAS-1284 Change 6: an existing account's saved moods are provisioned with 
   }
 });
 
+// CAS-1303 AC3: a mood saved before this ticket's `sort` field existed must not gain one merely by loading —
+// moodSort() resolves the display value in memory, off the pre-CAS-1303 moodOrder() derivation, every time
+// it's read, rather than loadUserPrefs() (or any other boot/load path) writing it back (CAS-1218/CAS-1243:
+// a load must never write).
+test("CAS-1303 AC3: a pre-CAS-1303 mood with no `sort` field resolves it in memory, with no boot-time write", async () => {
+  const E = loadEngine();
+  function makeFakeClient(row){
+    const rpcCalls = [];
+    function builder(table){
+      const state = { table, kind: "select" };
+      const b = {
+        select(){ return b; }, order(){ return b; }, range(){ return b; },
+        upsert(fields){ state.kind = "upsert"; state.fields = fields; return b; },
+        match(){ return b; },
+        then(resolve){
+          return Promise.resolve().then(() => (table === "user_prefs" && state.kind === "select")
+            ? { data: row ? [row] : [], error: null } : { data: [], error: null }).then(resolve);
+        },
+      };
+      return b;
+    }
+    return { rpcCalls, from(table){ return builder(table); },
+      rpc(name, params){ rpcCalls.push({ name, params }); return Promise.resolve({ data: null, error: null }); } };
+  }
+  const settle = () => new Promise(r => setTimeout(r, 0));
+  // moodsProvisioned is already at the latest level so the unrelated CAS-1284/1287/1295 starter-provisioning
+  // steps don't also fire here and add their own writes/moods to what this test is checking.
+  const savedMoods = [
+    { id: "with-top", name: "With top", topYou: 20, topPublic: null },
+    { id: "no-top", name: "No top", topYou: null, topPublic: null },
+  ];
+  const client = makeFakeClient({ user_id: "cas1303-test-user", view: { moods: savedMoods, moodsProvisioned: 3 } });
+  const auth = E.CascadeAuth;
+  auth.enabled = true; auth.client = client; auth.session = { user: { id: "cas1303-test-user" } };
+  try{
+    await E.CascadePersistence.loadUserPrefs();
+    await settle();
+
+    const withTop = [...E.watchMoods].find(m => m.id === "with-top");
+    const noTop = [...E.watchMoods].find(m => m.id === "no-top");
+    assert.ok(withTop && noTop, "setup: both fixture moods must have loaded");
+    assert.equal(withTop.sort, undefined, "a pre-CAS-1303 mood must not gain a `sort` key merely by loading");
+    assert.equal(noTop.sort, undefined, "a pre-CAS-1303 mood must not gain a `sort` key merely by loading");
+    assert.equal(E.moodSort(withTop), "score", "Show top on -> Score");
+    assert.equal(E.moodSort(noTop), "release", "both Show top caps Off -> Release date");
+
+    assert.equal(client.rpcCalls.length, 0, "CAS-1218/CAS-1243: loading an account must never write anything back");
+  } finally {
+    auth.enabled = false; auth.client = null; auth.session = null;
+  }
+});
+
 test("CAS-1287 Change 6: an account already carrying the old moodsProvisioned:1 flag gets its three starters' topYou/topPublic set once, to 20/10", async () => {
   const E = loadEngine();
   function makeFakeClient(row){

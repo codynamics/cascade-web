@@ -2135,20 +2135,77 @@ test("CAS-1296 AC2: a mood with Show top You set sorts the listing by You, desce
   expect(values[0]).toBeGreaterThanOrEqual(values[1]);
 });
 
-// CAS-1296 AC2 (release half): both Show top caps Off derives moodOrder()==="release" (filt.sort="cinema"),
-// the Releases mood's own behaviour. "+ Mood" starts with both caps Off, so it's a convenient real mood to
-// save and check without disturbing any other mood's saved state.
-test("CAS-1296 AC2: a mood with both Show top caps Off sorts by release date", async ({ page }) => {
+// CAS-1303 (supersedes CAS-1296 AC2's release half): Sort is now its own explicit section, last in the mood
+// sheet, rather than derived from Show top — a new mood defaults its Sort to Score (Change 5), signed in,
+// so saving one straight off "+ Mood" with no further taps now gives filt.sort="you", not "cinema". Picking
+// Release date explicitly is what gives the Releases mood's own ordering now.
+test("CAS-1303: a new mood's Sort defaults to Score; picking Release date explicitly sorts by release date", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
 
   await page.evaluate(() => window.openMoodSheetForNew());
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+  await expect(page.locator('.mfseg[aria-label="Sort"] button[data-sort="score"]')).toHaveClass(/on/);
   await page.locator("#moodName").fill("Both off");
   await page.locator("#moodSaveBtn").click();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
+  expect(await page.evaluate(() => filt.sort)).toBe("you");
 
+  const moodId = await page.evaluate(() => watchMoodSel);
+  await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
+  await page.locator('.mfseg[aria-label="Sort"] button[data-sort="release"]').click();
+  await page.locator("#moodSaveBtn").click();
+  await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
+  expect(await page.evaluate(() => filt.sort)).toBe("cinema");
+});
+
+// CAS-1303 AC1: the mood sheet's last section is "Sort", with exactly three options in order Score,
+// Release date, A-Z, and the saved value is the one pressed. The default mood (Top scores) carries its own
+// explicit sort:"score" (MOOD_DEFAULTS), so its Score button starts pressed.
+test("CAS-1303 AC1: the mood sheet's last section is Sort, three options in order, saved value pressed", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  const moodId = await page.evaluate(() => watchMoodSel);
+  await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
+  await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+
+  const lastSec = page.locator("#watchSheetBody .wsheetsec").last();
+  await expect(lastSec.locator(".wsheethd")).toHaveText("Sort");
+  const sortBtns = lastSec.locator(".mfseg button");
+  await expect(sortBtns).toHaveCount(3);
+  const labels = await sortBtns.evaluateAll(els => els.map(el => el.textContent.trim()));
+  expect(labels).toEqual(["Score", "Release date", "A–Z"]);
+  await expect(sortBtns.nth(0)).toHaveClass(/on/);
+  await page.evaluate(() => window.closeWatchSheet());
+});
+
+// CAS-1303 AC2: picking A-Z orders the visible titles ascending alphabetically; picking Release date goes
+// back to the existing "cinema" (release-date) order.
+test("CAS-1303 AC2: Sort A-Z orders titles ascending; Sort Release date uses the cinema order", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  const moodId = await page.evaluate(() => watchMoodSel);
+  await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
+  await page.locator('.mfseg[aria-label="Sort"] button[data-sort="title"]').click();
+  await page.locator("#moodSaveBtn").click();
+  await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
+  expect(await page.evaluate(() => filt.sort)).toBe("title");
+
+  const titles = await page.evaluate(() => [...document.querySelectorAll("#groups .card:not(.expanded)")]
+    .map(el => MOVIES.find(m => m.tmdb_id === Number(el.id.replace("card-", ""))))
+    .filter(Boolean).map(m => m.title));
+  expect(titles.length, "setup: the listing must show at least two titles to prove an order").toBeGreaterThan(1);
+  expect(titles).toEqual([...titles].sort((a, b) => a.localeCompare(b)));
+
+  await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
+  await page.locator('.mfseg[aria-label="Sort"] button[data-sort="release"]').click();
+  await page.locator("#moodSaveBtn").click();
+  await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
   expect(await page.evaluate(() => filt.sort)).toBe("cinema");
 });
 
@@ -2378,9 +2435,52 @@ test("CAS-1269 AC1: the Styles card and suggestions panel flag a taste disagreem
   await page.locator(".slmore").click();
   await expect(page.locator(".tsugg")).toContainText("! Your verdicts suggest 1 update to this agent");   // CAS-1276 wording
   await expect(page.locator(".tsuggrow")).toContainText("Animation + Science Fiction: listed");
+  await expect(page.locator(".tsuggrow")).toContainText("Suggested: skip.");   // CAS-1306
+  await expect(page.locator(".tsuggbtn")).toHaveText("Apply");
+  await expect(page.locator(".tsuggall")).toHaveCount(0);   // CAS-1306 AC3: a single flag shows no Apply all
 
   await page.locator(".tsuggbtn").click();
   expect(await page.evaluate(() => onbFlow.draft.pairs["Animation|Science Fiction"])).toBe("-");
+  await expect(page.locator(".tsugg")).toHaveCount(0);
+});
+
+test("CAS-1306: suggestion rows read Apply with Suggested: skip., and Apply all clears every flag", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await openStyleGrid(page);
+
+  await pushTasteFixture(page, 41, ["Science Fiction"], "wow", 6);
+  await pushTasteFixture(page, 42, ["Animation"], "wow", 6);
+  await pushTasteFixture(page, 43, ["Science Fiction", "Animation"], "notfor", 5);
+  await pushTasteFixture(page, 44, ["Comedy"], "wow", 6);
+  await pushTasteFixture(page, 45, ["Horror"], "wow", 6);
+  await pushTasteFixture(page, 46, ["Comedy", "Horror"], "notfor", 5);
+  await pushTasteFixture(page, 47, ["Action"], "wow", 6);
+  await pushTasteFixture(page, 48, ["Fantasy"], "wow", 6);
+  await pushTasteFixture(page, 49, ["Action", "Fantasy"], "notfor", 5);
+  await page.evaluate(() => styleGridRepaint());
+
+  await expect(page.locator(".tsugg")).toContainText("! Your verdicts suggest 3 updates to this agent");
+  const rows = page.locator(".tsuggrow");
+  await expect(rows).toHaveCount(3);
+  for(let i = 0; i < 3; i++){
+    await expect(rows.nth(i).locator(".tsuggbtn")).toHaveText("Apply");
+    await expect(rows.nth(i)).toContainText("Suggested: skip.");
+  }
+  await expect(page.locator(".tsuggall")).toContainText("Apply all");
+
+  const firstFlag = await page.evaluate(() => {
+    const f = styleGridFlags(onbApply())[0];
+    return { a: f.a, b: f.b, want: f.want };
+  });
+  await rows.first().locator(".tsuggbtn").click();   // AC2: tapping one row's Apply
+  const key = await page.evaluate(({ a, b }) => (a < b ? `${a}|${b}` : `${b}|${a}`), firstFlag);
+  expect(await page.evaluate(k => onbFlow.draft.pairs[k], key)).toBe(firstFlag.want);
+  await expect(rows).toHaveCount(2);
+
+  await page.locator(".tsuggall").click();   // AC3: Apply all clears the rest in one go
+  expect(await page.evaluate(() => styleGridFlags(onbApply()).length)).toBe(0);
   await expect(page.locator(".tsugg")).toHaveCount(0);
 });
 

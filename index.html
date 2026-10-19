@@ -2697,8 +2697,6 @@
   .wsheetfoot{display:flex;gap:10px;padding:12px 16px 14px;border-top:1px solid var(--line);flex:0 0 auto}
   .wsheetfoot .ebtn{flex:0 0 auto;margin:0}
   .wsheetfoot .donebtn{flex:1}
-  .wsheetfoot .moodmovebtn{padding:11px 14px;font-size:16px}
-  .wsheetfoot .moodmovebtn:disabled{opacity:.4;cursor:default}
   /* The listbox keeps its own outline all the way round. Squaring the joined corners only reads as "one
      control" when the panel is exactly as wide as the pill — and it is not: the Watch it panel is wider,
      the Watched panel is offset to stay on screen, and the open edge then reads as a cut-off box. A whole
@@ -3709,7 +3707,7 @@
   .tcell.slsq{width:26px;height:26px;flex:none;aspect-ratio:auto}
   .slhint{font:500 11.5px/1.4 var(--font-body);color:var(--faint);margin:8px 0 0}
   .sllink{color:#ffd27a;text-decoration:underline;cursor:pointer}
-  .slmore{margin-top:11px}
+  .slmore{margin:10px 0 12px}
   .tlegend{display:flex;align-items:center;gap:7px;margin-top:10px;font:600 10.5px/1 var(--font-body);color:var(--faint)}
   .tlegend .ramp{display:flex;gap:2px}
   .tlegend .ramp i{width:14px;height:9px;border-radius:2px}
@@ -3725,6 +3723,8 @@
   .tsugg{border:1px solid rgba(255,210,122,.35);background:rgba(255,210,122,.07);border-radius:14px;
     padding:12px 14px;margin-bottom:12px}
   .tsugg h4{margin:0;font:700 13.5px/1.3 var(--font-body);color:#ffd27a}
+  .tsugghead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .tsugghead h4{flex:1;min-width:0}
   .tsuggrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(255,210,122,.18)}
   .tsuggtext{flex:1;min-width:0}
   .tsuggtext b{display:block;font:600 12.5px/1.3 var(--font-body);color:var(--ink)}
@@ -4110,8 +4110,6 @@
     </div>
     <div class="wsheetbody" id="watchSheetBody"></div>
     <div class="wsheetfoot">
-      <button type="button" class="ebtn ghost moodmovebtn" id="moodMoveLeftBtn" aria-label="Move mood left" onclick="moveMoodDraft(-1)" hidden>&#8249;</button>
-      <button type="button" class="ebtn ghost moodmovebtn" id="moodMoveRightBtn" aria-label="Move mood right" onclick="moveMoodDraft(1)" hidden>&#8250;</button>
       <button type="button" class="ebtn ghost" id="moodDeleteBtn" onclick="handleMoodDeleteBtn()">Delete mood</button>
       <button type="button" class="donebtn" id="moodSaveBtn" onclick="saveMoodFromSheet()">Save mood</button>
     </div>
@@ -10478,17 +10476,17 @@ const moodStylesOffKeeping = keep => ALL_GENRES.filter(g=>!keep.includes(g));
 // catalogue moods only, never the pre-existing Top scores/Releases defaults.
 const MOOD_STARTER_IDS = Object.keys(MOOD_STARTER_STYLES);
 const MOOD_DEFAULTS = [
-  {id:"top", name:"Top scores", order:"score", topYou:null, topPublic:10},
-  {id:"releases", name:"Releases", order:"release", topYou:null, topPublic:null},
+  {id:"top", name:"Top scores", order:"score", sort:"score", topYou:null, topPublic:10},
+  {id:"releases", name:"Releases", order:"release", sort:"release", topYou:null, topPublic:null},
   // CAS-1295: the shortlist — every starred film standing on the current stage, watched or not, on any
   // service (mineOnly:false), across the whole catalogue (not just what an agent lists).
-  {id:"starred", name:"Starred", source:"catalogue", starredOnly:true, topYou:null, topPublic:null,
+  {id:"starred", name:"Starred", source:"catalogue", starredOnly:true, sort:"score", topYou:null, topPublic:null,
     mineOnly:false, watched:REVIEW_STEPS.map(v=>v.key), stylesOff:[]},
-  {id:"action", name:"Action", source:"catalogue", topYou:20, topPublic:10, order:"you",
+  {id:"action", name:"Action", source:"catalogue", topYou:20, topPublic:10, order:"you", sort:"score",
     stylesOff:moodStylesOffKeeping(MOOD_STARTER_STYLES.action), watched:["wow","liked"], mineOnly:true},
-  {id:"imagine", name:"Imagine", source:"catalogue", topYou:20, topPublic:10, order:"you",
+  {id:"imagine", name:"Imagine", source:"catalogue", topYou:20, topPublic:10, order:"you", sort:"score",
     stylesOff:moodStylesOffKeeping(MOOD_STARTER_STYLES.imagine), watched:["wow","liked"], mineOnly:true},
-  {id:"fun", name:"Fun", source:"catalogue", topYou:20, topPublic:10, order:"you",
+  {id:"fun", name:"Fun", source:"catalogue", topYou:20, topPublic:10, order:"you", sort:"score",
     stylesOff:moodStylesOffKeeping(MOOD_STARTER_STYLES.fun), watched:["wow","liked"], mineOnly:true},
 ];
 const moodDefaultFieldsNow = () => ({
@@ -10517,11 +10515,18 @@ function moodTopPublicN(mood){
 function moodTopYouAvailable(){
   return !!(window.CascadePersistence && window.CascadePersistence.accountActive()) && tasteProfile().n>0;
 }
-// CAS-1296: Order is no longer a field the sheet edits — with Show top already picking the films, a manual
-// order no longer means anything. The order is derived: either Show top list being on means "by You" (which
-// sortMoviesBy/applyMoodToState fall back to Public for, signed out or no taste); both Off means "by release
-// date", the behaviour the Releases mood needs. A mood's own stored `order` field (pre-CAS-1296) is ignored.
+// CAS-1296: with Show top already picking the films, a manual order no longer decided which films showed —
+// so the order was derived instead: either Show top list being on meant "by You" (falling back to Public,
+// signed out or no taste); both Off meant "by release date", the behaviour the Releases mood needs. Kept as
+// the fallback moodSort() below uses for a mood that predates CAS-1303's explicit `sort` field.
 function moodOrder(mood){ return (moodTopYouN(mood)||moodTopPublicN(mood)) ? "you" : "release"; }
+// CAS-1303: `sort` ("score"|"release"|"title") is the mood sheet's own explicit Sort pick — Show top still
+// decides which films qualify (moodShowTopKeep); this only decides how the kept films are ordered. A mood
+// saved before this field existed has no `sort` key at all (moodDefaultFieldsNow() deliberately omits it —
+// see applyMoodToState/moodDraftFrom), so it's resolved here, in memory, from the old moodOrder() derivation
+// instead — never written back (CAS-1218/CAS-1243 no-boot-write rule). It's only ever persisted once the
+// person actually saves that mood from the sheet.
+function moodSort(mood){ return mood.sort!==undefined ? mood.sort : (moodOrder(mood)==="release" ? "release" : "score"); }
 function moodTopYouEffectiveN(mood){ return moodTopYouAvailable() ? moodTopYouN(mood) : null; }
 // CAS-1290: raises the CAS-1247 cap of five — every literal 5 that caps the mood row/sheet uses this.
 const MOOD_MAX = 10;
@@ -10551,14 +10556,13 @@ function applyMoodToState(mood){
       watchAlsoShow[tab]=new Set(hasSaved ? mood.alsoShow[tab] : (WATCH_ALSO_SHOW_DEFAULT[tab]||[]));
     }
   });
-  // C3: order:"score" does exactly what tapping Cascade score did; order:"release" does exactly what
-  // tapping Release date did. sortPicked is always true on Watch now (one flat run, no agent lanes).
-  // CAS-1264: order:"you" only means anything signed in (tasteMatch needs an account's own verdicts) —
-  // signed out it falls back to "cascade", same as every other You-dependent UI in this file.
-  // CAS-1296: the mood's own order field is no longer read — moodOrder(mood) derives it from Show top.
+  // CAS-1303: sort:"release" does exactly what tapping Release date did; sort:"title" does exactly what
+  // tapping Title A-Z did. sortPicked is always true on Watch now (one flat run, no agent lanes).
+  // CAS-1264: sort:"score" (You score) only means anything signed in (tasteMatch needs an account's own
+  // verdicts) — signed out it falls back to "cascade", same as every other You-dependent UI in this file.
   const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  const ord = moodOrder(mood);
-  filt.sort = ord==="release" ? "cinema" : (ord==="you" && signedIn) ? "you" : "cascade";
+  const sort = moodSort(mood);
+  filt.sort = sort==="release" ? "cinema" : sort==="title" ? "title" : (signedIn ? "you" : "cascade");
   sortPicked = true;
 }
 applyMoodToState(currentMood());   // C3: applied at boot, from the in-memory defaults
@@ -10597,6 +10601,9 @@ function moodDraftFrom(mood){
     alsoShow: mood && mood.alsoShow ? {premium:[...(mood.alsoShow.premium||[])], rent:[...(mood.alsoShow.rent||[])], stream:[...(mood.alsoShow.stream||[])]} : null,
     // CAS-1295: "Only starred films" — default off for a new mood, carried over for an existing one.
     starredOnly: mood ? !!mood.starredOnly : false,
+    // CAS-1303: Sort — resolved from the existing mood's own field (or the pre-CAS-1303 derivation, via
+    // moodSort) or, for a new mood, the "+ Mood" default of Score.
+    sort: mood ? moodSort(mood) : "score",
   };
 }
 window.openMoodSheetFor = id => {
@@ -10616,6 +10623,9 @@ window.toggleMoodDraftAgent = id => { if(!moodDraft) return; moodDraft.agentsOff
 // CAS-1287 Change 1: replaces setMoodDraftBest — v is null (Off) or one of 10/20/30/40, one setter per list.
 window.setMoodDraftTopYou = v => { if(!moodDraft) return; moodDraft.topYou=v; renderMoodSheetBody(); };
 window.setMoodDraftTopPublic = v => { if(!moodDraft) return; moodDraft.topPublic=v; renderMoodSheetBody(); };
+// CAS-1303: the mood sheet's new Sort section — Score/Release date/A-Z, saved with the mood like every
+// other field.
+window.setMoodDraftSort = key => { if(!moodDraft) return; moodDraft.sort=key; renderMoodSheetBody(); };
 // CAS-1284 Change 4: "My agents" (the pre-existing behaviour) or "Everything" (a catalogue-wide pool).
 window.setMoodDraftSource = key => { if(!moodDraft) return; moodDraft.source=key==="catalogue"?"catalogue":"agents"; renderMoodSheetBody(); };
 window.toggleMoodDraftMineOnly = () => { if(!moodDraft) return; moodDraft.mineOnly=!moodDraft.mineOnly; renderMoodSheetBody(); };
@@ -10632,19 +10642,6 @@ window.clearAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.styles
 // actually wanted — see the new Help article instead), so nothing calls this any more. Left in place
 // rather than deleted — moodDraft.badges still lives on the draft shape and the stored mood shape.
 window.toggleMoodDraftBadge = key => { if(!moodDraft) return; moodDraft.badges.has(key)?moodDraft.badges.delete(key):moodDraft.badges.add(key); renderMoodSheetBody(); };
-// CAS-1290 C5 accessibility equivalent of the chip drag: swaps the mood being edited with its left/right
-// neighbour in watchMoods and writes immediately, same as the drag drop does — there's no draft-only staging
-// for order, since the row itself (behind the sheet) isn't reread until the next commitMoodOrder/render.
-window.moveMoodDraft = dir => {
-  const d=moodDraft; if(!d || !d.editingId) return;
-  const idx=watchMoods.findIndex(m=>m.id===d.editingId);
-  const j=idx+dir;
-  if(idx<0 || j<0 || j>=watchMoods.length) return;
-  const ids=watchMoods.map(m=>m.id);
-  [ids[idx], ids[j]]=[ids[j], ids[idx]];
-  commitMoodOrder(ids);
-  renderMoodSheetBody();
-};
 window.toggleMoodDraftAlsoShow = key => {
   if(!moodDraft) return;
   if(WATCH_TAB_OWN_STANDING[watchTab]===key) return;   // the tab's own window — not switchable
@@ -10670,6 +10667,7 @@ window.saveMoodFromSheet = () => {
     watched:[...d.watched], stylesOff:[...d.stylesOff], badges:[],   // CAS-1284: styles saved again; CAS-1281: badges still aren't
     alsoShow: d.alsoShow ? {premium:[...(d.alsoShow.premium||[])], rent:[...(d.alsoShow.rent||[])], stream:[...(d.alsoShow.stream||[])]} : null,
     starredOnly: !!d.starredOnly,
+    sort: d.sort,   // CAS-1303
   };
   const idx=watchMoods.findIndex(m=>m.id===mood.id);
   const selectionChanged = watchMoodSel!==mood.id;
@@ -10885,22 +10883,21 @@ function renderMoodSheetBody(){
     ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Also show</span></div>
       <div class="chips">${alsoShowHTML}</div>
-    </div>`}`;
+    </div>`}
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Sort</span></div>
+      <div class="mfseg" role="group" aria-label="Sort">
+        ${[["score","Score"],["release","Release date"],["title","A–Z"]].map(([key,label])=>{
+          const on=d.sort===key;
+          return `<button type="button" data-sort="${key}" aria-pressed="${on}" class="${on?"on":""}"
+            onclick="setMoodDraftSort('${key}')">${label}</button>`;
+        }).join("")}
+      </div>
+    </div>`;
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
     if(!d.editingId){ delBtn.textContent="Cancel"; delBtn.disabled=false; }
     else { delBtn.textContent = moodDeleteArmed ? "Tap again to delete" : "Delete mood"; delBtn.disabled = watchMoods.length<=1; }
-  }
-  // CAS-1290: Move left/right only make sense once there's a saved mood (an editingId) with a position —
-  // a brand-new draft isn't in watchMoods yet.
-  const moveLeftBtn=$("moodMoveLeftBtn"), moveRightBtn=$("moodMoveRightBtn");
-  if(moveLeftBtn && moveRightBtn){
-    const idx=d.editingId ? watchMoods.findIndex(m=>m.id===d.editingId) : -1;
-    moveLeftBtn.hidden = moveRightBtn.hidden = idx<0;
-    if(idx>=0){
-      moveLeftBtn.disabled = idx<=0;
-      moveRightBtn.disabled = idx>=watchMoods.length-1;
-    }
   }
 }
 // CAS-863: scopeRows() (the pre-CAS-721 pool, gating on the retired watch-list model's own ymFeedMatches)
@@ -16988,9 +16985,9 @@ function stylesListCardHTML(advanced){
     <span class="osdh"><span class="em">🎭</span><span class="dl">Styles</span></span>
     <p class="reqval">${esc(valueText)}${esc(comboSuffix)}</p>
     ${flags.length ? `<p class="reqval" style="color:#ffd27a;font-weight:600;font-size:12px">! ${flags.length} suggested updates from your taste${!advanced ? ` <a href="#" class="sllink" onclick="briefSetTab('advanced');return false">Review</a>` : ""}</p>` : ""}
+    ${advanced ? `<button type="button" class="osadv slmore" onclick="briefGo('genres')"><span class="osadvtitle">More — combinations of two styles, and how your taste compares ›</span></button>` : ""}
     <div class="sllist">${rows}</div>
     ${(!advanced && pairCount) ? `<p class="slhint">${pairCount} combination${pairCount===1?"":"s"} set — see Advanced</p>` : ""}
-    ${advanced ? `<button type="button" class="osadv slmore" onclick="briefGo('genres')"><span class="osadvtitle">More — combinations of two styles, and how your taste compares ›</span></button>` : ""}
   </div>`;
 }
 window.stylesListTap = g => {
@@ -17468,15 +17465,17 @@ function styleGridSuggestionsHTML(flags){
     const label = f.b ? `${esc(f.a)} + ${esc(f.b)}` : esc(f.a);
     const stateWord = f.state==="+" ? "listed" : f.state==="-" ? "skipped" : "not listed";
     const words = esc(tasteLeanWords(f.n, f.lean));
-    const btnLabel = f.want==="+" ? "+ List" : "− Skip";
+    const suggestWord = f.want==="+" ? "list" : "skip";
     const bArg = f.b ? `'${escA(f.b)}'` : "null";
+    const applyLabel = `Apply: ${suggestWord} ${f.b ? `${f.a} + ${f.b}` : f.a}`;
     return `<div class="tsuggrow">
-      <div class="tsuggtext"><b>${label}: ${stateWord}</b><span>Your ${f.n} verdict${f.n===1?"":"s"}: ${words}</span></div>
-      <button type="button" class="tsuggbtn" onclick="styleGridApply('${escA(f.a)}',${bArg},'${f.want}')">${btnLabel}</button>
+      <div class="tsuggtext"><b>${label}: ${stateWord}</b><span>Your ${f.n} verdict${f.n===1?"":"s"}: ${words}. Suggested: ${suggestWord}.</span></div>
+      <button type="button" class="tsuggbtn" aria-label="${escA(applyLabel)}" onclick="styleGridApply('${escA(f.a)}',${bArg},'${f.want}')">Apply</button>
     </div>`;
   }).join("");
   const more = flags.length>3 ? `<div class="tsuggmore">and ${flags.length-3} more, marked ! on the grid</div>` : "";
-  return `<div class="tsugg"><h4>! Your verdicts suggest ${flags.length} update${flags.length===1?"":"s"} to this agent</h4>${rows}${more}</div>`;
+  const applyAll = flags.length>=2 ? `<button type="button" class="tsuggbtn tsuggall" onclick="styleGridApplyAll()">Apply all</button>` : "";
+  return `<div class="tsugg"><div class="tsugghead"><h4>! Your verdicts suggest ${flags.length} update${flags.length===1?"":"s"} to this agent</h4>${applyAll}</div>${rows}${more}</div>`;
 }
 function styleGridCellHTML(c,T,a,b,flagKeys){
   const isAll=!b;
@@ -17623,6 +17622,13 @@ window.styleGridTapCell = (a,b) => {
 };
 window.styleGridApply = (a,b,state) => {
   if(b) styleGridSetPair(a,b,state); else styleGridSetStyle(a,state);
+  styleGridRepaint();
+};
+window.styleGridApplyAll = () => {
+  const c=onbApply();
+  styleGridFlags(c).forEach(f=>{
+    if(f.b) styleGridSetPair(f.a,f.b,f.want); else styleGridSetStyle(f.a,f.want);
+  });
   styleGridRepaint();
 };
 // Step registry — each ticket adds one entry. `progress` is the mock's fill %; `body()` builds the control;

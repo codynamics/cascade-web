@@ -552,8 +552,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // CAS-1264: applyMoodToState/moodDefaultFieldsNow — plain top-level functions, exported directly so a
   // test can drive the real order:"you" -> filt.sort translation (signed-in vs signed-out) instead of
   // re-deriving it by hand.
-  // CAS-1296: moodOrder — derives the no-longer-edited Order field from topYou/topPublic.
-  applyMoodToState, moodDefaultFieldsNow, moodOrder,
+  // CAS-1296: moodOrder — derives the pre-CAS-1303 fallback order from topYou/topPublic.
+  // CAS-1303: moodSort — the explicit Sort field, falling back to moodOrder's derivation when absent.
+  applyMoodToState, moodDefaultFieldsNow, moodOrder, moodSort,
   // CAS-1287: MOOD_DEFAULTS (the five built-in moods, including the three catalogue starters),
   // moodTopYouN/moodTopPublicN/moodTopYouAvailable/moodTopYouEffectiveN ("Show top"'s own cap-resolution
   // and You-availability pure functions), and moodShowTopKeep (the selection cut itself) — exported so a
