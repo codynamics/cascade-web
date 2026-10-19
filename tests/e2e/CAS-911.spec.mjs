@@ -33,7 +33,7 @@ async function walkToFavs(page){
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");          // v2_intro (CAS-1270)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");          // v2_intro (CAS-1312)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
 
@@ -128,7 +128,7 @@ test("first run, partner Yes + kids Yes: reaches a 4-agent 'set to work' screen 
   await expect(page.locator("#membScreen.open")).toBeVisible();
 
   const names = await readCascadeNames(page);                                    // AC4
-  expect(names).toEqual(["In Cinema", "Personal Favs", "Date Night", "Family Movies"]);   // CAS-1270: cinema Yes
+  expect(names).toEqual(["Cinema Releases", "Personal Favs", "Date Night", "Family Movies"]);   // CAS-1312: name is fixed now
   expect(await page.evaluate(() => localStorage.getItem("cascade_onboarded"))).toBe("1");
   expect(errors).toEqual([]);   // no console error at any screen
 });
@@ -157,7 +157,7 @@ test("first run, partner No + kids No: reaches a 2-agent 'set to work' screen, v
 
   await expect(page.locator("#onbStepInner .obhd")).toContainText("2 agents, set to work.");   // AC3
   const names = await readCascadeNames(page);
-  expect(names).toEqual(["In Cinema", "Personal Favs"]);   // CAS-1270: cinema Yes
+  expect(names).toEqual(["Cinema Releases", "Personal Favs"]);   // CAS-1312: name is fixed now
 });
 
 test("reloading mid-flow at v2_favs then completing a fresh run leaves exactly 4 agents, not 8 (CAS-911 AC5)", async ({ page }) => {

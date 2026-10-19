@@ -138,7 +138,7 @@ async function walkOnboarding(page, onFrame){
   await expect(page.locator(".obhd")).toContainText("Let's get you set up.");
   await ctaLocator(page).click();
   await page.waitForTimeout(SLIDE_SETTLE);
-  await expect(page.locator(".obhd")).toContainText("biggest movies");
+  await expect(page.locator(".obhd")).toContainText("Cinema Releases");
   await ctaLocator(page).click();
   await page.waitForTimeout(SLIDE_SETTLE);
   await expect(page.locator("#obCinemaOpts")).toBeVisible();

@@ -59,7 +59,7 @@ test("the app loads and onboarding renders", async ({ page }) => {
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");   // v2_intro (CAS-1270)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");   // v2_intro (CAS-1312)
 });
 
 // CAS-911: onboarding generates its roster from the v2 sequence's own four-agent generator
@@ -74,7 +74,7 @@ test("onboarding commits a real, de-duplicated agent roster", async ({ page }) =
   expect(roster.length).toBeGreaterThan(0);
   expect(new Set(roster.map(c => c.id)).size).toBe(roster.length);
   expect(roster.every(c => c.sort === "cascade")).toBe(true);
-  expect(roster.map(c => c.name)).toEqual(["In Cinema", "Personal Favs"]);   // CAS-1270: cinema Yes
+  expect(roster.map(c => c.name)).toEqual(["Cinema Releases", "Personal Favs"]);   // CAS-1312: name is fixed now
 });
 
 test("recommendations render as a results list with items", async ({ page }) => {
@@ -1140,7 +1140,7 @@ test("CAS-740 AC4: a signed-in user whose account already holds agents is never 
   expect(await page.evaluate(() => flowOn)).toBe(true);   // genuinely inside the wizard before the race resolves
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");   // v2_intro (CAS-1270) — proves the wizard actually opened
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");   // v2_intro (CAS-1312) — proves the wizard actually opened
 
   // Now let the session restore resolve to an account that already holds an agent.
   await page.evaluate(() => window.__cas740ResolveSession());
@@ -1308,7 +1308,7 @@ async function cas913WalkToShortlist(page){
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");            // v2_intro (CAS-1270)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");            // v2_intro (CAS-1312)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
   await expect(page.locator("#obCinemaOpts")).toBeVisible();                      // v2_cinema

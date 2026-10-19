@@ -15358,7 +15358,7 @@ function onbFamilyCritV2(ans, s){
 // order follows array position: Massive Movies is rank 0, and is therefore the default owner of a
 // contested film — deliberate, not incidental.
 const ONB_AGENTS_V2 = [
-  {key:"onb_massive", icon:"🎬", name: ans=>ans.cinema==="yes" ? "In Cinema" : "Massive Movies", who:"me", when:a=>true,
+  {key:"onb_massive", icon:"🎬", name:"Cinema Releases", who:"me", when:a=>true,
    build(ans){ const r = onbAgentCapSolveV2(onbMassiveCritV2, ans, 85); return onbMassiveCritV2(ans, r.score); }},
 
   {key:"onb_favs", icon:"⭐", name:"Personal Favs", who:"me", when:a=>true,
@@ -18134,8 +18134,8 @@ const SHARP_STEPS = {
     progress: 7,
     body(){
       return `<div class="obwrap">
-  <h2 class="obhd">First, we'll build you an agent for the <span class="obhi">biggest movies</span> of the year.</h2>
-  <p class="obintrotext">It watches for the biggest movies of each year — the ones with the highest Cascade scores — and tells you the moment one lands at the movies or on your preferred streaming services.</p>
+  <h2 class="obhd">First, we'll build your <span class="obhi">Cinema Releases</span> agent.</h2>
+  <p class="obintrotext">It watches the year's biggest cinema releases — the ones with the highest Cascade scores — and tells you the moment one lands at the movies or on your preferred streaming services.</p>
 </div>`;
     },
     wire(){ onbFlow.answersV2=onbAnswersV2Load(); },

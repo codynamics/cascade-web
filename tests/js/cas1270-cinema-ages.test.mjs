@@ -1,6 +1,6 @@
-// CAS-1270: the first onboarding agent becomes the cinema agent ("In Cinema") when the person says
-// they go to the cinema, keeping its old name ("Massive Movies") otherwise; a new question right after
-// v2_cinema confirms the age ratings wanted there, replacing the budget question outright.
+// CAS-1270: a new question right after v2_cinema confirms the age ratings wanted there, replacing the
+// budget question outright. (CAS-1312 later fixed the agent's name at "Cinema Releases" regardless of
+// the cinema answer — only the age ladder still varies here.)
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
@@ -11,19 +11,19 @@ const E = loadEngine();
 // values match — spread it into a real, this-realm array first.
 const arr = a => [...(a || [])];
 
-test("AC1: buildOnbAgentsV2[0] is named In Cinema with the chosen cinemaAges when cinema is yes, Massive Movies with the fixed ladder when no", () => {
+test("AC1: buildOnbAgentsV2[0] is named Cinema Releases either way, with the chosen cinemaAges when cinema is yes and the fixed ladder when no", () => {
   const yes = E.buildOnbAgentsV2({
     ...E.onbAnswersV2Default(),
     cinema: "yes", rent: "yes", cinemaAges: ["PG", "M"],
   })[0];
-  assert.equal(yes.name, "In Cinema");
+  assert.equal(yes.name, "Cinema Releases");
   assert.deepEqual(arr(yes.age), ["PG", "M"]);
 
   const no = E.buildOnbAgentsV2({
     ...E.onbAnswersV2Default(),
     cinema: "no", rent: "yes",
   })[0];
-  assert.equal(no.name, "Massive Movies");
+  assert.equal(no.name, "Cinema Releases");
   assert.deepEqual(arr(no.age), ["M", "MA 15+", "R 18+"]);
 });
 
