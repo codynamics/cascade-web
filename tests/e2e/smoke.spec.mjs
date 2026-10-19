@@ -2435,9 +2435,52 @@ test("CAS-1269 AC1: the Styles card and suggestions panel flag a taste disagreem
   await page.locator(".slmore").click();
   await expect(page.locator(".tsugg")).toContainText("! Your verdicts suggest 1 update to this agent");   // CAS-1276 wording
   await expect(page.locator(".tsuggrow")).toContainText("Animation + Science Fiction: listed");
+  await expect(page.locator(".tsuggrow")).toContainText("Suggested: skip.");   // CAS-1306
+  await expect(page.locator(".tsuggbtn")).toHaveText("Apply");
+  await expect(page.locator(".tsuggall")).toHaveCount(0);   // CAS-1306 AC3: a single flag shows no Apply all
 
   await page.locator(".tsuggbtn").click();
   expect(await page.evaluate(() => onbFlow.draft.pairs["Animation|Science Fiction"])).toBe("-");
+  await expect(page.locator(".tsugg")).toHaveCount(0);
+});
+
+test("CAS-1306: suggestion rows read Apply with Suggested: skip., and Apply all clears every flag", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await openStyleGrid(page);
+
+  await pushTasteFixture(page, 41, ["Science Fiction"], "wow", 6);
+  await pushTasteFixture(page, 42, ["Animation"], "wow", 6);
+  await pushTasteFixture(page, 43, ["Science Fiction", "Animation"], "notfor", 5);
+  await pushTasteFixture(page, 44, ["Comedy"], "wow", 6);
+  await pushTasteFixture(page, 45, ["Horror"], "wow", 6);
+  await pushTasteFixture(page, 46, ["Comedy", "Horror"], "notfor", 5);
+  await pushTasteFixture(page, 47, ["Action"], "wow", 6);
+  await pushTasteFixture(page, 48, ["Fantasy"], "wow", 6);
+  await pushTasteFixture(page, 49, ["Action", "Fantasy"], "notfor", 5);
+  await page.evaluate(() => styleGridRepaint());
+
+  await expect(page.locator(".tsugg")).toContainText("! Your verdicts suggest 3 updates to this agent");
+  const rows = page.locator(".tsuggrow");
+  await expect(rows).toHaveCount(3);
+  for(let i = 0; i < 3; i++){
+    await expect(rows.nth(i).locator(".tsuggbtn")).toHaveText("Apply");
+    await expect(rows.nth(i)).toContainText("Suggested: skip.");
+  }
+  await expect(page.locator(".tsuggall")).toContainText("Apply all");
+
+  const firstFlag = await page.evaluate(() => {
+    const f = styleGridFlags(onbApply())[0];
+    return { a: f.a, b: f.b, want: f.want };
+  });
+  await rows.first().locator(".tsuggbtn").click();   // AC2: tapping one row's Apply
+  const key = await page.evaluate(({ a, b }) => (a < b ? `${a}|${b}` : `${b}|${a}`), firstFlag);
+  expect(await page.evaluate(k => onbFlow.draft.pairs[k], key)).toBe(firstFlag.want);
+  await expect(rows).toHaveCount(2);
+
+  await page.locator(".tsuggall").click();   // AC3: Apply all clears the rest in one go
+  expect(await page.evaluate(() => styleGridFlags(onbApply()).length)).toBe(0);
   await expect(page.locator(".tsugg")).toHaveCount(0);
 });
 

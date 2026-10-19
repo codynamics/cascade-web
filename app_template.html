@@ -3723,6 +3723,8 @@
   .tsugg{border:1px solid rgba(255,210,122,.35);background:rgba(255,210,122,.07);border-radius:14px;
     padding:12px 14px;margin-bottom:12px}
   .tsugg h4{margin:0;font:700 13.5px/1.3 var(--font-body);color:#ffd27a}
+  .tsugghead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .tsugghead h4{flex:1;min-width:0}
   .tsuggrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(255,210,122,.18)}
   .tsuggtext{flex:1;min-width:0}
   .tsuggtext b{display:block;font:600 12.5px/1.3 var(--font-body);color:var(--ink)}
@@ -17463,15 +17465,17 @@ function styleGridSuggestionsHTML(flags){
     const label = f.b ? `${esc(f.a)} + ${esc(f.b)}` : esc(f.a);
     const stateWord = f.state==="+" ? "listed" : f.state==="-" ? "skipped" : "not listed";
     const words = esc(tasteLeanWords(f.n, f.lean));
-    const btnLabel = f.want==="+" ? "+ List" : "− Skip";
+    const suggestWord = f.want==="+" ? "list" : "skip";
     const bArg = f.b ? `'${escA(f.b)}'` : "null";
+    const applyLabel = `Apply: ${suggestWord} ${f.b ? `${f.a} + ${f.b}` : f.a}`;
     return `<div class="tsuggrow">
-      <div class="tsuggtext"><b>${label}: ${stateWord}</b><span>Your ${f.n} verdict${f.n===1?"":"s"}: ${words}</span></div>
-      <button type="button" class="tsuggbtn" onclick="styleGridApply('${escA(f.a)}',${bArg},'${f.want}')">${btnLabel}</button>
+      <div class="tsuggtext"><b>${label}: ${stateWord}</b><span>Your ${f.n} verdict${f.n===1?"":"s"}: ${words}. Suggested: ${suggestWord}.</span></div>
+      <button type="button" class="tsuggbtn" aria-label="${escA(applyLabel)}" onclick="styleGridApply('${escA(f.a)}',${bArg},'${f.want}')">Apply</button>
     </div>`;
   }).join("");
   const more = flags.length>3 ? `<div class="tsuggmore">and ${flags.length-3} more, marked ! on the grid</div>` : "";
-  return `<div class="tsugg"><h4>! Your verdicts suggest ${flags.length} update${flags.length===1?"":"s"} to this agent</h4>${rows}${more}</div>`;
+  const applyAll = flags.length>=2 ? `<button type="button" class="tsuggbtn tsuggall" onclick="styleGridApplyAll()">Apply all</button>` : "";
+  return `<div class="tsugg"><div class="tsugghead"><h4>! Your verdicts suggest ${flags.length} update${flags.length===1?"":"s"} to this agent</h4>${applyAll}</div>${rows}${more}</div>`;
 }
 function styleGridCellHTML(c,T,a,b,flagKeys){
   const isAll=!b;
@@ -17618,6 +17622,13 @@ window.styleGridTapCell = (a,b) => {
 };
 window.styleGridApply = (a,b,state) => {
   if(b) styleGridSetPair(a,b,state); else styleGridSetStyle(a,state);
+  styleGridRepaint();
+};
+window.styleGridApplyAll = () => {
+  const c=onbApply();
+  styleGridFlags(c).forEach(f=>{
+    if(f.b) styleGridSetPair(f.a,f.b,f.want); else styleGridSetStyle(f.a,f.want);
+  });
   styleGridRepaint();
 };
 // Step registry — each ticket adds one entry. `progress` is the mock's fill %; `body()` builds the control;
