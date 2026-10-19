@@ -272,14 +272,14 @@
   /* CAS-636: Moving takes the same gold the "Can Watch" state already uses (#ffd54a) — the chip that opens
      the alert feed is tinted with the one state that feed exists to surface. */
   #movingBtn{--mcf:#ffd54a}
-  #movingBtn.active{--mcf:#161000}
+  #movingBtn.active{--mcf:#fff}
   #movingBtn:not(.active){background:rgba(255,213,74,.09);border-color:rgba(255,213,74,.32)}
   #movingBtn.active{box-shadow:0 5px 16px -5px rgba(255,213,74,.7)}
   .modechip.mv.active{background:linear-gradient(135deg,#ffd54a 0%,#f0a336 100%);border-color:#ffd54a;color:#161000}
   /* CAS-1186: Find takes --cyan — distinct from Watch's blue and Moving's amber, and already the colour the
      app's own search affordances (focus rings, the Watch search icon) use. */
   #findBtn{--mcf:var(--cyan)}
-  #findBtn.active{--mcf:#001a1f}
+  #findBtn.active{--mcf:#fff}
   #findBtn:not(.active){background:rgba(34,211,238,.09);border-color:rgba(34,211,238,.32)}
   #findBtn.active{box-shadow:0 5px 16px -5px rgba(34,211,238,.7)}
   .modechip.fd.active{background:linear-gradient(135deg,#22d3ee 0%,#0891b2 100%);border-color:#22d3ee;color:#001a1f}
