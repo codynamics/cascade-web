@@ -706,6 +706,15 @@ WM_BACKCAT_UPKEEP_FLOOR = 300
 USER_HELD_IDS_FILE = os.path.join(STATE_DIR, "user_held_ids.json")   # CAS-986: monitor/store.py writes this
 SCOREABLE_SHIM = os.path.join(os.path.dirname(__file__), "scripts", "scoreable_shim.mjs")
 
+# CAS-1310: the same ~9 titles were tripping enrich_watchmode_fields' CAS-1134 identity guard
+# every single night — a 'mismatch' outcome writes nothing, so the title never leaves the
+# 'unfetched'/no_score tiers that keep re-selecting it, and watchmode_identity never clears.
+# Quarantining a mismatched tmdb_id here stops both the nightly fields pass and the CAS-986
+# scoreability probe from spending another credit re-asking a question whose answer won't change
+# inside the window, and lets watchmode_identity FAIL only on a genuinely new mismatch.
+WATCHMODE_MISMATCH_FILE = os.path.join(STATE_DIR, "watchmode_mismatch.json")
+WATCHMODE_MISMATCH_QUARANTINE_DAYS = 30
+
 # CAS-997 Defect 1: a released title only publishes at or above this Cascade score; a genuinely
 # upcoming title keeps publishing on cinema buzz alone, no floor (see scoreable_ids/isScoreable).
 WM_PUBLISH_FLOOR = int(os.getenv("WM_PUBLISH_FLOOR", "60"))
@@ -860,7 +869,56 @@ def _bump_wm_outcome(outcomes: dict, result: str, tmdb_id) -> None:
             ids.append(tmdb_id)
 
 
-def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) -> dict:
+def load_watchmode_mismatch_quarantine() -> dict:
+    """CAS-1310: tmdb_id (str) -> {'wm_id', 'first_seen', 'last_seen'} for every title
+    enrich_watchmode_fields has ever returned 'mismatch' for. {} when absent or unreadable —
+    never treated as an error, the same tolerance load_user_held_ids gives its own state file."""
+    if not os.path.exists(WATCHMODE_MISMATCH_FILE):
+        return {}
+    try:
+        return json.load(open(WATCHMODE_MISMATCH_FILE, encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def save_watchmode_mismatch_quarantine(quarantine: dict) -> None:
+    os.makedirs(STATE_DIR, exist_ok=True)
+    json.dump(quarantine, open(WATCHMODE_MISMATCH_FILE, "w", encoding="utf-8"), indent=2,
+              sort_keys=True)
+
+
+def _watchmode_quarantined(quarantine: dict, tmdb_id, today: datetime.date) -> bool:
+    """True while `tmdb_id`'s quarantine entry's last_seen is within
+    WATCHMODE_MISMATCH_QUARANTINE_DAYS of `today`. Past that window — or with no entry at all —
+    it is not quarantined, so a caller fetches it normally (CAS-1310 Change #2's single retry)."""
+    entry = quarantine.get(str(tmdb_id))
+    if not entry:
+        return False
+    last_seen = entry.get("last_seen")
+    if not last_seen:
+        return False
+    try:
+        stamped = datetime.date.fromisoformat(last_seen)
+    except ValueError:
+        return False
+    return (today - stamped).days < WATCHMODE_MISMATCH_QUARANTINE_DAYS
+
+
+def _record_watchmode_mismatch(quarantine: dict, tmdb_id, wm_id, today_iso: str) -> None:
+    """CAS-1310 Change #1: record today's mismatch for `tmdb_id`. A repeat mismatch (the Change
+    #2 retry, past the window, mismatching again) refreshes last_seen but never resets
+    first_seen."""
+    key = str(tmdb_id)
+    entry = quarantine.get(key)
+    if entry:
+        entry["last_seen"] = today_iso
+        entry["wm_id"] = wm_id
+    else:
+        quarantine[key] = {"wm_id": wm_id, "first_seen": today_iso, "last_seen": today_iso}
+
+
+def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None,
+                                     quarantine: dict | None = None) -> dict:
     """CAS-921: the nightly poc_pipeline.py run's own Watchmode fields pass. The earlier CAS-830/
     850 backfill only ever fires from the manual watchmode-backfill.yml dispatch, so a title added
     to the catalogue since the last manual run carried no Cascade score at all, and an upcoming
@@ -889,7 +947,13 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
 
     Returns an {'ok', 'cached', 'no-id', 'skip', 'stop'} outcome-count dict (plus 'mismatch' if
     CAS-1134's identity guard ever actually tripped this run — never pre-declared, so a run that
-    never trips it keeps the exact same dict shape as before)."""
+    never trips it keeps the exact same dict shape as before, and 'quarantined' — CAS-1310's count
+    of titles skipped, unfetched, because `quarantine` already carries a mismatch for them within
+    WATCHMODE_MISMATCH_QUARANTINE_DAYS).
+
+    `quarantine` is CAS-1310's mutable {tmdb_id: {...}} store (load_watchmode_mismatch_quarantine)
+    — a title already quarantined in it costs no credit and is skipped entirely; a fresh mismatch
+    found this run is recorded straight into it (the caller's own job to persist)."""
     outcomes = {"ok": 0, "cached": 0, "no-id": 0, "skip": 0, "stop": 0}
     if not WATCHMODE_KEY:
         print("[warn] Watchmode: WATCHMODE_API_KEY not set — skipping the nightly Watchmode "
@@ -909,13 +973,24 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
     wm_idmap = _invert_watchmode_idmap(idmap)
     tv_tmdb_ids = _watchmode_tv_tmdb_ids()
     today = datetime.date.fromisoformat(_RUN_DATE)
+    quarantine = {} if quarantine is None else quarantine
 
     if budget is None:
         budget = {"remaining": WM_NIGHTLY_MAX_CREDITS, "skipped": 0}
 
+    # CAS-1310: excluded from every tier below — skipped entirely, no credit spent.
     seen = set()
+    quarantined_n = 0
+    for m in movies:
+        if _watchmode_quarantined(quarantine, m.get("tmdb_id"), today):
+            seen.add(id(m))
+            quarantined_n += 1
+    outcomes["quarantined"] = quarantined_n
+
     repair = []
     for m in movies:
+        if id(m) in seen:
+            continue
         if m.get("wm_fields_fetched_at") and not m.get("wm_id") and m.get("tmdb_id") in tv_tmdb_ids:
             repair.append(m)
             seen.add(id(m))
@@ -945,21 +1020,23 @@ def enrich_watchmode_fields_nightly(movies: list, budget: dict | None = None) ->
     recent_year.sort(key=lambda m: m.get("wm_fields_fetched_at") or "")
     rest.sort(key=lambda m: m.get("wm_fields_fetched_at") or "")
 
+    def _probe(m, ttl_days):
+        result = enrich_watchmode_fields(m, wm_idmap, budget, ttl_days)
+        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
+        if result == "mismatch":
+            _record_watchmode_mismatch(quarantine, m.get("tmdb_id"),
+                                       wm_idmap.get(m.get("tmdb_id")), _RUN_DATE)
+
     for m in repair:
-        result = enrich_watchmode_fields(m, wm_idmap, budget, ttl_days=0)
-        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
+        _probe(m, 0)
     for m in unfetched:
-        result = enrich_watchmode_fields(m, wm_idmap, budget)
-        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
+        _probe(m, WATCHMODE_CACHE_TTL_DAYS)
     for m in cohort:
-        result = enrich_watchmode_fields(m, wm_idmap, budget, WM_NIGHTLY_COHORT_TTL_DAYS)
-        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
+        _probe(m, WM_NIGHTLY_COHORT_TTL_DAYS)
     for m in recent_year:
-        result = enrich_watchmode_fields(m, wm_idmap, budget)
-        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
+        _probe(m, WATCHMODE_CACHE_TTL_DAYS)
     for m in rest:
-        result = enrich_watchmode_fields(m, wm_idmap, budget)
-        _bump_wm_outcome(outcomes, result, m.get("tmdb_id"))
+        _probe(m, WATCHMODE_CACHE_TTL_DAYS)
     return outcomes
 
 
@@ -1128,7 +1205,8 @@ def _scoreability_recovery_due(c: dict, today: datetime.date) -> bool:
 
 
 def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idmap: dict,
-                      published_ids: set, tv_tmdb_ids: set = frozenset()) -> dict:
+                      published_ids: set, tv_tmdb_ids: set = frozenset(),
+                      quarantine: dict | None = None) -> dict:
     """CAS-986's own nightly scoreability probe, spending `budget` Watchmode credits across four
     priority tiers, highest first — the order matters and must not be rearranged:
       0. CAS-1134 repair — candidates fetched under the pre-fix movie/TV id-map collision (a
@@ -1147,10 +1225,17 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
     Reuses enrich_watchmode_fields for the actual per-title fetch (CAS-921) — never a second fetch/
     parse of Watchmode's response. Mutates each probed candidate's own last_probed/probe_count/
     outcome in place. Returns the {'ok','cached','no-id','skip','stop'} tally (plus 'mismatch' if
-    CAS-1134's identity guard ever actually tripped this run) plus 'probed', the count of
-    candidates that actually got a fresh answer (ok or no-id) this run."""
+    CAS-1134's identity guard ever actually tripped this run, and CAS-1310's 'quarantined' —
+    candidates skipped, unfetched, because `quarantine` already carries a mismatch for them within
+    WATCHMODE_MISMATCH_QUARANTINE_DAYS) plus 'probed', the count of candidates that actually got a
+    fresh answer (ok or no-id) this run.
+
+    `quarantine` is CAS-1310's mutable {tmdb_id: {...}} store (load_watchmode_mismatch_quarantine)
+    — excluded from every tier below; a fresh mismatch found this run is recorded straight into
+    it (the caller's own job to persist)."""
     bd = {"remaining": budget, "skipped": 0}
     today_iso = today.isoformat()
+    quarantine = {} if quarantine is None else quarantine
 
     def _by_popularity(items):
         return sorted(items, key=lambda m: m.get("popularity") or 0, reverse=True)
@@ -1158,14 +1243,21 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
     def _by_staleness(items):
         return sorted(items, key=lambda m: m.get("wm_fields_fetched_at") or "")
 
+    def _not_quarantined(c):
+        return not _watchmode_quarantined(quarantine, c.get("tmdb_id"), today)
+
+    quarantined_n = sum(1 for c in candidates.values() if not _not_quarantined(c))
+
     repair_tier = _by_popularity(
         c for c in candidates.values()
-        if c.get("wm_fields_fetched_at") and not c.get("wm_id") and c.get("tmdb_id") in tv_tmdb_ids)
+        if c.get("wm_fields_fetched_at") and not c.get("wm_id") and c.get("tmdb_id") in tv_tmdb_ids
+        and _not_quarantined(c))
     tier1_pool = [
         c for c in candidates.values()
         if c["tmdb_id"] in published_ids
         and _watchmode_fields_stale(c, SCOREABILITY_LADDER_STALE_DAYS if _is_wm_weekly_cohort(c, today)
-                                    else SCOREABILITY_STALE_DAYS)]
+                                    else SCOREABILITY_STALE_DAYS)
+        and _not_quarantined(c)]
     tier1_weekly = _by_staleness(c for c in tier1_pool if _is_wm_weekly_cohort(c, today))
     tier1_year = _by_staleness(c for c in tier1_pool
                                if not _is_wm_weekly_cohort(c, today)
@@ -1174,11 +1266,13 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
                                if not _is_wm_weekly_cohort(c, today)
                                and not _is_recent_release(c, today, WM_RECENT_YEAR_DAYS))
     tier1 = tier1_weekly + tier1_year + tier1_rest
-    tier2 = _by_popularity(c for c in candidates.values() if c.get("outcome") == "unprobed")
+    tier2 = _by_popularity(c for c in candidates.values()
+                           if c.get("outcome") == "unprobed" and _not_quarantined(c))
     tier3 = _by_popularity(c for c in candidates.values() if c.get("outcome") == "no_score"
-                           and _scoreability_recovery_due(c, today))
+                           and _scoreability_recovery_due(c, today) and _not_quarantined(c))
 
-    outcomes = {"ok": 0, "cached": 0, "no-id": 0, "skip": 0, "stop": 0, "probed": 0}
+    outcomes = {"ok": 0, "cached": 0, "no-id": 0, "skip": 0, "stop": 0, "probed": 0,
+               "quarantined": quarantined_n}
     for tier, forced_ttl in ((repair_tier, 0), (tier1, None), (tier2, None), (tier3, None)):
         for c in tier:
             ttl = forced_ttl
@@ -1186,6 +1280,9 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
                 ttl = SCOREABILITY_LADDER_STALE_DAYS if _is_wm_weekly_cohort(c, today) else SCOREABILITY_STALE_DAYS
             result = enrich_watchmode_fields(c, wm_idmap, bd, ttl)
             _bump_wm_outcome(outcomes, result, c.get("tmdb_id"))
+            if result == "mismatch":
+                _record_watchmode_mismatch(quarantine, c.get("tmdb_id"),
+                                           wm_idmap.get(c.get("tmdb_id")), today_iso)
             if result in ("ok", "no-id"):
                 outcomes["probed"] += 1
                 c["last_probed"] = today_iso
@@ -1412,7 +1509,7 @@ def publish_enrich_log_line(enrich_stats: dict, published: int) -> str:
 
 
 def run_scoreability_probe(candidates: dict, today: datetime.date, budget: int,
-                           published_ids: set) -> dict:
+                           published_ids: set, quarantine: dict | None = None) -> dict:
     """Fetch the Watchmode id map once, then run probe_candidates. Tolerates a missing/rejected
     WATCHMODE_API_KEY exactly like CAS-921's own nightly pass (enrich_watchmode_fields_nightly) —
     prints a [warn] and returns a zeroed tally rather than failing the run."""
@@ -1429,7 +1526,8 @@ def run_scoreability_probe(candidates: dict, today: datetime.date, budget: int,
         return empty
     wm_idmap = _invert_watchmode_idmap(idmap)
     tv_tmdb_ids = _watchmode_tv_tmdb_ids()
-    return probe_candidates(candidates, today, budget, wm_idmap, published_ids, tv_tmdb_ids)
+    return probe_candidates(candidates, today, budget, wm_idmap, published_ids, tv_tmdb_ids,
+                            quarantine=quarantine)
 
 
 def scoreable_ids(movies: list, floor: int = 0, today: str | None = None) -> set:
@@ -1540,7 +1638,8 @@ def select_publishable(candidates: dict, engine_scoreable_ids: set, previously_p
 
 def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery_pool: list,
                                enriched_records: list, previously_published_ids: set,
-                               probe_budget: int = SCOREABILITY_PROBE_BUDGET) -> tuple:
+                               probe_budget: int = SCOREABILITY_PROBE_BUDGET,
+                               quarantine: dict | None = None) -> tuple:
     """CAS-986's own top-level nightly step: merge today's discovery into candidates.json, sync in
     this run's already-enriched records, probe within budget, ask the engine which candidates are
     scoreable today, then rebuild movies.json's membership. Tolerant of a broken/unavailable Node
@@ -1579,7 +1678,8 @@ def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery
         print(f"[info] CAS-1134: reclassified {reclassified} candidate(s) 'scored' on popularity "
               f"alone (no real rating) to no_score.")
 
-    probe_outcomes = run_scoreability_probe(candidates, today, probe_budget, previously_published_ids)
+    probe_outcomes = run_scoreability_probe(candidates, today, probe_budget, previously_published_ids,
+                                            quarantine=quarantine)
 
     try:
         engine_ids = scoreable_ids(list(candidates.values()), floor=WM_PUBLISH_FLOOR, today=today_iso)
@@ -1628,6 +1728,7 @@ def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery
         "wm_spent": probe_outcomes.get("spent", 0),   # CAS-987: this pass's actual draw on probe_budget
         "mismatch": probe_outcomes.get("mismatch", 0),   # CAS-1135
         "mismatch_ids": probe_outcomes.get("mismatch_ids", []),   # CAS-1135
+        "quarantined": probe_outcomes.get("quarantined", 0),   # CAS-1310
         "not_found_dropped": not_found_dropped,
         "publish_guard_eligible": enrich_stats["eligible"],
         "publish_guard_enriched": enrich_stats["enriched"],
@@ -3218,10 +3319,14 @@ def run(simulate_day: bool = False):
     # docstring. Runs every night, live or sample; a missing/rejected key is tolerated so this
     # never fails the build. `nightly_budget` is CAS-987's cycle-paced share when LIVE, the old
     # fixed WM_NIGHTLY_MAX_CREDITS otherwise.
-    wm_outcomes = enrich_watchmode_fields_nightly(records, budget=nightly_budget)
+    # CAS-1310: loaded once, mutated in place by both the nightly fields pass and the CAS-986
+    # scoreability probe below, saved once at the end of this LIVE block.
+    wm_mismatch_quarantine = load_watchmode_mismatch_quarantine()
+    wm_outcomes = enrich_watchmode_fields_nightly(records, budget=nightly_budget,
+                                                  quarantine=wm_mismatch_quarantine)
     print(f"[watchmode] nightly fields: {wm_outcomes['ok']} enriched, {wm_outcomes['cached']} "
           f"cached, {wm_outcomes['no-id']} no-id, {wm_outcomes['skip']} skipped, "
-          f"{wm_outcomes['stop']} stopped")
+          f"{wm_outcomes['stop']} stopped, {wm_outcomes.get('quarantined', 0)} quarantined")
 
     # CAS-937: the nightly OscarBase awards pass — see enrich_oscarbase_awards_nightly's
     # docstring. Runs every night, live or sample; a failed fetch falls back to the committed
@@ -3250,7 +3355,7 @@ def run(simulate_day: bool = False):
         previously_published_ids = {m["tmdb_id"] for m in base_records}
         records, cas986_report = apply_two_tier_publication(
             candidates, today, counts["candidate_pool"], records, previously_published_ids,
-            probe_budget=scoreability_cap)
+            probe_budget=scoreability_cap, quarantine=wm_mismatch_quarantine)
         save_candidates(candidates)
         print(f"[candidates] candidates={cas986_report['candidates']} "
               f"unprobed={cas986_report['unprobed']} probed_today={cas986_report['probed_today']} "
@@ -3272,8 +3377,12 @@ def run(simulate_day: bool = False):
         # only two callers of enrich_watchmode_fields that can ever see that outcome.
         mismatch_total = wm_outcomes.get("mismatch", 0) + cas986_report.get("mismatch", 0)
         mismatch_ids = (wm_outcomes.get("mismatch_ids", []) + cas986_report.get("mismatch_ids", []))
+        # CAS-1310: same reasoning — the running quarantine count the nightly pass and the probe
+        # each skipped, unfetched, this run.
+        quarantined_total = wm_outcomes.get("quarantined", 0) + cas986_report.get("quarantined", 0)
         runstats.bump("watchmode", calls=run_spent, errors=counts["wm_fails"], mismatch=mismatch_total)
-        runstats.set_value("watchmode", mismatch_ids=mismatch_ids[:5])
+        runstats.set_value("watchmode", mismatch_ids=mismatch_ids[:5], quarantined=quarantined_total)
+        save_watchmode_mismatch_quarantine(wm_mismatch_quarantine)
         _save_watchmode_tv_tmdb_ids(today)
         today_total_spent = cycle["days"].get(today_iso, 0) + run_spent
         cycle["days"][today_iso] = today_total_spent
