@@ -45,8 +45,10 @@ test("CAS-1257 AC3: the built index.html carries the exact landing/heading marku
   const html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
   const count = (re) => (html.match(re) || []).length;
 
-  assert.equal(count(/#groups > \.group:first-child:not\(\.early\) > \.grouphead:not\(\.sub\)\{display:none\}/g), 1,
-    "AC3: the new first-child-not-early CSS rule must appear exactly once");
+  // CAS-1309: the first-child-not-early hiding rule is gone — every stage section heading shows now,
+  // including the first, on every stage (not just an early-tagged one).
+  assert.equal(count(/#groups > \.group:first-child:not\(\.early\) > \.grouphead:not\(\.sub\)\{display:none\}/g), 0,
+    "CAS-1309: the first-child-not-early hiding CSS rule must be gone");
   assert.equal(count(/#groups > \.group:first-child > \.grouphead:not\(\.sub\)\{display:none\}/g), 0,
     "AC3: the old first-child CSS rule (without :not(.early)) must be gone");
   assert.equal(count(/function landWatchList\(\)\{/g), 1, "AC3: landWatchList() must be defined exactly once");

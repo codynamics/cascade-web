@@ -640,6 +640,7 @@
   .gdot.opening_week{background:var(--open)} .gdot.in_cinema{background:var(--amber)}
   .gdot.pvod{background:var(--purple)} .gdot.rental{background:var(--blue)}
   .gdot.included_streaming{background:var(--green)} .gdot.upcoming{background:var(--upcoming)}
+  .gdot.upcoming_soon{background:var(--upcoming)}
   .gcount{color:var(--faint);font-weight:700}
   /* CAS-204: the cards take the full page width. 10px of side gutter on a 360px phone is 20px of nothing
      either side of every card, which is a poster's worth of width spent on air. 5px keeps the cards from
@@ -2590,16 +2591,13 @@
      stage/agent-column rail and the sort/search/filter tools row this comment used to describe — see the
      new CSS block near the end of this stylesheet (renderWatchTop() and the mood sheet, below). ---- */
   .watchtop[hidden]{display:none}
-  /* The stage line names the stage and carries its count, so the first stage heading above the list goes —
-     unless that first section is an earlier stage's (films tagged for this stage that have not arrived yet),
-     which always says what it is. */
-  #groups > .group:first-child:not(.early) > .grouphead:not(.sub){display:none}
   /* The stage's own section when nothing has arrived in it yet: its heading still shows, with one line. */
   .group.ownempty .ownnone{padding:0 12px 20px;font:500 12.5px/1.45 var(--font-body);color:var(--faint)}
   /* CAS-1298: the Watch list's stage section heading is a banner in the stage's own colour — tinted
      fill, left accent strip and a count pill — so each stage reads as a clear break in the list. Scoped to
      #groups top-level headings; the per-agent .grouphead.sub is unchanged. Earlier-stage sections stay quieter. */
-  #groups .group[data-g=upcoming]{--gc:var(--upcoming)} #groups .group[data-g=opening_week]{--gc:var(--open)}
+  #groups .group[data-g=upcoming]{--gc:var(--upcoming)} #groups .group[data-g=upcoming_soon]{--gc:var(--upcoming)}
+  #groups .group[data-g=opening_week]{--gc:var(--open)}
   #groups .group[data-g=in_cinema]{--gc:var(--amber)} #groups .group[data-g=pvod]{--gc:var(--purple)}
   #groups .group[data-g=rental]{--gc:var(--blue)} #groups .group[data-g=included_streaming]{--gc:var(--green)}
   #groups .group{margin-top:18px}
@@ -4856,6 +4854,9 @@ const STATUS_LABEL = {
   opening_week:"In Cinema · Opening week", in_cinema:"In Cinema",
   pvod:"Premium/Rent (~$30)", rental:"Rent (~$7)",
   included_streaming:"Stream (included)", upcoming:"Upcoming",
+  // CAS-1309: the Cinema tab's Upcoming stage splits into this section (cinema_date due within 7 days)
+  // ahead of "upcoming" itself — only ever a listingGroups section key, never a primaryStatus value.
+  upcoming_soon:"Next week",
   // Not an availability window (it isn't in CASCADE, so it is never a status a film HOLDS) — it's a moment,
   // and this is the label the alerts and the report print for it.
   past_opening:"Past opening weekend"
@@ -21490,7 +21491,7 @@ function listingGroups(rows, ac){
   // still overrides either, exactly as it always has.
   const tabDflt = watchTab==="in_cinema" ? "availability" : DEFAULT_SORT;
   const sortKey = effectiveSortKey(isUserSort ? filt.sort : tabDflt);
-  return orderFor(watchTab)      // CAS-750/CAS-754: order is the tab's own, not the agent's
+  const groups = orderFor(watchTab)      // CAS-750/CAS-754: order is the tab's own, not the agent's
     .map(g=>{
       const cmp=sortForKey(g, sortKey, ac && ac.kind==="cinema", isUserSort);
       // CAS-819: an explicit pick sorts across every agent within a status section — the chosen key leads,
@@ -21502,6 +21503,22 @@ function listingGroups(rows, ac){
                           : (a,b)=>filmOwnerOrder(a)-filmOwnerOrder(b) || cmp(a,b))};
     })
     .filter(x=>x.items.length);
+  // CAS-1309: the Cinema tab's Upcoming stage alone splits its one section into "Next week" (AU cinema
+  // date due within 7 days) ahead of "Upcoming" (everything else) — each keeps the sort order above
+  // intact, and an empty half is dropped like any other empty section.
+  if(watchTab==="in_cinema" && watchCinemaStage==="upcoming"){
+    const idx=groups.findIndex(x=>x.g==="upcoming");
+    if(idx>=0){
+      const isNextWeek = m => m.cinema_date!=null && m.cinema_date>=TODAY && m.cinema_date<=addDays(TODAY,7);
+      const soon=groups[idx].items.filter(isNextWeek);
+      const later=groups[idx].items.filter(m=>!isNextWeek(m));
+      const split=[];
+      if(soon.length) split.push({g:"upcoming_soon", items:soon});
+      if(later.length) split.push({g:"upcoming", items:later});
+      groups.splice(idx, 1, ...split);
+    }
+  }
+  return groups;
 }
 // CAS-1219 Change 4: true once every account-data load this session's own boot/sign-in fan-out owns has
 // actually settled. A guest device (or an account whose fan-out already resolved) is always settled —
