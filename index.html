@@ -10478,17 +10478,17 @@ const moodStylesOffKeeping = keep => ALL_GENRES.filter(g=>!keep.includes(g));
 // catalogue moods only, never the pre-existing Top scores/Releases defaults.
 const MOOD_STARTER_IDS = Object.keys(MOOD_STARTER_STYLES);
 const MOOD_DEFAULTS = [
-  {id:"top", name:"Top scores", order:"score", topYou:null, topPublic:10},
-  {id:"releases", name:"Releases", order:"release", topYou:null, topPublic:null},
+  {id:"top", name:"Top scores", order:"score", sort:"score", topYou:null, topPublic:10},
+  {id:"releases", name:"Releases", order:"release", sort:"release", topYou:null, topPublic:null},
   // CAS-1295: the shortlist — every starred film standing on the current stage, watched or not, on any
   // service (mineOnly:false), across the whole catalogue (not just what an agent lists).
-  {id:"starred", name:"Starred", source:"catalogue", starredOnly:true, topYou:null, topPublic:null,
+  {id:"starred", name:"Starred", source:"catalogue", starredOnly:true, sort:"score", topYou:null, topPublic:null,
     mineOnly:false, watched:REVIEW_STEPS.map(v=>v.key), stylesOff:[]},
-  {id:"action", name:"Action", source:"catalogue", topYou:20, topPublic:10, order:"you",
+  {id:"action", name:"Action", source:"catalogue", topYou:20, topPublic:10, order:"you", sort:"score",
     stylesOff:moodStylesOffKeeping(MOOD_STARTER_STYLES.action), watched:["wow","liked"], mineOnly:true},
-  {id:"imagine", name:"Imagine", source:"catalogue", topYou:20, topPublic:10, order:"you",
+  {id:"imagine", name:"Imagine", source:"catalogue", topYou:20, topPublic:10, order:"you", sort:"score",
     stylesOff:moodStylesOffKeeping(MOOD_STARTER_STYLES.imagine), watched:["wow","liked"], mineOnly:true},
-  {id:"fun", name:"Fun", source:"catalogue", topYou:20, topPublic:10, order:"you",
+  {id:"fun", name:"Fun", source:"catalogue", topYou:20, topPublic:10, order:"you", sort:"score",
     stylesOff:moodStylesOffKeeping(MOOD_STARTER_STYLES.fun), watched:["wow","liked"], mineOnly:true},
 ];
 const moodDefaultFieldsNow = () => ({
@@ -10517,11 +10517,18 @@ function moodTopPublicN(mood){
 function moodTopYouAvailable(){
   return !!(window.CascadePersistence && window.CascadePersistence.accountActive()) && tasteProfile().n>0;
 }
-// CAS-1296: Order is no longer a field the sheet edits — with Show top already picking the films, a manual
-// order no longer means anything. The order is derived: either Show top list being on means "by You" (which
-// sortMoviesBy/applyMoodToState fall back to Public for, signed out or no taste); both Off means "by release
-// date", the behaviour the Releases mood needs. A mood's own stored `order` field (pre-CAS-1296) is ignored.
+// CAS-1296: with Show top already picking the films, a manual order no longer decided which films showed —
+// so the order was derived instead: either Show top list being on meant "by You" (falling back to Public,
+// signed out or no taste); both Off meant "by release date", the behaviour the Releases mood needs. Kept as
+// the fallback moodSort() below uses for a mood that predates CAS-1303's explicit `sort` field.
 function moodOrder(mood){ return (moodTopYouN(mood)||moodTopPublicN(mood)) ? "you" : "release"; }
+// CAS-1303: `sort` ("score"|"release"|"title") is the mood sheet's own explicit Sort pick — Show top still
+// decides which films qualify (moodShowTopKeep); this only decides how the kept films are ordered. A mood
+// saved before this field existed has no `sort` key at all (moodDefaultFieldsNow() deliberately omits it —
+// see applyMoodToState/moodDraftFrom), so it's resolved here, in memory, from the old moodOrder() derivation
+// instead — never written back (CAS-1218/CAS-1243 no-boot-write rule). It's only ever persisted once the
+// person actually saves that mood from the sheet.
+function moodSort(mood){ return mood.sort!==undefined ? mood.sort : (moodOrder(mood)==="release" ? "release" : "score"); }
 function moodTopYouEffectiveN(mood){ return moodTopYouAvailable() ? moodTopYouN(mood) : null; }
 // CAS-1290: raises the CAS-1247 cap of five — every literal 5 that caps the mood row/sheet uses this.
 const MOOD_MAX = 10;
@@ -10551,14 +10558,13 @@ function applyMoodToState(mood){
       watchAlsoShow[tab]=new Set(hasSaved ? mood.alsoShow[tab] : (WATCH_ALSO_SHOW_DEFAULT[tab]||[]));
     }
   });
-  // C3: order:"score" does exactly what tapping Cascade score did; order:"release" does exactly what
-  // tapping Release date did. sortPicked is always true on Watch now (one flat run, no agent lanes).
-  // CAS-1264: order:"you" only means anything signed in (tasteMatch needs an account's own verdicts) —
-  // signed out it falls back to "cascade", same as every other You-dependent UI in this file.
-  // CAS-1296: the mood's own order field is no longer read — moodOrder(mood) derives it from Show top.
+  // CAS-1303: sort:"release" does exactly what tapping Release date did; sort:"title" does exactly what
+  // tapping Title A-Z did. sortPicked is always true on Watch now (one flat run, no agent lanes).
+  // CAS-1264: sort:"score" (You score) only means anything signed in (tasteMatch needs an account's own
+  // verdicts) — signed out it falls back to "cascade", same as every other You-dependent UI in this file.
   const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  const ord = moodOrder(mood);
-  filt.sort = ord==="release" ? "cinema" : (ord==="you" && signedIn) ? "you" : "cascade";
+  const sort = moodSort(mood);
+  filt.sort = sort==="release" ? "cinema" : sort==="title" ? "title" : (signedIn ? "you" : "cascade");
   sortPicked = true;
 }
 applyMoodToState(currentMood());   // C3: applied at boot, from the in-memory defaults
@@ -10597,6 +10603,9 @@ function moodDraftFrom(mood){
     alsoShow: mood && mood.alsoShow ? {premium:[...(mood.alsoShow.premium||[])], rent:[...(mood.alsoShow.rent||[])], stream:[...(mood.alsoShow.stream||[])]} : null,
     // CAS-1295: "Only starred films" — default off for a new mood, carried over for an existing one.
     starredOnly: mood ? !!mood.starredOnly : false,
+    // CAS-1303: Sort — resolved from the existing mood's own field (or the pre-CAS-1303 derivation, via
+    // moodSort) or, for a new mood, the "+ Mood" default of Score.
+    sort: mood ? moodSort(mood) : "score",
   };
 }
 window.openMoodSheetFor = id => {
@@ -10616,6 +10625,9 @@ window.toggleMoodDraftAgent = id => { if(!moodDraft) return; moodDraft.agentsOff
 // CAS-1287 Change 1: replaces setMoodDraftBest — v is null (Off) or one of 10/20/30/40, one setter per list.
 window.setMoodDraftTopYou = v => { if(!moodDraft) return; moodDraft.topYou=v; renderMoodSheetBody(); };
 window.setMoodDraftTopPublic = v => { if(!moodDraft) return; moodDraft.topPublic=v; renderMoodSheetBody(); };
+// CAS-1303: the mood sheet's new Sort section — Score/Release date/A-Z, saved with the mood like every
+// other field.
+window.setMoodDraftSort = key => { if(!moodDraft) return; moodDraft.sort=key; renderMoodSheetBody(); };
 // CAS-1284 Change 4: "My agents" (the pre-existing behaviour) or "Everything" (a catalogue-wide pool).
 window.setMoodDraftSource = key => { if(!moodDraft) return; moodDraft.source=key==="catalogue"?"catalogue":"agents"; renderMoodSheetBody(); };
 window.toggleMoodDraftMineOnly = () => { if(!moodDraft) return; moodDraft.mineOnly=!moodDraft.mineOnly; renderMoodSheetBody(); };
@@ -10670,6 +10682,7 @@ window.saveMoodFromSheet = () => {
     watched:[...d.watched], stylesOff:[...d.stylesOff], badges:[],   // CAS-1284: styles saved again; CAS-1281: badges still aren't
     alsoShow: d.alsoShow ? {premium:[...(d.alsoShow.premium||[])], rent:[...(d.alsoShow.rent||[])], stream:[...(d.alsoShow.stream||[])]} : null,
     starredOnly: !!d.starredOnly,
+    sort: d.sort,   // CAS-1303
   };
   const idx=watchMoods.findIndex(m=>m.id===mood.id);
   const selectionChanged = watchMoodSel!==mood.id;
@@ -10885,7 +10898,17 @@ function renderMoodSheetBody(){
     ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Also show</span></div>
       <div class="chips">${alsoShowHTML}</div>
-    </div>`}`;
+    </div>`}
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Sort</span></div>
+      <div class="mfseg" role="group" aria-label="Sort">
+        ${[["score","Score"],["release","Release date"],["title","A–Z"]].map(([key,label])=>{
+          const on=d.sort===key;
+          return `<button type="button" data-sort="${key}" aria-pressed="${on}" class="${on?"on":""}"
+            onclick="setMoodDraftSort('${key}')">${label}</button>`;
+        }).join("")}
+      </div>
+    </div>`;
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
     if(!d.editingId){ delBtn.textContent="Cancel"; delBtn.disabled=false; }
