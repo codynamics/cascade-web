@@ -18417,7 +18417,7 @@ const SHARP_STEPS = {
     body(){
       const c=buildOnbAgentsV2(onbFlow.answersV2).find(a=>a.template==="onb_massive");
       return c ? onbAgentRevealHTML(c, 1, "Your first agent",
-        "This agent will find the landmark, must-see movies each year. There won't be many of them (maybe 2-3 per month) but these are the ones everyone will talk about.") : "";
+        "This agent will find the landmark, must-see movies each year — the ones everyone will talk about.") : "";
     },
     // CAS-958: the grid now renders after the CTA (renderOnbStep's afterFoot hook), not inside body().
     afterFoot(){
