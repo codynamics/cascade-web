@@ -15229,7 +15229,7 @@ function onbAnswersSave(a){ onbAnswers = a; }
 // ONB_AGENTS/buildOnbAgents (the old per-answer recipe table) and obStripHTML/obLastKeys (the old
 // roster strip) are gone — CAS-911 retired them once FLOWS below stopped calling either.
 function onbAnswersV2Default(){
-  return {cinema:null, rent:null, styles:[], ages:["M","MA 15+"],
+  return {cinema:null, rent:null, styles:[], ages:["M","MA 15+"], agesTouched:false,
           cinemaAges:["M","MA 15+","R 18+"],
           partner:null, partnerDiff:null, partnerStyles:[], kids:null, kidAges:["G","PG"],
           services:[]};
@@ -18256,6 +18256,7 @@ const SHARP_STEPS = {
     wire(){
       onbFlow.answersV2=onbAnswersV2Load();
       const ans=onbFlow.answersV2;
+      if(ans.cinema==="yes" && !ans.agesTouched) ans.ages=[...ans.cinemaAges];
       const box=$("obAgesChips");
       if(box){
         box.innerHTML="";
@@ -18263,6 +18264,7 @@ const SHARP_STEPS = {
           box.appendChild(obGenChip(a, ans.ages.includes(a), ()=>{
             const i=ans.ages.indexOf(a);
             i<0 ? ans.ages.push(a) : ans.ages.splice(i,1);
+            ans.agesTouched=true;
             onbAnswersV2Save(ans);
             renderOnbStep("v2_ages");
           }));
