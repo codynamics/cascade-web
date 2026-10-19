@@ -3703,6 +3703,11 @@
     text-overflow:ellipsis;white-space:nowrap}
   .slname.faint{color:var(--faint);font-weight:500}
   .tcell.slsq{width:26px;height:26px;flex:none;aspect-ratio:auto}
+  /* CAS-1314: an unset square must read as a box you can tap, not as background. */
+  .tcell.slsq.empty{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.32)}
+  /* CAS-1314: onboarding's styles step lays the list out in two columns so Continue fits on one screen. */
+  .sllist.obsl{display:grid;grid-template-columns:1fr 1fr;column-gap:14px;row-gap:8px;margin-top:6px}
+  .sllist.obsl .slname{width:auto;flex:1;min-width:0}
   .slhint{font:500 11.5px/1.4 var(--font-body);color:var(--faint);margin:8px 0 0}
   .sllink{color:#ffd27a;text-decoration:underline;cursor:pointer}
   .slmore{margin:10px 0 12px}
@@ -16958,10 +16963,10 @@ function yearsCardHTML(){
 // CAS-1275: state/flagged/tapFn are passed in rather than read off the agent draft, so onboarding's own
 // styles step (ans.styles, no skip state, no flags) can call this with its own state instead of a copy.
 function stylesListRowHTML(g, state, flagged, tapFn){
-  const bg = state==="+" ? "#138c7d" : state==="-" ? "#b65a1c" : "rgba(255,255,255,.045)";
+  const bg = state==="+" ? "#138c7d" : state==="-" ? "#b65a1c" : "rgba(255,255,255,.10)";
   const glyph = state==="+" ? "+" : state==="-" ? "−" : "";
   const label = state==="+" ? "listed" : state==="-" ? "skipped" : "not listed";
-  const sqClass=`tcell slsq${flagged?" flag":""}`;
+  const sqClass=`tcell slsq${flagged?" flag":""}${state?"":" empty"}`;
   const sq = tapFn
     ? `<button type="button" class="${sqClass}" style="background:${bg}" aria-label="${escA(g)}: ${label}"
          onclick="${tapFn}('${escA(g)}')">${glyph}</button>`
@@ -18235,7 +18240,7 @@ const SHARP_STEPS = {
         .map(g=>stylesListRowHTML(g, ans.styles.includes(g) ? "+" : null, false, "obStylesListTap")).join("");
       return `<div class="obwrap"><h2 class="obhd">What are your favourite styles of movie?</h2></div>
         <p class="ossub">Tap the square to add a style. Pick as many as you like.</p>
-        <div class="sllist">${rows}</div>`;
+        <div class="sllist obsl">${rows}</div>`;
     },
     wire(){
       onbFlow.answersV2=onbAnswersV2Load();
