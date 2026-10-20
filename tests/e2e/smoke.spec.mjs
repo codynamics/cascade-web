@@ -1032,8 +1032,9 @@ test("Watch Cinema tab leads with Upcoming; the Streaming tab does not (CAS-750)
   await finishFlow(page);
   await toListing(page);
 
+  // CAS-1309 split Upcoming into "Next week" (upcoming_soon) then "Upcoming" — either still leads the tab.
   const cinemaFirst = await page.locator("#groups .group").first().getAttribute("data-g");
-  expect(cinemaFirst).toBe("upcoming");
+  expect(cinemaFirst).toMatch(/^upcoming/);
 
   await trackAStreamingFilm(page);
   // CAS-1223: the old header tab strip (#watchTabs .wtabbtn) is gone — "Streaming" is still its own single
@@ -1838,6 +1839,11 @@ test("CAS-919: the score row reads Watchmode fields as People/Critics, a missing
   // no-op). Force every window's marker to Off first so the floor can never react to the scores this
   // test is about to set.
   await page.evaluate(() => { WATCH_LEVEL_KEYS.forEach(k => { cascades[0].watchMarkers[k] = 0; }); });
+  // CAS-1247: the default mood caps each stage at its best 10 — nulling this card's critic score below
+  // can drop its cascadeScore far enough to fall out of that cap, silently no-oping the second
+  // fastPatchFindRow (same "film left the list" shape as the marker case above). Releases carries no
+  // cap, so select it first — the same fix the sibling collapsed-card CAS-919 test below already applies.
+  await page.locator('.moodchip[data-mood="releases"]').click();
 
   const cards = page.locator("#groups .card");
   const card = cards.first();
@@ -2052,10 +2058,17 @@ test("CAS-1264: the Order popover lists You score only when signed in, and picki
   await expect(youOpt).toBeVisible();
   await youOpt.click();
 
-  const values = await page.evaluate(() => [...document.querySelectorAll("#groups .card:not(.expanded)")]
-    .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null));
-  expect(values[0], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
-  expect(values[1], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
+  // CAS-1309 split Upcoming into two sections — sort only orders WITHIN a section (CAS-750/CAS-754), so
+  // compare the first two cards inside ONE section, not across its boundary.
+  const values = await page.evaluate(() => {
+    const group = [...document.querySelectorAll("#groups .group")]
+      .find(g => g.querySelectorAll(".card:not(.expanded)").length >= 2);
+    if(!group) return [null, null];
+    return [...group.querySelectorAll(".card:not(.expanded)")]
+      .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null);
+  });
+  expect(values[0], `first two You values (one section): ${JSON.stringify(values)}`).not.toBeNull();
+  expect(values[1], `first two You values (one section): ${JSON.stringify(values)}`).not.toBeNull();
   expect(values[0]).toBeGreaterThanOrEqual(values[1]);
 });
 
@@ -2128,10 +2141,17 @@ test("CAS-1296 AC2: a mood with Show top You set sorts the listing by You, desce
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
 
   expect(await page.evaluate(() => filt.sort)).toBe("you");
-  const values = await page.evaluate(() => [...document.querySelectorAll("#groups .card:not(.expanded)")]
-    .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null));
-  expect(values[0], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
-  expect(values[1], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
+  // CAS-1309 split Upcoming into two sections — sort only orders WITHIN a section (CAS-750/CAS-754), so
+  // compare the first two cards inside ONE section, not across its boundary.
+  const values = await page.evaluate(() => {
+    const group = [...document.querySelectorAll("#groups .group")]
+      .find(g => g.querySelectorAll(".card:not(.expanded)").length >= 2);
+    if(!group) return [null, null];
+    return [...group.querySelectorAll(".card:not(.expanded)")]
+      .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null);
+  });
+  expect(values[0], `first two You values (one section): ${JSON.stringify(values)}`).not.toBeNull();
+  expect(values[1], `first two You values (one section): ${JSON.stringify(values)}`).not.toBeNull();
   expect(values[0]).toBeGreaterThanOrEqual(values[1]);
 });
 
@@ -2196,10 +2216,17 @@ test("CAS-1303 AC2: Sort A-Z orders titles ascending; Sort Release date uses the
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
   expect(await page.evaluate(() => filt.sort)).toBe("title");
 
-  const titles = await page.evaluate(() => [...document.querySelectorAll("#groups .card:not(.expanded)")]
-    .map(el => MOVIES.find(m => m.tmdb_id === Number(el.id.replace("card-", ""))))
-    .filter(Boolean).map(m => m.title));
-  expect(titles.length, "setup: the listing must show at least two titles to prove an order").toBeGreaterThan(1);
+  // CAS-1309 split Upcoming into two sections — sort only orders WITHIN a section (CAS-750/CAS-754), so
+  // read titles from the first section with at least two cards, not across its boundary.
+  const titles = await page.evaluate(() => {
+    const group = [...document.querySelectorAll("#groups .group")]
+      .find(g => g.querySelectorAll(".card:not(.expanded)").length >= 2);
+    if(!group) return [];
+    return [...group.querySelectorAll(".card:not(.expanded)")]
+      .map(el => MOVIES.find(m => m.tmdb_id === Number(el.id.replace("card-", ""))))
+      .filter(Boolean).map(m => m.title);
+  });
+  expect(titles.length, "setup: the listing must show at least two titles in one section to prove an order").toBeGreaterThan(1);
   expect(titles).toEqual([...titles].sort((a, b) => a.localeCompare(b)));
 
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
