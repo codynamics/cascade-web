@@ -3459,24 +3459,34 @@
   .card:not(.expanded) .actions .ctl .ctog{display:none}
   .card:not(.expanded) .cmini{padding:0 4px}
   .card:not(.expanded) .actions{gap:5px}
-  /* ---- FIRST-RUN TUTORIAL (CAS-976) — five coach marks over the real listing controls ------------------
+  /* ---- GUIDED TOUR (CAS-1317, replaces the CAS-976 five-coach-mark version) ------------------------------
      One full-viewport layer above everything else (navmenu, the highest thing before this, tops out at
-     95). .tuthole is the spotlight: its own box carries the anchor's rect (plus padding), and its
-     box-shadow spreads 9999px outward, which is what actually paints the dimmed surround — the hole
-     itself stays visually clear because nothing is painted inside its own box. For the closing, anchorless
-     card, tutorialReposition() collapses the hole to a zero-size box at the viewport centre: a 0x0 box's
-     shadow still spreads the full 9999px in every direction, so the screen reads as evenly dimmed with no
-     spotlight, rather than needing a second code path. .tutscrim itself carries no background — it exists
-     only to catch pointer events everywhere outside the card and buttons, same as .overlay above. */
+     95). .tuthole is the spotlight: its own box carries the current step's anchor rect (plus padding), and
+     its box-shadow spreads 9999px outward, which is what actually paints the dimmed surround — the hole
+     itself stays visually clear because nothing is painted inside its own box. For a centred, anchorless
+     card (the opening and closing steps), tutorialReposition() collapses the hole to a zero-size box at the
+     viewport centre: a 0x0 box's shadow still spreads the full 9999px in every direction, so the screen
+     reads as evenly dimmed with no spotlight, rather than needing a second code path. .tutscrim itself
+     carries no background — it exists only to catch pointer events everywhere outside the card and
+     buttons, same as .overlay above. CAS-1317: the dim is lighter than CAS-976's (.55 vs .78) so the
+     interface stays readable around the spotlight, per the ticket's own principle 2. */
   .tutscrim{position:fixed;inset:0;z-index:120;display:none}
   .tutscrim.open{display:block}
-  .tuthole{position:fixed;pointer-events:none;border-radius:12px;box-shadow:0 0 0 9999px rgba(6,8,14,.78)}
+  .tuthole{position:fixed;pointer-events:none;border-radius:12px;box-shadow:0 0 0 9999px rgba(6,8,14,.55)}
   .tutcard{position:fixed;z-index:2;width:260px;background:var(--panel2);border:1px solid var(--line);
     border-radius:14px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  /* CAS-1317: the small friendly banner every step carries ("Cascade tour" + "n of N"). */
+  .tutbanner{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 10px;
+    font-size:11.5px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.3px}
+  .tutprog{font-weight:600;color:var(--faint);text-transform:none;letter-spacing:0}
   .tuttext{margin:0 0 14px;font-size:14.5px;line-height:1.5;color:var(--ink)}
   .tutbtns{display:flex;justify-content:space-between;align-items:center;gap:10px}
   .tutskip{background:transparent;border:none;color:var(--dim);font-size:13px;font-weight:600;cursor:pointer;padding:8px 4px}
   .tutskip:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .tutnav{display:flex;align-items:center;gap:8px}
+  .tutback{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:10px;
+    padding:9px 14px;font-weight:600;font-size:14px;cursor:pointer}
+  .tutback:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   .tutnext{background:var(--accentdeep);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-weight:700;font-size:14px;cursor:pointer}
   .tutnext:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   /* ---- Minimum client build gate (CAS-1108) ---- .tutscrim above tops out at 120; this has to sit above
@@ -4615,16 +4625,21 @@
   <div class="invcard" id="inviteBody"></div>
 </div>
 
-<!-- FIRST-RUN TUTORIAL (CAS-976) — five coach marks over the real listing. Static markup, always present,
-     toggled by .open same as .overlay above; the five cards' copy is painted by showTutorialCard() and the
-     spotlight geometry by tutorialReposition(), both further down in this script. -->
+<!-- GUIDED TOUR (CAS-1317, replaces CAS-976's five coach marks) — one card, driven over the real app
+     screens. Static markup, always present, toggled by .open same as .overlay above; each step's copy and
+     "n of N" are painted by showTutorialCard() and the spotlight geometry by tutorialReposition(), both
+     further down in this script. -->
 <div class="tutscrim" id="tutScrim" role="dialog" aria-modal="true" aria-label="Tour">
   <div class="tuthole" id="tutHole"></div>
   <div class="tutcard" id="tutCard">
+    <div class="tutbanner"><span>Cascade tour</span><span class="tutprog" id="tutProg"></span></div>
     <p class="tuttext" id="tutText"></p>
     <div class="tutbtns">
       <button type="button" class="tutskip" id="tutSkipBtn" onclick="tutorialSkip()">Skip tour</button>
-      <button type="button" class="tutnext" id="tutNextBtn" onclick="tutorialNext()">Next</button>
+      <span class="tutnav">
+        <button type="button" class="tutback" id="tutBackBtn" onclick="tutorialBack()">Back</button>
+        <button type="button" class="tutnext" id="tutNextBtn" onclick="tutorialNext()">Next</button>
+      </span>
     </div>
   </div>
 </div>
@@ -21053,40 +21068,121 @@ window.membStart=()=>{
     });
   } else proceed(false);
 };
-// ---- FIRST-RUN TUTORIAL (CAS-976) — five coach marks anchored to the real listing controls, shown once
-// per account the first time the listing paints after onboarding.
-// CAS-1222: in-memory only now, adopted off the account's own user_prefs.view.tutorialSeen field by
-// loadUserPrefs() (the account-sync IIFE, below) — a different account signing in on this device never
-// inherits "seen" from whoever was signed in before, same guarantee CAS-1100's wipeAccountLocalState used
-// to give the old localStorage key, now simply a consequence of there being nothing device-local to wipe.
+// ---- GUIDED TOUR (CAS-1317, replaces CAS-976's five coach marks) ----------------------------------------
+// Shown once per account the first time the listing paints after onboarding. Where CAS-976 pointed at four
+// small controls in place, this tour shows the whole interface first and drills into detail after: it
+// drives the app itself (switches screens, expands a card, opens the menu) across a fixed 20-step script,
+// and puts back whatever it opened on Skip or Done.
+// CAS-1222: seen-state stays in-memory only, adopted off the account's own user_prefs.view.tutorialSeen
+// field by loadUserPrefs() (the account-sync IIFE, below) — a different account signing in on this device
+// never inherits "seen" from whoever was signed in before.
 let tutorialSeenFlag=false;
 function tutorialSeen(){ return tutorialSeenFlag; }
 function markTutorialSeen(){ tutorialSeenFlag=true; pushViewField("tutorialSeen", true); }
-// The four anchored cards, in order; the fifth (closing, centred, no anchor) is appended in startTutorial.
-// Copy was originally verbatim per the CAS-976 ticket; CAS-1013 corrected the Moving card and the closing
-// card below, which had drifted from shipped behaviour (Moving's rolling window, the 5pm Sydney alert
-// time). Anchors are real listing controls: the agent rail the ticket names doesn't exist in this build
-// (agents are a vertical reorderable list, not a rail).
-// CAS-1246: Agents is back as a header chip (#agentsBtn), so the opening card anchors there again.
-function tutorialCardDefs(){
-  return [
-    {sel:"#agentsBtn", text:"Your agents live here. Each one watches for a different kind of film, all the time, so you don't have to."},
-    {sel:"#groups .card .qpub.intitle", text:"Public is what everyone thought of a film. Once you've given a few verdicts, You shows how much you're likely to enjoy it. Your agent only speaks up when a film clears the bar you set."},
-    {sel:"#groups .card .ctl.notify", text:"Films move — cinema, then rent, then streaming. Your agent follows each one and tells you when it reaches a window you actually use."},
-    {sel:"#movingBtn", text:"Alerts shows what your agents have found for you — Today, Week, 2 weeks or Month. It opens on Today."},
-  ];
-}
-// A DOM match that's actually on screen — a condensed ("cinfo") card hides its own .r-scores via
-// display:none rather than removing it, so a plain querySelector can resolve to a real element with a
-// zero-size rect. That is indistinguishable from "not present" for a coach mark to point at.
-function tutorialResolveAnchor(sel){
-  for(const el of document.querySelectorAll(sel)){
+// The one film card the tour drives through steps 7-15 (0-based 6-14 below). Captured once (the first
+// real .card on Watch — ticket rule 6) and reused across every step that needs it, rather than re-querying
+// each time: toggleExpand() below mutates the SAME node in place, so holding the reference stays valid for
+// as long as the tour does.
+let tourCardEl=null, tourCardId=null;
+function tutCaptureCard(){
+  tourCardEl=null; tourCardId=null;
+  for(const el of document.querySelectorAll("#groups .card")){
     const r=el.getBoundingClientRect();
-    if(r.width>0 && r.height>0) return el;
+    if(r.width>0 && r.height>0){
+      tourCardEl=el;
+      const m=/card-(\d+)/.exec(el.id);
+      tourCardId = m ? Number(m[1]) : null;
+      break;
+    }
   }
-  return null;
 }
-let tutCards=[], tutIdx=-1;
+function tutExpandCard(on){
+  if(tourCardId==null) return;
+  if(on !== expandedSet.has(tourCardId)) toggleExpand(tourCardId);
+}
+// Step 15's "You" chip: matchBadgeHTML renders nothing for a film with no tasteMatch yet (every film, on a
+// fresh account), so the step injects a sample lozenge in the exact spot the real one would sit — right
+// before the Public chip in the card's title, the same order titleScore (cardTopHTML) builds them in — and
+// removes it again on its own after(), tagged so this can never touch a real chip.
+function tutInjectSampleYou(){
+  if(!tourCardEl || tourCardEl.querySelector(".qyou")) return;
+  const pub=tourCardEl.querySelector(".qpub.intitle");
+  if(!pub) return;
+  const sample=document.createElement("span");
+  sample.className="qyou for c3 tutsample";
+  sample.setAttribute("aria-hidden","true");
+  sample.innerHTML="<b>88</b><small>You</small>";
+  pub.parentNode.insertBefore(sample, pub);
+}
+function tutRemoveSampleYou(){
+  const sample=tourCardEl && tourCardEl.querySelector(".qyou.tutsample");
+  if(sample) sample.remove();
+}
+// The 20-step script (Lee, approved 20 Oct). `sel` resolves against the whole document unless
+// `scope:"card"` says to resolve against tourCardEl instead; `wholeCard` spotlights tourCardEl itself.
+// `center` is the two anchorless steps (opening and closing). `before`/`after` drive and undo whatever the
+// step needs open — see endTutorial for why `after` only ever has to be idempotent, never careful about
+// what's "still" open.
+const TOUR_STEPS = [
+  {text:"Welcome to Cascade. Here's a one-minute tour of how it works.", center:true},
+  {text:"Cascade has four places. Here's what each one does.", sel:[".hdr-actions"]},
+  {text:"Watch — the films your agents have found, organised by where you can watch them: cinema, rental or streaming.", sel:["#moviesBtn"]},
+  {text:"Alerts — films you're tracking that have just arrived somewhere you watch.", sel:["#movingBtn"]},
+  {text:"Find — search any film in Cascade, whether an agent found it or not.", sel:["#findBtn"]},
+  {text:"Agents — each one hunts for a different kind of film for you, every day.", sel:["#agentsBtn"]},
+  {text:"This is a film card. Tap any card to open it.",
+    before(){ showAgentsHome(); tutCaptureCard(); }, wholeCard:true},
+  {text:"Opened, it shows the full picture — the story, trailers, cast, and where to watch.",
+    before(){ tutExpandCard(true); }, after(){ tutExpandCard(false); }, wholeCard:true},
+  {text:"Want company? Invite friends to watch it with you.", scope:"card", sel:[".exsharebtn"]},
+  {text:"Three buttons tell your agents what you want.",
+    before(){ tutExpandCard(false); }, scope:"card", sel:[".ctl.notify",".ctl.casc",".ctl.watch"]},
+  {text:"When to watch. Your agent suggests the best time — cinema, rental or streaming — and you can change it any time. Listed for cinema but you'd rather wait? Tell it to wait for streaming. Not for you? Choose Never.",
+    scope:"card", sel:[".ctl.notify"]},
+  {text:"Which agent found it. You can hand a film to a different agent — spot one the kids would love? Move it to your Family agent.",
+    scope:"card", sel:[".ctl.casc"]},
+  {text:"Seen it? Tell your agents, and what you thought. Every verdict teaches them what you like.",
+    scope:"card", sel:[".ctl.watch"]},
+  {text:"Public — one score combining what audiences and critics thought.", scope:"card", sel:[".qpub.intitle"]},
+  {text:"You — how much you're likely to enjoy it. It appears once you've rated a few films. It starts from Public, then moves up or down depending on how you've rated films with a similar mix of styles, and gets sharper with every verdict.",
+    before(){ tutInjectSampleYou(); }, after(){ tutRemoveSampleYou(); }, scope:"card", sel:[".qyou"]},
+  {text:"As films you're tracking reach cinemas, rental or your streaming services, they're listed here. We'll email you the same alerts, so you won't miss one.",
+    before(){ closeSettings(); openMovingScreen(); }, after(){ showAgentsHome(); }, sel:["#movingGroups"]},
+  {text:"Search the whole catalogue and open any film.",
+    before(){ closeSettings(); openFindScreen(); }, after(){ showAgentsHome(); }, sel:["#findSearchInput"]},
+  {text:"Agents are fully adjustable. Each one starts with sensible settings. As you rate films it learns your taste and suggests changes to its own settings, so it finds more of what you'll love.",
+    before(){ closeSettings(); openAgentsScreen(); }, after(){ showAgentsHome(); }, sel:["#agList .agrow"]},
+  {text:"Change your streaming services here any time, and see which services suit you best.",
+    before(){ showAgentsHome(); navMenuGo("settings"); }, after(){ closeSettings(); },
+    sel:['#settingsBody .urow[onclick="settingsOpenServices()"]']},
+  {text:"You're all set. Your agents report every day at 5pm.",
+    before(){ closeSettings(); showAgentsHome(); }, center:true},
+];
+let tutIdx=-1, tutCurrent=null;
+// Resolves one step's anchor(s) against the live DOM — never cached across steps, since most of the script
+// only exists once its own before() has opened the screen it lives on. A condensed ("cinfo") card hides its
+// own .r-scores via display:none rather than removing it (same trap CAS-976's tutorialResolveAnchor noted),
+// so every match is checked for a real, non-zero rect before counting as "present".
+function tutResolveEls(step){
+  const root = step.scope==="card" ? tourCardEl : document;
+  if(!root) return [];
+  const out=[];
+  (step.sel||[]).forEach(sel=>{
+    for(const el of root.querySelectorAll(sel)){
+      const r=el.getBoundingClientRect();
+      if(r.width>0 && r.height>0){ out.push(el); return; }
+    }
+  });
+  return out;
+}
+function tutResolveStep(step){
+  if(step.center) return {center:true};
+  if(step.wholeCard){
+    return (tourCardEl && tourCardEl.getBoundingClientRect().width>0) ? {els:[tourCardEl]} : null;
+  }
+  const els=tutResolveEls(step);
+  return els.length ? {els} : null;
+}
 // The one gate for the automatic (non-replay) trigger: onboarding done, at least one agent, not already
 // seen or skipped, and nothing else already on screen (a deep link opening straight into another screen
 // right after onboarding, per CAS-962, must win over the tour starting underneath it).
@@ -21106,23 +21202,37 @@ function startTutorial(){
   // see CAS-437) must still win, so the one check that matters here runs again right before the tour
   // actually shows.
   if(filmRouteId()!=null || document.querySelector(".filmpage.open")) return;
-  const anchored=tutorialCardDefs().map(c=>({text:c.text, el:tutorialResolveAnchor(c.sel)})).filter(c=>c.el);
-  // Resilience: skip a card whose anchor isn't there rather than point at nothing; if fewer than two of
-  // the four resolve, don't start at all — and don't mark it seen, so a later, better-populated listing
-  // gets a real chance at it.
-  if(anchored.length<2) return;
-  tutCards=anchored.concat([{text:"You're set. Nothing more to do today — your agents report at 5pm.", el:null}]);
-  tutIdx=0;
+  tutIdx=-1; tutCurrent=null;
   window.addEventListener("resize", tutorialReposition);
   window.addEventListener("scroll", tutorialReposition, true);
   $("tutScrim").classList.add("open");
-  showTutorialCard();
+  if(!tutorialAdvance(1)) endTutorial(false);   // step 1 is always centred/anchorless, so this never misses
+}
+// Runs the next (dir>0) or previous (dir<0) step's before(), skipping any step whose anchor doesn't resolve
+// once before() has run — CAS-976's "skip a card whose anchor isn't there" rule, extended to a tour that
+// now opens and closes screens rather than just pointing at fixed controls. Every screen a before() opens
+// is already mutually exclusive with the others it might have left behind (openMovingScreen/openFindScreen/
+// openAgentsScreen each close one another; closeSettings() above guards the one case none of them do), so
+// skipping forward or jumping back mid-script never needs its own clean-up pass here.
+function tutorialAdvance(dir){
+  let idx=tutIdx+dir;
+  while(idx>=0 && idx<TOUR_STEPS.length){
+    const step=TOUR_STEPS[idx];
+    if(step.before) step.before();
+    const resolved=tutResolveStep(step);
+    if(resolved){ tutIdx=idx; tutCurrent=resolved; showTutorialCard(); return true; }
+    idx+=dir;
+  }
+  return false;
 }
 function showTutorialCard(){
-  const c=tutCards[tutIdx];
-  $("tutText").textContent=c.text;
-  $("tutNextBtn").textContent = (tutIdx===tutCards.length-1) ? "Done" : "Next";
-  if(c.el) c.el.scrollIntoView({block:"center", inline:"center"});
+  const step=TOUR_STEPS[tutIdx];
+  $("tutText").textContent=step.text;
+  $("tutProg").textContent=`${tutIdx+1} of ${TOUR_STEPS.length}`;
+  $("tutNextBtn").textContent = (tutIdx===TOUR_STEPS.length-1) ? "Done" : "Next";
+  $("tutBackBtn").style.display = tutIdx===0 ? "none" : "";
+  const el = tutCurrent && tutCurrent.els ? tutCurrent.els[0] : null;
+  if(el) el.scrollIntoView({block:"center", inline:"center"});
   requestAnimationFrame(()=>requestAnimationFrame(tutorialReposition));
 }
 // CAS-1152: `zoom:var(--ui-scale)` (CAS-157) makes a position:fixed element's *written* style length
@@ -21139,9 +21249,20 @@ function tutZoomFactor(){
   probe.remove();
   return w>0 ? w/100 : 1;
 }
-// Re-measures the current card's anchor and repositions the spotlight + caption. Bound to resize/scroll
-// while the tour is open (AC: the cut-out stays correct after either), and called once per card on top of
-// that. The closing card carries no anchor: collapsing the hole to a zero-size box at the viewport centre
+// The union of every element a multi-anchor step (e.g. the whole nav row, or a card's three action
+// buttons) spotlights together, as one rect — a single-element step is just that element's own rect.
+function tutUnionRect(els){
+  let left=Infinity, top=Infinity, right=-Infinity, bottom=-Infinity;
+  els.forEach(el=>{
+    const r=el.getBoundingClientRect();
+    left=Math.min(left,r.left); top=Math.min(top,r.top);
+    right=Math.max(right,r.right); bottom=Math.max(bottom,r.bottom);
+  });
+  return {left, top, right, bottom, width:right-left, height:bottom-top};
+}
+// Re-measures the current step's anchor(s) and repositions the spotlight + card. Bound to resize/scroll
+// while the tour is open (AC: the cut-out stays correct after either), and called once per step on top of
+// that. A centred step carries no anchor: collapsing the hole to a zero-size box at the viewport centre
 // (see the .tuthole comment in <style>) dims the whole screen evenly instead of needing a second layout
 // branch for "no spotlight". r, vw and vh are all read-back (post-zoom, visual) units; offsetWidth/
 // offsetHeight are not — they report the card's pre-zoom authored size (CAS-1152: proven by measurement,
@@ -21149,15 +21270,18 @@ function tutZoomFactor(){
 // back ~291px under a 1.12 --ui-scale), so cardW/cardH are converted to visual units with the same probed
 // factor before mixing them into arithmetic with r/vw/vh. Only the final top/left written to .style are
 // divided back down by z, since a style write is interpreted pre-zoom — see tutZoomFactor above.
+// CAS-1317: the card docks to whichever side of the spotlight has MORE room (not "below unless it doesn't
+// fit"), so it never overlaps a spotlight that is itself nearly full-height — principle 3's "whichever is
+// clear".
 function tutorialReposition(){
   const scrim=$("tutScrim");
   if(!scrim || !scrim.classList.contains("open")) return;
-  const c=tutCards[tutIdx];
   const hole=$("tutHole"), card=$("tutCard"), pad=8, vw=innerWidth, vh=innerHeight;
   const z=tutZoomFactor();
+  const els = tutCurrent && tutCurrent.els ? tutCurrent.els : [];
   let r;
-  if(c && c.el){
-    r=c.el.getBoundingClientRect();
+  if(els.length){
+    r=tutUnionRect(els);
     hole.style.left=(r.left-pad)/z+"px"; hole.style.top=(r.top-pad)/z+"px";
     hole.style.width=(r.width+pad*2)/z+"px"; hole.style.height=(r.height+pad*2)/z+"px";
   } else {
@@ -21167,36 +21291,38 @@ function tutorialReposition(){
   }
   const cardH=(card.offsetHeight||140)*z, cardW=(card.offsetWidth||260)*z;
   let top, left;
-  if(!c || !c.el){
+  if(!els.length){
     top=(vh-cardH)/2; left=(vw-cardW)/2;
   } else {
-    const spaceBelow=vh-r.bottom-pad*2;
-    top = spaceBelow>=cardH+12 ? r.bottom+pad*2+12 : Math.max(12, r.top-pad*2-12-cardH);
+    const spaceBelow=vh-r.bottom-pad*2, spaceAbove=r.top-pad*2;
+    top = spaceBelow>=spaceAbove ? Math.min(r.bottom+pad*2+12, vh-cardH-12) : Math.max(12, r.top-pad*2-12-cardH);
+    top=Math.max(12, top);
     left = Math.min(Math.max(12, r.left), vw-cardW-12);
   }
   card.style.top=top/z+"px"; card.style.left=left/z+"px";
 }
-function tutorialNext(){
-  if(tutIdx>=tutCards.length-1){ endTutorial(true); return; }
-  tutIdx++;
-  showTutorialCard();
-}
+function tutorialNext(){ if(!tutorialAdvance(1)) endTutorial(true); }
+function tutorialBack(){ tutorialAdvance(-1); }
 function tutorialSkip(){ endTutorial(true); }
 function endTutorial(markSeen){
   $("tutScrim").classList.remove("open");
   window.removeEventListener("resize", tutorialReposition);
   window.removeEventListener("scroll", tutorialReposition, true);
+  // CAS-1317 rule 5: "everything it opened is put back on exit" — run every step's own after(), not just
+  // the current one. Forward progress often leaves an earlier step's before() already undone by a later
+  // step's own before() (step 10 collapsing what step 8 expanded, each screen-open step closing the last),
+  // so after() is written to be a safe no-op when there's nothing left for it to undo; running them all
+  // unconditionally is simpler than tracking exactly which one is still "outstanding".
+  TOUR_STEPS.forEach(step=>{ if(step.after) step.after(); });
   if(markSeen) markTutorialSeen();
-  tutCards=[]; tutIdx=-1;
+  tutIdx=-1; tutCurrent=null; tourCardEl=null; tourCardId=null;
 }
 // Replay (from the Help screen's "Still stuck?" row — CAS-1126 moved it here from Account's old Help &
 // feedback card, the only place it now lives). Help is a .uscreen sitting over whatever was already there,
 // but that "whatever" isn't always the Watch listing — Help can be reached from Menu while Moving or Agents
-// is open underneath it, and closing Help alone would just uncover that screen instead (CAS-1079: two of
-// the tour's cards anchor to #groups .card controls that are covered, not gone, so they resolved to
-// real-but-invisible rects instead of being skipped). showAgentsHome() is the same "uncover the Watch
-// listing" call applyDeepLink() already uses for the same reason — closes Moving/Agents if either is open,
-// then Help's own close reveals the listing underneath both.
+// is open underneath it, and closing Help alone would just uncover that screen instead. showAgentsHome() is
+// the same "uncover the Watch listing" call applyDeepLink() already uses for the same reason — closes
+// Moving/Agents if either is open, then Help's own close reveals the listing underneath both.
 // Bypasses tutorialSeen() on purpose, same as any other explicit "show me that again" control.
 function replayTutorial(){
   closeHelp();
