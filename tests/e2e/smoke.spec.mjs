@@ -1515,20 +1515,20 @@ test("CAS-1169 AC3: a valid new email moves straight to the code step on #membSc
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe("membCode");
   expect(await page.locator("#membEmail").evaluate(el => el.readOnly)).toBe(true);
 
-  // CAS-1216: #membCode becomes visible synchronously, but membShowCodeState's own scrollIntoView
-  // (app_template.html, B6) is deferred two requestAnimationFrame callbacks to let the code block's
-  // reflow settle first. A single boundingBox() read right after the visibility wait can land inside
-  // that two-frame window and measure .membcta before the scroll has landed — poll until the scroll
-  // is actually done before taking the single measurement the assertions below check.
+  // CAS-1316: the code step is a short, focused page scrolled to #membScreen's top rather than scrolled
+  // to the button — the heading takes over the line the offer/benefits chrome used to own, and that
+  // chrome (including .membenefits) is hidden for the duration of this state.
+  await expect(page.locator(".membh")).toHaveText("Check your email");
+  await expect(page.locator(".membenefits")).toBeHidden();
   const viewport = page.viewportSize();
-  await expect.poll(async () => {
-    const box = await page.locator(".membcta").boundingBox();
-    return box.y + box.height;
-  }).toBeLessThanOrEqual(viewport.height);
+  const screenBox = await page.locator("#membScreen").boundingBox();
+  const headBox = await page.locator(".membh").boundingBox();
+  expect(headBox.y - screenBox.y).toBeLessThanOrEqual(120);
 
-  const box = await page.locator(".membcta").boundingBox();
-  expect(box.y).toBeGreaterThanOrEqual(0);
-  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  const codeBox = await page.locator("#membCode").boundingBox();
+  const ctaBox = await page.locator(".membcta").boundingBox();
+  expect(codeBox.y).toBeGreaterThanOrEqual(0);
+  expect(ctaBox.y + ctaBox.height).toBeLessThanOrEqual(viewport.height);
 });
 
 test("CAS-1169 AC4: a wrong code stays in State B with an error; Change email returns to State A; a correct code lands on the listing", async ({ page }) => {

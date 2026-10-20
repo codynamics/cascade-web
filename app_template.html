@@ -2033,7 +2033,10 @@
   /* ---- Cascade Membership conversion page (CAS-120 / mock: 11-membership.html) ----
      The post-reveal conversion moment: offer-led, benefits under the button. Built standalone/previewable
      (?step=membership[&agent=<key>]) per Lee's wire-later call; the reveal→invite path is left as-is. */
-  .memb{position:fixed;inset:0;z-index:86;display:none;flex-direction:column;padding:24px 20px 22px;overflow-y:auto;
+  /* CAS-1316: same env(safe-area-inset-top) clearance as the header, film page and modals (CAS-509) —
+     without it the CASCADE pill sits under the iOS status bar/clock. */
+  .memb{position:fixed;inset:0;z-index:86;display:none;flex-direction:column;
+    padding:calc(24px + env(safe-area-inset-top,0px)) 20px 22px;overflow-y:auto;
     background:radial-gradient(120% 40% at 50% 0%,#141b30 0%,var(--bg) 44%,#080b14 100%)}
   .memb.open{display:flex}
   .membinner{width:100%;max-width:360px;margin:auto;display:flex;flex-direction:column;animation:splashIn .45s ease both}
@@ -20629,8 +20632,8 @@ function openMembership(agentKey, nameOverride, cascade){
   // starts — a signed-in return visit (or a guest/no-config build, per CascadeAuth.enabled) skips it.
   const needsEmail = membNeedsEmail();
   $("membBody").innerHTML = `
-    <span class="cascpill">CASCADE</span>
-    <h2 class="membh">Cascade Membership</h2>
+    <span class="cascpill" id="membPill">CASCADE</span>
+    <h2 class="membh" id="membHead">Cascade Membership</h2>
     ${haul}
     <p class="memfine">Free for your first month · then <b>$4.99/month</b> · cancel any time. No card needed — we'll always ask before anything is ever charged.</p>
     <div class="membenefits">
@@ -20639,13 +20642,15 @@ function openMembership(agentKey, nameOverride, cascade){
       </div>`).join("")}
     </div>
     ${needsEmail ? `
-    <div class="flabel">Email</div>
-    <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
-           placeholder="you@example.com" oninput="membEmailInput()">
-    <p class="fielderr" id="membEmailErr" role="alert" hidden></p>
-    <p class="fielderr" id="membAcctExists" hidden>There's already a Cascade account for that email.
-      <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
-              style="vertical-align:baseline">Sign in</button></p>
+    <div id="membEmailField">
+      <div class="flabel">Email</div>
+      <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
+             placeholder="you@example.com" oninput="membEmailInput()">
+      <p class="fielderr" id="membEmailErr" role="alert" hidden></p>
+      <p class="fielderr" id="membAcctExists" hidden>There's already a Cascade account for that email.
+        <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
+                style="vertical-align:baseline">Sign in</button></p>
+    </div>
     <div id="membCodeState" hidden>
       <p class="pnote" id="membCodeMsg"></p>
       <div class="flabel">Code</div>
@@ -20659,7 +20664,7 @@ function openMembership(agentKey, nameOverride, cascade){
     <p class="pnote">By continuing you agree to our
       <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button>.</p>` : ""}
     <button class="membcta" type="button" onclick="membStart()">Start my free month</button>
-    ${posters?`<div class="rvgrid membgrid">${posters}</div>`:""}`;
+    ${posters?`<div class="rvgrid membgrid" id="membPosterGrid">${posters}</div>`:""}`;
   membResetCodeState();   // B10: always opens in State A
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
@@ -20709,8 +20714,8 @@ function openOnbMembership(){
   const agents = onbFlow.workingAgents || [];
   const posters = onbMembershipFilms(agents).slice(0, MEMB_POSTERS).map(rvPosterHTML).join("");
   $("membBody").innerHTML = `
-    <span class="cascpill">CASCADE</span>
-    <h2 class="membh">Membership benefits</h2>
+    <span class="cascpill" id="membPill">CASCADE</span>
+    <h2 class="membh" id="membHead">Membership benefits</h2>
     <p class="membhaul">${n} agent${n===1?"":"s"} · <span class="cnt">${k}</span> film${k===1?"":"s"} worth your time · watching ${m}</p>
     <div class="membenefits">
       ${OB_MEMB_BENEFITS.map(b=>`<div class="mbrow"><span class="mbic">✓</span>
@@ -20718,13 +20723,15 @@ function openOnbMembership(){
     </div>
     <p class="memfine">Free for your first month · then <b>$4.99/month</b> · cancel any time. No card needed — we'll always ask before anything is ever charged.</p>
     ${needsEmail ? `
-    <div class="flabel">Email</div>
-    <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
-           placeholder="you@example.com" oninput="membEmailInput()">
-    <p class="fielderr" id="membEmailErr" role="alert" hidden></p>
-    <p class="fielderr" id="membAcctExists" hidden>There's already a Cascade account for that email.
-      <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
-              style="vertical-align:baseline">Sign in</button></p>
+    <div id="membEmailField">
+      <div class="flabel">Email</div>
+      <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
+             placeholder="you@example.com" oninput="membEmailInput()">
+      <p class="fielderr" id="membEmailErr" role="alert" hidden></p>
+      <p class="fielderr" id="membAcctExists" hidden>There's already a Cascade account for that email.
+        <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
+                style="vertical-align:baseline">Sign in</button></p>
+    </div>
     <div id="membCodeState" hidden>
       <p class="pnote" id="membCodeMsg"></p>
       <div class="flabel">Code</div>
@@ -20738,7 +20745,7 @@ function openOnbMembership(){
     <p class="pnote">By continuing you agree to our
       <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button>.</p>` : ""}
     <button class="membcta" type="button" onclick="membStart()">Start my free month</button>
-    ${posters?`<div class="rvgrid membgrid">${posters}</div>`:""}`;
+    ${posters?`<div class="rvgrid membgrid" id="membPosterGrid">${posters}</div>`:""}`;
   membResetCodeState();   // B10: always opens in State A
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
@@ -20808,6 +20815,10 @@ function membAcctExistsHide(){
 // code belongs to, for Resend and for the message under the field. -----------------------------------
 let membInCodeState=false;
 let membCodeEmail=null;
+// CAS-1316: .membh's text belongs to whichever page opened #membScreen ("Cascade Membership" or
+// "Membership benefits") — saved here so membBackToEmail can restore the exact heading State B
+// overwrote with "Check your email", rather than hard-coding one caller's copy into the other's path.
+let membHeadingSaved=null;
 let membResendTimer=null, membResendDeadline=0;
 function membStopResendTimer(){ if(membResendTimer){ clearInterval(membResendTimer); membResendTimer=null; } }
 // CAS-1089's own 60s throttle, mirrored here for the inline code step — driven off a deadline timestamp
@@ -20841,6 +20852,18 @@ function membResetCodeState(){
   membInCodeState=false;
   membCodeEmail=null;
   membStopResendTimer();
+  membHeadingSaved=null;
+}
+// CAS-1316: State B (the code step) is a short, focused page — these are the State A elements that
+// have no business on it (the offer/benefits chrome and the email field, now answered by the code
+// message above the field). Inline style, not the `hidden` attribute: .cascpill/.membenefits/etc already
+// set `display` from their own class rule, which would otherwise beat the `[hidden]` UA rule outright.
+function membSetStateAVisible(visible){
+  const body=$("membBody"); if(!body) return;
+  const d = visible ? "" : "none";
+  [$("membPill"), body.querySelector(".membhaul"), body.querySelector(".membenefits"),
+   body.querySelector(".memfine"), $("membEmailField"), $("membPosterGrid")]
+    .forEach(el=>{ if(el) el.style.display=d; });
 }
 // B1-B6: moves the screen from the email step to the code step, in place — no separate sheet.
 function membShowCodeState(email){
@@ -20856,18 +20879,13 @@ function membShowCodeState(email){
   const state=$("membCodeState"); if(state) state.hidden=false;
   membStartResendTimer();
   if(code) code.focus();
-  // B6: #membCode and .membcta both fully in view — the button is the lower of the two, so bringing IT
-  // fully into view is what actually needs the scroll; the code field sits in the same unbroken block
-  // directly above it, so the same scroll reveals both.
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    const scr=$("membScreen"), btn=document.querySelector(".membcta");
-    if(!(scr && btn && typeof btn.scrollIntoView==="function")) return;
-    btn.scrollIntoView({block:"end"});
-    // CAS-1242: WebKit's own "end" alignment can still leave the button's bottom edge a sub-pixel
-    // past the screen's (observed ~0.08px, CAS-1169 AC3) — round that stray fraction back in.
-    const over = btn.getBoundingClientRect().bottom - scr.getBoundingClientRect().bottom;
-    if(over > 0) scr.scrollTop += Math.ceil(over);
-  }));
+  // CAS-1316: the code step is its own short page — the offer/benefits chrome and the email field
+  // step aside, and the heading takes over their line, so the field and button sit above the keyboard
+  // without needing to scroll the button into view (that used to land the person mid-page, CAS-1169 AC3).
+  const head=$("membHead");
+  if(head && membHeadingSaved===null){ membHeadingSaved=head.textContent; head.textContent="Check your email"; }
+  membSetStateAVisible(false);
+  const scr=$("membScreen"); if(scr) scr.scrollTop=0;
 }
 // B9: back to State A — email editable and focused, code step gone, countdown stopped, both errors clear.
 // Also stands down onbMembershipInFlight: the code just abandoned can no longer land a session for this
@@ -20877,11 +20895,15 @@ window.membBackToEmail=()=>{
   membInCodeState=false;
   membCodeEmail=null;
   membStopResendTimer();
-  const emailEl=$("membEmail");
-  if(emailEl){ emailEl.readOnly=false; emailEl.style.opacity=""; emailEl.focus(); }
   const state=$("membCodeState"); if(state) state.hidden=true;
   membEmailError(null);
   membCodeErrorShow(null);
+  membSetStateAVisible(true);
+  const head=$("membHead");
+  if(head && membHeadingSaved!==null){ head.textContent=membHeadingSaved; membHeadingSaved=null; }
+  // Restored to visible above — focus has to happen after, or it's a no-op on a still-display:none field.
+  const emailEl=$("membEmail");
+  if(emailEl){ emailEl.readOnly=false; emailEl.style.opacity=""; emailEl.focus(); }
 };
 // B4: resends to the email State B is currently showing, and restarts the countdown.
 window.membResendCode=()=>{
