@@ -2484,21 +2484,30 @@ test("CAS-1306: suggestion rows read Apply with Suggested: skip., and Apply all 
   await expect(page.locator(".tsugg")).toHaveCount(0);
 });
 
-test("CAS-1269 AC2: Skip on a style writes exclude, Neither clears both, and Back keeps it", async ({ page }) => {
+test("CAS-1318: a single style only has two states — tapping the cell toggles + and off, Off replaces − Skip, and Back keeps it", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openStyleGrid(page);
 
-  await page.locator('.tgrid .tcell.allc[aria-label="Action"]').click();
-  await page.locator(".tdetail button", { hasText: "− Skip" }).click();
-  expect(await page.evaluate(() => onbFlow.draft.exclude)).toContain("Action");
-  expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBe("-");
+  await expect(page.locator(".tlegend-agent")).toContainText("skip (combination)");   // AC4: not "for styles" any more
 
-  await page.locator(".tdetail button", { hasText: "Neither" }).click();
-  expect(await page.evaluate(() => (onbFlow.draft.exclude || []).includes("Action"))).toBe(false);
+  const actionCell = page.locator('.tgrid .tcell.allc[aria-label="Action"]');
+  expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBe("+");
+
+  await actionCell.click();   // selects the cell AND toggles it: + -> off
   expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBeNull();
+  // CAS-1318: a whole style is never written to exclude by the grid any more — off is plainly absent
+  // from the on-list, the same representation the Basic Styles list and matchesCriteria both read.
+  expect(await page.evaluate(() => (onbFlow.draft.exclude || []).includes("Action"))).toBe(false);
+  await expect(page.locator(".tdetail button")).toHaveCount(2);
+  await expect(page.locator(".tdetail button", { hasText: "− Skip" })).toHaveCount(0);
+  await expect(page.locator(".tdetail button", { hasText: "Off" })).toHaveClass(/on/);
 
+  await page.locator(".tdetail button", { hasText: "+ List" }).click();   // off -> + again, via the detail panel
+  expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBe("+");
+
+  await actionCell.click();   // + -> off, for the Back/save check below
   const agentId = await page.evaluate(() => onbFlow.draft.id);
   await expect(page.locator("#onbStepInner .osback")).toBeVisible();
   await page.locator("#onbStepInner .osback").click();   // Style -> Briefing
@@ -2508,10 +2517,6 @@ test("CAS-1269 AC2: Skip on a style writes exclude, Neither clears both, and Bac
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
   const saved = await page.evaluate(id => cascades.find(c => c.id === id), agentId);
   expect(saved.exclude || []).not.toContain("Action");
-  // commitDraft() copies draft.genre/exclude verbatim (no transform), so the saved reading must match the
-  // draft reading just above — still null. styleGridSetStyle never re-adds a style to the include set on
-  // Neither (dEffectiveGenreSet nets out the current exclude set on purpose, so one style's Neither can
-  // never silently resurrect another's "+" the way a raw genre-array edit could — see its own comment).
   expect(await page.evaluate(id => styleGridState(cascades.find(c => c.id === id), "Action"), agentId)).toBeNull();
 });
 

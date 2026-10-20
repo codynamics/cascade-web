@@ -12370,11 +12370,12 @@ const cascadeOrderCmp = (a,b) => (a.order??1e9)-(b.order??1e9)
 // criteria, the windows, the scope and the alert moments. Nothing about a second copy can ever find a film the
 // first didn't, so keeping it is noise with no upside.
 // Only EXACT twins collapse. Two Cascades that differ anywhere — even one genre chip — are two real radars.
-// CAS-1147: bumped when the genre-matching RULE itself changes (first-style-only -> any-style) rather than
-// any agent's own criteria — folded into cascSigOf below so every stored agent_films row reads as drifted
-// on the first pass after this ships, the same "news about the agent, not the film" treatment CAS-715's
-// admitDrift already gives a hand-edited agent (see recomputeFound's own cascadeDrift comment).
-const GENRE_RULE_V = 2;
+// CAS-1147/CAS-1318: bumped when the genre-matching RULE itself changes (first-style-only -> any-style ->
+// main-style-only) rather than any agent's own criteria — folded into cascSigOf below so every stored
+// agent_films row reads as drifted on the first pass after this ships, the same "news about the agent,
+// not the film" treatment CAS-715's admitDrift already gives a hand-edited agent (see recomputeFound's
+// own cascadeDrift comment).
+const GENRE_RULE_V = 3;
 const cascSigOf = c => JSON.stringify([c.name, c.status, c.genre, c.exclude, c.pairs||{}, c.age, c.culture, c.year,
   c.imdb, c.rt, c.awards, c.budget, c.includeUnbudgeted, c.includeUnrated, c.tentpole,
   c.selCrowd||0, c.selCritScore||0, c.selAwards||0, c.selScale||0, c.selBuzz||0, !!c.selOr, c.yearsBack||0,
@@ -12651,10 +12652,15 @@ function matchesCriteria(m,c,ignoreBlocked,ignoreScoreGate){
   const pairVer=pairVerdict(m,c);
   if(pairVer==="out") return false;
   if(pairVer!=="in"){
-    if((c.exclude||[]).length && (m.genres||[]).some(g=>c.exclude.includes(g))) return false;   // skip beats match
     if(c.genre===null) return false;
-    // CAS-1147: ANY of the film's styles counts, not only the first — Lee's decision, 2026-10-02.
-    if(c.genre.length && !(m.genres||[]).some(g=>c.genre.includes(g))) return false;
+    // CAS-1318: a film is admitted or excluded by its MAIN style only (m.genres[0], TMDB's lead genre) —
+    // Lee's decision, 2026-10-20, supersedes CAS-1147's "any style" rule. Secondary styles no longer admit
+    // or exclude on their own; they matter only through a combination (pairVer, above). c.exclude still
+    // subtracts from the on-list (an agent can still say "every style but Horror").
+    const on=(c.genre.length ? c.genre : ALL_GENRES).filter(g=>!(c.exclude||[]).includes(g));
+    const main=(m.genres||[])[0];
+    // A film with no genres at all is admitted only when every style is on (nothing excluded).
+    if(main===undefined ? on.length<ALL_GENRES.length : !on.includes(main)) return false;
   }
   // CAS-744: includeUnrated was wired to ratingOK (the IMDb bar) only — this gate never read it, so the
   // escape hatch did nothing for a film with no age_rating at all (m.age_rating null/""), which is the
@@ -14509,11 +14515,11 @@ const ONB_GENRES=[...ALL_GENRES].sort((a,b)=>GENRE_COUNT[b]-GENRE_COUNT[a] || a.
 // grid's "effective state" below is a UI/flag-threshold notion only (rule 7) — real admission precedence
 // (pairVerdict, CAS-1268) is untouched and still wins inside matchesCriteria.
 function stylePairKey(a,b){ return a<b ? a+"|"+b : b+"|"+a; }
-// A style's own setting: c.exclude always wins (the same precedence matchesCriteria gives it), "+" is
-// being in the include list (or the list being "all", c.genre===[]), null is neither — not listed, no
-// explicit skip.
+// CAS-1318: a style is two-state now — "+" (on) or null (off). c.exclude still reads as off, for an
+// agent saved before this ticket; it carries no state of its own any more (there is no third "skip"
+// state for a single style — that survives only for a combination, in c.pairs).
 function styleGridState(c,g){
-  if((c.exclude||[]).includes(g)) return "-";
+  if((c.exclude||[]).includes(g)) return null;
   const genre=c.genre;
   if(genre===null) return null;
   if(!genre.length) return "+";
@@ -17537,9 +17543,11 @@ function styleGridDetailHTML(c,T,a,b,flagKeys){
     tasteLine = `Your taste: ${data.n} verdict${data.n===1?"":"s"}, ${words}. ${tally}.`;
   }
   const tasteLineHTML = esc(tasteLine) + (flagged ? ` <span style="color:#ffd27a">Your taste suggests a change here.</span>` : "");
-  const thirdLabel = isAll ? "Neither" : "Follow its styles";
   const bArg = b ? `'${escA(b)}'` : "null";
-  const btns=[{label:"+ List",v:"+"},{label:"− Skip",v:"-"},{label:thirdLabel,v:null}].map(o=>{
+  // CAS-1318: a whole style only has two states now (+ List / Off) — the third "− Skip" button is a
+  // combination-only control, kept for a pair.
+  const btns=(isAll ? [{label:"+ List",v:"+"},{label:"Off",v:null}]
+    : [{label:"+ List",v:"+"},{label:"− Skip",v:"-"},{label:"Follow its styles",v:null}]).map(o=>{
     const on=own===o.v;
     const vArg = o.v===null ? "null" : `'${o.v}'`;
     return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
@@ -17565,7 +17573,7 @@ function styleGridScreenHTML(){
       onclick="styleGridSetView('taste')">Your taste</button>
   </div>`;
   const notesHTML = `<div class="tnotes">
-      <p class="tnote${styleGridView==="agent"?"":" off"}">Tap the first column to cycle a whole style (+ list, − skip, neither), or a square to cycle two styles together (+, −, follow its styles). A combination beats its styles.</p>
+      <p class="tnote${styleGridView==="agent"?"":" off"}">Tap a style to turn it on or off — an agent finds films whose main style is on. Tap a square to set a combination (+ list, − skip, or follow the styles). A combination beats the styles.</p>
       <p class="tnote${styleGridView==="taste"?"":" off"}">The same grid coloured by your verdicts, exactly as on Your taste. Switch back to compare.</p>
     </div>`;
   const headerHTML = `<span class="tc0"></span><span class="th all">All</span>`
@@ -17580,7 +17588,7 @@ function styleGridScreenHTML(){
   const legend = styleGridView==="agent"
     ? `<div class="tlegend tlegend-agent">
         <span class="lg"><i style="background:#138c7d"></i>+ list</span>
-        <span class="lg"><i style="background:#b65a1c"></i>− skip</span>
+        <span class="lg"><i style="background:#b65a1c"></i>− skip (combination)</span>
         <span class="lg"><i style="background:rgba(45,212,191,.22)"></i>listed by its styles</span>
         <span class="lg"><i style="background:rgba(255,255,255,.045)"></i>not listed</span>
         <span class="lg">! suggested update</span>
@@ -17612,9 +17620,10 @@ function styleGridRepaint(){
   if(page) page.scrollTop = sy;
 }
 window.styleGridSetView = v => { styleGridView=v; styleGridRepaint(); };
-// CAS-1276: in "This agent" view a tap both selects the cell AND cycles its setting — the first column
-// (whole style) walks + list -> - skip -> neither -> + list; a pair square walks follow its styles -> + list
-// -> - skip -> follow its styles. In "Your taste" view a tap only selects, same as before.
+// CAS-1276/CAS-1318: in "This agent" view a tap both selects the cell AND cycles its setting — a pair
+// square walks follow its styles -> + list -> - skip -> follow its styles. The first column (whole
+// style) only TOGGLES now (+ list <-> off) — a single style lost its third "skip" state to CAS-1318; that
+// survives only for a combination. In "Your taste" view a tap only selects, same as before.
 window.styleGridTapCell = (a,b) => {
   styleGridSel={a, b:b||null};
   if(styleGridView==="agent"){
@@ -17624,7 +17633,7 @@ window.styleGridTapCell = (a,b) => {
       styleGridSetPair(a,b, own==="+" ? "-" : own==="-" ? null : "+");
     } else {
       const state=styleGridState(c,a);
-      styleGridSetStyle(a, state==="+" ? "-" : state==="-" ? null : "+");
+      styleGridSetStyle(a, state==="+" ? null : "+");
     }
   }
   styleGridRepaint();
