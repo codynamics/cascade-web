@@ -272,14 +272,14 @@
   /* CAS-636: Moving takes the same gold the "Can Watch" state already uses (#ffd54a) — the chip that opens
      the alert feed is tinted with the one state that feed exists to surface. */
   #movingBtn{--mcf:#ffd54a}
-  #movingBtn.active{--mcf:#161000}
+  #movingBtn.active{--mcf:#fff}
   #movingBtn:not(.active){background:rgba(255,213,74,.09);border-color:rgba(255,213,74,.32)}
   #movingBtn.active{box-shadow:0 5px 16px -5px rgba(255,213,74,.7)}
   .modechip.mv.active{background:linear-gradient(135deg,#ffd54a 0%,#f0a336 100%);border-color:#ffd54a;color:#161000}
   /* CAS-1186: Find takes --cyan — distinct from Watch's blue and Moving's amber, and already the colour the
      app's own search affordances (focus rings, the Watch search icon) use. */
   #findBtn{--mcf:var(--cyan)}
-  #findBtn.active{--mcf:#001a1f}
+  #findBtn.active{--mcf:#fff}
   #findBtn:not(.active){background:rgba(34,211,238,.09);border-color:rgba(34,211,238,.32)}
   #findBtn.active{box-shadow:0 5px 16px -5px rgba(34,211,238,.7)}
   .modechip.fd.active{background:linear-gradient(135deg,#22d3ee 0%,#0891b2 100%);border-color:#22d3ee;color:#001a1f}
@@ -640,6 +640,7 @@
   .gdot.opening_week{background:var(--open)} .gdot.in_cinema{background:var(--amber)}
   .gdot.pvod{background:var(--purple)} .gdot.rental{background:var(--blue)}
   .gdot.included_streaming{background:var(--green)} .gdot.upcoming{background:var(--upcoming)}
+  .gdot.upcoming_soon{background:var(--upcoming)}
   .gcount{color:var(--faint);font-weight:700}
   /* CAS-204: the cards take the full page width. 10px of side gutter on a 360px phone is 20px of nothing
      either side of every card, which is a poster's worth of width spent on air. 5px keeps the cards from
@@ -2032,7 +2033,10 @@
   /* ---- Cascade Membership conversion page (CAS-120 / mock: 11-membership.html) ----
      The post-reveal conversion moment: offer-led, benefits under the button. Built standalone/previewable
      (?step=membership[&agent=<key>]) per Lee's wire-later call; the reveal→invite path is left as-is. */
-  .memb{position:fixed;inset:0;z-index:86;display:none;flex-direction:column;padding:24px 20px 22px;overflow-y:auto;
+  /* CAS-1316: same env(safe-area-inset-top) clearance as the header, film page and modals (CAS-509) —
+     without it the CASCADE pill sits under the iOS status bar/clock. */
+  .memb{position:fixed;inset:0;z-index:86;display:none;flex-direction:column;
+    padding:calc(24px + env(safe-area-inset-top,0px)) 20px 22px;overflow-y:auto;
     background:radial-gradient(120% 40% at 50% 0%,#141b30 0%,var(--bg) 44%,#080b14 100%)}
   .memb.open{display:flex}
   .membinner{width:100%;max-width:360px;margin:auto;display:flex;flex-direction:column;animation:splashIn .45s ease both}
@@ -2590,16 +2594,13 @@
      stage/agent-column rail and the sort/search/filter tools row this comment used to describe — see the
      new CSS block near the end of this stylesheet (renderWatchTop() and the mood sheet, below). ---- */
   .watchtop[hidden]{display:none}
-  /* The stage line names the stage and carries its count, so the first stage heading above the list goes —
-     unless that first section is an earlier stage's (films tagged for this stage that have not arrived yet),
-     which always says what it is. */
-  #groups > .group:first-child:not(.early) > .grouphead:not(.sub){display:none}
   /* The stage's own section when nothing has arrived in it yet: its heading still shows, with one line. */
   .group.ownempty .ownnone{padding:0 12px 20px;font:500 12.5px/1.45 var(--font-body);color:var(--faint)}
   /* CAS-1298: the Watch list's stage section heading is a banner in the stage's own colour — tinted
      fill, left accent strip and a count pill — so each stage reads as a clear break in the list. Scoped to
      #groups top-level headings; the per-agent .grouphead.sub is unchanged. Earlier-stage sections stay quieter. */
-  #groups .group[data-g=upcoming]{--gc:var(--upcoming)} #groups .group[data-g=opening_week]{--gc:var(--open)}
+  #groups .group[data-g=upcoming]{--gc:var(--upcoming)} #groups .group[data-g=upcoming_soon]{--gc:var(--upcoming)}
+  #groups .group[data-g=opening_week]{--gc:var(--open)}
   #groups .group[data-g=in_cinema]{--gc:var(--amber)} #groups .group[data-g=pvod]{--gc:var(--purple)}
   #groups .group[data-g=rental]{--gc:var(--blue)} #groups .group[data-g=included_streaming]{--gc:var(--green)}
   #groups .group{margin-top:18px}
@@ -2881,7 +2882,7 @@
   .obsub{font-size:12.5px;color:var(--accenttext);margin:0 0 18px}
   .obq{font-size:15px;font-weight:750;color:var(--ink);margin:0 0 9px}
   .obq:not(:first-of-type){margin-top:20px}
-  .obhint{font-size:11.5px;color:var(--faint);margin:7px 0 0;line-height:1.5}
+  .obhint{font-size:11.5px;color:var(--dim);margin:7px 0 0;line-height:1.5}
   .obgrp{font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--faint);margin:16px 0 7px}
   /* the persistent roster strip
      CAS-626 device-parity-ignore: R2 — this sticks to its scrolling ancestor's padding edge, not the true
@@ -2916,11 +2917,11 @@
      "YesOften enough to plan around it". .oboptsub's own margin-top only applies once it is a block. */
   .obopttext{display:flex;flex-direction:column;min-width:0}
   .obopttitle{font-size:15px;font-weight:650}
-  .oboptsub{font-size:12px;color:var(--faint);margin-top:2px}
+  .oboptsub{font-size:12px;color:var(--dim);margin-top:2px}
   .obopt:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   /* The two statement-only screens (v2_intro/v2_handoff) — a headline with one highlighted phrase, same
      copy weight as .obhd, plus a longer explanatory paragraph .obsub is too small a font for. */
-  .obintrotext{font-size:14px;line-height:1.55;color:var(--dim);margin:10px 0 0}
+  .obintrotext{font-size:14px;line-height:1.55;color:#d6dce6;margin:10px 0 0}
   .obhi{color:var(--brand-blue)} /* a11y-contrast-ignore: LARGE-TEXT — inline span inside .obhd (22px/800), inherits that size; clears 3:1 large-text AA on every surface */
   /* ==== CAS-629 Onboarding S5/S6: the roster commits (S5) and reports back (S6) — both are read-only
      rows/cards inside the shared .obwrap skin above, nothing here is a control. */
@@ -3458,24 +3459,34 @@
   .card:not(.expanded) .actions .ctl .ctog{display:none}
   .card:not(.expanded) .cmini{padding:0 4px}
   .card:not(.expanded) .actions{gap:5px}
-  /* ---- FIRST-RUN TUTORIAL (CAS-976) — five coach marks over the real listing controls ------------------
+  /* ---- GUIDED TOUR (CAS-1317, replaces the CAS-976 five-coach-mark version) ------------------------------
      One full-viewport layer above everything else (navmenu, the highest thing before this, tops out at
-     95). .tuthole is the spotlight: its own box carries the anchor's rect (plus padding), and its
-     box-shadow spreads 9999px outward, which is what actually paints the dimmed surround — the hole
-     itself stays visually clear because nothing is painted inside its own box. For the closing, anchorless
-     card, tutorialReposition() collapses the hole to a zero-size box at the viewport centre: a 0x0 box's
-     shadow still spreads the full 9999px in every direction, so the screen reads as evenly dimmed with no
-     spotlight, rather than needing a second code path. .tutscrim itself carries no background — it exists
-     only to catch pointer events everywhere outside the card and buttons, same as .overlay above. */
+     95). .tuthole is the spotlight: its own box carries the current step's anchor rect (plus padding), and
+     its box-shadow spreads 9999px outward, which is what actually paints the dimmed surround — the hole
+     itself stays visually clear because nothing is painted inside its own box. For a centred, anchorless
+     card (the opening and closing steps), tutorialReposition() collapses the hole to a zero-size box at the
+     viewport centre: a 0x0 box's shadow still spreads the full 9999px in every direction, so the screen
+     reads as evenly dimmed with no spotlight, rather than needing a second code path. .tutscrim itself
+     carries no background — it exists only to catch pointer events everywhere outside the card and
+     buttons, same as .overlay above. CAS-1317: the dim is lighter than CAS-976's (.55 vs .78) so the
+     interface stays readable around the spotlight, per the ticket's own principle 2. */
   .tutscrim{position:fixed;inset:0;z-index:120;display:none}
   .tutscrim.open{display:block}
-  .tuthole{position:fixed;pointer-events:none;border-radius:12px;box-shadow:0 0 0 9999px rgba(6,8,14,.78)}
+  .tuthole{position:fixed;pointer-events:none;border-radius:12px;box-shadow:0 0 0 9999px rgba(6,8,14,.55)}
   .tutcard{position:fixed;z-index:2;width:260px;background:var(--panel2);border:1px solid var(--line);
     border-radius:14px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  /* CAS-1317: the small friendly banner every step carries ("Cascade tour" + "n of N"). */
+  .tutbanner{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 10px;
+    font-size:11.5px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.3px}
+  .tutprog{font-weight:600;color:var(--faint);text-transform:none;letter-spacing:0}
   .tuttext{margin:0 0 14px;font-size:14.5px;line-height:1.5;color:var(--ink)}
   .tutbtns{display:flex;justify-content:space-between;align-items:center;gap:10px}
   .tutskip{background:transparent;border:none;color:var(--dim);font-size:13px;font-weight:600;cursor:pointer;padding:8px 4px}
   .tutskip:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .tutnav{display:flex;align-items:center;gap:8px}
+  .tutback{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:10px;
+    padding:9px 14px;font-weight:600;font-size:14px;cursor:pointer}
+  .tutback:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   .tutnext{background:var(--accentdeep);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-weight:700;font-size:14px;cursor:pointer}
   .tutnext:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
   /* ---- Minimum client build gate (CAS-1108) ---- .tutscrim above tops out at 120; this has to sit above
@@ -3705,6 +3716,11 @@
     text-overflow:ellipsis;white-space:nowrap}
   .slname.faint{color:var(--faint);font-weight:500}
   .tcell.slsq{width:26px;height:26px;flex:none;aspect-ratio:auto}
+  /* CAS-1314: an unset square must read as a box you can tap, not as background. */
+  .tcell.slsq.empty{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.32)}
+  /* CAS-1314: onboarding's styles step lays the list out in two columns so Continue fits on one screen. */
+  .sllist.obsl{display:grid;grid-template-columns:1fr 1fr;column-gap:14px;row-gap:8px;margin-top:6px}
+  .sllist.obsl .slname{width:auto;flex:1;min-width:0}
   .slhint{font:500 11.5px/1.4 var(--font-body);color:var(--faint);margin:8px 0 0}
   .sllink{color:#ffd27a;text-decoration:underline;cursor:pointer}
   .slmore{margin:10px 0 12px}
@@ -4609,16 +4625,21 @@
   <div class="invcard" id="inviteBody"></div>
 </div>
 
-<!-- FIRST-RUN TUTORIAL (CAS-976) — five coach marks over the real listing. Static markup, always present,
-     toggled by .open same as .overlay above; the five cards' copy is painted by showTutorialCard() and the
-     spotlight geometry by tutorialReposition(), both further down in this script. -->
+<!-- GUIDED TOUR (CAS-1317, replaces CAS-976's five coach marks) — one card, driven over the real app
+     screens. Static markup, always present, toggled by .open same as .overlay above; each step's copy and
+     "n of N" are painted by showTutorialCard() and the spotlight geometry by tutorialReposition(), both
+     further down in this script. -->
 <div class="tutscrim" id="tutScrim" role="dialog" aria-modal="true" aria-label="Tour">
   <div class="tuthole" id="tutHole"></div>
   <div class="tutcard" id="tutCard">
+    <div class="tutbanner"><span>Cascade tour</span><span class="tutprog" id="tutProg"></span></div>
     <p class="tuttext" id="tutText"></p>
     <div class="tutbtns">
       <button type="button" class="tutskip" id="tutSkipBtn" onclick="tutorialSkip()">Skip tour</button>
-      <button type="button" class="tutnext" id="tutNextBtn" onclick="tutorialNext()">Next</button>
+      <span class="tutnav">
+        <button type="button" class="tutback" id="tutBackBtn" onclick="tutorialBack()">Back</button>
+        <button type="button" class="tutnext" id="tutNextBtn" onclick="tutorialNext()">Next</button>
+      </span>
     </div>
   </div>
 </div>
@@ -4856,6 +4877,9 @@ const STATUS_LABEL = {
   opening_week:"In Cinema · Opening week", in_cinema:"In Cinema",
   pvod:"Premium/Rent (~$30)", rental:"Rent (~$7)",
   included_streaming:"Stream (included)", upcoming:"Upcoming",
+  // CAS-1309: the Cinema tab's Upcoming stage splits into this section (cinema_date due within 7 days)
+  // ahead of "upcoming" itself — only ever a listingGroups section key, never a primaryStatus value.
+  upcoming_soon:"Next week",
   // Not an availability window (it isn't in CASCADE, so it is never a status a film HOLDS) — it's a moment,
   // and this is the label the alerts and the report print for it.
   past_opening:"Past opening weekend"
@@ -12361,11 +12385,12 @@ const cascadeOrderCmp = (a,b) => (a.order??1e9)-(b.order??1e9)
 // criteria, the windows, the scope and the alert moments. Nothing about a second copy can ever find a film the
 // first didn't, so keeping it is noise with no upside.
 // Only EXACT twins collapse. Two Cascades that differ anywhere — even one genre chip — are two real radars.
-// CAS-1147: bumped when the genre-matching RULE itself changes (first-style-only -> any-style) rather than
-// any agent's own criteria — folded into cascSigOf below so every stored agent_films row reads as drifted
-// on the first pass after this ships, the same "news about the agent, not the film" treatment CAS-715's
-// admitDrift already gives a hand-edited agent (see recomputeFound's own cascadeDrift comment).
-const GENRE_RULE_V = 2;
+// CAS-1147/CAS-1318: bumped when the genre-matching RULE itself changes (first-style-only -> any-style ->
+// main-style-only) rather than any agent's own criteria — folded into cascSigOf below so every stored
+// agent_films row reads as drifted on the first pass after this ships, the same "news about the agent,
+// not the film" treatment CAS-715's admitDrift already gives a hand-edited agent (see recomputeFound's
+// own cascadeDrift comment).
+const GENRE_RULE_V = 3;
 const cascSigOf = c => JSON.stringify([c.name, c.status, c.genre, c.exclude, c.pairs||{}, c.age, c.culture, c.year,
   c.imdb, c.rt, c.awards, c.budget, c.includeUnbudgeted, c.includeUnrated, c.tentpole,
   c.selCrowd||0, c.selCritScore||0, c.selAwards||0, c.selScale||0, c.selBuzz||0, !!c.selOr, c.yearsBack||0,
@@ -12642,10 +12667,15 @@ function matchesCriteria(m,c,ignoreBlocked,ignoreScoreGate){
   const pairVer=pairVerdict(m,c);
   if(pairVer==="out") return false;
   if(pairVer!=="in"){
-    if((c.exclude||[]).length && (m.genres||[]).some(g=>c.exclude.includes(g))) return false;   // skip beats match
     if(c.genre===null) return false;
-    // CAS-1147: ANY of the film's styles counts, not only the first — Lee's decision, 2026-10-02.
-    if(c.genre.length && !(m.genres||[]).some(g=>c.genre.includes(g))) return false;
+    // CAS-1318: a film is admitted or excluded by its MAIN style only (m.genres[0], TMDB's lead genre) —
+    // Lee's decision, 2026-10-20, supersedes CAS-1147's "any style" rule. Secondary styles no longer admit
+    // or exclude on their own; they matter only through a combination (pairVer, above). c.exclude still
+    // subtracts from the on-list (an agent can still say "every style but Horror").
+    const on=(c.genre.length ? c.genre : ALL_GENRES).filter(g=>!(c.exclude||[]).includes(g));
+    const main=(m.genres||[])[0];
+    // A film with no genres at all is admitted only when every style is on (nothing excluded).
+    if(main===undefined ? on.length<ALL_GENRES.length : !on.includes(main)) return false;
   }
   // CAS-744: includeUnrated was wired to ratingOK (the IMDb bar) only — this gate never read it, so the
   // escape hatch did nothing for a film with no age_rating at all (m.age_rating null/""), which is the
@@ -14500,11 +14530,11 @@ const ONB_GENRES=[...ALL_GENRES].sort((a,b)=>GENRE_COUNT[b]-GENRE_COUNT[a] || a.
 // grid's "effective state" below is a UI/flag-threshold notion only (rule 7) — real admission precedence
 // (pairVerdict, CAS-1268) is untouched and still wins inside matchesCriteria.
 function stylePairKey(a,b){ return a<b ? a+"|"+b : b+"|"+a; }
-// A style's own setting: c.exclude always wins (the same precedence matchesCriteria gives it), "+" is
-// being in the include list (or the list being "all", c.genre===[]), null is neither — not listed, no
-// explicit skip.
+// CAS-1318: a style is two-state now — "+" (on) or null (off). c.exclude still reads as off, for an
+// agent saved before this ticket; it carries no state of its own any more (there is no third "skip"
+// state for a single style — that survives only for a combination, in c.pairs).
 function styleGridState(c,g){
-  if((c.exclude||[]).includes(g)) return "-";
+  if((c.exclude||[]).includes(g)) return null;
   const genre=c.genre;
   if(genre===null) return null;
   if(!genre.length) return "+";
@@ -15223,7 +15253,7 @@ function onbAnswersSave(a){ onbAnswers = a; }
 // ONB_AGENTS/buildOnbAgents (the old per-answer recipe table) and obStripHTML/obLastKeys (the old
 // roster strip) are gone — CAS-911 retired them once FLOWS below stopped calling either.
 function onbAnswersV2Default(){
-  return {cinema:null, rent:null, styles:[], ages:["M","MA 15+"],
+  return {cinema:null, rent:null, styles:[], ages:["M","MA 15+"], agesTouched:false,
           cinemaAges:["M","MA 15+","R 18+"],
           partner:null, partnerDiff:null, partnerStyles:[], kids:null, kidAges:["G","PG"],
           services:[]};
@@ -15357,7 +15387,7 @@ function onbFamilyCritV2(ans, s){
 // order follows array position: Massive Movies is rank 0, and is therefore the default owner of a
 // contested film — deliberate, not incidental.
 const ONB_AGENTS_V2 = [
-  {key:"onb_massive", icon:"🎬", name: ans=>ans.cinema==="yes" ? "In Cinema" : "Massive Movies", who:"me", when:a=>true,
+  {key:"onb_massive", icon:"🎬", name:"Cinema Releases", who:"me", when:a=>true,
    build(ans){ const r = onbAgentCapSolveV2(onbMassiveCritV2, ans, 85); return onbMassiveCritV2(ans, r.score); }},
 
   {key:"onb_favs", icon:"⭐", name:"Personal Favs", who:"me", when:a=>true,
@@ -16957,10 +16987,10 @@ function yearsCardHTML(){
 // CAS-1275: state/flagged/tapFn are passed in rather than read off the agent draft, so onboarding's own
 // styles step (ans.styles, no skip state, no flags) can call this with its own state instead of a copy.
 function stylesListRowHTML(g, state, flagged, tapFn){
-  const bg = state==="+" ? "#138c7d" : state==="-" ? "#b65a1c" : "rgba(255,255,255,.045)";
+  const bg = state==="+" ? "#138c7d" : state==="-" ? "#b65a1c" : "rgba(255,255,255,.10)";
   const glyph = state==="+" ? "+" : state==="-" ? "−" : "";
   const label = state==="+" ? "listed" : state==="-" ? "skipped" : "not listed";
-  const sqClass=`tcell slsq${flagged?" flag":""}`;
+  const sqClass=`tcell slsq${flagged?" flag":""}${state?"":" empty"}`;
   const sq = tapFn
     ? `<button type="button" class="${sqClass}" style="background:${bg}" aria-label="${escA(g)}: ${label}"
          onclick="${tapFn}('${escA(g)}')">${glyph}</button>`
@@ -17528,9 +17558,11 @@ function styleGridDetailHTML(c,T,a,b,flagKeys){
     tasteLine = `Your taste: ${data.n} verdict${data.n===1?"":"s"}, ${words}. ${tally}.`;
   }
   const tasteLineHTML = esc(tasteLine) + (flagged ? ` <span style="color:#ffd27a">Your taste suggests a change here.</span>` : "");
-  const thirdLabel = isAll ? "Neither" : "Follow its styles";
   const bArg = b ? `'${escA(b)}'` : "null";
-  const btns=[{label:"+ List",v:"+"},{label:"− Skip",v:"-"},{label:thirdLabel,v:null}].map(o=>{
+  // CAS-1318: a whole style only has two states now (+ List / Off) — the third "− Skip" button is a
+  // combination-only control, kept for a pair.
+  const btns=(isAll ? [{label:"+ List",v:"+"},{label:"Off",v:null}]
+    : [{label:"+ List",v:"+"},{label:"− Skip",v:"-"},{label:"Follow its styles",v:null}]).map(o=>{
     const on=own===o.v;
     const vArg = o.v===null ? "null" : `'${o.v}'`;
     return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
@@ -17556,7 +17588,7 @@ function styleGridScreenHTML(){
       onclick="styleGridSetView('taste')">Your taste</button>
   </div>`;
   const notesHTML = `<div class="tnotes">
-      <p class="tnote${styleGridView==="agent"?"":" off"}">Tap the first column to cycle a whole style (+ list, − skip, neither), or a square to cycle two styles together (+, −, follow its styles). A combination beats its styles.</p>
+      <p class="tnote${styleGridView==="agent"?"":" off"}">Tap a style to turn it on or off — an agent finds films whose main style is on. Tap a square to set a combination (+ list, − skip, or follow the styles). A combination beats the styles.</p>
       <p class="tnote${styleGridView==="taste"?"":" off"}">The same grid coloured by your verdicts, exactly as on Your taste. Switch back to compare.</p>
     </div>`;
   const headerHTML = `<span class="tc0"></span><span class="th all">All</span>`
@@ -17571,7 +17603,7 @@ function styleGridScreenHTML(){
   const legend = styleGridView==="agent"
     ? `<div class="tlegend tlegend-agent">
         <span class="lg"><i style="background:#138c7d"></i>+ list</span>
-        <span class="lg"><i style="background:#b65a1c"></i>− skip</span>
+        <span class="lg"><i style="background:#b65a1c"></i>− skip (combination)</span>
         <span class="lg"><i style="background:rgba(45,212,191,.22)"></i>listed by its styles</span>
         <span class="lg"><i style="background:rgba(255,255,255,.045)"></i>not listed</span>
         <span class="lg">! suggested update</span>
@@ -17603,9 +17635,10 @@ function styleGridRepaint(){
   if(page) page.scrollTop = sy;
 }
 window.styleGridSetView = v => { styleGridView=v; styleGridRepaint(); };
-// CAS-1276: in "This agent" view a tap both selects the cell AND cycles its setting — the first column
-// (whole style) walks + list -> - skip -> neither -> + list; a pair square walks follow its styles -> + list
-// -> - skip -> follow its styles. In "Your taste" view a tap only selects, same as before.
+// CAS-1276/CAS-1318: in "This agent" view a tap both selects the cell AND cycles its setting — a pair
+// square walks follow its styles -> + list -> - skip -> follow its styles. The first column (whole
+// style) only TOGGLES now (+ list <-> off) — a single style lost its third "skip" state to CAS-1318; that
+// survives only for a combination. In "Your taste" view a tap only selects, same as before.
 window.styleGridTapCell = (a,b) => {
   styleGridSel={a, b:b||null};
   if(styleGridView==="agent"){
@@ -17615,7 +17648,7 @@ window.styleGridTapCell = (a,b) => {
       styleGridSetPair(a,b, own==="+" ? "-" : own==="-" ? null : "+");
     } else {
       const state=styleGridState(c,a);
-      styleGridSetStyle(a, state==="+" ? "-" : state==="-" ? null : "+");
+      styleGridSetStyle(a, state==="+" ? null : "+");
     }
   }
   styleGridRepaint();
@@ -18133,8 +18166,8 @@ const SHARP_STEPS = {
     progress: 7,
     body(){
       return `<div class="obwrap">
-  <h2 class="obhd">First, we'll build you an agent for the <span class="obhi">biggest movies</span> of the year.</h2>
-  <p class="obintrotext">It watches for the biggest movies of each year — the ones with the highest Cascade scores — and tells you the moment one lands at the movies or on your preferred streaming services.</p>
+  <h2 class="obhd">First, we'll build your <span class="obhi">Cinema Releases</span> agent.</h2>
+  <p class="obintrotext">It watches the year's biggest cinema releases — the ones with the highest Cascade scores — and tells you the moment one lands at the movies or on your preferred streaming services.</p>
 </div>`;
     },
     wire(){ onbFlow.answersV2=onbAnswersV2Load(); },
@@ -18234,7 +18267,7 @@ const SHARP_STEPS = {
         .map(g=>stylesListRowHTML(g, ans.styles.includes(g) ? "+" : null, false, "obStylesListTap")).join("");
       return `<div class="obwrap"><h2 class="obhd">What are your favourite styles of movie?</h2></div>
         <p class="ossub">Tap the square to add a style. Pick as many as you like.</p>
-        <div class="sllist">${rows}</div>`;
+        <div class="sllist obsl">${rows}</div>`;
     },
     wire(){
       onbFlow.answersV2=onbAnswersV2Load();
@@ -18250,6 +18283,7 @@ const SHARP_STEPS = {
     wire(){
       onbFlow.answersV2=onbAnswersV2Load();
       const ans=onbFlow.answersV2;
+      if(ans.cinema==="yes" && !ans.agesTouched) ans.ages=[...ans.cinemaAges];
       const box=$("obAgesChips");
       if(box){
         box.innerHTML="";
@@ -18257,6 +18291,7 @@ const SHARP_STEPS = {
           box.appendChild(obGenChip(a, ans.ages.includes(a), ()=>{
             const i=ans.ages.indexOf(a);
             i<0 ? ans.ages.push(a) : ans.ages.splice(i,1);
+            ans.agesTouched=true;
             onbAnswersV2Save(ans);
             renderOnbStep("v2_ages");
           }));
@@ -18416,7 +18451,7 @@ const SHARP_STEPS = {
     body(){
       const c=buildOnbAgentsV2(onbFlow.answersV2).find(a=>a.template==="onb_massive");
       return c ? onbAgentRevealHTML(c, 1, "Your first agent",
-        "This agent will find the landmark, must-see movies each year. There won't be many of them (maybe 2-3 per month) but these are the ones everyone will talk about.") : "";
+        "This agent will find the landmark, must-see movies each year — the ones everyone will talk about.") : "";
     },
     // CAS-958: the grid now renders after the CTA (renderOnbStep's afterFoot hook), not inside body().
     afterFoot(){
@@ -20621,8 +20656,8 @@ function openMembership(agentKey, nameOverride, cascade){
   // starts — a signed-in return visit (or a guest/no-config build, per CascadeAuth.enabled) skips it.
   const needsEmail = membNeedsEmail();
   $("membBody").innerHTML = `
-    <span class="cascpill">CASCADE</span>
-    <h2 class="membh">Cascade Membership</h2>
+    <span class="cascpill" id="membPill">CASCADE</span>
+    <h2 class="membh" id="membHead">Cascade Membership</h2>
     ${haul}
     <p class="memfine">Free for your first month · then <b>$4.99/month</b> · cancel any time. No card needed — we'll always ask before anything is ever charged.</p>
     <div class="membenefits">
@@ -20631,13 +20666,15 @@ function openMembership(agentKey, nameOverride, cascade){
       </div>`).join("")}
     </div>
     ${needsEmail ? `
-    <div class="flabel">Email</div>
-    <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
-           placeholder="you@example.com" oninput="membEmailInput()">
-    <p class="fielderr" id="membEmailErr" role="alert" hidden></p>
-    <p class="fielderr" id="membAcctExists" hidden>There's already a Cascade account for that email.
-      <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
-              style="vertical-align:baseline">Sign in</button></p>
+    <div id="membEmailField">
+      <div class="flabel">Email</div>
+      <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
+             placeholder="you@example.com" oninput="membEmailInput()">
+      <p class="fielderr" id="membEmailErr" role="alert" hidden></p>
+      <p class="fielderr" id="membAcctExists" hidden>There's already a Cascade account for that email.
+        <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
+                style="vertical-align:baseline">Sign in</button></p>
+    </div>
     <div id="membCodeState" hidden>
       <p class="pnote" id="membCodeMsg"></p>
       <div class="flabel">Code</div>
@@ -20651,7 +20688,7 @@ function openMembership(agentKey, nameOverride, cascade){
     <p class="pnote">By continuing you agree to our
       <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button>.</p>` : ""}
     <button class="membcta" type="button" onclick="membStart()">Start my free month</button>
-    ${posters?`<div class="rvgrid membgrid">${posters}</div>`:""}`;
+    ${posters?`<div class="rvgrid membgrid" id="membPosterGrid">${posters}</div>`:""}`;
   membResetCodeState();   // B10: always opens in State A
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
@@ -20701,8 +20738,8 @@ function openOnbMembership(){
   const agents = onbFlow.workingAgents || [];
   const posters = onbMembershipFilms(agents).slice(0, MEMB_POSTERS).map(rvPosterHTML).join("");
   $("membBody").innerHTML = `
-    <span class="cascpill">CASCADE</span>
-    <h2 class="membh">Membership benefits</h2>
+    <span class="cascpill" id="membPill">CASCADE</span>
+    <h2 class="membh" id="membHead">Membership benefits</h2>
     <p class="membhaul">${n} agent${n===1?"":"s"} · <span class="cnt">${k}</span> film${k===1?"":"s"} worth your time · watching ${m}</p>
     <div class="membenefits">
       ${OB_MEMB_BENEFITS.map(b=>`<div class="mbrow"><span class="mbic">✓</span>
@@ -20710,13 +20747,15 @@ function openOnbMembership(){
     </div>
     <p class="memfine">Free for your first month · then <b>$4.99/month</b> · cancel any time. No card needed — we'll always ask before anything is ever charged.</p>
     ${needsEmail ? `
-    <div class="flabel">Email</div>
-    <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
-           placeholder="you@example.com" oninput="membEmailInput()">
-    <p class="fielderr" id="membEmailErr" role="alert" hidden></p>
-    <p class="fielderr" id="membAcctExists" hidden>There's already a Cascade account for that email.
-      <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
-              style="vertical-align:baseline">Sign in</button></p>
+    <div id="membEmailField">
+      <div class="flabel">Email</div>
+      <input id="membEmail" class="namein" type="email" inputmode="email" autocomplete="email"
+             placeholder="you@example.com" oninput="membEmailInput()">
+      <p class="fielderr" id="membEmailErr" role="alert" hidden></p>
+      <p class="fielderr" id="membAcctExists" hidden>There's already a Cascade account for that email.
+        <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
+                style="vertical-align:baseline">Sign in</button></p>
+    </div>
     <div id="membCodeState" hidden>
       <p class="pnote" id="membCodeMsg"></p>
       <div class="flabel">Code</div>
@@ -20730,7 +20769,7 @@ function openOnbMembership(){
     <p class="pnote">By continuing you agree to our
       <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button>.</p>` : ""}
     <button class="membcta" type="button" onclick="membStart()">Start my free month</button>
-    ${posters?`<div class="rvgrid membgrid">${posters}</div>`:""}`;
+    ${posters?`<div class="rvgrid membgrid" id="membPosterGrid">${posters}</div>`:""}`;
   membResetCodeState();   // B10: always opens in State A
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
@@ -20800,6 +20839,10 @@ function membAcctExistsHide(){
 // code belongs to, for Resend and for the message under the field. -----------------------------------
 let membInCodeState=false;
 let membCodeEmail=null;
+// CAS-1316: .membh's text belongs to whichever page opened #membScreen ("Cascade Membership" or
+// "Membership benefits") — saved here so membBackToEmail can restore the exact heading State B
+// overwrote with "Check your email", rather than hard-coding one caller's copy into the other's path.
+let membHeadingSaved=null;
 let membResendTimer=null, membResendDeadline=0;
 function membStopResendTimer(){ if(membResendTimer){ clearInterval(membResendTimer); membResendTimer=null; } }
 // CAS-1089's own 60s throttle, mirrored here for the inline code step — driven off a deadline timestamp
@@ -20833,6 +20876,18 @@ function membResetCodeState(){
   membInCodeState=false;
   membCodeEmail=null;
   membStopResendTimer();
+  membHeadingSaved=null;
+}
+// CAS-1316: State B (the code step) is a short, focused page — these are the State A elements that
+// have no business on it (the offer/benefits chrome and the email field, now answered by the code
+// message above the field). Inline style, not the `hidden` attribute: .cascpill/.membenefits/etc already
+// set `display` from their own class rule, which would otherwise beat the `[hidden]` UA rule outright.
+function membSetStateAVisible(visible){
+  const body=$("membBody"); if(!body) return;
+  const d = visible ? "" : "none";
+  [$("membPill"), body.querySelector(".membhaul"), body.querySelector(".membenefits"),
+   body.querySelector(".memfine"), $("membEmailField"), $("membPosterGrid")]
+    .forEach(el=>{ if(el) el.style.display=d; });
 }
 // B1-B6: moves the screen from the email step to the code step, in place — no separate sheet.
 function membShowCodeState(email){
@@ -20848,18 +20903,13 @@ function membShowCodeState(email){
   const state=$("membCodeState"); if(state) state.hidden=false;
   membStartResendTimer();
   if(code) code.focus();
-  // B6: #membCode and .membcta both fully in view — the button is the lower of the two, so bringing IT
-  // fully into view is what actually needs the scroll; the code field sits in the same unbroken block
-  // directly above it, so the same scroll reveals both.
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    const scr=$("membScreen"), btn=document.querySelector(".membcta");
-    if(!(scr && btn && typeof btn.scrollIntoView==="function")) return;
-    btn.scrollIntoView({block:"end"});
-    // CAS-1242: WebKit's own "end" alignment can still leave the button's bottom edge a sub-pixel
-    // past the screen's (observed ~0.08px, CAS-1169 AC3) — round that stray fraction back in.
-    const over = btn.getBoundingClientRect().bottom - scr.getBoundingClientRect().bottom;
-    if(over > 0) scr.scrollTop += Math.ceil(over);
-  }));
+  // CAS-1316: the code step is its own short page — the offer/benefits chrome and the email field
+  // step aside, and the heading takes over their line, so the field and button sit above the keyboard
+  // without needing to scroll the button into view (that used to land the person mid-page, CAS-1169 AC3).
+  const head=$("membHead");
+  if(head && membHeadingSaved===null){ membHeadingSaved=head.textContent; head.textContent="Check your email"; }
+  membSetStateAVisible(false);
+  const scr=$("membScreen"); if(scr) scr.scrollTop=0;
 }
 // B9: back to State A — email editable and focused, code step gone, countdown stopped, both errors clear.
 // Also stands down onbMembershipInFlight: the code just abandoned can no longer land a session for this
@@ -20869,11 +20919,15 @@ window.membBackToEmail=()=>{
   membInCodeState=false;
   membCodeEmail=null;
   membStopResendTimer();
-  const emailEl=$("membEmail");
-  if(emailEl){ emailEl.readOnly=false; emailEl.style.opacity=""; emailEl.focus(); }
   const state=$("membCodeState"); if(state) state.hidden=true;
   membEmailError(null);
   membCodeErrorShow(null);
+  membSetStateAVisible(true);
+  const head=$("membHead");
+  if(head && membHeadingSaved!==null){ head.textContent=membHeadingSaved; membHeadingSaved=null; }
+  // Restored to visible above — focus has to happen after, or it's a no-op on a still-display:none field.
+  const emailEl=$("membEmail");
+  if(emailEl){ emailEl.readOnly=false; emailEl.style.opacity=""; emailEl.focus(); }
 };
 // B4: resends to the email State B is currently showing, and restarts the countdown.
 window.membResendCode=()=>{
@@ -21014,40 +21068,121 @@ window.membStart=()=>{
     });
   } else proceed(false);
 };
-// ---- FIRST-RUN TUTORIAL (CAS-976) — five coach marks anchored to the real listing controls, shown once
-// per account the first time the listing paints after onboarding.
-// CAS-1222: in-memory only now, adopted off the account's own user_prefs.view.tutorialSeen field by
-// loadUserPrefs() (the account-sync IIFE, below) — a different account signing in on this device never
-// inherits "seen" from whoever was signed in before, same guarantee CAS-1100's wipeAccountLocalState used
-// to give the old localStorage key, now simply a consequence of there being nothing device-local to wipe.
+// ---- GUIDED TOUR (CAS-1317, replaces CAS-976's five coach marks) ----------------------------------------
+// Shown once per account the first time the listing paints after onboarding. Where CAS-976 pointed at four
+// small controls in place, this tour shows the whole interface first and drills into detail after: it
+// drives the app itself (switches screens, expands a card, opens the menu) across a fixed 20-step script,
+// and puts back whatever it opened on Skip or Done.
+// CAS-1222: seen-state stays in-memory only, adopted off the account's own user_prefs.view.tutorialSeen
+// field by loadUserPrefs() (the account-sync IIFE, below) — a different account signing in on this device
+// never inherits "seen" from whoever was signed in before.
 let tutorialSeenFlag=false;
 function tutorialSeen(){ return tutorialSeenFlag; }
 function markTutorialSeen(){ tutorialSeenFlag=true; pushViewField("tutorialSeen", true); }
-// The four anchored cards, in order; the fifth (closing, centred, no anchor) is appended in startTutorial.
-// Copy was originally verbatim per the CAS-976 ticket; CAS-1013 corrected the Moving card and the closing
-// card below, which had drifted from shipped behaviour (Moving's rolling window, the 5pm Sydney alert
-// time). Anchors are real listing controls: the agent rail the ticket names doesn't exist in this build
-// (agents are a vertical reorderable list, not a rail).
-// CAS-1246: Agents is back as a header chip (#agentsBtn), so the opening card anchors there again.
-function tutorialCardDefs(){
-  return [
-    {sel:"#agentsBtn", text:"Your agents live here. Each one watches for a different kind of film, all the time, so you don't have to."},
-    {sel:"#groups .card .qpub.intitle", text:"Public is what everyone thought of a film. Once you've given a few verdicts, You shows how much you're likely to enjoy it. Your agent only speaks up when a film clears the bar you set."},
-    {sel:"#groups .card .ctl.notify", text:"Films move — cinema, then rent, then streaming. Your agent follows each one and tells you when it reaches a window you actually use."},
-    {sel:"#movingBtn", text:"Alerts shows what your agents have found for you — Today, Week, 2 weeks or Month. It opens on Today."},
-  ];
-}
-// A DOM match that's actually on screen — a condensed ("cinfo") card hides its own .r-scores via
-// display:none rather than removing it, so a plain querySelector can resolve to a real element with a
-// zero-size rect. That is indistinguishable from "not present" for a coach mark to point at.
-function tutorialResolveAnchor(sel){
-  for(const el of document.querySelectorAll(sel)){
+// The one film card the tour drives through steps 7-15 (0-based 6-14 below). Captured once (the first
+// real .card on Watch — ticket rule 6) and reused across every step that needs it, rather than re-querying
+// each time: toggleExpand() below mutates the SAME node in place, so holding the reference stays valid for
+// as long as the tour does.
+let tourCardEl=null, tourCardId=null;
+function tutCaptureCard(){
+  tourCardEl=null; tourCardId=null;
+  for(const el of document.querySelectorAll("#groups .card")){
     const r=el.getBoundingClientRect();
-    if(r.width>0 && r.height>0) return el;
+    if(r.width>0 && r.height>0){
+      tourCardEl=el;
+      const m=/card-(\d+)/.exec(el.id);
+      tourCardId = m ? Number(m[1]) : null;
+      break;
+    }
   }
-  return null;
 }
-let tutCards=[], tutIdx=-1;
+function tutExpandCard(on){
+  if(tourCardId==null) return;
+  if(on !== expandedSet.has(tourCardId)) toggleExpand(tourCardId);
+}
+// Step 15's "You" chip: matchBadgeHTML renders nothing for a film with no tasteMatch yet (every film, on a
+// fresh account), so the step injects a sample lozenge in the exact spot the real one would sit — right
+// before the Public chip in the card's title, the same order titleScore (cardTopHTML) builds them in — and
+// removes it again on its own after(), tagged so this can never touch a real chip.
+function tutInjectSampleYou(){
+  if(!tourCardEl || tourCardEl.querySelector(".qyou")) return;
+  const pub=tourCardEl.querySelector(".qpub.intitle");
+  if(!pub) return;
+  const sample=document.createElement("span");
+  sample.className="qyou for c3 tutsample";
+  sample.setAttribute("aria-hidden","true");
+  sample.innerHTML="<b>88</b><small>You</small>";
+  pub.parentNode.insertBefore(sample, pub);
+}
+function tutRemoveSampleYou(){
+  const sample=tourCardEl && tourCardEl.querySelector(".qyou.tutsample");
+  if(sample) sample.remove();
+}
+// The 20-step script (Lee, approved 20 Oct). `sel` resolves against the whole document unless
+// `scope:"card"` says to resolve against tourCardEl instead; `wholeCard` spotlights tourCardEl itself.
+// `center` is the two anchorless steps (opening and closing). `before`/`after` drive and undo whatever the
+// step needs open — see endTutorial for why `after` only ever has to be idempotent, never careful about
+// what's "still" open.
+const TOUR_STEPS = [
+  {text:"Welcome to Cascade. Here's a one-minute tour of how it works.", center:true},
+  {text:"Cascade has four places. Here's what each one does.", sel:[".hdr-actions"]},
+  {text:"Watch — the films your agents have found, organised by where you can watch them: cinema, rental or streaming.", sel:["#moviesBtn"]},
+  {text:"Alerts — films you're tracking that have just arrived somewhere you watch.", sel:["#movingBtn"]},
+  {text:"Find — search any film in Cascade, whether an agent found it or not.", sel:["#findBtn"]},
+  {text:"Agents — each one hunts for a different kind of film for you, every day.", sel:["#agentsBtn"]},
+  {text:"This is a film card. Tap any card to open it.",
+    before(){ showAgentsHome(); tutCaptureCard(); }, wholeCard:true},
+  {text:"Opened, it shows the full picture — the story, trailers, cast, and where to watch.",
+    before(){ tutExpandCard(true); }, after(){ tutExpandCard(false); }, wholeCard:true},
+  {text:"Want company? Invite friends to watch it with you.", scope:"card", sel:[".exsharebtn"]},
+  {text:"Three buttons tell your agents what you want.",
+    before(){ tutExpandCard(false); }, scope:"card", sel:[".ctl.notify",".ctl.casc",".ctl.watch"]},
+  {text:"When to watch. Your agent suggests the best time — cinema, rental or streaming — and you can change it any time. Listed for cinema but you'd rather wait? Tell it to wait for streaming. Not for you? Choose Never.",
+    scope:"card", sel:[".ctl.notify"]},
+  {text:"Which agent found it. You can hand a film to a different agent — spot one the kids would love? Move it to your Family agent.",
+    scope:"card", sel:[".ctl.casc"]},
+  {text:"Seen it? Tell your agents, and what you thought. Every verdict teaches them what you like.",
+    scope:"card", sel:[".ctl.watch"]},
+  {text:"Public — one score combining what audiences and critics thought.", scope:"card", sel:[".qpub.intitle"]},
+  {text:"You — how much you're likely to enjoy it. It appears once you've rated a few films. It starts from Public, then moves up or down depending on how you've rated films with a similar mix of styles, and gets sharper with every verdict.",
+    before(){ tutInjectSampleYou(); }, after(){ tutRemoveSampleYou(); }, scope:"card", sel:[".qyou"]},
+  {text:"As films you're tracking reach cinemas, rental or your streaming services, they're listed here. We'll email you the same alerts, so you won't miss one.",
+    before(){ closeSettings(); openMovingScreen(); }, after(){ showAgentsHome(); }, sel:["#movingGroups"]},
+  {text:"Search the whole catalogue and open any film.",
+    before(){ closeSettings(); openFindScreen(); }, after(){ showAgentsHome(); }, sel:["#findSearchInput"]},
+  {text:"Agents are fully adjustable. Each one starts with sensible settings. As you rate films it learns your taste and suggests changes to its own settings, so it finds more of what you'll love.",
+    before(){ closeSettings(); openAgentsScreen(); }, after(){ showAgentsHome(); }, sel:["#agList .agrow"]},
+  {text:"Change your streaming services here any time, and see which services suit you best.",
+    before(){ showAgentsHome(); navMenuGo("settings"); }, after(){ closeSettings(); },
+    sel:['#settingsBody .urow[onclick="settingsOpenServices()"]']},
+  {text:"You're all set. Your agents report every day at 5pm.",
+    before(){ closeSettings(); showAgentsHome(); }, center:true},
+];
+let tutIdx=-1, tutCurrent=null;
+// Resolves one step's anchor(s) against the live DOM — never cached across steps, since most of the script
+// only exists once its own before() has opened the screen it lives on. A condensed ("cinfo") card hides its
+// own .r-scores via display:none rather than removing it (same trap CAS-976's tutorialResolveAnchor noted),
+// so every match is checked for a real, non-zero rect before counting as "present".
+function tutResolveEls(step){
+  const root = step.scope==="card" ? tourCardEl : document;
+  if(!root) return [];
+  const out=[];
+  (step.sel||[]).forEach(sel=>{
+    for(const el of root.querySelectorAll(sel)){
+      const r=el.getBoundingClientRect();
+      if(r.width>0 && r.height>0){ out.push(el); return; }
+    }
+  });
+  return out;
+}
+function tutResolveStep(step){
+  if(step.center) return {center:true};
+  if(step.wholeCard){
+    return (tourCardEl && tourCardEl.getBoundingClientRect().width>0) ? {els:[tourCardEl]} : null;
+  }
+  const els=tutResolveEls(step);
+  return els.length ? {els} : null;
+}
 // The one gate for the automatic (non-replay) trigger: onboarding done, at least one agent, not already
 // seen or skipped, and nothing else already on screen (a deep link opening straight into another screen
 // right after onboarding, per CAS-962, must win over the tour starting underneath it).
@@ -21067,23 +21202,37 @@ function startTutorial(){
   // see CAS-437) must still win, so the one check that matters here runs again right before the tour
   // actually shows.
   if(filmRouteId()!=null || document.querySelector(".filmpage.open")) return;
-  const anchored=tutorialCardDefs().map(c=>({text:c.text, el:tutorialResolveAnchor(c.sel)})).filter(c=>c.el);
-  // Resilience: skip a card whose anchor isn't there rather than point at nothing; if fewer than two of
-  // the four resolve, don't start at all — and don't mark it seen, so a later, better-populated listing
-  // gets a real chance at it.
-  if(anchored.length<2) return;
-  tutCards=anchored.concat([{text:"You're set. Nothing more to do today — your agents report at 5pm.", el:null}]);
-  tutIdx=0;
+  tutIdx=-1; tutCurrent=null;
   window.addEventListener("resize", tutorialReposition);
   window.addEventListener("scroll", tutorialReposition, true);
   $("tutScrim").classList.add("open");
-  showTutorialCard();
+  if(!tutorialAdvance(1)) endTutorial(false);   // step 1 is always centred/anchorless, so this never misses
+}
+// Runs the next (dir>0) or previous (dir<0) step's before(), skipping any step whose anchor doesn't resolve
+// once before() has run — CAS-976's "skip a card whose anchor isn't there" rule, extended to a tour that
+// now opens and closes screens rather than just pointing at fixed controls. Every screen a before() opens
+// is already mutually exclusive with the others it might have left behind (openMovingScreen/openFindScreen/
+// openAgentsScreen each close one another; closeSettings() above guards the one case none of them do), so
+// skipping forward or jumping back mid-script never needs its own clean-up pass here.
+function tutorialAdvance(dir){
+  let idx=tutIdx+dir;
+  while(idx>=0 && idx<TOUR_STEPS.length){
+    const step=TOUR_STEPS[idx];
+    if(step.before) step.before();
+    const resolved=tutResolveStep(step);
+    if(resolved){ tutIdx=idx; tutCurrent=resolved; showTutorialCard(); return true; }
+    idx+=dir;
+  }
+  return false;
 }
 function showTutorialCard(){
-  const c=tutCards[tutIdx];
-  $("tutText").textContent=c.text;
-  $("tutNextBtn").textContent = (tutIdx===tutCards.length-1) ? "Done" : "Next";
-  if(c.el) c.el.scrollIntoView({block:"center", inline:"center"});
+  const step=TOUR_STEPS[tutIdx];
+  $("tutText").textContent=step.text;
+  $("tutProg").textContent=`${tutIdx+1} of ${TOUR_STEPS.length}`;
+  $("tutNextBtn").textContent = (tutIdx===TOUR_STEPS.length-1) ? "Done" : "Next";
+  $("tutBackBtn").style.display = tutIdx===0 ? "none" : "";
+  const el = tutCurrent && tutCurrent.els ? tutCurrent.els[0] : null;
+  if(el) el.scrollIntoView({block:"center", inline:"center"});
   requestAnimationFrame(()=>requestAnimationFrame(tutorialReposition));
 }
 // CAS-1152: `zoom:var(--ui-scale)` (CAS-157) makes a position:fixed element's *written* style length
@@ -21100,9 +21249,20 @@ function tutZoomFactor(){
   probe.remove();
   return w>0 ? w/100 : 1;
 }
-// Re-measures the current card's anchor and repositions the spotlight + caption. Bound to resize/scroll
-// while the tour is open (AC: the cut-out stays correct after either), and called once per card on top of
-// that. The closing card carries no anchor: collapsing the hole to a zero-size box at the viewport centre
+// The union of every element a multi-anchor step (e.g. the whole nav row, or a card's three action
+// buttons) spotlights together, as one rect — a single-element step is just that element's own rect.
+function tutUnionRect(els){
+  let left=Infinity, top=Infinity, right=-Infinity, bottom=-Infinity;
+  els.forEach(el=>{
+    const r=el.getBoundingClientRect();
+    left=Math.min(left,r.left); top=Math.min(top,r.top);
+    right=Math.max(right,r.right); bottom=Math.max(bottom,r.bottom);
+  });
+  return {left, top, right, bottom, width:right-left, height:bottom-top};
+}
+// Re-measures the current step's anchor(s) and repositions the spotlight + card. Bound to resize/scroll
+// while the tour is open (AC: the cut-out stays correct after either), and called once per step on top of
+// that. A centred step carries no anchor: collapsing the hole to a zero-size box at the viewport centre
 // (see the .tuthole comment in <style>) dims the whole screen evenly instead of needing a second layout
 // branch for "no spotlight". r, vw and vh are all read-back (post-zoom, visual) units; offsetWidth/
 // offsetHeight are not — they report the card's pre-zoom authored size (CAS-1152: proven by measurement,
@@ -21110,15 +21270,18 @@ function tutZoomFactor(){
 // back ~291px under a 1.12 --ui-scale), so cardW/cardH are converted to visual units with the same probed
 // factor before mixing them into arithmetic with r/vw/vh. Only the final top/left written to .style are
 // divided back down by z, since a style write is interpreted pre-zoom — see tutZoomFactor above.
+// CAS-1317: the card docks to whichever side of the spotlight has MORE room (not "below unless it doesn't
+// fit"), so it never overlaps a spotlight that is itself nearly full-height — principle 3's "whichever is
+// clear".
 function tutorialReposition(){
   const scrim=$("tutScrim");
   if(!scrim || !scrim.classList.contains("open")) return;
-  const c=tutCards[tutIdx];
   const hole=$("tutHole"), card=$("tutCard"), pad=8, vw=innerWidth, vh=innerHeight;
   const z=tutZoomFactor();
+  const els = tutCurrent && tutCurrent.els ? tutCurrent.els : [];
   let r;
-  if(c && c.el){
-    r=c.el.getBoundingClientRect();
+  if(els.length){
+    r=tutUnionRect(els);
     hole.style.left=(r.left-pad)/z+"px"; hole.style.top=(r.top-pad)/z+"px";
     hole.style.width=(r.width+pad*2)/z+"px"; hole.style.height=(r.height+pad*2)/z+"px";
   } else {
@@ -21128,36 +21291,38 @@ function tutorialReposition(){
   }
   const cardH=(card.offsetHeight||140)*z, cardW=(card.offsetWidth||260)*z;
   let top, left;
-  if(!c || !c.el){
+  if(!els.length){
     top=(vh-cardH)/2; left=(vw-cardW)/2;
   } else {
-    const spaceBelow=vh-r.bottom-pad*2;
-    top = spaceBelow>=cardH+12 ? r.bottom+pad*2+12 : Math.max(12, r.top-pad*2-12-cardH);
+    const spaceBelow=vh-r.bottom-pad*2, spaceAbove=r.top-pad*2;
+    top = spaceBelow>=spaceAbove ? Math.min(r.bottom+pad*2+12, vh-cardH-12) : Math.max(12, r.top-pad*2-12-cardH);
+    top=Math.max(12, top);
     left = Math.min(Math.max(12, r.left), vw-cardW-12);
   }
   card.style.top=top/z+"px"; card.style.left=left/z+"px";
 }
-function tutorialNext(){
-  if(tutIdx>=tutCards.length-1){ endTutorial(true); return; }
-  tutIdx++;
-  showTutorialCard();
-}
+function tutorialNext(){ if(!tutorialAdvance(1)) endTutorial(true); }
+function tutorialBack(){ tutorialAdvance(-1); }
 function tutorialSkip(){ endTutorial(true); }
 function endTutorial(markSeen){
   $("tutScrim").classList.remove("open");
   window.removeEventListener("resize", tutorialReposition);
   window.removeEventListener("scroll", tutorialReposition, true);
+  // CAS-1317 rule 5: "everything it opened is put back on exit" — run every step's own after(), not just
+  // the current one. Forward progress often leaves an earlier step's before() already undone by a later
+  // step's own before() (step 10 collapsing what step 8 expanded, each screen-open step closing the last),
+  // so after() is written to be a safe no-op when there's nothing left for it to undo; running them all
+  // unconditionally is simpler than tracking exactly which one is still "outstanding".
+  TOUR_STEPS.forEach(step=>{ if(step.after) step.after(); });
   if(markSeen) markTutorialSeen();
-  tutCards=[]; tutIdx=-1;
+  tutIdx=-1; tutCurrent=null; tourCardEl=null; tourCardId=null;
 }
 // Replay (from the Help screen's "Still stuck?" row — CAS-1126 moved it here from Account's old Help &
 // feedback card, the only place it now lives). Help is a .uscreen sitting over whatever was already there,
 // but that "whatever" isn't always the Watch listing — Help can be reached from Menu while Moving or Agents
-// is open underneath it, and closing Help alone would just uncover that screen instead (CAS-1079: two of
-// the tour's cards anchor to #groups .card controls that are covered, not gone, so they resolved to
-// real-but-invisible rects instead of being skipped). showAgentsHome() is the same "uncover the Watch
-// listing" call applyDeepLink() already uses for the same reason — closes Moving/Agents if either is open,
-// then Help's own close reveals the listing underneath both.
+// is open underneath it, and closing Help alone would just uncover that screen instead. showAgentsHome() is
+// the same "uncover the Watch listing" call applyDeepLink() already uses for the same reason — closes
+// Moving/Agents if either is open, then Help's own close reveals the listing underneath both.
 // Bypasses tutorialSeen() on purpose, same as any other explicit "show me that again" control.
 function replayTutorial(){
   closeHelp();
@@ -21490,7 +21655,7 @@ function listingGroups(rows, ac){
   // still overrides either, exactly as it always has.
   const tabDflt = watchTab==="in_cinema" ? "availability" : DEFAULT_SORT;
   const sortKey = effectiveSortKey(isUserSort ? filt.sort : tabDflt);
-  return orderFor(watchTab)      // CAS-750/CAS-754: order is the tab's own, not the agent's
+  const groups = orderFor(watchTab)      // CAS-750/CAS-754: order is the tab's own, not the agent's
     .map(g=>{
       const cmp=sortForKey(g, sortKey, ac && ac.kind==="cinema", isUserSort);
       // CAS-819: an explicit pick sorts across every agent within a status section — the chosen key leads,
@@ -21502,6 +21667,22 @@ function listingGroups(rows, ac){
                           : (a,b)=>filmOwnerOrder(a)-filmOwnerOrder(b) || cmp(a,b))};
     })
     .filter(x=>x.items.length);
+  // CAS-1309: the Cinema tab's Upcoming stage alone splits its one section into "Next week" (AU cinema
+  // date due within 7 days) ahead of "Upcoming" (everything else) — each keeps the sort order above
+  // intact, and an empty half is dropped like any other empty section.
+  if(watchTab==="in_cinema" && watchCinemaStage==="upcoming"){
+    const idx=groups.findIndex(x=>x.g==="upcoming");
+    if(idx>=0){
+      const isNextWeek = m => m.cinema_date!=null && m.cinema_date>=TODAY && m.cinema_date<=addDays(TODAY,7);
+      const soon=groups[idx].items.filter(isNextWeek);
+      const later=groups[idx].items.filter(m=>!isNextWeek(m));
+      const split=[];
+      if(soon.length) split.push({g:"upcoming_soon", items:soon});
+      if(later.length) split.push({g:"upcoming", items:later});
+      groups.splice(idx, 1, ...split);
+    }
+  }
+  return groups;
 }
 // CAS-1219 Change 4: true once every account-data load this session's own boot/sign-in fan-out owns has
 // actually settled. A guest device (or an account whose fan-out already resolved) is always settled —

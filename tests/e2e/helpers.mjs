@@ -224,7 +224,7 @@ export async function walkToServices(page, kind){
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");   // v2_intro (CAS-1270)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");   // v2_intro (CAS-1312)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);              // the flow slides between steps
   await expect(page.locator("#obCinemaOpts")).toBeVisible();             // v2_cinema

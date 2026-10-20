@@ -96,12 +96,11 @@ class RetiredLanguageFilter(unittest.TestCase):
 
 
 class AnyGenreMatches(unittest.TestCase):
-    """(c) CAS-1147: genre matching is against ANY of the film's genres, not only the first — the app
-    now tests `(m.genres||[]).some(g=>c.genre.includes(g))` (Lee's decision, 2026-10-02, replacing the
-    old `(m.genres||[])[0]`-only rule this class used to pin). A film carrying the wanted genre only as
-    a SECONDARY one must admit; a film not carrying it at all must not."""
+    """(c) CAS-1318 (Lee, 2026-10-20, superseding CAS-1147): an agent admits a film by its MAIN style
+    only — the first of `m.genres`. A film carrying the wanted genre only as a SECONDARY one must NOT
+    admit; the same genre as its main style must."""
 
-    def test_secondary_genre_does_admit(self):
+    def test_secondary_genre_does_not_admit(self):
         movie = {"tmdb_id": "999900001", "title": "Secondary Horror", "genres": ["Drama", "Horror"],
                  "age_rating": "M", "language": "en", "status": ["rental"],
                  "imdb_rating": 7.0, "imdb_votes": 5000, "wm_user_rating": 7.5, "wm_critic_score": 70,
@@ -109,7 +108,7 @@ class AnyGenreMatches(unittest.TestCase):
         cascade = {"id": "c-genre", "user_id": "u-genre",
                   "criteria": {"genre": ["Horror"], "watchMarkers": dict(_OPEN)}}
         admission = compute_admission([cascade], {"today": [movie]})
-        self.assertIn("999900001", admission["c-genre"]["today"])
+        self.assertNotIn("999900001", admission["c-genre"]["today"])
 
     def test_primary_genre_still_admits(self):
         # Control: the same shape, Horror moved to primary — proves admission isn't accidentally

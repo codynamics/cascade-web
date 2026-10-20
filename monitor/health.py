@@ -625,18 +625,29 @@ def check_activity_floor(window: dict | None) -> dict:
 def check_watchmode_identity(stats: dict | None) -> dict:
     """CAS-1134's details-response identity guard (poc_pipeline.enrich_watchmode_fields) returns
     'mismatch' — writing nothing — whenever a Watchmode id it was about to trust turns out to
-    identify a different tmdb_id or a non-movie type. Zero is the only acceptable count; this is
-    exactly the check that would have caught CAS-1134's own defect before Lee found it by hand."""
+    identify a different tmdb_id or a non-movie type. Zero NEW mismatches is the only acceptable
+    count; this is exactly the check that would have caught CAS-1134's own defect before Lee found
+    it by hand.
+
+    CAS-1310: a tmdb_id poc_pipeline.py has already quarantined (state/watchmode_mismatch.json)
+    is skipped before it ever reaches enrich_watchmode_fields again, so `stats['mismatch']` here
+    is already only ever a NEW mismatch — this never needs to subtract a quarantined count from
+    it. `stats['quarantined']` is reported in the detail purely as information, never as a
+    reason to fail."""
     if not stats:
         return _check("watchmode_identity", None, None, None,
                       "no run_stats.json entry this run — unavailable.")
     mismatches = stats.get("mismatch", 0)
+    quarantined = stats.get("quarantined", 0)
+    quarantined_suffix = f" {quarantined} quarantined." if quarantined else ""
     if not mismatches:
-        return _check("watchmode_identity", True, 0, 0, "0 identity mismatch(es) this run.")
+        return _check("watchmode_identity", True, 0, 0,
+                      f"0 identity mismatch(es) this run.{quarantined_suffix}")
     names = ", ".join(str(i) for i in (stats.get("mismatch_ids") or [])[:5])
     detail = f"{mismatches} identity mismatch(es) this run."
     if names:
         detail += f" TMDB id(s): {names}."
+    detail += quarantined_suffix
     return _check("watchmode_identity", False, mismatches, 0, detail)
 
 

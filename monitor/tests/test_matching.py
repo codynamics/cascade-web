@@ -1323,6 +1323,113 @@ class NewToAgentTests(unittest.TestCase):
         self.assertEqual(hits[0].cascade_id, "c1")
 
 
+class OwnWatchOnGateTests(unittest.TestCase):
+    """CAS-1307: a film the person has placed on a later window than where it currently stands
+    should only alert once it reaches that window — their own Watch On outranks newly_qualifies/
+    new_to_agent, the same way match()'s own CAS-841/CAS-1237 gates already outrank a real window
+    transition for the same film. Lee's reproduction: an Upcoming film placed Stream-only alerted
+    `announced` anyway, because match_newly_qualified()/match_new_to_agent() were never passed
+    film_watches at all."""
+
+    PREV_RUN_START = _dt.datetime(2026, 7, 15, 20, 0, tzinfo=_dt.timezone.utc)
+    STABLE = "2026-07-10T00:00:00+00:00"
+
+    def _upcoming_movie(self, imdb, tmdb_id=9601, title="Upcoming Placed Film"):
+        return {"tmdb_id": tmdb_id, "title": title, "genres": ["Drama"], "status": ["upcoming"],
+                "cinema_date": "2026-09-01", "language": "en", "wm_critic_score": 70,
+                "popularity": 50, "wm_popularity_percentile": 70, "offers": [],
+                "wm_user_rating": imdb}
+
+    def _streaming_movie(self, imdb, tmdb_id=9602, title="Streaming Placed Film"):
+        return {"tmdb_id": tmdb_id, "title": title, "genres": ["Drama"], "status": ["included_streaming"],
+                "cinema_date": "2026-01-01", "language": "en", "wm_critic_score": 70,
+                "popularity": 50, "wm_popularity_percentile": 70,
+                "offers": [{"service": "Netflix", "type": "sub"}], "wm_user_rating": imdb}
+
+    def _cascade(self, moments, imdb_bar=7.0, updated_at=STABLE, user_id="u1", cascade_id="c1"):
+        return [{"id": cascade_id, "user_id": user_id, "name": "Drama radar", "active": True,
+                 "alert_moments": list(moments), "criteria": _criteria(genre=["Drama"], imdb=imdb_bar),
+                 "updated_at": updated_at}]
+
+    # ---- AC1: an upcoming film newly qualifying, placed on a later window, is silent; the same
+    # film with no placement row still fires ----
+    def test_newly_qualified_upcoming_placed_on_stream_is_silent(self):
+        prev = [self._upcoming_movie(6.5)]
+        today = [self._upcoming_movie(7.5)]
+        cascades = self._cascade(["announced"])
+        admission = _admit(cascades, today=today, yesterday=prev)
+        watches = [{"user_id": "u1", "movie_id": "9601", "windows": ["stream"],
+                    "sources": {"stream": "manual"}}]
+        hits = match_newly_qualified(cascades, prev, today, admission=admission, film_watches=watches)
+        self.assertEqual(hits, {})
+
+    def test_newly_qualified_upcoming_with_no_placement_row_still_fires(self):
+        prev = [self._upcoming_movie(6.5)]
+        today = [self._upcoming_movie(7.5)]
+        cascades = self._cascade(["announced"])
+        admission = _admit(cascades, today=today, yesterday=prev)
+        hits = match_newly_qualified(cascades, prev, today, admission=admission, film_watches=[])
+        self.assertEqual(len(hits.get("u1", [])), 1)
+        self.assertEqual(hits["u1"][0].transition.moment, "newly_qualifies")
+
+    # ---- AC2: a film whose current window IS the one it's placed in still fires ----
+    def test_newly_qualified_still_fires_when_placed_on_its_own_current_window(self):
+        prev = [self._streaming_movie(6.5)]
+        today = [self._streaming_movie(7.5)]
+        cascades = self._cascade(["hits_stream"])
+        admission = _admit(cascades, today=today, yesterday=prev)
+        watches = [{"user_id": "u1", "movie_id": "9602", "windows": ["stream"],
+                    "sources": {"stream": "manual"}}]
+        hits = match_newly_qualified(cascades, prev, today, admission=admission, film_watches=watches)
+        self.assertEqual(len(hits.get("u1", [])), 1)
+
+    # ---- AC3: the same two cases for match_new_to_agent ----
+    def test_new_to_agent_upcoming_placed_on_stream_is_silent(self):
+        prev = [self._upcoming_movie(6.5)]
+        today = [self._upcoming_movie(7.5)]
+        cascades = self._cascade([])
+        admission = _admit(cascades, today=today, yesterday=prev)
+        watches = [{"user_id": "u1", "movie_id": "9601", "windows": ["stream"],
+                    "sources": {"stream": "manual"}}]
+        hits = match_new_to_agent(cascades, prev, today, self.PREV_RUN_START,
+                                  admission=admission, film_watches=watches)
+        self.assertEqual(hits, {})
+
+    def test_new_to_agent_upcoming_with_no_placement_row_still_fires(self):
+        prev = [self._upcoming_movie(6.5)]
+        today = [self._upcoming_movie(7.5)]
+        cascades = self._cascade([])
+        admission = _admit(cascades, today=today, yesterday=prev)
+        hits = match_new_to_agent(cascades, prev, today, self.PREV_RUN_START,
+                                  admission=admission, film_watches=[])
+        self.assertEqual(len(hits.get("u1", [])), 1)
+        self.assertEqual(hits["u1"][0].transition.moment, "new_to_agent")
+
+    def test_new_to_agent_still_fires_when_placed_on_its_own_current_window(self):
+        prev = [self._streaming_movie(6.5)]
+        today = [self._streaming_movie(7.5)]
+        cascades = self._cascade([])
+        admission = _admit(cascades, today=today, yesterday=prev)
+        watches = [{"user_id": "u1", "movie_id": "9602", "windows": ["stream"],
+                    "sources": {"stream": "manual"}}]
+        hits = match_new_to_agent(cascades, prev, today, self.PREV_RUN_START,
+                                  admission=admission, film_watches=watches)
+        self.assertEqual(len(hits.get("u1", [])), 1)
+
+    # ---- placement_counts reporting (__main__.py's run log) ----
+    def test_placement_counts_report_own_watch_on_suppressions(self):
+        prev = [self._upcoming_movie(6.5)]
+        today = [self._upcoming_movie(7.5)]
+        cascades = self._cascade(["announced"])
+        admission = _admit(cascades, today=today, yesterday=prev)
+        watches = [{"user_id": "u1", "movie_id": "9601", "windows": ["stream"],
+                    "sources": {"stream": "manual"}}]
+        counts = {}
+        match_newly_qualified(cascades, prev, today, admission=admission, film_watches=watches,
+                              placement_counts=counts)
+        self.assertEqual(counts, {"own_watch_on": 1})
+
+
 class AwardsAdmissionTests(unittest.TestCase):
     """CAS-1195: compute_admission() -> admit_shim.mjs now admits on matchesCriteria AND awardsListOK —
     the listing's own rule — not matchesCriteria alone, which waives the Awards requirement for a

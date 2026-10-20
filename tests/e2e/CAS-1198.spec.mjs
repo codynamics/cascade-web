@@ -25,8 +25,8 @@ test("CAS-1198/CAS-1297 AC6: the Agents screen shows Alerts on for every built a
   await openAgentsScreenFromNav(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
 
-  // CAS-1270: cinema Yes (toShortlist's "cinema" kind) renames the onb_massive template "In Cinema".
-  await expect(agentRow(page, "In Cinema").locator(".agwho")).toContainText("🔔 Alerts on");
+  // CAS-1312: the onb_massive template is always named "Cinema Releases" now.
+  await expect(agentRow(page, "Cinema Releases").locator(".agwho")).toContainText("🔔 Alerts on");
   // CAS-1297: every agent defaults to Alerts on now, not just the onboarding-massive template.
   await expect(agentRow(page, "Personal Favs").locator(".agwho")).toContainText("🔔 Alerts on");
 });

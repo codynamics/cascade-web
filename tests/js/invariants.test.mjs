@@ -1181,7 +1181,9 @@ test("CAS-662 AC2: the listing yields exactly E.listedBy's rows, for every group
       `${label}: the listing dropped ${rows.length - total} of ${rows.length} listed film(s) — a cap survived`);
     // AC3: a group's header count (rendered cards minus tagged-out stubs) can never exceed what render()
     // actually streams for that group — true as long as no group holds more than its own rows.length.
-    for(const { g, items } of groups) assert.ok(items.length <= rows.filter(m => E.primaryStatus(m) === g).length,
+    // CAS-1309: "upcoming_soon" is listingGroups' own Next-week split of the "upcoming" primaryStatus —
+    // never a primaryStatus value itself — so it rolls up to "upcoming"'s own row count here.
+    for(const { g, items } of groups) assert.ok(items.length <= rows.filter(m => E.primaryStatus(m) === (g==="upcoming_soon"?"upcoming":g)).length,
       `${label}/${g}: group holds more items than the rows that belong to it`);
   }
 });

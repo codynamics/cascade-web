@@ -38,9 +38,12 @@ test("AC3: every other onboarding agent builds with cinemaReleaseOnly false", ()
   });
 });
 
-test("AC4: onbAgentRevealHTML for Massive Movies never mentions \"cinema release\"", () => {
+test("AC4: onbAgentRevealHTML for Massive Movies never mentions the cinemaReleaseOnly flag as a setting", () => {
   const agents = E.buildOnbAgentsV2({ cinema: "yes" });
   const massive = agents.find(a => a.template === "onb_massive");
   const html = E.onbAgentRevealHTML(massive, 1, "Your first agent", "");
-  assert.equal(/cinema release/i.test(html), false);
+  // CAS-1312 gave the agent itself the display name "Cinema Releases", which legitimately contains
+  // "cinema release" — strip that span before checking the flag never leaks as a settings row.
+  const withoutName = html.replace(`<span class="agname">${massive.name}</span>`, "");
+  assert.equal(/cinema release/i.test(withoutName), false);
 });

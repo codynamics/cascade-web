@@ -162,6 +162,30 @@ def _forward_matches(windows_here: set, sources: dict, target: str) -> bool:
     return True
 
 
+def _own_watch_on_ok(placements: dict, user_id, movie_id, moment: Optional[str]) -> bool:
+    """CAS-1307: does the film's own placement (if any) allow `moment` — the film's CURRENT
+    window-derived moment, from ``_current_moment`` — to fire for ``match_newly_qualified``/
+    ``match_new_to_agent``? A film the person has placed on a later window should only alert when
+    it reaches that window; their own Watch On outranks an agent's newly-qualifies/new-to-agent
+    catch. Mirrors ``match()``'s own CAS-841/CAS-1237 gates exactly, with `announced` folded into
+    the CAS-1237 side (a film still Upcoming has no window of its own to agree or disagree with a
+    window-arrival test, but a stale Watch On set to Rent/Stream means the person has already
+    moved past caring that it was announced). No placement row at all, or a moment this gate
+    doesn't recognise: unchanged (fires) — same fail-open rule CAS-841 already uses for these two
+    functions."""
+    row = placements.get((str(user_id), str(movie_id)))
+    if not row:
+        return True
+    if moment in WINDOW_ARRIVAL_MOMENTS:
+        target_window = MOMENT_TO_WINDOW[moment]
+        return (target_window in row["windows"]
+                or _forward_matches(row["windows"], row["sources"], target_window))
+    if moment == "announced" or moment in REMINDER_MOMENTS:
+        current = _current_watch_on(placements, user_id, movie_id)
+        return current is None or current == "in_cinema"
+    return True
+
+
 # --------------------------------------------------------------------------- #
 # taste matching — CAS-825: a lookup into the REAL engine's own admission answer, not a second port
 # --------------------------------------------------------------------------- #
@@ -629,7 +653,7 @@ def _current_moment(record: dict) -> Optional[str]:
 
 def match_newly_qualified(cascades: list, prev_movies: list, today_movies: list, already=None,
                           admission=None, suppressed=None, excluded=None, covered=None,
-                          picks=None) -> dict:
+                          picks=None, film_watches=None, placement_counts=None) -> dict:
     """Return {user_id: [Hit, ...]} for a film present in both catalogues whose own attributes
     changed so it now matches an active Cascade's criteria and did NOT match yesterday (Lee's rule,
     2026-08-24) — an IMDb rating crossing the bar, a metacritic score/award/gross arriving, a genre
@@ -658,6 +682,13 @@ def match_newly_qualified(cascades: list, prev_movies: list, today_movies: list,
                          cascade_id-keyed set would miss that (CAS-1041).
     picks              : same film_picks rows ``match()`` takes (CAS-925) — a Hit here is attributed
                          to the film's owner exactly as ``match()``'s are.
+    film_watches       : same film_watch rows ``match()`` takes (CAS-841/CAS-1097) — CAS-1307: a
+                         placement row for (user, film) outranks this film's own `moment` here too,
+                         via `_own_watch_on_ok`, the same test ``match()`` applies to a real window
+                         transition for the same film. None/missing -> no placement row for anyone,
+                         so nothing is gated (today's behaviour, unchanged).
+    placement_counts   : same optional dict ``match()`` increments in place (CAS-841) — CAS-1307
+                         adds "own_watch_on" here for a hit this gate suppresses.
 
     CAS-784: same one-film-one-agent collapse as ``match()`` — see its docstring.
     """
@@ -667,6 +698,7 @@ def match_newly_qualified(cascades: list, prev_movies: list, today_movies: list,
     off = {(str(u), str(m)) for u, m in (suppressed or ())}
     muted = excluded_moments(excluded)
     admission = admission or {}
+    placements = _film_watch_placements(film_watches)
     rank_of = {c["id"]: _rank_key(c) for c in cascades}
     overrides = pick_overrides(picks)
     cascades_by_user = _cascades_by_user(cascades)
@@ -696,6 +728,10 @@ def match_newly_qualified(cascades: list, prev_movies: list, today_movies: list,
             moment = _current_moment(today_record)
             if moment is None or moment not in moments:
                 continue
+            if not _own_watch_on_ok(placements, c["user_id"], mid, moment):
+                if placement_counts is not None:
+                    placement_counts["own_watch_on"] = placement_counts.get("own_watch_on", 0) + 1
+                continue                       # CAS-1307: the user's own Watch On outranks this
             services, price = _detail_for(moment, today_record)
             probe = Transition(mid, today_record.get("title", ""), moment,
                                services=services, price=price, movie=today_record)
@@ -744,7 +780,7 @@ def _parse_dt(value):
 
 def match_new_to_agent(cascades: list, prev_movies: list, today_movies: list, previous_run_start,
                        already=None, admission=None, suppressed=None, excluded=None,
-                       covered=None, picks=None) -> dict:
+                       covered=None, picks=None, film_watches=None, placement_counts=None) -> dict:
     """Return {user_id: [Hit, ...]} for CAS-785's first-appearance moment: a film present in both
     catalogues that matches an active Cascade's criteria today and did NOT match it yesterday —
     the same test ``match_newly_qualified`` makes — fired ONLY when the Cascade itself has been
@@ -772,6 +808,14 @@ def match_new_to_agent(cascades: list, prev_movies: list, today_movies: list, pr
                          match_newly_qualified takes (CAS-825) — both snapshots are read here too.
     picks              : same film_picks rows ``match()`` takes (CAS-925) — a Hit here is attributed
                          to the film's owner exactly as ``match()``'s are.
+    film_watches       : same film_watch rows ``match()`` takes (CAS-841/CAS-1097) — CAS-1307: a
+                         placement row for (user, film) outranks a first appearance too, via
+                         `_own_watch_on_ok` applied to the film's own CURRENT window-derived moment
+                         (from `_current_moment`, same as `match_newly_qualified`) even though this
+                         function's own fired moment is always "new_to_agent" rather than that
+                         moment itself. None/missing -> no placement row for anyone, unchanged.
+    placement_counts   : same optional dict ``match()`` increments in place (CAS-841) — CAS-1307
+                         adds "own_watch_on" here for a hit this gate suppresses.
     """
     prev_by_id = {str(m.get("tmdb_id")): m for m in prev_movies}
     today_by_id = {str(m.get("tmdb_id")): m for m in today_movies}
@@ -779,6 +823,7 @@ def match_new_to_agent(cascades: list, prev_movies: list, today_movies: list, pr
     off = {(str(u), str(m)) for u, m in (suppressed or ())}
     muted = excluded_moments(excluded)
     admission = admission or {}
+    placements = _film_watch_placements(film_watches)
     rank_of = {c["id"]: _rank_key(c) for c in cascades}
     overrides = pick_overrides(picks)
     cascades_by_user = _cascades_by_user(cascades)
@@ -807,6 +852,13 @@ def match_new_to_agent(cascades: list, prev_movies: list, today_movies: list, pr
                 continue                   # already matched yesterday -> not a first appearance
             if not matches_criteria(mid, c["id"], "today", admission):
                 continue                   # still doesn't match today
+            # CAS-1307: gate on the film's own CURRENT window-derived moment, not the "new_to_agent"
+            # moment this Hit will actually carry — the same question CAS-841/CAS-1237 ask of a real
+            # window transition for this film, asked here of a first-appearance one instead.
+            if not _own_watch_on_ok(placements, c["user_id"], mid, _current_moment(today_record)):
+                if placement_counts is not None:
+                    placement_counts["own_watch_on"] = placement_counts.get("own_watch_on", 0) + 1
+                continue
             # CAS-1294: key the de-dupe on the OWNER, not the firing cascade — see match()'s own
             # comment above the equivalent line; the ledger row below is always written under
             # `owner["id"]`.

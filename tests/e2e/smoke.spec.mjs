@@ -59,7 +59,7 @@ test("the app loads and onboarding renders", async ({ page }) => {
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");   // v2_intro (CAS-1270)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");   // v2_intro (CAS-1312)
 });
 
 // CAS-911: onboarding generates its roster from the v2 sequence's own four-agent generator
@@ -74,7 +74,7 @@ test("onboarding commits a real, de-duplicated agent roster", async ({ page }) =
   expect(roster.length).toBeGreaterThan(0);
   expect(new Set(roster.map(c => c.id)).size).toBe(roster.length);
   expect(roster.every(c => c.sort === "cascade")).toBe(true);
-  expect(roster.map(c => c.name)).toEqual(["In Cinema", "Personal Favs"]);   // CAS-1270: cinema Yes
+  expect(roster.map(c => c.name)).toEqual(["Cinema Releases", "Personal Favs"]);   // CAS-1312: name is fixed now
 });
 
 test("recommendations render as a results list with items", async ({ page }) => {
@@ -1032,8 +1032,9 @@ test("Watch Cinema tab leads with Upcoming; the Streaming tab does not (CAS-750)
   await finishFlow(page);
   await toListing(page);
 
+  // CAS-1309 split Upcoming into "Next week" (upcoming_soon) then "Upcoming" — either still leads the tab.
   const cinemaFirst = await page.locator("#groups .group").first().getAttribute("data-g");
-  expect(cinemaFirst).toBe("upcoming");
+  expect(cinemaFirst).toMatch(/^upcoming/);
 
   await trackAStreamingFilm(page);
   // CAS-1223: the old header tab strip (#watchTabs .wtabbtn) is gone — "Streaming" is still its own single
@@ -1140,7 +1141,7 @@ test("CAS-740 AC4: a signed-in user whose account already holds agents is never 
   expect(await page.evaluate(() => flowOn)).toBe(true);   // genuinely inside the wizard before the race resolves
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");   // v2_intro (CAS-1270) — proves the wizard actually opened
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");   // v2_intro (CAS-1312) — proves the wizard actually opened
 
   // Now let the session restore resolve to an account that already holds an agent.
   await page.evaluate(() => window.__cas740ResolveSession());
@@ -1308,7 +1309,7 @@ async function cas913WalkToShortlist(page){
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");            // v2_intro (CAS-1270)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");            // v2_intro (CAS-1312)
   await ctaLocator(page).click();
   await page.waitForTimeout(120);
   await expect(page.locator("#obCinemaOpts")).toBeVisible();                      // v2_cinema
@@ -1515,20 +1516,20 @@ test("CAS-1169 AC3: a valid new email moves straight to the code step on #membSc
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe("membCode");
   expect(await page.locator("#membEmail").evaluate(el => el.readOnly)).toBe(true);
 
-  // CAS-1216: #membCode becomes visible synchronously, but membShowCodeState's own scrollIntoView
-  // (app_template.html, B6) is deferred two requestAnimationFrame callbacks to let the code block's
-  // reflow settle first. A single boundingBox() read right after the visibility wait can land inside
-  // that two-frame window and measure .membcta before the scroll has landed — poll until the scroll
-  // is actually done before taking the single measurement the assertions below check.
+  // CAS-1316: the code step is a short, focused page scrolled to #membScreen's top rather than scrolled
+  // to the button — the heading takes over the line the offer/benefits chrome used to own, and that
+  // chrome (including .membenefits) is hidden for the duration of this state.
+  await expect(page.locator(".membh")).toHaveText("Check your email");
+  await expect(page.locator(".membenefits")).toBeHidden();
   const viewport = page.viewportSize();
-  await expect.poll(async () => {
-    const box = await page.locator(".membcta").boundingBox();
-    return box.y + box.height;
-  }).toBeLessThanOrEqual(viewport.height);
+  const screenBox = await page.locator("#membScreen").boundingBox();
+  const headBox = await page.locator(".membh").boundingBox();
+  expect(headBox.y - screenBox.y).toBeLessThanOrEqual(120);
 
-  const box = await page.locator(".membcta").boundingBox();
-  expect(box.y).toBeGreaterThanOrEqual(0);
-  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  const codeBox = await page.locator("#membCode").boundingBox();
+  const ctaBox = await page.locator(".membcta").boundingBox();
+  expect(codeBox.y).toBeGreaterThanOrEqual(0);
+  expect(ctaBox.y + ctaBox.height).toBeLessThanOrEqual(viewport.height);
 });
 
 test("CAS-1169 AC4: a wrong code stays in State B with an error; Change email returns to State A; a correct code lands on the listing", async ({ page }) => {
@@ -1838,6 +1839,11 @@ test("CAS-919: the score row reads Watchmode fields as People/Critics, a missing
   // no-op). Force every window's marker to Off first so the floor can never react to the scores this
   // test is about to set.
   await page.evaluate(() => { WATCH_LEVEL_KEYS.forEach(k => { cascades[0].watchMarkers[k] = 0; }); });
+  // CAS-1247: the default mood caps each stage at its best 10 — nulling this card's critic score below
+  // can drop its cascadeScore far enough to fall out of that cap, silently no-oping the second
+  // fastPatchFindRow (same "film left the list" shape as the marker case above). Releases carries no
+  // cap, so select it first — the same fix the sibling collapsed-card CAS-919 test below already applies.
+  await page.locator('.moodchip[data-mood="releases"]').click();
 
   const cards = page.locator("#groups .card");
   const card = cards.first();
@@ -2052,10 +2058,17 @@ test("CAS-1264: the Order popover lists You score only when signed in, and picki
   await expect(youOpt).toBeVisible();
   await youOpt.click();
 
-  const values = await page.evaluate(() => [...document.querySelectorAll("#groups .card:not(.expanded)")]
-    .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null));
-  expect(values[0], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
-  expect(values[1], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
+  // CAS-1309 split Upcoming into two sections — sort only orders WITHIN a section (CAS-750/CAS-754), so
+  // compare the first two cards inside ONE section, not across its boundary.
+  const values = await page.evaluate(() => {
+    const group = [...document.querySelectorAll("#groups .group")]
+      .find(g => g.querySelectorAll(".card:not(.expanded)").length >= 2);
+    if(!group) return [null, null];
+    return [...group.querySelectorAll(".card:not(.expanded)")]
+      .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null);
+  });
+  expect(values[0], `first two You values (one section): ${JSON.stringify(values)}`).not.toBeNull();
+  expect(values[1], `first two You values (one section): ${JSON.stringify(values)}`).not.toBeNull();
   expect(values[0]).toBeGreaterThanOrEqual(values[1]);
 });
 
@@ -2128,10 +2141,17 @@ test("CAS-1296 AC2: a mood with Show top You set sorts the listing by You, desce
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
 
   expect(await page.evaluate(() => filt.sort)).toBe("you");
-  const values = await page.evaluate(() => [...document.querySelectorAll("#groups .card:not(.expanded)")]
-    .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null));
-  expect(values[0], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
-  expect(values[1], `first two You values: ${JSON.stringify(values)}`).not.toBeNull();
+  // CAS-1309 split Upcoming into two sections — sort only orders WITHIN a section (CAS-750/CAS-754), so
+  // compare the first two cards inside ONE section, not across its boundary.
+  const values = await page.evaluate(() => {
+    const group = [...document.querySelectorAll("#groups .group")]
+      .find(g => g.querySelectorAll(".card:not(.expanded)").length >= 2);
+    if(!group) return [null, null];
+    return [...group.querySelectorAll(".card:not(.expanded)")]
+      .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null);
+  });
+  expect(values[0], `first two You values (one section): ${JSON.stringify(values)}`).not.toBeNull();
+  expect(values[1], `first two You values (one section): ${JSON.stringify(values)}`).not.toBeNull();
   expect(values[0]).toBeGreaterThanOrEqual(values[1]);
 });
 
@@ -2196,10 +2216,17 @@ test("CAS-1303 AC2: Sort A-Z orders titles ascending; Sort Release date uses the
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
   expect(await page.evaluate(() => filt.sort)).toBe("title");
 
-  const titles = await page.evaluate(() => [...document.querySelectorAll("#groups .card:not(.expanded)")]
-    .map(el => MOVIES.find(m => m.tmdb_id === Number(el.id.replace("card-", ""))))
-    .filter(Boolean).map(m => m.title));
-  expect(titles.length, "setup: the listing must show at least two titles to prove an order").toBeGreaterThan(1);
+  // CAS-1309 split Upcoming into two sections — sort only orders WITHIN a section (CAS-750/CAS-754), so
+  // read titles from the first section with at least two cards, not across its boundary.
+  const titles = await page.evaluate(() => {
+    const group = [...document.querySelectorAll("#groups .group")]
+      .find(g => g.querySelectorAll(".card:not(.expanded)").length >= 2);
+    if(!group) return [];
+    return [...group.querySelectorAll(".card:not(.expanded)")]
+      .map(el => MOVIES.find(m => m.tmdb_id === Number(el.id.replace("card-", ""))))
+      .filter(Boolean).map(m => m.title);
+  });
+  expect(titles.length, "setup: the listing must show at least two titles in one section to prove an order").toBeGreaterThan(1);
   expect(titles).toEqual([...titles].sort((a, b) => a.localeCompare(b)));
 
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
@@ -2484,21 +2511,30 @@ test("CAS-1306: suggestion rows read Apply with Suggested: skip., and Apply all 
   await expect(page.locator(".tsugg")).toHaveCount(0);
 });
 
-test("CAS-1269 AC2: Skip on a style writes exclude, Neither clears both, and Back keeps it", async ({ page }) => {
+test("CAS-1318: a single style only has two states — tapping the cell toggles + and off, Off replaces − Skip, and Back keeps it", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await openStyleGrid(page);
 
-  await page.locator('.tgrid .tcell.allc[aria-label="Action"]').click();
-  await page.locator(".tdetail button", { hasText: "− Skip" }).click();
-  expect(await page.evaluate(() => onbFlow.draft.exclude)).toContain("Action");
-  expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBe("-");
+  await expect(page.locator(".tlegend-agent")).toContainText("skip (combination)");   // AC4: not "for styles" any more
 
-  await page.locator(".tdetail button", { hasText: "Neither" }).click();
-  expect(await page.evaluate(() => (onbFlow.draft.exclude || []).includes("Action"))).toBe(false);
+  const actionCell = page.locator('.tgrid .tcell.allc[aria-label="Action"]');
+  expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBe("+");
+
+  await actionCell.click();   // selects the cell AND toggles it: + -> off
   expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBeNull();
+  // CAS-1318: a whole style is never written to exclude by the grid any more — off is plainly absent
+  // from the on-list, the same representation the Basic Styles list and matchesCriteria both read.
+  expect(await page.evaluate(() => (onbFlow.draft.exclude || []).includes("Action"))).toBe(false);
+  await expect(page.locator(".tdetail button")).toHaveCount(2);
+  await expect(page.locator(".tdetail button", { hasText: "− Skip" })).toHaveCount(0);
+  await expect(page.locator(".tdetail button", { hasText: "Off" })).toHaveClass(/on/);
 
+  await page.locator(".tdetail button", { hasText: "+ List" }).click();   // off -> + again, via the detail panel
+  expect(await page.evaluate(() => styleGridState(onbFlow.draft, "Action"))).toBe("+");
+
+  await actionCell.click();   // + -> off, for the Back/save check below
   const agentId = await page.evaluate(() => onbFlow.draft.id);
   await expect(page.locator("#onbStepInner .osback")).toBeVisible();
   await page.locator("#onbStepInner .osback").click();   // Style -> Briefing
@@ -2508,10 +2544,6 @@ test("CAS-1269 AC2: Skip on a style writes exclude, Neither clears both, and Bac
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
   const saved = await page.evaluate(id => cascades.find(c => c.id === id), agentId);
   expect(saved.exclude || []).not.toContain("Action");
-  // commitDraft() copies draft.genre/exclude verbatim (no transform), so the saved reading must match the
-  // draft reading just above — still null. styleGridSetStyle never re-adds a style to the include set on
-  // Neither (dEffectiveGenreSet nets out the current exclude set on purpose, so one style's Neither can
-  // never silently resurrect another's "+" the way a raw genre-array edit could — see its own comment).
   expect(await page.evaluate(id => styleGridState(cascades.find(c => c.id === id), "Action"), agentId)).toBeNull();
 });
 

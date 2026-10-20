@@ -64,7 +64,7 @@ test("CAS-1047 AC: v2_cinema's Continue is disabled on arrival via the wired flo
   await page.locator("#splashCta").click();
   await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about
   await page.locator("#onbStepInner #onbStepCta").click();
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("biggest movies");   // v2_intro (CAS-1270)
+  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");   // v2_intro (CAS-1312)
   await page.locator("#onbStepInner #onbStepCta").click();   // slides into v2_cinema
   await expect(page.locator("#obCinemaOpts")).toBeVisible();
   await expect(page.locator("#onbStepInner #onbStepCta")).toBeDisabled();
