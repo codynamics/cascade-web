@@ -141,7 +141,7 @@ class ApplyTwoTierPublicationCallsBackcatalogueMergeTestCase(unittest.TestCase):
             order.append("merge_backcatalogue")
             return {"merged": 0, "already_known": 0, "no_tmdb_id": 0}
 
-        def fake_run_probe(candidates, today, budget, published_ids):
+        def fake_run_probe(candidates, today, budget, published_ids, **_kwargs):
             order.append("probe")
             return {"ok": 0, "cached": 0, "no-id": 0, "skip": 0, "stop": 0, "probed": 0, "spent": 0}
 
