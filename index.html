@@ -10566,6 +10566,12 @@ const MOOD_EDIT_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 function applyMoodToState(mood){
   watchAgentOff.clear();
   (mood.agentsOff||[]).forEach(id=>watchAgentOff.add(id));
+  // CAS-1322 Change 2: an agents-sourced mood whose agentsOff now excludes every surviving agent (e.g. an
+  // account that drifted into this state before the delete-time repair above existed) reads as "all agents"
+  // here, in memory only — never written back (CAS-1218/1243: boot/load never write).
+  if(mood.source!=="catalogue" && cascades.length && cascades.every(c=>watchAgentOff.has(c.id))){
+    watchAgentOff.clear();
+  }
   WATCH_LEVEL_KEYS.forEach(tab=>{
     watchPickedBy[tab]=mood.pickedBy||"all";
     watchWatchedSel[tab]=new Set(mood.watched||[]);
@@ -10683,6 +10689,9 @@ window.saveMoodFromSheet = () => {
   const d=moodDraft; if(!d) return;
   const name=(d.name||"").trim();
   if(!name){ const inp=$("moodName"); if(inp) inp.focus(); return; }
+  // CAS-1322 Change 3: Save is already disabled in the sheet for this (renderMoodSheetBody's noAgentsSelected),
+  // but guard the actual save too since nothing else stops a direct call.
+  if(d.source!=="catalogue" && cascades.length>0 && cascades.every(c=>d.agentsOff.has(c.id))) return;
   const mood={
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
     name, source:d.source==="catalogue"?"catalogue":"agents",
@@ -10792,6 +10801,9 @@ function renderMoodSheetBody(){
   const d=moodDraft; if(!d) return;
   const rows=watchSheetLastRows;
   const isCatalogue=d.source==="catalogue";
+  // CAS-1322 Change 3: an agents-sourced mood with every agent toggled off would save with nothing included —
+  // Save is disabled and a hint shown under the Agents list (below) rather than letting that state back in.
+  const noAgentsSelected = !isCatalogue && cascades.length>0 && cascades.every(c=>d.agentsOff.has(c.id));
   // CAS-1288: "My agents" only offers the main styles the selected agents actually list (styleGridState
   // "+"), not every catalogue style — a style reached only through a "+" pair doesn't count. "Everything"
   // has no agents to narrow by, so it still offers every style.
@@ -10888,6 +10900,7 @@ function renderMoodSheetBody(){
     ${isCatalogue ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Agents</span></div>
       <div class="chips">${agentsHTML}</div>
+      ${noAgentsSelected ? `<div style="color:var(--faint);font-size:12.5px;margin-top:8px">Pick at least one agent.</div>` : ""}
     </div>`}
     ${isCatalogue ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Picked by</span></div>
@@ -10923,6 +10936,8 @@ function renderMoodSheetBody(){
     if(!d.editingId){ delBtn.textContent="Cancel"; delBtn.disabled=false; }
     else { delBtn.textContent = moodDeleteArmed ? "Tap again to delete" : "Delete mood"; delBtn.disabled = watchMoods.length<=1; }
   }
+  const saveBtn=$("moodSaveBtn");
+  if(saveBtn) saveBtn.disabled = noAgentsSelected;
 }
 // CAS-863: scopeRows() (the pre-CAS-721 pool, gating on the retired watch-list model's own ymFeedMatches)
 // is gone — it had no callers left once the List Editor went with the rest of that model, and every live
@@ -13191,6 +13206,17 @@ function emptyResultsHTML(){
   // only from the Watch pipeline itself, in the order a person would actually hit them.
   const agentOff=watchAgentOff;
   const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
+  // CAS-1322 Change 4: "no agent is included" is a different fact from "none of your included agents track
+  // this tab" — the latter blames the agents' own settings, which is wrong when the real problem is that
+  // this mood excludes all of them. After Change 2 this should be unreachable (applyMoodToState already
+  // widens such a mood to "all agents" in memory); kept as a safety net.
+  if(cascades.length && agentOff.size && !acs.length){
+    return `<div class="empty">
+      <div class="emoji">🔍</div>
+      <div class="eh">This mood has no agents selected.</div>
+      <div class="ebtns"><button class="ebtn" onclick="openMoodSheetFor('${escA(watchMoodSel)}')"><span>Edit this mood</span></button></div>
+    </div>`;
+  }
   if(!acs.some(c=>windowUsable(c, watchTab))){
     return `<div class="empty">
       <div class="emoji">🔍</div>
@@ -13724,6 +13750,28 @@ function deleteAgentAsk(c){
     // CAS-1096: one acctOp per film whose pin/move actually named this agent — never the whole table.
     if((e.pinnedTo||[]).length!==pinLenBefore || (e.notIn||[]).length!==outLenBefore) pushFilmPick(id);
   });
+  // CAS-1322: a mood's agentsOff is an exclusion list — deleting an agent that was the ONLY one left
+  // included leaves every surviving agent excluded, which reads (emptyResultsHTML) as "no agent tracks
+  // this tab" rather than the true "this mood has no agents selected". Scrub the deleted id out of every
+  // agents-sourced mood's agentsOff, then widen back to "all agents" ([]) wherever that scrub (or an
+  // already-stale exclusion list) now excludes every surviving agent. Deleting is the user's own action,
+  // so writing the repaired moods back is allowed (unlike boot/load — CAS-1218/1243).
+  let moodsChanged=false, selectedMoodChanged=false;
+  watchMoods.forEach(m=>{
+    if(m.source==="catalogue") return;
+    const before=m.agentsOff||[];
+    let next=before.filter(id=>id!==c.id);
+    if(cascades.length && cascades.every(cc=>next.includes(cc.id))) next=[];
+    if(next.length!==before.length || next.some((id,i)=>id!==before[i])){
+      m.agentsOff=next;
+      moodsChanged=true;
+      if(m.id===watchMoodSel) selectedMoodChanged=true;
+    }
+  });
+  if(moodsChanged){
+    pushViewField("moods", watchMoods.map(m=>({...m})));
+    if(selectedMoodChanged){ applyMoodToState(currentMood()); render(); }
+  }
   recomputeFound();
   const wasSelected=activeIds.includes(c.id);
   if(wasSelected){
