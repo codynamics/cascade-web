@@ -10045,7 +10045,7 @@ function renderWatchTop(){
   const moodChipHTML=(m, pinned)=>{
     const on=m.id===watchMoodSel;
     return `<button type="button" class="moodchip${on?" on":""}${pinned?" pinned":""}" data-mood="${escA(m.id)}" aria-pressed="${on}"
-        onclick="onMoodChipTap('${escA(m.id)}')">${esc(m.name)}<span class="moodedit" aria-hidden="true">${MOOD_EDIT_SVG}</span></button>`;
+        onclick="onMoodChipTap('${escA(m.id)}')">${esc(moodDisplayName(m))}<span class="moodedit" aria-hidden="true">${MOOD_EDIT_SVG}</span></button>`;
   };
   // CAS-1296 Change 4: Releases, if the account has one, always renders first — pinned outside the
   // draggable set, with a divider after it — the rest keep their saved order.
@@ -10529,7 +10529,11 @@ const moodStylesOffKeeping = keep => ALL_GENRES.filter(g=>!keep.includes(g));
 const MOOD_STARTER_IDS = Object.keys(MOOD_STARTER_STYLES);
 const MOOD_DEFAULTS = [
   {id:"top", name:"Top scores", order:"score", sort:"score", topYou:null, topPublic:10},
-  {id:"releases", name:"Releases", order:"release", sort:"release", topYou:null, topPublic:null},
+  // CAS-1328: Latest (built-in id "releases", carried over from the pre-rename Releases mood) — every
+  // cinema release of the last 12 months or still ahead, in release order, agents and agent floors never
+  // consulted. source/sort are overridden for this id regardless of what's stored (moodSource/moodSort
+  // below), so an existing account's pre-rename {source:"agents", ...} record still behaves this way.
+  {id:"releases", name:"Latest", source:"catalogue", order:"release", sort:"release", topYou:null, topPublic:null},
   // CAS-1295: the shortlist — every starred film standing on the current stage, watched or not, on any
   // service (mineOnly:false), across the whole catalogue (not just what an agent lists).
   {id:"starred", name:"Starred", source:"catalogue", starredOnly:true, sort:"score", topYou:null, topPublic:null,
@@ -10578,7 +10582,20 @@ function moodOrder(mood){ return (moodTopYouN(mood)||moodTopPublicN(mood)) ? "yo
 // see applyMoodToState/moodDraftFrom), so it's resolved here, in memory, from the old moodOrder() derivation
 // instead — never written back (CAS-1218/CAS-1243 no-boot-write rule). It's only ever persisted once the
 // person actually saves that mood from the sheet.
-function moodSort(mood){ return mood.sort!==undefined ? mood.sort : (moodOrder(mood)==="release" ? "release" : "score"); }
+// CAS-1328: Latest's own sort is fixed by the app, never the stored field — see MOOD_DEFAULTS' own comment.
+function moodSort(mood){ return mood.id==="releases" ? "release" : (mood.sort!==undefined ? mood.sort : (moodOrder(mood)==="release" ? "release" : "score")); }
+// CAS-1328: Latest (id "releases") always behaves as a catalogue-sourced mood regardless of what an
+// existing account's stored record carries (CAS-1218/1243: a load never rewrites it) — every place that
+// cares whether a mood is agent- or catalogue-scoped reads this instead of the raw `source` field.
+function moodSource(mood){ return mood.id==="releases" ? "catalogue" : mood.source; }
+// CAS-1328: the display name for Latest — "Latest" even when the stored record still reads the pre-rename
+// "Releases" (never rewritten on load); a name the person has actually typed themselves is always kept.
+function moodDisplayName(mood){ return (mood.id==="releases" && mood.name==="Releases") ? "Latest" : mood.name; }
+// CAS-1328: Latest's own pool restriction — a real cinema release (cinema_release) whose cinema_date falls
+// in the 12 months before today or any time after it. Applies only to the built-in Latest mood (id
+// "releases"), never to any other catalogue mood (Starred/Action/Imagine/Fun carry no such window).
+const LATEST_WINDOW_DAYS = 365;
+function filmInLatestWindow(m){ return !!m.cinema_release && !!m.cinema_date && m.cinema_date>=addDays(TODAY,-LATEST_WINDOW_DAYS); }
 function moodTopYouEffectiveN(mood){ return moodTopYouAvailable() ? moodTopYouN(mood) : null; }
 // CAS-1290: raises the CAS-1247 cap of five — every literal 5 that caps the mood row/sheet uses this.
 const MOOD_MAX = 10;
@@ -10597,7 +10614,7 @@ function applyMoodToState(mood){
   // CAS-1322 Change 2: an agents-sourced mood whose agentsOff now excludes every surviving agent (e.g. an
   // account that drifted into this state before the delete-time repair above existed) reads as "all agents"
   // here, in memory only — never written back (CAS-1218/1243: boot/load never write).
-  if(mood.source!=="catalogue" && cascades.length && cascades.every(c=>watchAgentOff.has(c.id))){
+  if(moodSource(mood)!=="catalogue" && cascades.length && cascades.every(c=>watchAgentOff.has(c.id))){
     watchAgentOff.clear();
   }
   WATCH_LEVEL_KEYS.forEach(tab=>{
@@ -10643,9 +10660,10 @@ let moodDeleteArmTimer = null;
 function moodDraftFrom(mood){
   return {
     editingId: mood ? mood.id : null,
-    name: mood ? mood.name : "",
+    name: mood ? moodDisplayName(mood) : "",
     // CAS-1284 Change 4: a new mood defaults to "My agents" — "missing means agents" (Change 1).
-    source: mood && mood.source==="catalogue" ? "catalogue" : "agents",
+    // CAS-1328: Latest's own source is fixed regardless of what's stored — see moodSource.
+    source: mood && moodSource(mood)==="catalogue" ? "catalogue" : "agents",
     // CAS-1296: order is no longer part of the draft — it's derived (moodOrder) from topYou/topPublic below.
     // CAS-1287 Change 1: topYou/topPublic replace Best N's single `best` field.
     topYou: mood ? moodTopYouN(mood) : null,
@@ -10829,6 +10847,10 @@ function renderMoodSheetBody(){
   const d=moodDraft; if(!d) return;
   const rows=watchSheetLastRows;
   const isCatalogue=d.source==="catalogue";
+  // CAS-1328: Latest's own Agents/Styles sections never apply — Agents is already hidden for any catalogue
+  // mood (isCatalogue, forced true for this id by moodDraftFrom); Styles needs its own flag since every
+  // other catalogue mood (Starred/Action/Imagine/Fun) still offers it.
+  const isLatestDraft = d.editingId==="releases";
   // CAS-1322 Change 3: an agents-sourced mood with every agent toggled off would save with nothing included —
   // Save is disabled and a hint shown under the Agents list (below) rather than letting that state back in.
   const noAgentsSelected = !isCatalogue && cascades.length>0 && cascades.every(c=>d.agentsOff.has(c.id));
@@ -10916,7 +10938,7 @@ function renderMoodSheetBody(){
           aria-label="Only starred films" onclick="toggleMoodDraftStarredOnly()"><i></i></button>
       </div>
     </div>
-    <div class="wsheetsec">
+    ${isLatestDraft ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Styles</span>
         <div class="wsheetlinks">
           <button type="button" class="linkbtn" onclick="selectAllMoodDraftStyles()">Select all</button>
@@ -10924,7 +10946,7 @@ function renderMoodSheetBody(){
         </div>
       </div>
       <div class="chips">${stylesHTML}</div>
-    </div>
+    </div>`}
     ${isCatalogue ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Agents</span></div>
       <div class="chips">${agentsHTML}</div>
@@ -10979,12 +11001,15 @@ function watchScopeRows(){
   // decided directly off primaryStatus(m), whether or not any agent lists it — not the agent/occasion-based
   // pool below. Agents-off, occasion and Picked by are all agent-scoped, so none of them apply here; search,
   // Styles, Watched and mine-only (watchVisibleRows below) still do, unchanged.
-  if(currentMood().source==="catalogue"){
+  if(moodSource(currentMood())==="catalogue"){
+    const isLatest = currentMood().id==="releases";
     const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
     return MOVIES.filter(m=>{
       // The account-level world every agent searches inside (CAS-146/170/560) applies to a catalogue mood too:
       // a film with nothing to watch, or outside the Languages setting, is never in it.
       if(!showable(m) || !passesTasteBase(m)) return false;
+      // CAS-1328: Latest's own 12-month cinema-release window — no other catalogue mood carries it.
+      if(isLatest && !filmInLatestWindow(m)) return false;
       const ps=primaryStatus(m);
       const standing = watchTab==="in_cinema" ? (ps==="upcoming" || ps==="opening_week" || ps==="in_cinema") : ps===ownStanding;
       return standing && watchStageMatches(m);
@@ -11028,7 +11053,7 @@ function watchVisibleRows(){
   if(wsearch) rows=rows.filter(m=>m.title.toLowerCase().includes(wsearch));
   const preSheetRows=rows;
   // CAS-1284 Change 1: Picked by is agent-scoped — never applies to a catalogue mood.
-  if(watchPickedBy[watchTab]!=="all" && currentMood().source!=="catalogue") rows=rows.filter(filmMatchesPickedBy);
+  if(watchPickedBy[watchTab]!=="all" && moodSource(currentMood())!=="catalogue") rows=rows.filter(filmMatchesPickedBy);
   const genreOff=watchGenreOff[watchTab];
   if(genreOff.size) rows=rows.filter(m=>filmPassesStylesOff(m, genreOff));
   if(watchBadgeSel[watchTab].size) rows=rows.filter(filmMatchesBadgeFilter);
@@ -13792,7 +13817,7 @@ function deleteAgentAsk(c){
   // so writing the repaired moods back is allowed (unlike boot/load — CAS-1218/1243).
   let moodsChanged=false, selectedMoodChanged=false;
   watchMoods.forEach(m=>{
-    if(m.source==="catalogue") return;
+    if(moodSource(m)==="catalogue") return;
     const before=m.agentsOff||[];
     let next=before.filter(id=>id!==c.id);
     if(cascades.length && cascades.every(cc=>next.includes(cc.id))) next=[];
@@ -21833,7 +21858,7 @@ function watchNavKey(){
     watchMoodSel,
     moodTopYouEffectiveN(currentMood()),
     moodTopPublicN(currentMood()),
-    currentMood().source==="catalogue",
+    moodSource(currentMood())==="catalogue",
     // CAS-1248: the tabs a Where & when switch actually leaves enabled — watchTab alone (above) says which
     // one is SELECTED, not which ones EXIST, so switching a window off/on never showed up here even though
     // watchStageStopsNow()/watchScopeRows() both derive their stops/scope from this same list.
@@ -22177,7 +22202,9 @@ function filmInWatchRows(m){
   if(!watchTabsNow().length) return false;
   // CAS-1284 Change 1: a catalogue mood's pool test — see watchScopeRows's own comment. Agents-off,
   // occasion and Picked by are all agent-scoped, so none of them apply here.
-  if(currentMood().source==="catalogue"){
+  if(moodSource(currentMood())==="catalogue"){
+    // CAS-1328: Latest's own 12-month cinema-release window — see watchScopeRows' identical branch.
+    if(currentMood().id==="releases" && !filmInLatestWindow(m)) return false;
     const ps=primaryStatus(m);
     const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
     const standing = watchTab==="in_cinema" ? (ps==="upcoming" || ps==="opening_week" || ps==="in_cinema") : ps===ownStanding;
@@ -22203,7 +22230,7 @@ function filmInWatchRows(m){
   }
   const wsearch=watchSearch[watchTab];
   if(wsearch && !m.title.toLowerCase().includes(wsearch)) return false;
-  if(watchPickedBy[watchTab]!=="all" && currentMood().source!=="catalogue" && !filmMatchesPickedBy(m)) return false;
+  if(watchPickedBy[watchTab]!=="all" && moodSource(currentMood())!=="catalogue" && !filmMatchesPickedBy(m)) return false;
   const genreOff=watchGenreOff[watchTab];
   if(!filmPassesStylesOff(m, genreOff)) return false;
   if(watchBadgeSel[watchTab].size && !filmMatchesBadgeFilter(m)) return false;
@@ -22289,7 +22316,7 @@ function wtRefreshMini(){
   const stop = watchStageStopsNow().find(s=>s.key===curKey);
   const stageName = stop ? (stop.key==="in_cinema" ? "Now showing" : stop.label) : "";
   mini.innerHTML = `<span class="gdot ${stop?stop.dot:""}" aria-hidden="true"></span><span>${esc(stageName)}</span>`
-    + `<span class="wtsep">·</span><span class="wtmood">${esc(currentMood().name)}</span><span class="wtchev">Change ▾</span>`;
+    + `<span class="wtsep">·</span><span class="wtmood">${esc(moodDisplayName(currentMood()))}</span><span class="wtchev">Change ▾</span>`;
 }
 // Measuring shortH forces a layout flush while the bar is shrunk but not yet margin-compensated — if the
 // page is scrolled to (or past) what is, for that one instant, a shorter document, the browser clamps

@@ -558,7 +558,11 @@ if(typeof window.CascadeAuth === "undefined"){
   // re-deriving it by hand.
   // CAS-1296: moodOrder — derives the pre-CAS-1303 fallback order from topYou/topPublic.
   // CAS-1303: moodSort — the explicit Sort field, falling back to moodOrder's derivation when absent.
-  applyMoodToState, moodDefaultFieldsNow, moodOrder, moodSort,
+  // CAS-1328: moodSource/moodDisplayName — Latest's (id "releases") fixed-by-the-app source and display
+  // name, overriding whatever an existing account's stored record carries. filmInLatestWindow/
+  // LATEST_WINDOW_DAYS are Latest's own 12-month cinema-release pool test.
+  applyMoodToState, moodDefaultFieldsNow, moodOrder, moodSort, moodSource, moodDisplayName,
+  filmInLatestWindow, LATEST_WINDOW_DAYS,
   // CAS-1287: MOOD_DEFAULTS (the five built-in moods, including the three catalogue starters),
   // moodTopYouN/moodTopPublicN/moodTopYouAvailable/moodTopYouEffectiveN ("Show top"'s own cap-resolution
   // and You-availability pure functions), and moodShowTopKeep (the selection cut itself) — exported so a
