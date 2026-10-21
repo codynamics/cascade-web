@@ -744,6 +744,16 @@ if(typeof window.CascadeAuth === "undefined"){
   // card's ADVANCED-tagged rows and Edit Agent's Basic-view "SET IN ADVANCED" section — exported so a test
   // can assert its four cases directly against fixtures, rather than re-deriving them from rendered HTML.
   agentAdvancedSet,
+  // CAS-1326: attributionHTML (the card's "which agents would find this" chip) — exported so a test can
+  // assert its Watch-mode output directly, rather than only through cardTopHTML's combined render.
+  // commitDraft is the Briefing/builder's own save chokepoint, a plain top-level function; draft is the
+  // module-level editing buffer commitDraft reads, reassigned wholesale (new/applied templates, discarded
+  // edits), so it's exposed through a getter/setter like watchPrefs/flowKind elsewhere in this file.
+  // watchNavKey is render()'s own "did anything navigational change" key — exported so a test can assert
+  // it directly instead of only through render()'s rebuild-vs-patch choice.
+  attributionHTML, commitDraft, watchNavKey,
+  get draft(){ return draft; },
+  setDraft(d){ draft = d; },
 };
 `;
 
