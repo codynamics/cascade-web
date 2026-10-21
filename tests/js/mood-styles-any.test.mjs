@@ -75,11 +75,16 @@ test("CAS-1256 AC2: on the Streaming stage, only Action on shows a film carrying
   const savedTab = E.watchTab;
   const savedOff = new Set(E.watchGenreOff.stream);
   const savedMoodSel = E.watchMoodSel;
+  const savedMoods = [...E.watchMoods].map(m => ({ ...m }));
   E.setWatchTab("stream");
   // The default mood ("Top scores") keeps only the best 10 by cascadeScore (CAS-1247 7th requeue) — unrelated
   // to this ticket's Styles rule, but it would otherwise cap the 219-film candidate pool below this test's
-  // two seeded films. "Releases" (top:false) is the other built-in mood, same precedent CAS-1247 itself used.
-  if(savedMoodSel !== "releases") E.window.setWatchMood("releases");
+  // two seeded films. CAS-1328 turned the other built-in mood ("Releases", the old top:false precedent
+  // CAS-1247 used) into Latest — a catalogue-sourced mood restricted to recent cinema releases, no longer a
+  // generic uncapped agents-mode mood — so this pushes its own uncapped agents-sourced mood instead.
+  const uncappedMood = { ...E.moodDefaultFieldsNow(), id: "t-cas1256-uncapped", name: "Test", order: "score", topYou: null, topPublic: null };
+  E.watchMoods.push(uncappedMood);
+  E.window.setWatchMood(uncappedMood.id);
   // CAS-753's mine-only default hides any film the guest harness has no configured service for — both
   // seeded films carry a streaming offer, so this is CAS-1222/CAS-1234's own established way to reach
   // past it, not something this ticket's own behaviour touches.
@@ -113,6 +118,7 @@ test("CAS-1256 AC2: on the Streaming stage, only Action on shows a film carrying
     restoreX(); restoreY();
   } finally{
     if(savedMoodSel !== E.watchMoodSel) E.window.setWatchMood(savedMoodSel);
+    E.watchMoods.length = 0; E.watchMoods.push(...savedMoods);
     E.watchGenreOff.stream = savedOff;
     if(savedMineOnly !== E.watchMineOnlyOn()) E.window.toggleWatchMineOnly();
     E.setWatchTab(savedTab);
