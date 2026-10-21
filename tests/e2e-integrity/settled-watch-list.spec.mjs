@@ -109,12 +109,21 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
   await waitForAccountLoads(page);
 
   // CAS-1247: the default mood (Top scores) now caps each stage at its best 10 — too short for this
-  // test's "at least 20" premise regardless of roster size. Releases carries no such cap. setWatchTab and
-  // setWatchMood each already call render() internally — a trailing explicit render() here bumps renderGen
+  // test's "at least 20" premise regardless of roster size. The old "releases" precedent carried no such
+  // cap, but CAS-1328 turned it into Latest — a catalogue-sourced mood restricted to a 12-month cinema-
+  // release window, no longer a generic uncapped agents-mode mood — so this pushes its own uncapped
+  // agents-sourced test mood instead (same fix mood-styles-any.test.mjs made for the same reason). setWatchTab
+  // and setWatchMood each already call render() internally — a trailing explicit render() here bumps renderGen
   // a second time in the same tick, before fillListChunked's requestAnimationFrame-deferred remainder
   // (anything past its first 36-item batch) ever gets to run, so that remainder's gen!==renderGen guard
   // (CAS-129) abandons it outright. No extra render() call needed or safe to add.
-  await page.evaluate(() => { setWatchTab("stream"); window.setWatchMood("releases"); });
+  await page.evaluate(() => {
+    setWatchTab("stream");
+    const uncappedMood = { ...moodDefaultFieldsNow(), id: "t-cas1236-ac3-uncapped", name: "Test",
+      sort: "score", topYou: null, topPublic: null };
+    watchMoods.push(uncappedMood);
+    window.setWatchMood(uncappedMood.id);
+  });
   await settleListing(page);
 
   const before = await page.evaluate(() => ({
