@@ -5140,7 +5140,7 @@ function primaryStatus(m){
   // availability is truly behind a film, not while it is simultaneous with a pvod/rent/stream offer.
   if(st.includes("opening_week")) return "opening_week";
   if(st.includes("in_cinema")) return "in_cinema";
-  if(st.includes("rental") && st.includes("included_streaming") && (scopedFor("rental")||scopedFor("included_streaming"))){
+  if(st.includes("rental") && st.includes("included_streaming") && accountScopedFor()){
     const own=ownReach(m);
     if(own.stream) return "included_streaming";
     if(own.rent) return "rental";
@@ -6349,6 +6349,12 @@ const anyScope = c => HOME_KEYS.some(k=>!!scopeOf(c)[k]);
 const allScoped = c => HOME_KEYS.every(k=>!!scopeOf(c)[k]);
 const scopedFor = w => { const c=activeCascade(); return c ? !!scopeOf(c)[w] : prefs.on; };
 const servicesScoped = () => { const c=activeCascade(); return c ? anyScope(c) : prefs.on; };
+// CAS-1324: Watch (primaryStatus, cardHTML's own-services narrowing) must never follow the open agent's
+// myServices — Watch is driven by the selected mood and stage buttons alone (Lee, 21 Oct 2026). This is
+// scopedFor/servicesScoped's own account-switch fallback, taken unconditionally, without ever consulting
+// activeCascade(). Agent builder previews and admission (matchesCriteria, passes()) keep reading the open
+// agent's own scope via scopedFor/servicesScoped above — untouched by this ticket.
+const accountScopedFor = () => prefs.on;
 // Short window names for scope copy. A per-window scope has to be REPORTED per window: "my services" alone
 // is what the old global boolean said, and saying it for a Cascade scoped to Stream only would be a lie.
 const SCOPE_SHORT = {pvod:"premium", rental:"rent", included_streaming:"stream"};
@@ -8532,7 +8538,11 @@ function cardHTML(m, markNew=false, {hideDismiss=false, inWatch=false}={}){
   const id=m.tmdb_id;
   // CAS-110: an estimated title shows no offers and no prices — see savingsHTML.
   let offers=isEstimated(m) ? [] : dedupOffers(m.offers);
-  if(prefsActive() && !m._fixture) offers=offers.filter(myService);   // CAS-491: see matchesServices
+  // CAS-1324: on Watch, the card's own-services narrowing reads the account switch only — see
+  // accountScopedFor. Find/the Moving ledger (inWatch:false) are agent builder/admission-adjacent
+  // screens, not Watch, so they keep following the open agent's own scope via prefsActive(), unchanged.
+  const svcScoped = inWatch ? (!ignoreScope && accountScopedFor()) : prefsActive();
+  if(svcScoped && !m._fixture) offers=offers.filter(myService);   // CAS-491: see matchesServices
   // CAS-285: the per-title provider credit is gone from the card. The attribution is REQUIRED but it is not
   // information about the film, and repeating it under every "where to watch" list on a 2,000-card listing
   // is the same sentence a thousand times. It is stated once, in About & credits, which is where TMDB's own
