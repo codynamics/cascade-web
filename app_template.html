@@ -5140,7 +5140,7 @@ function primaryStatus(m){
   // availability is truly behind a film, not while it is simultaneous with a pvod/rent/stream offer.
   if(st.includes("opening_week")) return "opening_week";
   if(st.includes("in_cinema")) return "in_cinema";
-  if(st.includes("rental") && st.includes("included_streaming") && (scopedFor("rental")||scopedFor("included_streaming"))){
+  if(st.includes("rental") && st.includes("included_streaming") && accountScopedFor()){
     const own=ownReach(m);
     if(own.stream) return "included_streaming";
     if(own.rent) return "rental";
@@ -6349,6 +6349,12 @@ const anyScope = c => HOME_KEYS.some(k=>!!scopeOf(c)[k]);
 const allScoped = c => HOME_KEYS.every(k=>!!scopeOf(c)[k]);
 const scopedFor = w => { const c=activeCascade(); return c ? !!scopeOf(c)[w] : prefs.on; };
 const servicesScoped = () => { const c=activeCascade(); return c ? anyScope(c) : prefs.on; };
+// CAS-1324: Watch (primaryStatus, cardHTML's own-services narrowing) must never follow the open agent's
+// myServices — Watch is driven by the selected mood and stage buttons alone (Lee, 21 Oct 2026). This is
+// scopedFor/servicesScoped's own account-switch fallback, taken unconditionally, without ever consulting
+// activeCascade(). Agent builder previews and admission (matchesCriteria, passes()) keep reading the open
+// agent's own scope via scopedFor/servicesScoped above — untouched by this ticket.
+const accountScopedFor = () => prefs.on;
 // Short window names for scope copy. A per-window scope has to be REPORTED per window: "my services" alone
 // is what the old global boolean said, and saying it for a Cascade scoped to Stream only would be a lie.
 const SCOPE_SHORT = {pvod:"premium", rental:"rent", included_streaming:"stream"};
@@ -7012,11 +7018,27 @@ const PRE_RELEASE_SORTS=new Set(["availability","title","cinema","cascade","you"
 // is never a second source of truth for the sort key itself, only which of the two reasons produced the key
 // already in hand — derived, at each caller, from whatever already told it: ymSort being non-null in
 // listingGroups (nothing chosen for a list keeps it null), or the caller of listingOrder saying so directly.
+// CAS-1325: the Release-date mood sort's own comparator (key==="cinema" picked explicitly, isUserSort) —
+// Upcoming reads soonest first, every other stage reads most-recent first, a film with no cinema_date
+// goes last on every stage, and every tie (equal date, or both absent) reads by title — never by which
+// agent is open (cinema, below, is never read here) and never by filmOwnerOrder (listingGroups' own
+// tie-break is skipped too, since this already resolves to a non-zero title order).
+function byCinemaDate(a,b,asc){
+  const da=a.cinema_date||"", db=b.cinema_date||"";
+  if(!da && !db) return a.title.localeCompare(b.title);
+  if(!da) return 1;
+  if(!db) return -1;
+  return (asc ? da.localeCompare(db) : db.localeCompare(da)) || a.title.localeCompare(b.title);
+}
 const sortForKey = (g,key,cinema,isUserSort) =>
+    // CAS-1325: an explicit "cinema" pick (isUserSort — a selected mood always makes one) owns its own
+    // comparator above, whatever agent is open. cinema (the open agent's kind) still drives the CAS-410
+    // default below for every caller that never passes isUserSort — a cascade's own untouched default.
+    (key==="cinema" && isUserSort) ? ((a,b)=>byCinemaDate(a,b, g==="upcoming"))
     // CAS-410: "Newest cinema" (key==="cinema") is in PRE_RELEASE_SORTS because it's a literal pre-release
     // date order like Title — but for a cinema agent it needs to read the same direction as every other
     // Upcoming sort (soonest first), not sortMoviesBy's plain descending. Non-cinema agents keep it descending.
-    (g==="upcoming" && (!PRE_RELEASE_SORTS.has(key) || (cinema && key==="cinema"))) ? byTimelineAsc
+  : (g==="upcoming" && (!PRE_RELEASE_SORTS.has(key) || (cinema && key==="cinema"))) ? byTimelineAsc
   : (cinema && g==="in_cinema" && !isUserSort) ? byTimelineAsc
   : key==="availability" ? (cinema||g==="upcoming" ? byTimelineAsc : byTimeline)
   : key==="imdb" ? byRatingDesc
@@ -8532,7 +8554,11 @@ function cardHTML(m, markNew=false, {hideDismiss=false, inWatch=false}={}){
   const id=m.tmdb_id;
   // CAS-110: an estimated title shows no offers and no prices — see savingsHTML.
   let offers=isEstimated(m) ? [] : dedupOffers(m.offers);
-  if(prefsActive() && !m._fixture) offers=offers.filter(myService);   // CAS-491: see matchesServices
+  // CAS-1324: on Watch, the card's own-services narrowing reads the account switch only — see
+  // accountScopedFor. Find/the Moving ledger (inWatch:false) are agent builder/admission-adjacent
+  // screens, not Watch, so they keep following the open agent's own scope via prefsActive(), unchanged.
+  const svcScoped = inWatch ? (!ignoreScope && accountScopedFor()) : prefsActive();
+  if(svcScoped && !m._fixture) offers=offers.filter(myService);   // CAS-491: see matchesServices
   // CAS-285: the per-title provider credit is gone from the card. The attribution is REQUIRED but it is not
   // information about the film, and repeating it under every "where to watch" list on a 2,000-card listing
   // is the same sentence a thousand times. It is stated once, in About & credits, which is where TMDB's own
@@ -21707,11 +21733,12 @@ function listingGroups(rows, ac){
     .map(g=>{
       const cmp=sortForKey(g, sortKey, ac && ac.kind==="cinema", isUserSort);
       // CAS-819: an explicit pick sorts across every agent within a status section — the chosen key leads,
-      // agent rank only breaks a tie. With no pick, agent rank still leads and the tab's own sort only
-      // breaks ties inside one agent's own films, same order it read before this ticket.
+      // title only breaks a tie (CAS-1325: never agent rank — an explicit pick, mood or menu, has no agent
+      // to rank by). With no pick, agent rank still leads and the tab's own sort only breaks ties inside one
+      // agent's own films, same order it read before this ticket.
       // CAS-1301: watchGroupRows is the same row-to-group test watchStageCountFor uses for the stage button.
       return {g, items: watchGroupRows(rows, g)
-        .sort(isUserSort ? (a,b)=>cmp(a,b) || filmOwnerOrder(a)-filmOwnerOrder(b)
+        .sort(isUserSort ? (a,b)=>cmp(a,b) || a.title.localeCompare(b.title)
                           : (a,b)=>filmOwnerOrder(a)-filmOwnerOrder(b) || cmp(a,b))};
     })
     .filter(x=>x.items.length);

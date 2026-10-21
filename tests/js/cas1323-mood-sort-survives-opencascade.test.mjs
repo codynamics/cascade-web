@@ -96,8 +96,10 @@ test("CAS-1323 AC3: after opening an agent, the Watch listing is one flat run or
       const groups = E.listingGroups([filmEarly, filmLate], null);
       const upcoming = groups.find(g => g.g === "upcoming");
       assert.ok(upcoming, "setup: both films must land in the upcoming group");
-      assert.deepEqual([...upcoming.items].map(m => m.tmdb_id), [idLate, idEarly],
-        "AC3: a flat release-date run — the later release leads, agent rank only matters as a tiebreak");
+      // CAS-1325: Upcoming reads soonest release first, so idEarly leads — agent rank (a owns idEarly,
+      // the lower order) never enters it, which is the behaviour this assertion is actually checking.
+      assert.deepEqual([...upcoming.items].map(m => m.tmdb_id), [idEarly, idLate],
+        "AC3: a flat release-date run — the sooner release leads, agent rank never enters it");
     } finally {
       unplantFilm(E, idEarly); unplantFilm(E, idLate);
     }
