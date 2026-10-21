@@ -12866,8 +12866,8 @@ function applyCascade(c){
   filt.budget=c.budget||0; filt.includeUnbudgeted=!!c.includeUnbudgeted;
   // The two Exclude toggles ARE the View chips — one state, two places to reach it.
   filt.hideWatched=c.excludeWatched!==false; filt.showHidden=c.excludeBlocked===false;
-  filt.sort=c.sort||DEFAULT_SORT;
-  sortPicked=false;   // CAS-819: an agent's own default sort landing in filt.sort is never a person's pick
+  // CAS-1323: filt.sort/sortPicked are no longer touched here — agents have no sort order; Watch order
+  // comes from the selected mood only (applyMoodToState is the sole owner of both).
   syncFilterUI();
 }
 // Opening is idempotent: landing a card in the deck's centre IS selecting it, so this can be called
