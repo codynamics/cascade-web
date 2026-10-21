@@ -139,7 +139,7 @@ CASCADE_SPINE = os.getenv("CASCADE_SPINE", "tmdb")
 
 # CAS-109 — poll-tiering + free-tier-capped scheduler (staging prototype).
 import poll_scheduler as ps
-CATALOGUE_TARGET = int(os.getenv("CATALOGUE_TARGET", "6000"))
+CATALOGUE_TARGET = int(os.getenv("CATALOGUE_TARGET", "7000"))
                          # CAS-128: persistent browsable catalogue size — was pinned to MAX_TITLES (the
                          # theatrical-pass cap) so the ~300 cap was gone and the full ingested AU set held.
                          # CAS-422: decoupled from MAX_TITLES — theatrical+upcoming+streaming can now sum
@@ -148,6 +148,9 @@ CATALOGUE_TARGET = int(os.getenv("CATALOGUE_TARGET", "6000"))
                          # (CAS-361) back down. 6,000 covers the ~5,700 target with headroom; still
                          # env-overridable. Availability is free (TMDB Providers), so catalogue size no
                          # longer gates the daily budget.
+                         # CAS-1327: raised to 7,000 — lowering WM_PUBLISH_FLOOR to the app's own
+                         # TRACK_MIN (50, was 60) makes ~6,180 titles scoreable instead of ~5,970, and
+                         # this ceiling must not cut any of the newly-scoreable ones back out.
 
 # CAS-127 — TMDB Watch Providers is the primary availability source (free, no quota).
 # It runs once per released title per day across the WHOLE catalogue, so pace it politely
@@ -715,9 +718,32 @@ SCOREABLE_SHIM = os.path.join(os.path.dirname(__file__), "scripts", "scoreable_s
 WATCHMODE_MISMATCH_FILE = os.path.join(STATE_DIR, "watchmode_mismatch.json")
 WATCHMODE_MISMATCH_QUARANTINE_DAYS = 30
 
+def engine_publish_floor(html_path: str | None = None) -> int:
+    """CAS-1327: the catalogue's publication floor must equal the app's own agent-score minimum
+    (TRACK_MIN in app_template.html) — read from the shipped engine via scoreable_shim.mjs's
+    --track-min mode rather than a second hard-coded number here, so a future change to the app's
+    track can never silently diverge from what the catalogue publishes. `html_path` lets a test
+    point this at a fixture built with a different TRACK_MIN instead of the repo's own index.html.
+    Falls back to 50 (today's TRACK_MIN) if the engine call itself fails, e.g. no `node` on PATH —
+    the same tolerance apply_two_tier_publication already applies to every other scoreable_ids()
+    call, so a broken toolchain degrades rather than blocking this module from importing at all."""
+    args = ["node", SCOREABLE_SHIM, "--track-min"]
+    if html_path:
+        args += ["--html", html_path]
+    try:
+        proc = subprocess.run(args, capture_output=True, text=True, timeout=30, check=True)
+        return int(json.loads(proc.stdout)["track_min"])
+    except Exception as err:  # noqa: BLE001 — a broken engine call must never block import
+        print(f"[warn] CAS-1327: engine track-min call failed ({err}) — falling back to 50.")
+        return 50
+
+
 # CAS-997 Defect 1: a released title only publishes at or above this Cascade score; a genuinely
 # upcoming title keeps publishing on cinema buzz alone, no floor (see scoreable_ids/isScoreable).
-WM_PUBLISH_FLOOR = int(os.getenv("WM_PUBLISH_FLOOR", "60"))
+# CAS-1327: the floor equals the app's own agent-score minimum (TRACK_MIN), read from the shipped
+# engine via engine_publish_floor() above — not a second hard-coded number here. Still
+# env-overridable for testing.
+WM_PUBLISH_FLOOR = int(os.getenv("WM_PUBLISH_FLOOR", str(engine_publish_floor())))
 
 # CAS-997 Defect 2: a title TMDB reports not-found (404) on this many CONSECUTIVE nightly runs is
 # gone for good, not a transient blip — dropped from candidates.json/publication unless user-held.
@@ -1721,6 +1747,10 @@ def apply_two_tier_publication(candidates: dict, today: datetime.date, discovery
         print(f"[info] CAS-1105: revalidate_published_floor dropped {floor_dropped} published "
               f"title(s) that no longer clear WM_PUBLISH_FLOOR and are not user-held.")
     print(publish_enrich_log_line(enrich_stats, stats["promoted"]))
+    # CAS-1327: the floor is now sourced from the app's own TRACK_MIN rather than a fixed 60 — print
+    # it alongside the existing counts so the first run after a floor change shows the delta.
+    print(f"[info] CAS-1327: WM_PUBLISH_FLOOR={WM_PUBLISH_FLOOR} — published={stats['published']} "
+          f"promoted={stats['promoted']} demoted={stats['demoted']}.")
     unprobed = sum(1 for c in candidates.values() if c.get("outcome") == "unprobed")
     report = {
         "candidates": len(candidates), "unprobed": unprobed,

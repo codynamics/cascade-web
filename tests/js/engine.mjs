@@ -125,6 +125,10 @@ if(typeof window.CascadeAuth === "undefined"){
 }
 ;globalThis.__ENGINE__ = {
   MOVIES, CASCADE, STATUS_LABEL, SHOWABLE_N,
+  // CAS-1327: TRACK_MIN is the agent score track's own floor — exported so scripts/scoreable_shim.mjs
+  // can hand poc_pipeline.py the catalogue's publication floor straight from the shipped engine instead
+  // of a second hard-coded number in Python.
+  TRACK_MIN,
   // CAS-1241 Part A: acctFetchKeepalive is the pure cap check the account-sync client's fetch wrapper (the
   // auth module, a separate <script type="module"> this harness doesn't load) calls by name off window —
   // exported directly here since it's a plain top-level function in the classic script, not window-only.
