@@ -20,6 +20,12 @@
 // own build date, so a film doesn't cross WM_PUBLISH_FLOOR between refreshes purely because the
 // CI runner's clock ticked over. Omitted entirely, every existing caller (including
 // wm_scoreable_manifest.mjs's own CAS-922 manifest build) keeps asking against the real date.
+//
+// CAS-1327: `--track-min` is a second, stdin-free CLI mode — poc_pipeline.py's publication floor
+// must equal the app's own agent-score minimum (TRACK_MIN), so it asks this shim rather than
+// hard-coding a second copy of that number in Python. Prints { "track_min": <int> } and exits,
+// never touching stdin. `--html <path>` overrides which built file the engine loads from (default
+// the repo's own index.html) — used by tests to point at a fixture with a different TRACK_MIN.
 import { loadEngine } from "../tests/js/engine.mjs";
 import { isScoreable } from "./wm_scoreable_manifest.mjs";
 
@@ -29,13 +35,23 @@ async function readStdin(){
   return Buffer.concat(chunks).toString("utf8");
 }
 
+function htmlPathArg(){
+  const i = process.argv.indexOf("--html");
+  return i >= 0 ? process.argv[i + 1] : undefined;
+}
+
 // CAS-992: one malformed candidate (e.g. missing `status`) must never fail the whole batch — a
 // record that throws is treated as not scoreable, and the count of such records goes to stderr,
 // never stdout, so the JSON response scoreable_ids() parses stays clean.
 async function main(){
+  const htmlPath = htmlPathArg();
+  const E = loadEngine(htmlPath ? { htmlPath } : {});
+  if (process.argv.includes("--track-min")){
+    process.stdout.write(JSON.stringify({ track_min: E.TRACK_MIN }));
+    return;
+  }
   const raw = await readStdin();
   const req = raw.trim() ? JSON.parse(raw) : {};
-  const E = loadEngine();
   const movies = req.movies || [];
   const floor = req.floor || 0;
   if (req.today) E.setToday(req.today);

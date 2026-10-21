@@ -125,6 +125,10 @@ if(typeof window.CascadeAuth === "undefined"){
 }
 ;globalThis.__ENGINE__ = {
   MOVIES, CASCADE, STATUS_LABEL, SHOWABLE_N,
+  // CAS-1327: TRACK_MIN is the agent score track's own floor — exported so scripts/scoreable_shim.mjs
+  // can hand poc_pipeline.py the catalogue's publication floor straight from the shipped engine instead
+  // of a second hard-coded number in Python.
+  TRACK_MIN,
   // CAS-1241 Part A: acctFetchKeepalive is the pure cap check the account-sync client's fetch wrapper (the
   // auth module, a separate <script type="module"> this harness doesn't load) calls by name off window —
   // exported directly here since it's a plain top-level function in the classic script, not window-only.
@@ -744,6 +748,16 @@ if(typeof window.CascadeAuth === "undefined"){
   // card's ADVANCED-tagged rows and Edit Agent's Basic-view "SET IN ADVANCED" section — exported so a test
   // can assert its four cases directly against fixtures, rather than re-deriving them from rendered HTML.
   agentAdvancedSet,
+  // CAS-1326: attributionHTML (the card's "which agents would find this" chip) — exported so a test can
+  // assert its Watch-mode output directly, rather than only through cardTopHTML's combined render.
+  // commitDraft is the Briefing/builder's own save chokepoint, a plain top-level function; draft is the
+  // module-level editing buffer commitDraft reads, reassigned wholesale (new/applied templates, discarded
+  // edits), so it's exposed through a getter/setter like watchPrefs/flowKind elsewhere in this file.
+  // watchNavKey is render()'s own "did anything navigational change" key — exported so a test can assert
+  // it directly instead of only through render()'s rebuild-vs-patch choice.
+  attributionHTML, commitDraft, watchNavKey,
+  get draft(){ return draft; },
+  setDraft(d){ draft = d; },
 };
 `;
 

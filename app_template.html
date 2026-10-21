@@ -6910,8 +6910,10 @@ function oscMarkHTML(m){
 // CAS-634: which agents would find this film — read off ALL of them, not just the ones currently selected
 // in the rail, since an agent you haven't turned on can still be worth naming. Omitted entirely with a
 // single agent selected: it would name that one agent on every card and say nothing.
-function attributionHTML(m){
-  if(activeIds.length<2) return "";
+// CAS-1326: on Watch (inWatch), gate on how many agents EXIST rather than activeIds — Watch has no open
+// agent of its own (Lee, 21 Oct 2026), so opening one elsewhere must not change this chip.
+function attributionHTML(m, inWatch=false){
+  if(inWatch ? cascades.length<2 : activeIds.length<2) return "";
   const names=cascades.filter(c=>watchesFilm(m,c)).map(c=>c.name);
   if(!names.length) return "";
   const text = names.length<=2 ? names.join(", ") : `${names[0]}, ${names[1]} +${names.length-2}`;
@@ -8533,7 +8535,7 @@ function cardTopHTML(m, inWatch=false){
       <div class="metaline">${(m.genres||[]).length ? esc((m.genres||[]).join(", "))+cult : cult.replace(/^ · /,"")}</div>
       ${syn}
       <div class="mrow r-money">${moneyRowHTML(m)}</div>
-      <div class="mrow r-scores">${scoresRowHTML(m)}${rowScore}${oscMarkHTML(m)}${condensedBadgeHTML(m)}${attributionHTML(m)}</div>
+      <div class="mrow r-scores">${scoresRowHTML(m)}${rowScore}${oscMarkHTML(m)}${condensedBadgeHTML(m)}${attributionHTML(m, inWatch)}</div>
       <!-- CAS-686: condensed-card-only — shown instead of r-scores when this film gets the "cinfo" class
            on .card. Hidden everywhere else, including the expanded card and the invite/film page, by the
            base .r-cinfo{display:none}. -->
@@ -12894,6 +12896,9 @@ function applyCascade(c){
   filt.hideWatched=c.excludeWatched!==false; filt.showHidden=c.excludeBlocked===false;
   // CAS-1323: filt.sort/sortPicked are no longer touched here — agents have no sort order; Watch order
   // comes from the selected mood only (applyMoodToState is the sole owner of both).
+  // CAS-1326 AC1: confirmed already guaranteed by CAS-1323 above — filt.sort/sortPicked have exactly two
+  // writers in the whole file (the stage-button pick handler and applyMoodToState), neither reachable from
+  // applyCascade/openCascade/commitDraft/openMovingAgent/afterSignIn — see tests/js/cas1326-*.test.mjs.
   syncFilterUI();
 }
 // Opening is idempotent: landing a card in the deck's centre IS selecting it, so this can be called
@@ -12905,8 +12910,11 @@ window.openCascade=(id, push=true)=>{
   // still be riding alongside other agents in activeIds, and this is the single-select entry point (Manage
   // Agents, sign-in landing), so it always has to collapse back down to just this one.
   const c=cascades.find(x=>x.id===id); if(!c || (activeId===id && activeIds.length===1)) return;
-  setActive(id, push); settleFoundView(); settleWatchHeldOpen(); applyCascade(c); restoreCascadeSearch();
-  $("groups").classList.add("listloading");     // CAS-421: held blurred till the new agent's list is ready
+  // CAS-1326: opening an agent must not touch Watch — no settling its held-open films (that's CAS-134's
+  // settleFoundView()'s job, for Found, not Watch) and no forced blur-while-rebuilding class on #groups.
+  // Watch's own nav key (watchNavKey()) is untouched by anything applyCascade/setActive write, so render()
+  // below patches in place rather than rebuilding — a blur class added here would never have been cleared.
+  setActive(id, push); settleFoundView(); applyCascade(c); restoreCascadeSearch();
   closeFilterPanel(); restoreCascadeWatchTiers(); render();
   logEvent("cascade_opened", {key:c.template||"custom"});
   // countCriteria() is what the Cascade SHOWS you right now, which is not the same as what it has found and is
@@ -13283,7 +13291,6 @@ window.dismissSvcNote = state => {
 function renderCascadeBar(shown){
   // CAS-718: the deck (deckSync/deckBuild) is retired from the live Watch screen — #cascStrip stays
   // permanently empty (see the HTML comment above it), so this no longer paints it.
-  const c=activeCascade();
   let html="";
   // ---- CAS-254: the services banner ------------------------------------------------------------------
   // Used to be two states. CAS-321 removed the "scoped" one outright — "we're only showing films on your
@@ -13292,11 +13299,12 @@ function renderCascadeBar(shown){
   // vertical space. The "empty" state stays: it's a warning, not a status update — nothing qualifies and the
   // way out has to stay one tap away. Still dismissible, still session-scoped: a fact worth repeating next
   // time you open the app, and a banner you can never get back is worse than one that returns.
-  if(c && anyScope(c) && !servicesPicked()){
-    const where = allScoped(c) ? "" : ` in <b>${scopeSummary(c)}</b>`;
+  // CAS-1326: reads accountScopedFor() (the account switch, CAS-1324's own fallback), never activeCascade()
+  // — Watch has no open agent of its own, so this can no longer name one or ride its per-window scope.
+  if(accountScopedFor() && !servicesPicked()){
     if(!svcNoteHidden.empty){
       html += `<div class="warnnote dismissible" data-svcnote="empty">${svcNoteClose("empty")}
-             <span>“${esc(c.name)}” only wants films on your services${where} — and you haven't named any yet,
+             <span>Only films on your services — and you haven't named any yet,
              so nothing qualifies.<br>${pickServicesCTA()}</span></div>`;
     }
   }
