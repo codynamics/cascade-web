@@ -2594,8 +2594,6 @@
      stage/agent-column rail and the sort/search/filter tools row this comment used to describe — see the
      new CSS block near the end of this stylesheet (renderWatchTop() and the mood sheet, below). ---- */
   .watchtop[hidden]{display:none}
-  /* The stage's own section when nothing has arrived in it yet: its heading still shows, with one line. */
-  .group.ownempty .ownnone{padding:0 12px 20px;font:500 12.5px/1.45 var(--font-body);color:var(--faint)}
   /* CAS-1298: the Watch list's stage section heading is a banner in the stage's own colour — tinted
      fill, left accent strip and a count pill — so each stage reads as a clear break in the list. Scoped to
      #groups top-level headings; the per-agent .grouphead.sub is unchanged. Earlier-stage sections stay quieter. */
@@ -2611,7 +2609,6 @@
   #groups .grouphead:not(.sub) .gdot{width:9px;height:9px}
   #groups .grouphead:not(.sub) .gcount{margin-left:auto;padding:2px 8px;border-radius:999px;font:800 12px/1.2 var(--font-body);
     color:var(--ink);background:color-mix(in srgb,var(--gc) 30%,transparent)}
-  #groups .group.early > .grouphead:not(.sub){font-size:13px;color:var(--dim)}
   /* CAS-1247: Watch's own search box and Filters sheet are gone — .watchsearchwrap/its .search/.searchclear
      stay, since Find's own search box (#findSearchWrap, renderFindScreen()) is still built from them. */
   .watchsearchwrap{display:flex;align-items:center;gap:8px;margin:9px 12px 0}
@@ -2672,13 +2669,6 @@
      uses for the same six values); Styles chips don't set --wwc, so the accent fallback applies to them. */
   .wsheetsec .chip.on{background:color-mix(in srgb, var(--wwc, var(--accent)) 22%, var(--panel2));
     border-color:var(--wwc, var(--accent))}
-  /* CAS-823: "Also show" — same --wwc-tinted .chip.on above, plus a status dot (matching the section's own
-     .gdot), a live count, and — for the tab's own, non-switchable window — an "always" tag instead of a dot
-     colour change, so it reads as permanently on rather than merely selected. */
-  .alsochip{display:inline-flex;align-items:center;gap:6px}
-  .alsochip .jn{font-weight:800;opacity:.85}
-  .alsochip .alwaystag{font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;opacity:.7}
-  .alsochip:disabled{cursor:default;opacity:1}
   /* CAS-1234: the Badges section — one full-width row per option (a descriptor line needs room a .chip's
      single-line pill doesn't have), gold-tinted ON to match the card's own .tentbadge colour rather than
      the --wwc-tinted convention above, since the card badge is gold regardless of which tier it names. */
@@ -4114,7 +4104,7 @@
     <div id="cascDetail"></div>
   </div>
   <!-- CAS-1247: the Filters sheet is now the Mood sheet — a saved bundle of order + agents + the Availability/
-       Picked by/Watched/Styles/Also show/Badges sections this sheet already had. Title and footer buttons are
+       Picked by/Watched/Styles/Badges sections this sheet already had. Title and footer buttons are
        repainted by renderMoodSheet() per mood/new-mood; the scrim/Escape/close-button discard wiring is
        unchanged from the Filters sheet it replaces. Slides up from the bottom over a scrim; position:fixed so
        its place in the DOM doesn't matter. -->
@@ -4889,44 +4879,20 @@ const STATUS_LABEL = {
 // that puts one marker per enabled window on the score track. Replaces CAS-713's hardcoded three-entry
 // array (which folded Premium into Streaming) now that every rung gets its own named tab.
 const WATCH_TAB_LABEL = {in_cinema:"Cinema", premium:"Premium", rent:"Rental", stream:"Streaming"};
-// CAS-823: the standing each non-Cinema tab restricts to by default (filmMatchesWatchTab below) — the fix
-// for "Streaming showed films still in cinemas". Cinema carries no entry here: Part A's own decision left
-// its behaviour untouched, so it keeps testing Watch On alone, never a standing.
+// CAS-823/CAS-1329: the standing each non-Cinema tab lists — the window a film must actually be IN now.
 const WATCH_TAB_OWN_STANDING = {stream:"included_streaming", rent:"rental", premium:"pvod"};
 function watchTabsNow(){
   return WATCH_LEVEL_KEYS.filter(k=>windowEnabled(k)).map(k=>({key:k, label:WATCH_TAB_LABEL[k]}));
 }
-// CAS-717/CAS-725 — a tab filters by each film's chosen WATCH ON level (filmNotifyState's single-select
-// `.key`, post CAS-716) matched straight to its own tab, not by its availability status — status stays as
-// the section grouping INSIDE a tab (listingGroups/render below, unchanged). Cinema alone carries a default
-// bucket — an undecided film (no Watch On pick at all) whose current status is still upcoming/in_cinema —
-// so a film nobody has chosen a level for isn't invisible everywhere; the other tabs carry no such default.
-// CAS-823: a Watch On match is no longer the whole test for the other three tabs — the film must also be
-// STANDING in the tab's own window (WATCH_TAB_OWN_STANDING) unless Also-show (watchAlsoShow, set by the
-// Filters sheet) has widened that tab to include the film's current standing too. Cinema's own branch above
-// is untouched by this — it never consults a standing test or watchAlsoShow at all.
+// CAS-1329 (Lee, 22 Oct 2026): a film is listed only under the stage it is actually in NOW, never by its
+// Watch On pick — Watch On is information on the card, not a placement. Reverses CAS-717/CAS-725's Watch-On-
+// key match and CAS-823's Also-show widening (both removed): every tab, including Cinema, now tests
+// primaryStatus (the window the film stands in) alone. The CAS-1180 taggedOut branch already worked this
+// way, so it's now simply the one rule for every film, watched or not.
 function filmMatchesWatchTab(m, tab){
-  // CAS-1180: setOpinion() clears every Watch On rung the moment a verdict is given, so a watched film
-  // never again carries a key — read its tab off primaryStatus (the window it stands in NOW) instead, the
-  // only way such a film can ever reach the Watched filter/search below rather than being invisible on
-  // every non-Cinema tab forever. It still needs no standing test beyond this: Also-show and
-  // WATCH_TAB_OWN_STANDING are both about a Watch On level widening a tab, which a verdict film has none of.
-  if(taggedOut(m)){
-    const ps=primaryStatus(m);
-    if(tab==="in_cinema") return ps==="upcoming" || ps==="opening_week" || ps==="in_cinema";
-    return ps===WATCH_TAB_OWN_STANDING[tab];
-  }
-  const key = filmNotifyState(m.tmdb_id).key;
-  if(tab==="in_cinema"){
-    if(key==="in_cinema") return true;
-    if(key) return false;
-    const ps=primaryStatus(m);
-    return ps==="upcoming" || ps==="in_cinema";
-  }
-  if(key!==tab) return false;
   const ps=primaryStatus(m);
-  if(ps===WATCH_TAB_OWN_STANDING[tab]) return true;
-  return watchAlsoShow[tab].has(ps);
+  if(tab==="in_cinema") return ps==="upcoming" || ps==="opening_week" || ps==="in_cinema";
+  return ps===WATCH_TAB_OWN_STANDING[tab];
 }
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const FMT_RANK = {SD:1, HD:2, "4K":3};
@@ -10399,53 +10365,6 @@ function filmMatchesPickedBy(m){
   if(sel==="all") return true;
   return filmWatchSource(m.tmdb_id)===sel;
 }
-// CAS-823: the widener for filmMatchesWatchTab's own-standing restriction above — one chip per window in
-// ladder order, following the same four windows Part A itself tests (upcoming/in_cinema/rental/
-// included_streaming). pvod and opening_week aren't offered: no tab's own standing is pvod-adjacent enough
-// to need widening past it, and opening_week has always been swept into "In cinemas" (the Cinema tab's own
-// union already reads it that way). Replaces CAS-720's "Current status" section, which this ticket's own
-// description names as that section's deliberate follow-on.
-const ALSO_SHOW_WINDOWS = [
-  {key:"upcoming", label:"Unreleased", cd:"var(--upcoming)"},
-  {key:"in_cinema", label:"In cinemas", cd:"var(--amber)"},
-  {key:"rental", label:"At rental", cd:"var(--blue)"},
-  {key:"included_streaming", label:"Streaming", cd:"var(--green)"},
-];
-// CAS-1235: a film "disappears" when its Watch On moves to a later stage (e.g. Upcoming → Streaming) unless
-// every earlier-than-own-standing window is already widened in — so each non-Cinema tab now defaults to
-// widening every ALSO_SHOW_WINDOWS entry EARLIER than its own standing on the upcoming/in_cinema/rental/
-// included_streaming ladder, not none. Premium's own standing (pvod) sits outside that four-window ladder
-// entirely, so only upcoming/in_cinema (both before it either way) apply to Premium.
-const WATCH_ALSO_SHOW_DEFAULT = {
-  premium: ["upcoming", "in_cinema"],
-  rent: ["upcoming", "in_cinema"],
-  stream: ["upcoming", "in_cinema", "rental"],
-};
-// Which windows are switched ON (widened in) per tab — same per-tab, session-only shape as watchGenreOff,
-// but "nothing switched OFF from default" here means WATCH_ALSO_SHOW_DEFAULT, not empty (CAS-1235) — CAS-720's
-// off-set had yet a third default ("everything shows"). The tab's own window is tested by
-// WATCH_TAB_OWN_STANDING directly and is never added to this Set, so it can never be switched off from here.
-const watchAlsoShow = {in_cinema:new Set(), premium:new Set(WATCH_ALSO_SHOW_DEFAULT.premium),
-  rent:new Set(WATCH_ALSO_SHOW_DEFAULT.rent), stream:new Set(WATCH_ALSO_SHOW_DEFAULT.stream)};
-window.toggleWatchAlsoShow = key => {
-  if(WATCH_TAB_OWN_STANDING[watchTab]===key) return;   // the tab's own window — not switchable
-  const set=watchAlsoShow[watchTab];
-  set.has(key) ? set.delete(key) : set.add(key);
-  render();
-};
-// CAS-1235: "clear" returns Also-show to its default (the earlier-stages-on state), not to empty — empty
-// would itself now read as a deviation (watchAlsoShowIsDefault below), the opposite of what Clear means.
-window.clearWatchAlsoShow = () => {
-  watchAlsoShow[watchTab]=new Set(WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
-  render(); scrollWatchListingToTop();
-};   // CAS-857
-// CAS-1235: true when a tab's Also-show set exactly matches its default — the badge/active-filter-chip's own
-// "no deviation" test, now that the default is no longer empty.
-function watchAlsoShowIsDefault(tab){
-  const def=WATCH_ALSO_SHOW_DEFAULT[tab]||[];
-  const cur=watchAlsoShow[tab];
-  return cur.size===def.length && def.every(k=>cur.has(k));
-}
 // CAS-720: agent inclusion — restores the agent narrowing scopeRows() gave up when CAS-718 retired the
 // deck's per-list agent picker (see that function's own comment), reading from this sheet state instead of
 // the old activeIds/cascOff deck selection. Session-only, empty-means-"nothing excluded".
@@ -10546,7 +10465,7 @@ const MOOD_DEFAULTS = [
     stylesOff:moodStylesOffKeeping(MOOD_STARTER_STYLES.fun), watched:["wow","liked"], mineOnly:true},
 ];
 const moodDefaultFieldsNow = () => ({
-  agentsOff:[], mineOnly:true, pickedBy:"all", watched:[], stylesOff:[], badges:[], alsoShow:null,
+  agentsOff:[], mineOnly:true, pickedBy:"all", watched:[], stylesOff:[], badges:[],
   starredOnly:false,
 });
 // CAS-1284: defaults spread FIRST, then the mood's own fields — so a starter's explicit mineOnly/watched/
@@ -10624,12 +10543,6 @@ function applyMoodToState(mood){
     watchBadgeSel[tab]=new Set();   // CAS-1281: moods no longer filter by badge; mood.badges is ignored
     watchMineOnly[tab]=mood.mineOnly!==false;
     watchSearch[tab]=""; watchSearchRaw[tab]="";
-    if(tab!=="in_cinema"){
-      // A saved mood's alsoShow[tab] is an array (possibly empty — "explicitly nothing widened" is a real,
-      // distinct state from the default) whenever alsoShow itself isn't null; only null means "use default".
-      const hasSaved = mood.alsoShow && Array.isArray(mood.alsoShow[tab]);
-      watchAlsoShow[tab]=new Set(hasSaved ? mood.alsoShow[tab] : (WATCH_ALSO_SHOW_DEFAULT[tab]||[]));
-    }
   });
   // CAS-1303: sort:"release" does exactly what tapping Release date did; sort:"title" does exactly what
   // tapping Title A-Z did. sortPicked is always true on Watch now (one flat run, no agent lanes).
@@ -10674,7 +10587,6 @@ function moodDraftFrom(mood){
     watched: new Set(mood ? (mood.watched||[]) : []),
     stylesOff: new Set(mood ? (mood.stylesOff||[]) : []),
     badges: new Set(mood ? (mood.badges||[]) : []),
-    alsoShow: mood && mood.alsoShow ? {premium:[...(mood.alsoShow.premium||[])], rent:[...(mood.alsoShow.rent||[])], stream:[...(mood.alsoShow.stream||[])]} : null,
     // CAS-1295: "Only starred films" — default off for a new mood, carried over for an existing one.
     starredOnly: mood ? !!mood.starredOnly : false,
     // CAS-1303: Sort — resolved from the existing mood's own field (or the pre-CAS-1303 derivation, via
@@ -10718,15 +10630,6 @@ window.clearAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.styles
 // actually wanted — see the new Help article instead), so nothing calls this any more. Left in place
 // rather than deleted — moodDraft.badges still lives on the draft shape and the stored mood shape.
 window.toggleMoodDraftBadge = key => { if(!moodDraft) return; moodDraft.badges.has(key)?moodDraft.badges.delete(key):moodDraft.badges.add(key); renderMoodSheetBody(); };
-window.toggleMoodDraftAlsoShow = key => {
-  if(!moodDraft) return;
-  if(WATCH_TAB_OWN_STANDING[watchTab]===key) return;   // the tab's own window — not switchable
-  if(!moodDraft.alsoShow) moodDraft.alsoShow={premium:[...WATCH_ALSO_SHOW_DEFAULT.premium], rent:[...WATCH_ALSO_SHOW_DEFAULT.rent], stream:[...WATCH_ALSO_SHOW_DEFAULT.stream]};
-  const set=new Set(moodDraft.alsoShow[watchTab]||[]);
-  set.has(key) ? set.delete(key) : set.add(key);
-  moodDraft.alsoShow[watchTab]=[...set];
-  renderMoodSheetBody();
-};
 // C5: Save — an empty trimmed name saves nothing and focuses the name field; otherwise stores the mood,
 // selects it, closes the sheet and applies it. C4: one pushViewField("moods", ...) always; a second,
 // pushViewField("mood", id), only when the selection actually changed (editing the already-selected mood
@@ -10744,7 +10647,6 @@ window.saveMoodFromSheet = () => {
     topYou:d.topYou, topPublic:d.topPublic,
     agentsOff:[...d.agentsOff], mineOnly:!!d.mineOnly, pickedBy:d.pickedBy,
     watched:[...d.watched], stylesOff:[...d.stylesOff], badges:[],   // CAS-1284: styles saved again; CAS-1281: badges still aren't
-    alsoShow: d.alsoShow ? {premium:[...(d.alsoShow.premium||[])], rent:[...(d.alsoShow.rent||[])], stream:[...(d.alsoShow.stream||[])]} : null,
     starredOnly: !!d.starredOnly,
     sort: d.sort,   // CAS-1303
   };
@@ -10827,8 +10729,7 @@ function watchFiltersActiveCount(){
   const badgeSel=watchBadgeSel[watchTab];
   const pickedBy=watchPickedBySafe(watchTab);
   const mineOnly=watchMineOnlyOn();
-  // CAS-1235: Also-show's default is no longer empty — only a DIFFERENCE from WATCH_ALSO_SHOW_DEFAULT counts.
-  return (pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(badgeSel.size?1:0)+(watchAlsoShowIsDefault(watchTab)?0:1)+(mineOnly?0:1);
+  return (pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(badgeSel.size?1:0)+(mineOnly?0:1);
 }
 // CAS-1247: renderWatchSheet(rows, shownCount) is still render()'s own call site (unchanged signature) —
 // it just caches the pipeline's own rows/count for whenever the mood sheet is actually open, since genre/
@@ -10886,18 +10787,6 @@ function renderMoodSheetBody(){
     return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
       onclick="toggleMoodDraftGenre('${escA(g)}')">${esc(g)}</button>`;
   }).join("") : `<span style="color:var(--faint)">Select an agent to choose styles.</span>`;
-  const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
-  const alsoShowSet = watchTab==="in_cinema" ? new Set() : new Set((d.alsoShow && d.alsoShow[watchTab]) || WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
-  const alsoShowPool = watchTab==="in_cinema" ? [] : watchAlsoShowPool();
-  const alsoShowHTML = watchTab==="in_cinema" ? "" : ALSO_SHOW_WINDOWS.map(w=>{
-    const isOwn = w.key===ownStanding;
-    const on = isOwn || alsoShowSet.has(w.key);
-    const count = alsoShowPool.filter(m=>primaryStatus(m)===w.key).length;
-    return `<button type="button" class="chip alsochip${on?" on":""}" style="--wwc:${w.cd}"
-      aria-pressed="${on}"${isOwn?" disabled aria-disabled=\"true\"":""}
-      ${isOwn?"":`onclick="toggleMoodDraftAlsoShow('${w.key}')"`}>
-      <span class="gdot ${w.key}" aria-hidden="true"></span>${esc(w.label)}<span class="jn">${count}</span>${isOwn?`<span class="alwaystag">always</span>`:""}</button>`;
-  }).join("");
   const body=$("watchSheetBody");
   // CAS-1296: section order is now Name → From → Show top (+ Only starred) → Styles → Agents / Picked by
   // → Availability → Watched. The Order section is gone — Order is derived (moodOrder), never edited here.
@@ -10967,10 +10856,6 @@ function renderMoodSheetBody(){
       <div class="wsheethd"><span>Watched</span></div>
       <div class="chips">${watchedHTML}</div>
     </div>
-    ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
-      <div class="wsheethd"><span>Also show</span></div>
-      <div class="chips">${alsoShowHTML}</div>
-    </div>`}
     <div class="wsheetsec">
       <div class="wsheethd"><span>Sort</span></div>
       <div class="mfseg" role="group" aria-label="Sort">
@@ -11207,32 +11092,9 @@ function applyPendingAnswer(){
   filmPageConfirmId=id;
   openFilmPage(id);
 }
-// CAS-823: the same agent+occasion scope as watchScopeRows above, but narrowed only by the tab's own Watch
-// On key — no standing test — so the Also-show chips can show each window's count (renderWatchSheet) before
-// it's switched on. Mirrors watchScopeRows's own two branches rather than sharing code with it, same
-// precedent as filmInWatchRows below. Cinema has no Also-show section (see renderWatchSheet), so this is
-// never called for it.
-function watchAlsoShowPool(){
-  if(!watchTabsNow().length) return [];
-  const agentOff=watchAgentOff;
-  const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
-  const ownKey = m => filmNotifyState(m.tmdb_id).key===watchTab;
-  let pool;
-  if(watchOccasion){
-    const occAcs=acs.filter(c=>(c.occasions||[]).includes(watchOccasion));
-    pool = occAcs.length ? MOVIES.filter(m=>{
-      const owner=filmOwnerCascade(m);
-      return owner && occAcs.some(c=>c.id===owner.id) && ownKey(m);
-    }) : [];
-  } else {
-    pool = acs.length ? MOVIES.filter(m=>acs.some(c=>listedBy(m,c)) && ownKey(m)) : [];
-  }
-  const wsearch=watchSearch[watchTab];
-  return wsearch ? pool.filter(m=>m.title.toLowerCase().includes(wsearch)) : pool;
-}
 // CAS-1180 Part D: while the search box holds text, the listing stops being "this tab, filtered" and becomes
 // "every film any of the account's agents lists, anywhere" — render() swaps its own tab/Picked by/Watched/
-// Styles/Also show/agent-narrowed `rows` for this set instead. `cascades.some` (not watchAgentOff's
+// Styles/agent-narrowed `rows` for this set instead. `cascades.some` (not watchAgentOff's
 // included set) is deliberate: agent inclusion is one of the filters search ignores. A
 // verdict film is still listedBy's own ordinary call (CAS-718's excludeWatched:false), so it's included too.
 function watchSearchRows(wsearch){
@@ -21727,17 +21589,13 @@ function cascadeRankTint(c){
   const idx=sorted.findIndex(x=>x.id===c.id);
   return idx<0 ? null : (idx%6)+1;
 }
-// A section heading in the Watch list. On a Home stage (Rental, Streaming, Premium) the stage's own section
-// is headed with the stage's name, exactly as its button reads; an earlier stage's section, holding films
-// tagged for this stage that have not arrived yet, reads "<where they are now>, tagged for <this stage>"
-// (Lee, 2026-10-11; replaces CAS-1235's "<stage> · set to watch on <tab>"). The Cinema stages are unchanged.
-const WATCH_EARLY_STAGE_LABEL = {upcoming:"Upcoming", opening_week:"In cinema now", in_cinema:"In cinema now",
-                                 pvod:"Premium", rental:"Rental", included_streaming:"Streaming"};
-const watchIsEarlySection = g => watchTab!=="in_cinema" && g!==WATCH_TAB_OWN_STANDING[watchTab];
+// A section heading in the Watch list. The Cinema tab keeps its plain STATUS_LABEL per section; a Home
+// stage (Rental, Streaming, Premium) lists only its own section, headed with the stage's name, exactly as
+// its button reads (CAS-1329: there is no other section to head any more — a film never again appears
+// earlier than the stage it is actually in).
 function watchGroupHeading(g){
   if(watchTab==="in_cinema") return STATUS_LABEL[g];
-  if(!watchIsEarlySection(g)) return WATCH_TAB_LABEL[watchTab];
-  return `${WATCH_EARLY_STAGE_LABEL[g]||STATUS_LABEL[g]}, tagged for ${WATCH_TAB_LABEL[watchTab]}`;
+  return WATCH_TAB_LABEL[watchTab];
 }
 // Splits a status section's already agent-sorted `items` (filmOwnerOrder is listingGroups' primary sort
 // key, so one agent's films already run contiguously) into per-owner runs, in the same order.
@@ -21845,11 +21703,10 @@ function watchNavKey(){
     [...watchGenreOff[watchTab]].sort(),
     [...watchWatchedSel[watchTab]].sort(),
     [...watchBadgeSel[watchTab]].sort(),
-    [...watchAlsoShow[watchTab]].sort(),
     watchMineOnlyOn(),
     watchOccasion,
     // CAS-1247: the selected mood and its own Show top cut — every other mood field a mood switch changes
-    // (agents/pickedBy/watched/styles/badges/alsoShow/mineOnly/order) is already one of the fields above.
+    // (agents/pickedBy/watched/styles/badges/mineOnly/order) is already one of the fields above.
     // CAS-1287: topYou/topPublic are each resolved (legacy fallback, You-availability gate) so the nav key
     // reads the actual cut; source is its own entry too — switching a saved mood between My agents/
     // Everything changes watchScopeRows' whole pool without touching any field already listed above
@@ -22000,7 +21857,7 @@ function render(){
     // CAS-682: a tagged-out film still renders here, as a stub — a row you can see and count, not a hidden
     // exclusion — so the header counts every item, matching what fillListChunked below actually streams.
     const live=items.length;
-    const grp=document.createElement("div"); grp.className="group"+(watchIsEarlySection(g)?" early":""); grp.dataset.g=g;
+    const grp=document.createElement("div"); grp.className="group"; grp.dataset.g=g;
     grp.innerHTML=`<div class="grouphead"><span class="gdot ${g}"></span>${watchGroupHeading(g)}
       <span class="gcount">${live}</span></div>`;
     wrap.appendChild(grp);
@@ -22028,16 +21885,6 @@ function render(){
       fillListChunked(listEl, block.items, renderGen, isFresh, oneListDone);
     });
   });
-  // A Home stage whose own section holds nothing yet still gets that section's heading, after the earlier
-  // stages' sections, so a tap on the stage always has its own heading to land on.
-  const ownG=WATCH_TAB_OWN_STANDING[watchTab];
-  if(ownG && !sections.some(s=>s.g===ownG)){
-    const grp=document.createElement("div"); grp.className="group ownempty"; grp.dataset.g=ownG;
-    grp.innerHTML=`<div class="grouphead"><span class="gdot ${ownG}"></span>${watchGroupHeading(ownG)}
-      <span class="gcount">0</span></div>
-      <div class="ownnone">Nothing in ${WATCH_TAB_LABEL[watchTab]} yet. The films tagged for it are listed above until they arrive.</div>`;
-    wrap.appendChild(grp);
-  }
   renderJumpBar();     // after the groups exist — it is built FROM them, never from a fixed menu
   syncHeaderHeight();  // CAS-761: tabs/filters/jump bar above are all part of #cascbar's measured height
   // CAS-1066: the Agents screen is a layer on top of home and was rendered only by openAgentsScreen(), so
@@ -22191,8 +22038,7 @@ function patchFindCounts(){
   renderCascadeBar(shown.length);
 }
 // CAS-752: whether `m` would still be one of render()'s `rows` right now — the same chain render() applies
-// (agent scope, tab (standing/Also-show included, CAS-823), search, styles, watched filter + hold, my-
-// services), reusing its own
+// (agent scope, tab standing (CAS-1329), search, styles, watched filter + hold, my-services), reusing its own
 // named predicates so the two can never disagree. fastPatchFindRow's whole point is answering this for ONE
 // film without re-deriving the ~2,000-film list a full render() would; the old check here tested the tapped
 // film against activeCascade() — a single-agent idea CAS-718/725 already retired from this listing — so it

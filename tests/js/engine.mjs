@@ -192,13 +192,11 @@ if(typeof window.CascadeAuth === "undefined"){
   watchBadgeSel, filmMatchesBadgeFilter, BADGE_FILTER_OPTS,
   toggleWatchBadge: (key) => window.toggleWatchBadge(key),
   clearAllWatchBadge: () => window.clearAllWatchBadge(),
-  // CAS-1235: watchAlsoShow (by reference — toggleWatchAlsoShow/clearWatchAlsoShow mutate or reassign the
-  // per-tab Set in place) plus the default it now widens to and the heading render() builds from a group's
-  // status key, so a test can assert the default-on behaviour and its heading text without scraping the DOM
-  // the stub swallows. WATCH_TAB_OWN_STANDING already exists for filmMatchesWatchTab's own use above.
-  watchAlsoShow, WATCH_ALSO_SHOW_DEFAULT, watchAlsoShowIsDefault, watchGroupHeading, WATCH_TAB_OWN_STANDING,
-  clearWatchAlsoShow: () => window.clearWatchAlsoShow(),
-  // CAS-1235 AC4/CAS-1301: watchStageStopsNow/watchStageCountFor (CAS-1223's stage-strip count, aimed at a
+  // CAS-1329: watchGroupHeading (the heading render() builds for a group's status key) and
+  // WATCH_TAB_OWN_STANDING (filmMatchesWatchTab's own standing table) — exported so a test can assert the
+  // heading text without scraping the DOM the stub swallows.
+  watchGroupHeading, WATCH_TAB_OWN_STANDING,
+  // CAS-1301: watchStageStopsNow/watchStageCountFor (CAS-1223's stage-strip count, aimed at a
   // stop through the same watchVisibleRows() pipeline the listing itself uses) plus watchGroupRows (CAS-1301's
   // shared row-to-group test the button and the section heading both key off) — exported so a test can
   // assert the count agrees with a section's own heading directly, rather than trusting that both read the
