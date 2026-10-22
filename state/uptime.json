@@ -1,7 +1,7 @@
 {
-  "lastRun": "2026-10-22T15:18:24.005Z",
-  "consecutiveReds": 0,
-  "slowConsecutiveReds": 0,
+  "lastRun": "2026-10-22T16:18:27.005Z",
+  "consecutiveReds": 1,
+  "slowConsecutiveReds": 1,
   "fastRedNames": [],
   "lastAlertedRedNames": null,
   "lastAlertAt": "2026-10-21T14:17:44.309Z",
@@ -10,56 +10,56 @@
     {
       "name": "site_up",
       "ok": true,
-      "ms": 338,
+      "ms": 852,
       "detail": "HTTP 200, version 1.0.0"
     },
     {
       "name": "movies_json",
       "ok": true,
-      "ms": 359,
+      "ms": 831,
       "detail": "6192 record(s), parses."
     },
     {
       "name": "supabase_canary",
       "ok": true,
-      "ms": 2563,
+      "ms": 2411,
       "detail": "4 agent(s), 1 admitted film(s), film_watch read OK."
     },
     {
       "name": "signup",
       "ok": true,
-      "ms": 1392,
-      "detail": "created and removed lee+probe-1792682300195@codynamics.com.au via delete_my_account."
+      "ms": 1285,
+      "detail": "created and removed lee+probe-1792685903890@codynamics.com.au via delete_my_account."
     },
     {
       "name": "orphan_probe_accounts",
       "ok": true,
-      "ms": 289,
+      "ms": 187,
       "detail": "no probe account older than 2h."
     },
     {
       "name": "usage_events_insert",
       "ok": true,
-      "ms": 653,
+      "ms": 220,
       "detail": "HTTP 201"
     },
     {
       "name": "pages_head",
       "ok": true,
-      "ms": 229,
+      "ms": 295,
       "detail": "HEAD https://cascade-web-3x1.pages.dev/ -> HTTP 200"
     },
     {
       "name": "daily_refresh_fresh",
       "ok": true,
-      "ms": 545,
-      "detail": "last \"Daily refresh\" commit 9.3h ago (floor 30h)."
+      "ms": 783,
+      "detail": "last \"Daily refresh\" commit 10.3h ago (floor 30h)."
     },
     {
       "name": "alerts_ran",
-      "ok": true,
-      "ms": 702,
-      "detail": "last successful alerts.yml run 9.3h ago (floor 30h)."
+      "ok": false,
+      "ms": 344,
+      "detail": "no successful alerts.yml run found"
     }
   ]
 }
