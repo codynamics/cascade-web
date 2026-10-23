@@ -10449,11 +10449,11 @@ const MOOD_STARTER_IDS = Object.keys(MOOD_STARTER_STYLES);
 const MOOD_DEFAULTS = [
   {id:"top", name:"Top scores", order:"score", sort:"score", topYou:null, topPublic:10},
   // CAS-1328: Latest (built-in id "releases", carried over from the pre-rename Releases mood) — every
-  // cinema release of the last 12 months or still ahead, in release order. sort is fixed for this id
-  // regardless of what's stored (moodSort below). CAS-1331: source defaults to catalogue the same way, but
-  // sticks to the person's own choice once they've actually saved one from the sheet (moodSource below) —
-  // so an existing account's pre-rename {source:"agents", ...} record (no sourceChosen) still defaults to
-  // catalogue.
+  // cinema release of the last 12 months or still ahead. CAS-1333: sort/source/name all default the same
+  // way (Release date/catalogue/"Latest") but each sticks to the person's own choice once they've actually
+  // saved one from the sheet (moodSort/moodSource/moodDisplayName below) — so an existing account's
+  // pre-rename {source:"agents", ...} record (no sourceChosen/sortChosen) still defaults to catalogue and
+  // Release date.
   {id:"releases", name:"Latest", source:"catalogue", order:"release", sort:"release", topYou:null, topPublic:null},
   // CAS-1295: the shortlist — every starred film standing on the current stage, watched or not, on any
   // service (mineOnly:false), across the whole catalogue (not just what an agent lists).
@@ -10503,8 +10503,11 @@ function moodOrder(mood){ return (moodTopYouN(mood)||moodTopPublicN(mood)) ? "yo
 // see applyMoodToState/moodDraftFrom), so it's resolved here, in memory, from the old moodOrder() derivation
 // instead — never written back (CAS-1218/CAS-1243 no-boot-write rule). It's only ever persisted once the
 // person actually saves that mood from the sheet.
-// CAS-1328: Latest's own sort is fixed by the app, never the stored field — see MOOD_DEFAULTS' own comment.
-function moodSort(mood){ return mood.id==="releases" ? "release" : (mood.sort!==undefined ? mood.sort : (moodOrder(mood)==="release" ? "release" : "score")); }
+// CAS-1328: Latest defaults to Release date regardless of what an existing account's pre-rename record
+// carries (CAS-1218/1243: a load never rewrites it). CAS-1333: once the person actually chooses a sort from
+// the sheet (saveMoodFromSheet stamps sortChosen:true alongside sort, same pattern as moodSource/
+// moodDisplayName below), that choice sticks.
+function moodSort(mood){ return mood.id==="releases" ? (mood.sortChosen ? mood.sort : "release") : (mood.sort!==undefined ? mood.sort : (moodOrder(mood)==="release" ? "release" : "score")); }
 // CAS-1328: Latest (id "releases") defaults to catalogue-sourced regardless of what an existing account's
 // pre-rename record carries (CAS-1218/1243: a load never rewrites it). CAS-1331: once the person actually
 // chooses a source from the sheet (saveMoodFromSheet stamps sourceChosen:true alongside source), that choice
@@ -10656,10 +10659,10 @@ window.saveMoodFromSheet = () => {
     starredOnly: !!d.starredOnly,
     sort: d.sort,   // CAS-1303
   };
-  // CAS-1331: Latest (id "releases") is the only mood whose source/name can disagree with what the sheet
-  // just saved (moodSource/moodDisplayName's legacy pre-rename fallbacks) — stamping these makes an actual
-  // save from the sheet always win over that fallback, from this point on.
-  if(mood.id==="releases"){ mood.sourceChosen=true; mood.nameChosen=true; }
+  // CAS-1331/CAS-1333: Latest (id "releases") is the only mood whose source/name/sort can disagree with
+  // what the sheet just saved (moodSource/moodDisplayName/moodSort's legacy pre-rename fallbacks) —
+  // stamping these makes an actual save from the sheet always win over that fallback, from this point on.
+  if(mood.id==="releases"){ mood.sourceChosen=true; mood.nameChosen=true; mood.sortChosen=true; }
   const idx=watchMoods.findIndex(m=>m.id===mood.id);
   const selectionChanged = watchMoodSel!==mood.id;
   if(idx>=0) watchMoods[idx]=mood; else watchMoods.push(mood);
