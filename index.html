@@ -1180,7 +1180,7 @@
   /* CAS-1302: the star is the row's last flex child, flex:none like the dots/caps either side of it — the
      .wline segments (flex:1 1 16px, below) are what shrink to leave it room, same as they already do for
      each other. Its own box is a static circle now, not the poster overlay .starbtn still defaults to. */
-  .bandstar{position:static;flex:none;margin-left:8px;width:28px;height:28px;border-radius:50%;
+  .bandstar{position:static;flex:none;margin-left:auto;width:28px;height:28px;border-radius:50%;
     background:var(--panel);border:1px solid var(--line);color:var(--dim);font-size:15px}
   /* CAS-433: the timeline's own origin label — the film's real release date, ahead of whatever dots follow. */
   .reldate{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;margin-right:9px;line-height:1.2}
@@ -1200,6 +1200,7 @@
      whatever room that leaves. Lighter too: no outer glow, a thin border, tight padding. */
   .cap{flex:none;min-width:0;max-width:100%;overflow:hidden;display:flex;align-items:center;gap:6px;
     padding:5px 9px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);color:var(--faint)}
+  .avail2 .cap{margin-right:8px}
   /* CAS-433: the whole capsule is the services toggle now (window label + date + service line), not just
      the saveline fused inside it — so the pointer/focus affordance moves to .cap itself. */
   .cap.captog{cursor:pointer}
@@ -7203,6 +7204,9 @@ function bandHTML(m, svcLine){
   const rel=releaseDateOf(m);
   const relHTML = rel ? `<span class="reldate"><span class="rellbl">${rel>=TODAY?"Releasing":"Released"}</span><b>${fmtDay(rel)}</b></span>` : "";
   const segs=WINDOW_SLOTS.map((key,i)=>{
+    // Lee, 2026-10-23: dots only between the release date and the lozenge — nothing after it, so the star
+    // reads as its own control instead of the end of the dot trail.
+    if(i>cur) return "";
     const line = i>0 ? `<span class="wline${i>cur?" fut":""}"></span>` : "";
     const cls  = i===0 ? "w-cin-"+cin.key : "w-"+key;
     if(i!==cur){
