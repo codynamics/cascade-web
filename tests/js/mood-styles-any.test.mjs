@@ -1,7 +1,7 @@
-// CAS-1256: a mood's Styles work the way an agent's do (CAS-1147) — a film shows when ANY of its
-// styles is switched on, not only when every one of its styles is. Before this ticket, picking just
-// Action in the Mood sheet switched every OTHER style off, and the list dropped a film the moment any
-// ONE of its styles was off — so a film listed as Action, Adventure vanished with only Action on.
+// CAS-1334: a mood's Styles match a film by its MAIN style only (m.genres[0]) — supersedes CAS-1256/
+// CAS-1147's "ANY of the film's styles counts" rule, matching the agent rule CAS-1318 already gave
+// matchesCriteria. Picking just Action in the Mood sheet now lists only films whose FIRST style is
+// Action; a film listed as Horror, Action no longer shows even though Action is still on.
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -44,31 +44,36 @@ function forceStreamWatchOn(film){
 
 // ---- AC1: filmPassesStylesOff itself -----------------------------------------------------------
 
-test("CAS-1256 AC1: filmPassesStylesOff — off empty never rejects", () => {
+test("CAS-1334 AC1: filmPassesStylesOff — off empty never rejects", () => {
   assert.equal(E.filmPassesStylesOff({ genres: ["Comedy"] }, new Set()), true);
   assert.equal(E.filmPassesStylesOff({ genres: [] }, new Set()), true);
   assert.equal(E.filmPassesStylesOff({}, new Set()), true);
 });
 
-test("CAS-1256 AC1: filmPassesStylesOff — every style off except Action", () => {
+test("CAS-1334 AC1: filmPassesStylesOff — every style off except Action, MAIN style decides it", () => {
   const off = new Set(["Adventure", "Comedy", "Drama", "Horror", "Thriller"]);
-  assert.equal(E.filmPassesStylesOff({ genres: ["Action", "Adventure"] }, off), true);
-  assert.equal(E.filmPassesStylesOff({ genres: ["Horror", "Action", "Thriller"] }, off), true);
+  assert.equal(E.filmPassesStylesOff({ genres: ["Action", "Adventure"] }, off), true,
+    "Action as the MAIN style passes");
+  assert.equal(E.filmPassesStylesOff({ genres: ["Horror", "Action", "Thriller"] }, off), false,
+    "Action only as a SECONDARY style no longer saves it — main style is Horror, which is off");
   assert.equal(E.filmPassesStylesOff({ genres: ["Comedy"] }, off), false);
   assert.equal(E.filmPassesStylesOff({ genres: ["Comedy", "Drama"] }, off), false);
-  assert.equal(E.filmPassesStylesOff({ genres: [] }, off), false);
-  assert.equal(E.filmPassesStylesOff({}, off), false);
+  assert.equal(E.filmPassesStylesOff({ genres: [] }, off), true, "a film with no styles at all always passes");
+  assert.equal(E.filmPassesStylesOff({}, off), true, "a film with no genres field at all always passes");
 });
 
-test("CAS-1256 AC1: filmPassesStylesOff — only Horror off", () => {
+test("CAS-1334 AC1: filmPassesStylesOff — only Horror off, MAIN style decides it", () => {
   const off = new Set(["Horror"]);
-  assert.equal(E.filmPassesStylesOff({ genres: ["Horror", "Thriller"] }, off), true);
+  assert.equal(E.filmPassesStylesOff({ genres: ["Horror", "Thriller"] }, off), false,
+    "Horror as the MAIN style is rejected even though Thriller (secondary) is on");
+  assert.equal(E.filmPassesStylesOff({ genres: ["Thriller", "Horror"] }, off), true,
+    "Horror as a SECONDARY style no longer rejects — main style is Thriller, which is on");
   assert.equal(E.filmPassesStylesOff({ genres: ["Horror"] }, off), false);
 });
 
 // ---- AC2: the real list, through watchVisibleRows() ---------------------------------------------
 
-test("CAS-1256 AC2: on the Streaming stage, only Action on shows a film carrying Action anywhere and hides one that doesn't", () => {
+test("CAS-1334 AC2: on the Streaming stage, only Action on shows a film whose MAIN style is Action and hides one whose main style is off even with Action as a secondary style", () => {
   const owner = broadCascade("cas1256-ac2", 0);
   E.cascades.push(owner);
   E.recomputeFound();
@@ -94,8 +99,8 @@ test("CAS-1256 AC2: on the Streaming stage, only Action on shows a film carrying
     const filmX = pickListedStreamingFilm(owner);
     const filmY = pickListedStreamingFilm(owner, filmX.tmdb_id);
     const savedGenresX = filmX.genres, savedGenresY = filmY.genres;
-    filmX.genres = ["Horror", "Action"];
-    filmY.genres = ["Comedy", "Drama"];
+    filmX.genres = ["Action", "Horror"];
+    filmY.genres = ["Horror", "Action"];
     const restoreX = forceStreamWatchOn(filmX);
     const restoreY = forceStreamWatchOn(filmY);
 
@@ -104,9 +109,9 @@ test("CAS-1256 AC2: on the Streaming stage, only Action on shows a film carrying
 
     const onlyAction = E.watchVisibleRows().rows.map(m => m.tmdb_id);
     assert.ok(onlyAction.includes(filmX.tmdb_id),
-      "AC2: a film carrying Action anywhere among its styles must show with only Action on");
+      "AC2: a film whose MAIN style is Action must show with only Action on");
     assert.ok(!onlyAction.includes(filmY.tmdb_id),
-      "AC2: a film carrying none of the on styles must not show");
+      "AC2: a film whose main style is Horror (off) must not show even though Action is a secondary style");
 
     E.watchGenreOff.stream.clear();
     const cleared = E.watchVisibleRows().rows.map(m => m.tmdb_id);

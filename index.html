@@ -10204,10 +10204,13 @@ window.setWatchOccasion = id => {
 // narrows what a render puts on screen. Now rendered inside the Filters sheet's own Styles section
 // (renderWatchSheet below) rather than a standalone bar.
 const watchGenreOff = {in_cinema:new Set(), premium:new Set(), rent:new Set(), stream:new Set()};
-// A mood's Styles work the way an agent's do (CAS-1147): a film shows when ANY of its styles is switched on,
-// not only when every one of them is. `off` is the set of styles switched off; none off means no filter.
+// CAS-1334: a mood's Styles match a film by its MAIN style only (m.genres[0]), the same rule CAS-1318 gave
+// agents — supersedes CAS-1147/CAS-1256's "ANY of the film's styles counts" rule. `off` is the set of
+// styles switched off; none off means no filter. A film with no styles at all always passes.
 function filmPassesStylesOff(m, off){
-  return !off.size || (m.genres||[]).some(g=>!off.has(g));
+  if(!off.size) return true;
+  const main=(m.genres||[])[0];
+  return !main || !off.has(main);
 }
 window.toggleWatchGenre = g => {
   const set=watchGenreOff[watchTab];
@@ -10761,10 +10764,9 @@ function renderMoodSheetBody(){
   const d=moodDraft; if(!d) return;
   const rows=watchSheetLastRows;
   const isCatalogue=d.source==="catalogue";
-  // CAS-1328: Latest's own Agents/Styles sections never apply — Agents is already hidden for any catalogue
-  // mood (isCatalogue, forced true for this id by moodDraftFrom); Styles needs its own flag since every
-  // other catalogue mood (Starred/Action/Imagine/Fun) still offers it.
-  const isLatestDraft = d.editingId==="releases";
+  // CAS-1328: Latest's own Agents section never applies — already hidden for any catalogue mood
+  // (isCatalogue, forced true for this id by moodDraftFrom). CAS-1334: Styles now applies to Latest too,
+  // same as every other catalogue mood (Starred/Action/Imagine/Fun).
   // CAS-1322 Change 3: an agents-sourced mood with every agent toggled off would save with nothing included —
   // Save is disabled and a hint shown under the Agents list (below) rather than letting that state back in.
   const noAgentsSelected = !isCatalogue && cascades.length>0 && cascades.every(c=>d.agentsOff.has(c.id));
@@ -10840,7 +10842,7 @@ function renderMoodSheetBody(){
           aria-label="Only starred films" onclick="toggleMoodDraftStarredOnly()"><i></i></button>
       </div>
     </div>
-    ${isLatestDraft ? "" : `<div class="wsheetsec">
+    <div class="wsheetsec">
       <div class="wsheethd"><span>Styles</span>
         <div class="wsheetlinks">
           <button type="button" class="linkbtn" onclick="selectAllMoodDraftStyles()">Select all</button>
@@ -10848,7 +10850,7 @@ function renderMoodSheetBody(){
         </div>
       </div>
       <div class="chips">${stylesHTML}</div>
-    </div>`}
+    </div>
     ${isCatalogue ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Agents</span></div>
       <div class="chips">${agentsHTML}</div>
