@@ -10449,9 +10449,11 @@ const MOOD_STARTER_IDS = Object.keys(MOOD_STARTER_STYLES);
 const MOOD_DEFAULTS = [
   {id:"top", name:"Top scores", order:"score", sort:"score", topYou:null, topPublic:10},
   // CAS-1328: Latest (built-in id "releases", carried over from the pre-rename Releases mood) — every
-  // cinema release of the last 12 months or still ahead, in release order, agents and agent floors never
-  // consulted. source/sort are overridden for this id regardless of what's stored (moodSource/moodSort
-  // below), so an existing account's pre-rename {source:"agents", ...} record still behaves this way.
+  // cinema release of the last 12 months or still ahead, in release order. sort is fixed for this id
+  // regardless of what's stored (moodSort below). CAS-1331: source defaults to catalogue the same way, but
+  // sticks to the person's own choice once they've actually saved one from the sheet (moodSource below) —
+  // so an existing account's pre-rename {source:"agents", ...} record (no sourceChosen) still defaults to
+  // catalogue.
   {id:"releases", name:"Latest", source:"catalogue", order:"release", sort:"release", topYou:null, topPublic:null},
   // CAS-1295: the shortlist — every starred film standing on the current stage, watched or not, on any
   // service (mineOnly:false), across the whole catalogue (not just what an agent lists).
@@ -10503,13 +10505,16 @@ function moodOrder(mood){ return (moodTopYouN(mood)||moodTopPublicN(mood)) ? "yo
 // person actually saves that mood from the sheet.
 // CAS-1328: Latest's own sort is fixed by the app, never the stored field — see MOOD_DEFAULTS' own comment.
 function moodSort(mood){ return mood.id==="releases" ? "release" : (mood.sort!==undefined ? mood.sort : (moodOrder(mood)==="release" ? "release" : "score")); }
-// CAS-1328: Latest (id "releases") always behaves as a catalogue-sourced mood regardless of what an
-// existing account's stored record carries (CAS-1218/1243: a load never rewrites it) — every place that
-// cares whether a mood is agent- or catalogue-scoped reads this instead of the raw `source` field.
-function moodSource(mood){ return mood.id==="releases" ? "catalogue" : mood.source; }
+// CAS-1328: Latest (id "releases") defaults to catalogue-sourced regardless of what an existing account's
+// pre-rename record carries (CAS-1218/1243: a load never rewrites it). CAS-1331: once the person actually
+// chooses a source from the sheet (saveMoodFromSheet stamps sourceChosen:true alongside source), that choice
+// sticks — every place that cares whether a mood is agent- or catalogue-scoped reads this instead of the
+// raw `source` field.
+function moodSource(mood){ return mood.id==="releases" ? (mood.sourceChosen ? mood.source : "catalogue") : mood.source; }
 // CAS-1328: the display name for Latest — "Latest" even when the stored record still reads the pre-rename
-// "Releases" (never rewritten on load); a name the person has actually typed themselves is always kept.
-function moodDisplayName(mood){ return (mood.id==="releases" && mood.name==="Releases") ? "Latest" : mood.name; }
+// "Releases" (never rewritten on load). CAS-1331: once the person has actually saved a name from the sheet
+// (nameChosen:true, stamped by saveMoodFromSheet), it is always shown verbatim, including "Releases".
+function moodDisplayName(mood){ return (mood.id==="releases" && mood.name==="Releases" && !mood.nameChosen) ? "Latest" : mood.name; }
 // CAS-1328: Latest's own pool restriction — a real cinema release (cinema_release) whose cinema_date falls
 // in the 12 months before today or any time after it. Applies only to the built-in Latest mood (id
 // "releases"), never to any other catalogue mood (Starred/Action/Imagine/Fun carry no such window).
@@ -10575,7 +10580,8 @@ function moodDraftFrom(mood){
     editingId: mood ? mood.id : null,
     name: mood ? moodDisplayName(mood) : "",
     // CAS-1284 Change 4: a new mood defaults to "My agents" — "missing means agents" (Change 1).
-    // CAS-1328: Latest's own source is fixed regardless of what's stored — see moodSource.
+    // CAS-1328/CAS-1331: Latest's own source defaults to catalogue but sticks to a person's actual choice —
+    // see moodSource.
     source: mood && moodSource(mood)==="catalogue" ? "catalogue" : "agents",
     // CAS-1296: order is no longer part of the draft — it's derived (moodOrder) from topYou/topPublic below.
     // CAS-1287 Change 1: topYou/topPublic replace Best N's single `best` field.
@@ -10650,6 +10656,10 @@ window.saveMoodFromSheet = () => {
     starredOnly: !!d.starredOnly,
     sort: d.sort,   // CAS-1303
   };
+  // CAS-1331: Latest (id "releases") is the only mood whose source/name can disagree with what the sheet
+  // just saved (moodSource/moodDisplayName's legacy pre-rename fallbacks) — stamping these makes an actual
+  // save from the sheet always win over that fallback, from this point on.
+  if(mood.id==="releases"){ mood.sourceChosen=true; mood.nameChosen=true; }
   const idx=watchMoods.findIndex(m=>m.id===mood.id);
   const selectionChanged = watchMoodSel!==mood.id;
   if(idx>=0) watchMoods[idx]=mood; else watchMoods.push(mood);
@@ -10882,18 +10892,19 @@ function watchScopeRows(){
   // empty branch (already keyed off rows.length) shows its existing empty state rather than a live listing
   // under a blank strip.
   if(!watchTabsNow().length) return [];
+  // CAS-1328/CAS-1331: Latest's own 12-month cinema-release window applies no matter which source the
+  // person has chosen for it — no other mood (catalogue or agents) carries it.
+  const isLatest = currentMood().id==="releases";
   // CAS-1284 Change 1: a catalogue mood's pool is every film in MOVIES standing in the current stage —
   // decided directly off primaryStatus(m), whether or not any agent lists it — not the agent/occasion-based
   // pool below. Agents-off, occasion and Picked by are all agent-scoped, so none of them apply here; search,
   // Styles, Watched and mine-only (watchVisibleRows below) still do, unchanged.
   if(moodSource(currentMood())==="catalogue"){
-    const isLatest = currentMood().id==="releases";
     const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
     return MOVIES.filter(m=>{
       // The account-level world every agent searches inside (CAS-146/170/560) applies to a catalogue mood too:
       // a film with nothing to watch, or outside the Languages setting, is never in it.
       if(!showable(m) || !passesTasteBase(m)) return false;
-      // CAS-1328: Latest's own 12-month cinema-release window — no other catalogue mood carries it.
       if(isLatest && !filmInLatestWindow(m)) return false;
       const ps=primaryStatus(m);
       const standing = watchTab==="in_cinema" ? (ps==="upcoming" || ps==="opening_week" || ps==="in_cinema") : ps===ownStanding;
@@ -10911,7 +10922,7 @@ function watchScopeRows(){
     if(!pool.length) return [];
     return MOVIES.filter(m=>{
       const owner=filmOwnerCascade(m);
-      return owner && pool.some(c=>c.id===owner.id) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m);
+      return owner && pool.some(c=>c.id===owner.id) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m) && (!isLatest || filmInLatestWindow(m));
     });
   }
   if(!acs.length) return [];
@@ -10923,10 +10934,10 @@ function watchScopeRows(){
     return MOVIES.filter(m=>{
       if(!cascades.some(c=>listedBy(m,c))) return false;
       const owner=filmOwnerCascade(m);
-      return (!owner || !agentOff.has(owner.id)) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m);
+      return (!owner || !agentOff.has(owner.id)) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m) && (!isLatest || filmInLatestWindow(m));
     });
   }
-  return MOVIES.filter(m=>acs.some(c=>listedBy(m,c)) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m));
+  return MOVIES.filter(m=>acs.some(c=>listedBy(m,c)) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m) && (!isLatest || filmInLatestWindow(m)));
 }
 // CAS-1223: render()'s own Watch pipeline (tab scope → search → Picked by/Styles/Watched → mine-only →
 // search-override), pulled out of render() so watchStageCountFor can aim the exact same pipeline at a
@@ -22046,11 +22057,13 @@ function patchFindCounts(){
 // left the list.
 function filmInWatchRows(m){
   if(!watchTabsNow().length) return false;
+  // CAS-1328/CAS-1331: Latest's own 12-month cinema-release window applies no matter which source the
+  // person has chosen for it — see watchScopeRows' identical top-level check.
+  const isLatest = currentMood().id==="releases";
+  if(isLatest && !filmInLatestWindow(m)) return false;
   // CAS-1284 Change 1: a catalogue mood's pool test — see watchScopeRows's own comment. Agents-off,
   // occasion and Picked by are all agent-scoped, so none of them apply here.
   if(moodSource(currentMood())==="catalogue"){
-    // CAS-1328: Latest's own 12-month cinema-release window — see watchScopeRows' identical branch.
-    if(currentMood().id==="releases" && !filmInLatestWindow(m)) return false;
     const ps=primaryStatus(m);
     const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
     const standing = watchTab==="in_cinema" ? (ps==="upcoming" || ps==="opening_week" || ps==="in_cinema") : ps===ownStanding;

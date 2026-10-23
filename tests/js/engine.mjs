@@ -559,7 +559,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // CAS-1328: moodSource/moodDisplayName — Latest's (id "releases") fixed-by-the-app source and display
   // name, overriding whatever an existing account's stored record carries. filmInLatestWindow/
   // LATEST_WINDOW_DAYS are Latest's own 12-month cinema-release pool test.
-  applyMoodToState, moodDefaultFieldsNow, moodOrder, moodSort, moodSource, moodDisplayName,
+  // CAS-1331: moodDraftFrom — the mood sheet's own draft-building function, exported so a test can assert
+  // what reopening the sheet after a save would actually show (moodDraft itself is a plain let-bound
+  // variable, never reachable outside the engine's own scope) without needing to read DOM the stub swallows.
+  applyMoodToState, moodDefaultFieldsNow, moodOrder, moodSort, moodSource, moodDisplayName, moodDraftFrom,
   filmInLatestWindow, LATEST_WINDOW_DAYS,
   // CAS-1287: MOOD_DEFAULTS (the five built-in moods, including the three catalogue starters),
   // moodTopYouN/moodTopPublicN/moodTopYouAvailable/moodTopYouEffectiveN ("Show top"'s own cap-resolution
