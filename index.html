@@ -3557,7 +3557,7 @@
      The selected stage and the selected mood use the same --sel-bg / --sel-bd as the selected nav item. */
   .watchtop{display:block;margin:10px 12px 0}
   .cascbar.rail .watchtop{margin:10px 12px 0}
-  .stgroups{display:flex;gap:8px;align-items:stretch}
+  .stgroups{display:flex;gap:8px;align-items:stretch;margin-top:10px}
   .stgrp{min-width:0;border:1px solid var(--line);border-radius:12px;padding:5px;background:rgba(255,255,255,.025)}
   .stgrplbl{font:700 9px/1 var(--font-body);letter-spacing:.9px;text-transform:uppercase;color:var(--faint);
     padding:2px 5px 6px}
@@ -3581,7 +3581,7 @@
     .stgroups .stagestop .stagename{font-size:11px;letter-spacing:-.1px}
   }
   /* moods: one row, one selected at a time */
-  .moodrow{display:flex;gap:6px;margin-top:9px;overflow-x:auto;scrollbar-width:none;align-items:center;
+  .moodrow{display:flex;gap:6px;margin-top:0;overflow-x:auto;scrollbar-width:none;align-items:center;
     user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   .moodrow::-webkit-scrollbar{display:none}
   .moodchip{flex:none;height:34px;padding:0 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
@@ -10028,7 +10028,7 @@ function renderWatchTop(){
   // to be captured before it's thrown away and reapplied (or adjusted) on the new one below.
   const prevRow=el.querySelector(".moodrow");
   const prevScrollLeft=prevRow ? prevRow.scrollLeft : 0;
-  el.innerHTML = `${stageHTML}<div class="moodrow" role="group" aria-label="Mood">${moodHTML}${addHTML}</div>`;
+  el.innerHTML = `<div class="moodrow" role="group" aria-label="Mood">${moodHTML}${addHTML}</div>${stageHTML}`;
   // Keeps #wtMini's own text honest immediately after a stage/mood change, independent of the next scroll
   // event — the collapse listener itself (defined later in this script) only ever touches it on scroll.
   if(typeof wtRefreshMini==="function") wtRefreshMini();
@@ -22183,8 +22183,8 @@ function wtRefreshMini(){
   const curKey = watchTab==="in_cinema" ? watchCinemaStage : watchTab;
   const stop = watchStageStopsNow().find(s=>s.key===curKey);
   const stageName = stop ? (stop.key==="in_cinema" ? "Now showing" : stop.label) : "";
-  mini.innerHTML = `<span class="gdot ${stop?stop.dot:""}" aria-hidden="true"></span><span>${esc(stageName)}</span>`
-    + `<span class="wtsep">·</span><span class="wtmood">${esc(moodDisplayName(currentMood()))}</span><span class="wtchev">Change ▾</span>`;
+  mini.innerHTML = `<span class="wtmood">${esc(moodDisplayName(currentMood()))}</span><span class="wtsep">·</span>`
+    + `<span class="gdot ${stop?stop.dot:""}" aria-hidden="true"></span><span>${esc(stageName)}</span><span class="wtchev">Change ▾</span>`;
 }
 // Measuring shortH forces a layout flush while the bar is shrunk but not yet margin-compensated — if the
 // page is scrolled to (or past) what is, for that one instant, a shorter document, the browser clamps
