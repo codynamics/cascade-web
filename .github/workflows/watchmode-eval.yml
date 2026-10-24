@@ -41,7 +41,7 @@ jobs:
     if: ${{ inputs.job == 'evaluate' || inputs.job == 'all' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -77,7 +77,7 @@ jobs:
     if: ${{ inputs.job == 'evaluate_trial' || inputs.job == 'all' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -112,7 +112,7 @@ jobs:
     if: ${{ inputs.job == 'reprobe' || inputs.job == 'all' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
