@@ -1,67 +1,48 @@
 [
   {
-    "tmdb_id": 1211776,
-    "title": "Violent Ends",
+    "tmdb_id": 1083381,
+    "title": "Backrooms",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
-      "SBS On Demand"
+      "Stan"
     ],
-    "detected": "2026-10-24"
+    "detected": "2026-10-25"
   },
   {
-    "tmdb_id": 1211776,
-    "title": "Violent Ends",
+    "tmdb_id": 1083381,
+    "title": "Backrooms",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-10-24"
+    "detected": "2026-10-25"
   },
   {
-    "tmdb_id": 660360,
-    "title": "Noryang: Deadly Sea",
+    "tmdb_id": 1387382,
+    "title": "Hunting Season",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
-      "SBS On Demand"
+      "HBO Max"
     ],
-    "detected": "2026-10-24"
+    "detected": "2026-10-25"
   },
   {
-    "tmdb_id": 660360,
-    "title": "Noryang: Deadly Sea",
-    "kind": "left",
-    "lost_window": "released",
-    "label": "Released (no AU offer)",
-    "detected": "2026-10-24"
-  },
-  {
-    "tmdb_id": 589712,
-    "title": "The Captain",
-    "kind": "arrived",
-    "new_window": "included_streaming",
-    "label": "Included Streaming",
-    "services": [
-      "SBS On Demand"
-    ],
-    "detected": "2026-10-24"
-  },
-  {
-    "tmdb_id": 589712,
-    "title": "The Captain",
+    "tmdb_id": 1387382,
+    "title": "Hunting Season",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-10-24"
+    "detected": "2026-10-25"
   },
   {
-    "tmdb_id": 406000,
-    "title": "The Teacher",
+    "tmdb_id": 558915,
+    "title": "The Color Purple",
     "kind": "left",
     "lost_window": "included_streaming",
     "label": "Included Streaming",
-    "detected": "2026-10-24"
+    "detected": "2026-10-25"
   }
 ]
