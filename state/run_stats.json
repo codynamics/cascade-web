@@ -1,23 +1,25 @@
 {
-  "date": "2026-10-25",
+  "date": "2026-10-26",
   "tmdb": {
-    "calls": 6902,
+    "calls": 6901,
     "errors": 0,
     "not_found": 0,
     "status_counts": {}
   },
   "watchmode": {
     "quota": 2500,
-    "quota_used": 918,
-    "remaining_monthly_credits": 1582,
+    "quota_used": 990,
+    "remaining_monthly_credits": 1510,
     "calls": 72,
     "errors": 0,
-    "mismatch": 0,
-    "mismatch_ids": [],
-    "quarantined": 16
+    "mismatch": 1,
+    "mismatch_ids": [
+      1802674
+    ],
+    "quarantined": 17
   },
   "oscarbase": {
     "calls": 750,
-    "errors": 0
+    "errors": 750
   }
 }
