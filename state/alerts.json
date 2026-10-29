@@ -21902,5 +21902,115 @@
     "lost_window": "released",
     "label": "Released (no AU offer)",
     "detected": "2026-10-28"
+  },
+  {
+    "tmdb_id": 1228834,
+    "title": "The Fix",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-10-29"
+  },
+  {
+    "tmdb_id": 1228834,
+    "title": "The Fix",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-10-29"
+  },
+  {
+    "tmdb_id": 1375441,
+    "title": "Primetime",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-10-29"
+  },
+  {
+    "tmdb_id": 1375441,
+    "title": "Primetime",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-10-29"
+  },
+  {
+    "tmdb_id": 1318413,
+    "title": "Pressure",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-10-29"
+  },
+  {
+    "tmdb_id": 1318413,
+    "title": "Pressure",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-10-29"
+  },
+  {
+    "tmdb_id": 292011,
+    "title": "Richard Jewell",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-29"
+  },
+  {
+    "tmdb_id": 1376400,
+    "title": "Crawlers",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-10-29"
+  },
+  {
+    "tmdb_id": 1376400,
+    "title": "Crawlers",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-10-29"
+  },
+  {
+    "tmdb_id": 1473148,
+    "title": "Gentle Monster",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-10-29"
+  },
+  {
+    "tmdb_id": 1473148,
+    "title": "Gentle Monster",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-10-29"
+  },
+  {
+    "tmdb_id": 1603262,
+    "title": "Everest: The Other Side",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-10-29"
+  },
+  {
+    "tmdb_id": 1603262,
+    "title": "Everest: The Other Side",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-10-29"
   }
 ]
