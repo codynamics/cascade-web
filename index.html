@@ -3899,6 +3899,21 @@
   .qpub{border:0;background:rgba(255,255,255,.07)}
   .qpub small{color:var(--dim)}
   .qpub.intitle{top:40px}
+  /* ==== ONE AGENT: SINGLE SCORE BOX (CAS-1338, Lee, 30 Oct 2026) ========================================
+     A v2 (one-agent) account's card shows ONE score box, oneScoreBoxHTML(m), instead of the You+Public
+     pair above. The six rules up to and including ".card.expanded .qone{display:none}" are EXACT, from the
+     approved prototype — applied verbatim. The two below are this ticket's own: the box's collapsed-only
+     visibility already comes from that last EXACT rule, so oneScoreTextHTML(m)'s expanded-card companion
+     (.qonetext) just needs the opposite — hidden collapsed, its own full-width line in the scores row open. */
+  .qone{position:absolute;top:4px;right:0;width:42px;height:40px}
+  .qone .qpub{position:absolute;left:0;top:7px;background:var(--panel)}
+  .qone.up .qpub{top:0} .qone.down .qpub{top:14px}
+  .qone .qghost{position:absolute;left:0;top:7px;width:42px;height:26px;border-radius:7px;border:1.5px dashed rgba(255,255,255,.28);box-sizing:border-box}
+  .qone.up .qpub{box-shadow:0 3px 8px rgba(0,0,0,.45)} .qone.down .qpub{box-shadow:0 -3px 8px rgba(0,0,0,.45)}
+  .qone.up .qpub small{color:#5eead4;opacity:1} .qone.down .qpub small{color:#f0a060;opacity:1}
+  .card.expanded .qone{display:none}
+  .card:not(.expanded) .qonetext{display:none}
+  .ctop.hasmatch .mrow.r-scores .qonetext{order:5;flex:1 1 100%;font:500 12px/1.4 var(--font-body);color:var(--dim)}
   .card:not(.expanded) .wline{display:block;flex:1 1 0;min-width:0;margin:0}
   .card:not(.expanded) .wline:last-of-type{min-width:9px}
   .card:not(.expanded) .avail2{gap:0}
@@ -6918,9 +6933,56 @@ function publicLozengeHTML(m, extraClass=""){
   if(q<0) return `<span class="qpub none${cls}" title="Not enough agreement to score this yet"><b>&ndash;</b><small>Public</small></span>`;
   return `<span class="qpub ${q>=85?"hi":q>=70?"mid":"lo"}${cls}" title="Public &mdash; ${escA(cascadeScoreSourcesText(m))}"><b>${q}</b><small>Public</small></span>`;
 }
+// CAS-1338: a v2 (one-agent) account's card shows ONE score box in place of the You+Public lozenge pair
+// above — oneAgentCriteria() (CAS-1337) is null for every non-v2 account, so cardTopHTML only ever calls
+// this once it has already checked that. value/adj come straight from oneScoreParts(m); "adj" here is
+// value-pub (the rounded, DISPLAYED difference) rather than oneScoreParts' own raw adj, so the box's
+// direction and label always agree with the two numbers actually shown, even after the ±1/99 clamp.
+// .qone's CSS (verbatim from the ticket) hides it on .card.expanded — oneScoreTextHTML below is its
+// expanded-card companion.
+function oneScoreBoxHTML(m){
+  const {value, public:pub} = oneScoreParts(m);
+  if(value === -1){
+    return `<span class="qone" title="Not enough agreement to score this yet"><span class="qpub none"><b>&ndash;</b><small>SCORE</small></span></span>`;
+  }
+  const adj = value - pub;
+  const dir = adj > 0 ? "up" : adj < 0 ? "down" : "";
+  const band = value>=85 ? "hi" : value>=70 ? "mid" : "lo";
+  const label = adj > 0 ? `▲${adj}` : adj < 0 ? `▼${-adj}` : "SCORE";
+  const ghost = dir ? `<span class="qghost"></span>` : "";
+  const title = adj ? `Public ${pub}, ${adj>0?"+":""}${adj} from your verdicts` : `Public ${pub}`;
+  return `<span class="qone ${dir}" title="${escA(title)}">${ghost}<span class="qpub ${band}"><b>${value}</b><small>${label}</small></span></span>`;
+}
+// CAS-1338 §7: the open card's companion to oneScoreBoxHTML — the box itself hides on expand, and this
+// spells the same oneScoreParts(m) out as a sentence listing every style-combination part behind the
+// adjustment (mainOtherCombos' own (main, other) keying, same as oneScoreParts uses to build `parts`).
+function oneScoreTextHTML(m){
+  const {value, public:pub, parts} = oneScoreParts(m);
+  if(value === -1) return `<span class="qonetext">Not enough agreement to score this yet</span>`;
+  if(!parts.length) return `<span class="qonetext">Score ${value} = Public; no verdicts on its combinations yet</span>`;
+  const {main} = mainOtherCombos(m);
+  const adj = value - pub;
+  const sign = adj >= 0 ? "+" : "−";
+  const bits = parts.map(p => {
+    const n = Math.round(p.points);
+    return `${esc(main)} + ${esc(p.other)} (${n>=0?"+":"−"}${Math.abs(n)})`;
+  }).join(", ");
+  return `<span class="qonetext">Score ${value} = Public ${pub} ${sign}${Math.abs(adj)} from your verdicts on ${bits}</span>`;
+}
 function sortMoviesBy(a,b,key){
   switch(key){
     case "you": {
+      // CAS-1338 §8: on a v2 account the "you" sort becomes Score — oneScore(m), ties broken on Public —
+      // the same oneAgentCriteria() gate oneScoreParts/oneScoreBoxHTML use, so a non-v2 account
+      // (oneAgentCriteria() null) falls straight through to today's tasteMatch-based comparison, untouched.
+      const oneC = oneAgentCriteria();
+      if(oneC){
+        const va=oneScore(a,oneC), vb=oneScore(b,oneC);
+        if(va===-1 && vb===-1) return sortMoviesBy(a,b,"cascade");
+        if(va===-1) return 1;
+        if(vb===-1) return -1;
+        return va!==vb ? vb-va : sortMoviesBy(a,b,"cascade");
+      }
       // CAS-1264: tasteMatch(m) walks every judged film, so calling it on every comparison (O(n log n)
       // calls across one sort) redoes the same walk for the same film many times over. _tasteMatchCache
       // memoizes it per film, cleared at exactly the points tasteProfile() itself goes stale (see
@@ -8489,12 +8551,17 @@ function cardTopHTML(m, inWatch=false){
   // row, keep it beside the title instead; see the "MATCH ON CARDS" CSS for which chip each card shows).
   // Signed out (the shared film page, onboarding) the card draws exactly as it always has.
   const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  const matchBadge = signedIn ? matchBadgeHTML(m) : "";
-  const titleScore = signedIn ? matchBadge + publicLozengeHTML(m, "intitle") : qScoreHTML(m);
-  const rowScore = signedIn ? publicLozengeHTML(m, "inrow") : "";
+  // CAS-1338: a v2 (one-agent) account shows ONE score box instead of the You+Public lozenge pair —
+  // oneAgentCriteria() (CAS-1337) is null for every non-v2 account, so this is the one gate everything
+  // below it keys off, and a non-v2 card draws exactly as it always has.
+  const oneAgentC = signedIn ? oneAgentCriteria() : null;
+  const matchBadge = (signedIn && !oneAgentC) ? matchBadgeHTML(m) : "";
+  const titleScore = oneAgentC ? oneScoreBoxHTML(m)
+    : signedIn ? matchBadge + publicLozengeHTML(m, "intitle") : qScoreHTML(m);
+  const rowScore = oneAgentC ? oneScoreTextHTML(m) : signedIn ? publicLozengeHTML(m, "inrow") : "";
   // CAS-179: one grid, one order — title · genres·language · synopsis · money · scores · awards, with
   // the poster spanning down to the scores row and the scale badge tucked under it beside the awards.
-  return `<div class="ctop${signedIn?" hasmatch":""}${signedIn && !matchBadge?" nomatch":""}">
+  return `<div class="ctop${signedIn?" hasmatch":""}${signedIn && !oneAgentC && !matchBadge?" nomatch":""}">
       <!-- CAS-276: the tombstone is the POSTER, and nothing else. -->
       <div class="ptomb">
         <div class="poster"${posterAttr}>${play}</div>
@@ -10289,8 +10356,14 @@ const PICKER_KINDS = {
     // CAS-1264: You score only means anything for a signed-in account (tasteMatch reads their own
     // verdicts) — the window.CascadeAuth-backed guard rather than accountActive() by name, same reason
     // filmPageIsMember() above the account-sync IIFE can't call it directly either.
-    items: () => (window.CascadePersistence && window.CascadePersistence.accountActive())
-      ? SORT_OPTS : SORT_OPTS.filter(o=>o.key!=="you"),
+    // CAS-1338 §8: on a v2 (one-agent) account, "You score" and "Public score" collapse into one Score
+    // entry (oneAgentCriteria() is null for every non-v2 account, so this branch never fires for them).
+    items: () => {
+      if(!(window.CascadePersistence && window.CascadePersistence.accountActive())) return SORT_OPTS.filter(o=>o.key!=="you");
+      return oneAgentCriteria()
+        ? SORT_OPTS.filter(o=>o.key!=="cascade").map(o => o.key==="you" ? {...o, label:"Score"} : o)
+        : SORT_OPTS;
+    },
     current: () => filt.sort,
     // CAS-1240: any explicit tap/pick is a genuine pick, full stop. CAS-819's original rule compared the
     // chosen key against DEFAULT_SORT instead, which silently dropped the pick whenever someone chose

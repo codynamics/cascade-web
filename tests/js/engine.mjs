@@ -299,6 +299,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // and oneAgentAlerts (the per-style alert switch CAS-1343's monitor gating calls) — exported so a test
   // can drive each directly against a fixture criteria object, the same convention youScore above uses.
   oneScore, oneScoreParts, barAdvice, oneTopPct, oneAgentAlerts,
+  // CAS-1338: oneScoreBoxHTML/oneScoreTextHTML are the v2 agent's single score box (collapsed card) and
+  // its expanded-card sentence companion — exported so a test can assert their markup directly, the same
+  // convention matchBadgeHTML/publicLozengeHTML above use.
+  oneScoreBoxHTML, oneScoreTextHTML,
   // CAS-1289: renderStyleMapSection is the Style map card's own render, and tasteSelPrimary/tasteSelOther
   // (module-level lets, same reassignment pattern as watchTab above) are the cell it's currently showing
   // detail for -- exported through getters/setters so a test can seed a stale selection (left over from a
