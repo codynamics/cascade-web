@@ -24,7 +24,7 @@ import unittest
 from monitor import (compute_transitions, match, matches_criteria, compute_admission,
                      compute_auto_placements, synthesize_auto_watch_rows, service_ok,
                      notification_rows, suppressed_pairs, excluded_moments, match_film_watches,
-                     match_newly_qualified, match_new_to_agent)
+                     match_newly_qualified, match_new_to_agent, hand_picked_pairs)
 from monitor.matching import Hit, agent_channels, MOMENT_TO_WINDOW
 from monitor.catalogue import load_catalogue_file
 from monitor.store import InMemoryStore
@@ -1560,6 +1560,125 @@ class AlertsOffGateTests(unittest.TestCase):
         hits = match_film_watches(watches, ts)
         self.assertEqual(len(hits.get("u1", [])), 1)
         self.assertIsNone(hits["u1"][0].cascade_id)
+
+
+class OneAgentAlertTests(unittest.TestCase):
+    """CAS-1343 AC1: a v2 agent's per-style/per-window alert switch (oneAgentAlerts) gates a real
+    window transition inside match() itself — ahead of (never instead of) admission/service/
+    placement, which all still run first (item 1 of the ticket's own behaviour section)."""
+
+    def _transition(self, before_status, after_status, moment, tmdb_id=9601):
+        prev = [{"tmdb_id": tmdb_id, "title": "V2 Fixture", "status": list(before_status),
+                 "cinema_date": "2026-01-01", "offers": []}]
+        today = [{"tmdb_id": tmdb_id, "title": "V2 Fixture", "status": list(after_status),
+                  "cinema_date": "2026-01-01", "genres": ["Science Fiction"], "language": "en",
+                  "imdb_rating": 7.0, "imdb_votes": 5000, "wm_user_rating": 7.5, "wm_critic_score": 70,
+                  "offers": [{"service": "Netflix", "type": "sub", "price": None}]}]
+        ts = compute_transitions(prev, today, RUN_DATE)
+        return next(t for t in ts if t.moment == moment), today[0]
+
+    def _cascade(self, al):
+        # alert_moments carries BOTH moments, as the front end's own oneAgentMomentsOf union would
+        # for an account with some OTHER style alerting on stream too — the fixture's only style
+        # (Science Fiction) is the one whose own `al` actually decides each test's outcome.
+        return [{"id": "v2", "user_id": "u1", "name": "My agent", "active": True,
+                 "alert_moments": ["hits_cinema", "hits_stream"],
+                 "criteria": {"v": 2, "styles": {"Science Fiction": {"bar": 1, "al": al}}}}]
+
+    def test_ac1_cinema_alert_on_fires_for_a_sci_fi_cinema_opening(self):
+        t, movie = self._transition(["upcoming"], ["in_cinema"], "hits_cinema")
+        cascades = self._cascade({"cinema": True, "rent": False, "stream": False})
+        admission = _admit(cascades, today=[movie])
+        hits = match(cascades, [t], admission=admission,
+                     film_watches=[{"user_id": "u1", "movie_id": t.movie_id, "windows": ["in_cinema"]}])
+        self.assertEqual(len(hits.get("u1", [])), 1)
+
+    def test_ac1_stream_alert_off_is_silent_for_an_admitted_film(self):
+        t, movie = self._transition(["in_cinema"], ["included_streaming"], "hits_stream")
+        cascades = self._cascade({"cinema": True, "rent": False, "stream": False})
+        admission = _admit(cascades, today=[movie])
+        hits = match(cascades, [t], admission=admission,
+                     film_watches=[{"user_id": "u1", "movie_id": t.movie_id, "windows": ["stream"]}])
+        self.assertEqual(hits.get("u1", []), [])
+
+
+class HandPickedAlertTests(unittest.TestCase):
+    """CAS-1343 AC2/AC3: a film hand-added to a v2 mood (`user_prefs.view.moods[*].in`) alerts on a
+    window arrival regardless of the agent's own admission or per-style alert switch (AC2) —
+    except once the film has been watched or blocked (AC3, enforced by hand_picked_pairs() itself,
+    see HandPickedPairsTests below) — Lee's 29 Oct 2026 decision."""
+
+    def _transition(self, tmdb_id=9701):
+        prev = [{"tmdb_id": tmdb_id, "title": "Hand Picked", "status": [], "cinema_date": "2026-01-01",
+                 "offers": []}]
+        today = [{"tmdb_id": tmdb_id, "title": "Hand Picked", "status": ["included_streaming"],
+                  "cinema_date": "2026-01-01", "genres": ["Science Fiction"], "offers": []}]
+        ts = compute_transitions(prev, today, RUN_DATE)
+        return next(t for t in ts if t.moment == "hits_stream")
+
+    def _cascade(self):
+        # bar:99 and stream:False together mean this film would fail BOTH the admission test and
+        # the per-style alert switch were it not hand-picked — AC2's own "even though" wording.
+        return [{"id": "v2", "user_id": "u1", "name": "My agent", "active": True,
+                 "alert_moments": [],
+                 "criteria": {"v": 2, "styles": {
+                     "Science Fiction": {"bar": 99, "al": {"cinema": False, "rent": False, "stream": False}}}}}]
+
+    def test_ac2_fires_despite_admission_and_style_alert_both_being_off(self):
+        t = self._transition()
+        hits = match(self._cascade(), [t], admission={}, hand_picked={("u1", t.movie_id)},
+                     watch_windows={"u1": {"stream": {"list": True}}})
+        self.assertEqual(len(hits.get("u1", [])), 1)
+        self.assertEqual(hits["u1"][0].cascade_id, "v2")
+
+    def test_a_window_the_account_has_not_enabled_stays_silent(self):
+        t = self._transition()
+        hits = match(self._cascade(), [t], admission={}, hand_picked={("u1", t.movie_id)},
+                     watch_windows={"u1": {"stream": {"list": False}}})
+        self.assertEqual(hits.get("u1", []), [])
+
+    def test_a_globally_muted_moment_still_silences_a_hand_picked_film(self):
+        t = self._transition()
+        hits = match(self._cascade(), [t], admission={}, hand_picked={("u1", t.movie_id)},
+                     watch_windows={"u1": {"stream": {"list": True}}}, excluded={"u1": ["hits_stream"]})
+        self.assertEqual(hits.get("u1", []), [])
+
+    def test_a_non_v2_cascade_never_gets_the_hand_picked_bypass(self):
+        t = self._transition()
+        cascades = [{"id": "v1", "user_id": "u1", "name": "Old Agent", "active": True,
+                     "alert_moments": [], "criteria": {}}]
+        hits = match(cascades, [t], admission={}, hand_picked={("u1", t.movie_id)},
+                     watch_windows={"u1": {"stream": {"list": True}}})
+        self.assertEqual(hits.get("u1", []), [])
+
+
+class HandPickedPairsTests(unittest.TestCase):
+    """CAS-1343: hand_picked_pairs() itself — the pure function that turns `user_prefs.view.moods`
+    into the (user_id, movie_id) set match() reads, including AC3's watched/blocked exclusion."""
+
+    def test_a_v2_moods_in_list_is_picked_up(self):
+        prefs = {"u1": {"view": {"moods": [{"v2": True, "in": ["501", "502"]}]}}}
+        self.assertEqual(hand_picked_pairs(prefs, {}), {("u1", "501"), ("u1", "502")})
+
+    def test_a_non_v2_moods_in_list_is_ignored(self):
+        prefs = {"u1": {"view": {"moods": [{"in": ["501"]}]}}}   # no v2 marker
+        self.assertEqual(hand_picked_pairs(prefs, {}), set())
+
+    def test_ac3_a_watched_or_blocked_film_is_excluded(self):
+        prefs = {"u1": {"view": {"moods": [{"v2": True, "in": ["501", "502"]}]}}}
+        film_statuses = {"u1": [{"movie_id": "501", "status": "liked"}]}
+        self.assertEqual(hand_picked_pairs(prefs, film_statuses), {("u1", "502")})
+
+    def test_a_blocked_film_is_excluded_too(self):
+        prefs = {"u1": {"view": {"moods": [{"v2": True, "in": ["501"]}]}}}
+        film_statuses = {"u1": [{"movie_id": "501", "status": "notfor"}]}
+        self.assertEqual(hand_picked_pairs(prefs, film_statuses), set())
+
+    def test_no_view_column_is_empty(self):
+        self.assertEqual(hand_picked_pairs({"u1": {}}, {}), set())
+
+    def test_no_user_prefs_row_at_all_is_empty(self):
+        self.assertEqual(hand_picked_pairs({}, {}), set())
 
 
 if __name__ == "__main__":

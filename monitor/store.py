@@ -27,7 +27,8 @@ Interface:
                                                            # scope, for notify-test's real-film verify()
   upsert_film_watch(user_id, movie_id, window) -> None    # CAS-1052: notify-test's guaranteed-match tick
   delete_film_watch_for_movie_ids(ids) -> int             # CAS-1052: fixture-range-only, for notify-test
-  fetch_user_prefs() -> {user_id: {sub_services, store_services, taste, services_only}}    # CAS-825/CAS-853
+  fetch_user_prefs() -> {user_id: {sub_services, store_services, taste, services_only, watch_windows,
+                                    view}}                               # CAS-825/CAS-853/CAS-1343
   fetch_user_films() -> [{user_id, movie_id, status}]                                      # CAS-825
   fetch_user_held_ids() -> set[str]  # every tmdb_id a user holds state on                  # CAS-986
   fetch_agent_films() -> [{user_id, cascade_id, movie_id, admission_score, admission_status}]  # CAS-1097
@@ -484,17 +485,20 @@ class SupabaseStore:
         return {(str(r.get("user_id")), str(r.get("movie_id")), r.get("moment")) for r in rows}
 
     def fetch_user_prefs(self) -> dict:
-        """user_id -> {sub_services, store_services, taste, services_only, watch_windows}
-        (CAS-825/CAS-853/CAS-1097): the account facts the real engine reads beyond an agent's own
-        criteria — CAS-211's services (the my-services scope's own comparison set), CAS-146's taste
-        baseline (only `.langs` survives there today, see app_template.html's passesTasteBase),
-        CAS-853's `services_only` (the "only show films on my services" switch, now authoritative
-        over every agent's own myServices), and CAS-1097's `watch_windows` (Where & when you'll
-        watch — compute_auto_placements()'s own windowUsable/windowFollowed gate). A user with no
-        row here has never opened those screens, and compute_admission()/compute_auto_placements()
-        both read that as the engine's own permissive default, not as "answered empty"."""
+        """user_id -> {sub_services, store_services, taste, services_only, watch_windows, view}
+        (CAS-825/CAS-853/CAS-1097/CAS-1343): the account facts the real engine reads beyond an
+        agent's own criteria — CAS-211's services (the my-services scope's own comparison set),
+        CAS-146's taste baseline (only `.langs` survives there today, see app_template.html's
+        passesTasteBase), CAS-853's `services_only` (the "only show films on my services" switch,
+        now authoritative over every agent's own myServices), CAS-1097's `watch_windows` (Where &
+        when you'll watch — compute_auto_placements()'s own windowUsable/windowFollowed gate), and
+        CAS-1343's `view` (CAS-1220's per-account view-state jsonb, read here only for
+        `view.moods[*].in` — a v2 mood's hand-picked films, see hand_picked_pairs()). A user with no
+        row here has never opened those screens, and compute_admission()/compute_auto_placements()/
+        hand_picked_pairs() all read that as the engine's own permissive default, not as "answered
+        empty"."""
         rows = self._get(
-            "/user_prefs?select=user_id,sub_services,store_services,taste,services_only,watch_windows"
+            "/user_prefs?select=user_id,sub_services,store_services,taste,services_only,watch_windows,view"
             "&order=user_id.asc"
         )
         return {str(r.get("user_id")): r for r in rows if r.get("user_id")}
