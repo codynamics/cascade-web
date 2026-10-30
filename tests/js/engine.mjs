@@ -298,7 +298,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // breakdown), barAdvice/topPct (the agent's own raise/lower suggestion and share-of-catalogue line),
   // and oneAgentAlerts (the per-style alert switch CAS-1343's monitor gating calls) — exported so a test
   // can drive each directly against a fixture criteria object, the same convention youScore above uses.
-  oneScore, oneScoreParts, barAdvice, oneTopPct, oneAgentAlerts,
+  // oneComboAdj (the per-combo learned number, with no override applied) is exported alongside them so a
+  // CAS-1340 test can pin a fixture's learned value directly rather than only through oneScoreParts' blend.
+  oneScore, oneScoreParts, barAdvice, oneTopPct, oneAgentAlerts, oneComboAdj, mainOtherCombos,
   // CAS-1339: oneAgentCriteria is the account's one v2 agent lookup barAdvice/oneScore/oneScoreParts
   // already fall back to — exported directly so a test can assert the v2/non-v2 gate itself.
   oneAgentCriteria,
@@ -321,6 +323,23 @@ if(typeof window.CascadeAuth === "undefined"){
   oaApplySuggestion: (style, to) => window.oaApplySuggestion(style, to),
   oaDismissSuggestion: (style) => window.oaDismissSuggestion(style),
   oaToggleAlert: (style, win) => window.oaToggleAlert(style, win),
+  // CAS-1340: Score adjustments section — the pure building blocks (combo enumeration/sort, bar/value/row
+  // HTML, the nav-dot question) exported directly, the wire mutators window-assigned, the same two
+  // conventions CAS-1339's own exports just above use. verdictAt is exposed by reference (same convention
+  // the watched Set uses) so a fixture can seed deterministic "verdict newer than seenAdjAt" timestamps
+  // without waiting on real wall-clock gaps between two Date.now() calls.
+  oaComboStats, oaComboSort, oaComboDirection, oaComboMag, oaAnyAdjusted, oaComboFilms, oaComboAdjustTitles,
+  oaFmtPoints, oaTrackPct, oaComboBarHTML, oaComboValueHTML, oaOverrideLeftHTML, oaComboWasLineHTML,
+  oaComboRowHTML, oaAdjustedBadgeHTML, oaAdjustSectionHTML, updateAgentNavDot,
+  verdictAt,
+  get oaShowAllAdj(){ return oaShowAllAdj; },
+  get oaComboFilmsOpen(){ return oaComboFilmsOpen; },
+  oaToggleComboFilms: (key) => window.oaToggleComboFilms(key),
+  oaToggleShowAllAdj: () => window.oaToggleShowAllAdj(),
+  oaUseLearned: (key) => window.oaUseLearned(key),
+  oaMarkSeenAdjusted: (style) => window.oaMarkSeenAdjusted(style),
+  oaComboOnDrag: (input) => window.oaComboOnDrag(input),
+  oaComboOnRelease: (input) => window.oaComboOnRelease(input),
   // CAS-1289: renderStyleMapSection is the Style map card's own render, and tasteSelPrimary/tasteSelOther
   // (module-level lets, same reassignment pattern as watchTab above) are the cell it's currently showing
   // detail for -- exported through getters/setters so a test can seed a stale selection (left over from a

@@ -285,6 +285,10 @@
   .modechip.fd.active{background:linear-gradient(135deg,#22d3ee 0%,#0891b2 100%);border-color:#22d3ee;color:#001a1f}
   .mcbadge{position:absolute;top:-6px;right:-4px;background:var(--rt);color:#fff;font-size:10px;font-weight:800;
     min-width:16px;height:16px;border-radius:9px;display:grid;place-items:center;padding:0 4px;line-height:1}
+  /* CAS-1340: the Agent nav chip's own gold dot — lit while any style has a combo adjusted since the
+     account's v2 agent last had its Score adjustments section marked seen (updateAgentNavDot). */
+  .modechip.oa-adjusted::after{content:"";position:absolute;top:-2px;right:-2px;width:8px;height:8px;
+    border-radius:50%;background:var(--gold);box-shadow:0 0 0 2px var(--panel2,#0b1020)}
   /* CAS-538: two label strings per chip, one shown at a time — .mclabel-short only appears below the
      460px breakpoint above, where "Find"/"Watch" fit but "Agents"/"Your Movies" don't. */
   .mclabel-short{display:none}
@@ -3223,6 +3227,70 @@
   .oachip.on{border-color:var(--wc);background:color-mix(in srgb, var(--wc) 20%, transparent);color:var(--ink)}
   .oachip.on .oachipdot{background:var(--wc)}
 
+  /* ---- CAS-1340: Score adjustments section (section 3 of an open style) ----------------------------------
+     Teal/orange reuse the exact literals .qone.up/.qone.down already mark a positive/negative adjustment
+     with (#5eead4/#f0a060) — there is no --teal custom property in this file, so this follows that existing
+     precedent rather than inventing a new token for the same two colours. */
+  .oacintro{font-size:12.5px;color:var(--dim);line-height:1.5;margin:6px 0 10px}
+  .oacseen{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;
+    padding:10px 12px;border-radius:10px;border:1px solid var(--gold);background:rgba(245,214,117,.08);
+    font-size:12.5px;color:var(--ink)}
+  .oacseen b{color:var(--gold)}
+  .oacseenbtn{flex:0 0 auto;background:none;border:0;color:var(--gold);font-weight:800;font-size:12.5px;
+    cursor:pointer;white-space:nowrap;padding:0}
+  .oaclist{display:flex;flex-direction:column}
+  .oacrow{padding:10px 0;border-bottom:1px solid var(--line)}
+  .oacrow:last-child{border-bottom:0}
+  .oacrow-empty .oacright{opacity:.45}
+  .oactitle{font-size:14px;font-weight:800;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .oactag{font-size:10px;font-weight:800;letter-spacing:.3px;padding:2px 8px;border-radius:10px;text-transform:uppercase}
+  .oactag.up{background:rgba(94,234,212,.18);color:#5eead4}
+  .oactag.down{background:rgba(240,160,96,.18);color:#f0a060}
+  .oacline2{display:flex;align-items:center;gap:10px;margin-top:3px}
+  .oacleft{flex:0 0 104px;font-size:12px;line-height:1.4;background:none;border:0;text-align:left;padding:0;
+    color:var(--cyan,#22d3ee);cursor:pointer}
+  .oacnoverdict{color:var(--faint);cursor:default}
+  .oacset{color:var(--faint);cursor:default;display:block}
+  .oacuse{color:var(--gold);text-decoration:underline;background:none;border:0;padding:0;font:inherit;cursor:pointer}
+  .oacright{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+  .oacombowrap{position:relative;flex:1;height:16px}
+  .oacombobar{position:absolute;inset:0;display:flex;gap:3px}
+  .oacbox{position:relative;flex:1;height:16px;border-radius:3px;border:1px solid rgba(255,255,255,.12);background:transparent}
+  .oacfill{position:absolute;top:1px;bottom:1px;border-radius:2px}
+  .oacfill.up{background:#5eead4}
+  .oacfill.down{background:#f0a060}
+  .oacfill.never{background:repeating-linear-gradient(135deg,#f0a060,#f0a060 4px,transparent 4px,transparent 8px)}
+  .oacbarline{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff}
+  .oacdash{position:absolute;top:-2px;bottom:-2px;width:0;border-left:2px dashed rgba(255,255,255,.6)}
+  .oacrange{position:relative;z-index:2;width:100%;height:16px;margin:0;cursor:pointer;
+    -webkit-appearance:none;appearance:none;background:transparent}
+  .oacrange::-webkit-slider-runnable-track{height:16px;background:transparent}
+  .oacrange::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:18px;border-radius:5px;
+    background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:grab;margin-top:-1px}
+  .oacrange::-moz-range-track{height:16px;background:transparent;border:none}
+  .oacrange::-moz-range-thumb{width:10px;height:18px;border-radius:5px;background:#fff;
+    border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:grab}
+  .oacrange:focus-visible{outline:none}
+  .oacrange:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
+  .oacrange:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
+  .oacval{flex:0 0 auto;font-size:12.5px;font-weight:800;color:var(--ink);min-width:28px;text-align:right}
+  .oacval-empty{color:var(--faint);font-weight:600}
+  .oacval-over{color:var(--gold);text-decoration:underline}
+  .oacwas{font-size:11.5px;margin:4px 0 0;line-height:1.4}
+  .oacwas.up{color:#5eead4}
+  .oacwas.down{color:#f0a060}
+  .oacchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .oacchip{font-size:11px;font-weight:700;padding:4px 9px;border-radius:12px;background:var(--panel2);
+    border:1px solid var(--line)}
+  .oacchip.up{color:#5eead4;border-color:rgba(94,234,212,.4)}
+  .oacchip.down{color:#f0a060;border-color:rgba(240,160,96,.4)}
+  .oacshowall{display:block;margin:8px 0 0;background:none;border:0;color:var(--accent);font-size:12.5px;
+    font-weight:800;cursor:pointer;padding:0}
+  .oacfoot{font-size:11px;color:var(--faint);line-height:1.5;margin:12px 0 0}
+  .oaadjup,.oaadjdown{font-style:normal;font-weight:800;font-size:11px;margin-left:6px}
+  .oaadjup{color:#5eead4}
+  .oaadjdown{color:#f0a060}
+
   /* ---- CAS-775: Occasions screen — same .ucard/.urow row language as Account, plus rename/delete
      affordances no other .urow row needs (an Occasion is a thing you can rename or remove yourself). ---- */
   .listact{flex:0 0 auto;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);
@@ -5461,6 +5529,14 @@ const wowed = new Set();
 // CAS-349: and a SIXTH, between Watch Again and So-so — "I enjoyed it" without it being one you'd go back to.
 // Same pattern as `wowed`/`indifferent`: rides alongside `watched`.
 const enjoyed = new Set();
+// CAS-1340: when each film's verdict was last (re)written — id -> ms. Session-derived bookkeeping only,
+// never persisted on its own: seeded from each account-sync row's own updated_at (applyFilmRows, below) and
+// refreshed by every local setOpinion. The one consumer is the Score adjustments section's "after your
+// verdict(s) on <titles>" line, which lists a combo's films whose verdict is newer than the v2 agent's own
+// seenAdjAt for that combo — if a film's timestamp was never captured (e.g. a verdict predating this ticket
+// that hasn't round-tripped the server yet), it simply never qualifies as "newer", which degrades to no
+// titles shown rather than a wrong one.
+const verdictAt = new Map();
 const isWow      = id => watched.has(id) && wowed.has(id) && !disliked.has(id) && !indifferent.has(id);
 const isEnjoyed  = id => watched.has(id) && enjoyed.has(id) && !wowed.has(id) && !disliked.has(id) && !indifferent.has(id);
 const isDisliked = id => watched.has(id) && disliked.has(id);
@@ -19625,8 +19701,8 @@ function oaAlertsHTML(c, style){
       </button>`;
   }).join("")}</div>`;
 }
-// Section 1 (MOVIE MINIMUM SCORE) + section 2 (FILM ALERTS) for the one open style. Section 3 (SCORE
-// ADJUSTMENTS) is CAS-1340, a separate ticket — deliberately not built here.
+// Section 1 (MOVIE MINIMUM SCORE) + section 2 (FILM ALERTS) for the one open style, then CAS-1340's own
+// section 3 (SCORE ADJUSTMENTS, oaAdjustSectionHTML further down this file).
 function oaOpenBodyHTML(c, style){
   const bar=oaBar(c, style);
   const top = bar==null ? 0 : oneTopPct(style, bar);
@@ -19649,6 +19725,7 @@ function oaOpenBodyHTML(c, style){
       ${oaSuggestionHTML(style)}
       <div class="oasechdr">FILM ALERTS</div>
       ${oaAlertsHTML(c, style)}
+      ${oaAdjustSectionHTML(c, style)}
     </div>`;
 }
 function oaRowHTML(c, style, filmCount){
@@ -19664,7 +19741,7 @@ function oaRowHTML(c, style, filmCount){
     <button type="button" class="oarowhead" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
       <span class="oarowleft">
         <span class="oastyname">${esc(name)}${oaAlertDotsHTML(c, style)}</span>
-        <span class="oarowfilms">${filmsLine}</span>
+        <span class="oarowfilms">${filmsLine}${oaAdjustedBadgeHTML(c, style)}</span>
       </span>
       ${strip}
       <span class="oachev" aria-hidden="true">${open?"▴":"▾"}</span>
@@ -19689,6 +19766,9 @@ window.oaToggleStyle=(style)=>{
   const c=oneAgentCriteria(); if(!c) return;
   if(oaOpenStyle===style){ oaOpenStyle=null; oaOrderSnapshot=null; }
   else { oaOrderSnapshot=oaComputeOrder(c); oaOpenStyle=style; }
+  // CAS-1340: section 3's own "Show all"/open-film-chips state is per open style, not per account — start
+  // fresh every time a style opens (or closes), the same way oaOrderSnapshot does above.
+  oaShowAllAdj=false; oaComboFilmsOpen.clear();
   renderAgentsScreen();
 };
 // Live drag feedback (oninput) — redraws the slider's own boxes/value/description text in place, without a
@@ -19750,6 +19830,250 @@ window.oaToggleAlert=(style,win)=>{
   st.al=st.al||{};
   st.al[win]=!st.al[win];
   saveCascades();
+  renderAgentsScreen();
+};
+
+// ================= CAS-1340: Score adjustments section (v2 accounts) =======================================
+// Section 3 of an open style — one row per OTHER genre that appears anywhere in the catalogue on a film
+// whose MAIN style is this one (not just the ones you've judged — a combo with zero verdicts still gets an
+// unlit row), showing CAS-1337's learned comboAdj (oneComboAdj) alongside any hand override (c.combo[key]),
+// and flagging a combo "adjusted since you last looked" by comparing it to c.seenAdj. Adds no new admission
+// logic of its own — matchesCriteriaOneAgent's own "never" gate (CAS-1337) already covers an override saved
+// here, and oneScorePartsFor's own override blend already covers a numeric one.
+let oaShowAllAdj = false;             // "Show all <n>" expansion — one open style at a time, reset on open/close
+const oaComboFilmsOpen = new Set();   // which combo rows (by key) have their liked/not film chips open
+
+function oaFmtPoints(p){ return p>0 ? `+${p}` : p<0 ? `−${Math.abs(p)}` : "±0"; }
+// The SAME value->position mapping section 1's own native range input uses (min 50, max 100) — every mark
+// section 3 draws (the style's own bar line, a combo's value, an override/was dashed mark) is placed with
+// this one formula, so it always lines up under section 1's thumb at the same value (within rounding).
+function oaTrackPct(v){ return Math.max(0, Math.min(100, (v-50)/50*100)); }
+// Every (style, other) combo that appears in the catalogue, with its learned/override points and verdict/
+// film counts — the row set section 3 draws from. One MOVIES pass (same shape as oaFilmCounts above).
+function oaComboStats(c, style){
+  const P = oneAgentProfile();
+  const combo = (c && c.combo) || {};
+  const seenAdj = (c && c.seenAdj) || {};
+  const filmCounts = {};
+  MOVIES.forEach(m=>{
+    const {main, keys} = mainOtherCombos(m);
+    if(main!==style) return;
+    keys.forEach(({key})=>{ filmCounts[key]=(filmCounts[key]||0)+1; });
+  });
+  return Object.keys(filmCounts).map(key=>{
+    const other = key.slice(style.length+1);
+    const pr = P.pairs[key];
+    const n = pr ? pr.n : 0;
+    const learned = oneComboAdj(key);
+    const ov = combo[key];
+    const never = ov==="never";
+    const overridden = typeof ov==="number";
+    const points = overridden ? ov : learned;
+    const seen = typeof seenAdj[key]==="number" ? seenAdj[key] : 0;
+    const adjusted = !overridden && !never && Math.abs(learned-seen)>=2;
+    return {key, other, n, filmCount:filmCounts[key], learned, override:ov, overridden, never, points, adjusted, seen};
+  });
+}
+// Order: combos adjusted since last looked first, then by |points| descending, then by film count — a
+// "never" row's magnitude is treated as -1 (below every real |points|, including 0) so it still sorts
+// ahead of nothing at all.
+function oaComboMag(r){ return r.never ? -1 : Math.abs(r.points); }
+function oaComboSort(a,b){
+  if(a.adjusted!==b.adjusted) return a.adjusted ? -1 : 1;
+  const am=oaComboMag(a), bm=oaComboMag(b);
+  if(am!==bm) return bm-am;
+  return b.filmCount-a.filmCount;
+}
+function oaComboDirection(r){ return (r.learned-r.seen)>=0 ? "up" : "down"; }
+// Any style with an adjusted combo, account-wide — the Agent nav dot's one question. Deliberately NOT
+// memoised against renderOneAgentScreen's own pass: this is also called off the Watch screen (every verdict,
+// via repaintAfterOpinion), where no Agent-screen render has run yet to prime a cache.
+function oaAnyAdjusted(c){ return ALL_GENRES.some(style => oaComboStats(c, style).some(r=>r.adjusted)); }
+// The films behind one combo — every film you've judged (watched or blocked, same `ids` oneAgentProfile
+// itself builds from) whose mainOtherCombos keys include this exact key.
+function oaComboFilms(key){
+  const ids = new Set(watched); blocked.forEach(id=>ids.add(id));
+  const out = [];
+  ids.forEach(id=>{
+    const kind = opinionOf(id); if(!kind) return;
+    const m = MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
+    if(!mainOtherCombos(m).keys.some(k=>k.key===key)) return;
+    out.push({id, title:m.title, kind, good: TASTE_WEIGHTS[kind]>0, at: verdictAt.get(id)||0});
+  });
+  return out;
+}
+// Titles for the "<was> -> <now> after your verdict(s) on <titles>" line: this combo's judged films whose
+// verdictAt is newer than the v2 agent's own seenAdjAt for this key (c.seenAdjAt, written alongside
+// c.seenAdj by oaMarkSeenAdjusted below) — the ticket's own fallback wording ("verdicts newer than the last
+// seenAdj write") for "whose verdicts were saved after seenAdj was last written". A film whose verdictAt was
+// never captured (see the verdictAt comment, above the Set it backs) simply never qualifies.
+function oaComboAdjustTitles(c, key){
+  const seenAt = ((c && c.seenAdjAt) || {})[key] || 0;
+  return oaComboFilms(key).filter(f=>f.at>seenAt).sort((a,b)=>b.at-a.at).map(f=>f.title);
+}
+// The bar: five faint outline boxes (same brackets/colours as oaBoxesHTML, so the row lines up with section
+// 1's own strip), the style's own bar as a white 2px line, a fill from that line to bar+points (teal right /
+// orange left), and — for an override or an adjusted combo — a dashed mark at the learned or "was" position.
+// A zero-verdict, non-overridden combo draws only the faint boxes (greyed out by its row's own CSS class).
+function oaComboBarHTML(c, style, r){
+  const bar = oaBar(c, style);
+  const boxesHTML = ONE_AGENT_SCORE_BRACKETS.map(b=>`<i class="oacbox" style="--bc:${b.color}"></i>`).join("");
+  if(bar==null || (r.n===0 && !r.overridden && !r.never)){
+    return `<span class="oacombowrap oacombo-empty"><span class="oacombobar">${boxesHTML}</span></span>`;
+  }
+  const barPct = oaTrackPct(bar);
+  const valuePos = r.never ? 49 : bar+r.points;
+  const valuePct = oaTrackPct(valuePos);
+  const lo = Math.min(barPct,valuePct), hi = Math.max(barPct,valuePct);
+  const fillHTML = r.never
+    ? `<i class="oacfill down never" style="left:0%;width:${barPct}%"></i>`
+    : `<i class="oacfill ${r.points>=0?"up":"down"}" style="left:${lo}%;width:${hi-lo}%"></i>`;
+  let marks = `<i class="oacbarline" style="left:${barPct}%"></i>`;
+  if(r.overridden || r.never) marks += `<i class="oacdash" style="left:${oaTrackPct(bar+r.learned)}%"></i>`;
+  else if(r.adjusted) marks += `<i class="oacdash" style="left:${oaTrackPct(bar+r.seen)}%"></i>`;
+  const inputVal = Math.max(49, Math.min(100, Math.round(r.never ? 49 : bar+r.points)));
+  const rangeHTML = `<input type="range" class="oacrange" min="49" max="100" step="1" value="${inputVal}"
+      data-style="${escA(style)}" data-key="${escA(r.key)}"
+      oninput="oaComboOnDrag(this)" onchange="oaComboOnRelease(this)"
+      aria-label="${escA(style)}, ${escA(r.other)} score adjustment">`;
+  return `<span class="oacombowrap${r.overridden||r.never?" oacoverridden":""}">
+      <span class="oacombobar">${boxesHTML}${fillHTML}${marks}</span>
+      ${rangeHTML}
+    </span>`;
+}
+function oaComboValueHTML(r){
+  if(r.n===0 && !r.overridden && !r.never) return `<span class="oacval oacval-empty">—</span>`;
+  const text = r.never ? "Never" : oaFmtPoints(r.points);
+  return `<span class="oacval${r.overridden||r.never?" oacval-over":""}">${text}</span>`;
+}
+// Left column (104px) of an overridden (or "never") row — replaces the liked/not link entirely.
+function oaOverrideLeftHTML(r){
+  const learnedText = oaFmtPoints(r.learned);
+  const useLink = `<button type="button" class="oaclink oacuse" onclick="oaUseLearned('${escA(r.key)}')">use ${learnedText}</button>`;
+  if(r.never || Math.abs(r.learned-r.override)>=5){
+    return `<span class="oacleft oacset">Set by you · your verdicts say ${learnedText} · ${useLink}</span>`;
+  }
+  return `<span class="oacleft oacset">Set by you · <button type="button" class="oaclink oacuse" onclick="oaUseLearned('${escA(r.key)}')">let the agent decide</button></span>`;
+}
+function oaComboWasLineHTML(c, r){
+  const titles = oaComboAdjustTitles(c, r.key);
+  const titleTxt = titles.length ? ` after your verdict${titles.length===1?"":"s"} on ${titles.map(esc).join(", ")}` : "";
+  return `<p class="oacwas ${oaComboDirection(r)}">${oaFmtPoints(r.seen)} → ${oaFmtPoints(r.learned)}${titleTxt}</p>`;
+}
+function oaComboRowHTML(c, style, r){
+  const tagHTML = r.adjusted
+    ? `<span class="oactag ${oaComboDirection(r)}">${oaComboDirection(r)==="up"?"▲":"▼"} ADJUSTED</span>` : "";
+  const films = (r.n>0 || r.overridden || r.never) ? oaComboFilms(r.key) : [];
+  const liked = films.filter(f=>f.good).length, notN = films.length-liked;
+  const leftHTML = (r.overridden || r.never) ? oaOverrideLeftHTML(r)
+    : (r.n===0 ? `<span class="oacleft oacnoverdict">no verdicts yet</span>`
+       : `<button type="button" class="oacleft oaclink" onclick="oaToggleComboFilms('${escA(r.key)}')">${liked} liked · ${notN} not <span aria-hidden="true">›</span></button>`);
+  const rowEmpty = r.n===0 && !r.overridden && !r.never;
+  const wasLine = r.adjusted ? oaComboWasLineHTML(c, r) : "";
+  const chipsOpen = oaComboFilmsOpen.has(r.key);
+  const chipsHTML = chipsOpen ? `<div class="oacchips">${films.map(f=>
+      `<span class="oacchip ${f.good?"up":"down"}">${esc(f.title)} · ${esc((OPINIONS.find(o=>o.key===f.kind)||{}).lbl||f.kind)}</span>`).join("")}</div>` : "";
+  return `<div class="oacrow${rowEmpty?" oacrow-empty":""}" data-key="${escA(r.key)}">
+      <div class="oactitle">${esc(style)}, ${esc(r.other)}${tagHTML}</div>
+      <div class="oacline2">${leftHTML}
+        <span class="oacright">${oaComboBarHTML(c, style, r)}${oaComboValueHTML(r)}</span>
+      </div>
+      ${wasLine}
+      ${chipsHTML}
+    </div>`;
+}
+// The collapsed row's own "<n> films ▲<up> ▼<down>" badge — counts THIS style's adjusted combos, whether or
+// not the style is currently open.
+function oaAdjustedBadgeHTML(c, style){
+  const rows = oaComboStats(c, style).filter(r=>r.adjusted);
+  if(!rows.length) return "";
+  const up = rows.filter(r=>oaComboDirection(r)==="up").length, down = rows.length-up;
+  return (up?`<i class="oaadjup">▲${up}</i>`:"") + (down?`<i class="oaadjdown">▼${down}</i>`:"");
+}
+function oaAdjustSectionHTML(c, style){
+  const name = oneAgentShortName(style);
+  const bar = oaBar(c, style);
+  if(bar==null){
+    return `<div class="oasechdr">SCORE ADJUSTMENTS</div>
+      <p class="oacintro">Turn ${esc(name)} on (set a minimum score, above) to see its score adjustments.</p>`;
+  }
+  const rows = oaComboStats(c, style).sort(oaComboSort);
+  const adjustedN = rows.filter(r=>r.adjusted).length;
+  const shown = oaShowAllAdj ? rows : rows.slice(0,8);
+  const seenBox = adjustedN ? `<div class="oacseen">
+      <span><b>${adjustedN}</b> score${adjustedN===1?"":"s"} adjusted since you last looked</span>
+      <button type="button" class="oacseenbtn" onclick="oaMarkSeenAdjusted('${escA(style)}')">Mark as seen</button>
+    </div>` : "";
+  const showAllHTML = (!oaShowAllAdj && rows.length>8)
+    ? `<button type="button" class="oacshowall" onclick="oaToggleShowAllAdj()">Show all ${rows.length}</button>` : "";
+  return `<div class="oasechdr">SCORE ADJUSTMENTS</div>
+    <p class="oacintro">Your agent is automatically adjusting movie scores, up or down, for films that combine ${esc(name)} with these styles, based on your verdicts on films you've watched. The adjusted score is the one you see in Watch. Tap a row to see the films behind it.</p>
+    ${seenBox}
+    <div class="oaclist">${shown.map(r=>oaComboRowHTML(c, style, r)).join("")}</div>
+    ${showAllHTML}
+    <p class="oacfoot">The white line is ${esc(name)}'s ${bar}+. Drag a row to set it yourself; all the way left means never list it. Your agent keeps learning underneath and tells you if your verdicts start to disagree.</p>`;
+}
+// Gold dot on the Agent nav chip — pure DOM sync, called from both the full render() and the lean verdict-
+// repaint path (repaintAfterOpinion's fastPatchFindRow branch skips a full render()).
+function updateAgentNavDot(){
+  const btn = typeof $==="function" ? $("agentsBtn") : null;
+  if(!btn || !btn.classList) return;
+  const c = oneAgentCriteria();
+  btn.classList.toggle("oa-adjusted", !!(c && oaAnyAdjusted(c)));
+}
+window.oaToggleComboFilms=(key)=>{
+  if(oaComboFilmsOpen.has(key)) oaComboFilmsOpen.delete(key); else oaComboFilmsOpen.add(key);
+  renderAgentsScreen();
+};
+window.oaToggleShowAllAdj=()=>{ oaShowAllAdj=true; renderAgentsScreen(); };
+// "use <learned>" / "let the agent decide" — both clear the override and let CAS-1337's own comboAdj drive
+// the combo again.
+window.oaUseLearned=(key)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  if(c.combo) delete c.combo[key];
+  saveCascades();
+  if(typeof render==="function") render();
+  renderAgentsScreen();
+};
+// "Mark as seen" — writes c.seenAdj[k] = comboAdj(k) (the ticket's own wording) for every combo of this
+// style, plus c.seenAdjAt[k] (this ticket's own companion timestamp, see oaComboAdjustTitles above) so a
+// later adjustment's "after your verdict(s) on <titles>" line only names films newer than THIS write.
+window.oaMarkSeenAdjusted=(style)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  c.seenAdj=c.seenAdj||{}; c.seenAdjAt=c.seenAdjAt||{};
+  const now=Date.now();
+  oaComboStats(c, style).forEach(r=>{ c.seenAdj[r.key]=r.learned; c.seenAdjAt[r.key]=now; });
+  saveCascades();
+  if(typeof render==="function") render();
+  renderAgentsScreen();
+};
+// Live drag feedback (oninput) — redraws just this row's fill in place, the same convention oaOnDrag (section
+// 1) uses for its own boxes.
+window.oaComboOnDrag=(input)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  const bar=oaBar(c, input.dataset.style); if(bar==null) return;
+  const v=parseInt(input.value,10);
+  const wrap=input.closest(".oacombowrap");
+  const barEl=wrap && wrap.querySelector(".oacombobar");
+  const fill=barEl && barEl.querySelector(".oacfill");
+  if(!fill) return;
+  const barPct=oaTrackPct(bar);
+  if(v<=49){ fill.className="oacfill down never"; fill.style.left="0%"; fill.style.width=barPct+"%"; return; }
+  const valuePct=oaTrackPct(v);
+  const lo=Math.min(barPct,valuePct), hi=Math.max(barPct,valuePct);
+  fill.className="oacfill "+(v>=bar?"up":"down");
+  fill.style.left=lo+"%"; fill.style.width=(hi-lo)+"%";
+};
+// Release (onchange) — the ticket's own rule verbatim: combo[k] = value - bar; at 49, combo[k] = "never".
+window.oaComboOnRelease=(input)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  const style=input.dataset.style, key=input.dataset.key;
+  const bar=oaBar(c, style); if(bar==null) return;
+  const v=parseInt(input.value,10);
+  c.combo=c.combo||{};
+  c.combo[key] = v<=49 ? "never" : v-bar;
+  saveCascades();
+  if(typeof render==="function") render();
   renderAgentsScreen();
 };
 
@@ -22356,6 +22680,7 @@ function render(){
   // picked, all land in the Found list immediately, and none of them can clobber an override. It's cheap
   // (Cascades × titles) and it means membership has exactly one definition, evaluated in exactly one place.
   recomputeFound();
+  updateAgentNavDot();   // CAS-1340: the Agent nav chip's gold dot — cheap, and every full render is a fine time to resync it
   ensureWatchTab();   // CAS-725: keep the active tab valid before it drives rows/scope-bar below
   // CAS-1236: everything above must run even on a settled (non-navigating) pass — recomputeFound is what
   // keeps notify/found/taggedOut honest, and ensureWatchTab can itself force a navigation (a tab that just
@@ -22684,6 +23009,7 @@ function fastPatchFindRow(id){
 }
 function repaintAfterOpinion(id){
   recomputeFound();
+  updateAgentNavDot();   // CAS-1340: a verdict can move a combo's adjusted state even on the fast-patch path below
   refreshOpenFilmPageFor(id);   // CAS-1205: keep the film page's own WATCHED column/confirm panel (if open on this film) in step
   if(fastPatchFindRow(id)) return;                     // instant single-node swap
   render();                                            // fallback (off-screen cards skip layout, so cheap)
@@ -22934,6 +23260,7 @@ window.setOpinion=(id,kind)=>{
   watched.delete(id); disliked.delete(id); blocked.delete(id); indifferent.delete(id); wowed.delete(id);
   enjoyed.delete(id);
   if(on){
+    verdictAt.set(id, Date.now());   // CAS-1340: this device's own record of when this verdict was given
     if(kind==="notfor") blocked.add(id);
     else { watched.add(id);
            if(kind==="disliked") disliked.add(id);
@@ -24068,6 +24395,10 @@ function acctFetchKeepalive(init){
     watched.clear(); disliked.clear(); blocked.clear(); indifferent.clear(); wowed.clear(); enjoyed.clear();
     (rows||[]).forEach(r=>{
       const id=Number(r.movie_id); if(!isFinite(id)) return;
+      // CAS-1340: capture the row's own updated_at (when present) as this film's verdictAt — the server's
+      // record of when the verdict was last written, used by the Score adjustments section to tell which
+      // films' verdicts are newer than a combo's seenAdjAt.
+      if(r.updated_at){ const ts=Date.parse(r.updated_at); if(isFinite(ts)) verdictAt.set(id, ts); }
       if(r.status==="notfor") return blocked.add(id);
       watched.add(id);
       if(r.status==="disliked") disliked.add(id);
