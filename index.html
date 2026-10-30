@@ -140,7 +140,11 @@
      the real viewport: the splash, the reveal, the sticky header and the sticky footer all stay put.
      Verified at 360/390/430px across splash, pick-agent, get-selective, set-your-bar, taste-baseline,
      reveal and the listing — see CAS-157. */
-  :root{ --ui-scale:1.12 }
+  :root{ --ui-scale:1.12;
+    /* CAS-1163: 1 at the shipped default, shrinking as --ui-scale grows past it — a factor non-text
+       chrome (gaps/padding, never font-size: CAS-960 AC6 forbids shrinking the user's chosen text
+       size) can multiply by to give back room that zoom:var(--ui-scale) ate, without touching type. */
+    --zoomcomp:calc(1.12 / var(--ui-scale)) }
   /* CAS-188: every screen of the signup flow is capped to a phone's width and centred, the way .modal
      already is. The flow was designed in the hand; on a desktop an uncapped full-bleed screen stretches
      one column of controls across 1400px and stops reading as the same product. One token, so the cap
@@ -314,7 +318,11 @@
     .modechip .mcicon{width:15px;height:15px}
     .modechip .mclabel-short{font-size:12.5px;font-weight:700}
     .mcbadge{top:-5px;right:-3px}
-    .brandrow .updated{overflow:visible;text-overflow:clip}
+    /* CAS-1163: still no clip — the freshness line keeps its full text — but white-space:normal lets it
+       wrap onto a second line instead of overflowing when it no longer fits one (enlarged text sizes,
+       CAS-960 AC6). A no-op at the text sizes this was written for: wrapping only engages once a line
+       actually runs out of room. */
+    .brandrow .updated{overflow:visible;text-overflow:clip;white-space:normal}
   }
   /* CAS-269: the rule that hid the 📍 AU pill below 420px went with the pill itself. The header now has
      one thing on the left that can give way — the freshness line — and it ellipsises rather than pushing
@@ -1736,7 +1744,15 @@
      leaves the art visible only in two thin bands; from the top the wall reads as a wall and the copy
      still lands above the fold on a 360x640 phone. */
   .splashinner{position:relative;z-index:2;width:100%;max-width:400px;margin:0 auto;
-    padding:3vh 0 8px;padding:3dvh 0 8px;animation:splashIn .5s ease both}
+    padding:3vh 0 8px;padding:3dvh 0 8px;animation:splashIn .5s ease both;
+    display:flex;flex-direction:column;max-height:100%}
+  /* CAS-1163: at the default text size this box is shorter than .splash, so max-height never binds and
+     .splashscroll/.splashfoot take their natural (unstretched) heights — identical layout to before this
+     ticket. Only once the column genuinely can't fit (enlarged text, CAS-960 AC6) does the cap engage:
+     .splashscroll absorbs the overflow as an internal scroll, and .splashfoot (the CTA/Sign in doors)
+     stays pinned below it, inside the viewport, rather than being pushed off the bottom of the page. */
+  .splashscroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}
+  .splashfoot{flex:0 0 auto}
   /* ---- the poster wall (CAS-200) ----
      A perspective grid of real posters, blurred and dimmed, with a dark radial fade over it. Three
      separate jobs, three separate layers: the wall never touches the text's contrast (that is the fade's
@@ -3722,17 +3738,24 @@
   /* ==== WATCH TOP: TWO STAGE GROUPS, MOODS, AND A BAR THAT COLLAPSES ON SCROLL (Lee, 2026-10-10) ====
      Replaces the stage line + agent column (CAS-1223/1226) and the tools row (sort switch, search, filter).
      The selected stage and the selected mood use the same --sel-bg / --sel-bd as the selected nav item. */
-  .watchtop{display:block;margin:10px 12px 0}
-  .cascbar.rail .watchtop{margin:10px 12px 0}
-  .stgroups{display:flex;gap:8px;align-items:stretch;margin-top:10px}
-  .stgrp{min-width:0;border:1px solid var(--line);border-radius:12px;padding:5px;background:rgba(255,255,255,.025)}
+  /* CAS-1163: side margins use --zoomcomp too (see :root) — unchanged at the shipped default, shrinking
+     only once --ui-scale grows past it, for the same reason .stgroups/.stgrp/.stsegs/.stagestop below do. */
+  .watchtop{display:block;margin:10px calc(12px * var(--zoomcomp)) 0}
+  .cascbar.rail .watchtop{margin:10px calc(12px * var(--zoomcomp)) 0}
+  /* CAS-1163: gap/padding below are `* var(--zoomcomp)` — unchanged at the shipped default (1 there),
+     shrinking only once --ui-scale grows past it, to give the fixed-nowrap .stagename (CAS-1247: "Now
+     showing stays on one line at every phone width") the room zoom:var(--ui-scale) otherwise takes from
+     it before any text ever grows. */
+  .stgroups{display:flex;gap:calc(8px * var(--zoomcomp));align-items:stretch;margin-top:10px}
+  .stgrp{min-width:0;border:1px solid var(--line);border-radius:12px;padding:calc(5px * var(--zoomcomp));
+    background:rgba(255,255,255,.025)}
   .stgrplbl{font:700 9px/1 var(--font-body);letter-spacing:.9px;text-transform:uppercase;color:var(--faint);
     padding:2px 5px 6px}
-  .stsegs{display:flex;gap:4px}
+  .stsegs{display:flex;gap:calc(4px * var(--zoomcomp))}
   /* flex-basis auto, not 0: a longer name (Now showing) takes a wider button, so no name overhangs its own box */
-  .stgroups .stagestop{flex:1 1 auto;min-width:0;width:auto;height:40px;border-radius:8px;border:1px solid transparent;
+  .stgroups .stagestop{flex:1 1 auto;min-width:0;width:auto;min-height:40px;border-radius:8px;border:1px solid transparent;
     background:none;color:var(--dim);display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:4px;padding:0 5px;text-align:center}
+    gap:4px;padding:0 calc(5px * var(--zoomcomp));text-align:center}
   .stgroups .stagestop .stagename{flex:none;font:600 12px/1 var(--font-body);color:inherit;overflow:visible}
   .stgroups .stagestop .stagecount{flex:none;display:flex;align-items:center;gap:4px;font:600 11px/1 var(--font-body);
     color:var(--faint)}
@@ -3799,8 +3822,20 @@
   .mftog.on{background:var(--sel-bd)}
   .mftog.on i{left:21px}
   #watchSheet .chip.on{background:var(--sel-bg);border-color:var(--sel-bd)}
-  /* Now showing stays on one line at every phone width (fix to CAS-1247) */
-  .stgroups .stagestop .stagename{white-space:nowrap}
+  /* Now showing stays on one line at every phone width (fix to CAS-1247) — still true here: nothing below
+     changes how this looks at the default text size or any real phone width, since none of the four
+     labels need more than one line until --ui-scale pushes well past the shipped default. CAS-1163:
+     white-space:normal (not nowrap) + overflow-wrap:anywhere is the same last-resort valve as the
+     data-stage="in_cinema" override just above, for the three single-word stops that have no space to
+     break at — it only ever engages once a word genuinely has nowhere else to go. */
+  .stgroups .stagestop .stagename{white-space:normal;overflow-wrap:anywhere}
+  /* CAS-1163: "Now showing" (data-stage="in_cinema", renderWatchTop's own renamed label — the longest of
+     the four) is the one stop CAS-1247's fix above was named for; at enlarged text sizes it can still run
+     out of room even after the --zoomcomp easing above. Scoped to this one stop only, so the other three
+     (already proven to fit at every real phone width) keep the CAS-1247 guarantee unchanged — letting this
+     one wrap to two lines, with .stagestop's min-height (not height) free to grow for it, beats the name
+     bleeding past its own button's edge into its neighbour. */
+  .stgroups .stagestop[data-stage="in_cinema"] .stagename{white-space:normal}
   @media (max-width:409px){
     .stgrp{padding:4px}
     .stsegs{gap:2px}
@@ -4581,43 +4616,51 @@
   <div class="splashwall" aria-hidden="true"><div class="splashwallgrid" id="splashWall"></div></div>
   <div class="splashfade" aria-hidden="true"></div>
   <div class="splashinner splashfront">
-    <!-- CAS-152: static logo image, inline in normal document flow — no iframe, no animation, no
-         downscale, so it cannot gate first paint (CAS-137) and cannot render illegibly (CAS-131).
-         CAS-153: the haloed raster (splash-logo.webp/.png, a feathered white-background knockout) is
-         retired for Lee's approved vector. True transparency means no speckled fringe, and the strokes
-         stay crisp at any DPI. SVG needs no <picture>/PNG fallback, and at ~3.6 KB it is smaller than
-         the box it paints — width/height are the viewBox so the space is still reserved up front. -->
-    <img class="splashlogo" src="splash-logo.svg" width="586" height="382" alt="" aria-hidden="true"
-         decoding="async" loading="eager">
-    <div class="splashword">CASCADE</div>
-    <!-- CAS-257: the tagline. Directly under the wordmark, so the first thing after the name says what
-         the thing IS — the bullets below say what it does. -->
-    <div class="splashtag">Movies</div>
-    <!-- CAS-258: all five windows Cascade follows, not four — Purchase was missing, which made the strip
-         quietly untrue about what the app tracks. Split 2 / 3: before it is home, then home. -->
-    <div class="splashloz">
-      <div class="splashlozrow">
-        <span class="splashpill"><span class="splashdot" style="background:var(--upcoming)"></span>Upcoming</span>
-        <span class="splashpill"><span class="splashdot" style="background:var(--amber)"></span>In cinemas</span>
+    <!-- CAS-1163: the scrollable part of the column. Split from the CTA/Sign in doors below (now
+         .splashfoot) so that at enlarged text sizes the copy can scroll internally while the doors stay
+         on screen (CAS-960 AC6) — at the default text size .splashinner never hits its max-height cap,
+         so this wrapper has no effect on layout at all. -->
+    <div class="splashscroll" tabindex="0">
+      <!-- CAS-152: static logo image, inline in normal document flow — no iframe, no animation, no
+           downscale, so it cannot gate first paint (CAS-137) and cannot render illegibly (CAS-131).
+           CAS-153: the haloed raster (splash-logo.webp/.png, a feathered white-background knockout) is
+           retired for Lee's approved vector. True transparency means no speckled fringe, and the strokes
+           stay crisp at any DPI. SVG needs no <picture>/PNG fallback, and at ~3.6 KB it is smaller than
+           the box it paints — width/height are the viewBox so the space is still reserved up front. -->
+      <img class="splashlogo" src="splash-logo.svg" width="586" height="382" alt="" aria-hidden="true"
+           decoding="async" loading="eager">
+      <div class="splashword">CASCADE</div>
+      <!-- CAS-257: the tagline. Directly under the wordmark, so the first thing after the name says what
+           the thing IS — the bullets below say what it does. -->
+      <div class="splashtag">Movies</div>
+      <!-- CAS-258: all five windows Cascade follows, not four — Purchase was missing, which made the strip
+           quietly untrue about what the app tracks. Split 2 / 3: before it is home, then home. -->
+      <div class="splashloz">
+        <div class="splashlozrow">
+          <span class="splashpill"><span class="splashdot" style="background:var(--upcoming)"></span>Upcoming</span>
+          <span class="splashpill"><span class="splashdot" style="background:var(--amber)"></span>In cinemas</span>
+        </div>
+        <div class="splashlozrow">
+          <span class="splashpill"><span class="splashdot" style="background:var(--purple)"></span>Premium</span>
+          <span class="splashpill"><span class="splashdot" style="background:var(--blue)"></span>Rental</span>
+          <span class="splashpill"><span class="splashdot" style="background:var(--green)"></span>Streaming</span>
+        </div>
       </div>
-      <div class="splashlozrow">
-        <span class="splashpill"><span class="splashdot" style="background:var(--purple)"></span>Premium</span>
-        <span class="splashpill"><span class="splashdot" style="background:var(--blue)"></span>Rental</span>
-        <span class="splashpill"><span class="splashdot" style="background:var(--green)"></span>Streaming</span>
+      <div class="splashbullets">
+        <div class="splashb"><svg class="splashtick" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#22D3EE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>find movies you'll love</span></div>
+        <div class="splashb"><svg class="splashtick" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#22D3EE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>always know what to watch on cinema, rental and streaming</span></div>
+        <div class="splashb"><svg class="splashtick" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#22D3EE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>always have the viewing inside track</span></div>
       </div>
-    </div>
-    <div class="splashbullets">
-      <div class="splashb"><svg class="splashtick" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#22D3EE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>find movies you'll love</span></div>
-      <div class="splashb"><svg class="splashtick" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#22D3EE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>always know what to watch on cinema, rental and streaming</span></div>
-      <div class="splashb"><svg class="splashtick" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#22D3EE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>always have the viewing inside track</span></div>
     </div>
     <!-- CAS-186: two doors, not one. New here → the setup flow. Been here → straight to your own
          Cascades, without walking through a setup you already did. The primary is Sign up because a
          first visit is the common case; Log in is quiet but never hidden. -->
     <!-- CAS-259: just "Sign up". The bullets above and the tagline already say what you get; the button
          only has to name the door. It also puts the two doors in the same grammar — Sign up / Log in. -->
-    <button class="splashcta" id="splashCta" type="button">Sign up</button>
-    <button class="splashlogin" id="splashLogin" type="button">Sign in</button>
+    <div class="splashfoot">
+      <button class="splashcta" id="splashCta" type="button">Sign up</button>
+      <button class="splashlogin" id="splashLogin" type="button">Sign in</button>
+    </div>
   </div>
 </div>
 

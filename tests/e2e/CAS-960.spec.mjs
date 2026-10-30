@@ -205,8 +205,6 @@ test("Dynamic Type: Watch, the film card, Agents and Moving do not clip (CAS-960
 // animationName." emulateMedia's reduced-motion covers the whole browsing context, same as a real device
 // setting — no per-element opt-in needed on this app's side beyond the @media queries it already ships.
 test.describe("reduced motion (CAS-960 AC7)", () => {
-  test.use({ reducedMotion: "reduce" });
-
   async function assertNoAnimation(page, surfaceName) {
     const animating = await page.evaluate(() => {
       const bad = [];
@@ -226,6 +224,9 @@ test.describe("reduced motion (CAS-960 AC7)", () => {
   }
 
   test("onboarding honours reduced motion", async ({ page }) => {
+    // CAS-1163: test.use({ reducedMotion }) does not make matchMedia("(prefers-reduced-motion: reduce)")
+    // report true in this environment — page.emulateMedia does, same as CAS-909/cas752 already use.
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await freshApp(page);
     await expect(page.locator("#splashCta")).toBeVisible();
     await assertNoAnimation(page, "onboarding — splash");
@@ -235,6 +236,7 @@ test.describe("reduced motion (CAS-960 AC7)", () => {
   });
 
   test("Watch, the film card, Agents and Moving honour reduced motion", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await reachListing(page);
     await assertNoAnimation(page, "Watch listing");
 
