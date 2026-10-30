@@ -294,6 +294,11 @@ if(typeof window.CascadeAuth === "undefined"){
   // You-v3 arithmetic behind tasteMatch, exported so a test can assert it directly against the ticket's own
   // worked fixtures.
   tasteProfile, tasteMatch, youScore, matchBadgeHTML, publicLozengeHTML, tasteStyleMapData, creditsHTML,
+  // CAS-1337: the v2 "one agent" engine — oneScore/oneScoreParts (single score + its per-combo
+  // breakdown), barAdvice/topPct (the agent's own raise/lower suggestion and share-of-catalogue line),
+  // and oneAgentAlerts (the per-style alert switch CAS-1343's monitor gating calls) — exported so a test
+  // can drive each directly against a fixture criteria object, the same convention youScore above uses.
+  oneScore, oneScoreParts, barAdvice, oneTopPct, oneAgentAlerts,
   // CAS-1289: renderStyleMapSection is the Style map card's own render, and tasteSelPrimary/tasteSelOther
   // (module-level lets, same reassignment pattern as watchTab above) are the cell it's currently showing
   // detail for -- exported through getters/setters so a test can seed a stale selection (left over from a

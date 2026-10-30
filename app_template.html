@@ -9615,6 +9615,7 @@ function advanceClock(){
   agMetricsCache.clear();   // CAS-867: "last find Nd ago" and the recent-find count move with the clock alone
   _tasteProfileCache = null;   // CAS-1251: the learned score range reads cascadeScore(m), which moves with the clock too
   _tasteMatchCache.clear();    // CAS-1264: a stale per-film You value would otherwise outlive this invalidation
+  _oneAgentProfileCache = null;   // CAS-1337: the v2 main-keyed pair baseline reads cascadeScore(m) too
   return true;
 }
 async function pollCatalogue(){
@@ -11676,6 +11677,182 @@ function tasteMatchCached(m){
   return t;
 }
 
+// ---- One agent (CAS-1337): v2 agent model, single score and admission engine ----------------------------
+// Approved by Lee, 30 Oct 2026 — every account will eventually have exactly ONE agent, gated by
+// criteria.v===2 (see matchesCriteria's own v2 branch, below passesTasteBase). Nothing here runs for a
+// non-v2 account. oneAgentCriteria() is the one place that reads "the" v2 agent off `cascades` for the
+// exported single-argument conveniences (oneScore/oneScoreParts/barAdvice/oneAgentAlerts), which is exactly
+// right once an account can only ever hold one — admission itself (matchesCriteriaOneAgent, further down)
+// never uses it, since it already has the real criteria object matchesCriteria was called with.
+function oneAgentCriteria(){ return cascades.find(c => c && c.v === 2) || null; }
+// A film's MAIN style (TMDB's lead genre, same convention matchesCriteria's own CAS-1318 gate uses) paired
+// with each of its OTHER styles — never the reverse order, never an other|other combination. This is the
+// one change You v3's pair-keying makes for a v2 agent (section 2 of the ticket).
+function mainOtherCombos(m){
+  const G = [...new Set(m.genres||[])];
+  const main = G[0];
+  if(main===undefined) return {main:undefined, keys:[]};
+  return {main, keys: G.slice(1).map(other => ({other, key: main+"|"+other}))};
+}
+// The account-wide main-keyed pair stats and baseline — every v2 account's one source of learned taste,
+// built the same two-stage way tasteProfile() builds its own (a style's lean from every appearance, then
+// each pair smoothed towards the AVERAGE of its two styles' leans), except pairs are only ever added for a
+// film's (main, other) combination. Cleared at the exact same points _tasteProfileCache is (see the five
+// `_tasteProfileCache = null` call sites) since it is built from the same verdict set.
+let _oneAgentProfileCache = null;
+function oneAgentProfile(){
+  if(_oneAgentProfileCache) return _oneAgentProfileCache;
+  const T = tasteProfile();
+  const ids = new Set(watched); blocked.forEach(id => ids.add(id));
+  const pairs = {};
+  ids.forEach(id => {
+    const kind = opinionOf(id); if(!kind) return;
+    const m = MOVIES.find(x => x.tmdb_id === id);
+    if(!m || !(m.genres && m.genres.length)) return;
+    const {main, keys} = mainOtherCombos(m);
+    if(main===undefined) return;
+    keys.forEach(({other, key}) => {
+      const pr = pairs[key] || (pairs[key] = {primary:main, other, sum:0, n:0});
+      pr.sum += TASTE_WEIGHTS[kind]; pr.n += 1;
+    });
+  });
+  let baseSum=0, baseN=0;
+  Object.values(pairs).forEach(pr => {
+    const sMain=(T.styles[pr.primary]||{lean:0}).lean, sOther=(T.styles[pr.other]||{lean:0}).lean;
+    pr.lean = (pr.sum + TASTE_K*((sMain+sOther)/2)) / (pr.n + TASTE_K);
+    baseSum += pr.lean*pr.n; baseN += pr.n;
+  });
+  const profile = {pairs, baseline: baseN ? baseSum/baseN : 0};
+  _oneAgentProfileCache = profile;
+  return profile;
+}
+// comboAdj(k): the learned number the Agent screen shows for a combination with no override — today's
+// You v3 scaling (youScore's own asymmetric 45x-down/20x-up) applied to ONE pair's lean against the
+// account's main-keyed baseline, rather than aggregated across several pairs. youScore({pub:0, ...}).adj
+// is exactly that unclamped, unrounded scaled difference, so this reuses it rather than re-deriving it.
+function oneComboAdj(key){
+  const P = oneAgentProfile();
+  const pr = P.pairs[key];
+  return Math.round(youScore({pub:0, pairs:[{sum: pr?pr.sum:0, n: pr?pr.n:0}], b:P.baseline}).adj);
+}
+// The real arithmetic behind oneScore/oneScoreParts, parameterised by the criteria object the CALLER
+// already has (matchesCriteria's v2 branch passes its own `c`; the exported single-argument wrappers
+// below fall back to oneAgentCriteria()). "never" combos are not numeric, so they are never an override —
+// matchesCriteriaOneAgent rejects those films before admission, but a direct oneScore/oneScoreParts call
+// (e.g. an already-admitted film, or a What-if the Agent screen draws) treats them exactly like an absent,
+// purely-learned combo rather than throwing.
+function oneScorePartsFor(m, c){
+  const pub = cascadeScore(m);
+  const {main, keys} = mainOtherCombos(m);
+  if(pub < 0) return {value:-1, public:pub, adj:0, parts:[]};
+  if(main===undefined || !keys.length) return {value: Math.max(1,Math.min(99,Math.round(pub))), public:pub, adj:0, parts:[]};
+  const P = oneAgentProfile();
+  const combo = (c && c.combo) || {};
+  const parts = keys.map(({other, key}) => {
+    const pr = P.pairs[key];
+    const n = pr ? pr.n : 0;
+    const ov = combo[key];
+    const overridden = typeof ov === "number";
+    return {other, points: overridden ? ov : oneComboAdj(key), n, overridden};
+  });
+  const hasOverride = parts.some(p => p.overridden);
+  let value, adj;
+  if(!hasOverride){
+    const pairs = keys.map(({key}) => { const pr=P.pairs[key]; return {sum: pr?pr.sum:0, n: pr?pr.n:0}; });
+    const ys = youScore({pub, pairs, b:P.baseline});
+    value = ys.value; adj = ys.adj;
+  } else {
+    let wsum=0, wtot=0;
+    parts.forEach(p => { const w = p.overridden ? Math.max(4,p.n) : p.n; wsum += p.points*w; wtot += w; });
+    adj = wtot ? wsum/wtot : 0;
+    value = Math.max(1, Math.min(99, Math.round(pub + adj)));
+  }
+  return {value, public:pub, adj, parts};
+}
+function oneScoreFor(m, c){ return oneScorePartsFor(m, c).value; }
+// Exported conveniences: an explicit criteria object for a direct unit-test fixture (matching the shape
+// matchesCriteria itself is called with), falling back to the account's own single v2 agent otherwise —
+// the shape every real caller (CAS-1338's score box, CAS-1339's Agent screen) actually has in hand.
+function oneScore(m, c){ return oneScoreFor(m, c || oneAgentCriteria() || {}); }
+function oneScoreParts(m, c){ return oneScorePartsFor(m, c || oneAgentCriteria() || {}); }
+// barAdvice(style): is the bar for this style due to move? Evidence is the person's own verdicts on films
+// whose MAIN style is this one, each scored with oneScore (so the advice is judged on the same number the
+// bar itself gates), using the existing verdict weights (TASTE_WEIGHTS) to call a verdict "good".
+function barAdvice(style){
+  const c = oneAgentCriteria();
+  if(!c) return null;
+  const s = (c.styles||{})[style];
+  if(!s || s.bar==null) return null;
+  if((c.dismissed||[]).includes("bar:"+style)) return null;
+  const bar = s.bar;
+  const ids = new Set(watched); blocked.forEach(id => ids.add(id));
+  const evidence = [];
+  ids.forEach(id => {
+    const kind = opinionOf(id); if(!kind) return;
+    const m = MOVIES.find(x => x.tmdb_id === id);
+    if(!m || !(m.genres && m.genres.length) || m.genres[0]!==style) return;
+    const score = oneScore(m, c);
+    if(score === -1) return;
+    evidence.push({score, good: TASTE_WEIGHTS[kind] > 0});
+  });
+  const likedShare = list => list.length ? list.filter(e=>e.good).length / list.length : 0;
+  let raise = null;
+  for(let t = bar+5; t <= 95; t += 5){
+    const lo = evidence.filter(e => e.score >= bar && e.score < t);
+    const hi = evidence.filter(e => e.score >= t);
+    if(lo.length >= 3 && likedShare(lo) <= 0.4 && hi.length >= 3 && likedShare(hi) >= 0.6) raise = {dir:"up", from:bar, to:t, lo, hi};
+  }
+  if(raise) return raise;
+  if(bar > 50){
+    const below = evidence.filter(e => e.score >= bar-15 && e.score < bar);
+    if(below.length >= 3 && likedShare(below) >= 0.75) return {dir:"down", from:bar, to:Math.max(50, bar-10), lo:below, hi:[]};
+  }
+  return null;
+}
+// oneTopPct(style, score): the share of this style's SCORED catalogue (Public ≥ 0) that clears `score` —
+// the "shows you the top N%" line barAdvice's own card reads alongside the raise/lower suggestion. Named
+// distinctly from the existing (unrelated) topPct(v) — the Mission rating-bar's own vote percentile.
+function oneTopPct(style, score){
+  let total=0, top=0;
+  MOVIES.forEach(m => {
+    if(!(m.genres && m.genres.length) || m.genres[0]!==style) return;
+    const pub = cascadeScore(m);
+    if(pub < 0) return;
+    total++;
+    if(pub >= score) top++;
+  });
+  return total ? Math.round(100*top/total) : 0;
+}
+// oneAgentAlerts(m, window): the per-style alert switch CAS-1343's monitor gating calls — the account's
+// one agent, the film's own main style, the window asked about ("cinema"/"rent"/"stream").
+function oneAgentAlerts(m, window){
+  const c = oneAgentCriteria();
+  if(!c) return false;
+  const main = (m.genres||[])[0];
+  const style = main!==undefined && (c.styles||{})[main];
+  return !!(style && style.al && style.al[window]);
+}
+// matchesCriteriaOneAgent: admission for a v2 agent (matchesCriteria's own c.v===2 branch calls this
+// directly, ahead of passesTasteBase and every v1-only gate). showable/blocked/watched/services-only are
+// the same checks and the same account-level `prefs.on` reasoning as the v1 path just below — nothing
+// about those changes for a v2 account, so this reuses the identical expressions rather than a re-derived
+// copy that could quietly drift from them.
+function matchesCriteriaOneAgent(m,c,ignoreBlocked){
+  if(c.excludeBlocked!==false && !ignoreBlocked && blocked.has(m.tmdb_id)) return false;
+  if(c.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
+  const ps=primaryStatus(m);
+  if(c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)) return false;
+  const {main, keys} = mainOtherCombos(m);
+  if(main===undefined) return false;
+  const style=(c.styles||{})[main];
+  if(!style || style.bar==null) return false;
+  const combo=c.combo||{};
+  if(keys.some(({key}) => combo[key]==="never")) return false;
+  const score=oneScoreFor(m,c);
+  if(score===-1 || score<style.bar) return false;
+  return true;
+}
+
 // ---- Your taste: the page and its card on the Agents screen (CAS-1252) ---------------------------------
 // Draws tasteProfile() (CAS-1251); stores and writes nothing. tasteSelPrimary/tasteSelOther is the style
 // map's selected square, reset to null on every open so renderStyleMapSection() re-picks the default.
@@ -12560,7 +12737,7 @@ window.showScaleInfer=id=>{ const m=MOVIES.find(x=>x.tmdb_id===id); if(m) toast(
 // one that just booted. CAS-748 reuses this same hook for _wmReleasedScoreVals rather than adding a second,
 // separate clearing mechanism. CAS-867: agMetricsCache (declared further down, with agentMetrics) reuses it
 // too — a catalogue swap can change which films an agent lists without touching that agent's own signature.
-function invalidateComputeCaches(){ _scaleInferCache.clear(); _awardRankCache.clear(); _wmReleasedScoreVals = null; agMetricsCache.clear(); _tasteProfileCache = null; _tasteMatchCache.clear(); }
+function invalidateComputeCaches(){ _scaleInferCache.clear(); _awardRankCache.clear(); _wmReleasedScoreVals = null; agMetricsCache.clear(); _tasteProfileCache = null; _tasteMatchCache.clear(); _oneAgentProfileCache = null; }
 // CAS-1268: an agent's style combination — two different styles set together to "+" (list) or "-"
 // (skip), keyed "A|B" with A<B. Returns "out" the instant any matching pair is set "-" (a skip beats
 // a list at the same level, so order of discovery never matters), "in" once every matching pair has
@@ -12587,6 +12764,10 @@ function matchesCriteria(m,c,ignoreBlocked,ignoreScoreGate){
   // to watch. This sits here rather than in passes() alone so every derived number (card counts, hub counts,
   // the reveal, Found-list membership via matchesTaste) is drawn from the same set the listing draws.
   if(!showable(m)) return false;
+  // CAS-1337: a v2 agent (criteria.v===2) runs an entirely different admission test — single score, no
+  // taste-base/age/awards/years/budget/window gates — and never falls through to anything below. Every
+  // other account is untouched: c.v is undefined for them, so this branch never taken.
+  if(c && c.v===2) return matchesCriteriaOneAgent(m,c,ignoreBlocked);
   // CAS-146: the account-level taste baseline is inherited by every agent and applied first — it is the
   // world they all search, so an agent can narrow inside it but never reach outside it.
   if(!passesTasteBase(m)) return false;
@@ -22368,6 +22549,7 @@ window.setOpinion=(id,kind)=>{
   agMetricsCache.clear();   // CAS-867: this flips taggedOut(id) for every agent that lists this film
   _tasteProfileCache = null;   // CAS-1251: the verdict just changed, so the counted set has too
   _tasteMatchCache.clear();    // CAS-1264: same reason — a changed verdict can move any film's You value
+  _oneAgentProfileCache = null;   // CAS-1337: same reason — the v2 main-keyed pair stats just changed too
   const was=opinionOf(id), on=was!==kind, wasFound=found.has(id);
   // Read the film's freshness BEFORE the answer changes it, so the 🆕 chip on the stub doesn't flicker off
   // under the tap. (The ORDER can't move at all now — availability section, then date, see byTimeline.)
@@ -22957,7 +23139,22 @@ function acctFetchKeepalive(init){
   // UI applies: the window must be switched ON in Where & when you'll watch and REACHABLE for this
   // Cascade's scope. Writing a moment that fails either would have the daily job email about something
   // the app is simultaneously telling the user it will never mention.
+  // CAS-1337: a v2 agent has no per-agent Alerts switch or window scope to read alertLive() with — its
+  // alert_moments is the plain union of whatever moments any of its styles alerts on (per-style gating of
+  // those moments at alert time is CAS-1343's oneAgentAlerts, not this derivation).
+  function oneAgentMomentsOf(c){
+    const out=new Set();
+    Object.values(c.styles||{}).forEach(s=>{
+      if(!s || s.bar==null) return;
+      const al=s.al||{};
+      if(al.cinema) out.add("hits_cinema");
+      if(al.rent){ out.add("hits_rent"); out.add("hits_pvod"); }
+      if(al.stream) out.add("hits_stream");
+    });
+    return [...out];
+  }
   function momentsOf(c){
+    if(c && c.v===2) return oneAgentMomentsOf(c);
     const out=[];
     for(const k in ALERT_TO_MOMENT) if(alertLive(c,k)) out.push(ALERT_TO_MOMENT[k]);
     return out;
@@ -23277,6 +23474,7 @@ function acctFetchKeepalive(init){
     agMetricsCache.clear();   // CAS-867: a cleared verdict set can flip taggedOut() too
     _tasteProfileCache = null;   // CAS-1251: same reason — a signed-out device has no verdicts to count
     _tasteMatchCache.clear();    // CAS-1264: same reason — nothing left to cache a You value from
+    _oneAgentProfileCache = null;   // CAS-1337: same reason — nothing left for the v2 pair stats either
     // Every other in-memory domain a signed-in session could have populated, back to its fresh-device
     // default — the wipe above already means re-reading each of these from localStorage would land on the
     // same default anyway, but resetting directly avoids re-parsing keys that no longer exist.
@@ -23503,6 +23701,7 @@ function acctFetchKeepalive(init){
     agMetricsCache.clear();   // CAS-867: a synced verdict can flip taggedOut() same as a local one can
     _tasteProfileCache = null;   // CAS-1251: a synced verdict changes the counted set same as a local one can
     _tasteMatchCache.clear();    // CAS-1264: same reason — a synced verdict can move any film's You value too
+    _oneAgentProfileCache = null;   // CAS-1337: same reason — a synced verdict changes the v2 pair stats too
     recomputeFound();
     // CAS-1236: skip the repaint (not the merge above) when this is byte-identical to the last rows this
     // device applied for this table — a reconcile pull that changed nothing must draw nothing.
