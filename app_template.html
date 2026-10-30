@@ -3291,6 +3291,33 @@
   .oaadjup{color:#5eead4}
   .oaadjdown{color:#f0a060}
 
+  /* ---- CAS-1341: moods as lists — the v2 mood sheet and the card's list sheet. Reuses CAS-1339's .oarowstrip/
+     .oabox/.oafill/.oaslider* geometry verbatim for the read-only style rows and the mood-minimum slider; only
+     the handful of classes below (oam*) are new. */
+  .oamhead{display:flex;align-items:center;gap:10px}
+  .oamhead .mfinput{flex:1}
+  .oamstylerow{display:grid;grid-template-columns:18px 104px 1fr 52px;align-items:center;gap:8px;
+    padding:8px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+  .oamstylerow input[type=checkbox]{width:16px;height:16px}
+  .oamstylerow.off{opacity:.45}
+  .oamstyleleft{min-width:0}
+  .oamstylename{display:block;font-size:13.5px;font-weight:800;color:var(--ink);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .oamalso{display:block;font-size:10.5px;color:var(--faint);margin-top:1px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .oamlistpanel{padding:10px 14px;max-width:280px}
+  .oamlisttitle{font-size:14px;font-weight:800;color:var(--ink)}
+  .oamlistagent,.oamlistscore{font-size:11.5px;color:var(--dim);line-height:1.4;margin-top:4px}
+  .oamlistrows{margin-top:10px;display:flex;flex-direction:column}
+  .oamlistrow{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:7px 0;border-bottom:1px solid var(--line)}
+  .oamlistrow:last-child{border-bottom:0}
+  .oamlistname{font-size:12.5px;font-weight:800;color:var(--ink);flex:1;min-width:0}
+  .oamliststate{font-size:10.5px;color:var(--faint);margin-right:6px;white-space:nowrap}
+  .oamlistnote{font-size:11px;color:var(--faint);line-height:1.5;margin-top:10px}
+  .oamlistbtn{flex:0 0 auto;padding:6px 10px;font-size:11.5px;border-radius:8px}
+  .ctl.oamlist.handmark .cmini{box-shadow:inset 0 0 0 1.5px var(--gold)}
+
   /* ---- CAS-775: Occasions screen — same .ucard/.urow row language as Account, plus rename/delete
      affordances no other .urow row needs (an Occasion is a thing you can rename or remove yourself). ---- */
   .listact{flex:0 0 auto;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);
@@ -8808,7 +8835,7 @@ function cardHTML(m, markNew=false, {hideDismiss=false, inWatch=false}={}){
            told about it. -->
       <div class="actions">
         ${notifyChipHTML(id)}
-        ${agentChipHTML(id)}
+        ${oneAgentCriteria() ? oamListChipHTML(id) : agentChipHTML(id)}
         ${watchChipHTML(id)}
       </div>
     </div>
@@ -10758,8 +10785,13 @@ const MOOD_MAX = 10;
 let watchMoods = moodDefaultsNow();
 // C2: the selected mood is view.mood if it names a mood that exists, otherwise the first.
 let watchMoodSel = watchMoods[0].id;
-function watchMoodsList(){ return watchMoods; }
-function currentMood(){ return watchMoods.find(m=>m.id===watchMoodSel) || watchMoods[0]; }
+// CAS-1341: a v2 account's moods are a different shape entirely (oamMoodsListReal/currentOamMood, further
+// down) — both gates read oneAgentCriteria() fresh each call, never cached, so neither drifts from the other.
+function watchMoodsList(){ return oneAgentCriteria() ? oamMoodsListReal() : watchMoods; }
+function currentMood(){
+  if(oneAgentCriteria()) return currentOamMood();
+  return watchMoods.find(m=>m.id===watchMoodSel) || watchMoods[0];
+}
 const MOOD_EDIT_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>`;
 // C3: copies one mood's values into the state the pipeline already reads — the only place any of that
 // state changes now. Applied at boot (below, from the in-memory defaults), again whenever loadUserPrefs()
@@ -10801,7 +10833,12 @@ window.setWatchMood = id => {
   scrollWatchListingToTop();
 };
 // C5: tapping the selected mood's own chip opens the sheet for it; tapping a different chip selects it.
-window.onMoodChipTap = id => { id===watchMoodSel ? openMoodSheetFor(id) : setWatchMood(id); };
+// CAS-1341: switching mood (setWatchMood) is shared as-is — watchMoods/watchMoodSel/applyMoodToState are all
+// shape-agnostic for a v2 mood record (see their own comments). Only OPENING the sheet differs.
+window.onMoodChipTap = id => {
+  if(id!==watchMoodSel){ setWatchMood(id); return; }
+  oneAgentCriteria() ? openOamMoodSheetFor(id) : openMoodSheetFor(id);
+};
 
 // ---- The mood sheet's own draft — nothing below writes watchMoods/the live watch* state until Save. ----
 let moodDraft = null;
@@ -10839,6 +10876,7 @@ window.openMoodSheetFor = id => {
   openWatchSheet();
 };
 window.openMoodSheetForNew = () => {
+  if(oneAgentCriteria()){ openOamMoodSheetForNew(); return; }   // CAS-1341
   if(watchMoods.length>=MOOD_MAX) return;   // C5: #moodAddBtn is already not written at the cap, but guard anyway
   moodDraft=moodDraftFrom(null);
   moodDeleteArmed=false; clearTimeout(moodDeleteArmTimer);
@@ -10873,6 +10911,7 @@ window.toggleMoodDraftBadge = key => { if(!moodDraft) return; moodDraft.badges.h
 // pushViewField("mood", id), only when the selection actually changed (editing the already-selected mood
 // does not reselect it).
 window.saveMoodFromSheet = () => {
+  if(oamDraft) return oamSaveMoodFromSheet();   // CAS-1341: defensive — v2's own Save lives in the body, not here
   const d=moodDraft; if(!d) return;
   const name=(d.name||"").trim();
   if(!name){ const inp=$("moodName"); if(inp) inp.focus(); return; }
@@ -10907,6 +10946,7 @@ window.saveMoodFromSheet = () => {
 // C5: the footer's left button — "Cancel" (discard) for a new mood; "Delete mood" for an existing one,
 // armed to "Tap again to delete" for 4s by a first tap, disabled when only one mood is left.
 window.handleMoodDeleteBtn = () => {
+  if(oamDraft) return oamHandleMoodDeleteBtn();   // CAS-1341
   const d=moodDraft; if(!d) return;
   if(!d.editingId){ closeWatchSheet(); return; }
   if(watchMoods.length<=1) return;
@@ -10939,7 +10979,7 @@ window.openWatchSheet = () => {
   $("watchSheet").classList.add("open");
   $("watchSheetScrim").classList.add("open");
   lockBodyScroll(true);
-  renderMoodSheetBody();
+  if(oamDraft) renderOamMoodSheetBody(); else renderMoodSheetBody();   // CAS-1341
 };
 window.closeWatchSheet = () => {
   watchSheetOpen=false;
@@ -10949,6 +10989,9 @@ window.closeWatchSheet = () => {
   moodDraft=null;
   moodDeleteArmed=false;
   clearTimeout(moodDeleteArmTimer);
+  oamDraft=null;   // CAS-1341
+  oamDeleteArmed=false;
+  clearTimeout(oamDeleteArmTimer);
 };
 document.addEventListener("keydown", e=>{ if(e.key==="Escape" && watchSheetOpen) closeWatchSheet(); });
 const chipSummary = labels => labels.length<=2 ? labels.join(", ") : `${labels.slice(0,2).join(", ")} +${labels.length-2}`;
@@ -10985,6 +11028,7 @@ function renderWatchSheet(rows, shownCount){
   watchSheetLastRows = rows;
   watchSheetLastShownCount = shownCount;
   if(moodDraft) renderMoodSheetBody();
+  if(oamDraft) renderOamMoodSheetBody();   // CAS-1341
 }
 function renderMoodSheetBody(){
   const d=moodDraft; if(!d) return;
@@ -11123,6 +11167,8 @@ function watchScopeRows(){
   // empty branch (already keyed off rows.length) shows its existing empty state rather than a live listing
   // under a blank strip.
   if(!watchTabsNow().length) return [];
+  // CAS-1341: a v2 account's pool is the selected mood's own membership test, nothing below applies to it.
+  { const oaC=oneAgentCriteria(); if(oaC){ const mood=currentOamMood(); return mood ? oamStagePool().filter(m=>filmInOneAgentMood(m, mood, oaC)) : []; } }
   // CAS-1328/CAS-1331: Latest's own 12-month cinema-release window applies no matter which source the
   // person has chosen for it — no other mood (catalogue or agents) carries it.
   const isLatest = currentMood().id==="releases";
@@ -11175,6 +11221,7 @@ function watchScopeRows(){
 // stage stop that isn't the active one and read its count back, rather than a second implementation that
 // could drift from what render() actually draws.
 function watchVisibleRows(){
+  if(oneAgentCriteria()) return oamVisibleRows();   // CAS-1341
   let rows=watchScopeRows();
   const wsearch=watchSearch[watchTab];
   if(wsearch) rows=rows.filter(m=>m.title.toLowerCase().includes(wsearch));
@@ -13531,6 +13578,7 @@ function watchRowsWithFiltersCleared(){
   return n;
 }
 function emptyResultsHTML(){
+  if(oneAgentCriteria()) return oamEmptyResultsHTML();   // CAS-1341
   // CAS-1295 Change 5: a stage with no starred films gets its own honest, specific empty state — ahead of
   // every other check below, since Starred is catalogue-sourced and not an agent/filter question at all.
   if(currentMood().starredOnly){
@@ -20077,6 +20125,499 @@ window.oaComboOnRelease=(input)=>{
   renderAgentsScreen();
 };
 
+// ================= CAS-1341: moods as lists (v2 accounts) ===================================================
+// Moods become saved LISTS for a v2 account: a film is in a mood when it was added by hand, or it meets the
+// mood's own rules and wasn't taken out by hand. Storage rides the same user_prefs.view.moods/view.mood path
+// v1 moods already use (watchMoods/watchMoodSel, both shared below) — every v2 mood record simply carries its
+// own `v2:true` marker, decided per-record (never off oneAgentCriteria(), which races loadAccount()'s own
+// cascades load — see loadUserPrefs' own v.moods adoption) so a v1 account's data is never touched by any of
+// this (AC6). Nothing in this section runs unless oneAgentCriteria() is non-null.
+const ONE_AGENT_MOOD_BUILTINS=[
+  {id:"releases", name:"Latest"},
+  {id:"starred", name:"Starred", starredOnly:true},
+];
+function oamMoodDefaultFields(){
+  return {v2:true, handOnly:false, styles:[], minScore:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[]};
+}
+function oamMoodDefaultsNow(){ return ONE_AGENT_MOOD_BUILTINS.map(b=>({...oamMoodDefaultFields(), ...b})); }
+// The account's own saved v2 moods — falls back (in memory only, never written: CAS-1218/1243) to the two
+// built-ins for a v2 account CAS-1342 hasn't provisioned yet.
+function oamMoodsListReal(){
+  const stored=watchMoods.filter(m=>m && m.v2);
+  return stored.length ? stored : oamMoodDefaultsNow();
+}
+function currentOamMood(){
+  const list=oamMoodsListReal();
+  return list.find(m=>m.id===watchMoodSel) || list[0];
+}
+// Every style the mood's agent actually has on (CAS-1339's oaBar), narrowed by the mood's own ticked styles —
+// an empty mood.styles means every on style, per the ticket.
+function oamMoodStyles(mood, c){
+  const onStyles=ALL_GENRES.filter(g=>oaBar(c,g)!=null);
+  if(!mood.styles || !mood.styles.length) return onStyles;
+  return onStyles.filter(g=>mood.styles.includes(g));
+}
+// The bar actually applied to a style inside this mood — the mood's own minScore only ever RAISES the
+// agent's, never lowers it.
+function oamMoodBarFor(mood, c, style){
+  const agentBar=oaBar(c, style);
+  if(agentBar==null) return null;
+  return mood.minScore!=null ? Math.max(agentBar, mood.minScore) : agentBar;
+}
+function oamFilmAge(m){ return AGE_RATING_CANON[m.age_rating] || m.age_rating; }
+function oamFilmMatchesAwards(m, awards){
+  if(awards==="won") return m.award==="won";
+  if(awards==="nominated") return awardRank(m)>=1;
+  return true;
+}
+// The RULES half of membership — admission, style, score, ages, awards, how-far-back. Hand add/take-out
+// (filmInOneAgentMood, below) always wins over this.
+function oamFilmMeetsMoodRules(m, mood, c){
+  if(!matchesCriteriaOneAgent(m, c, false)) return false;
+  const {main}=mainOtherCombos(m);
+  if(main===undefined) return false;
+  if(!oamMoodStyles(mood, c).includes(main)) return false;
+  const bar=oamMoodBarFor(mood, c, main);
+  if(bar==null) return false;
+  const score=oneScoreFor(m, c);
+  if(score===-1 || score<bar) return false;
+  if(mood.ages && mood.ages.length && !mood.ages.includes(oamFilmAge(m))) return false;
+  if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
+  if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
+  return true;
+}
+// Full membership: a hand choice always beats the rules (ticket's own words). Latest/Starred keep today's
+// behaviour — see each ticket line in CAS-1341's description for what that means for each.
+function filmInOneAgentMood(m, mood, c){
+  const id=m.tmdb_id;
+  if((mood.out||[]).includes(id)) return false;
+  if((mood.in||[]).includes(id)) return true;
+  if(mood.handOnly) return false;
+  if(mood.id==="releases"){
+    if(!filmInLatestWindow(m)) return false;
+    const {main}=mainOtherCombos(m);
+    return main!==undefined && oaBar(c, main)!=null;
+  }
+  if(mood.id==="starred" || mood.starredOnly) return starredIds.has(id);
+  return oamFilmMeetsMoodRules(m, mood, c);
+}
+// Show cap — All/Best 10/20/40 by oneScore, applied AFTER membership. Hand-added films always show and count
+// towards the limit (ticket's own words): they're never cut, and they eat into the N rule-based films get.
+function oamApplyShowCap(rows, mood, c, heldThisTab){
+  const n = mood.show==="10"?10 : mood.show==="20"?20 : mood.show==="40"?40 : null;
+  if(n==null) return rows;
+  const handIds=new Set(mood.in||[]);
+  const hand=rows.filter(m=>handIds.has(m.tmdb_id));
+  const rest=rows.filter(m=>!handIds.has(m.tmdb_id))
+    .sort((a,b)=>{ const d=oneScoreFor(b,c)-oneScoreFor(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
+  const remaining=Math.max(0, n-hand.length);
+  const keep=new Set([...hand, ...rest.slice(0,remaining)].map(m=>m.tmdb_id));
+  rows.forEach(m=>{ if(heldThisTab.has(m.tmdb_id)) keep.add(m.tmdb_id); });
+  return rows.filter(m=>keep.has(m.tmdb_id));
+}
+// Every film standing in the CURRENT watchTab's own stage — the same scoping v1's catalogue-sourced moods use
+// (watchScopeRows' own "catalogue" branch), reused verbatim since a v2 account's one mood pool is always
+// catalogue-wide.
+function oamStagePool(){
+  const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
+  return MOVIES.filter(m=>{
+    if(!showable(m) || !passesTasteBase(m)) return false;
+    const ps=primaryStatus(m);
+    const standing = watchTab==="in_cinema" ? (ps==="upcoming" || ps==="opening_week" || ps==="in_cinema") : ps===ownStanding;
+    return standing && watchStageMatches(m);
+  });
+}
+// watchVisibleRows()'s v2 replacement — gated in by watchVisibleRows itself below. Mirrors its v1 shape
+// ({rows, preSheetRows, preMineOnlyRows, mineOnly}) so render() needs no changes at all; mineOnly is always
+// false here — "my services" is already folded into agent admission (matchesCriteriaOneAgent's own
+// myServices check), so there's no separate toggle for a v2 mood to carry.
+function oamVisibleRows(){
+  const c=oneAgentCriteria();
+  const mood=currentOamMood();
+  if(!c || !mood) return {rows:[], preSheetRows:[], preMineOnlyRows:[], mineOnly:false};
+  let pool=oamStagePool().filter(m=>filmInOneAgentMood(m, mood, c));
+  const heldThisTab=watchHeldOpen[watchTab];
+  pool=pool.filter(m=>filmMatchesWatchedFilter(m) || heldThisTab.has(m.tmdb_id));
+  const preSheetRows=pool;
+  const wsearch=watchSearch[watchTab];
+  if(wsearch) pool=pool.filter(m=>m.title.toLowerCase().includes(wsearch));
+  const rows = (mood.id==="releases" || mood.id==="starred" || mood.starredOnly)
+    ? pool : oamApplyShowCap(pool, mood, c, heldThisTab);
+  return {rows, preSheetRows, preMineOnlyRows:rows, mineOnly:false};
+}
+function oamEmptyResultsHTML(){
+  const mood=currentOamMood();
+  return `<div class="empty">
+    <div class="emoji">🔍</div>
+    <div class="eh">No titles in ${esc(mood?moodDisplayName(mood):"this list")} here yet.</div>
+    <div class="ebtns"><button class="ebtn" onclick="openOamMoodSheetFor('${escA(watchMoodSel)}')"><span>Edit this mood</span></button></div>
+  </div>`;
+}
+
+// ---- The mood sheet (v2) — oamDraft is the working copy; nothing below writes watchMoods until Save, same
+// no-write-until-save discipline as the v1 moodDraft it sits beside. ----
+let oamDraft=null;
+let oamDeleteArmed=false;
+let oamDeleteArmTimer=null;
+function oamMoodDraftFrom(mood){
+  return {
+    editingId: mood ? mood.id : null,
+    name: mood ? moodDisplayName(mood) : "",
+    handOnly: mood ? !!mood.handOnly : false,
+    stylesAll: mood ? !(mood.styles && mood.styles.length) : true,
+    styles: new Set(mood && mood.styles ? mood.styles : []),
+    minScore: mood && mood.minScore!=null ? mood.minScore : null,
+    ages: new Set(mood ? (mood.ages||[]) : []),
+    awards: mood ? (mood.awards||"any") : "any",
+    years: mood ? (mood.years||0) : 0,
+    show: mood ? (mood.show||"all") : "all",
+    sort: mood ? (mood.sort||"score") : "score",
+    in: [...(mood ? (mood.in||[]) : [])],
+    out: [...(mood ? (mood.out||[]) : [])],
+  };
+}
+window.openOamMoodSheetFor=id=>{
+  const mood=oamMoodsListReal().find(m=>m.id===id); if(!mood) return;
+  oamDraft=oamMoodDraftFrom(mood);
+  oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
+  openWatchSheet();
+};
+window.openOamMoodSheetForNew=()=>{
+  if(oamMoodsListReal().length>=MOOD_MAX) return;
+  oamDraft=oamMoodDraftFrom(null);
+  oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
+  openWatchSheet();
+};
+window.setOamDraftName=v=>{ if(oamDraft) oamDraft.name=v; };
+window.toggleOamDraftHandOnly=()=>{ if(!oamDraft) return; oamDraft.handOnly=!oamDraft.handOnly; renderOamMoodSheetBody(); };
+window.toggleOamDraftStyle=style=>{
+  const d=oamDraft; if(!d) return;
+  const c=oneAgentCriteria(); if(!c) return;
+  const onStyles=ALL_GENRES.filter(g=>oaBar(c,g)!=null);
+  if(d.stylesAll){
+    d.stylesAll=false;
+    d.styles=new Set(onStyles.filter(g=>g!==style));
+  } else if(d.styles.has(style)){
+    d.styles.delete(style);
+  } else {
+    d.styles.add(style);
+    if(onStyles.every(g=>d.styles.has(g))){ d.stylesAll=true; d.styles=new Set(); }
+  }
+  renderOamMoodSheetBody();
+};
+window.selectAllOamDraftStyles=()=>{ if(!oamDraft) return; oamDraft.stylesAll=true; oamDraft.styles=new Set(); renderOamMoodSheetBody(); };
+window.clearAllOamDraftStyles=()=>{ if(!oamDraft) return; oamDraft.stylesAll=false; oamDraft.styles=new Set(); renderOamMoodSheetBody(); };
+window.oamMinScoreOnDrag=input=>{
+  const v=parseInt(input.value,10);
+  const bar=v>=100?null:v;
+  const wrap=input.closest(".oaslidewrap");
+  const boxes=wrap?wrap.querySelectorAll(".oabox"):[];
+  ONE_AGENT_SCORE_BRACKETS.forEach((b,i)=>{ const fill=boxes[i]&&boxes[i].querySelector(".oafill"); if(fill) fill.style.width=oaBoxPct(bar,b)+"%"; });
+  const valEl=$("oamMinScoreVal");
+  if(valEl) valEl.innerHTML = bar==null ? `Agent's<i>no extra</i>` : `${bar}+<i>this mood</i>`;
+};
+window.oamMinScoreOnRelease=input=>{
+  const d=oamDraft; if(!d) return;
+  const v=parseInt(input.value,10);
+  d.minScore = v>=100?null:v;
+  renderOamMoodSheetBody();
+};
+window.oamClearMinScore=()=>{ if(!oamDraft) return; oamDraft.minScore=null; renderOamMoodSheetBody(); };
+window.toggleOamDraftAge=a=>{ if(!oamDraft) return; oamDraft.ages.has(a)?oamDraft.ages.delete(a):oamDraft.ages.add(a); renderOamMoodSheetBody(); };
+window.setOamDraftAwards=v=>{ if(!oamDraft) return; oamDraft.awards=v; renderOamMoodSheetBody(); };
+window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMoodSheetBody(); };
+window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMoodSheetBody(); };
+window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
+// Every other saved mood that would ALSO list this style — "also in <names>" under a style row.
+function oamStylesAlsoIn(style, excludeId){
+  return oamMoodsListReal().filter(m=>m.id!==excludeId && !m.handOnly && m.id!=="releases" && m.id!=="starred"
+    && (!m.styles || !m.styles.length || m.styles.includes(style))).map(m=>m.name);
+}
+function oamStyleRowHTML(c, d, style){
+  const agentBar=oaBar(c, style);
+  const effBar = d.minScore!=null ? Math.max(agentBar, d.minScore) : agentBar;
+  const on = d.stylesAll || d.styles.has(style);
+  const name=oneAgentShortName(style);
+  const raised = d.minScore!=null && d.minScore>agentBar;
+  const valText = raised ? `${effBar}+<i>agent ${agentBar}+</i>` : `${agentBar}+`;
+  const alsoIn=oamStylesAlsoIn(style, d.editingId).filter(n=>n!==d.name);
+  const alsoText = alsoIn.length ? `also in ${alsoIn.join(", ")}` : "";
+  return `<label class="oamstylerow${on?"":" off"}">
+      <input type="checkbox" ${on?"checked":""} onchange="toggleOamDraftStyle('${escA(style)}')" aria-label="${escA(name)}">
+      <span class="oamstyleleft">
+        <span class="oamstylename">${esc(name)}</span>
+        ${alsoText?`<span class="oamalso">${esc(alsoText)}</span>`:""}
+      </span>
+      <span class="oarowstrip">${oaBoxesHTML(effBar)}</span>
+      <span class="oarowval">${valText}</span>
+    </label>`;
+}
+function oamMinScoreSectionHTML(d){
+  const bar=d.minScore;
+  const raised = bar!=null;
+  const val = raised ? `${bar}+<i>this mood</i>` : `Agent's<i>no extra</i>`;
+  const desc = raised
+    ? `Styles your agent lists below ${bar} are lifted to ${bar}+ in this mood. <button type="button" class="linkbtn" onclick="oamClearMinScore()">Remove</button>`
+    : `Drag to make this mood pickier than your agent. All the way right takes it off.`;
+  return `<div class="wsheetsec">
+      <div class="wsheethd"><span>MOOD MINIMUM SCORE &middot; only ever raises your agent's</span></div>
+      <div class="oaslider">
+        <div class="oaslidewrap">
+          <div class="oastrip oastripfull">${oaBoxesHTML(bar,{labels:true})}</div>
+          <input type="range" class="oarange" min="50" max="100" step="1" value="${bar==null?100:bar}"
+            oninput="oamMinScoreOnDrag(this)" onchange="oamMinScoreOnRelease(this)" aria-label="Mood minimum score">
+        </div>
+        <span class="oaslideval" id="oamMinScoreVal">${val}</span>
+      </div>
+      <p class="oaslidedesc">${desc}</p>
+    </div>`;
+}
+const OAM_AGE_OPTS=TASTE_AGE_ORDER;
+const OAM_AWARDS_OPTS=[["any","Any"],["nominated","Nominated or won"],["won","Won"]];
+const OAM_YEARS_OPTS=[[0,"Any"],[10,"10 yrs"],[5,"5 yrs"],[3,"3 yrs"],[2,"2 yrs"],[1,"1 yr"]];
+const OAM_SHOW_OPTS=[["all","All"],["10","Best 10"],["20","Best 20"],["40","Best 40"]];
+const OAM_SORT_OPTS=[["score","Score"],["release","Release date"],["title","A–Z"]];
+function renderOamMoodSheetBody(){
+  const d=oamDraft; if(!d) return;
+  const c=oneAgentCriteria(); if(!c){ closeWatchSheet(); return; }
+  const isBuiltin = d.editingId==="releases" || d.editingId==="starred";
+  const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "Mood" : "New mood";
+  const onStyles=ALL_GENRES.filter(g=>oaBar(c,g)!=null);
+  const kOn = d.stylesAll ? onStyles.length : d.styles.size;
+  const styleRows = onStyles.map(g=>oamStyleRowHTML(c, d, g)).join("");
+  const seg=(opts, cur, setter, label)=>`<div class="mfseg" role="group" aria-label="${escA(label)}">
+      ${opts.map(([k,l])=>{ const on=cur===k; return `<button type="button" aria-pressed="${on}" class="${on?"on":""}"
+        onclick="${setter}(${typeof k==="number"?k:`'${k}'`})">${esc(l)}</button>`; }).join("")}
+    </div>`;
+  const body=$("watchSheetBody");
+  if(body) body.innerHTML=`
+    <div class="wsheetsec oamhead">
+      <input id="oamMoodName" class="mfinput" type="text" maxlength="24" placeholder="Mood name" autocomplete="off"
+        value="${escA(d.name)}" oninput="setOamDraftName(this.value)">
+      <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Which films</span></div>
+      <div class="mfrow"><span>Only films I add by hand</span>
+        <button type="button" class="mftog${d.handOnly?" on":""}" role="switch" aria-checked="${!!d.handOnly}"
+          aria-label="Only films I add by hand" onclick="toggleOamDraftHandOnly()"><i></i></button>
+      </div>
+    </div>
+    ${d.handOnly ? "" : `
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>STYLES &middot; ${kOn} of ${onStyles.length}</span>
+        <div class="wsheetlinks">
+          <button type="button" class="linkbtn" onclick="selectAllOamDraftStyles()">All</button>
+          <button type="button" class="linkbtn" onclick="clearAllOamDraftStyles()">None</button>
+        </div>
+      </div>
+      <div class="oalist">${styleRows}</div>
+    </div>
+    ${oamMinScoreSectionHTML(d)}
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>WHO'S WATCHING: AGE RATINGS</span></div>
+      <div class="chips">${OAM_AGE_OPTS.map(a=>{ const on=d.ages.has(a); return `<button type="button" class="chip${on?" on":""}"
+        aria-pressed="${on}" onclick="toggleOamDraftAge('${escA(a)}')">${esc(a)}</button>`; }).join("")}</div>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>AWARDS</span></div>
+      <div class="chips">${OAM_AWARDS_OPTS.map(([k,l])=>{ const on=d.awards===k; return `<button type="button" class="chip${on?" on":""}"
+        aria-pressed="${on}" onclick="setOamDraftAwards('${k}')">${esc(l)}</button>`; }).join("")}</div>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>HOW FAR BACK</span></div>
+      <div class="chips">${OAM_YEARS_OPTS.map(([k,l])=>{ const on=d.years===k; return `<button type="button" class="chip${on?" on":""}"
+        aria-pressed="${on}" onclick="setOamDraftYears(${k})">${esc(l)}</button>`; }).join("")}</div>
+    </div>`}
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>How many, and in what order</span></div>
+      <div class="mfrow"><span>SHOW</span></div>
+      ${seg(OAM_SHOW_OPTS, d.show, "setOamDraftShow", "Show")}
+      <div class="mfrow"><span>ORDER</span></div>
+      ${seg(OAM_SORT_OPTS, d.sort, "setOamDraftSort", "Order")}
+    </div>`;
+  const delBtn=$("moodDeleteBtn");
+  if(delBtn){
+    delBtn.style.display="";
+    if(isBuiltin){ delBtn.textContent="Delete this mood"; delBtn.disabled=true; }
+    else { delBtn.textContent = oamDeleteArmed ? "Tap again to delete" : "Delete this mood"; delBtn.disabled=false; }
+  }
+  const saveBtn=$("moodSaveBtn");
+  if(saveBtn) saveBtn.style.display="none";
+}
+window.oamSaveMoodFromSheet=()=>{
+  const d=oamDraft; if(!d) return;
+  const name=(d.name||"").trim();
+  if(!name){ const inp=$("oamMoodName"); if(inp) inp.focus(); return; }
+  const mood={
+    id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
+    name, v2:true,
+    handOnly: !!d.handOnly,
+    styles: d.stylesAll ? [] : [...d.styles],
+    minScore: d.minScore,
+    ages: [...d.ages],
+    awards: d.awards,
+    years: d.years,
+    show: d.show,
+    sort: d.sort,
+    in: [...d.in], out: [...d.out],
+  };
+  if(mood.id==="starred") mood.starredOnly=true;
+  const list=oamMoodsListReal();
+  const idx=list.findIndex(m=>m.id===mood.id);
+  watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
+  const selectionChanged = watchMoodSel!==mood.id;
+  watchMoodSel=mood.id;
+  applyMoodToState(mood);
+  pushViewField("moods", watchMoods.map(m=>({...m})));
+  if(selectionChanged) pushViewField("mood", mood.id);
+  logEvent("watch_mood", {action: d.editingId ? "save" : "create"});
+  closeWatchSheet();
+  render();
+  scrollWatchListingToTop();
+};
+window.oamHandleMoodDeleteBtn=()=>{
+  const d=oamDraft; if(!d) return;
+  if(!d.editingId){ closeWatchSheet(); return; }
+  if(d.editingId==="releases" || d.editingId==="starred") return;
+  const list=oamMoodsListReal();
+  if(list.length<=1) return;
+  if(!oamDeleteArmed){
+    oamDeleteArmed=true;
+    renderOamMoodSheetBody();
+    clearTimeout(oamDeleteArmTimer);
+    oamDeleteArmTimer=setTimeout(()=>{ oamDeleteArmed=false; if(oamDraft) renderOamMoodSheetBody(); }, 4000);
+    return;
+  }
+  clearTimeout(oamDeleteArmTimer);
+  const deletedId=d.editingId;
+  watchMoods = list.filter(m=>m.id!==deletedId);
+  const selectionChanged = watchMoodSel===deletedId;
+  if(selectionChanged){ watchMoodSel=watchMoods[0].id; applyMoodToState(watchMoods[0]); }
+  pushViewField("moods", watchMoods.map(m=>({...m})));
+  if(selectionChanged) pushViewField("mood", watchMoodSel);
+  logEvent("watch_mood", {action:"delete"});
+  closeWatchSheet();
+  render();
+  if(selectionChanged) scrollWatchListingToTop();
+};
+
+// ---- The card's list control (v2) — replaces the Agent middle action (agentChipHTML) on the card's own
+// .actions row, and its sheet (tap target: oamListChipHTML's own button). ----
+function oamMoodsForFilm(id, c){
+  const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return [];
+  return oamMoodsListReal().filter(mood=>filmInOneAgentMood(m, mood, c));
+}
+function oamFilmHandTouched(id){
+  return oamMoodsListReal().some(mood=>(mood.in||[]).includes(id) || (mood.out||[]).includes(id));
+}
+function oamListChipHTML(id){
+  const c=oneAgentCriteria(); if(!c) return "";
+  const moods=oamMoodsForFilm(id, c);
+  const lbl = moods.length ? (moods.length>1 ? `${moods[0].name} +${moods.length-1}` : moods[0].name) : "Add to list";
+  const hand=oamFilmHandTouched(id);
+  const title = moods.length ? `In your lists: ${moods.map(m=>m.name).join(", ")}. Tap to change.` : "Not in any list yet. Tap to add.";
+  return `<button type="button" class="ctl oamlist${hand?" handmark":""}${filmIsNew(id)?" isnew":""}" data-lid="${id}" onclick="openOamListPanel(${id},this)"
+      aria-haspopup="true" aria-expanded="false" title="${escA(title)}" aria-label="${escA(title)}">
+    <span class="cmini"><i class="cfill" style="width:${moods.length?100:0}%;background:var(--accent)"></i>
+      <span class="cic">${ICON.deck}</span>
+      <span class="clab${moods.length?"":" dim"}">${esc(lbl)}</span>
+      <span class="ctog">${ICON.chev}</span></span></button>`;
+}
+// "Your agent: ✓/✕ <reason>" — mirrors matchesCriteriaOneAgent's own checks (CAS-1337), spelled out as a
+// sentence rather than a boolean, for the sheet's own first line.
+function oneAgentAdmitReason(m){
+  const c=oneAgentCriteria();
+  if(!c) return {ok:false, text:""};
+  const {main}=mainOtherCombos(m);
+  if(main===undefined) return {ok:false, text:"has no listed style"};
+  const name=oneAgentShortName(main);
+  const style=(c.styles||{})[main];
+  if(!style || style.bar==null) return {ok:false, text:`${name} isn't on`};
+  if(c.excludeBlocked!==false && blocked.has(m.tmdb_id)) return {ok:false, text:"marked Never"};
+  if(c.excludeWatched!==false && watched.has(m.tmdb_id)) return {ok:false, text:"already watched"};
+  const score=oneScoreFor(m, c);
+  if(score===-1) return {ok:false, text:"not enough agreement to score yet"};
+  if(score<style.bar) return {ok:false, text:`${name} lists ${style.bar}+, this scores ${score}`};
+  return {ok:true, text:`${name} lists ${style.bar}+ &middot; this scores ${score}`};
+}
+function oamListPanelRowsHTML(id){
+  const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return "";
+  const c=oneAgentCriteria(); if(!c) return "";
+  const reason=oneAgentAdmitReason(m);
+  const rows=oamMoodsListReal().map(mood=>{
+    const inHand=(mood.in||[]).includes(id);
+    const outHand=(mood.out||[]).includes(id);
+    const byRules = !outHand && !inHand && filmInOneAgentMood(m, {...mood, in:[], out:[]}, c);
+    let state, btnLabel, action;
+    if(inHand){ state="In &middot; added by you"; btnLabel="Take out"; action=`oamTakeOut(${id},'${escA(mood.id)}')`; }
+    else if(outHand){ state="Out &middot; taken out by you"; btnLabel="Put back"; action=`oamPutBack(${id},'${escA(mood.id)}')`; }
+    else if(byRules){ state="In &middot; by its rules"; btnLabel="Take out"; action=`oamTakeOut(${id},'${escA(mood.id)}')`; }
+    else { state="Not in"; btnLabel="Add"; action=`oamAddIn(${id},'${escA(mood.id)}')`; }
+    return `<div class="oamlistrow">
+      <span class="oamlistname">${esc(moodDisplayName(mood))}</span>
+      <span class="oamliststate">${state}</span>
+      <button type="button" class="ebtn ghost oamlistbtn" onclick="${action}">${esc(btnLabel)}</button>
+    </div>`;
+  }).join("");
+  return `<div class="oamlistpanel">
+    <div class="oamlisttitle">${esc(m.title)}</div>
+    <div class="oamlistagent">Your agent: ${reason.ok?"&check;":"&cross;"} ${esc(reason.text)}</div>
+    <div class="oamlistscore">${oneScoreTextHTML(m)}</div>
+    <div class="oamlistrows">${rows}</div>
+    <div class="oamlistnote">Adding keeps a film in a list whatever its score, and it will alert you when it lands somewhere you watch. Taking it out keeps it out.</div>
+  </div>`;
+}
+window.openOamListPanel=(id, btn)=>{
+  const open=btn.closest(".actions").querySelector(".cpop");
+  const mine=open && open.classList.contains("oamlpop");
+  closeWatchPanel();
+  if(mine) return;
+  const card=btn.closest(".card"); if(card) card.classList.add("popopen");
+  armPanelAnchor();
+  const pop=document.createElement("div");
+  pop.className="cpop oamlpop al-c";
+  pop.innerHTML=oamListPanelRowsHTML(id);
+  btn.closest(".actions").appendChild(pop);
+  positionPanel(pop, btn);
+  document.addEventListener("keydown", watchPanelKey, true);
+  document.addEventListener("pointerdown", watchPanelOutsideClose, true);
+  btn.classList.add("open"); btn.setAttribute("aria-expanded","true");
+  snapToWatchPanelAnchor();
+};
+function oamMutateMood(moodId, fn){
+  const list=oamMoodsListReal();
+  const idx=list.findIndex(m=>m.id===moodId); if(idx<0) return;
+  const next=list.map(m=>({...m, in:[...(m.in||[])], out:[...(m.out||[])]}));
+  fn(next[idx]);
+  watchMoods=next;
+  pushViewField("moods", watchMoods.map(m=>({...m})));
+}
+window.oamAddIn=(id, moodId)=>{
+  oamMutateMood(moodId, mood=>{
+    mood.out=mood.out.filter(x=>x!==id);
+    if(!mood.in.includes(id)) mood.in.push(id);
+  });
+  logEvent("watch_mood", {action:"hand_add"});
+  closeWatchPanel();
+  keepRowInPlace(id, ()=>repaintAfterOpinion(id));
+};
+window.oamTakeOut=(id, moodId)=>{
+  oamMutateMood(moodId, mood=>{
+    if(mood.in.includes(id)) mood.in=mood.in.filter(x=>x!==id);
+    else if(!mood.out.includes(id)) mood.out.push(id);
+  });
+  logEvent("watch_mood", {action:"hand_out"});
+  closeWatchPanel();
+  keepRowInPlace(id, ()=>repaintAfterOpinion(id));
+};
+window.oamPutBack=(id, moodId)=>{
+  oamMutateMood(moodId, mood=>{ mood.out=mood.out.filter(x=>x!==id); });
+  logEvent("watch_mood", {action:"hand_clear"});
+  closeWatchPanel();
+  keepRowInPlace(id, ()=>repaintAfterOpinion(id));
+};
+
 // ---- CAS-909: onboarding v2's agent reveal — the app's own Agents-screen row, assembled in front of the
 // user as each agent is created (buildOnbAgentsV2, CAS-908). Every value below reads off the SAME
 // functions renderAgentsScreen() calls above; a second set of summary functions is how onboarding and the
@@ -22949,6 +23490,10 @@ function patchFindCounts(){
 // left the list.
 function filmInWatchRows(m){
   if(!watchTabsNow().length) return false;
+  // CAS-1341: a v2 account defers to the real pipeline (oamVisibleRows) for the final answer — its pool is
+  // small (one agent, one mood) so this is cheap, and it means this fast path can never disagree with a full
+  // render() the way a hand-duplicated v2 predicate could.
+  { const oaC=oneAgentCriteria(); if(oaC) return oamVisibleRows().rows.some(r=>r.tmdb_id===m.tmdb_id); }
   // CAS-1328/CAS-1331: Latest's own 12-month cinema-release window applies no matter which source the
   // person has chosen for it — see watchScopeRows' identical top-level check.
   const isLatest = currentMood().id==="releases";
@@ -25225,7 +25770,11 @@ function acctFetchKeepalive(init){
       // below. C2: view.moods/view.mood adopted together, falling back to the in-memory defaults when the
       // account has saved none yet; applyMoodToState makes the adopted mood the live state, same as boot.
       if(Array.isArray(v.moods) && v.moods.length){
-        watchMoods = v.moods.slice(0, MOOD_MAX).map(m=>({...moodDefaultFieldsNow(), ...m}));
+        // CAS-1341: each record's OWN v2 marker decides its defaults — never oneAgentCriteria(), which races
+        // loadAccount()'s own cascades load (both run inside the same Promise.allSettled fan-out, no ordering
+        // guarantee between them) and so cannot be trusted at this exact point in the load.
+        watchMoods = v.moods.slice(0, MOOD_MAX).map(m=>
+          m && m.v2 ? {...oamMoodDefaultFields(), ...m} : {...moodDefaultFieldsNow(), ...m});
       }
       // CAS-1284 Change 6 / CAS-1287 Change 6: an existing account's saved moods predate the three new
       // catalogue starters (step 1, moodsProvisioned reaching 1) and/or predate "Show top" replacing Best N
@@ -25235,23 +25784,28 @@ function acctFetchKeepalive(init){
       // next real view write instead, through riderReviewSessionsOnto below (same deferred-write idiom as
       // the reviewSessions replay above it).
       const moodsProvisionedLevel = typeof v.moodsProvisioned==="number" ? v.moodsProvisioned : (v.moodsProvisioned ? 1 : 0);
-      if(moodsProvisionedLevel<1){
+      // CAS-1341: these three steps are v1-only migrations (adding v1-shaped catalogue starters/Starred) —
+      // a v2 account's moods (any record carrying v2:true) must never be touched by them, race-free since
+      // this reads the just-loaded array itself rather than oneAgentCriteria() (see the v.moods adoption
+      // above for why that gate can't be trusted at this exact point in the load).
+      const watchMoodsHasV2 = watchMoods.some(m=>m && m.v2);
+      if(moodsProvisionedLevel<1 && !watchMoodsHasV2){
         const haveIds=new Set(watchMoods.map(m=>m.id));
         const missing=MOOD_DEFAULTS.filter(md=>MOOD_STARTER_IDS.includes(md.id) && !haveIds.has(md.id));
         if(missing.length && watchMoods.length<MOOD_MAX){
           watchMoods=[...watchMoods, ...missing.slice(0, MOOD_MAX-watchMoods.length).map(md=>({...moodDefaultFieldsNow(), ...md}))];
         }
       }
-      if(moodsProvisionedLevel<2){
+      if(moodsProvisionedLevel<2 && !watchMoodsHasV2){
         watchMoods=watchMoods.map(m=>MOOD_STARTER_IDS.includes(m.id) ? {...m, topYou:20, topPublic:10} : m);
       }
-      if(moodsProvisionedLevel<2){
+      if(moodsProvisionedLevel<2 && !watchMoodsHasV2){
         moodsProvisionPending={moods:watchMoods.map(m=>({...m})), moodsProvisioned:2};
       }
       // CAS-1295 Change 4: a third provisioning step — an existing account's saved moods predate the
       // Starred mood; add it once, directly after Releases (or at the end if there's no Releases to anchor
       // on), within the 10-mood cap. Never resurrected once the account has deleted it, same rule as above.
-      if(moodsProvisionedLevel<3){
+      if(moodsProvisionedLevel<3 && !watchMoodsHasV2){
         if(!watchMoods.some(m=>m.id==="starred") && watchMoods.length<MOOD_MAX){
           const starred={...moodDefaultFieldsNow(), ...MOOD_DEFAULTS.find(md=>md.id==="starred")};
           const relIdx=watchMoods.findIndex(m=>m.id==="releases");
