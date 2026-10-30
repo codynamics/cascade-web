@@ -215,12 +215,15 @@ test("AC4: changing a listed film's Watch On leaves its card on the current stag
   expect(await page.evaluate((id) => filmNotifyState(Number(id)).key, filmId),
     "the film's Watch On must already read Streaming").toBe("stream");
 
-  // Switching stage away and back is a real navigation — the film must now be gone from Upcoming.
+  // CAS-1329 (Lee, 22 Oct): a film is always listed under the stage it is in now; its Watch On only shows
+  // on the card. So after a real navigation the film is STILL on Upcoming, now labelled Streaming.
   await page.evaluate(() => { setWatchTab("stream"); render(); setWatchTab("in_cinema"); render(); });
   await settleListing(page);
 
   expect(await page.evaluate((id) => !!document.getElementById(`card-${id}`), filmId),
-    "the film must have left the Upcoming screen at the next navigation").toBe(false);
+    "the film must still be listed on Upcoming after the next navigation (CAS-1329)").toBe(true);
+  expect(await page.evaluate((id) => filmNotifyState(Number(id)).key, filmId),
+    "its Watch On must still read Streaming").toBe("stream");
 });
 
 test("AC5: pinning a film to an agent that doesn't list it on the current stage leaves its card in place", async ({ page }) => {

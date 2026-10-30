@@ -285,6 +285,10 @@
   .modechip.fd.active{background:linear-gradient(135deg,#22d3ee 0%,#0891b2 100%);border-color:#22d3ee;color:#001a1f}
   .mcbadge{position:absolute;top:-6px;right:-4px;background:var(--rt);color:#fff;font-size:10px;font-weight:800;
     min-width:16px;height:16px;border-radius:9px;display:grid;place-items:center;padding:0 4px;line-height:1}
+  /* CAS-1340: the Agent nav chip's own gold dot — lit while any style has a combo adjusted since the
+     account's v2 agent last had its Score adjustments section marked seen (updateAgentNavDot). */
+  .modechip.oa-adjusted::after{content:"";position:absolute;top:-2px;right:-2px;width:8px;height:8px;
+    border-radius:50%;background:var(--gold);box-shadow:0 0 0 2px var(--panel2,#0b1020)}
   /* CAS-538: two label strings per chip, one shown at a time — .mclabel-short only appears below the
      460px breakpoint above, where "Find"/"Watch" fit but "Agents"/"Your Movies" don't. */
   .mclabel-short{display:none}
@@ -1180,7 +1184,7 @@
   /* CAS-1302: the star is the row's last flex child, flex:none like the dots/caps either side of it — the
      .wline segments (flex:1 1 16px, below) are what shrink to leave it room, same as they already do for
      each other. Its own box is a static circle now, not the poster overlay .starbtn still defaults to. */
-  .bandstar{position:static;flex:none;margin-left:8px;width:28px;height:28px;border-radius:50%;
+  .bandstar{position:static;flex:none;margin-left:auto;width:28px;height:28px;border-radius:50%;
     background:var(--panel);border:1px solid var(--line);color:var(--dim);font-size:15px}
   /* CAS-433: the timeline's own origin label — the film's real release date, ahead of whatever dots follow. */
   .reldate{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;margin-right:9px;line-height:1.2}
@@ -1200,6 +1204,7 @@
      whatever room that leaves. Lighter too: no outer glow, a thin border, tight padding. */
   .cap{flex:none;min-width:0;max-width:100%;overflow:hidden;display:flex;align-items:center;gap:6px;
     padding:5px 9px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);color:var(--faint)}
+  .avail2 .cap{margin-right:8px}
   /* CAS-433: the whole capsule is the services toggle now (window label + date + service line), not just
      the saveline fused inside it — so the pointer/focus affordance moves to .cap itself. */
   .cap.captog{cursor:pointer}
@@ -2594,8 +2599,6 @@
      stage/agent-column rail and the sort/search/filter tools row this comment used to describe — see the
      new CSS block near the end of this stylesheet (renderWatchTop() and the mood sheet, below). ---- */
   .watchtop[hidden]{display:none}
-  /* The stage's own section when nothing has arrived in it yet: its heading still shows, with one line. */
-  .group.ownempty .ownnone{padding:0 12px 20px;font:500 12.5px/1.45 var(--font-body);color:var(--faint)}
   /* CAS-1298: the Watch list's stage section heading is a banner in the stage's own colour — tinted
      fill, left accent strip and a count pill — so each stage reads as a clear break in the list. Scoped to
      #groups top-level headings; the per-agent .grouphead.sub is unchanged. Earlier-stage sections stay quieter. */
@@ -2611,7 +2614,6 @@
   #groups .grouphead:not(.sub) .gdot{width:9px;height:9px}
   #groups .grouphead:not(.sub) .gcount{margin-left:auto;padding:2px 8px;border-radius:999px;font:800 12px/1.2 var(--font-body);
     color:var(--ink);background:color-mix(in srgb,var(--gc) 30%,transparent)}
-  #groups .group.early > .grouphead:not(.sub){font-size:13px;color:var(--dim)}
   /* CAS-1247: Watch's own search box and Filters sheet are gone — .watchsearchwrap/its .search/.searchclear
      stay, since Find's own search box (#findSearchWrap, renderFindScreen()) is still built from them. */
   .watchsearchwrap{display:flex;align-items:center;gap:8px;margin:9px 12px 0}
@@ -2672,13 +2674,6 @@
      uses for the same six values); Styles chips don't set --wwc, so the accent fallback applies to them. */
   .wsheetsec .chip.on{background:color-mix(in srgb, var(--wwc, var(--accent)) 22%, var(--panel2));
     border-color:var(--wwc, var(--accent))}
-  /* CAS-823: "Also show" — same --wwc-tinted .chip.on above, plus a status dot (matching the section's own
-     .gdot), a live count, and — for the tab's own, non-switchable window — an "always" tag instead of a dot
-     colour change, so it reads as permanently on rather than merely selected. */
-  .alsochip{display:inline-flex;align-items:center;gap:6px}
-  .alsochip .jn{font-weight:800;opacity:.85}
-  .alsochip .alwaystag{font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;opacity:.7}
-  .alsochip:disabled{cursor:default;opacity:1}
   /* CAS-1234: the Badges section — one full-width row per option (a descriptor line needs room a .chip's
      single-line pill doesn't have), gold-tinted ON to match the card's own .tentbadge colour rather than
      the --wwc-tinted convention above, since the card badge is gold regardless of which tier it names. */
@@ -3160,6 +3155,169 @@
   /* CAS-441: same quiet-indicator language as the deck's .dc-learn, sized for the row. The Agents screen
      has no coverflow focus state to gate on, so it is interactive from the moment it paints. */
 
+  /* ---- CAS-1339: the v2 "Your agent" screen — style list, minimum score, agent suggestion, film alerts.
+     Replaces renderAgentsScreen's whole body for a v2 account (oneAgentCriteria() non-null); every class
+     below is scoped to this screen alone, so the v1 .ag* rules above are untouched. */
+  .oacolhdr{display:grid;grid-template-columns:104px 1fr 52px 28px;gap:8px;padding:0 4px 6px;
+    font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--faint)}
+  .oacolhdr span:last-child{grid-column:2 / span 3;text-align:right}
+  .oalist{display:flex;flex-direction:column}
+  .oarow{border-bottom:1px solid var(--line)}
+  .oarowhead{display:grid;grid-template-columns:104px 1fr 52px 28px;align-items:center;gap:8px;
+    padding:11px 4px;cursor:pointer;background:none;border:0;width:100%;text-align:left;font:inherit;color:inherit}
+  .oarowhead:hover,.oarowhead:focus-visible{background:rgba(255,255,255,.03)}
+  .oarowhead:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
+  .oarowleft{min-width:0}
+  .oastyname{display:block;font-size:14px;font-weight:800;color:var(--ink);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .oarowfilms{display:block;font-size:11px;color:var(--faint);margin-top:1px}
+  .oaalertmark{display:inline-flex;align-items:center;gap:3px;margin-left:4px;white-space:nowrap}
+  .oadot{display:inline-block;width:7px;height:7px;border-radius:50%}
+  .oarowstrip{display:flex;gap:3px}
+  .oarowval{font-size:12.5px;font-weight:800;text-align:right;color:var(--ink);white-space:nowrap}
+  .oarowval i{display:block;font-style:normal;font-weight:600;font-size:10px;color:var(--faint);margin-top:1px}
+  .oachev{text-align:center;color:var(--faint);font-size:11px}
+  /* The score strip — collapsed row (small, no decade labels) and the open style's full-width slider
+     (.oastripfull: taller, with decade labels) share the same box/fill markup. */
+  .oabox{position:relative;flex:1;height:16px;border-radius:3px;overflow:hidden;
+    border:1px solid color-mix(in srgb, var(--bc) 65%, transparent);background:transparent}
+  .oafill{position:absolute;top:0;right:0;bottom:0;background:var(--bc)}
+  .oastripfull .oabox{height:34px;border-radius:5px}
+  .oalbl{position:relative;z-index:2;display:block;margin:3px 0 0 4px;font-size:10px;font-weight:800;
+    color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  .oaopen{padding:2px 4px 16px}
+  .oasechdr{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--faint);margin:14px 0 8px}
+  .oaopen>.oasechdr:first-child{margin-top:4px}
+  /* The minimum-score slider — boxes drawn under a transparent range input (.rslider's own pattern), with
+     only a white 14x26 pill thumb painted; the value sits in its own fixed 52px column to the right. */
+  .oaslider{display:flex;align-items:center;gap:8px}
+  .oaslidewrap{position:relative;flex:1;height:34px}
+  .oaslidewrap .oastripfull{position:absolute;inset:0;display:flex;gap:3px;pointer-events:none}
+  .oarange{position:relative;z-index:2;width:100%;height:34px;margin:0;cursor:pointer;
+    -webkit-appearance:none;appearance:none;background:transparent}
+  .oarange::-webkit-slider-runnable-track{height:34px;background:transparent}
+  .oarange::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:26px;border-radius:7px;
+    background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:grab;margin-top:4px}
+  .oarange::-moz-range-track{height:34px;background:transparent;border:none}
+  .oarange::-moz-range-thumb{width:14px;height:26px;border-radius:7px;background:#fff;
+    border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:grab}
+  .oarange:focus-visible{outline:none}
+  .oarange:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
+  .oarange:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
+  .oaslideval{flex:0 0 52px;width:52px;text-align:right;font-size:13px;font-weight:800;color:var(--ink)}
+  .oaslideval i{display:block;font-style:normal;font-size:10.5px;font-weight:600;color:var(--faint);margin-top:1px}
+  .oaslidedesc{font-size:12px;color:var(--dim);line-height:1.5;margin:8px 0 0}
+  /* Agent suggestion — a gold-bordered callout, same gold token the rest of the app marks a suggestion with. */
+  .oasuggest{margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--gold);
+    background:rgba(245,214,117,.08)}
+  .oasuglbl{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--gold)}
+  .oasugtext{font-size:12.5px;color:var(--ink);line-height:1.5;margin-top:4px}
+  .oasugbtns{display:flex;gap:8px;margin-top:9px}
+  .oasugchange{flex:0 0 auto;padding:7px 12px;border-radius:8px;border:1px solid var(--accent);
+    background:var(--accent);color:#fff;font-size:12px;font-weight:800;cursor:pointer}
+  .oasugkeep{flex:0 0 auto;padding:7px 12px;border-radius:8px;border:0;background:none;
+    color:var(--dim);font-size:12px;font-weight:700;cursor:pointer}
+  /* Film alert chips — "● Cinema / ● Rent / ● Stream", on = the window's own colour; off = grey. */
+  .oaalerts{display:flex;gap:8px;flex-wrap:wrap}
+  .oachip{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:20px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--faint);
+    font-size:12.5px;font-weight:700;cursor:pointer}
+  .oachipdot{width:8px;height:8px;border-radius:50%;background:#6b7280;flex:0 0 auto}
+  .oachip.on{border-color:var(--wc);background:color-mix(in srgb, var(--wc) 20%, transparent);color:var(--ink)}
+  .oachip.on .oachipdot{background:var(--wc)}
+
+  /* ---- CAS-1340: Score adjustments section (section 3 of an open style) ----------------------------------
+     Teal/orange reuse the exact literals .qone.up/.qone.down already mark a positive/negative adjustment
+     with (#5eead4/#f0a060) — there is no --teal custom property in this file, so this follows that existing
+     precedent rather than inventing a new token for the same two colours. */
+  .oacintro{font-size:12.5px;color:var(--dim);line-height:1.5;margin:6px 0 10px}
+  .oacseen{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;
+    padding:10px 12px;border-radius:10px;border:1px solid var(--gold);background:rgba(245,214,117,.08);
+    font-size:12.5px;color:var(--ink)}
+  .oacseen b{color:var(--gold)}
+  .oacseenbtn{flex:0 0 auto;background:none;border:0;color:var(--gold);font-weight:800;font-size:12.5px;
+    cursor:pointer;white-space:nowrap;padding:0}
+  .oaclist{display:flex;flex-direction:column}
+  .oacrow{padding:10px 0;border-bottom:1px solid var(--line)}
+  .oacrow:last-child{border-bottom:0}
+  .oacrow-empty .oacright{opacity:.45}
+  .oactitle{font-size:14px;font-weight:800;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .oactag{font-size:10px;font-weight:800;letter-spacing:.3px;padding:2px 8px;border-radius:10px;text-transform:uppercase}
+  .oactag.up{background:rgba(94,234,212,.18);color:#5eead4}
+  .oactag.down{background:rgba(240,160,96,.18);color:#f0a060}
+  .oacline2{display:flex;align-items:center;gap:10px;margin-top:3px}
+  .oacleft{flex:0 0 104px;font-size:12px;line-height:1.4;background:none;border:0;text-align:left;padding:0;
+    color:var(--cyan,#22d3ee);cursor:pointer}
+  .oacnoverdict{color:var(--faint);cursor:default}
+  .oacset{color:var(--faint);cursor:default;display:block}
+  .oacuse{color:var(--gold);text-decoration:underline;background:none;border:0;padding:0;font:inherit;cursor:pointer}
+  .oacright{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+  .oacombowrap{position:relative;flex:1;height:16px}
+  .oacombobar{position:absolute;inset:0;display:flex;gap:3px}
+  .oacbox{position:relative;flex:1;height:16px;border-radius:3px;border:1px solid rgba(255,255,255,.12);background:transparent}
+  .oacfill{position:absolute;top:1px;bottom:1px;border-radius:2px}
+  .oacfill.up{background:#5eead4}
+  .oacfill.down{background:#f0a060}
+  .oacfill.never{background:repeating-linear-gradient(135deg,#f0a060,#f0a060 4px,transparent 4px,transparent 8px)}
+  .oacbarline{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff}
+  .oacdash{position:absolute;top:-2px;bottom:-2px;width:0;border-left:2px dashed rgba(255,255,255,.6)}
+  .oacrange{position:relative;z-index:2;width:100%;height:16px;margin:0;cursor:pointer;
+    -webkit-appearance:none;appearance:none;background:transparent}
+  .oacrange::-webkit-slider-runnable-track{height:16px;background:transparent}
+  .oacrange::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:18px;border-radius:5px;
+    background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:grab;margin-top:-1px}
+  .oacrange::-moz-range-track{height:16px;background:transparent;border:none}
+  .oacrange::-moz-range-thumb{width:10px;height:18px;border-radius:5px;background:#fff;
+    border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:grab}
+  .oacrange:focus-visible{outline:none}
+  .oacrange:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
+  .oacrange:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
+  .oacval{flex:0 0 auto;font-size:12.5px;font-weight:800;color:var(--ink);min-width:28px;text-align:right}
+  .oacval-empty{color:var(--faint);font-weight:600}
+  .oacval-over{color:var(--gold);text-decoration:underline}
+  .oacwas{font-size:11.5px;margin:4px 0 0;line-height:1.4}
+  .oacwas.up{color:#5eead4}
+  .oacwas.down{color:#f0a060}
+  .oacchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .oacchip{font-size:11px;font-weight:700;padding:4px 9px;border-radius:12px;background:var(--panel2);
+    border:1px solid var(--line)}
+  .oacchip.up{color:#5eead4;border-color:rgba(94,234,212,.4)}
+  .oacchip.down{color:#f0a060;border-color:rgba(240,160,96,.4)}
+  .oacshowall{display:block;margin:8px 0 0;background:none;border:0;color:var(--accent);font-size:12.5px;
+    font-weight:800;cursor:pointer;padding:0}
+  .oacfoot{font-size:11px;color:var(--faint);line-height:1.5;margin:12px 0 0}
+  .oaadjup,.oaadjdown{font-style:normal;font-weight:800;font-size:11px;margin-left:6px}
+  .oaadjup{color:#5eead4}
+  .oaadjdown{color:#f0a060}
+
+  /* ---- CAS-1341: moods as lists — the v2 mood sheet and the card's list sheet. Reuses CAS-1339's .oarowstrip/
+     .oabox/.oafill/.oaslider* geometry verbatim for the read-only style rows and the mood-minimum slider; only
+     the handful of classes below (oam*) are new. */
+  .oamhead{display:flex;align-items:center;gap:10px}
+  .oamhead .mfinput{flex:1}
+  .oamstylerow{display:grid;grid-template-columns:18px 104px 1fr 52px;align-items:center;gap:8px;
+    padding:8px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+  .oamstylerow input[type=checkbox]{width:16px;height:16px}
+  .oamstylerow.off{opacity:.45}
+  .oamstyleleft{min-width:0}
+  .oamstylename{display:block;font-size:13.5px;font-weight:800;color:var(--ink);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .oamalso{display:block;font-size:10.5px;color:var(--faint);margin-top:1px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .oamlistpanel{padding:10px 14px;max-width:280px}
+  .oamlisttitle{font-size:14px;font-weight:800;color:var(--ink)}
+  .oamlistagent,.oamlistscore{font-size:11.5px;color:var(--dim);line-height:1.4;margin-top:4px}
+  .oamlistrows{margin-top:10px;display:flex;flex-direction:column}
+  .oamlistrow{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:7px 0;border-bottom:1px solid var(--line)}
+  .oamlistrow:last-child{border-bottom:0}
+  .oamlistname{font-size:12.5px;font-weight:800;color:var(--ink);flex:1;min-width:0}
+  .oamliststate{font-size:10.5px;color:var(--faint);margin-right:6px;white-space:nowrap}
+  .oamlistnote{font-size:11px;color:var(--faint);line-height:1.5;margin-top:10px}
+  .oamlistbtn{flex:0 0 auto;padding:6px 10px;font-size:11.5px;border-radius:8px}
+  .ctl.oamlist.handmark .cmini{box-shadow:inset 0 0 0 1.5px var(--gold)}
+
   /* ---- CAS-775: Occasions screen — same .ucard/.urow row language as Account, plus rename/delete
      affordances no other .urow row needs (an Occasion is a thing you can rename or remove yourself). ---- */
   .listact{flex:0 0 auto;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);
@@ -3566,7 +3724,7 @@
      The selected stage and the selected mood use the same --sel-bg / --sel-bd as the selected nav item. */
   .watchtop{display:block;margin:10px 12px 0}
   .cascbar.rail .watchtop{margin:10px 12px 0}
-  .stgroups{display:flex;gap:8px;align-items:stretch}
+  .stgroups{display:flex;gap:8px;align-items:stretch;margin-top:10px}
   .stgrp{min-width:0;border:1px solid var(--line);border-radius:12px;padding:5px;background:rgba(255,255,255,.025)}
   .stgrplbl{font:700 9px/1 var(--font-body);letter-spacing:.9px;text-transform:uppercase;color:var(--faint);
     padding:2px 5px 6px}
@@ -3590,7 +3748,7 @@
     .stgroups .stagestop .stagename{font-size:11px;letter-spacing:-.1px}
   }
   /* moods: one row, one selected at a time */
-  .moodrow{display:flex;gap:6px;margin-top:9px;overflow-x:auto;scrollbar-width:none;align-items:center;
+  .moodrow{display:flex;gap:6px;margin-top:0;overflow-x:auto;scrollbar-width:none;align-items:center;
     user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   .moodrow::-webkit-scrollbar{display:none}
   .moodchip{flex:none;height:34px;padding:0 13px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
@@ -3908,6 +4066,21 @@
   .qpub{border:0;background:rgba(255,255,255,.07)}
   .qpub small{color:var(--dim)}
   .qpub.intitle{top:40px}
+  /* ==== ONE AGENT: SINGLE SCORE BOX (CAS-1338, Lee, 30 Oct 2026) ========================================
+     A v2 (one-agent) account's card shows ONE score box, oneScoreBoxHTML(m), instead of the You+Public
+     pair above. The six rules up to and including ".card.expanded .qone{display:none}" are EXACT, from the
+     approved prototype — applied verbatim. The two below are this ticket's own: the box's collapsed-only
+     visibility already comes from that last EXACT rule, so oneScoreTextHTML(m)'s expanded-card companion
+     (.qonetext) just needs the opposite — hidden collapsed, its own full-width line in the scores row open. */
+  .qone{position:absolute;top:4px;right:0;width:42px;height:40px}
+  .qone .qpub{position:absolute;left:0;top:7px;background:var(--panel)}
+  .qone.up .qpub{top:0} .qone.down .qpub{top:14px}
+  .qone .qghost{position:absolute;left:0;top:7px;width:42px;height:26px;border-radius:7px;border:1.5px dashed rgba(255,255,255,.28);box-sizing:border-box}
+  .qone.up .qpub{box-shadow:0 3px 8px rgba(0,0,0,.45)} .qone.down .qpub{box-shadow:0 -3px 8px rgba(0,0,0,.45)}
+  .qone.up .qpub small{color:#5eead4;opacity:1} .qone.down .qpub small{color:#f0a060;opacity:1}
+  .card.expanded .qone{display:none}
+  .card:not(.expanded) .qonetext{display:none}
+  .ctop.hasmatch .mrow.r-scores .qonetext{order:5;flex:1 1 100%;font:500 12px/1.4 var(--font-body);color:var(--dim)}
   .card:not(.expanded) .wline{display:block;flex:1 1 0;min-width:0;margin:0}
   .card:not(.expanded) .wline:last-of-type{min-width:9px}
   .card:not(.expanded) .avail2{gap:0}
@@ -4114,7 +4287,7 @@
     <div id="cascDetail"></div>
   </div>
   <!-- CAS-1247: the Filters sheet is now the Mood sheet — a saved bundle of order + agents + the Availability/
-       Picked by/Watched/Styles/Also show/Badges sections this sheet already had. Title and footer buttons are
+       Picked by/Watched/Styles/Badges sections this sheet already had. Title and footer buttons are
        repainted by renderMoodSheet() per mood/new-mood; the scrim/Escape/close-button discard wiring is
        unchanged from the Filters sheet it replaces. Slides up from the bottom over a scrim; position:fixed so
        its place in the DOM doesn't matter. -->
@@ -4889,44 +5062,20 @@ const STATUS_LABEL = {
 // that puts one marker per enabled window on the score track. Replaces CAS-713's hardcoded three-entry
 // array (which folded Premium into Streaming) now that every rung gets its own named tab.
 const WATCH_TAB_LABEL = {in_cinema:"Cinema", premium:"Premium", rent:"Rental", stream:"Streaming"};
-// CAS-823: the standing each non-Cinema tab restricts to by default (filmMatchesWatchTab below) — the fix
-// for "Streaming showed films still in cinemas". Cinema carries no entry here: Part A's own decision left
-// its behaviour untouched, so it keeps testing Watch On alone, never a standing.
+// CAS-823/CAS-1329: the standing each non-Cinema tab lists — the window a film must actually be IN now.
 const WATCH_TAB_OWN_STANDING = {stream:"included_streaming", rent:"rental", premium:"pvod"};
 function watchTabsNow(){
   return WATCH_LEVEL_KEYS.filter(k=>windowEnabled(k)).map(k=>({key:k, label:WATCH_TAB_LABEL[k]}));
 }
-// CAS-717/CAS-725 — a tab filters by each film's chosen WATCH ON level (filmNotifyState's single-select
-// `.key`, post CAS-716) matched straight to its own tab, not by its availability status — status stays as
-// the section grouping INSIDE a tab (listingGroups/render below, unchanged). Cinema alone carries a default
-// bucket — an undecided film (no Watch On pick at all) whose current status is still upcoming/in_cinema —
-// so a film nobody has chosen a level for isn't invisible everywhere; the other tabs carry no such default.
-// CAS-823: a Watch On match is no longer the whole test for the other three tabs — the film must also be
-// STANDING in the tab's own window (WATCH_TAB_OWN_STANDING) unless Also-show (watchAlsoShow, set by the
-// Filters sheet) has widened that tab to include the film's current standing too. Cinema's own branch above
-// is untouched by this — it never consults a standing test or watchAlsoShow at all.
+// CAS-1329 (Lee, 22 Oct 2026): a film is listed only under the stage it is actually in NOW, never by its
+// Watch On pick — Watch On is information on the card, not a placement. Reverses CAS-717/CAS-725's Watch-On-
+// key match and CAS-823's Also-show widening (both removed): every tab, including Cinema, now tests
+// primaryStatus (the window the film stands in) alone. The CAS-1180 taggedOut branch already worked this
+// way, so it's now simply the one rule for every film, watched or not.
 function filmMatchesWatchTab(m, tab){
-  // CAS-1180: setOpinion() clears every Watch On rung the moment a verdict is given, so a watched film
-  // never again carries a key — read its tab off primaryStatus (the window it stands in NOW) instead, the
-  // only way such a film can ever reach the Watched filter/search below rather than being invisible on
-  // every non-Cinema tab forever. It still needs no standing test beyond this: Also-show and
-  // WATCH_TAB_OWN_STANDING are both about a Watch On level widening a tab, which a verdict film has none of.
-  if(taggedOut(m)){
-    const ps=primaryStatus(m);
-    if(tab==="in_cinema") return ps==="upcoming" || ps==="opening_week" || ps==="in_cinema";
-    return ps===WATCH_TAB_OWN_STANDING[tab];
-  }
-  const key = filmNotifyState(m.tmdb_id).key;
-  if(tab==="in_cinema"){
-    if(key==="in_cinema") return true;
-    if(key) return false;
-    const ps=primaryStatus(m);
-    return ps==="upcoming" || ps==="in_cinema";
-  }
-  if(key!==tab) return false;
   const ps=primaryStatus(m);
-  if(ps===WATCH_TAB_OWN_STANDING[tab]) return true;
-  return watchAlsoShow[tab].has(ps);
+  if(tab==="in_cinema") return ps==="upcoming" || ps==="opening_week" || ps==="in_cinema";
+  return ps===WATCH_TAB_OWN_STANDING[tab];
 }
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const FMT_RANK = {SD:1, HD:2, "4K":3};
@@ -5407,6 +5556,14 @@ const wowed = new Set();
 // CAS-349: and a SIXTH, between Watch Again and So-so — "I enjoyed it" without it being one you'd go back to.
 // Same pattern as `wowed`/`indifferent`: rides alongside `watched`.
 const enjoyed = new Set();
+// CAS-1340: when each film's verdict was last (re)written — id -> ms. Session-derived bookkeeping only,
+// never persisted on its own: seeded from each account-sync row's own updated_at (applyFilmRows, below) and
+// refreshed by every local setOpinion. The one consumer is the Score adjustments section's "after your
+// verdict(s) on <titles>" line, which lists a combo's films whose verdict is newer than the v2 agent's own
+// seenAdjAt for that combo — if a film's timestamp was never captured (e.g. a verdict predating this ticket
+// that hasn't round-tripped the server yet), it simply never qualifies as "newer", which degrades to no
+// titles shown rather than a wrong one.
+const verdictAt = new Map();
 const isWow      = id => watched.has(id) && wowed.has(id) && !disliked.has(id) && !indifferent.has(id);
 const isEnjoyed  = id => watched.has(id) && enjoyed.has(id) && !wowed.has(id) && !disliked.has(id) && !indifferent.has(id);
 const isDisliked = id => watched.has(id) && disliked.has(id);
@@ -6951,9 +7108,56 @@ function publicLozengeHTML(m, extraClass=""){
   if(q<0) return `<span class="qpub none${cls}" title="Not enough agreement to score this yet"><b>&ndash;</b><small>Public</small></span>`;
   return `<span class="qpub ${q>=85?"hi":q>=70?"mid":"lo"}${cls}" title="Public &mdash; ${escA(cascadeScoreSourcesText(m))}"><b>${q}</b><small>Public</small></span>`;
 }
+// CAS-1338: a v2 (one-agent) account's card shows ONE score box in place of the You+Public lozenge pair
+// above — oneAgentCriteria() (CAS-1337) is null for every non-v2 account, so cardTopHTML only ever calls
+// this once it has already checked that. value/adj come straight from oneScoreParts(m); "adj" here is
+// value-pub (the rounded, DISPLAYED difference) rather than oneScoreParts' own raw adj, so the box's
+// direction and label always agree with the two numbers actually shown, even after the ±1/99 clamp.
+// .qone's CSS (verbatim from the ticket) hides it on .card.expanded — oneScoreTextHTML below is its
+// expanded-card companion.
+function oneScoreBoxHTML(m){
+  const {value, public:pub} = oneScoreParts(m);
+  if(value === -1){
+    return `<span class="qone" title="Not enough agreement to score this yet"><span class="qpub none"><b>&ndash;</b><small>SCORE</small></span></span>`;
+  }
+  const adj = value - pub;
+  const dir = adj > 0 ? "up" : adj < 0 ? "down" : "";
+  const band = value>=85 ? "hi" : value>=70 ? "mid" : "lo";
+  const label = adj > 0 ? `▲${adj}` : adj < 0 ? `▼${-adj}` : "SCORE";
+  const ghost = dir ? `<span class="qghost"></span>` : "";
+  const title = adj ? `Public ${pub}, ${adj>0?"+":""}${adj} from your verdicts` : `Public ${pub}`;
+  return `<span class="qone ${dir}" title="${escA(title)}">${ghost}<span class="qpub ${band}"><b>${value}</b><small>${label}</small></span></span>`;
+}
+// CAS-1338 §7: the open card's companion to oneScoreBoxHTML — the box itself hides on expand, and this
+// spells the same oneScoreParts(m) out as a sentence listing every style-combination part behind the
+// adjustment (mainOtherCombos' own (main, other) keying, same as oneScoreParts uses to build `parts`).
+function oneScoreTextHTML(m){
+  const {value, public:pub, parts} = oneScoreParts(m);
+  if(value === -1) return `<span class="qonetext">Not enough agreement to score this yet</span>`;
+  if(!parts.length) return `<span class="qonetext">Score ${value} = Public; no verdicts on its combinations yet</span>`;
+  const {main} = mainOtherCombos(m);
+  const adj = value - pub;
+  const sign = adj >= 0 ? "+" : "−";
+  const bits = parts.map(p => {
+    const n = Math.round(p.points);
+    return `${esc(main)} + ${esc(p.other)} (${n>=0?"+":"−"}${Math.abs(n)})`;
+  }).join(", ");
+  return `<span class="qonetext">Score ${value} = Public ${pub} ${sign}${Math.abs(adj)} from your verdicts on ${bits}</span>`;
+}
 function sortMoviesBy(a,b,key){
   switch(key){
     case "you": {
+      // CAS-1338 §8: on a v2 account the "you" sort becomes Score — oneScore(m), ties broken on Public —
+      // the same oneAgentCriteria() gate oneScoreParts/oneScoreBoxHTML use, so a non-v2 account
+      // (oneAgentCriteria() null) falls straight through to today's tasteMatch-based comparison, untouched.
+      const oneC = oneAgentCriteria();
+      if(oneC){
+        const va=oneScore(a,oneC), vb=oneScore(b,oneC);
+        if(va===-1 && vb===-1) return sortMoviesBy(a,b,"cascade");
+        if(va===-1) return 1;
+        if(vb===-1) return -1;
+        return va!==vb ? vb-va : sortMoviesBy(a,b,"cascade");
+      }
       // CAS-1264: tasteMatch(m) walks every judged film, so calling it on every comparison (O(n log n)
       // calls across one sort) redoes the same walk for the same film many times over. _tasteMatchCache
       // memoizes it per film, cleared at exactly the points tasteProfile() itself goes stale (see
@@ -7237,6 +7441,9 @@ function bandHTML(m, svcLine){
   const rel=releaseDateOf(m);
   const relHTML = rel ? `<span class="reldate"><span class="rellbl">${rel>=TODAY?"Releasing":"Released"}</span><b>${fmtDay(rel)}</b></span>` : "";
   const segs=WINDOW_SLOTS.map((key,i)=>{
+    // Lee, 2026-10-23: dots only between the release date and the lozenge — nothing after it, so the star
+    // reads as its own control instead of the end of the dot trail.
+    if(i>cur) return "";
     const line = i>0 ? `<span class="wline${i>cur?" fut":""}"></span>` : "";
     const cls  = i===0 ? "w-cin-"+cin.key : "w-"+key;
     if(i!==cur){
@@ -8519,12 +8726,17 @@ function cardTopHTML(m, inWatch=false){
   // row, keep it beside the title instead; see the "MATCH ON CARDS" CSS for which chip each card shows).
   // Signed out (the shared film page, onboarding) the card draws exactly as it always has.
   const signedIn = !!(window.CascadePersistence && window.CascadePersistence.accountActive());
-  const matchBadge = signedIn ? matchBadgeHTML(m) : "";
-  const titleScore = signedIn ? matchBadge + publicLozengeHTML(m, "intitle") : qScoreHTML(m);
-  const rowScore = signedIn ? publicLozengeHTML(m, "inrow") : "";
+  // CAS-1338: a v2 (one-agent) account shows ONE score box instead of the You+Public lozenge pair —
+  // oneAgentCriteria() (CAS-1337) is null for every non-v2 account, so this is the one gate everything
+  // below it keys off, and a non-v2 card draws exactly as it always has.
+  const oneAgentC = signedIn ? oneAgentCriteria() : null;
+  const matchBadge = (signedIn && !oneAgentC) ? matchBadgeHTML(m) : "";
+  const titleScore = oneAgentC ? oneScoreBoxHTML(m)
+    : signedIn ? matchBadge + publicLozengeHTML(m, "intitle") : qScoreHTML(m);
+  const rowScore = oneAgentC ? oneScoreTextHTML(m) : signedIn ? publicLozengeHTML(m, "inrow") : "";
   // CAS-179: one grid, one order — title · genres·language · synopsis · money · scores · awards, with
   // the poster spanning down to the scores row and the scale badge tucked under it beside the awards.
-  return `<div class="ctop${signedIn?" hasmatch":""}${signedIn && !matchBadge?" nomatch":""}">
+  return `<div class="ctop${signedIn?" hasmatch":""}${signedIn && !oneAgentC && !matchBadge?" nomatch":""}">
       <!-- CAS-276: the tombstone is the POSTER, and nothing else. -->
       <div class="ptomb">
         <div class="poster"${posterAttr}>${play}</div>
@@ -8623,7 +8835,7 @@ function cardHTML(m, markNew=false, {hideDismiss=false, inWatch=false}={}){
            told about it. -->
       <div class="actions">
         ${notifyChipHTML(id)}
-        ${agentChipHTML(id)}
+        ${oneAgentCriteria() ? oamListChipHTML(id) : agentChipHTML(id)}
         ${watchChipHTML(id)}
       </div>
     </div>
@@ -9645,6 +9857,7 @@ function advanceClock(){
   agMetricsCache.clear();   // CAS-867: "last find Nd ago" and the recent-find count move with the clock alone
   _tasteProfileCache = null;   // CAS-1251: the learned score range reads cascadeScore(m), which moves with the clock too
   _tasteMatchCache.clear();    // CAS-1264: a stale per-film You value would otherwise outlive this invalidation
+  _oneAgentProfileCache = null;   // CAS-1337: the v2 main-keyed pair baseline reads cascadeScore(m) too
   return true;
 }
 async function pollCatalogue(){
@@ -10058,7 +10271,7 @@ function renderWatchTop(){
   // to be captured before it's thrown away and reapplied (or adjusted) on the new one below.
   const prevRow=el.querySelector(".moodrow");
   const prevScrollLeft=prevRow ? prevRow.scrollLeft : 0;
-  el.innerHTML = `${stageHTML}<div class="moodrow" role="group" aria-label="Mood">${moodHTML}${addHTML}</div>`;
+  el.innerHTML = `<div class="moodrow" role="group" aria-label="Mood">${moodHTML}${addHTML}</div>${stageHTML}`;
   // Keeps #wtMini's own text honest immediately after a stage/mood change, independent of the next scroll
   // event — the collapse listener itself (defined later in this script) only ever touches it on scroll.
   if(typeof wtRefreshMini==="function") wtRefreshMini();
@@ -10238,10 +10451,13 @@ window.setWatchOccasion = id => {
 // narrows what a render puts on screen. Now rendered inside the Filters sheet's own Styles section
 // (renderWatchSheet below) rather than a standalone bar.
 const watchGenreOff = {in_cinema:new Set(), premium:new Set(), rent:new Set(), stream:new Set()};
-// A mood's Styles work the way an agent's do (CAS-1147): a film shows when ANY of its styles is switched on,
-// not only when every one of them is. `off` is the set of styles switched off; none off means no filter.
+// CAS-1334: a mood's Styles match a film by its MAIN style only (m.genres[0]), the same rule CAS-1318 gave
+// agents — supersedes CAS-1147/CAS-1256's "ANY of the film's styles counts" rule. `off` is the set of
+// styles switched off; none off means no filter. A film with no styles at all always passes.
 function filmPassesStylesOff(m, off){
-  return !off.size || (m.genres||[]).some(g=>!off.has(g));
+  if(!off.size) return true;
+  const main=(m.genres||[])[0];
+  return !main || !off.has(main);
 }
 window.toggleWatchGenre = g => {
   const set=watchGenreOff[watchTab];
@@ -10315,8 +10531,14 @@ const PICKER_KINDS = {
     // CAS-1264: You score only means anything for a signed-in account (tasteMatch reads their own
     // verdicts) — the window.CascadeAuth-backed guard rather than accountActive() by name, same reason
     // filmPageIsMember() above the account-sync IIFE can't call it directly either.
-    items: () => (window.CascadePersistence && window.CascadePersistence.accountActive())
-      ? SORT_OPTS : SORT_OPTS.filter(o=>o.key!=="you"),
+    // CAS-1338 §8: on a v2 (one-agent) account, "You score" and "Public score" collapse into one Score
+    // entry (oneAgentCriteria() is null for every non-v2 account, so this branch never fires for them).
+    items: () => {
+      if(!(window.CascadePersistence && window.CascadePersistence.accountActive())) return SORT_OPTS.filter(o=>o.key!=="you");
+      return oneAgentCriteria()
+        ? SORT_OPTS.filter(o=>o.key!=="cascade").map(o => o.key==="you" ? {...o, label:"Score"} : o)
+        : SORT_OPTS;
+    },
     current: () => filt.sort,
     // CAS-1240: any explicit tap/pick is a genuine pick, full stop. CAS-819's original rule compared the
     // chosen key against DEFAULT_SORT instead, which silently dropped the pick whenever someone chose
@@ -10398,53 +10620,6 @@ function filmMatchesPickedBy(m){
   const sel=watchPickedBySafe(watchTab);
   if(sel==="all") return true;
   return filmWatchSource(m.tmdb_id)===sel;
-}
-// CAS-823: the widener for filmMatchesWatchTab's own-standing restriction above — one chip per window in
-// ladder order, following the same four windows Part A itself tests (upcoming/in_cinema/rental/
-// included_streaming). pvod and opening_week aren't offered: no tab's own standing is pvod-adjacent enough
-// to need widening past it, and opening_week has always been swept into "In cinemas" (the Cinema tab's own
-// union already reads it that way). Replaces CAS-720's "Current status" section, which this ticket's own
-// description names as that section's deliberate follow-on.
-const ALSO_SHOW_WINDOWS = [
-  {key:"upcoming", label:"Unreleased", cd:"var(--upcoming)"},
-  {key:"in_cinema", label:"In cinemas", cd:"var(--amber)"},
-  {key:"rental", label:"At rental", cd:"var(--blue)"},
-  {key:"included_streaming", label:"Streaming", cd:"var(--green)"},
-];
-// CAS-1235: a film "disappears" when its Watch On moves to a later stage (e.g. Upcoming → Streaming) unless
-// every earlier-than-own-standing window is already widened in — so each non-Cinema tab now defaults to
-// widening every ALSO_SHOW_WINDOWS entry EARLIER than its own standing on the upcoming/in_cinema/rental/
-// included_streaming ladder, not none. Premium's own standing (pvod) sits outside that four-window ladder
-// entirely, so only upcoming/in_cinema (both before it either way) apply to Premium.
-const WATCH_ALSO_SHOW_DEFAULT = {
-  premium: ["upcoming", "in_cinema"],
-  rent: ["upcoming", "in_cinema"],
-  stream: ["upcoming", "in_cinema", "rental"],
-};
-// Which windows are switched ON (widened in) per tab — same per-tab, session-only shape as watchGenreOff,
-// but "nothing switched OFF from default" here means WATCH_ALSO_SHOW_DEFAULT, not empty (CAS-1235) — CAS-720's
-// off-set had yet a third default ("everything shows"). The tab's own window is tested by
-// WATCH_TAB_OWN_STANDING directly and is never added to this Set, so it can never be switched off from here.
-const watchAlsoShow = {in_cinema:new Set(), premium:new Set(WATCH_ALSO_SHOW_DEFAULT.premium),
-  rent:new Set(WATCH_ALSO_SHOW_DEFAULT.rent), stream:new Set(WATCH_ALSO_SHOW_DEFAULT.stream)};
-window.toggleWatchAlsoShow = key => {
-  if(WATCH_TAB_OWN_STANDING[watchTab]===key) return;   // the tab's own window — not switchable
-  const set=watchAlsoShow[watchTab];
-  set.has(key) ? set.delete(key) : set.add(key);
-  render();
-};
-// CAS-1235: "clear" returns Also-show to its default (the earlier-stages-on state), not to empty — empty
-// would itself now read as a deviation (watchAlsoShowIsDefault below), the opposite of what Clear means.
-window.clearWatchAlsoShow = () => {
-  watchAlsoShow[watchTab]=new Set(WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
-  render(); scrollWatchListingToTop();
-};   // CAS-857
-// CAS-1235: true when a tab's Also-show set exactly matches its default — the badge/active-filter-chip's own
-// "no deviation" test, now that the default is no longer empty.
-function watchAlsoShowIsDefault(tab){
-  const def=WATCH_ALSO_SHOW_DEFAULT[tab]||[];
-  const cur=watchAlsoShow[tab];
-  return cur.size===def.length && def.every(k=>cur.has(k));
 }
 // CAS-720: agent inclusion — restores the agent narrowing scopeRows() gave up when CAS-718 retired the
 // deck's per-list agent picker (see that function's own comment), reading from this sheet state instead of
@@ -10530,9 +10705,11 @@ const MOOD_STARTER_IDS = Object.keys(MOOD_STARTER_STYLES);
 const MOOD_DEFAULTS = [
   {id:"top", name:"Top scores", order:"score", sort:"score", topYou:null, topPublic:10},
   // CAS-1328: Latest (built-in id "releases", carried over from the pre-rename Releases mood) — every
-  // cinema release of the last 12 months or still ahead, in release order, agents and agent floors never
-  // consulted. source/sort are overridden for this id regardless of what's stored (moodSource/moodSort
-  // below), so an existing account's pre-rename {source:"agents", ...} record still behaves this way.
+  // cinema release of the last 12 months or still ahead. CAS-1333: sort/source/name all default the same
+  // way (Release date/catalogue/"Latest") but each sticks to the person's own choice once they've actually
+  // saved one from the sheet (moodSort/moodSource/moodDisplayName below) — so an existing account's
+  // pre-rename {source:"agents", ...} record (no sourceChosen/sortChosen) still defaults to catalogue and
+  // Release date.
   {id:"releases", name:"Latest", source:"catalogue", order:"release", sort:"release", topYou:null, topPublic:null},
   // CAS-1295: the shortlist — every starred film standing on the current stage, watched or not, on any
   // service (mineOnly:false), across the whole catalogue (not just what an agent lists).
@@ -10546,7 +10723,7 @@ const MOOD_DEFAULTS = [
     stylesOff:moodStylesOffKeeping(MOOD_STARTER_STYLES.fun), watched:["wow","liked"], mineOnly:true},
 ];
 const moodDefaultFieldsNow = () => ({
-  agentsOff:[], mineOnly:true, pickedBy:"all", watched:[], stylesOff:[], badges:[], alsoShow:null,
+  agentsOff:[], mineOnly:true, pickedBy:"all", watched:[], stylesOff:[], badges:[],
   starredOnly:false,
 });
 // CAS-1284: defaults spread FIRST, then the mood's own fields — so a starter's explicit mineOnly/watched/
@@ -10582,15 +10759,21 @@ function moodOrder(mood){ return (moodTopYouN(mood)||moodTopPublicN(mood)) ? "yo
 // see applyMoodToState/moodDraftFrom), so it's resolved here, in memory, from the old moodOrder() derivation
 // instead — never written back (CAS-1218/CAS-1243 no-boot-write rule). It's only ever persisted once the
 // person actually saves that mood from the sheet.
-// CAS-1328: Latest's own sort is fixed by the app, never the stored field — see MOOD_DEFAULTS' own comment.
-function moodSort(mood){ return mood.id==="releases" ? "release" : (mood.sort!==undefined ? mood.sort : (moodOrder(mood)==="release" ? "release" : "score")); }
-// CAS-1328: Latest (id "releases") always behaves as a catalogue-sourced mood regardless of what an
-// existing account's stored record carries (CAS-1218/1243: a load never rewrites it) — every place that
-// cares whether a mood is agent- or catalogue-scoped reads this instead of the raw `source` field.
-function moodSource(mood){ return mood.id==="releases" ? "catalogue" : mood.source; }
+// CAS-1328: Latest defaults to Release date regardless of what an existing account's pre-rename record
+// carries (CAS-1218/1243: a load never rewrites it). CAS-1333: once the person actually chooses a sort from
+// the sheet (saveMoodFromSheet stamps sortChosen:true alongside sort, same pattern as moodSource/
+// moodDisplayName below), that choice sticks.
+function moodSort(mood){ return mood.id==="releases" ? (mood.sortChosen ? mood.sort : "release") : (mood.sort!==undefined ? mood.sort : (moodOrder(mood)==="release" ? "release" : "score")); }
+// CAS-1328: Latest (id "releases") defaults to catalogue-sourced regardless of what an existing account's
+// pre-rename record carries (CAS-1218/1243: a load never rewrites it). CAS-1331: once the person actually
+// chooses a source from the sheet (saveMoodFromSheet stamps sourceChosen:true alongside source), that choice
+// sticks — every place that cares whether a mood is agent- or catalogue-scoped reads this instead of the
+// raw `source` field.
+function moodSource(mood){ return mood.id==="releases" ? (mood.sourceChosen ? mood.source : "catalogue") : mood.source; }
 // CAS-1328: the display name for Latest — "Latest" even when the stored record still reads the pre-rename
-// "Releases" (never rewritten on load); a name the person has actually typed themselves is always kept.
-function moodDisplayName(mood){ return (mood.id==="releases" && mood.name==="Releases") ? "Latest" : mood.name; }
+// "Releases" (never rewritten on load). CAS-1331: once the person has actually saved a name from the sheet
+// (nameChosen:true, stamped by saveMoodFromSheet), it is always shown verbatim, including "Releases".
+function moodDisplayName(mood){ return (mood.id==="releases" && mood.name==="Releases" && !mood.nameChosen) ? "Latest" : mood.name; }
 // CAS-1328: Latest's own pool restriction — a real cinema release (cinema_release) whose cinema_date falls
 // in the 12 months before today or any time after it. Applies only to the built-in Latest mood (id
 // "releases"), never to any other catalogue mood (Starred/Action/Imagine/Fun carry no such window).
@@ -10602,8 +10785,13 @@ const MOOD_MAX = 10;
 let watchMoods = moodDefaultsNow();
 // C2: the selected mood is view.mood if it names a mood that exists, otherwise the first.
 let watchMoodSel = watchMoods[0].id;
-function watchMoodsList(){ return watchMoods; }
-function currentMood(){ return watchMoods.find(m=>m.id===watchMoodSel) || watchMoods[0]; }
+// CAS-1341: a v2 account's moods are a different shape entirely (oamMoodsListReal/currentOamMood, further
+// down) — both gates read oneAgentCriteria() fresh each call, never cached, so neither drifts from the other.
+function watchMoodsList(){ return oneAgentCriteria() ? oamMoodsListReal() : watchMoods; }
+function currentMood(){
+  if(oneAgentCriteria()) return currentOamMood();
+  return watchMoods.find(m=>m.id===watchMoodSel) || watchMoods[0];
+}
 const MOOD_EDIT_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>`;
 // C3: copies one mood's values into the state the pipeline already reads — the only place any of that
 // state changes now. Applied at boot (below, from the in-memory defaults), again whenever loadUserPrefs()
@@ -10624,12 +10812,6 @@ function applyMoodToState(mood){
     watchBadgeSel[tab]=new Set();   // CAS-1281: moods no longer filter by badge; mood.badges is ignored
     watchMineOnly[tab]=mood.mineOnly!==false;
     watchSearch[tab]=""; watchSearchRaw[tab]="";
-    if(tab!=="in_cinema"){
-      // A saved mood's alsoShow[tab] is an array (possibly empty — "explicitly nothing widened" is a real,
-      // distinct state from the default) whenever alsoShow itself isn't null; only null means "use default".
-      const hasSaved = mood.alsoShow && Array.isArray(mood.alsoShow[tab]);
-      watchAlsoShow[tab]=new Set(hasSaved ? mood.alsoShow[tab] : (WATCH_ALSO_SHOW_DEFAULT[tab]||[]));
-    }
   });
   // CAS-1303: sort:"release" does exactly what tapping Release date did; sort:"title" does exactly what
   // tapping Title A-Z did. sortPicked is always true on Watch now (one flat run, no agent lanes).
@@ -10651,7 +10833,12 @@ window.setWatchMood = id => {
   scrollWatchListingToTop();
 };
 // C5: tapping the selected mood's own chip opens the sheet for it; tapping a different chip selects it.
-window.onMoodChipTap = id => { id===watchMoodSel ? openMoodSheetFor(id) : setWatchMood(id); };
+// CAS-1341: switching mood (setWatchMood) is shared as-is — watchMoods/watchMoodSel/applyMoodToState are all
+// shape-agnostic for a v2 mood record (see their own comments). Only OPENING the sheet differs.
+window.onMoodChipTap = id => {
+  if(id!==watchMoodSel){ setWatchMood(id); return; }
+  oneAgentCriteria() ? openOamMoodSheetFor(id) : openMoodSheetFor(id);
+};
 
 // ---- The mood sheet's own draft — nothing below writes watchMoods/the live watch* state until Save. ----
 let moodDraft = null;
@@ -10662,7 +10849,8 @@ function moodDraftFrom(mood){
     editingId: mood ? mood.id : null,
     name: mood ? moodDisplayName(mood) : "",
     // CAS-1284 Change 4: a new mood defaults to "My agents" — "missing means agents" (Change 1).
-    // CAS-1328: Latest's own source is fixed regardless of what's stored — see moodSource.
+    // CAS-1328/CAS-1331: Latest's own source defaults to catalogue but sticks to a person's actual choice —
+    // see moodSource.
     source: mood && moodSource(mood)==="catalogue" ? "catalogue" : "agents",
     // CAS-1296: order is no longer part of the draft — it's derived (moodOrder) from topYou/topPublic below.
     // CAS-1287 Change 1: topYou/topPublic replace Best N's single `best` field.
@@ -10674,7 +10862,6 @@ function moodDraftFrom(mood){
     watched: new Set(mood ? (mood.watched||[]) : []),
     stylesOff: new Set(mood ? (mood.stylesOff||[]) : []),
     badges: new Set(mood ? (mood.badges||[]) : []),
-    alsoShow: mood && mood.alsoShow ? {premium:[...(mood.alsoShow.premium||[])], rent:[...(mood.alsoShow.rent||[])], stream:[...(mood.alsoShow.stream||[])]} : null,
     // CAS-1295: "Only starred films" — default off for a new mood, carried over for an existing one.
     starredOnly: mood ? !!mood.starredOnly : false,
     // CAS-1303: Sort — resolved from the existing mood's own field (or the pre-CAS-1303 derivation, via
@@ -10689,6 +10876,7 @@ window.openMoodSheetFor = id => {
   openWatchSheet();
 };
 window.openMoodSheetForNew = () => {
+  if(oneAgentCriteria()){ openOamMoodSheetForNew(); return; }   // CAS-1341
   if(watchMoods.length>=MOOD_MAX) return;   // C5: #moodAddBtn is already not written at the cap, but guard anyway
   moodDraft=moodDraftFrom(null);
   moodDeleteArmed=false; clearTimeout(moodDeleteArmTimer);
@@ -10718,20 +10906,12 @@ window.clearAllMoodDraftStyles = () => { if(!moodDraft) return; moodDraft.styles
 // actually wanted — see the new Help article instead), so nothing calls this any more. Left in place
 // rather than deleted — moodDraft.badges still lives on the draft shape and the stored mood shape.
 window.toggleMoodDraftBadge = key => { if(!moodDraft) return; moodDraft.badges.has(key)?moodDraft.badges.delete(key):moodDraft.badges.add(key); renderMoodSheetBody(); };
-window.toggleMoodDraftAlsoShow = key => {
-  if(!moodDraft) return;
-  if(WATCH_TAB_OWN_STANDING[watchTab]===key) return;   // the tab's own window — not switchable
-  if(!moodDraft.alsoShow) moodDraft.alsoShow={premium:[...WATCH_ALSO_SHOW_DEFAULT.premium], rent:[...WATCH_ALSO_SHOW_DEFAULT.rent], stream:[...WATCH_ALSO_SHOW_DEFAULT.stream]};
-  const set=new Set(moodDraft.alsoShow[watchTab]||[]);
-  set.has(key) ? set.delete(key) : set.add(key);
-  moodDraft.alsoShow[watchTab]=[...set];
-  renderMoodSheetBody();
-};
 // C5: Save — an empty trimmed name saves nothing and focuses the name field; otherwise stores the mood,
 // selects it, closes the sheet and applies it. C4: one pushViewField("moods", ...) always; a second,
 // pushViewField("mood", id), only when the selection actually changed (editing the already-selected mood
 // does not reselect it).
 window.saveMoodFromSheet = () => {
+  if(oamDraft) return oamSaveMoodFromSheet();   // CAS-1341: defensive — v2's own Save lives in the body, not here
   const d=moodDraft; if(!d) return;
   const name=(d.name||"").trim();
   if(!name){ const inp=$("moodName"); if(inp) inp.focus(); return; }
@@ -10744,10 +10924,13 @@ window.saveMoodFromSheet = () => {
     topYou:d.topYou, topPublic:d.topPublic,
     agentsOff:[...d.agentsOff], mineOnly:!!d.mineOnly, pickedBy:d.pickedBy,
     watched:[...d.watched], stylesOff:[...d.stylesOff], badges:[],   // CAS-1284: styles saved again; CAS-1281: badges still aren't
-    alsoShow: d.alsoShow ? {premium:[...(d.alsoShow.premium||[])], rent:[...(d.alsoShow.rent||[])], stream:[...(d.alsoShow.stream||[])]} : null,
     starredOnly: !!d.starredOnly,
     sort: d.sort,   // CAS-1303
   };
+  // CAS-1331/CAS-1333: Latest (id "releases") is the only mood whose source/name/sort can disagree with
+  // what the sheet just saved (moodSource/moodDisplayName/moodSort's legacy pre-rename fallbacks) —
+  // stamping these makes an actual save from the sheet always win over that fallback, from this point on.
+  if(mood.id==="releases"){ mood.sourceChosen=true; mood.nameChosen=true; mood.sortChosen=true; }
   const idx=watchMoods.findIndex(m=>m.id===mood.id);
   const selectionChanged = watchMoodSel!==mood.id;
   if(idx>=0) watchMoods[idx]=mood; else watchMoods.push(mood);
@@ -10763,6 +10946,7 @@ window.saveMoodFromSheet = () => {
 // C5: the footer's left button — "Cancel" (discard) for a new mood; "Delete mood" for an existing one,
 // armed to "Tap again to delete" for 4s by a first tap, disabled when only one mood is left.
 window.handleMoodDeleteBtn = () => {
+  if(oamDraft) return oamHandleMoodDeleteBtn();   // CAS-1341
   const d=moodDraft; if(!d) return;
   if(!d.editingId){ closeWatchSheet(); return; }
   if(watchMoods.length<=1) return;
@@ -10795,7 +10979,7 @@ window.openWatchSheet = () => {
   $("watchSheet").classList.add("open");
   $("watchSheetScrim").classList.add("open");
   lockBodyScroll(true);
-  renderMoodSheetBody();
+  if(oamDraft) renderOamMoodSheetBody(); else renderMoodSheetBody();   // CAS-1341
 };
 window.closeWatchSheet = () => {
   watchSheetOpen=false;
@@ -10805,6 +10989,9 @@ window.closeWatchSheet = () => {
   moodDraft=null;
   moodDeleteArmed=false;
   clearTimeout(moodDeleteArmTimer);
+  oamDraft=null;   // CAS-1341
+  oamDeleteArmed=false;
+  clearTimeout(oamDeleteArmTimer);
 };
 document.addEventListener("keydown", e=>{ if(e.key==="Escape" && watchSheetOpen) closeWatchSheet(); });
 const chipSummary = labels => labels.length<=2 ? labels.join(", ") : `${labels.slice(0,2).join(", ")} +${labels.length-2}`;
@@ -10827,8 +11014,7 @@ function watchFiltersActiveCount(){
   const badgeSel=watchBadgeSel[watchTab];
   const pickedBy=watchPickedBySafe(watchTab);
   const mineOnly=watchMineOnlyOn();
-  // CAS-1235: Also-show's default is no longer empty — only a DIFFERENCE from WATCH_ALSO_SHOW_DEFAULT counts.
-  return (pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(badgeSel.size?1:0)+(watchAlsoShowIsDefault(watchTab)?0:1)+(mineOnly?0:1);
+  return (pickedBy!=="all"?1:0)+(watchedSel.size?1:0)+(genreOff.size?1:0)+(badgeSel.size?1:0)+(mineOnly?0:1);
 }
 // CAS-1247: renderWatchSheet(rows, shownCount) is still render()'s own call site (unchanged signature) —
 // it just caches the pipeline's own rows/count for whenever the mood sheet is actually open, since genre/
@@ -10842,15 +11028,15 @@ function renderWatchSheet(rows, shownCount){
   watchSheetLastRows = rows;
   watchSheetLastShownCount = shownCount;
   if(moodDraft) renderMoodSheetBody();
+  if(oamDraft) renderOamMoodSheetBody();   // CAS-1341
 }
 function renderMoodSheetBody(){
   const d=moodDraft; if(!d) return;
   const rows=watchSheetLastRows;
   const isCatalogue=d.source==="catalogue";
-  // CAS-1328: Latest's own Agents/Styles sections never apply — Agents is already hidden for any catalogue
-  // mood (isCatalogue, forced true for this id by moodDraftFrom); Styles needs its own flag since every
-  // other catalogue mood (Starred/Action/Imagine/Fun) still offers it.
-  const isLatestDraft = d.editingId==="releases";
+  // CAS-1328: Latest's own Agents section never applies — already hidden for any catalogue mood
+  // (isCatalogue, forced true for this id by moodDraftFrom). CAS-1334: Styles now applies to Latest too,
+  // same as every other catalogue mood (Starred/Action/Imagine/Fun).
   // CAS-1322 Change 3: an agents-sourced mood with every agent toggled off would save with nothing included —
   // Save is disabled and a hint shown under the Agents list (below) rather than letting that state back in.
   const noAgentsSelected = !isCatalogue && cascades.length>0 && cascades.every(c=>d.agentsOff.has(c.id));
@@ -10886,18 +11072,6 @@ function renderMoodSheetBody(){
     return `<button type="button" class="chip${on?" on":""}" aria-pressed="${on}"
       onclick="toggleMoodDraftGenre('${escA(g)}')">${esc(g)}</button>`;
   }).join("") : `<span style="color:var(--faint)">Select an agent to choose styles.</span>`;
-  const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
-  const alsoShowSet = watchTab==="in_cinema" ? new Set() : new Set((d.alsoShow && d.alsoShow[watchTab]) || WATCH_ALSO_SHOW_DEFAULT[watchTab]||[]);
-  const alsoShowPool = watchTab==="in_cinema" ? [] : watchAlsoShowPool();
-  const alsoShowHTML = watchTab==="in_cinema" ? "" : ALSO_SHOW_WINDOWS.map(w=>{
-    const isOwn = w.key===ownStanding;
-    const on = isOwn || alsoShowSet.has(w.key);
-    const count = alsoShowPool.filter(m=>primaryStatus(m)===w.key).length;
-    return `<button type="button" class="chip alsochip${on?" on":""}" style="--wwc:${w.cd}"
-      aria-pressed="${on}"${isOwn?" disabled aria-disabled=\"true\"":""}
-      ${isOwn?"":`onclick="toggleMoodDraftAlsoShow('${w.key}')"`}>
-      <span class="gdot ${w.key}" aria-hidden="true"></span>${esc(w.label)}<span class="jn">${count}</span>${isOwn?`<span class="alwaystag">always</span>`:""}</button>`;
-  }).join("");
   const body=$("watchSheetBody");
   // CAS-1296: section order is now Name → From → Show top (+ Only starred) → Styles → Agents / Picked by
   // → Availability → Watched. The Order section is gone — Order is derived (moodOrder), never edited here.
@@ -10938,7 +11112,7 @@ function renderMoodSheetBody(){
           aria-label="Only starred films" onclick="toggleMoodDraftStarredOnly()"><i></i></button>
       </div>
     </div>
-    ${isLatestDraft ? "" : `<div class="wsheetsec">
+    <div class="wsheetsec">
       <div class="wsheethd"><span>Styles</span>
         <div class="wsheetlinks">
           <button type="button" class="linkbtn" onclick="selectAllMoodDraftStyles()">Select all</button>
@@ -10946,7 +11120,7 @@ function renderMoodSheetBody(){
         </div>
       </div>
       <div class="chips">${stylesHTML}</div>
-    </div>`}
+    </div>
     ${isCatalogue ? "" : `<div class="wsheetsec">
       <div class="wsheethd"><span>Agents</span></div>
       <div class="chips">${agentsHTML}</div>
@@ -10967,10 +11141,6 @@ function renderMoodSheetBody(){
       <div class="wsheethd"><span>Watched</span></div>
       <div class="chips">${watchedHTML}</div>
     </div>
-    ${watchTab==="in_cinema" ? "" : `<div class="wsheetsec">
-      <div class="wsheethd"><span>Also show</span></div>
-      <div class="chips">${alsoShowHTML}</div>
-    </div>`}
     <div class="wsheetsec">
       <div class="wsheethd"><span>Sort</span></div>
       <div class="mfseg" role="group" aria-label="Sort">
@@ -10997,18 +11167,21 @@ function watchScopeRows(){
   // empty branch (already keyed off rows.length) shows its existing empty state rather than a live listing
   // under a blank strip.
   if(!watchTabsNow().length) return [];
+  // CAS-1341: a v2 account's pool is the selected mood's own membership test, nothing below applies to it.
+  { const oaC=oneAgentCriteria(); if(oaC){ const mood=currentOamMood(); return mood ? oamStagePool().filter(m=>filmInOneAgentMood(m, mood, oaC)) : []; } }
+  // CAS-1328/CAS-1331: Latest's own 12-month cinema-release window applies no matter which source the
+  // person has chosen for it — no other mood (catalogue or agents) carries it.
+  const isLatest = currentMood().id==="releases";
   // CAS-1284 Change 1: a catalogue mood's pool is every film in MOVIES standing in the current stage —
   // decided directly off primaryStatus(m), whether or not any agent lists it — not the agent/occasion-based
   // pool below. Agents-off, occasion and Picked by are all agent-scoped, so none of them apply here; search,
   // Styles, Watched and mine-only (watchVisibleRows below) still do, unchanged.
   if(moodSource(currentMood())==="catalogue"){
-    const isLatest = currentMood().id==="releases";
     const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
     return MOVIES.filter(m=>{
       // The account-level world every agent searches inside (CAS-146/170/560) applies to a catalogue mood too:
       // a film with nothing to watch, or outside the Languages setting, is never in it.
       if(!showable(m) || !passesTasteBase(m)) return false;
-      // CAS-1328: Latest's own 12-month cinema-release window — no other catalogue mood carries it.
       if(isLatest && !filmInLatestWindow(m)) return false;
       const ps=primaryStatus(m);
       const standing = watchTab==="in_cinema" ? (ps==="upcoming" || ps==="opening_week" || ps==="in_cinema") : ps===ownStanding;
@@ -11026,7 +11199,7 @@ function watchScopeRows(){
     if(!pool.length) return [];
     return MOVIES.filter(m=>{
       const owner=filmOwnerCascade(m);
-      return owner && pool.some(c=>c.id===owner.id) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m);
+      return owner && pool.some(c=>c.id===owner.id) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m) && (!isLatest || filmInLatestWindow(m));
     });
   }
   if(!acs.length) return [];
@@ -11038,16 +11211,17 @@ function watchScopeRows(){
     return MOVIES.filter(m=>{
       if(!cascades.some(c=>listedBy(m,c))) return false;
       const owner=filmOwnerCascade(m);
-      return (!owner || !agentOff.has(owner.id)) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m);
+      return (!owner || !agentOff.has(owner.id)) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m) && (!isLatest || filmInLatestWindow(m));
     });
   }
-  return MOVIES.filter(m=>acs.some(c=>listedBy(m,c)) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m));
+  return MOVIES.filter(m=>acs.some(c=>listedBy(m,c)) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m) && (!isLatest || filmInLatestWindow(m)));
 }
 // CAS-1223: render()'s own Watch pipeline (tab scope → search → Picked by/Styles/Watched → mine-only →
 // search-override), pulled out of render() so watchStageCountFor can aim the exact same pipeline at a
 // stage stop that isn't the active one and read its count back, rather than a second implementation that
 // could drift from what render() actually draws.
 function watchVisibleRows(){
+  if(oneAgentCriteria()) return oamVisibleRows();   // CAS-1341
   let rows=watchScopeRows();
   const wsearch=watchSearch[watchTab];
   if(wsearch) rows=rows.filter(m=>m.title.toLowerCase().includes(wsearch));
@@ -11207,32 +11381,9 @@ function applyPendingAnswer(){
   filmPageConfirmId=id;
   openFilmPage(id);
 }
-// CAS-823: the same agent+occasion scope as watchScopeRows above, but narrowed only by the tab's own Watch
-// On key — no standing test — so the Also-show chips can show each window's count (renderWatchSheet) before
-// it's switched on. Mirrors watchScopeRows's own two branches rather than sharing code with it, same
-// precedent as filmInWatchRows below. Cinema has no Also-show section (see renderWatchSheet), so this is
-// never called for it.
-function watchAlsoShowPool(){
-  if(!watchTabsNow().length) return [];
-  const agentOff=watchAgentOff;
-  const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
-  const ownKey = m => filmNotifyState(m.tmdb_id).key===watchTab;
-  let pool;
-  if(watchOccasion){
-    const occAcs=acs.filter(c=>(c.occasions||[]).includes(watchOccasion));
-    pool = occAcs.length ? MOVIES.filter(m=>{
-      const owner=filmOwnerCascade(m);
-      return owner && occAcs.some(c=>c.id===owner.id) && ownKey(m);
-    }) : [];
-  } else {
-    pool = acs.length ? MOVIES.filter(m=>acs.some(c=>listedBy(m,c)) && ownKey(m)) : [];
-  }
-  const wsearch=watchSearch[watchTab];
-  return wsearch ? pool.filter(m=>m.title.toLowerCase().includes(wsearch)) : pool;
-}
 // CAS-1180 Part D: while the search box holds text, the listing stops being "this tab, filtered" and becomes
 // "every film any of the account's agents lists, anywhere" — render() swaps its own tab/Picked by/Watched/
-// Styles/Also show/agent-narrowed `rows` for this set instead. `cascades.some` (not watchAgentOff's
+// Styles/agent-narrowed `rows` for this set instead. `cascades.some` (not watchAgentOff's
 // included set) is deliberate: agent inclusion is one of the filters search ignores. A
 // verdict film is still listedBy's own ordinary call (CAS-718's excludeWatched:false), so it's included too.
 function watchSearchRows(wsearch){
@@ -11792,6 +11943,182 @@ function tasteMatchCached(m){
   const t = tasteMatch(m);
   _tasteMatchCache.set(m.tmdb_id, t);
   return t;
+}
+
+// ---- One agent (CAS-1337): v2 agent model, single score and admission engine ----------------------------
+// Approved by Lee, 30 Oct 2026 — every account will eventually have exactly ONE agent, gated by
+// criteria.v===2 (see matchesCriteria's own v2 branch, below passesTasteBase). Nothing here runs for a
+// non-v2 account. oneAgentCriteria() is the one place that reads "the" v2 agent off `cascades` for the
+// exported single-argument conveniences (oneScore/oneScoreParts/barAdvice/oneAgentAlerts), which is exactly
+// right once an account can only ever hold one — admission itself (matchesCriteriaOneAgent, further down)
+// never uses it, since it already has the real criteria object matchesCriteria was called with.
+function oneAgentCriteria(){ return cascades.find(c => c && c.v === 2) || null; }
+// A film's MAIN style (TMDB's lead genre, same convention matchesCriteria's own CAS-1318 gate uses) paired
+// with each of its OTHER styles — never the reverse order, never an other|other combination. This is the
+// one change You v3's pair-keying makes for a v2 agent (section 2 of the ticket).
+function mainOtherCombos(m){
+  const G = [...new Set(m.genres||[])];
+  const main = G[0];
+  if(main===undefined) return {main:undefined, keys:[]};
+  return {main, keys: G.slice(1).map(other => ({other, key: main+"|"+other}))};
+}
+// The account-wide main-keyed pair stats and baseline — every v2 account's one source of learned taste,
+// built the same two-stage way tasteProfile() builds its own (a style's lean from every appearance, then
+// each pair smoothed towards the AVERAGE of its two styles' leans), except pairs are only ever added for a
+// film's (main, other) combination. Cleared at the exact same points _tasteProfileCache is (see the five
+// `_tasteProfileCache = null` call sites) since it is built from the same verdict set.
+let _oneAgentProfileCache = null;
+function oneAgentProfile(){
+  if(_oneAgentProfileCache) return _oneAgentProfileCache;
+  const T = tasteProfile();
+  const ids = new Set(watched); blocked.forEach(id => ids.add(id));
+  const pairs = {};
+  ids.forEach(id => {
+    const kind = opinionOf(id); if(!kind) return;
+    const m = MOVIES.find(x => x.tmdb_id === id);
+    if(!m || !(m.genres && m.genres.length)) return;
+    const {main, keys} = mainOtherCombos(m);
+    if(main===undefined) return;
+    keys.forEach(({other, key}) => {
+      const pr = pairs[key] || (pairs[key] = {primary:main, other, sum:0, n:0});
+      pr.sum += TASTE_WEIGHTS[kind]; pr.n += 1;
+    });
+  });
+  let baseSum=0, baseN=0;
+  Object.values(pairs).forEach(pr => {
+    const sMain=(T.styles[pr.primary]||{lean:0}).lean, sOther=(T.styles[pr.other]||{lean:0}).lean;
+    pr.lean = (pr.sum + TASTE_K*((sMain+sOther)/2)) / (pr.n + TASTE_K);
+    baseSum += pr.lean*pr.n; baseN += pr.n;
+  });
+  const profile = {pairs, baseline: baseN ? baseSum/baseN : 0};
+  _oneAgentProfileCache = profile;
+  return profile;
+}
+// comboAdj(k): the learned number the Agent screen shows for a combination with no override — today's
+// You v3 scaling (youScore's own asymmetric 45x-down/20x-up) applied to ONE pair's lean against the
+// account's main-keyed baseline, rather than aggregated across several pairs. youScore({pub:0, ...}).adj
+// is exactly that unclamped, unrounded scaled difference, so this reuses it rather than re-deriving it.
+function oneComboAdj(key){
+  const P = oneAgentProfile();
+  const pr = P.pairs[key];
+  return Math.round(youScore({pub:0, pairs:[{sum: pr?pr.sum:0, n: pr?pr.n:0}], b:P.baseline}).adj);
+}
+// The real arithmetic behind oneScore/oneScoreParts, parameterised by the criteria object the CALLER
+// already has (matchesCriteria's v2 branch passes its own `c`; the exported single-argument wrappers
+// below fall back to oneAgentCriteria()). "never" combos are not numeric, so they are never an override —
+// matchesCriteriaOneAgent rejects those films before admission, but a direct oneScore/oneScoreParts call
+// (e.g. an already-admitted film, or a What-if the Agent screen draws) treats them exactly like an absent,
+// purely-learned combo rather than throwing.
+function oneScorePartsFor(m, c){
+  const pub = cascadeScore(m);
+  const {main, keys} = mainOtherCombos(m);
+  if(pub < 0) return {value:-1, public:pub, adj:0, parts:[]};
+  if(main===undefined || !keys.length) return {value: Math.max(1,Math.min(99,Math.round(pub))), public:pub, adj:0, parts:[]};
+  const P = oneAgentProfile();
+  const combo = (c && c.combo) || {};
+  const parts = keys.map(({other, key}) => {
+    const pr = P.pairs[key];
+    const n = pr ? pr.n : 0;
+    const ov = combo[key];
+    const overridden = typeof ov === "number";
+    return {other, points: overridden ? ov : oneComboAdj(key), n, overridden};
+  });
+  const hasOverride = parts.some(p => p.overridden);
+  let value, adj;
+  if(!hasOverride){
+    const pairs = keys.map(({key}) => { const pr=P.pairs[key]; return {sum: pr?pr.sum:0, n: pr?pr.n:0}; });
+    const ys = youScore({pub, pairs, b:P.baseline});
+    value = ys.value; adj = ys.adj;
+  } else {
+    let wsum=0, wtot=0;
+    parts.forEach(p => { const w = p.overridden ? Math.max(4,p.n) : p.n; wsum += p.points*w; wtot += w; });
+    adj = wtot ? wsum/wtot : 0;
+    value = Math.max(1, Math.min(99, Math.round(pub + adj)));
+  }
+  return {value, public:pub, adj, parts};
+}
+function oneScoreFor(m, c){ return oneScorePartsFor(m, c).value; }
+// Exported conveniences: an explicit criteria object for a direct unit-test fixture (matching the shape
+// matchesCriteria itself is called with), falling back to the account's own single v2 agent otherwise —
+// the shape every real caller (CAS-1338's score box, CAS-1339's Agent screen) actually has in hand.
+function oneScore(m, c){ return oneScoreFor(m, c || oneAgentCriteria() || {}); }
+function oneScoreParts(m, c){ return oneScorePartsFor(m, c || oneAgentCriteria() || {}); }
+// barAdvice(style): is the bar for this style due to move? Evidence is the person's own verdicts on films
+// whose MAIN style is this one, each scored with oneScore (so the advice is judged on the same number the
+// bar itself gates), using the existing verdict weights (TASTE_WEIGHTS) to call a verdict "good".
+function barAdvice(style){
+  const c = oneAgentCriteria();
+  if(!c) return null;
+  const s = (c.styles||{})[style];
+  if(!s || s.bar==null) return null;
+  if((c.dismissed||[]).includes("bar:"+style)) return null;
+  const bar = s.bar;
+  const ids = new Set(watched); blocked.forEach(id => ids.add(id));
+  const evidence = [];
+  ids.forEach(id => {
+    const kind = opinionOf(id); if(!kind) return;
+    const m = MOVIES.find(x => x.tmdb_id === id);
+    if(!m || !(m.genres && m.genres.length) || m.genres[0]!==style) return;
+    const score = oneScore(m, c);
+    if(score === -1) return;
+    evidence.push({score, good: TASTE_WEIGHTS[kind] > 0});
+  });
+  const likedShare = list => list.length ? list.filter(e=>e.good).length / list.length : 0;
+  let raise = null;
+  for(let t = bar+5; t <= 95; t += 5){
+    const lo = evidence.filter(e => e.score >= bar && e.score < t);
+    const hi = evidence.filter(e => e.score >= t);
+    if(lo.length >= 3 && likedShare(lo) <= 0.4 && hi.length >= 3 && likedShare(hi) >= 0.6) raise = {dir:"up", from:bar, to:t, lo, hi};
+  }
+  if(raise) return raise;
+  if(bar > 50){
+    const below = evidence.filter(e => e.score >= bar-15 && e.score < bar);
+    if(below.length >= 3 && likedShare(below) >= 0.75) return {dir:"down", from:bar, to:Math.max(50, bar-10), lo:below, hi:[]};
+  }
+  return null;
+}
+// oneTopPct(style, score): the share of this style's SCORED catalogue (Public ≥ 0) that clears `score` —
+// the "shows you the top N%" line barAdvice's own card reads alongside the raise/lower suggestion. Named
+// distinctly from the existing (unrelated) topPct(v) — the Mission rating-bar's own vote percentile.
+function oneTopPct(style, score){
+  let total=0, top=0;
+  MOVIES.forEach(m => {
+    if(!(m.genres && m.genres.length) || m.genres[0]!==style) return;
+    const pub = cascadeScore(m);
+    if(pub < 0) return;
+    total++;
+    if(pub >= score) top++;
+  });
+  return total ? Math.round(100*top/total) : 0;
+}
+// oneAgentAlerts(m, window): the per-style alert switch CAS-1343's monitor gating calls — the account's
+// one agent, the film's own main style, the window asked about ("cinema"/"rent"/"stream").
+function oneAgentAlerts(m, window){
+  const c = oneAgentCriteria();
+  if(!c) return false;
+  const main = (m.genres||[])[0];
+  const style = main!==undefined && (c.styles||{})[main];
+  return !!(style && style.al && style.al[window]);
+}
+// matchesCriteriaOneAgent: admission for a v2 agent (matchesCriteria's own c.v===2 branch calls this
+// directly, ahead of passesTasteBase and every v1-only gate). showable/blocked/watched/services-only are
+// the same checks and the same account-level `prefs.on` reasoning as the v1 path just below — nothing
+// about those changes for a v2 account, so this reuses the identical expressions rather than a re-derived
+// copy that could quietly drift from them.
+function matchesCriteriaOneAgent(m,c,ignoreBlocked){
+  if(c.excludeBlocked!==false && !ignoreBlocked && blocked.has(m.tmdb_id)) return false;
+  if(c.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
+  const ps=primaryStatus(m);
+  if(c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)) return false;
+  const {main, keys} = mainOtherCombos(m);
+  if(main===undefined) return false;
+  const style=(c.styles||{})[main];
+  if(!style || style.bar==null) return false;
+  const combo=c.combo||{};
+  if(keys.some(({key}) => combo[key]==="never")) return false;
+  const score=oneScoreFor(m,c);
+  if(score===-1 || score<style.bar) return false;
+  return true;
 }
 
 // ---- Your taste: the page and its card on the Agents screen (CAS-1252) ---------------------------------
@@ -12678,7 +13005,7 @@ window.showScaleInfer=id=>{ const m=MOVIES.find(x=>x.tmdb_id===id); if(m) toast(
 // one that just booted. CAS-748 reuses this same hook for _wmReleasedScoreVals rather than adding a second,
 // separate clearing mechanism. CAS-867: agMetricsCache (declared further down, with agentMetrics) reuses it
 // too — a catalogue swap can change which films an agent lists without touching that agent's own signature.
-function invalidateComputeCaches(){ _scaleInferCache.clear(); _awardRankCache.clear(); _wmReleasedScoreVals = null; agMetricsCache.clear(); _tasteProfileCache = null; _tasteMatchCache.clear(); }
+function invalidateComputeCaches(){ _scaleInferCache.clear(); _awardRankCache.clear(); _wmReleasedScoreVals = null; agMetricsCache.clear(); _tasteProfileCache = null; _tasteMatchCache.clear(); _oneAgentProfileCache = null; }
 // CAS-1268: an agent's style combination — two different styles set together to "+" (list) or "-"
 // (skip), keyed "A|B" with A<B. Returns "out" the instant any matching pair is set "-" (a skip beats
 // a list at the same level, so order of discovery never matters), "in" once every matching pair has
@@ -12705,6 +13032,10 @@ function matchesCriteria(m,c,ignoreBlocked,ignoreScoreGate){
   // to watch. This sits here rather than in passes() alone so every derived number (card counts, hub counts,
   // the reveal, Found-list membership via matchesTaste) is drawn from the same set the listing draws.
   if(!showable(m)) return false;
+  // CAS-1337: a v2 agent (criteria.v===2) runs an entirely different admission test — single score, no
+  // taste-base/age/awards/years/budget/window gates — and never falls through to anything below. Every
+  // other account is untouched: c.v is undefined for them, so this branch never taken.
+  if(c && c.v===2) return matchesCriteriaOneAgent(m,c,ignoreBlocked);
   // CAS-146: the account-level taste baseline is inherited by every agent and applied first — it is the
   // world they all search, so an agent can narrow inside it but never reach outside it.
   if(!passesTasteBase(m)) return false;
@@ -13247,6 +13578,7 @@ function watchRowsWithFiltersCleared(){
   return n;
 }
 function emptyResultsHTML(){
+  if(oneAgentCriteria()) return oamEmptyResultsHTML();   // CAS-1341
   // CAS-1295 Change 5: a stage with no starred films gets its own honest, specific empty state — ahead of
   // every other check below, since Starred is catalogue-sourced and not an agent/filter question at all.
   if(currentMood().starredOnly){
@@ -19266,6 +19598,10 @@ function agentSettingsRowsHTML(c){
     ${advRows}`;
 }
 function renderAgentsScreen(){
+  // CAS-1339: a v2 account (oneAgentCriteria() non-null) gets the single-agent "Your agent" screen instead
+  // of today's agent list/editor — every other account falls through to the unchanged body below.
+  const oaCriteria=oneAgentCriteria();
+  if(oaCriteria){ renderOneAgentScreen(oaCriteria); return; }
   const _t664=performance.now();
   const n=cascades.length;
   // CAS-708: rank is display/drag order, not array position — sort a local copy by .order so a stale
@@ -19313,6 +19649,975 @@ function renderAgentsScreen(){
   wireAgentsDrag();
   console.log('[CAS-664] renderAgentsScreen took', (performance.now()-_t664).toFixed(1), 'ms for', n, 'agents');
 }
+
+// ================= CAS-1339: the Agent screen (v2 accounts) =================================================
+// "Your agent" — one row per genre (style list, minimum score, agent suggestion, film alerts), replacing
+// today's agents list/editor/Briefing hub/Your taste screen for a v2 account. Reads straight off CAS-1337's
+// engine (oneAgentCriteria/oneScore/barAdvice/oneTopPct/matchesCriteria's own v2 branch) — this ticket adds
+// no new scoring or admission logic of its own, only the screen that edits the one agent's criteria.
+const ONE_AGENT_SCORE_BRACKETS=[
+  {lo:50,hi:60,color:"#b65a1c"},
+  {lo:60,hi:70,color:"#a0732e"},
+  {lo:70,hi:80,color:"#7f8540"},
+  {lo:80,hi:90,color:"#3f8f62"},
+  {lo:90,hi:100,color:"#138c7d"},
+];
+// Only the three styles the ticket names actually need a short form — every other TMDB genre name already
+// reads short enough to show as-is in the row's own 104px column.
+const ONE_AGENT_SHORT_NAMES={"Science Fiction":"Sci-fi","Documentary":"Doco","TV Movie":"TV movie"};
+function oneAgentShortName(style){ return ONE_AGENT_SHORT_NAMES[style] || style; }
+// amber cinema / blue rent / green stream — the same WINDOW_COLOR palette the rest of the app already
+// alerts with, keyed the way CAS-1337's styles[s].al object is (cinema/rent/stream, not in_cinema/pvod).
+const ONE_AGENT_WINDOWS=[
+  {key:"cinema", label:"Cinema", color:"var(--amber)"},
+  {key:"rent", label:"Rent", color:"var(--blue)"},
+  {key:"stream", label:"Stream", color:"var(--green)"},
+];
+let oaOpenStyle=null;       // the one open style row at a time (null = none open)
+let oaOrderSnapshot=null;   // the row order, frozen the moment a style opens — see oaOrder() below
+
+function oaBar(c, style){ const s=(c.styles||{})[style]; return (s && s.bar!=null) ? s.bar : null; }
+// The share of a style's score 50-99 covered by each of the five boxes, for a given bar (or null = off,
+// every box empty). Shared by the collapsed row's strip, the open slider's boxes and oaOnDrag's live redraw,
+// so the three can never quietly compute a fill percentage three different ways.
+function oaBoxPct(bar, b){
+  if(bar==null) return 0;
+  if(bar<=b.lo) return 100;
+  if(bar>=b.hi) return 0;
+  return Math.round(100*(b.hi-bar)/(b.hi-b.lo));
+}
+function oaBoxesHTML(bar, opts){
+  const labels = opts && opts.labels;
+  return ONE_AGENT_SCORE_BRACKETS.map(b=>
+    `<span class="oabox" style="--bc:${b.color}">${labels?`<i class="oalbl">${b.lo}</i>`:""}<i class="oafill" style="width:${oaBoxPct(bar,b)}%"></i></span>`
+  ).join("");
+}
+// Row order: on styles (a bar set) by bar ascending then name, then off styles (never listed) A-Z.
+function oaComputeOrder(c){
+  const on=[], off=[];
+  ALL_GENRES.forEach(g=>{ (oaBar(c,g)!=null ? on : off).push(g); });
+  on.sort((a,b)=> oaBar(c,a)-oaBar(c,b) || a.localeCompare(b));
+  off.sort((a,b)=> a.localeCompare(b));
+  return [...on, ...off];
+}
+// Frozen while a style is open (the ticket's own "does NOT re-sort" rule — Lee hit a score edit re-sorting
+// the list under his finger in the prototype); recomputed fresh every time nothing is open.
+function oaOrder(c){ return (oaOpenStyle && oaOrderSnapshot) ? oaOrderSnapshot : oaComputeOrder(c); }
+// One matchesCriteria pass over the whole catalogue (not one pass per style) — the films-admitted count for
+// every style at once, keyed by each film's own MAIN style (mainOtherCombos, CAS-1337's own convention).
+function oaFilmCounts(c){
+  const counts={};
+  MOVIES.forEach(m=>{
+    const main=mainOtherCombos(m).main;
+    if(main===undefined) return;
+    if(matchesCriteria(m,c)) counts[main]=(counts[main]||0)+1;
+  });
+  return counts;
+}
+// The small 🔔 + one 7px dot per alerting window, shown after the style name when any window alert is on.
+function oaAlertDotsHTML(c, style){
+  const al=((c.styles||{})[style]||{}).al || {};
+  const active=ONE_AGENT_WINDOWS.filter(w=>al[w.key]);
+  if(!active.length) return "";
+  return `<span class="oaalertmark" aria-hidden="true">🔔${active.map(w=>`<i class="oadot" style="background:${w.color}"></i>`).join("")}</span>`;
+}
+// AGENT SUGGESTION — only when barAdvice(style) has something to say; raise/lower read straight off its
+// own lo/hi evidence groups, per the ticket's worked copy.
+function oaSuggestionHTML(style){
+  const adv=barAdvice(style);
+  if(!adv) return "";
+  const x=oneTopPct(style, adv.to);
+  const text = adv.dir==="up"
+    ? `Raise to <b>${adv.to}+</b> (top ${x}%). You liked ${adv.hi.filter(e=>e.good).length} of ${adv.hi.length} at ${adv.to}+, only ${adv.lo.filter(e=>e.good).length} of ${adv.lo.length} below.`
+    : `Lower to <b>${adv.to}+</b> (top ${x}%). You liked ${adv.lo.filter(e=>e.good).length} of ${adv.lo.length} just under ${adv.from}.`;
+  return `<div class="oasuggest">
+      <div class="oasuglbl">AGENT SUGGESTION</div>
+      <div class="oasugtext">${text}</div>
+      <div class="oasugbtns">
+        <button type="button" class="oasugchange" onclick="oaApplySuggestion('${escA(style)}',${adv.to})">Change to ${adv.to}+</button>
+        <button type="button" class="oasugkeep" onclick="oaDismissSuggestion('${escA(style)}')">Keep ${adv.from}+</button>
+      </div>
+    </div>`;
+}
+function oaAlertsHTML(c, style){
+  const al=((c.styles||{})[style]||{}).al || {};
+  return `<div class="oaalerts">${ONE_AGENT_WINDOWS.map(w=>{
+    const on=!!al[w.key];
+    return `<button type="button" class="oachip${on?" on":""}" style="--wc:${w.color}"
+        onclick="oaToggleAlert('${escA(style)}','${w.key}')" aria-pressed="${on}">
+        <i class="oachipdot" aria-hidden="true"></i>${esc(w.label)}${on?" 🔔":""}
+      </button>`;
+  }).join("")}</div>`;
+}
+// Section 1 (MOVIE MINIMUM SCORE) + section 2 (FILM ALERTS) for the one open style, then CAS-1340's own
+// section 3 (SCORE ADJUSTMENTS, oaAdjustSectionHTML further down this file).
+function oaOpenBodyHTML(c, style){
+  const bar=oaBar(c, style);
+  const top = bar==null ? 0 : oneTopPct(style, bar);
+  const name=oneAgentShortName(style);
+  const desc = bar==null
+    ? `Off: no ${esc(name)} films are listed. Drag left to turn it on.`
+    : `${esc(name)} films scoring ${bar} or more are listed: the top ${top}% of ${esc(name)}.`;
+  return `<div class="oaopen">
+      <div class="oasechdr">MOVIE MINIMUM SCORE</div>
+      <div class="oaslider">
+        <div class="oaslidewrap">
+          <div class="oastrip oastripfull">${oaBoxesHTML(bar,{labels:true})}</div>
+          <input type="range" class="oarange" min="50" max="100" step="1" value="${bar==null?100:bar}"
+            data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
+            aria-label="${escA(name)} minimum score">
+        </div>
+        <span class="oaslideval" id="oaSliderVal">${bar==null?"Off":`${bar}+<i>top ${top}%</i>`}</span>
+      </div>
+      <p class="oaslidedesc" id="oaSliderDesc">${desc}</p>
+      ${oaSuggestionHTML(style)}
+      <div class="oasechdr">FILM ALERTS</div>
+      ${oaAlertsHTML(c, style)}
+      ${oaAdjustSectionHTML(c, style)}
+    </div>`;
+}
+function oaRowHTML(c, style, filmCount){
+  const open = oaOpenStyle===style;
+  const bar=oaBar(c, style);
+  const name=oneAgentShortName(style);
+  const filmsLine = bar==null ? "never listed" : `${filmCount} film${filmCount===1?"":"s"}`;
+  const rowTop = bar==null ? 0 : oneTopPct(style,bar);
+  const strip = open ? `<span class="oarowstrip"></span><span class="oarowval"></span>`
+    : `<span class="oarowstrip">${oaBoxesHTML(bar)}</span>
+       <span class="oarowval">${bar==null?"Off":`${bar}+<i>top ${rowTop}%</i>`}</span>`;
+  const head=`
+    <button type="button" class="oarowhead" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
+      <span class="oarowleft">
+        <span class="oastyname">${esc(name)}${oaAlertDotsHTML(c, style)}</span>
+        <span class="oarowfilms">${filmsLine}${oaAdjustedBadgeHTML(c, style)}</span>
+      </span>
+      ${strip}
+      <span class="oachev" aria-hidden="true">${open?"▴":"▾"}</span>
+    </button>`;
+  return `<div class="oarow" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
+}
+function renderOneAgentScreen(c){
+  const counts=oaFilmCounts(c);
+  const order=oaOrder(c);
+  const n=tasteProfile().n;
+  const rows=order.map(style=>oaRowHTML(c, style, counts[style]||0)).join("");
+  $("agentsBody").innerHTML=`
+    <div class="agshdr"><h2 class="osh">Your agent</h2></div>
+    <p class="ossub">${n} verdict${n===1?"":"s"} learned</p>
+    <div class="oacolhdr"><span>STYLE</span><span>LISTS FILMS SCORING</span></div>
+    <div class="oalist" id="oaList" role="list" aria-label="Your agent's styles">${rows}</div>`;
+}
+// Opening a style freezes the row order NOW (as if nothing were open), so switching straight from one open
+// style to another never shows an intermediate resort — only closing (oaOpenStyle back to null) lets the
+// next render recompute a fresh order.
+window.oaToggleStyle=(style)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  if(oaOpenStyle===style){ oaOpenStyle=null; oaOrderSnapshot=null; }
+  else { oaOrderSnapshot=oaComputeOrder(c); oaOpenStyle=style; }
+  // CAS-1340: section 3's own "Show all"/open-film-chips state is per open style, not per account — start
+  // fresh every time a style opens (or closes), the same way oaOrderSnapshot does above.
+  oaShowAllAdj=false; oaComboFilmsOpen.clear();
+  renderAgentsScreen();
+};
+// Live drag feedback (oninput) — redraws the slider's own boxes/value/description text in place, without a
+// full re-render, so neither the drag gesture nor the frozen row order is disturbed mid-drag.
+window.oaOnDrag=(input)=>{
+  const style=input.dataset.style;
+  const v=parseInt(input.value,10);
+  const bar = v>=100 ? null : v;
+  const wrap=input.closest(".oaslidewrap");
+  const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
+  ONE_AGENT_SCORE_BRACKETS.forEach((b,i)=>{
+    const fill=boxes[i] && boxes[i].querySelector(".oafill");
+    if(fill) fill.style.width=oaBoxPct(bar,b)+"%";
+  });
+  const top = bar==null ? 0 : oneTopPct(style, bar);
+  const name=oneAgentShortName(style);
+  const valEl=$("oaSliderVal");
+  if(valEl) valEl.innerHTML = bar==null ? "Off" : `${bar}+<i>top ${top}%</i>`;
+  const descEl=$("oaSliderDesc");
+  if(descEl) descEl.textContent = bar==null
+    ? `Off: no ${name} films are listed. Drag left to turn it on.`
+    : `${name} films scoring ${bar} or more are listed: the top ${top}% of ${name}.`;
+};
+// Release (onchange) — the one point this screen actually saves: CAS-1339's own "every change saves
+// immediately... no Save button", through the same saveCascades()/render() chokepoint every other agent
+// edit already uses.
+window.oaOnRelease=(input)=>{
+  const style=input.dataset.style;
+  const c=oneAgentCriteria(); if(!c) return;
+  const v=parseInt(input.value,10);
+  c.styles=c.styles||{};
+  const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
+  st.bar = v>=100 ? null : v;
+  saveCascades();
+  if(typeof render==="function") render();
+  renderAgentsScreen();
+};
+window.oaApplySuggestion=(style,to)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  c.styles=c.styles||{};
+  const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
+  st.bar=to;
+  saveCascades();
+  if(typeof render==="function") render();
+  renderAgentsScreen();
+};
+window.oaDismissSuggestion=(style)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  c.dismissed=c.dismissed||[];
+  const key="bar:"+style;
+  if(!c.dismissed.includes(key)) c.dismissed.push(key);
+  saveCascades();
+  renderAgentsScreen();
+};
+window.oaToggleAlert=(style,win)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  c.styles=c.styles||{};
+  const st=c.styles[style]||(c.styles[style]={al:{}});
+  st.al=st.al||{};
+  st.al[win]=!st.al[win];
+  saveCascades();
+  renderAgentsScreen();
+};
+
+// ================= CAS-1340: Score adjustments section (v2 accounts) =======================================
+// Section 3 of an open style — one row per OTHER genre that appears anywhere in the catalogue on a film
+// whose MAIN style is this one (not just the ones you've judged — a combo with zero verdicts still gets an
+// unlit row), showing CAS-1337's learned comboAdj (oneComboAdj) alongside any hand override (c.combo[key]),
+// and flagging a combo "adjusted since you last looked" by comparing it to c.seenAdj. Adds no new admission
+// logic of its own — matchesCriteriaOneAgent's own "never" gate (CAS-1337) already covers an override saved
+// here, and oneScorePartsFor's own override blend already covers a numeric one.
+let oaShowAllAdj = false;             // "Show all <n>" expansion — one open style at a time, reset on open/close
+const oaComboFilmsOpen = new Set();   // which combo rows (by key) have their liked/not film chips open
+
+function oaFmtPoints(p){ return p>0 ? `+${p}` : p<0 ? `−${Math.abs(p)}` : "±0"; }
+// The SAME value->position mapping section 1's own native range input uses (min 50, max 100) — every mark
+// section 3 draws (the style's own bar line, a combo's value, an override/was dashed mark) is placed with
+// this one formula, so it always lines up under section 1's thumb at the same value (within rounding).
+function oaTrackPct(v){ return Math.max(0, Math.min(100, (v-50)/50*100)); }
+// Every (style, other) combo that appears in the catalogue, with its learned/override points and verdict/
+// film counts — the row set section 3 draws from. One MOVIES pass (same shape as oaFilmCounts above).
+function oaComboStats(c, style){
+  const P = oneAgentProfile();
+  const combo = (c && c.combo) || {};
+  const seenAdj = (c && c.seenAdj) || {};
+  const filmCounts = {};
+  MOVIES.forEach(m=>{
+    const {main, keys} = mainOtherCombos(m);
+    if(main!==style) return;
+    keys.forEach(({key})=>{ filmCounts[key]=(filmCounts[key]||0)+1; });
+  });
+  return Object.keys(filmCounts).map(key=>{
+    const other = key.slice(style.length+1);
+    const pr = P.pairs[key];
+    const n = pr ? pr.n : 0;
+    const learned = oneComboAdj(key);
+    const ov = combo[key];
+    const never = ov==="never";
+    const overridden = typeof ov==="number";
+    const points = overridden ? ov : learned;
+    const seen = typeof seenAdj[key]==="number" ? seenAdj[key] : 0;
+    const adjusted = !overridden && !never && Math.abs(learned-seen)>=2;
+    return {key, other, n, filmCount:filmCounts[key], learned, override:ov, overridden, never, points, adjusted, seen};
+  });
+}
+// Order: combos adjusted since last looked first, then by |points| descending, then by film count — a
+// "never" row's magnitude is treated as -1 (below every real |points|, including 0) so it still sorts
+// ahead of nothing at all.
+function oaComboMag(r){ return r.never ? -1 : Math.abs(r.points); }
+function oaComboSort(a,b){
+  if(a.adjusted!==b.adjusted) return a.adjusted ? -1 : 1;
+  const am=oaComboMag(a), bm=oaComboMag(b);
+  if(am!==bm) return bm-am;
+  return b.filmCount-a.filmCount;
+}
+function oaComboDirection(r){ return (r.learned-r.seen)>=0 ? "up" : "down"; }
+// Any style with an adjusted combo, account-wide — the Agent nav dot's one question. Deliberately NOT
+// memoised against renderOneAgentScreen's own pass: this is also called off the Watch screen (every verdict,
+// via repaintAfterOpinion), where no Agent-screen render has run yet to prime a cache.
+function oaAnyAdjusted(c){ return ALL_GENRES.some(style => oaComboStats(c, style).some(r=>r.adjusted)); }
+// The films behind one combo — every film you've judged (watched or blocked, same `ids` oneAgentProfile
+// itself builds from) whose mainOtherCombos keys include this exact key.
+function oaComboFilms(key){
+  const ids = new Set(watched); blocked.forEach(id=>ids.add(id));
+  const out = [];
+  ids.forEach(id=>{
+    const kind = opinionOf(id); if(!kind) return;
+    const m = MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
+    if(!mainOtherCombos(m).keys.some(k=>k.key===key)) return;
+    out.push({id, title:m.title, kind, good: TASTE_WEIGHTS[kind]>0, at: verdictAt.get(id)||0});
+  });
+  return out;
+}
+// Titles for the "<was> -> <now> after your verdict(s) on <titles>" line: this combo's judged films whose
+// verdictAt is newer than the v2 agent's own seenAdjAt for this key (c.seenAdjAt, written alongside
+// c.seenAdj by oaMarkSeenAdjusted below) — the ticket's own fallback wording ("verdicts newer than the last
+// seenAdj write") for "whose verdicts were saved after seenAdj was last written". A film whose verdictAt was
+// never captured (see the verdictAt comment, above the Set it backs) simply never qualifies.
+function oaComboAdjustTitles(c, key){
+  const seenAt = ((c && c.seenAdjAt) || {})[key] || 0;
+  return oaComboFilms(key).filter(f=>f.at>seenAt).sort((a,b)=>b.at-a.at).map(f=>f.title);
+}
+// The bar: five faint outline boxes (same brackets/colours as oaBoxesHTML, so the row lines up with section
+// 1's own strip), the style's own bar as a white 2px line, a fill from that line to bar+points (teal right /
+// orange left), and — for an override or an adjusted combo — a dashed mark at the learned or "was" position.
+// A zero-verdict, non-overridden combo draws only the faint boxes (greyed out by its row's own CSS class).
+function oaComboBarHTML(c, style, r){
+  const bar = oaBar(c, style);
+  const boxesHTML = ONE_AGENT_SCORE_BRACKETS.map(b=>`<i class="oacbox" style="--bc:${b.color}"></i>`).join("");
+  if(bar==null || (r.n===0 && !r.overridden && !r.never)){
+    return `<span class="oacombowrap oacombo-empty"><span class="oacombobar">${boxesHTML}</span></span>`;
+  }
+  const barPct = oaTrackPct(bar);
+  const valuePos = r.never ? 49 : bar+r.points;
+  const valuePct = oaTrackPct(valuePos);
+  const lo = Math.min(barPct,valuePct), hi = Math.max(barPct,valuePct);
+  const fillHTML = r.never
+    ? `<i class="oacfill down never" style="left:0%;width:${barPct}%"></i>`
+    : `<i class="oacfill ${r.points>=0?"up":"down"}" style="left:${lo}%;width:${hi-lo}%"></i>`;
+  let marks = `<i class="oacbarline" style="left:${barPct}%"></i>`;
+  if(r.overridden || r.never) marks += `<i class="oacdash" style="left:${oaTrackPct(bar+r.learned)}%"></i>`;
+  else if(r.adjusted) marks += `<i class="oacdash" style="left:${oaTrackPct(bar+r.seen)}%"></i>`;
+  const inputVal = Math.max(49, Math.min(100, Math.round(r.never ? 49 : bar+r.points)));
+  const rangeHTML = `<input type="range" class="oacrange" min="49" max="100" step="1" value="${inputVal}"
+      data-style="${escA(style)}" data-key="${escA(r.key)}"
+      oninput="oaComboOnDrag(this)" onchange="oaComboOnRelease(this)"
+      aria-label="${escA(style)}, ${escA(r.other)} score adjustment">`;
+  return `<span class="oacombowrap${r.overridden||r.never?" oacoverridden":""}">
+      <span class="oacombobar">${boxesHTML}${fillHTML}${marks}</span>
+      ${rangeHTML}
+    </span>`;
+}
+function oaComboValueHTML(r){
+  if(r.n===0 && !r.overridden && !r.never) return `<span class="oacval oacval-empty">—</span>`;
+  const text = r.never ? "Never" : oaFmtPoints(r.points);
+  return `<span class="oacval${r.overridden||r.never?" oacval-over":""}">${text}</span>`;
+}
+// Left column (104px) of an overridden (or "never") row — replaces the liked/not link entirely.
+function oaOverrideLeftHTML(r){
+  const learnedText = oaFmtPoints(r.learned);
+  const useLink = `<button type="button" class="oaclink oacuse" onclick="oaUseLearned('${escA(r.key)}')">use ${learnedText}</button>`;
+  if(r.never || Math.abs(r.learned-r.override)>=5){
+    return `<span class="oacleft oacset">Set by you · your verdicts say ${learnedText} · ${useLink}</span>`;
+  }
+  return `<span class="oacleft oacset">Set by you · <button type="button" class="oaclink oacuse" onclick="oaUseLearned('${escA(r.key)}')">let the agent decide</button></span>`;
+}
+function oaComboWasLineHTML(c, r){
+  const titles = oaComboAdjustTitles(c, r.key);
+  const titleTxt = titles.length ? ` after your verdict${titles.length===1?"":"s"} on ${titles.map(esc).join(", ")}` : "";
+  return `<p class="oacwas ${oaComboDirection(r)}">${oaFmtPoints(r.seen)} → ${oaFmtPoints(r.learned)}${titleTxt}</p>`;
+}
+function oaComboRowHTML(c, style, r){
+  const tagHTML = r.adjusted
+    ? `<span class="oactag ${oaComboDirection(r)}">${oaComboDirection(r)==="up"?"▲":"▼"} ADJUSTED</span>` : "";
+  const films = (r.n>0 || r.overridden || r.never) ? oaComboFilms(r.key) : [];
+  const liked = films.filter(f=>f.good).length, notN = films.length-liked;
+  const leftHTML = (r.overridden || r.never) ? oaOverrideLeftHTML(r)
+    : (r.n===0 ? `<span class="oacleft oacnoverdict">no verdicts yet</span>`
+       : `<button type="button" class="oacleft oaclink" onclick="oaToggleComboFilms('${escA(r.key)}')">${liked} liked · ${notN} not <span aria-hidden="true">›</span></button>`);
+  const rowEmpty = r.n===0 && !r.overridden && !r.never;
+  const wasLine = r.adjusted ? oaComboWasLineHTML(c, r) : "";
+  const chipsOpen = oaComboFilmsOpen.has(r.key);
+  const chipsHTML = chipsOpen ? `<div class="oacchips">${films.map(f=>
+      `<span class="oacchip ${f.good?"up":"down"}">${esc(f.title)} · ${esc((OPINIONS.find(o=>o.key===f.kind)||{}).lbl||f.kind)}</span>`).join("")}</div>` : "";
+  return `<div class="oacrow${rowEmpty?" oacrow-empty":""}" data-key="${escA(r.key)}">
+      <div class="oactitle">${esc(style)}, ${esc(r.other)}${tagHTML}</div>
+      <div class="oacline2">${leftHTML}
+        <span class="oacright">${oaComboBarHTML(c, style, r)}${oaComboValueHTML(r)}</span>
+      </div>
+      ${wasLine}
+      ${chipsHTML}
+    </div>`;
+}
+// The collapsed row's own "<n> films ▲<up> ▼<down>" badge — counts THIS style's adjusted combos, whether or
+// not the style is currently open.
+function oaAdjustedBadgeHTML(c, style){
+  const rows = oaComboStats(c, style).filter(r=>r.adjusted);
+  if(!rows.length) return "";
+  const up = rows.filter(r=>oaComboDirection(r)==="up").length, down = rows.length-up;
+  return (up?`<i class="oaadjup">▲${up}</i>`:"") + (down?`<i class="oaadjdown">▼${down}</i>`:"");
+}
+function oaAdjustSectionHTML(c, style){
+  const name = oneAgentShortName(style);
+  const bar = oaBar(c, style);
+  if(bar==null){
+    return `<div class="oasechdr">SCORE ADJUSTMENTS</div>
+      <p class="oacintro">Turn ${esc(name)} on (set a minimum score, above) to see its score adjustments.</p>`;
+  }
+  const rows = oaComboStats(c, style).sort(oaComboSort);
+  const adjustedN = rows.filter(r=>r.adjusted).length;
+  const shown = oaShowAllAdj ? rows : rows.slice(0,8);
+  const seenBox = adjustedN ? `<div class="oacseen">
+      <span><b>${adjustedN}</b> score${adjustedN===1?"":"s"} adjusted since you last looked</span>
+      <button type="button" class="oacseenbtn" onclick="oaMarkSeenAdjusted('${escA(style)}')">Mark as seen</button>
+    </div>` : "";
+  const showAllHTML = (!oaShowAllAdj && rows.length>8)
+    ? `<button type="button" class="oacshowall" onclick="oaToggleShowAllAdj()">Show all ${rows.length}</button>` : "";
+  return `<div class="oasechdr">SCORE ADJUSTMENTS</div>
+    <p class="oacintro">Your agent is automatically adjusting movie scores, up or down, for films that combine ${esc(name)} with these styles, based on your verdicts on films you've watched. The adjusted score is the one you see in Watch. Tap a row to see the films behind it.</p>
+    ${seenBox}
+    <div class="oaclist">${shown.map(r=>oaComboRowHTML(c, style, r)).join("")}</div>
+    ${showAllHTML}
+    <p class="oacfoot">The white line is ${esc(name)}'s ${bar}+. Drag a row to set it yourself; all the way left means never list it. Your agent keeps learning underneath and tells you if your verdicts start to disagree.</p>`;
+}
+// Gold dot on the Agent nav chip — pure DOM sync, called from both the full render() and the lean verdict-
+// repaint path (repaintAfterOpinion's fastPatchFindRow branch skips a full render()).
+function updateAgentNavDot(){
+  const btn = typeof $==="function" ? $("agentsBtn") : null;
+  if(!btn || !btn.classList) return;
+  const c = oneAgentCriteria();
+  btn.classList.toggle("oa-adjusted", !!(c && oaAnyAdjusted(c)));
+}
+window.oaToggleComboFilms=(key)=>{
+  if(oaComboFilmsOpen.has(key)) oaComboFilmsOpen.delete(key); else oaComboFilmsOpen.add(key);
+  renderAgentsScreen();
+};
+window.oaToggleShowAllAdj=()=>{ oaShowAllAdj=true; renderAgentsScreen(); };
+// "use <learned>" / "let the agent decide" — both clear the override and let CAS-1337's own comboAdj drive
+// the combo again.
+window.oaUseLearned=(key)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  if(c.combo) delete c.combo[key];
+  saveCascades();
+  if(typeof render==="function") render();
+  renderAgentsScreen();
+};
+// "Mark as seen" — writes c.seenAdj[k] = comboAdj(k) (the ticket's own wording) for every combo of this
+// style, plus c.seenAdjAt[k] (this ticket's own companion timestamp, see oaComboAdjustTitles above) so a
+// later adjustment's "after your verdict(s) on <titles>" line only names films newer than THIS write.
+window.oaMarkSeenAdjusted=(style)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  c.seenAdj=c.seenAdj||{}; c.seenAdjAt=c.seenAdjAt||{};
+  const now=Date.now();
+  oaComboStats(c, style).forEach(r=>{ c.seenAdj[r.key]=r.learned; c.seenAdjAt[r.key]=now; });
+  saveCascades();
+  if(typeof render==="function") render();
+  renderAgentsScreen();
+};
+// Live drag feedback (oninput) — redraws just this row's fill in place, the same convention oaOnDrag (section
+// 1) uses for its own boxes.
+window.oaComboOnDrag=(input)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  const bar=oaBar(c, input.dataset.style); if(bar==null) return;
+  const v=parseInt(input.value,10);
+  const wrap=input.closest(".oacombowrap");
+  const barEl=wrap && wrap.querySelector(".oacombobar");
+  const fill=barEl && barEl.querySelector(".oacfill");
+  if(!fill) return;
+  const barPct=oaTrackPct(bar);
+  if(v<=49){ fill.className="oacfill down never"; fill.style.left="0%"; fill.style.width=barPct+"%"; return; }
+  const valuePct=oaTrackPct(v);
+  const lo=Math.min(barPct,valuePct), hi=Math.max(barPct,valuePct);
+  fill.className="oacfill "+(v>=bar?"up":"down");
+  fill.style.left=lo+"%"; fill.style.width=(hi-lo)+"%";
+};
+// Release (onchange) — the ticket's own rule verbatim: combo[k] = value - bar; at 49, combo[k] = "never".
+window.oaComboOnRelease=(input)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  const style=input.dataset.style, key=input.dataset.key;
+  const bar=oaBar(c, style); if(bar==null) return;
+  const v=parseInt(input.value,10);
+  c.combo=c.combo||{};
+  c.combo[key] = v<=49 ? "never" : v-bar;
+  saveCascades();
+  if(typeof render==="function") render();
+  renderAgentsScreen();
+};
+
+// ================= CAS-1341: moods as lists (v2 accounts) ===================================================
+// Moods become saved LISTS for a v2 account: a film is in a mood when it was added by hand, or it meets the
+// mood's own rules and wasn't taken out by hand. Storage rides the same user_prefs.view.moods/view.mood path
+// v1 moods already use (watchMoods/watchMoodSel, both shared below) — every v2 mood record simply carries its
+// own `v2:true` marker, decided per-record (never off oneAgentCriteria(), which races loadAccount()'s own
+// cascades load — see loadUserPrefs' own v.moods adoption) so a v1 account's data is never touched by any of
+// this (AC6). Nothing in this section runs unless oneAgentCriteria() is non-null.
+const ONE_AGENT_MOOD_BUILTINS=[
+  {id:"releases", name:"Latest"},
+  {id:"starred", name:"Starred", starredOnly:true},
+];
+function oamMoodDefaultFields(){
+  return {v2:true, handOnly:false, styles:[], minScore:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[]};
+}
+function oamMoodDefaultsNow(){ return ONE_AGENT_MOOD_BUILTINS.map(b=>({...oamMoodDefaultFields(), ...b})); }
+// The account's own saved v2 moods — falls back (in memory only, never written: CAS-1218/1243) to the two
+// built-ins for a v2 account CAS-1342 hasn't provisioned yet.
+function oamMoodsListReal(){
+  const stored=watchMoods.filter(m=>m && m.v2);
+  return stored.length ? stored : oamMoodDefaultsNow();
+}
+function currentOamMood(){
+  const list=oamMoodsListReal();
+  return list.find(m=>m.id===watchMoodSel) || list[0];
+}
+// Every style the mood's agent actually has on (CAS-1339's oaBar), narrowed by the mood's own ticked styles —
+// an empty mood.styles means every on style, per the ticket.
+function oamMoodStyles(mood, c){
+  const onStyles=ALL_GENRES.filter(g=>oaBar(c,g)!=null);
+  if(!mood.styles || !mood.styles.length) return onStyles;
+  return onStyles.filter(g=>mood.styles.includes(g));
+}
+// The bar actually applied to a style inside this mood — the mood's own minScore only ever RAISES the
+// agent's, never lowers it.
+function oamMoodBarFor(mood, c, style){
+  const agentBar=oaBar(c, style);
+  if(agentBar==null) return null;
+  return mood.minScore!=null ? Math.max(agentBar, mood.minScore) : agentBar;
+}
+function oamFilmAge(m){ return AGE_RATING_CANON[m.age_rating] || m.age_rating; }
+function oamFilmMatchesAwards(m, awards){
+  if(awards==="won") return m.award==="won";
+  if(awards==="nominated") return awardRank(m)>=1;
+  return true;
+}
+// The RULES half of membership — admission, style, score, ages, awards, how-far-back. Hand add/take-out
+// (filmInOneAgentMood, below) always wins over this.
+function oamFilmMeetsMoodRules(m, mood, c){
+  if(!matchesCriteriaOneAgent(m, c, false)) return false;
+  const {main}=mainOtherCombos(m);
+  if(main===undefined) return false;
+  if(!oamMoodStyles(mood, c).includes(main)) return false;
+  const bar=oamMoodBarFor(mood, c, main);
+  if(bar==null) return false;
+  const score=oneScoreFor(m, c);
+  if(score===-1 || score<bar) return false;
+  if(mood.ages && mood.ages.length && !mood.ages.includes(oamFilmAge(m))) return false;
+  if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
+  if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
+  return true;
+}
+// Full membership: a hand choice always beats the rules (ticket's own words). Latest/Starred keep today's
+// behaviour — see each ticket line in CAS-1341's description for what that means for each.
+function filmInOneAgentMood(m, mood, c){
+  const id=m.tmdb_id;
+  if((mood.out||[]).includes(id)) return false;
+  if((mood.in||[]).includes(id)) return true;
+  if(mood.handOnly) return false;
+  if(mood.id==="releases"){
+    if(!filmInLatestWindow(m)) return false;
+    const {main}=mainOtherCombos(m);
+    return main!==undefined && oaBar(c, main)!=null;
+  }
+  if(mood.id==="starred" || mood.starredOnly) return starredIds.has(id);
+  return oamFilmMeetsMoodRules(m, mood, c);
+}
+// Show cap — All/Best 10/20/40 by oneScore, applied AFTER membership. Hand-added films always show and count
+// towards the limit (ticket's own words): they're never cut, and they eat into the N rule-based films get.
+function oamApplyShowCap(rows, mood, c, heldThisTab){
+  const n = mood.show==="10"?10 : mood.show==="20"?20 : mood.show==="40"?40 : null;
+  if(n==null) return rows;
+  const handIds=new Set(mood.in||[]);
+  const hand=rows.filter(m=>handIds.has(m.tmdb_id));
+  const rest=rows.filter(m=>!handIds.has(m.tmdb_id))
+    .sort((a,b)=>{ const d=oneScoreFor(b,c)-oneScoreFor(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
+  const remaining=Math.max(0, n-hand.length);
+  const keep=new Set([...hand, ...rest.slice(0,remaining)].map(m=>m.tmdb_id));
+  rows.forEach(m=>{ if(heldThisTab.has(m.tmdb_id)) keep.add(m.tmdb_id); });
+  return rows.filter(m=>keep.has(m.tmdb_id));
+}
+// Every film standing in the CURRENT watchTab's own stage — the same scoping v1's catalogue-sourced moods use
+// (watchScopeRows' own "catalogue" branch), reused verbatim since a v2 account's one mood pool is always
+// catalogue-wide.
+function oamStagePool(){
+  const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
+  return MOVIES.filter(m=>{
+    if(!showable(m) || !passesTasteBase(m)) return false;
+    const ps=primaryStatus(m);
+    const standing = watchTab==="in_cinema" ? (ps==="upcoming" || ps==="opening_week" || ps==="in_cinema") : ps===ownStanding;
+    return standing && watchStageMatches(m);
+  });
+}
+// watchVisibleRows()'s v2 replacement — gated in by watchVisibleRows itself below. Mirrors its v1 shape
+// ({rows, preSheetRows, preMineOnlyRows, mineOnly}) so render() needs no changes at all; mineOnly is always
+// false here — "my services" is already folded into agent admission (matchesCriteriaOneAgent's own
+// myServices check), so there's no separate toggle for a v2 mood to carry.
+function oamVisibleRows(){
+  const c=oneAgentCriteria();
+  const mood=currentOamMood();
+  if(!c || !mood) return {rows:[], preSheetRows:[], preMineOnlyRows:[], mineOnly:false};
+  let pool=oamStagePool().filter(m=>filmInOneAgentMood(m, mood, c));
+  const heldThisTab=watchHeldOpen[watchTab];
+  pool=pool.filter(m=>filmMatchesWatchedFilter(m) || heldThisTab.has(m.tmdb_id));
+  const preSheetRows=pool;
+  const wsearch=watchSearch[watchTab];
+  if(wsearch) pool=pool.filter(m=>m.title.toLowerCase().includes(wsearch));
+  const rows = (mood.id==="releases" || mood.id==="starred" || mood.starredOnly)
+    ? pool : oamApplyShowCap(pool, mood, c, heldThisTab);
+  return {rows, preSheetRows, preMineOnlyRows:rows, mineOnly:false};
+}
+function oamEmptyResultsHTML(){
+  const mood=currentOamMood();
+  return `<div class="empty">
+    <div class="emoji">🔍</div>
+    <div class="eh">No titles in ${esc(mood?moodDisplayName(mood):"this list")} here yet.</div>
+    <div class="ebtns"><button class="ebtn" onclick="openOamMoodSheetFor('${escA(watchMoodSel)}')"><span>Edit this mood</span></button></div>
+  </div>`;
+}
+
+// ---- The mood sheet (v2) — oamDraft is the working copy; nothing below writes watchMoods until Save, same
+// no-write-until-save discipline as the v1 moodDraft it sits beside. ----
+let oamDraft=null;
+let oamDeleteArmed=false;
+let oamDeleteArmTimer=null;
+function oamMoodDraftFrom(mood){
+  return {
+    editingId: mood ? mood.id : null,
+    name: mood ? moodDisplayName(mood) : "",
+    handOnly: mood ? !!mood.handOnly : false,
+    stylesAll: mood ? !(mood.styles && mood.styles.length) : true,
+    styles: new Set(mood && mood.styles ? mood.styles : []),
+    minScore: mood && mood.minScore!=null ? mood.minScore : null,
+    ages: new Set(mood ? (mood.ages||[]) : []),
+    awards: mood ? (mood.awards||"any") : "any",
+    years: mood ? (mood.years||0) : 0,
+    show: mood ? (mood.show||"all") : "all",
+    sort: mood ? (mood.sort||"score") : "score",
+    in: [...(mood ? (mood.in||[]) : [])],
+    out: [...(mood ? (mood.out||[]) : [])],
+  };
+}
+window.openOamMoodSheetFor=id=>{
+  const mood=oamMoodsListReal().find(m=>m.id===id); if(!mood) return;
+  oamDraft=oamMoodDraftFrom(mood);
+  oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
+  openWatchSheet();
+};
+window.openOamMoodSheetForNew=()=>{
+  if(oamMoodsListReal().length>=MOOD_MAX) return;
+  oamDraft=oamMoodDraftFrom(null);
+  oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
+  openWatchSheet();
+};
+window.setOamDraftName=v=>{ if(oamDraft) oamDraft.name=v; };
+window.toggleOamDraftHandOnly=()=>{ if(!oamDraft) return; oamDraft.handOnly=!oamDraft.handOnly; renderOamMoodSheetBody(); };
+window.toggleOamDraftStyle=style=>{
+  const d=oamDraft; if(!d) return;
+  const c=oneAgentCriteria(); if(!c) return;
+  const onStyles=ALL_GENRES.filter(g=>oaBar(c,g)!=null);
+  if(d.stylesAll){
+    d.stylesAll=false;
+    d.styles=new Set(onStyles.filter(g=>g!==style));
+  } else if(d.styles.has(style)){
+    d.styles.delete(style);
+  } else {
+    d.styles.add(style);
+    if(onStyles.every(g=>d.styles.has(g))){ d.stylesAll=true; d.styles=new Set(); }
+  }
+  renderOamMoodSheetBody();
+};
+window.selectAllOamDraftStyles=()=>{ if(!oamDraft) return; oamDraft.stylesAll=true; oamDraft.styles=new Set(); renderOamMoodSheetBody(); };
+window.clearAllOamDraftStyles=()=>{ if(!oamDraft) return; oamDraft.stylesAll=false; oamDraft.styles=new Set(); renderOamMoodSheetBody(); };
+window.oamMinScoreOnDrag=input=>{
+  const v=parseInt(input.value,10);
+  const bar=v>=100?null:v;
+  const wrap=input.closest(".oaslidewrap");
+  const boxes=wrap?wrap.querySelectorAll(".oabox"):[];
+  ONE_AGENT_SCORE_BRACKETS.forEach((b,i)=>{ const fill=boxes[i]&&boxes[i].querySelector(".oafill"); if(fill) fill.style.width=oaBoxPct(bar,b)+"%"; });
+  const valEl=$("oamMinScoreVal");
+  if(valEl) valEl.innerHTML = bar==null ? `Agent's<i>no extra</i>` : `${bar}+<i>this mood</i>`;
+};
+window.oamMinScoreOnRelease=input=>{
+  const d=oamDraft; if(!d) return;
+  const v=parseInt(input.value,10);
+  d.minScore = v>=100?null:v;
+  renderOamMoodSheetBody();
+};
+window.oamClearMinScore=()=>{ if(!oamDraft) return; oamDraft.minScore=null; renderOamMoodSheetBody(); };
+window.toggleOamDraftAge=a=>{ if(!oamDraft) return; oamDraft.ages.has(a)?oamDraft.ages.delete(a):oamDraft.ages.add(a); renderOamMoodSheetBody(); };
+window.setOamDraftAwards=v=>{ if(!oamDraft) return; oamDraft.awards=v; renderOamMoodSheetBody(); };
+window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMoodSheetBody(); };
+window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMoodSheetBody(); };
+window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
+// Every other saved mood that would ALSO list this style — "also in <names>" under a style row.
+function oamStylesAlsoIn(style, excludeId){
+  return oamMoodsListReal().filter(m=>m.id!==excludeId && !m.handOnly && m.id!=="releases" && m.id!=="starred"
+    && (!m.styles || !m.styles.length || m.styles.includes(style))).map(m=>m.name);
+}
+function oamStyleRowHTML(c, d, style){
+  const agentBar=oaBar(c, style);
+  const effBar = d.minScore!=null ? Math.max(agentBar, d.minScore) : agentBar;
+  const on = d.stylesAll || d.styles.has(style);
+  const name=oneAgentShortName(style);
+  const raised = d.minScore!=null && d.minScore>agentBar;
+  const valText = raised ? `${effBar}+<i>agent ${agentBar}+</i>` : `${agentBar}+`;
+  const alsoIn=oamStylesAlsoIn(style, d.editingId).filter(n=>n!==d.name);
+  const alsoText = alsoIn.length ? `also in ${alsoIn.join(", ")}` : "";
+  return `<label class="oamstylerow${on?"":" off"}">
+      <input type="checkbox" ${on?"checked":""} onchange="toggleOamDraftStyle('${escA(style)}')" aria-label="${escA(name)}">
+      <span class="oamstyleleft">
+        <span class="oamstylename">${esc(name)}</span>
+        ${alsoText?`<span class="oamalso">${esc(alsoText)}</span>`:""}
+      </span>
+      <span class="oarowstrip">${oaBoxesHTML(effBar)}</span>
+      <span class="oarowval">${valText}</span>
+    </label>`;
+}
+function oamMinScoreSectionHTML(d){
+  const bar=d.minScore;
+  const raised = bar!=null;
+  const val = raised ? `${bar}+<i>this mood</i>` : `Agent's<i>no extra</i>`;
+  const desc = raised
+    ? `Styles your agent lists below ${bar} are lifted to ${bar}+ in this mood. <button type="button" class="linkbtn" onclick="oamClearMinScore()">Remove</button>`
+    : `Drag to make this mood pickier than your agent. All the way right takes it off.`;
+  return `<div class="wsheetsec">
+      <div class="wsheethd"><span>MOOD MINIMUM SCORE &middot; only ever raises your agent's</span></div>
+      <div class="oaslider">
+        <div class="oaslidewrap">
+          <div class="oastrip oastripfull">${oaBoxesHTML(bar,{labels:true})}</div>
+          <input type="range" class="oarange" min="50" max="100" step="1" value="${bar==null?100:bar}"
+            oninput="oamMinScoreOnDrag(this)" onchange="oamMinScoreOnRelease(this)" aria-label="Mood minimum score">
+        </div>
+        <span class="oaslideval" id="oamMinScoreVal">${val}</span>
+      </div>
+      <p class="oaslidedesc">${desc}</p>
+    </div>`;
+}
+const OAM_AGE_OPTS=TASTE_AGE_ORDER;
+const OAM_AWARDS_OPTS=[["any","Any"],["nominated","Nominated or won"],["won","Won"]];
+const OAM_YEARS_OPTS=[[0,"Any"],[10,"10 yrs"],[5,"5 yrs"],[3,"3 yrs"],[2,"2 yrs"],[1,"1 yr"]];
+const OAM_SHOW_OPTS=[["all","All"],["10","Best 10"],["20","Best 20"],["40","Best 40"]];
+const OAM_SORT_OPTS=[["score","Score"],["release","Release date"],["title","A–Z"]];
+function renderOamMoodSheetBody(){
+  const d=oamDraft; if(!d) return;
+  const c=oneAgentCriteria(); if(!c){ closeWatchSheet(); return; }
+  const isBuiltin = d.editingId==="releases" || d.editingId==="starred";
+  const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "Mood" : "New mood";
+  const onStyles=ALL_GENRES.filter(g=>oaBar(c,g)!=null);
+  const kOn = d.stylesAll ? onStyles.length : d.styles.size;
+  const styleRows = onStyles.map(g=>oamStyleRowHTML(c, d, g)).join("");
+  const seg=(opts, cur, setter, label)=>`<div class="mfseg" role="group" aria-label="${escA(label)}">
+      ${opts.map(([k,l])=>{ const on=cur===k; return `<button type="button" aria-pressed="${on}" class="${on?"on":""}"
+        onclick="${setter}(${typeof k==="number"?k:`'${k}'`})">${esc(l)}</button>`; }).join("")}
+    </div>`;
+  const body=$("watchSheetBody");
+  if(body) body.innerHTML=`
+    <div class="wsheetsec oamhead">
+      <input id="oamMoodName" class="mfinput" type="text" maxlength="24" placeholder="Mood name" autocomplete="off"
+        value="${escA(d.name)}" oninput="setOamDraftName(this.value)">
+      <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>Which films</span></div>
+      <div class="mfrow"><span>Only films I add by hand</span>
+        <button type="button" class="mftog${d.handOnly?" on":""}" role="switch" aria-checked="${!!d.handOnly}"
+          aria-label="Only films I add by hand" onclick="toggleOamDraftHandOnly()"><i></i></button>
+      </div>
+    </div>
+    ${d.handOnly ? "" : `
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>STYLES &middot; ${kOn} of ${onStyles.length}</span>
+        <div class="wsheetlinks">
+          <button type="button" class="linkbtn" onclick="selectAllOamDraftStyles()">All</button>
+          <button type="button" class="linkbtn" onclick="clearAllOamDraftStyles()">None</button>
+        </div>
+      </div>
+      <div class="oalist">${styleRows}</div>
+    </div>
+    ${oamMinScoreSectionHTML(d)}
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>WHO'S WATCHING: AGE RATINGS</span></div>
+      <div class="chips">${OAM_AGE_OPTS.map(a=>{ const on=d.ages.has(a); return `<button type="button" class="chip${on?" on":""}"
+        aria-pressed="${on}" onclick="toggleOamDraftAge('${escA(a)}')">${esc(a)}</button>`; }).join("")}</div>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>AWARDS</span></div>
+      <div class="chips">${OAM_AWARDS_OPTS.map(([k,l])=>{ const on=d.awards===k; return `<button type="button" class="chip${on?" on":""}"
+        aria-pressed="${on}" onclick="setOamDraftAwards('${k}')">${esc(l)}</button>`; }).join("")}</div>
+    </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>HOW FAR BACK</span></div>
+      <div class="chips">${OAM_YEARS_OPTS.map(([k,l])=>{ const on=d.years===k; return `<button type="button" class="chip${on?" on":""}"
+        aria-pressed="${on}" onclick="setOamDraftYears(${k})">${esc(l)}</button>`; }).join("")}</div>
+    </div>`}
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>How many, and in what order</span></div>
+      <div class="mfrow"><span>SHOW</span></div>
+      ${seg(OAM_SHOW_OPTS, d.show, "setOamDraftShow", "Show")}
+      <div class="mfrow"><span>ORDER</span></div>
+      ${seg(OAM_SORT_OPTS, d.sort, "setOamDraftSort", "Order")}
+    </div>`;
+  const delBtn=$("moodDeleteBtn");
+  if(delBtn){
+    delBtn.style.display="";
+    if(isBuiltin){ delBtn.textContent="Delete this mood"; delBtn.disabled=true; }
+    else { delBtn.textContent = oamDeleteArmed ? "Tap again to delete" : "Delete this mood"; delBtn.disabled=false; }
+  }
+  const saveBtn=$("moodSaveBtn");
+  if(saveBtn) saveBtn.style.display="none";
+}
+window.oamSaveMoodFromSheet=()=>{
+  const d=oamDraft; if(!d) return;
+  const name=(d.name||"").trim();
+  if(!name){ const inp=$("oamMoodName"); if(inp) inp.focus(); return; }
+  const mood={
+    id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
+    name, v2:true,
+    handOnly: !!d.handOnly,
+    styles: d.stylesAll ? [] : [...d.styles],
+    minScore: d.minScore,
+    ages: [...d.ages],
+    awards: d.awards,
+    years: d.years,
+    show: d.show,
+    sort: d.sort,
+    in: [...d.in], out: [...d.out],
+  };
+  if(mood.id==="starred") mood.starredOnly=true;
+  const list=oamMoodsListReal();
+  const idx=list.findIndex(m=>m.id===mood.id);
+  watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
+  const selectionChanged = watchMoodSel!==mood.id;
+  watchMoodSel=mood.id;
+  applyMoodToState(mood);
+  pushViewField("moods", watchMoods.map(m=>({...m})));
+  if(selectionChanged) pushViewField("mood", mood.id);
+  logEvent("watch_mood", {action: d.editingId ? "save" : "create"});
+  closeWatchSheet();
+  render();
+  scrollWatchListingToTop();
+};
+window.oamHandleMoodDeleteBtn=()=>{
+  const d=oamDraft; if(!d) return;
+  if(!d.editingId){ closeWatchSheet(); return; }
+  if(d.editingId==="releases" || d.editingId==="starred") return;
+  const list=oamMoodsListReal();
+  if(list.length<=1) return;
+  if(!oamDeleteArmed){
+    oamDeleteArmed=true;
+    renderOamMoodSheetBody();
+    clearTimeout(oamDeleteArmTimer);
+    oamDeleteArmTimer=setTimeout(()=>{ oamDeleteArmed=false; if(oamDraft) renderOamMoodSheetBody(); }, 4000);
+    return;
+  }
+  clearTimeout(oamDeleteArmTimer);
+  const deletedId=d.editingId;
+  watchMoods = list.filter(m=>m.id!==deletedId);
+  const selectionChanged = watchMoodSel===deletedId;
+  if(selectionChanged){ watchMoodSel=watchMoods[0].id; applyMoodToState(watchMoods[0]); }
+  pushViewField("moods", watchMoods.map(m=>({...m})));
+  if(selectionChanged) pushViewField("mood", watchMoodSel);
+  logEvent("watch_mood", {action:"delete"});
+  closeWatchSheet();
+  render();
+  if(selectionChanged) scrollWatchListingToTop();
+};
+
+// ---- The card's list control (v2) — replaces the Agent middle action (agentChipHTML) on the card's own
+// .actions row, and its sheet (tap target: oamListChipHTML's own button). ----
+function oamMoodsForFilm(id, c){
+  const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return [];
+  return oamMoodsListReal().filter(mood=>filmInOneAgentMood(m, mood, c));
+}
+function oamFilmHandTouched(id){
+  return oamMoodsListReal().some(mood=>(mood.in||[]).includes(id) || (mood.out||[]).includes(id));
+}
+function oamListChipHTML(id){
+  const c=oneAgentCriteria(); if(!c) return "";
+  const moods=oamMoodsForFilm(id, c);
+  const lbl = moods.length ? (moods.length>1 ? `${moods[0].name} +${moods.length-1}` : moods[0].name) : "Add to list";
+  const hand=oamFilmHandTouched(id);
+  const title = moods.length ? `In your lists: ${moods.map(m=>m.name).join(", ")}. Tap to change.` : "Not in any list yet. Tap to add.";
+  return `<button type="button" class="ctl oamlist${hand?" handmark":""}${filmIsNew(id)?" isnew":""}" data-lid="${id}" onclick="openOamListPanel(${id},this)"
+      aria-haspopup="true" aria-expanded="false" title="${escA(title)}" aria-label="${escA(title)}">
+    <span class="cmini"><i class="cfill" style="width:${moods.length?100:0}%;background:var(--accent)"></i>
+      <span class="cic">${ICON.deck}</span>
+      <span class="clab${moods.length?"":" dim"}">${esc(lbl)}</span>
+      <span class="ctog">${ICON.chev}</span></span></button>`;
+}
+// "Your agent: ✓/✕ <reason>" — mirrors matchesCriteriaOneAgent's own checks (CAS-1337), spelled out as a
+// sentence rather than a boolean, for the sheet's own first line.
+function oneAgentAdmitReason(m){
+  const c=oneAgentCriteria();
+  if(!c) return {ok:false, text:""};
+  const {main}=mainOtherCombos(m);
+  if(main===undefined) return {ok:false, text:"has no listed style"};
+  const name=oneAgentShortName(main);
+  const style=(c.styles||{})[main];
+  if(!style || style.bar==null) return {ok:false, text:`${name} isn't on`};
+  if(c.excludeBlocked!==false && blocked.has(m.tmdb_id)) return {ok:false, text:"marked Never"};
+  if(c.excludeWatched!==false && watched.has(m.tmdb_id)) return {ok:false, text:"already watched"};
+  const score=oneScoreFor(m, c);
+  if(score===-1) return {ok:false, text:"not enough agreement to score yet"};
+  if(score<style.bar) return {ok:false, text:`${name} lists ${style.bar}+, this scores ${score}`};
+  return {ok:true, text:`${name} lists ${style.bar}+ &middot; this scores ${score}`};
+}
+function oamListPanelRowsHTML(id){
+  const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return "";
+  const c=oneAgentCriteria(); if(!c) return "";
+  const reason=oneAgentAdmitReason(m);
+  const rows=oamMoodsListReal().map(mood=>{
+    const inHand=(mood.in||[]).includes(id);
+    const outHand=(mood.out||[]).includes(id);
+    const byRules = !outHand && !inHand && filmInOneAgentMood(m, {...mood, in:[], out:[]}, c);
+    let state, btnLabel, action;
+    if(inHand){ state="In &middot; added by you"; btnLabel="Take out"; action=`oamTakeOut(${id},'${escA(mood.id)}')`; }
+    else if(outHand){ state="Out &middot; taken out by you"; btnLabel="Put back"; action=`oamPutBack(${id},'${escA(mood.id)}')`; }
+    else if(byRules){ state="In &middot; by its rules"; btnLabel="Take out"; action=`oamTakeOut(${id},'${escA(mood.id)}')`; }
+    else { state="Not in"; btnLabel="Add"; action=`oamAddIn(${id},'${escA(mood.id)}')`; }
+    return `<div class="oamlistrow">
+      <span class="oamlistname">${esc(moodDisplayName(mood))}</span>
+      <span class="oamliststate">${state}</span>
+      <button type="button" class="ebtn ghost oamlistbtn" onclick="${action}">${esc(btnLabel)}</button>
+    </div>`;
+  }).join("");
+  return `<div class="oamlistpanel">
+    <div class="oamlisttitle">${esc(m.title)}</div>
+    <div class="oamlistagent">Your agent: ${reason.ok?"&check;":"&cross;"} ${esc(reason.text)}</div>
+    <div class="oamlistscore">${oneScoreTextHTML(m)}</div>
+    <div class="oamlistrows">${rows}</div>
+    <div class="oamlistnote">Adding keeps a film in a list whatever its score, and it will alert you when it lands somewhere you watch. Taking it out keeps it out.</div>
+  </div>`;
+}
+window.openOamListPanel=(id, btn)=>{
+  const open=btn.closest(".actions").querySelector(".cpop");
+  const mine=open && open.classList.contains("oamlpop");
+  closeWatchPanel();
+  if(mine) return;
+  const card=btn.closest(".card"); if(card) card.classList.add("popopen");
+  armPanelAnchor();
+  const pop=document.createElement("div");
+  pop.className="cpop oamlpop al-c";
+  pop.innerHTML=oamListPanelRowsHTML(id);
+  btn.closest(".actions").appendChild(pop);
+  positionPanel(pop, btn);
+  document.addEventListener("keydown", watchPanelKey, true);
+  document.addEventListener("pointerdown", watchPanelOutsideClose, true);
+  btn.classList.add("open"); btn.setAttribute("aria-expanded","true");
+  snapToWatchPanelAnchor();
+};
+function oamMutateMood(moodId, fn){
+  const list=oamMoodsListReal();
+  const idx=list.findIndex(m=>m.id===moodId); if(idx<0) return;
+  const next=list.map(m=>({...m, in:[...(m.in||[])], out:[...(m.out||[])]}));
+  fn(next[idx]);
+  watchMoods=next;
+  pushViewField("moods", watchMoods.map(m=>({...m})));
+}
+window.oamAddIn=(id, moodId)=>{
+  oamMutateMood(moodId, mood=>{
+    mood.out=mood.out.filter(x=>x!==id);
+    if(!mood.in.includes(id)) mood.in.push(id);
+  });
+  logEvent("watch_mood", {action:"hand_add"});
+  closeWatchPanel();
+  keepRowInPlace(id, ()=>repaintAfterOpinion(id));
+};
+window.oamTakeOut=(id, moodId)=>{
+  oamMutateMood(moodId, mood=>{
+    if(mood.in.includes(id)) mood.in=mood.in.filter(x=>x!==id);
+    else if(!mood.out.includes(id)) mood.out.push(id);
+  });
+  logEvent("watch_mood", {action:"hand_out"});
+  closeWatchPanel();
+  keepRowInPlace(id, ()=>repaintAfterOpinion(id));
+};
+window.oamPutBack=(id, moodId)=>{
+  oamMutateMood(moodId, mood=>{ mood.out=mood.out.filter(x=>x!==id); });
+  logEvent("watch_mood", {action:"hand_clear"});
+  closeWatchPanel();
+  keepRowInPlace(id, ()=>repaintAfterOpinion(id));
+};
+
 // ---- CAS-909: onboarding v2's agent reveal — the app's own Agents-screen row, assembled in front of the
 // user as each agent is created (buildOnbAgentsV2, CAS-908). Every value below reads off the SAME
 // functions renderAgentsScreen() calls above; a second set of summary functions is how onboarding and the
@@ -21727,17 +23032,13 @@ function cascadeRankTint(c){
   const idx=sorted.findIndex(x=>x.id===c.id);
   return idx<0 ? null : (idx%6)+1;
 }
-// A section heading in the Watch list. On a Home stage (Rental, Streaming, Premium) the stage's own section
-// is headed with the stage's name, exactly as its button reads; an earlier stage's section, holding films
-// tagged for this stage that have not arrived yet, reads "<where they are now>, tagged for <this stage>"
-// (Lee, 2026-10-11; replaces CAS-1235's "<stage> · set to watch on <tab>"). The Cinema stages are unchanged.
-const WATCH_EARLY_STAGE_LABEL = {upcoming:"Upcoming", opening_week:"In cinema now", in_cinema:"In cinema now",
-                                 pvod:"Premium", rental:"Rental", included_streaming:"Streaming"};
-const watchIsEarlySection = g => watchTab!=="in_cinema" && g!==WATCH_TAB_OWN_STANDING[watchTab];
+// A section heading in the Watch list. The Cinema tab keeps its plain STATUS_LABEL per section; a Home
+// stage (Rental, Streaming, Premium) lists only its own section, headed with the stage's name, exactly as
+// its button reads (CAS-1329: there is no other section to head any more — a film never again appears
+// earlier than the stage it is actually in).
 function watchGroupHeading(g){
   if(watchTab==="in_cinema") return STATUS_LABEL[g];
-  if(!watchIsEarlySection(g)) return WATCH_TAB_LABEL[watchTab];
-  return `${WATCH_EARLY_STAGE_LABEL[g]||STATUS_LABEL[g]}, tagged for ${WATCH_TAB_LABEL[watchTab]}`;
+  return WATCH_TAB_LABEL[watchTab];
 }
 // Splits a status section's already agent-sorted `items` (filmOwnerOrder is listingGroups' primary sort
 // key, so one agent's films already run contiguously) into per-owner runs, in the same order.
@@ -21845,11 +23146,10 @@ function watchNavKey(){
     [...watchGenreOff[watchTab]].sort(),
     [...watchWatchedSel[watchTab]].sort(),
     [...watchBadgeSel[watchTab]].sort(),
-    [...watchAlsoShow[watchTab]].sort(),
     watchMineOnlyOn(),
     watchOccasion,
     // CAS-1247: the selected mood and its own Show top cut — every other mood field a mood switch changes
-    // (agents/pickedBy/watched/styles/badges/alsoShow/mineOnly/order) is already one of the fields above.
+    // (agents/pickedBy/watched/styles/badges/mineOnly/order) is already one of the fields above.
     // CAS-1287: topYou/topPublic are each resolved (legacy fallback, You-availability gate) so the nav key
     // reads the actual cut; source is its own entry too — switching a saved mood between My agents/
     // Everything changes watchScopeRows' whole pool without touching any field already listed above
@@ -21921,6 +23221,7 @@ function render(){
   // picked, all land in the Found list immediately, and none of them can clobber an override. It's cheap
   // (Cascades × titles) and it means membership has exactly one definition, evaluated in exactly one place.
   recomputeFound();
+  updateAgentNavDot();   // CAS-1340: the Agent nav chip's gold dot — cheap, and every full render is a fine time to resync it
   ensureWatchTab();   // CAS-725: keep the active tab valid before it drives rows/scope-bar below
   // CAS-1236: everything above must run even on a settled (non-navigating) pass — recomputeFound is what
   // keeps notify/found/taggedOut honest, and ensureWatchTab can itself force a navigation (a tab that just
@@ -22000,7 +23301,7 @@ function render(){
     // CAS-682: a tagged-out film still renders here, as a stub — a row you can see and count, not a hidden
     // exclusion — so the header counts every item, matching what fillListChunked below actually streams.
     const live=items.length;
-    const grp=document.createElement("div"); grp.className="group"+(watchIsEarlySection(g)?" early":""); grp.dataset.g=g;
+    const grp=document.createElement("div"); grp.className="group"; grp.dataset.g=g;
     grp.innerHTML=`<div class="grouphead"><span class="gdot ${g}"></span>${watchGroupHeading(g)}
       <span class="gcount">${live}</span></div>`;
     wrap.appendChild(grp);
@@ -22028,16 +23329,6 @@ function render(){
       fillListChunked(listEl, block.items, renderGen, isFresh, oneListDone);
     });
   });
-  // A Home stage whose own section holds nothing yet still gets that section's heading, after the earlier
-  // stages' sections, so a tap on the stage always has its own heading to land on.
-  const ownG=WATCH_TAB_OWN_STANDING[watchTab];
-  if(ownG && !sections.some(s=>s.g===ownG)){
-    const grp=document.createElement("div"); grp.className="group ownempty"; grp.dataset.g=ownG;
-    grp.innerHTML=`<div class="grouphead"><span class="gdot ${ownG}"></span>${watchGroupHeading(ownG)}
-      <span class="gcount">0</span></div>
-      <div class="ownnone">Nothing in ${WATCH_TAB_LABEL[watchTab]} yet. The films tagged for it are listed above until they arrive.</div>`;
-    wrap.appendChild(grp);
-  }
   renderJumpBar();     // after the groups exist — it is built FROM them, never from a fixed menu
   syncHeaderHeight();  // CAS-761: tabs/filters/jump bar above are all part of #cascbar's measured height
   // CAS-1066: the Agents screen is a layer on top of home and was rendered only by openAgentsScreen(), so
@@ -22191,8 +23482,7 @@ function patchFindCounts(){
   renderCascadeBar(shown.length);
 }
 // CAS-752: whether `m` would still be one of render()'s `rows` right now — the same chain render() applies
-// (agent scope, tab (standing/Also-show included, CAS-823), search, styles, watched filter + hold, my-
-// services), reusing its own
+// (agent scope, tab standing (CAS-1329), search, styles, watched filter + hold, my-services), reusing its own
 // named predicates so the two can never disagree. fastPatchFindRow's whole point is answering this for ONE
 // film without re-deriving the ~2,000-film list a full render() would; the old check here tested the tapped
 // film against activeCascade() — a single-agent idea CAS-718/725 already retired from this listing — so it
@@ -22200,11 +23490,17 @@ function patchFindCounts(){
 // left the list.
 function filmInWatchRows(m){
   if(!watchTabsNow().length) return false;
+  // CAS-1341: a v2 account defers to the real pipeline (oamVisibleRows) for the final answer — its pool is
+  // small (one agent, one mood) so this is cheap, and it means this fast path can never disagree with a full
+  // render() the way a hand-duplicated v2 predicate could.
+  { const oaC=oneAgentCriteria(); if(oaC) return oamVisibleRows().rows.some(r=>r.tmdb_id===m.tmdb_id); }
+  // CAS-1328/CAS-1331: Latest's own 12-month cinema-release window applies no matter which source the
+  // person has chosen for it — see watchScopeRows' identical top-level check.
+  const isLatest = currentMood().id==="releases";
+  if(isLatest && !filmInLatestWindow(m)) return false;
   // CAS-1284 Change 1: a catalogue mood's pool test — see watchScopeRows's own comment. Agents-off,
   // occasion and Picked by are all agent-scoped, so none of them apply here.
   if(moodSource(currentMood())==="catalogue"){
-    // CAS-1328: Latest's own 12-month cinema-release window — see watchScopeRows' identical branch.
-    if(currentMood().id==="releases" && !filmInLatestWindow(m)) return false;
     const ps=primaryStatus(m);
     const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
     const standing = watchTab==="in_cinema" ? (ps==="upcoming" || ps==="opening_week" || ps==="in_cinema") : ps===ownStanding;
@@ -22258,6 +23554,7 @@ function fastPatchFindRow(id){
 }
 function repaintAfterOpinion(id){
   recomputeFound();
+  updateAgentNavDot();   // CAS-1340: a verdict can move a combo's adjusted state even on the fast-patch path below
   refreshOpenFilmPageFor(id);   // CAS-1205: keep the film page's own WATCHED column/confirm panel (if open on this film) in step
   if(fastPatchFindRow(id)) return;                     // instant single-node swap
   render();                                            // fallback (off-screen cards skip layout, so cheap)
@@ -22315,8 +23612,8 @@ function wtRefreshMini(){
   const curKey = watchTab==="in_cinema" ? watchCinemaStage : watchTab;
   const stop = watchStageStopsNow().find(s=>s.key===curKey);
   const stageName = stop ? (stop.key==="in_cinema" ? "Now showing" : stop.label) : "";
-  mini.innerHTML = `<span class="gdot ${stop?stop.dot:""}" aria-hidden="true"></span><span>${esc(stageName)}</span>`
-    + `<span class="wtsep">·</span><span class="wtmood">${esc(moodDisplayName(currentMood()))}</span><span class="wtchev">Change ▾</span>`;
+  mini.innerHTML = `<span class="wtmood">${esc(moodDisplayName(currentMood()))}</span><span class="wtsep">·</span>`
+    + `<span class="gdot ${stop?stop.dot:""}" aria-hidden="true"></span><span>${esc(stageName)}</span><span class="wtchev">Change ▾</span>`;
 }
 // Measuring shortH forces a layout flush while the bar is shrunk but not yet margin-compensated — if the
 // page is scrolled to (or past) what is, for that one instant, a shorter document, the browser clamps
@@ -22500,6 +23797,7 @@ window.setOpinion=(id,kind)=>{
   agMetricsCache.clear();   // CAS-867: this flips taggedOut(id) for every agent that lists this film
   _tasteProfileCache = null;   // CAS-1251: the verdict just changed, so the counted set has too
   _tasteMatchCache.clear();    // CAS-1264: same reason — a changed verdict can move any film's You value
+  _oneAgentProfileCache = null;   // CAS-1337: same reason — the v2 main-keyed pair stats just changed too
   const was=opinionOf(id), on=was!==kind, wasFound=found.has(id);
   // Read the film's freshness BEFORE the answer changes it, so the 🆕 chip on the stub doesn't flicker off
   // under the tap. (The ORDER can't move at all now — availability section, then date, see byTimeline.)
@@ -22507,6 +23805,7 @@ window.setOpinion=(id,kind)=>{
   watched.delete(id); disliked.delete(id); blocked.delete(id); indifferent.delete(id); wowed.delete(id);
   enjoyed.delete(id);
   if(on){
+    verdictAt.set(id, Date.now());   // CAS-1340: this device's own record of when this verdict was given
     if(kind==="notfor") blocked.add(id);
     else { watched.add(id);
            if(kind==="disliked") disliked.add(id);
@@ -23089,7 +24388,22 @@ function acctFetchKeepalive(init){
   // UI applies: the window must be switched ON in Where & when you'll watch and REACHABLE for this
   // Cascade's scope. Writing a moment that fails either would have the daily job email about something
   // the app is simultaneously telling the user it will never mention.
+  // CAS-1337: a v2 agent has no per-agent Alerts switch or window scope to read alertLive() with — its
+  // alert_moments is the plain union of whatever moments any of its styles alerts on (per-style gating of
+  // those moments at alert time is CAS-1343's oneAgentAlerts, not this derivation).
+  function oneAgentMomentsOf(c){
+    const out=new Set();
+    Object.values(c.styles||{}).forEach(s=>{
+      if(!s || s.bar==null) return;
+      const al=s.al||{};
+      if(al.cinema) out.add("hits_cinema");
+      if(al.rent){ out.add("hits_rent"); out.add("hits_pvod"); }
+      if(al.stream) out.add("hits_stream");
+    });
+    return [...out];
+  }
   function momentsOf(c){
+    if(c && c.v===2) return oneAgentMomentsOf(c);
     const out=[];
     for(const k in ALERT_TO_MOMENT) if(alertLive(c,k)) out.push(ALERT_TO_MOMENT[k]);
     return out;
@@ -23409,6 +24723,7 @@ function acctFetchKeepalive(init){
     agMetricsCache.clear();   // CAS-867: a cleared verdict set can flip taggedOut() too
     _tasteProfileCache = null;   // CAS-1251: same reason — a signed-out device has no verdicts to count
     _tasteMatchCache.clear();    // CAS-1264: same reason — nothing left to cache a You value from
+    _oneAgentProfileCache = null;   // CAS-1337: same reason — nothing left for the v2 pair stats either
     // Every other in-memory domain a signed-in session could have populated, back to its fresh-device
     // default — the wipe above already means re-reading each of these from localStorage would land on the
     // same default anyway, but resetting directly avoids re-parsing keys that no longer exist.
@@ -23625,6 +24940,10 @@ function acctFetchKeepalive(init){
     watched.clear(); disliked.clear(); blocked.clear(); indifferent.clear(); wowed.clear(); enjoyed.clear();
     (rows||[]).forEach(r=>{
       const id=Number(r.movie_id); if(!isFinite(id)) return;
+      // CAS-1340: capture the row's own updated_at (when present) as this film's verdictAt — the server's
+      // record of when the verdict was last written, used by the Score adjustments section to tell which
+      // films' verdicts are newer than a combo's seenAdjAt.
+      if(r.updated_at){ const ts=Date.parse(r.updated_at); if(isFinite(ts)) verdictAt.set(id, ts); }
       if(r.status==="notfor") return blocked.add(id);
       watched.add(id);
       if(r.status==="disliked") disliked.add(id);
@@ -23635,6 +24954,7 @@ function acctFetchKeepalive(init){
     agMetricsCache.clear();   // CAS-867: a synced verdict can flip taggedOut() same as a local one can
     _tasteProfileCache = null;   // CAS-1251: a synced verdict changes the counted set same as a local one can
     _tasteMatchCache.clear();    // CAS-1264: same reason — a synced verdict can move any film's You value too
+    _oneAgentProfileCache = null;   // CAS-1337: same reason — a synced verdict changes the v2 pair stats too
     recomputeFound();
     // CAS-1236: skip the repaint (not the merge above) when this is byte-identical to the last rows this
     // device applied for this table — a reconcile pull that changed nothing must draw nothing.
@@ -24450,7 +25770,11 @@ function acctFetchKeepalive(init){
       // below. C2: view.moods/view.mood adopted together, falling back to the in-memory defaults when the
       // account has saved none yet; applyMoodToState makes the adopted mood the live state, same as boot.
       if(Array.isArray(v.moods) && v.moods.length){
-        watchMoods = v.moods.slice(0, MOOD_MAX).map(m=>({...moodDefaultFieldsNow(), ...m}));
+        // CAS-1341: each record's OWN v2 marker decides its defaults — never oneAgentCriteria(), which races
+        // loadAccount()'s own cascades load (both run inside the same Promise.allSettled fan-out, no ordering
+        // guarantee between them) and so cannot be trusted at this exact point in the load.
+        watchMoods = v.moods.slice(0, MOOD_MAX).map(m=>
+          m && m.v2 ? {...oamMoodDefaultFields(), ...m} : {...moodDefaultFieldsNow(), ...m});
       }
       // CAS-1284 Change 6 / CAS-1287 Change 6: an existing account's saved moods predate the three new
       // catalogue starters (step 1, moodsProvisioned reaching 1) and/or predate "Show top" replacing Best N
@@ -24460,23 +25784,28 @@ function acctFetchKeepalive(init){
       // next real view write instead, through riderReviewSessionsOnto below (same deferred-write idiom as
       // the reviewSessions replay above it).
       const moodsProvisionedLevel = typeof v.moodsProvisioned==="number" ? v.moodsProvisioned : (v.moodsProvisioned ? 1 : 0);
-      if(moodsProvisionedLevel<1){
+      // CAS-1341: these three steps are v1-only migrations (adding v1-shaped catalogue starters/Starred) —
+      // a v2 account's moods (any record carrying v2:true) must never be touched by them, race-free since
+      // this reads the just-loaded array itself rather than oneAgentCriteria() (see the v.moods adoption
+      // above for why that gate can't be trusted at this exact point in the load).
+      const watchMoodsHasV2 = watchMoods.some(m=>m && m.v2);
+      if(moodsProvisionedLevel<1 && !watchMoodsHasV2){
         const haveIds=new Set(watchMoods.map(m=>m.id));
         const missing=MOOD_DEFAULTS.filter(md=>MOOD_STARTER_IDS.includes(md.id) && !haveIds.has(md.id));
         if(missing.length && watchMoods.length<MOOD_MAX){
           watchMoods=[...watchMoods, ...missing.slice(0, MOOD_MAX-watchMoods.length).map(md=>({...moodDefaultFieldsNow(), ...md}))];
         }
       }
-      if(moodsProvisionedLevel<2){
+      if(moodsProvisionedLevel<2 && !watchMoodsHasV2){
         watchMoods=watchMoods.map(m=>MOOD_STARTER_IDS.includes(m.id) ? {...m, topYou:20, topPublic:10} : m);
       }
-      if(moodsProvisionedLevel<2){
+      if(moodsProvisionedLevel<2 && !watchMoodsHasV2){
         moodsProvisionPending={moods:watchMoods.map(m=>({...m})), moodsProvisioned:2};
       }
       // CAS-1295 Change 4: a third provisioning step — an existing account's saved moods predate the
       // Starred mood; add it once, directly after Releases (or at the end if there's no Releases to anchor
       // on), within the 10-mood cap. Never resurrected once the account has deleted it, same rule as above.
-      if(moodsProvisionedLevel<3){
+      if(moodsProvisionedLevel<3 && !watchMoodsHasV2){
         if(!watchMoods.some(m=>m.id==="starred") && watchMoods.length<MOOD_MAX){
           const starred={...moodDefaultFieldsNow(), ...MOOD_DEFAULTS.find(md=>md.id==="starred")};
           const relIdx=watchMoods.findIndex(m=>m.id==="releases");

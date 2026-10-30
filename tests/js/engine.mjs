@@ -192,13 +192,11 @@ if(typeof window.CascadeAuth === "undefined"){
   watchBadgeSel, filmMatchesBadgeFilter, BADGE_FILTER_OPTS,
   toggleWatchBadge: (key) => window.toggleWatchBadge(key),
   clearAllWatchBadge: () => window.clearAllWatchBadge(),
-  // CAS-1235: watchAlsoShow (by reference — toggleWatchAlsoShow/clearWatchAlsoShow mutate or reassign the
-  // per-tab Set in place) plus the default it now widens to and the heading render() builds from a group's
-  // status key, so a test can assert the default-on behaviour and its heading text without scraping the DOM
-  // the stub swallows. WATCH_TAB_OWN_STANDING already exists for filmMatchesWatchTab's own use above.
-  watchAlsoShow, WATCH_ALSO_SHOW_DEFAULT, watchAlsoShowIsDefault, watchGroupHeading, WATCH_TAB_OWN_STANDING,
-  clearWatchAlsoShow: () => window.clearWatchAlsoShow(),
-  // CAS-1235 AC4/CAS-1301: watchStageStopsNow/watchStageCountFor (CAS-1223's stage-strip count, aimed at a
+  // CAS-1329: watchGroupHeading (the heading render() builds for a group's status key) and
+  // WATCH_TAB_OWN_STANDING (filmMatchesWatchTab's own standing table) — exported so a test can assert the
+  // heading text without scraping the DOM the stub swallows.
+  watchGroupHeading, WATCH_TAB_OWN_STANDING,
+  // CAS-1301: watchStageStopsNow/watchStageCountFor (CAS-1223's stage-strip count, aimed at a
   // stop through the same watchVisibleRows() pipeline the listing itself uses) plus watchGroupRows (CAS-1301's
   // shared row-to-group test the button and the section heading both key off) — exported so a test can
   // assert the count agrees with a section's own heading directly, rather than trusting that both read the
@@ -296,6 +294,52 @@ if(typeof window.CascadeAuth === "undefined"){
   // You-v3 arithmetic behind tasteMatch, exported so a test can assert it directly against the ticket's own
   // worked fixtures.
   tasteProfile, tasteMatch, youScore, matchBadgeHTML, publicLozengeHTML, tasteStyleMapData, creditsHTML,
+  // CAS-1337: the v2 "one agent" engine — oneScore/oneScoreParts (single score + its per-combo
+  // breakdown), barAdvice/topPct (the agent's own raise/lower suggestion and share-of-catalogue line),
+  // and oneAgentAlerts (the per-style alert switch CAS-1343's monitor gating calls) — exported so a test
+  // can drive each directly against a fixture criteria object, the same convention youScore above uses.
+  // oneComboAdj (the per-combo learned number, with no override applied) is exported alongside them so a
+  // CAS-1340 test can pin a fixture's learned value directly rather than only through oneScoreParts' blend.
+  oneScore, oneScoreParts, barAdvice, oneTopPct, oneAgentAlerts, oneComboAdj, mainOtherCombos,
+  // CAS-1339: oneAgentCriteria is the account's one v2 agent lookup barAdvice/oneScore/oneScoreParts
+  // already fall back to — exported directly so a test can assert the v2/non-v2 gate itself.
+  oneAgentCriteria,
+  // CAS-1338: oneScoreBoxHTML/oneScoreTextHTML are the v2 agent's single score box (collapsed card) and
+  // its expanded-card sentence companion — exported so a test can assert their markup directly, the same
+  // convention matchBadgeHTML/publicLozengeHTML above use.
+  oneScoreBoxHTML, oneScoreTextHTML,
+  // CAS-1339: the Agent screen's own pure building blocks — row order, per-style film counts, the score-
+  // strip fill rule, and each section's render (row/open-body/suggestion/alerts) — exported so a test can
+  // assert each directly, the same convention oneScoreBoxHTML above uses. The wire mutators (toggle/drag/
+  // release/suggestion/alert) are window-assigned, wrapped the same way toggleFilmOpt elsewhere in this file
+  // is, so a test can drive a real edit through the real function rather than poking criteria by hand.
+  oneAgentShortName, oaBar, oaBoxPct, oaBoxesHTML, oaComputeOrder, oaOrder, oaFilmCounts,
+  oaAlertDotsHTML, oaSuggestionHTML, oaAlertsHTML, oaOpenBodyHTML, oaRowHTML, renderOneAgentScreen,
+  get oaOpenStyle(){ return oaOpenStyle; },
+  get oaOrderSnapshot(){ return oaOrderSnapshot; },
+  oaToggleStyle: (style) => window.oaToggleStyle(style),
+  oaOnDrag: (input) => window.oaOnDrag(input),
+  oaOnRelease: (input) => window.oaOnRelease(input),
+  oaApplySuggestion: (style, to) => window.oaApplySuggestion(style, to),
+  oaDismissSuggestion: (style) => window.oaDismissSuggestion(style),
+  oaToggleAlert: (style, win) => window.oaToggleAlert(style, win),
+  // CAS-1340: Score adjustments section — the pure building blocks (combo enumeration/sort, bar/value/row
+  // HTML, the nav-dot question) exported directly, the wire mutators window-assigned, the same two
+  // conventions CAS-1339's own exports just above use. verdictAt is exposed by reference (same convention
+  // the watched Set uses) so a fixture can seed deterministic "verdict newer than seenAdjAt" timestamps
+  // without waiting on real wall-clock gaps between two Date.now() calls.
+  oaComboStats, oaComboSort, oaComboDirection, oaComboMag, oaAnyAdjusted, oaComboFilms, oaComboAdjustTitles,
+  oaFmtPoints, oaTrackPct, oaComboBarHTML, oaComboValueHTML, oaOverrideLeftHTML, oaComboWasLineHTML,
+  oaComboRowHTML, oaAdjustedBadgeHTML, oaAdjustSectionHTML, updateAgentNavDot,
+  verdictAt,
+  get oaShowAllAdj(){ return oaShowAllAdj; },
+  get oaComboFilmsOpen(){ return oaComboFilmsOpen; },
+  oaToggleComboFilms: (key) => window.oaToggleComboFilms(key),
+  oaToggleShowAllAdj: () => window.oaToggleShowAllAdj(),
+  oaUseLearned: (key) => window.oaUseLearned(key),
+  oaMarkSeenAdjusted: (style) => window.oaMarkSeenAdjusted(style),
+  oaComboOnDrag: (input) => window.oaComboOnDrag(input),
+  oaComboOnRelease: (input) => window.oaComboOnRelease(input),
   // CAS-1289: renderStyleMapSection is the Style map card's own render, and tasteSelPrimary/tasteSelOther
   // (module-level lets, same reassignment pattern as watchTab above) are the cell it's currently showing
   // detail for -- exported through getters/setters so a test can seed a stale selection (left over from a
@@ -561,7 +605,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // CAS-1328: moodSource/moodDisplayName — Latest's (id "releases") fixed-by-the-app source and display
   // name, overriding whatever an existing account's stored record carries. filmInLatestWindow/
   // LATEST_WINDOW_DAYS are Latest's own 12-month cinema-release pool test.
-  applyMoodToState, moodDefaultFieldsNow, moodOrder, moodSort, moodSource, moodDisplayName,
+  // CAS-1331: moodDraftFrom — the mood sheet's own draft-building function, exported so a test can assert
+  // what reopening the sheet after a save would actually show (moodDraft itself is a plain let-bound
+  // variable, never reachable outside the engine's own scope) without needing to read DOM the stub swallows.
+  applyMoodToState, moodDefaultFieldsNow, moodOrder, moodSort, moodSource, moodDisplayName, moodDraftFrom,
   filmInLatestWindow, LATEST_WINDOW_DAYS,
   // CAS-1287: MOOD_DEFAULTS (the five built-in moods, including the three catalogue starters),
   // moodTopYouN/moodTopPublicN/moodTopYouAvailable/moodTopYouEffectiveN ("Show top"'s own cap-resolution

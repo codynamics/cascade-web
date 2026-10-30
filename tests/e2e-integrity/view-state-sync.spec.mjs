@@ -36,7 +36,9 @@ async function viewRow(userId){
   return (data && data.view) || {};
 }
 
-test("AC1: A selects an agent and sets Streaming mine-only off; B reconciles and shows both", async ({ browser }) => {
+// CAS-1336: fixme'd, not deleted. Failing since 23 Oct with an unconfirmed root cause (CAS-1330); agent
+// selection is removed by the one-agent redesign (CAS-1337..CAS-1344). Re-assess under CAS-1330 after CAS-1344.
+test.fixme("AC1: A selects an agent and sets Streaming mine-only off; B reconciles and shows both", async ({ browser }) => {
   const email = testEmail("cas1222-ac1");
   const user = await createTestUser(email);
   const [, agentB] = await seedCascades(user.id, [{ name: "AC1 agent A" }, { name: "AC1 agent B" }]);

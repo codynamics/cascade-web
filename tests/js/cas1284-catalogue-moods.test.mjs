@@ -310,8 +310,11 @@ test("CAS-1284 Change 3: applyMoodToState restores watchGenreOff from mood.style
       assert.deepEqual([...E.watchGenreOff.stream].sort(), [...stylesOff].sort(),
         "AC: a mood's own stylesOff must land straight in watchGenreOff for the active tab");
       const { rows } = E.watchVisibleRows();
-      const expected = [...E.MOVIES].filter(m => E.primaryStatus(m) === "included_streaming" && E.showable(m) && E.passesTasteBase(m) && (m.genres || []).includes("Comedy"));
-      assert.ok(expected.length > 0, "setup: a Comedy streaming film must exist in the harness catalogue");
+      // CAS-1334: Styles now matches a film's MAIN style only (m.genres[0]), not any of its styles; a film
+      // with no styles at all always passes (filmPassesStylesOff), so it stays in the expected set too.
+      const expected = [...E.MOVIES].filter(m => E.primaryStatus(m) === "included_streaming" && E.showable(m) && E.passesTasteBase(m)
+        && (!(m.genres || []).length || m.genres[0] === "Comedy"));
+      assert.ok(expected.length > 0, "setup: a Comedy-main-style streaming film must exist in the harness catalogue");
       assert.ok(rows.length > 0, "the Styles filter must not empty the list outright");
       assert.deepEqual([...rows].map(m => m.tmdb_id).sort(), expected.map(m => m.tmdb_id).sort());
     });
