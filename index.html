@@ -3307,6 +3307,48 @@
   .oaadjup{color:#5eead4}
   .oaadjdown{color:#f0a060}
 
+  /* ---- CAS-1342: the one-agent setup wizard — two steps (styles+bars, then alerts) that create the v2
+     agent. Reuses CAS-1339's ONE_AGENT_SCORE_BRACKETS colours (--bc) and ONE_AGENT_WINDOWS colours (--wc),
+     but draws its own tappable box picker (oas1*) — CAS-1339's own score control is a continuous drag, not
+     five discrete taps, so nothing there fits this screen's "tap a box" interaction. */
+  .oassteplbl{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gold);margin:0 0 6px}
+  .oas1hdr{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700;color:var(--faint);
+    margin:16px 0 6px;padding:0 32px 0 96px}
+  .oas1list{display:flex;flex-direction:column}
+  .oas1row{display:grid;grid-template-columns:96px 1fr 32px;align-items:center;gap:8px;
+    padding:10px 0;border-bottom:1px solid var(--line)}
+  .oas1name{font-size:13px;font-weight:800;color:var(--ink)}
+  .oas1sub{display:block;font-size:11px;font-weight:600;color:var(--faint);margin-top:2px}
+  .oas1boxes{display:flex;gap:3px}
+  .oas1box{position:relative;flex:1;height:34px;border-radius:5px;overflow:hidden;cursor:pointer;padding:0;
+    border:1px solid color-mix(in srgb, var(--bc) 65%, transparent);background:transparent}
+  .oas1box.picked{box-shadow:inset 3px 0 0 #fff}
+  .oas1fill{position:absolute;top:0;right:0;bottom:0;background:var(--bc)}
+  .oas1lbl{position:relative;z-index:2;display:block;margin:3px 0 0 4px;font-size:10px;font-weight:800;
+    color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  .oas1never{flex:0 0 auto;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);
+    background:var(--panel2);color:var(--faint);font-size:15px;line-height:30px;cursor:pointer;padding:0}
+  .oas1never.on{border-color:var(--amber);color:var(--amber);box-shadow:0 0 0 2px var(--amber)}
+  .oas2hdr{display:grid;grid-template-columns:1fr 52px 52px 52px;gap:4px;padding:0 0 8px;
+    font-size:11px;font-weight:800;color:var(--faint)}
+  .oas2hdr span{text-align:center}
+  .oas2hdr span:first-child{text-align:left}
+  .oas2list{display:flex;flex-direction:column}
+  .oas2row{display:grid;grid-template-columns:1fr 52px 52px 52px;align-items:center;gap:4px;
+    padding:9px 0;border-bottom:1px solid var(--line)}
+  .oas2name{font-size:13px;font-weight:800;color:var(--ink)}
+  .oas2name i{display:block;font-style:normal;font-size:11px;font-weight:600;color:var(--faint);margin-top:1px}
+  .oas2cell{justify-self:center;width:40px;height:32px;border-radius:16px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--faint);font-size:14px;cursor:pointer;padding:0}
+  .oas2cell.on{border-color:var(--wc);background:color-mix(in srgb, var(--wc) 25%, transparent)}
+  .oasprimarybtn{display:block;width:100%;margin-top:18px;padding:13px;border-radius:10px;
+    border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:14.5px;font-weight:800;
+    cursor:pointer;text-align:center}
+  .oassecondarybtn{display:block;width:100%;margin-top:10px;padding:6px;background:none;border:0;
+    color:var(--dim);font-size:13px;font-weight:700;cursor:pointer;text-align:center}
+  .oaspreview{background:none;border:0;color:var(--accent);font-size:12.5px;font-weight:800;cursor:pointer;
+    padding:0;margin-left:6px}
+
   /* ---- CAS-1341: moods as lists — the v2 mood sheet and the card's list sheet. Reuses CAS-1339's .oarowstrip/
      .oabox/.oafill/.oaslider* geometry verbatim for the read-only style rows and the mood-minimum slider; only
      the handful of classes below (oam*) are new. */
@@ -4693,6 +4735,13 @@
      order, it just isn't editable here any more) and its back control. Body rendered by renderAgentsScreen(). -->
 <div class="uscreen" id="agentsScreen" role="dialog" aria-modal="true" aria-label="Agents">
   <div class="uwrap" id="agentsBody"></div>
+</div>
+
+<!-- ONE-AGENT SETUP (CAS-1342): the two-step wizard that creates the v2 agent and switches the account over.
+     Reached from ?oneagent=setup (gated until CAS-1344) or the Agent screen's own "Preview setup ›" link.
+     Body rendered by oasRender(). -->
+<div class="uscreen" id="oneAgentSetupScreen" role="dialog" aria-modal="true" aria-label="Set up your agent">
+  <div class="uwrap" id="oneAgentSetupBody"></div>
 </div>
 
 <!-- MOVING (CAS-636): the alert feed made visible. CAS-649: it opens at boot with no back control, so
@@ -19846,7 +19895,7 @@ function renderOneAgentScreen(c){
   const rows=order.map(style=>oaRowHTML(c, style, counts[style]||0)).join("");
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">Your agent</h2></div>
-    <p class="ossub">${n} verdict${n===1?"":"s"} learned</p>
+    <p class="ossub">${n} verdict${n===1?"":"s"} learned<button type="button" class="oaspreview" onclick="oasOpenPreview()">Preview setup ›</button></p>
     <div class="oacolhdr"><span>STYLE</span><span>LISTS FILMS SCORING</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's styles">${rows}</div>`;
 }
@@ -20715,6 +20764,192 @@ function onbRevealGridHTML(c){
   return films.length
     ? `<div class="rvgrid rvgridtop">${films.slice(0, REVEAL_POSTERS).map(rvPosterHTML).join("")}</div>` : "";
 }
+// ================= CAS-1342: one-agent setup (creates the v2 agent, switches the account over) =============
+// Two steps — style bars (with ⊘ never), then per-style/per-window alerts — ending in ONE atomic account
+// change (oasStartWatching below): soft-delete every existing agent, create the single v2 agent row, and
+// replace view.moods with the provisioned v2 moods (CAS-1341's own defaults — nothing before this ticket
+// ever wrote a real one). Nothing here runs unless the wizard is actually open (oasOpen), so an account that
+// never runs setup is never touched (AC5).
+const ONE_AGENT_SETUP_STYLES = Object.keys(TASTE_SHORT);   // the exact 19, in TASTE_SHORT's own order
+const ONE_AGENT_SETUP_DEFAULT_BAR = {
+  Action:60, Adventure:60, "Science Fiction":60, Thriller:60,
+  Crime:70, Drama:70, Fantasy:70, History:70, Mystery:70, War:70, Western:70,
+  Animation:80, Comedy:80, Documentary:80, Family:80, Music:80,
+  Horror:null, Romance:null, "TV Movie":null,
+};
+const ONE_AGENT_SETUP_BAR_LABELS = {50:"Anything", 60:"Most", 70:"The good ones", 80:"Only the best", 90:"Must-sees"};
+
+let oasState = null;     // {styles:{style:{bar,never}}, alerts:{style:{cinema,rent,stream}}} — null when closed
+let oasStep = 1;
+let oasSetupQueryConsumed = false;   // the ?oneagent=setup gate fires at most once per page load (afterSignIn)
+
+function oasDefaultState(){
+  const styles={}, alerts={};
+  ONE_AGENT_SETUP_STYLES.forEach(s=>{
+    const bar = ONE_AGENT_SETUP_DEFAULT_BAR[s];
+    styles[s] = {bar: bar==null ? null : bar, never: bar==null};
+    alerts[s] = {cinema: bar!=null && bar<=60, rent:false, stream:false};
+  });
+  return {styles, alerts};
+}
+// Re-run prefill (AC4): bars round DOWN to the decade and clamp into the picker's 50-90 range; alerts carry
+// the current agent's own switches verbatim (never re-applies step 2's new-account preset over a real
+// account's actual choices).
+function oasPrefillFromAgent(c){
+  const styles={}, alerts={};
+  ONE_AGENT_SETUP_STYLES.forEach(s=>{
+    const st=(c.styles||{})[s];
+    const bar = (st && st.bar!=null) ? Math.max(50, Math.min(90, Math.floor(st.bar/10)*10)) : null;
+    styles[s] = {bar, never: bar==null};
+    const al = (st && st.al) || {};
+    alerts[s] = {cinema:!!al.cinema, rent:!!al.rent, stream:!!al.stream};
+  });
+  return {styles, alerts};
+}
+// The five tappable boxes for one style row — oaBoxPct (CAS-1339) gives a full/empty fill for every bracket
+// against a bar that always lands exactly on a bracket's own `lo`, which is exactly "fills from that value
+// rightwards" for five discrete steps; only the per-box onclick and the picked (white-edge) box are new here.
+function oas1BoxesHTML(style, st){
+  return ONE_AGENT_SCORE_BRACKETS.map(b=>{
+    const picked = st.bar===b.lo;
+    const pct = oaBoxPct(st.bar, b);
+    return `<button type="button" class="oas1box${picked?" picked":""}" style="--bc:${b.color}"
+        onclick="oasPickBar('${escA(style)}',${b.lo})" aria-pressed="${picked}"
+        aria-label="${escA(oneAgentShortName(style))} minimum score ${b.lo}">
+        <i class="oas1fill" style="width:${pct}%"></i><i class="oas1lbl">${b.lo}</i>
+      </button>`;
+  }).join("");
+}
+function oas1RowSubHTML(style, st){
+  if(st.never) return "never";
+  if(st.bar==null) return "";
+  return `${esc(ONE_AGENT_SETUP_BAR_LABELS[st.bar]||"")} · top ${oneTopPct(style, st.bar)}%`;
+}
+function oas1RowHTML(style){
+  const st=oasState.styles[style];
+  return `<div class="oas1row" data-style="${escA(style)}">
+      <span class="oas1name">${esc(oneAgentShortName(style))}<span class="oas1sub">${oas1RowSubHTML(style, st)}</span></span>
+      <span class="oas1boxes">${oas1BoxesHTML(style, st)}</span>
+      <button type="button" class="oas1never${st.never?" on":""}" onclick="oasToggleNever('${escA(style)}')"
+          aria-pressed="${st.never}" aria-label="Never show ${escA(oneAgentShortName(style))}">⊘</button>
+    </div>`;
+}
+function oasStep1HTML(){
+  return `<div class="oassteplbl">STEP 1 OF 2</div>
+    <h2 class="osh">How keen are you on each style?</h2>
+    <p class="ossub">Tap where you'd start watching. Further left, more films; further right, only the best. ⊘ means never.</p>
+    <div class="oas1hdr"><span>← more films</span><span>only the best →</span></div>
+    <div class="oas1list">${ONE_AGENT_SETUP_STYLES.map(oas1RowHTML).join("")}</div>
+    <button type="button" class="oasprimarybtn" onclick="oasGoStep2()">Next: alerts</button>
+    <button type="button" class="oassecondarybtn" onclick="oasCancel()">Cancel</button>`;
+}
+// Step 2 lists only ON styles (a bar set), bar ascending then name — never styles don't alert on anything.
+function oas2OnStyles(){
+  return ONE_AGENT_SETUP_STYLES.filter(s=>oasState.styles[s].bar!=null)
+    .sort((a,b)=> oasState.styles[a].bar-oasState.styles[b].bar || a.localeCompare(b));
+}
+function oas2RowHTML(style){
+  const st=oasState.styles[style];
+  const al=oasState.alerts[style];
+  const cells=ONE_AGENT_WINDOWS.map(w=>{
+    const on=!!al[w.key];
+    return `<button type="button" class="oas2cell${on?" on":""}" style="--wc:${w.color}"
+        onclick="oasToggleAlert('${escA(style)}','${w.key}')" aria-pressed="${on}"
+        aria-label="${escA(oneAgentShortName(style))} ${w.label} alert">${on?"🔔":""}</button>`;
+  }).join("");
+  return `<div class="oas2row" data-style="${escA(style)}">
+      <span class="oas2name">${esc(oneAgentShortName(style))}<i>${st.bar}+</i></span>
+      ${cells}
+    </div>`;
+}
+function oasStep2HTML(){
+  return `<div class="oassteplbl">STEP 2 OF 2</div>
+    <h2 class="osh">Which should tell you when they arrive?</h2>
+    <p class="ossub">We've ticked the cinema for the styles you're keenest on. Everything else just appears in Watch.</p>
+    <div class="oas2hdr"><span></span><span>● Cinema</span><span>● Rent</span><span>● Stream</span></div>
+    <div class="oas2list">${oas2OnStyles().map(oas2RowHTML).join("")}</div>
+    <button type="button" class="oasprimarybtn" onclick="oasStartWatching()">Start watching</button>
+    <button type="button" class="oassecondarybtn" onclick="oasGoStep1()">Back</button>`;
+}
+function oasRender(){
+  const el=$("oneAgentSetupBody"); if(!el) return;
+  el.innerHTML = oasStep===1 ? oasStep1HTML() : oasStep2HTML();
+}
+window.oasPickBar=(style, val)=>{
+  if(!oasState) return;
+  oasState.styles[style] = {bar:val, never:false};
+  oasRender();
+};
+window.oasToggleNever=(style)=>{
+  if(!oasState) return;
+  const st=oasState.styles[style];
+  oasState.styles[style] = st.never
+    ? {bar: ONE_AGENT_SETUP_DEFAULT_BAR[style]!=null ? ONE_AGENT_SETUP_DEFAULT_BAR[style] : 50, never:false}
+    : {bar:null, never:true};
+  oasRender();
+};
+window.oasToggleAlert=(style, win)=>{
+  if(!oasState) return;
+  const al=oasState.alerts[style] || (oasState.alerts[style]={cinema:false,rent:false,stream:false});
+  al[win]=!al[win];
+  oasRender();
+};
+window.oasGoStep2=()=>{ oasStep=2; oasRender(); };
+window.oasGoStep1=()=>{ oasStep=1; oasRender(); };
+window.oasCancel=()=>{ oasClose(); };
+window.oasOpen=(opts)=>{
+  opts=opts||{};
+  oasState = opts.prefill || oasDefaultState();
+  oasStep=1;
+  oasRender();
+  $("oneAgentSetupScreen").scrollTop=0;
+  $("oneAgentSetupScreen").classList.add("open");
+  lockBodyScroll(true);
+};
+window.oasClose=()=>{
+  $("oneAgentSetupScreen").classList.remove("open");
+  lockBodyScroll(false);
+  oasState=null;
+};
+// The Agent screen's own "Preview setup ›" link (until CAS-1344) — re-runs the wizard, pre-filled from the
+// account's current v2 agent.
+window.oasOpenPreview=()=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  oasOpen({prefill: oasPrefillFromAgent(c)});
+};
+// ---- On "Start watching": one atomic account change (the ticket's own numbered steps 1-5) -------------------
+window.oasStartWatching=()=>{
+  if(!oasState) return;
+  // 1. Soft-delete every existing agent of the account — the existing delete_agent path (same RPC
+  // deleteAgentAsk itself uses; Start watching IS the confirmation, so no second confirm() here).
+  cascades.forEach(c=>deleteCascadeFromAccount(c.id));
+  cascades.length=0;
+  // 2. Create the v2 agent row.
+  const styles={};
+  ONE_AGENT_SETUP_STYLES.forEach(s=>{
+    const st=oasState.styles[s];
+    if(st.bar==null) return;   // never: no entry at all — matchesCriteriaOneAgent's own "no style" gate
+    styles[s]={bar:st.bar, al:{...oasState.alerts[s]}};
+  });
+  // seenAdj: today's learned comboAdj for every combo that appears anywhere in the catalogue, so nothing
+  // reads as "adjusted since you last looked" on day one (CAS-1340's own oaComboStats comparison).
+  const seenAdj={};
+  MOVIES.forEach(m=>{ mainOtherCombos(m).keys.forEach(({key})=>{ if(!(key in seenAdj)) seenAdj[key]=oneComboAdj(key); }); });
+  const agent={id:cascadeNewId(), name:"My agent", v:2, styles, combo:{}, seenAdj, seenAdjAt:{}, dismissed:[]};
+  cascades.push(agent);
+  saveCascades();
+  setActive(agent.id);
+  // 3. Replace view.moods with the provisioned v2 moods (CAS-1341's own built-in defaults).
+  watchMoods = oamMoodDefaultsNow();
+  pushViewField("moods", watchMoods.map(m=>({...m})));
+  watchMoodSel = "releases";
+  pushViewField("mood", watchMoodSel);
+  // 4/5. Close the wizard (and the Agents screen, if reached via Preview setup) and land on Watch.
+  oasClose();
+  if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
+  if(typeof render==="function") render();
+};
+
 // ================= CAS-636: Moving — the alert feed made visible =================
 // CAS-848: the screen's own subtitle, shared by the loading state and the real one so they never say two
 // different things about what this screen covers.
@@ -24019,6 +24254,17 @@ function afterSignIn(){
   // the same flowStop() either way, just no longer conditioned on which of the two happened to be showing.
   if(splashUp || flowOn) flowStop();
   lockBodyScroll(false);
+  // CAS-1342: a signed-in account opening ?oneagent=setup gets the setup wizard on top of its normal
+  // landing — gated until CAS-1344 replaces first-run onboarding outright. Guarded so a second afterSignIn()
+  // this session (e.g. a token refresh re-firing the account fan-out) never reopens it under the person's
+  // hands.
+  if(URLQ.get("oneagent")==="setup" && !oasSetupQueryConsumed){
+    oasSetupQueryConsumed=true;
+    if(cascades.length){ activeId=null; openCascade(cascades[0].id, false); }
+    else { showFoundList(); render(); }
+    oasOpen();
+    return;
+  }
   if(cascades.length){
     // CAS-420/CAS-409/CAS-566: arrival at an account with agents already made is arrival at the FIRST one.
     // Always land there, not only when the incoming view happened to lack a real filtered listing: CAS-420's
