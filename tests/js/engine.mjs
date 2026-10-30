@@ -299,10 +299,28 @@ if(typeof window.CascadeAuth === "undefined"){
   // and oneAgentAlerts (the per-style alert switch CAS-1343's monitor gating calls) — exported so a test
   // can drive each directly against a fixture criteria object, the same convention youScore above uses.
   oneScore, oneScoreParts, barAdvice, oneTopPct, oneAgentAlerts,
+  // CAS-1339: oneAgentCriteria is the account's one v2 agent lookup barAdvice/oneScore/oneScoreParts
+  // already fall back to — exported directly so a test can assert the v2/non-v2 gate itself.
+  oneAgentCriteria,
   // CAS-1338: oneScoreBoxHTML/oneScoreTextHTML are the v2 agent's single score box (collapsed card) and
   // its expanded-card sentence companion — exported so a test can assert their markup directly, the same
   // convention matchBadgeHTML/publicLozengeHTML above use.
   oneScoreBoxHTML, oneScoreTextHTML,
+  // CAS-1339: the Agent screen's own pure building blocks — row order, per-style film counts, the score-
+  // strip fill rule, and each section's render (row/open-body/suggestion/alerts) — exported so a test can
+  // assert each directly, the same convention oneScoreBoxHTML above uses. The wire mutators (toggle/drag/
+  // release/suggestion/alert) are window-assigned, wrapped the same way toggleFilmOpt elsewhere in this file
+  // is, so a test can drive a real edit through the real function rather than poking criteria by hand.
+  oneAgentShortName, oaBar, oaBoxPct, oaBoxesHTML, oaComputeOrder, oaOrder, oaFilmCounts,
+  oaAlertDotsHTML, oaSuggestionHTML, oaAlertsHTML, oaOpenBodyHTML, oaRowHTML, renderOneAgentScreen,
+  get oaOpenStyle(){ return oaOpenStyle; },
+  get oaOrderSnapshot(){ return oaOrderSnapshot; },
+  oaToggleStyle: (style) => window.oaToggleStyle(style),
+  oaOnDrag: (input) => window.oaOnDrag(input),
+  oaOnRelease: (input) => window.oaOnRelease(input),
+  oaApplySuggestion: (style, to) => window.oaApplySuggestion(style, to),
+  oaDismissSuggestion: (style) => window.oaDismissSuggestion(style),
+  oaToggleAlert: (style, win) => window.oaToggleAlert(style, win),
   // CAS-1289: renderStyleMapSection is the Style map card's own render, and tasteSelPrimary/tasteSelOther
   // (module-level lets, same reassignment pattern as watchTab above) are the cell it's currently showing
   // detail for -- exported through getters/setters so a test can seed a stale selection (left over from a

@@ -3151,6 +3151,78 @@
   /* CAS-441: same quiet-indicator language as the deck's .dc-learn, sized for the row. The Agents screen
      has no coverflow focus state to gate on, so it is interactive from the moment it paints. */
 
+  /* ---- CAS-1339: the v2 "Your agent" screen — style list, minimum score, agent suggestion, film alerts.
+     Replaces renderAgentsScreen's whole body for a v2 account (oneAgentCriteria() non-null); every class
+     below is scoped to this screen alone, so the v1 .ag* rules above are untouched. */
+  .oacolhdr{display:grid;grid-template-columns:104px 1fr 52px 28px;gap:8px;padding:0 4px 6px;
+    font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--faint)}
+  .oacolhdr span:last-child{grid-column:2 / span 3;text-align:right}
+  .oalist{display:flex;flex-direction:column}
+  .oarow{border-bottom:1px solid var(--line)}
+  .oarowhead{display:grid;grid-template-columns:104px 1fr 52px 28px;align-items:center;gap:8px;
+    padding:11px 4px;cursor:pointer;background:none;border:0;width:100%;text-align:left;font:inherit;color:inherit}
+  .oarowhead:hover,.oarowhead:focus-visible{background:rgba(255,255,255,.03)}
+  .oarowhead:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
+  .oarowleft{min-width:0}
+  .oastyname{display:block;font-size:14px;font-weight:800;color:var(--ink);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .oarowfilms{display:block;font-size:11px;color:var(--faint);margin-top:1px}
+  .oaalertmark{display:inline-flex;align-items:center;gap:3px;margin-left:4px;white-space:nowrap}
+  .oadot{display:inline-block;width:7px;height:7px;border-radius:50%}
+  .oarowstrip{display:flex;gap:3px}
+  .oarowval{font-size:12.5px;font-weight:800;text-align:right;color:var(--ink);white-space:nowrap}
+  .oarowval i{display:block;font-style:normal;font-weight:600;font-size:10px;color:var(--faint);margin-top:1px}
+  .oachev{text-align:center;color:var(--faint);font-size:11px}
+  /* The score strip — collapsed row (small, no decade labels) and the open style's full-width slider
+     (.oastripfull: taller, with decade labels) share the same box/fill markup. */
+  .oabox{position:relative;flex:1;height:16px;border-radius:3px;overflow:hidden;
+    border:1px solid color-mix(in srgb, var(--bc) 65%, transparent);background:transparent}
+  .oafill{position:absolute;top:0;right:0;bottom:0;background:var(--bc)}
+  .oastripfull .oabox{height:34px;border-radius:5px}
+  .oalbl{position:relative;z-index:2;display:block;margin:3px 0 0 4px;font-size:10px;font-weight:800;
+    color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  .oaopen{padding:2px 4px 16px}
+  .oasechdr{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+    color:var(--faint);margin:14px 0 8px}
+  .oaopen>.oasechdr:first-child{margin-top:4px}
+  /* The minimum-score slider — boxes drawn under a transparent range input (.rslider's own pattern), with
+     only a white 14x26 pill thumb painted; the value sits in its own fixed 52px column to the right. */
+  .oaslider{display:flex;align-items:center;gap:8px}
+  .oaslidewrap{position:relative;flex:1;height:34px}
+  .oaslidewrap .oastripfull{position:absolute;inset:0;display:flex;gap:3px;pointer-events:none}
+  .oarange{position:relative;z-index:2;width:100%;height:34px;margin:0;cursor:pointer;
+    -webkit-appearance:none;appearance:none;background:transparent}
+  .oarange::-webkit-slider-runnable-track{height:34px;background:transparent}
+  .oarange::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:26px;border-radius:7px;
+    background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:grab;margin-top:4px}
+  .oarange::-moz-range-track{height:34px;background:transparent;border:none}
+  .oarange::-moz-range-thumb{width:14px;height:26px;border-radius:7px;background:#fff;
+    border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:grab}
+  .oarange:focus-visible{outline:none}
+  .oarange:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
+  .oarange:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
+  .oaslideval{flex:0 0 52px;width:52px;text-align:right;font-size:13px;font-weight:800;color:var(--ink)}
+  .oaslideval i{display:block;font-style:normal;font-size:10.5px;font-weight:600;color:var(--faint);margin-top:1px}
+  .oaslidedesc{font-size:12px;color:var(--dim);line-height:1.5;margin:8px 0 0}
+  /* Agent suggestion — a gold-bordered callout, same gold token the rest of the app marks a suggestion with. */
+  .oasuggest{margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--gold);
+    background:rgba(245,214,117,.08)}
+  .oasuglbl{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--gold)}
+  .oasugtext{font-size:12.5px;color:var(--ink);line-height:1.5;margin-top:4px}
+  .oasugbtns{display:flex;gap:8px;margin-top:9px}
+  .oasugchange{flex:0 0 auto;padding:7px 12px;border-radius:8px;border:1px solid var(--accent);
+    background:var(--accent);color:#fff;font-size:12px;font-weight:800;cursor:pointer}
+  .oasugkeep{flex:0 0 auto;padding:7px 12px;border-radius:8px;border:0;background:none;
+    color:var(--dim);font-size:12px;font-weight:700;cursor:pointer}
+  /* Film alert chips — "● Cinema / ● Rent / ● Stream", on = the window's own colour; off = grey. */
+  .oaalerts{display:flex;gap:8px;flex-wrap:wrap}
+  .oachip{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:20px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--faint);
+    font-size:12.5px;font-weight:700;cursor:pointer}
+  .oachipdot{width:8px;height:8px;border-radius:50%;background:#6b7280;flex:0 0 auto}
+  .oachip.on{border-color:var(--wc);background:color-mix(in srgb, var(--wc) 20%, transparent);color:var(--ink)}
+  .oachip.on .oachipdot{background:var(--wc)}
+
   /* ---- CAS-775: Occasions screen — same .ucard/.urow row language as Account, plus rename/delete
      affordances no other .urow row needs (an Occasion is a thing you can rename or remove yourself). ---- */
   .listact{flex:0 0 auto;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);
@@ -19402,6 +19474,10 @@ function agentSettingsRowsHTML(c){
     ${advRows}`;
 }
 function renderAgentsScreen(){
+  // CAS-1339: a v2 account (oneAgentCriteria() non-null) gets the single-agent "Your agent" screen instead
+  // of today's agent list/editor — every other account falls through to the unchanged body below.
+  const oaCriteria=oneAgentCriteria();
+  if(oaCriteria){ renderOneAgentScreen(oaCriteria); return; }
   const _t664=performance.now();
   const n=cascades.length;
   // CAS-708: rank is display/drag order, not array position — sort a local copy by .order so a stale
@@ -19449,6 +19525,234 @@ function renderAgentsScreen(){
   wireAgentsDrag();
   console.log('[CAS-664] renderAgentsScreen took', (performance.now()-_t664).toFixed(1), 'ms for', n, 'agents');
 }
+
+// ================= CAS-1339: the Agent screen (v2 accounts) =================================================
+// "Your agent" — one row per genre (style list, minimum score, agent suggestion, film alerts), replacing
+// today's agents list/editor/Briefing hub/Your taste screen for a v2 account. Reads straight off CAS-1337's
+// engine (oneAgentCriteria/oneScore/barAdvice/oneTopPct/matchesCriteria's own v2 branch) — this ticket adds
+// no new scoring or admission logic of its own, only the screen that edits the one agent's criteria.
+const ONE_AGENT_SCORE_BRACKETS=[
+  {lo:50,hi:60,color:"#b65a1c"},
+  {lo:60,hi:70,color:"#a0732e"},
+  {lo:70,hi:80,color:"#7f8540"},
+  {lo:80,hi:90,color:"#3f8f62"},
+  {lo:90,hi:100,color:"#138c7d"},
+];
+// Only the three styles the ticket names actually need a short form — every other TMDB genre name already
+// reads short enough to show as-is in the row's own 104px column.
+const ONE_AGENT_SHORT_NAMES={"Science Fiction":"Sci-fi","Documentary":"Doco","TV Movie":"TV movie"};
+function oneAgentShortName(style){ return ONE_AGENT_SHORT_NAMES[style] || style; }
+// amber cinema / blue rent / green stream — the same WINDOW_COLOR palette the rest of the app already
+// alerts with, keyed the way CAS-1337's styles[s].al object is (cinema/rent/stream, not in_cinema/pvod).
+const ONE_AGENT_WINDOWS=[
+  {key:"cinema", label:"Cinema", color:"var(--amber)"},
+  {key:"rent", label:"Rent", color:"var(--blue)"},
+  {key:"stream", label:"Stream", color:"var(--green)"},
+];
+let oaOpenStyle=null;       // the one open style row at a time (null = none open)
+let oaOrderSnapshot=null;   // the row order, frozen the moment a style opens — see oaOrder() below
+
+function oaBar(c, style){ const s=(c.styles||{})[style]; return (s && s.bar!=null) ? s.bar : null; }
+// The share of a style's score 50-99 covered by each of the five boxes, for a given bar (or null = off,
+// every box empty). Shared by the collapsed row's strip, the open slider's boxes and oaOnDrag's live redraw,
+// so the three can never quietly compute a fill percentage three different ways.
+function oaBoxPct(bar, b){
+  if(bar==null) return 0;
+  if(bar<=b.lo) return 100;
+  if(bar>=b.hi) return 0;
+  return Math.round(100*(b.hi-bar)/(b.hi-b.lo));
+}
+function oaBoxesHTML(bar, opts){
+  const labels = opts && opts.labels;
+  return ONE_AGENT_SCORE_BRACKETS.map(b=>
+    `<span class="oabox" style="--bc:${b.color}">${labels?`<i class="oalbl">${b.lo}</i>`:""}<i class="oafill" style="width:${oaBoxPct(bar,b)}%"></i></span>`
+  ).join("");
+}
+// Row order: on styles (a bar set) by bar ascending then name, then off styles (never listed) A-Z.
+function oaComputeOrder(c){
+  const on=[], off=[];
+  ALL_GENRES.forEach(g=>{ (oaBar(c,g)!=null ? on : off).push(g); });
+  on.sort((a,b)=> oaBar(c,a)-oaBar(c,b) || a.localeCompare(b));
+  off.sort((a,b)=> a.localeCompare(b));
+  return [...on, ...off];
+}
+// Frozen while a style is open (the ticket's own "does NOT re-sort" rule — Lee hit a score edit re-sorting
+// the list under his finger in the prototype); recomputed fresh every time nothing is open.
+function oaOrder(c){ return (oaOpenStyle && oaOrderSnapshot) ? oaOrderSnapshot : oaComputeOrder(c); }
+// One matchesCriteria pass over the whole catalogue (not one pass per style) — the films-admitted count for
+// every style at once, keyed by each film's own MAIN style (mainOtherCombos, CAS-1337's own convention).
+function oaFilmCounts(c){
+  const counts={};
+  MOVIES.forEach(m=>{
+    const main=mainOtherCombos(m).main;
+    if(main===undefined) return;
+    if(matchesCriteria(m,c)) counts[main]=(counts[main]||0)+1;
+  });
+  return counts;
+}
+// The small 🔔 + one 7px dot per alerting window, shown after the style name when any window alert is on.
+function oaAlertDotsHTML(c, style){
+  const al=((c.styles||{})[style]||{}).al || {};
+  const active=ONE_AGENT_WINDOWS.filter(w=>al[w.key]);
+  if(!active.length) return "";
+  return `<span class="oaalertmark" aria-hidden="true">🔔${active.map(w=>`<i class="oadot" style="background:${w.color}"></i>`).join("")}</span>`;
+}
+// AGENT SUGGESTION — only when barAdvice(style) has something to say; raise/lower read straight off its
+// own lo/hi evidence groups, per the ticket's worked copy.
+function oaSuggestionHTML(style){
+  const adv=barAdvice(style);
+  if(!adv) return "";
+  const x=oneTopPct(style, adv.to);
+  const text = adv.dir==="up"
+    ? `Raise to <b>${adv.to}+</b> (top ${x}%). You liked ${adv.hi.filter(e=>e.good).length} of ${adv.hi.length} at ${adv.to}+, only ${adv.lo.filter(e=>e.good).length} of ${adv.lo.length} below.`
+    : `Lower to <b>${adv.to}+</b> (top ${x}%). You liked ${adv.lo.filter(e=>e.good).length} of ${adv.lo.length} just under ${adv.from}.`;
+  return `<div class="oasuggest">
+      <div class="oasuglbl">AGENT SUGGESTION</div>
+      <div class="oasugtext">${text}</div>
+      <div class="oasugbtns">
+        <button type="button" class="oasugchange" onclick="oaApplySuggestion('${escA(style)}',${adv.to})">Change to ${adv.to}+</button>
+        <button type="button" class="oasugkeep" onclick="oaDismissSuggestion('${escA(style)}')">Keep ${adv.from}+</button>
+      </div>
+    </div>`;
+}
+function oaAlertsHTML(c, style){
+  const al=((c.styles||{})[style]||{}).al || {};
+  return `<div class="oaalerts">${ONE_AGENT_WINDOWS.map(w=>{
+    const on=!!al[w.key];
+    return `<button type="button" class="oachip${on?" on":""}" style="--wc:${w.color}"
+        onclick="oaToggleAlert('${escA(style)}','${w.key}')" aria-pressed="${on}">
+        <i class="oachipdot" aria-hidden="true"></i>${esc(w.label)}${on?" 🔔":""}
+      </button>`;
+  }).join("")}</div>`;
+}
+// Section 1 (MOVIE MINIMUM SCORE) + section 2 (FILM ALERTS) for the one open style. Section 3 (SCORE
+// ADJUSTMENTS) is CAS-1340, a separate ticket — deliberately not built here.
+function oaOpenBodyHTML(c, style){
+  const bar=oaBar(c, style);
+  const top = bar==null ? 0 : oneTopPct(style, bar);
+  const name=oneAgentShortName(style);
+  const desc = bar==null
+    ? `Off: no ${esc(name)} films are listed. Drag left to turn it on.`
+    : `${esc(name)} films scoring ${bar} or more are listed: the top ${top}% of ${esc(name)}.`;
+  return `<div class="oaopen">
+      <div class="oasechdr">MOVIE MINIMUM SCORE</div>
+      <div class="oaslider">
+        <div class="oaslidewrap">
+          <div class="oastrip oastripfull">${oaBoxesHTML(bar,{labels:true})}</div>
+          <input type="range" class="oarange" min="50" max="100" step="1" value="${bar==null?100:bar}"
+            data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
+            aria-label="${escA(name)} minimum score">
+        </div>
+        <span class="oaslideval" id="oaSliderVal">${bar==null?"Off":`${bar}+<i>top ${top}%</i>`}</span>
+      </div>
+      <p class="oaslidedesc" id="oaSliderDesc">${desc}</p>
+      ${oaSuggestionHTML(style)}
+      <div class="oasechdr">FILM ALERTS</div>
+      ${oaAlertsHTML(c, style)}
+    </div>`;
+}
+function oaRowHTML(c, style, filmCount){
+  const open = oaOpenStyle===style;
+  const bar=oaBar(c, style);
+  const name=oneAgentShortName(style);
+  const filmsLine = bar==null ? "never listed" : `${filmCount} film${filmCount===1?"":"s"}`;
+  const rowTop = bar==null ? 0 : oneTopPct(style,bar);
+  const strip = open ? `<span class="oarowstrip"></span><span class="oarowval"></span>`
+    : `<span class="oarowstrip">${oaBoxesHTML(bar)}</span>
+       <span class="oarowval">${bar==null?"Off":`${bar}+<i>top ${rowTop}%</i>`}</span>`;
+  const head=`
+    <button type="button" class="oarowhead" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
+      <span class="oarowleft">
+        <span class="oastyname">${esc(name)}${oaAlertDotsHTML(c, style)}</span>
+        <span class="oarowfilms">${filmsLine}</span>
+      </span>
+      ${strip}
+      <span class="oachev" aria-hidden="true">${open?"▴":"▾"}</span>
+    </button>`;
+  return `<div class="oarow" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
+}
+function renderOneAgentScreen(c){
+  const counts=oaFilmCounts(c);
+  const order=oaOrder(c);
+  const n=tasteProfile().n;
+  const rows=order.map(style=>oaRowHTML(c, style, counts[style]||0)).join("");
+  $("agentsBody").innerHTML=`
+    <div class="agshdr"><h2 class="osh">Your agent</h2></div>
+    <p class="ossub">${n} verdict${n===1?"":"s"} learned</p>
+    <div class="oacolhdr"><span>STYLE</span><span>LISTS FILMS SCORING</span></div>
+    <div class="oalist" id="oaList" role="list" aria-label="Your agent's styles">${rows}</div>`;
+}
+// Opening a style freezes the row order NOW (as if nothing were open), so switching straight from one open
+// style to another never shows an intermediate resort — only closing (oaOpenStyle back to null) lets the
+// next render recompute a fresh order.
+window.oaToggleStyle=(style)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  if(oaOpenStyle===style){ oaOpenStyle=null; oaOrderSnapshot=null; }
+  else { oaOrderSnapshot=oaComputeOrder(c); oaOpenStyle=style; }
+  renderAgentsScreen();
+};
+// Live drag feedback (oninput) — redraws the slider's own boxes/value/description text in place, without a
+// full re-render, so neither the drag gesture nor the frozen row order is disturbed mid-drag.
+window.oaOnDrag=(input)=>{
+  const style=input.dataset.style;
+  const v=parseInt(input.value,10);
+  const bar = v>=100 ? null : v;
+  const wrap=input.closest(".oaslidewrap");
+  const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
+  ONE_AGENT_SCORE_BRACKETS.forEach((b,i)=>{
+    const fill=boxes[i] && boxes[i].querySelector(".oafill");
+    if(fill) fill.style.width=oaBoxPct(bar,b)+"%";
+  });
+  const top = bar==null ? 0 : oneTopPct(style, bar);
+  const name=oneAgentShortName(style);
+  const valEl=$("oaSliderVal");
+  if(valEl) valEl.innerHTML = bar==null ? "Off" : `${bar}+<i>top ${top}%</i>`;
+  const descEl=$("oaSliderDesc");
+  if(descEl) descEl.textContent = bar==null
+    ? `Off: no ${name} films are listed. Drag left to turn it on.`
+    : `${name} films scoring ${bar} or more are listed: the top ${top}% of ${name}.`;
+};
+// Release (onchange) — the one point this screen actually saves: CAS-1339's own "every change saves
+// immediately... no Save button", through the same saveCascades()/render() chokepoint every other agent
+// edit already uses.
+window.oaOnRelease=(input)=>{
+  const style=input.dataset.style;
+  const c=oneAgentCriteria(); if(!c) return;
+  const v=parseInt(input.value,10);
+  c.styles=c.styles||{};
+  const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
+  st.bar = v>=100 ? null : v;
+  saveCascades();
+  if(typeof render==="function") render();
+  renderAgentsScreen();
+};
+window.oaApplySuggestion=(style,to)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  c.styles=c.styles||{};
+  const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
+  st.bar=to;
+  saveCascades();
+  if(typeof render==="function") render();
+  renderAgentsScreen();
+};
+window.oaDismissSuggestion=(style)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  c.dismissed=c.dismissed||[];
+  const key="bar:"+style;
+  if(!c.dismissed.includes(key)) c.dismissed.push(key);
+  saveCascades();
+  renderAgentsScreen();
+};
+window.oaToggleAlert=(style,win)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  c.styles=c.styles||{};
+  const st=c.styles[style]||(c.styles[style]={al:{}});
+  st.al=st.al||{};
+  st.al[win]=!st.al[win];
+  saveCascades();
+  renderAgentsScreen();
+};
+
 // ---- CAS-909: onboarding v2's agent reveal — the app's own Agents-screen row, assembled in front of the
 // user as each agent is created (buildOnbAgentsV2, CAS-908). Every value below reads off the SAME
 // functions renderAgentsScreen() calls above; a second set of summary functions is how onboarding and the
