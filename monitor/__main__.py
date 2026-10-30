@@ -37,7 +37,7 @@ from . import (compute_transitions, DEFAULT_WEEKEND_N, MOMENTS, match, notificat
                prefs_for, excludes_from_prefs, delivery_plan, send_via_apns, push_copy,
                match_film_watches, match_newly_qualified, match_new_to_agent, suppressed_pairs,
                compute_admission, compute_auto_placements, compute_scores, synthesize_auto_watch_rows,
-               format_invite_reply)
+               format_invite_reply, hand_picked_pairs)
 from .catalogue import load_catalogue_file, load_today, load_yesterday_from_git
 from .store import FIXTURE_ID_MAX, FIXTURE_ID_MIN, InMemoryStore, store_from_env
 
@@ -262,6 +262,13 @@ def main(argv=None) -> int:
             "watchWindows": row.get("watch_windows"),
         }
 
+    # CAS-1343: a film hand-added to one of a v2 account's moods (`user_prefs.view.moods[*].in`)
+    # alerts regardless of the agent's own admission or per-style alert switch — read here,
+    # alongside account_prefs above, since both come off the same `user_prefs_rows`/
+    # `film_statuses_by_user` this run already fetched.
+    hand_picked = hand_picked_pairs(user_prefs_rows, film_statuses_by_user)
+    watch_windows_by_user = {uid: p["watchWindows"] for uid, p in account_prefs.items()}
+
     # CAS-825: ONE call to the shipped engine for the whole run — never once per film, never once
     # per agent (see compute_admission()'s own docstring). Both catalogue snapshots are included
     # since match_newly_qualified/match_new_to_agent below need to ask "admitted today, but not in
@@ -300,7 +307,8 @@ def main(argv=None) -> int:
     placement_counts = {}
     agent_hits = match(cascades, transitions, already=already, admission=admission,
                        suppressed=suppressed, excluded=muted, film_watches=watches,
-                       placement_counts=placement_counts, picks=picks)
+                       placement_counts=placement_counts, picks=picks,
+                       hand_picked=hand_picked, watch_windows=watch_windows_by_user)
     # CAS-841 AC5: the size of the placement change, measurable on the first live run rather than
     # inferred.
     print(f"[monitor] window placement (CAS-841): {placement_counts.get('wrong_window', 0)} "

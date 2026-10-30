@@ -52,6 +52,7 @@ from .matching import (  # noqa: E402
     WINDOW_TO_MOMENT,
     match_newly_qualified,
     match_new_to_agent,
+    hand_picked_pairs,
 )
 from .store import InMemoryStore, SupabaseStore, store_from_env  # noqa: E402
 from .emailer import (  # noqa: E402
@@ -72,7 +73,7 @@ __all__ = [
     "synthesize_auto_watch_rows", "service_ok", "notification_rows",
     "suppressed_pairs", "pick_overrides", "excluded_moments", "prefs_for", "excludes_from_prefs", "delivery_plan",
     "PREFS_DEFAULT", "match_film_watches", "WINDOW_TO_MOMENT", "match_newly_qualified",
-    "match_new_to_agent",
+    "match_new_to_agent", "hand_picked_pairs",
     "InMemoryStore", "SupabaseStore", "store_from_env",
     "render_digest", "digest_subject", "send_via_resend", "format_invite_reply",
     "send_via_apns", "push_copy",

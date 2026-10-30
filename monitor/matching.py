@@ -187,6 +187,85 @@ def _own_watch_on_ok(placements: dict, user_id, movie_id, moment: Optional[str])
 
 
 # --------------------------------------------------------------------------- #
+# CAS-1343: v2 "one agent" per-style/per-window alert switches, plus hand-picked mood overrides
+# --------------------------------------------------------------------------- #
+# Moment -> the v2 agent's own `styles[style].al` window key (app_template.html's oneAgentAlerts/
+# oneAgentMomentsOf) — hits_pvod folds into "rent" and the two cinema-opening reminders fold into
+# "cinema", mirroring the front end's own alert_moments union exactly (Lee's 29 Oct 2026 moment
+# map). A moment absent here (announced, newly_qualifies, new_to_agent) is untouched by this gate.
+MOMENT_TO_AL_WINDOW = {
+    "hits_cinema": "cinema", "opens_soon": "cinema", "past_opening_weekend": "cinema",
+    "hits_rent": "rent", "hits_pvod": "rent",
+    "hits_stream": "stream",
+}
+
+
+def one_agent_alerts(movie: dict, criteria: dict, window: str) -> bool:
+    """Python mirror of app_template.html's `oneAgentAlerts(m, window)` — a v2 agent's per-style
+    alert switch: does THIS film's main style (its first genre) have `window` switched on in
+    `criteria.styles[style].al`? A plain lookup on the criteria object already in hand, with no
+    score/taste arithmetic behind it — unlike compute_admission()'s own question, CAS-825's hand-
+    porting caution does not apply here, the same reasoning agent_channels() above already relies
+    on for its own plain lookup on `channelsLive`."""
+    genres = movie.get("genres") or []
+    main = genres[0] if genres else None
+    if main is None:
+        return False
+    style = (criteria.get("styles") or {}).get(main)
+    if not style:
+        return False
+    return bool((style.get("al") or {}).get(window))
+
+
+# The account's own "Where & when you'll watch" defaults (app_template.html's watchPrefsDefaults())
+# for the four windows WINDOW_TO_MOMENT names — in_cinema/rent/stream default on, premium (PVOD)
+# defaults off (CAS-243, "the one window nobody should be opted into by default").
+_WATCH_WINDOW_DEFAULT = {"in_cinema": True, "premium": False, "rent": True, "stream": True}
+
+
+def window_enabled(watch_windows, window: str) -> bool:
+    """Does the account watch `window` at all (`user_prefs.watch_windows[window].list`, CAS-532/
+    1097)? Only ever asked here for a hand-picked film's window-arrival moment (below) — the
+    ordinary agent-criteria path already has its own, per-film answer to this question via
+    `film_watch` placement (CAS-841), which a hand-picked film deliberately skips."""
+    row = (watch_windows or {}).get(window)
+    if isinstance(row, dict):
+        return bool(row.get("list", _WATCH_WINDOW_DEFAULT.get(window, True)))
+    return _WATCH_WINDOW_DEFAULT.get(window, True)
+
+
+def hand_picked_pairs(user_prefs_rows: dict, film_statuses: dict) -> set:
+    """CAS-1343: {(user_id, movie_id)} for every film a person added by hand to one of their v2
+    moods (`user_prefs.view.moods[*].in`, CAS-1341's mood-as-list model) — Lee's 29 Oct 2026
+    decision that a hand-added film always alerts, whatever the agent's admission or that film's
+    style/window alert switch say, EXCEPT a film the person has since watched or blocked, which is
+    excluded here rather than left for `match()` to re-check per transition.
+
+    user_prefs_rows : {user_id: user_prefs row} (store.fetch_user_prefs()'s own shape) — only the
+                      `view` column is read here; every other key belongs to compute_admission()'s
+                      own account_prefs build.
+    film_statuses   : {user_id: [{movie_id, status}, ...]} — the same shape __main__.py already
+                      builds for compute_admission()'s filmStatuses. CAS-183: a row here, whatever
+                      its `status`, always means the film has been watched or blocked — there is no
+                      third, opinion-free reason for a user_films row to exist.
+    """
+    opinioned: dict = {}
+    for uid, rows in (film_statuses or {}).items():
+        opinioned[str(uid)] = {str(r.get("movie_id")) for r in rows if r.get("movie_id") is not None}
+    out = set()
+    for uid, row in (user_prefs_rows or {}).items():
+        view = (row or {}).get("view")
+        moods = view.get("moods") if isinstance(view, dict) else None
+        ids = set()
+        for m in (moods or ()):
+            if isinstance(m, dict) and m.get("v2"):
+                ids.update(str(x) for x in (m.get("in") or ()) if x is not None)
+        ids -= opinioned.get(str(uid), set())
+        out.update((str(uid), mid) for mid in ids)
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # taste matching — CAS-825: a lookup into the REAL engine's own admission answer, not a second port
 # --------------------------------------------------------------------------- #
 def compute_admission(cascades: list, catalogues: dict, account_prefs: dict = None) -> dict:
@@ -518,7 +597,8 @@ def _collapse_by_rank(hits: list, rank_of: dict) -> list:
 
 
 def match(cascades: list, transitions: list, already=None, admission=None, suppressed=None,
-          excluded=None, film_watches=None, placement_counts=None, picks=None) -> dict:
+          excluded=None, film_watches=None, placement_counts=None, picks=None,
+          hand_picked=None, watch_windows=None) -> dict:
     """Return {user_id: [Hit, ...]} — one entry per (cascade, transition) that fires and hasn't
     been sent before.
 
@@ -562,6 +642,18 @@ def match(cascades: list, transitions: list, already=None, admission=None, suppr
                   email names the same agent Moving does. None/missing -> no pins or moves, and a
                   Hit's owner is whichever of the user's cascades has the lowest rank among those
                   admitting the film (or the firing cascade itself, failing that).
+    hand_picked : iterable of (user_id, movie_id) (see ``hand_picked_pairs``) — CAS-1343: a film a
+                  person added by hand to one of their v2 moods. For a user's v2 cascade
+                  (``criteria.v == 2``) only, a window-arrival moment for one of these pairs fires
+                  regardless of admission, service, placement or that film's own per-style alert
+                  switch — only a globally muted moment type, or the account not watching that
+                  window at all (``watch_windows`` below), still silences it. None/missing -> no
+                  hand-picked overrides, today's behaviour for every account.
+    watch_windows : {user_id: the account's `user_prefs.watch_windows`} — read only for a
+                  ``hand_picked`` pair's own window-enabled check (see ``window_enabled``); the
+                  ordinary agent-criteria path keeps answering that question from ``film_watches``
+                  (CAS-841), as it always has. None/missing -> every window reads as its own
+                  engine-matching default (see ``window_enabled``).
 
     CAS-784: when two of a user's active Cascades both catch the same film at the same moment,
     only one Hit survives — since CAS-925 both would already be attributed to the same owner, this
@@ -575,6 +667,8 @@ def match(cascades: list, transitions: list, already=None, admission=None, suppr
     rank_of = {c["id"]: _rank_key(c) for c in cascades}
     overrides = pick_overrides(picks)
     cascades_by_user = _cascades_by_user(cascades)
+    hand_picked = {(str(u), str(m)) for u, m in (hand_picked or ())}
+    watch_windows = watch_windows or {}
     by_user: dict = {}
 
     for c in cascades:
@@ -585,31 +679,49 @@ def match(cascades: list, transitions: list, already=None, admission=None, suppr
         # the de-dupe key, the ledger, the digest — simply never sees a muted moment.
         moments -= muted.get(str(c["user_id"]), set())
         criteria = c.get("criteria") or {}
+        is_v2 = criteria.get("v") == 2
         for t in transitions:
-            if t.moment not in moments:
-                continue
-            if (str(c["user_id"]), str(t.movie_id)) in off:
+            uid = str(c["user_id"])
+            if (uid, str(t.movie_id)) in off:
                 continue                                    # your answer outranks your Cascade
-            if not matches_criteria(t.movie_id, c["id"], "today", admission):
-                continue
-            if not service_ok(t, criteria):
-                continue
-            if t.moment in REMINDER_MOMENTS:
-                current = _current_watch_on(placements, c["user_id"], t.movie_id)
-                if current is not None and current != "in_cinema":
-                    continue                                # already placed past cinema — no reminder
-            if t.moment in WINDOW_ARRIVAL_MOMENTS:
-                row = placements.get((str(c["user_id"]), str(t.movie_id)))
-                if not row:
-                    if placement_counts is not None:
-                        placement_counts["no_placement"] = placement_counts.get("no_placement", 0) + 1
+            # CAS-1343: a film hand-added to this account's v2 mood list alerts on every window-
+            # arrival moment for a window the account watches, skipping admission, the per-style
+            # alert switch, and the usual film_watch placement gate entirely (Lee's 29 Oct 2026
+            # decision) — but a globally muted moment type still silences it, same as everywhere
+            # else.
+            hand = (is_v2 and (uid, str(t.movie_id)) in hand_picked
+                    and t.moment in MOMENT_TO_WINDOW and t.moment not in muted.get(uid, set())
+                    and window_enabled(watch_windows.get(uid), MOMENT_TO_WINDOW[t.moment]))
+            if not hand:
+                if t.moment not in moments:
                     continue
-                target_window = MOMENT_TO_WINDOW[t.moment]
-                if target_window not in row["windows"] and \
-                        not _forward_matches(row["windows"], row["sources"], target_window):
-                    if placement_counts is not None:
-                        placement_counts["wrong_window"] = placement_counts.get("wrong_window", 0) + 1
+                if not matches_criteria(t.movie_id, c["id"], "today", admission):
                     continue
+                if not service_ok(t, criteria):
+                    continue
+                # CAS-1343: alert_moments (above) is only the UNION of every style's own window
+                # switches (app_template.html's oneAgentMomentsOf) — this is the finer, per-style
+                # answer for the film actually in hand ("Sci-fi can list almost everything yet
+                # alert only at the cinema", Lee's own words).
+                if is_v2 and t.moment in MOMENT_TO_AL_WINDOW and \
+                        not one_agent_alerts(t.movie, criteria, MOMENT_TO_AL_WINDOW[t.moment]):
+                    continue
+                if t.moment in REMINDER_MOMENTS:
+                    current = _current_watch_on(placements, c["user_id"], t.movie_id)
+                    if current is not None and current != "in_cinema":
+                        continue                                # already placed past cinema — no reminder
+                if t.moment in WINDOW_ARRIVAL_MOMENTS:
+                    row = placements.get((str(c["user_id"]), str(t.movie_id)))
+                    if not row:
+                        if placement_counts is not None:
+                            placement_counts["no_placement"] = placement_counts.get("no_placement", 0) + 1
+                        continue
+                    target_window = MOMENT_TO_WINDOW[t.moment]
+                    if target_window not in row["windows"] and \
+                            not _forward_matches(row["windows"], row["sources"], target_window):
+                        if placement_counts is not None:
+                            placement_counts["wrong_window"] = placement_counts.get("wrong_window", 0) + 1
+                        continue
             # CAS-1294: resolve the OWNER before the de-dupe check. The ledger's unique constraint
             # is (cascade_id, movie_id, moment) on the row actually written — notification_row()
             # always writes `owner["id"]`, never the firing cascade's — so the de-dupe key must be
