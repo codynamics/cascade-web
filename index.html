@@ -23377,18 +23377,21 @@ function v2OpenFirstOnStyle(){
   oaShowAllAdj=false; oaComboFilmsOpen.clear(); oaSuggestionOpen=false;
   renderAgentsScreen();
 }
-// Lee approved 31 Oct 2026. Steps 7-16 (0-based 6-15) drive the same tour card tutCaptureCard/tutExpandCard
-// already use for the non-v2 script above. Step 7's invite button needs a signed-in account (inviteFilmHTML
-// renders nothing signed out) and is the one step this script ever skips — see v2InviteSkipped below.
+// Lee's revisions of 1 Nov 2026 (CAS-1353), on top of the 31 Oct script (CAS-1349). Steps 8-17 (0-based
+// 7-16) drive the same tour card tutCaptureCard/tutExpandCard already use for the non-v2 script above.
+// Step 8's invite button needs a signed-in account (inviteFilmHTML renders nothing signed out) and is the
+// one step this script ever skips — see v2InviteSkipped/V2_INVITE_STEP_IDX below.
 const V2_TOUR_STEPS = [
   {html:v2CardHTML("You're all set. Here's a one-minute tour of how Cascade works."), center:true},
   {html:v2CardHTML("Cascade has four places. Here's what each one does."), sel:[".hdr-actions"]},
   {html:v2CardHTML("Watch: every film your agent has found for you."), sel:["#moviesBtn"]},
-  {html:v2CardHTML("Moods are filtered collections of movies. A number have been created for you, which you can change, and you can create your own. ¶ Releases is special: it gives you every movie release, upcoming, current and recent. ¶ Tap a mood to change it, or + Mood to make your own."),
+  {html:v2CardHTML("Moods are filtered collections of movies. A number have been created for you, which you can change, and you can create your own. ¶ Releases is special: it gives you every movie release, upcoming, current and recent. Starred holds every movie you star. ¶ Tap a mood to change it, or + Mood to make your own."),
     sel:[".moodrow"]},
   {html:v2CardHTML("Each mood lets you see its movies by viewing status."), sel:[".stgroups"]},
   {html:v2CardHTML("This is a film card. Tap it to expand and see details such as director, cast and awards, and to watch trailers."),
     before(){ setWatchMood("releases"); showAgentsHome(); v2CaptureCard(); }, wholeCard:true},
+  {html:v2CardHTML("Tap ☆ to star a movie. Starred movies go into your Starred mood, so you can find them again."),
+    scope:"card", sel:[".starbtn"]},
   {html:v2CardHTML("Watching with someone? Invite a friend to watch this. They get a link with the film and a simple Yes / No, no app needed, so you can see who's in."),
     before(){ tutExpandCard(true); }, after(){ tutExpandCard(false); }, scope:"card", sel:[".exsharebtn"]},
   {html:v2CardHTML("The Cascade score is built from public and critics' opinion. Once you start telling Cascade which movies you like, scores are adjusted up or down to give you much more personal recommendations. Above a dotted outline: raised for you. Below: lowered."),
@@ -23397,27 +23400,27 @@ const V2_TOUR_STEPS = [
     scope:"card", sel:[".ctl.notify"]},
   {html:v2CardHTML("Add to mood: put any film in a mood by hand, or take it out."), scope:"card", sel:[".ctl.oamlist"]},
   {html:v2CardHTML("Seen it? Say what you thought. Every verdict teaches your agent your taste."), scope:"card", sel:[".ctl.watch"]},
-  {html:v2CardHTML("Alerts: films arriving where you watch, in the styles you asked to hear about, plus anything you added by hand. We email them to you too."),
+  {html:v2CardHTML("Alerts: films arriving where you watch, in the genres you asked to hear about, plus anything you added by hand. We email them to you too."),
     before(){ closeSettings(); openMovingScreen(); }, after(){ showAgentsHome(); }, sel:["#movingBtn"]},
   {html:v2CardHTML("Find any film in Cascade, whether your agent picked it or not."),
     before(){ closeSettings(); openFindScreen(); }, after(){ showAgentsHome(); }, sel:["#findSearchInput"]},
-  {html:v2CardHTML("Your agent. Each style has a minimum score, and the bells show which availability statuses alert you. Tap a style to change it."),
+  {html:v2CardHTML("Your agent. Each genre shows how much of the catalogue you want, and the bells show which availability statuses alert you. Tap a genre to change it."),
     before(){ closeSettings(); oaOpenStyle=null; oaOrderSnapshot=null; openAgentsScreen(); },
     after(){ oaOpenStyle=null; oaOrderSnapshot=null; showAgentsHome(); }, sel:["#oaList .oarow"]},
-  {html:v2CardHTML("Most movies have a main style, listed first, and other styles after it: a Sci-fi that is also a Thriller, a Comedy that is also a Romance. ¶ Your Cascade agent studies those combinations in what you watch and rate, and works out which ones you're most and least likely to enjoy."),
+  {html:v2CardHTML("Most movies have a main genre, listed first, and sub-genres after it: a Sci-fi that is also a Thriller, a Comedy that is also a Romance. ¶ Your Cascade agent studies those combinations in what you watch and rate, and works out which ones you're most and least likely to enjoy."),
     center:true},
-  {html:v2CardHTML("So your agent tracks each main style together with the styles that come with it. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here, and you can override any of them."),
+  {html:v2CardHTML("So your agent tracks each genre together with its sub-genres. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here, and you can override any of them."),
     before(){ v2OpenFirstOnStyle(); }, sel:["#oaAdjustSection"]},
   {html:v2CardHTML("That's it. Your agent checks the whole catalogue every day and reports at 5pm."),
     before(){ oaOpenStyle=null; oaOrderSnapshot=null; closeSettings(); showAgentsHome(); }, center:true},
 ];
 let tutSteps=TOUR_STEPS, tutV2Active=false, tutIdx=-1, tutCurrent=null;
-// Set once, when the v2 tour starts (startTutorialV2) — the invite step (index 6) is the only step this
-// script ever skips, so "n of N" never counts it once it's known to be unreachable, instead of the raw
-// index silently jumping 6 of 17 -> 8 of 17 the way a non-v2 skip would (CAS-1349 AC: "n of N must not
-// count it").
+// Set once, when the v2 tour starts (startTutorialV2) — the invite step (index 7, CAS-1353's new star
+// step at index 6 shifted it from CAS-1349's index 6) is the only step this script ever skips, so "n of N"
+// never counts it once it's known to be unreachable, instead of the raw index silently jumping forward the
+// way a non-v2 skip would (CAS-1349 AC: "n of N must not count it").
 let v2InviteSkipped=false;
-const V2_INVITE_STEP_IDX=6;
+const V2_INVITE_STEP_IDX=7;
 function tutDisplayN(){
   if(!tutV2Active || !v2InviteSkipped || tutIdx<=V2_INVITE_STEP_IDX) return tutIdx+1;
   return tutIdx;
