@@ -301,6 +301,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // oneComboAdj (the per-combo learned number, with no override applied) is exported alongside them so a
   // CAS-1340 test can pin a fixture's learned value directly rather than only through oneScoreParts' blend.
   oneScore, oneScoreParts, barAdvice, oneTopPct, oneAgentAlerts, oneComboAdj, mainOtherCombos,
+  // CAS-1351: oneBarForTopPct is oneTopPct's own inverse (a share picked on the setup/Agent/slider screens
+  // back to the score it stores) — exported alongside oneTopPct so a test can assert the round-trip directly.
+  oneBarForTopPct,
   // CAS-1339: oneAgentCriteria is the account's one v2 agent lookup barAdvice/oneScore/oneScoreParts
   // already fall back to — exported directly so a test can assert the v2/non-v2 gate itself.
   oneAgentCriteria,
@@ -315,6 +318,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // is, so a test can drive a real edit through the real function rather than poking criteria by hand.
   oneAgentShortName, oaBar, oaBoxPct, oaBoxesHTML, oaComputeOrder, oaOrder, oaFilmCounts,
   oaAlertDotsHTML, oaSuggestionHTML, oaAlertsHTML, oaOpenBodyHTML, oaRowHTML, renderOneAgentScreen,
+  // CAS-1351: the share-based boxes (setup scores step/Agent rows/open slider) — exported alongside the
+  // CAS-1339 raw-score ones above (still used, unchanged, by the CAS-1341 mood sheet) so a test can assert
+  // the share fill/label rule directly.
+  ONE_AGENT_SHARE_BRACKETS, oaShareBoxPct, oaShareLabel, oaShareBoxesHTML,
   get oaOpenStyle(){ return oaOpenStyle; },
   get oaOrderSnapshot(){ return oaOrderSnapshot; },
   oaToggleStyle: (style) => window.oaToggleStyle(style),
@@ -333,7 +340,7 @@ if(typeof window.CascadeAuth === "undefined"){
   // the watched Set uses) so a fixture can seed deterministic "verdict newer than seenAdjAt" timestamps
   // without waiting on real wall-clock gaps between two Date.now() calls.
   oaComboStats, oaComboSort, oaComboDirection, oaComboMag, oaAnyAdjusted, oaComboFilms, oaComboAdjustTitles,
-  oaFmtPoints, oaTrackPct, oaComboBarHTML, oaComboValueHTML, oaOverrideLeftHTML, oaComboWasLineHTML,
+  oaFmtPoints, oaTrackPct, oaComboMarkShare, oaComboBarHTML, oaComboValueHTML, oaOverrideLeftHTML, oaComboWasLineHTML,
   oaComboRowHTML, oaAdjustedBadgeHTML, oaAdjustSectionHTML, updateAgentNavDot,
   verdictAt,
   get oaShowAllAdj(){ return oaShowAllAdj; },

@@ -111,7 +111,7 @@ test("CAS-1339 AC1: oaComputeOrder sorts on-styles by bar then name, off-styles 
 
 // ---- AC2: opening a style freezes the row order until it closes ---------------------------------------------
 
-test("CAS-1339 AC2: opening Thriller freezes order; dragging 65->85 and releasing does not move the row until it closes", () => {
+test("CAS-1339/CAS-1351 AC2: opening Thriller freezes order; dragging to a selective share and releasing does not move the row until it closes", () => {
   withCascades([oneAgent({ styles: {
     "Thriller": styleOn(65), "Action": styleOn(60), "Crime": styleOn(70),
   }})], () => {
@@ -122,14 +122,16 @@ test("CAS-1339 AC2: opening Thriller freezes order; dragging 65->85 and releasin
     assert.equal(E.oaOpenStyle, "Thriller");
     const frozen = E.oaOrder(c);
     assert.deepEqual(frozen, before, "the snapshot taken on open matches the pre-open order");
-    E.oaOnRelease({ dataset:{style:"Thriller"}, value:"85" });
-    assert.equal(c.styles.Thriller.bar, 85, "the release commits the dragged value");
-    // 85 would now sort Thriller last among on-styles if the order re-derived — assert it hasn't.
+    // CAS-1351: the slider carries a SHARE now (0 Never .. 100 All) — Top 20% is the most selective end,
+    // which lands the highest bar of the three and so should sort Thriller last once the order re-derives.
+    const bar20 = E.oneBarForTopPct("Thriller", 20);
+    E.oaOnRelease({ dataset:{style:"Thriller"}, value:"20" });
+    assert.equal(c.styles.Thriller.bar, bar20, "the release commits oneBarForTopPct(style, share)");
     assert.deepEqual(E.oaOrder(c), frozen, "the row stays in its frozen position while still open");
     E.oaToggleStyle("Thriller");
     assert.equal(E.oaOpenStyle, null);
     const onStyles = [...E.oaOrder(c)].filter(g => ["Thriller","Action","Crime"].includes(g));
-    assert.deepEqual(onStyles, ["Action","Crime","Thriller"], "closing re-sorts, and 85 now sorts Thriller last of the three");
+    assert.deepEqual(onStyles, ["Action","Crime","Thriller"], "closing re-sorts, and Top 20% now sorts Thriller last of the three");
   });
   closeAnyOpenStyle();
 });
@@ -148,19 +150,19 @@ test("CAS-1339 AC2: oaRowHTML hides the collapsed strip/value while its own styl
   });
 });
 
-// ---- AC3: dragging to 100 turns the style off; its films leave admission ------------------------------------
+// ---- AC3 (CAS-1351): releasing fully left (share 0) turns the style off; its films leave admission ----------
 
-test("CAS-1339 AC3: releasing a drag at 100 turns the style off (bar null) and the film is no longer admitted", () => {
+test("CAS-1351 AC2: releasing a drag at share 0 (far left) turns the style off (bar null) and the film is no longer admitted", () => {
   withCascades([oneAgent({ styles: { "War": styleOn(50) } })], () => {
     const c = E.cascades[0];
     const film = scoredFilm(["War","Drama"], 70);
     withMovies([film], () => {
       assert.equal(E.matchesCriteria(film, c), true, "sanity: admitted while War is on");
-      E.oaOnRelease({ dataset:{style:"War"}, value:"100" });
-      assert.equal(c.styles.War.bar, null, "100 commits as off, not the literal number 100");
+      E.oaOnRelease({ dataset:{style:"War"}, value:"0" });
+      assert.equal(c.styles.War.bar, null, "0 (far left) commits as Never, not a literal 0 score");
       assert.equal(E.matchesCriteria(film, c), false, "the film leaves admission once the style is off");
       const html = E.oaRowHTML(c, "War", 0);
-      assert.ok(html.includes("Off") && html.includes("never listed"));
+      assert.ok(html.includes("Never") && html.includes("never listed"));
     });
   });
 });
@@ -191,10 +193,12 @@ test("CAS-1339 AC4: a fixture barAdvice({dir:up}) renders the suggestion text, a
       E.oaToggleSuggestion();
       assert.equal(E.oaSuggestionOpen, true);
       const html = E.oaSuggestionHTML(style);
+      // CAS-1351: the suggestion names the share, not the score.
+      const toPct = E.oneTopPct(style, 80), fromPct = E.oneTopPct(style, 65);
       assert.ok(html.includes("AGENT SUGGESTION ⌄"));
-      assert.ok(html.includes("Your verdicts suggest <b>80+</b> would suit you better."));
-      assert.ok(html.includes("Change to 80+"));
-      assert.ok(html.includes("Keep 65+"));
+      assert.ok(html.includes(`Your verdicts suggest <b>Top ${toPct}%</b> would suit you better.`));
+      assert.ok(html.includes(`Change to Top ${toPct}%`));
+      assert.ok(html.includes(`Keep Top ${fromPct}%`));
       // "Change to <to>+" sets the bar.
       E.oaApplySuggestion(style, 80);
       assert.equal(c.styles[style].bar, 80);
