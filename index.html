@@ -3310,45 +3310,54 @@
   .oaadjup{color:#5eead4}
   .oaadjdown{color:#f0a060}
 
-  /* ---- CAS-1342: the one-agent setup wizard — two steps (styles+bars, then alerts) that create the v2
-     agent. Reuses CAS-1339's ONE_AGENT_SCORE_BRACKETS colours (--bc) and ONE_AGENT_WINDOWS colours (--wc),
-     but draws its own tappable box picker (oas1*) — CAS-1339's own score control is a continuous drag, not
-     five discrete taps, so nothing there fits this screen's "tap a box" interaction. */
-  .oassteplbl{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gold);margin:0 0 6px}
-  .oas1hdr{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700;color:var(--faint);
-    margin:16px 0 6px;padding:0 32px 0 96px}
-  .oas1list{display:flex;flex-direction:column}
-  .oas1row{display:grid;grid-template-columns:96px 1fr 32px;align-items:center;gap:8px;
-    padding:10px 0;border-bottom:1px solid var(--line)}
-  .oas1name{font-size:13px;font-weight:800;color:var(--ink)}
-  .oas1sub{display:block;font-size:11px;font-weight:600;color:var(--faint);margin-top:2px}
-  .oas1boxes{display:flex;gap:3px}
-  .oas1box{position:relative;flex:1;height:34px;border-radius:5px;overflow:hidden;cursor:pointer;padding:0;
+  /* ---- CAS-1346: the one-agent setup wizard — one screen for both steps (CAS-1342's separate step1/step2
+     screens retired). Every style row renders once; step 2 slides its track left by half (translateX(-50%))
+     rather than swapping to a different list, so a row's own box never moves between steps (AC1). Reuses
+     CAS-1339's ONE_AGENT_SCORE_BRACKETS colours (--bc) and ONE_AGENT_WINDOWS colours (--wc). */
+  .oassteplbl{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gold);margin:0}
+  .onbtop{position:sticky;top:-1px;z-index:3;display:flex;justify-content:space-between;align-items:center;
+    padding:6px 0 8px;background:var(--panel)}
+  .onbtopbtns{display:flex;align-items:center;gap:10px}
+  .onbbtn{padding:8px 14px;border-radius:999px;font-size:13px;font-weight:800;cursor:pointer}
+  .onbbtn.primary{border:1px solid var(--accent);background:var(--accent);color:#fff}
+  .onbbtn.ghost{border:0;background:none;color:var(--dim);padding:8px 4px}
+  .onbhead{min-height:112px}
+  .onbhead b{display:block;font:700 20px/1.25 var(--font-display);color:#fff;margin-bottom:6px}
+  .onbhead span{font:500 13px/1.4 var(--font-body);color:var(--dim)}
+  .onbhdr{display:grid;grid-template-columns:104px minmax(0,1fr);gap:8px;margin:16px 0 6px;
+    font-size:10.5px;font-weight:700;color:var(--faint)}
+  .onbhdrarrows{display:flex;justify-content:space-between}
+  .onbfrom{font-size:10.5px;font-weight:700;color:var(--faint)}
+  .onbwinheads{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+  .onbwh{display:flex;align-items:center;justify-content:center;gap:4px;color:var(--wc);font-weight:800}
+  .onbdot{width:7px;height:7px;border-radius:50%;background:var(--wc);display:inline-block}
+  .onblist{display:flex;flex-direction:column}
+  .onb10{display:grid;grid-template-columns:104px minmax(0,1fr);gap:8px;align-items:center;padding:6px 0;
+    border-top:1px solid var(--line);min-height:52px}
+  .onbname{font-size:13px;font-weight:800;color:var(--ink)}
+  .onbnamesub{display:block;font-size:11px;font-weight:600;color:var(--faint);margin-top:2px}
+  .onbwin{overflow:hidden;display:block}
+  .onbtrack{display:flex;width:200%;transition:transform .35s ease}
+  .onbbody.s2 .onbtrack{transform:translateX(-50%)}
+  .onbpane{width:50%;display:grid;align-items:center;gap:6px}
+  .onbpane.p1{grid-template-columns:minmax(0,1fr) 26px}
+  .onbpane.p2{grid-template-columns:40px minmax(0,1fr)}
+  .onbboxes{display:flex;gap:3px}
+  .obx{position:relative;flex:1;height:24px;border-radius:5px;overflow:hidden;cursor:pointer;padding:0;
     border:1px solid color-mix(in srgb, var(--bc) 65%, transparent);background:transparent}
-  .oas1box.picked{box-shadow:inset 3px 0 0 #fff}
-  .oas1fill{position:absolute;top:0;right:0;bottom:0;background:var(--bc)}
-  .oas1lbl{position:relative;z-index:2;display:block;margin:3px 0 0 4px;font-size:10px;font-weight:800;
-    color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
-  .oas1never{flex:0 0 auto;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);
-    background:var(--panel2);color:var(--faint);font-size:15px;line-height:30px;cursor:pointer;padding:0}
-  .oas1never.on{border-color:var(--amber);color:var(--amber);box-shadow:0 0 0 2px var(--amber)}
-  .oas2hdr{display:grid;grid-template-columns:1fr 52px 52px 52px;gap:4px;padding:0 0 8px;
-    font-size:11px;font-weight:800;color:var(--faint)}
-  .oas2hdr span{text-align:center}
-  .oas2hdr span:first-child{text-align:left}
-  .oas2list{display:flex;flex-direction:column}
-  .oas2row{display:grid;grid-template-columns:1fr 52px 52px 52px;align-items:center;gap:4px;
-    padding:9px 0;border-bottom:1px solid var(--line)}
-  .oas2name{font-size:13px;font-weight:800;color:var(--ink)}
-  .oas2name i{display:block;font-style:normal;font-size:11px;font-weight:600;color:var(--faint);margin-top:1px}
-  .oas2cell{justify-self:center;width:40px;height:32px;border-radius:16px;border:1px solid var(--line);
-    background:var(--panel2);color:var(--faint);font-size:14px;cursor:pointer;padding:0}
-  .oas2cell.on{border-color:var(--wc);background:color-mix(in srgb, var(--wc) 25%, transparent)}
-  .oasprimarybtn{display:block;width:100%;margin-top:18px;padding:13px;border-radius:10px;
-    border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:14.5px;font-weight:800;
-    cursor:pointer;text-align:center}
-  .oassecondarybtn{display:block;width:100%;margin-top:10px;padding:6px;background:none;border:0;
-    color:var(--dim);font-size:13px;font-weight:700;cursor:pointer;text-align:center}
+  .obx.picked{box-shadow:inset 3px 0 0 #fff}
+  .obxfill{position:absolute;top:0;right:0;bottom:0;background:var(--bc)}
+  .obxlbl{position:relative;z-index:2;display:block;margin:2px 0 0 4px;font-size:10px;font-weight:700;
+    font-style:normal;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  .onbnever{flex:0 0 auto;width:26px;height:26px;border-radius:13px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--faint);font-size:12px;line-height:24px;cursor:pointer;padding:0}
+  .onbnever.on{border-color:var(--amber);color:var(--amber);box-shadow:0 0 0 2px var(--amber)}
+  .onbpick{font:700 14px var(--font-body);color:#fff;text-align:left}
+  .onbbells{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+  .onbbell{height:26px;border-radius:13px;font-size:11px;cursor:pointer;padding:0;background:transparent;
+    color:var(--faint);border:1px solid color-mix(in srgb, var(--wc) 35%, var(--line))}
+  .onbbell.on{background:color-mix(in srgb, var(--wc) 22%, transparent);border-color:var(--wc);color:#fff}
+  .onbnv{grid-column:1/4;font:500 11.5px var(--font-body);color:var(--faint)}
   .oaspreview{background:none;border:0;color:var(--accent);font-size:12.5px;font-weight:800;cursor:pointer;
     padding:0;margin-left:6px}
 
@@ -20794,120 +20803,142 @@ function onbRevealGridHTML(c){
 // ever wrote a real one). Nothing here runs unless the wizard is actually open (oasOpen), so an account that
 // never runs setup is never touched (AC5).
 const ONE_AGENT_SETUP_STYLES = Object.keys(TASTE_SHORT);   // the exact 19, in TASTE_SHORT's own order
-const ONE_AGENT_SETUP_DEFAULT_BAR = {
-  Action:60, Adventure:60, "Science Fiction":60, Thriller:60,
-  Crime:70, Drama:70, Fantasy:70, History:70, Mystery:70, War:70, Western:70,
-  Animation:80, Comedy:80, Documentary:80, Family:80, Music:80,
-  Horror:null, Romance:null, "TV Movie":null,
-};
+const ONE_AGENT_SETUP_DEFAULT_BAR = 70;   // CAS-1346: every style starts here on a fresh account — no per-style map
 const ONE_AGENT_SETUP_BAR_LABELS = {50:"Anything", 60:"Most", 70:"The good ones", 80:"Only the best", 90:"Must-sees"};
 
-let oasState = null;     // {styles:{style:{bar,never}}, alerts:{style:{cinema,rent,stream}}} — null when closed
+let oasState = null;     // {styles:{style:{bar,never}}, alerts:{style:{cinema,rent,stream}}, touched:{style:bool}} — null when closed
 let oasStep = 1;
 let oasSetupQueryConsumed = false;   // the ?oneagent=setup gate fires at most once per page load (afterSignIn)
 
 function oasDefaultState(){
-  const styles={}, alerts={};
+  const styles={}, alerts={}, touched={};
   ONE_AGENT_SETUP_STYLES.forEach(s=>{
-    const bar = ONE_AGENT_SETUP_DEFAULT_BAR[s];
-    styles[s] = {bar: bar==null ? null : bar, never: bar==null};
-    alerts[s] = {cinema: bar!=null && bar<=60, rent:false, stream:false};
+    styles[s] = {bar: ONE_AGENT_SETUP_DEFAULT_BAR, never:false};
+    alerts[s] = {cinema:false, rent:false, stream:false};
+    touched[s] = false;
   });
-  return {styles, alerts};
+  return {styles, alerts, touched};
 }
 // Re-run prefill (AC4): bars round DOWN to the decade and clamp into the picker's 50-90 range; alerts carry
-// the current agent's own switches verbatim (never re-applies step 2's new-account preset over a real
-// account's actual choices).
+// the current agent's own switches verbatim (never re-applies the new-account preset over a real account's
+// actual choices). A style arriving with any alert already on is `touched`, so tapping its bar down to 60
+// in this run never clobbers a choice the real agent already made (the "unless already set" guard below).
 function oasPrefillFromAgent(c){
-  const styles={}, alerts={};
+  const styles={}, alerts={}, touched={};
   ONE_AGENT_SETUP_STYLES.forEach(s=>{
     const st=(c.styles||{})[s];
     const bar = (st && st.bar!=null) ? Math.max(50, Math.min(90, Math.floor(st.bar/10)*10)) : null;
     styles[s] = {bar, never: bar==null};
     const al = (st && st.al) || {};
     alerts[s] = {cinema:!!al.cinema, rent:!!al.rent, stream:!!al.stream};
+    touched[s] = alerts[s].cinema || alerts[s].rent || alerts[s].stream;
   });
-  return {styles, alerts};
+  return {styles, alerts, touched};
 }
-// The five tappable boxes for one style row — oaBoxPct (CAS-1339) gives a full/empty fill for every bracket
-// against a bar that always lands exactly on a bracket's own `lo`, which is exactly "fills from that value
-// rightwards" for five discrete steps; only the per-box onclick and the picked (white-edge) box are new here.
-function oas1BoxesHTML(style, st){
+function oasRowSubHTML(style, st){
+  if(st.never) return "never";
+  return `${esc(ONE_AGENT_SETUP_BAR_LABELS[st.bar]||"")} · top ${oneTopPct(style, st.bar)}%`;
+}
+// The five tappable boxes for one style row's pane 1 — oaBoxPct (CAS-1339) gives a full/empty fill for every
+// bracket against a bar that always lands exactly on a bracket's own `lo`.
+function oasRowBoxesHTML(style, st){
   return ONE_AGENT_SCORE_BRACKETS.map(b=>{
     const picked = st.bar===b.lo;
     const pct = oaBoxPct(st.bar, b);
-    return `<button type="button" class="oas1box${picked?" picked":""}" style="--bc:${b.color}"
+    return `<button type="button" class="obx${picked?" picked":""}" style="--bc:${b.color}"
         onclick="oasPickBar('${escA(style)}',${b.lo})" aria-pressed="${picked}"
         aria-label="${escA(oneAgentShortName(style))} minimum score ${b.lo}">
-        <i class="oas1fill" style="width:${pct}%"></i><i class="oas1lbl">${b.lo}</i>
+        <i class="obxfill" style="width:${pct}%"></i><i class="obxlbl">${b.lo}</i>
       </button>`;
   }).join("");
 }
-function oas1RowSubHTML(style, st){
-  if(st.never) return "never";
-  if(st.bar==null) return "";
-  return `${esc(ONE_AGENT_SETUP_BAR_LABELS[st.bar]||"")} · top ${oneTopPct(style, st.bar)}%`;
+// Pane 2: the chosen score plus the three alert pills, or "Never listed" in their place for a never style.
+function oasPaneTwoHTML(style, st, al){
+  const score = st.never ? "–" : `${st.bar}+`;
+  const inner = st.never
+    ? `<span class="onbnv">Never listed</span>`
+    : ONE_AGENT_WINDOWS.map(w=>{
+        const on=!!al[w.key];
+        return `<button type="button" class="onbbell${on?" on":""}" style="--wc:${w.color}"
+            onclick="oasToggleAlert('${escA(style)}','${w.key}')" aria-pressed="${on}"
+            aria-label="${escA(oneAgentShortName(style))} ${w.label} alert">${on?"🔔":""}</button>`;
+      }).join("");
+  return `<span class="onbpick">${score}</span><span class="onbbells">${inner}</span>`;
 }
-function oas1RowHTML(style){
-  const st=oasState.styles[style];
-  return `<div class="oas1row" data-style="${escA(style)}">
-      <span class="oas1name">${esc(oneAgentShortName(style))}<span class="oas1sub">${oas1RowSubHTML(style, st)}</span></span>
-      <span class="oas1boxes">${oas1BoxesHTML(style, st)}</span>
-      <button type="button" class="oas1never${st.never?" on":""}" onclick="oasToggleNever('${escA(style)}')"
-          aria-pressed="${st.never}" aria-label="Never show ${escA(oneAgentShortName(style))}">⊘</button>
-    </div>`;
-}
-function oasStep1HTML(){
-  return `<div class="oassteplbl">STEP 1 OF 2</div>
-    <h2 class="osh">How keen are you on each style?</h2>
-    <p class="ossub">Tap where you'd start watching. Further left, more films; further right, only the best. ⊘ means never.</p>
-    <div class="oas1hdr"><span>← more films</span><span>only the best →</span></div>
-    <div class="oas1list">${ONE_AGENT_SETUP_STYLES.map(oas1RowHTML).join("")}</div>
-    <button type="button" class="oasprimarybtn" onclick="oasGoStep2()">Next: alerts</button>
-    <button type="button" class="oassecondarybtn" onclick="oasCancel()">Cancel</button>`;
-}
-// Step 2 lists only ON styles (a bar set), bar ascending then name — never styles don't alert on anything.
-function oas2OnStyles(){
-  return ONE_AGENT_SETUP_STYLES.filter(s=>oasState.styles[s].bar!=null)
-    .sort((a,b)=> oasState.styles[a].bar-oasState.styles[b].bar || a.localeCompare(b));
-}
-function oas2RowHTML(style){
+// One row — both panes always render; only the track's own transform (driven by .onbbody's s2 class) decides
+// which is visible, so a row's own box never changes size or position when the step changes (AC1).
+function oasRowHTML(style){
   const st=oasState.styles[style];
   const al=oasState.alerts[style];
-  const cells=ONE_AGENT_WINDOWS.map(w=>{
-    const on=!!al[w.key];
-    return `<button type="button" class="oas2cell${on?" on":""}" style="--wc:${w.color}"
-        onclick="oasToggleAlert('${escA(style)}','${w.key}')" aria-pressed="${on}"
-        aria-label="${escA(oneAgentShortName(style))} ${w.label} alert">${on?"🔔":""}</button>`;
-  }).join("");
-  return `<div class="oas2row" data-style="${escA(style)}">
-      <span class="oas2name">${esc(oneAgentShortName(style))}<i>${st.bar}+</i></span>
-      ${cells}
+  return `<div class="onb10" data-style="${escA(style)}">
+      <span class="onbname">${esc(oneAgentShortName(style))}<span class="onbnamesub">${oasRowSubHTML(style, st)}</span></span>
+      <span class="onbwin"><span class="onbtrack">
+        <span class="onbpane p1">
+          <span class="onbboxes">${oasRowBoxesHTML(style, st)}</span>
+          <button type="button" class="onbnever${st.never?" on":""}" onclick="oasToggleNever('${escA(style)}')"
+              aria-pressed="${st.never}" aria-label="Never show ${escA(oneAgentShortName(style))}">⊘</button>
+        </span>
+        <span class="onbpane p2">${oasPaneTwoHTML(style, st, al)}</span>
+      </span></span>
     </div>`;
 }
-function oasStep2HTML(){
-  return `<div class="oassteplbl">STEP 2 OF 2</div>
-    <h2 class="osh">Which should tell you when they arrive?</h2>
-    <p class="ossub">We've ticked the cinema for the styles you're keenest on. Everything else just appears in Watch.</p>
-    <div class="oas2hdr"><span></span><span>● Cinema</span><span>● Rent</span><span>● Stream</span></div>
-    <div class="oas2list">${oas2OnStyles().map(oas2RowHTML).join("")}</div>
-    <button type="button" class="oasprimarybtn" onclick="oasStartWatching()">Start watching</button>
-    <button type="button" class="oassecondarybtn" onclick="oasGoStep1()">Back</button>`;
+// The header row above the styles — same 104px/track split as a style row, so its two labels (step 1) or
+// three window headings (step 2) line up with the boxes/pills beneath them.
+function oasHeaderHTML(){
+  const heads = ONE_AGENT_WINDOWS.map(w=>
+    `<span class="onbwh" style="--wc:${w.color}"><i class="onbdot" style="background:${w.color}"></i>${esc(w.label)}</span>`
+  ).join("");
+  return `<div class="onbhdr">
+      <span></span>
+      <span class="onbwin"><span class="onbtrack">
+        <span class="onbpane p1"><span class="onbhdrarrows"><span>← more films</span><span>only the best →</span></span><span></span></span>
+        <span class="onbpane p2"><span class="onbfrom">From</span><span class="onbwinheads">${heads}</span></span>
+      </span></span>
+    </div>`;
+}
+function oasHeadHTML(){
+  return oasStep===1
+    ? `<b>How keen are you on each style?</b><span>Tap where you'd start watching. Further left, more films; further right, only the best. ⊘ means never.</span>`
+    : `<b>Which should tell you when they arrive?</b><span>Pick the windows you want a heads-up for. Everything else just appears in Watch.</span>`;
+}
+function oasTopHTML(){
+  const right = oasStep===1
+    ? `<button type="button" class="onbbtn primary" onclick="oasGoStep2()">Next: alerts ›</button>`
+    : `<button type="button" class="onbbtn ghost" onclick="oasGoStep1()">‹ Back</button>
+       <button type="button" class="onbbtn primary" onclick="oasStartWatching()">Start watching</button>`;
+  return `<div class="onbtop">
+      <span class="oassteplbl">STEP ${oasStep} OF 2</span>
+      <span class="onbtopbtns">${right}</span>
+    </div>`;
+}
+function oasBodyHTML(){
+  return `${oasTopHTML()}
+    <div class="onbhead">${oasHeadHTML()}</div>
+    <div class="onbbody${oasStep===2?" s2":""}">
+      ${oasHeaderHTML()}
+      <div class="onblist">${ONE_AGENT_SETUP_STYLES.map(oasRowHTML).join("")}</div>
+    </div>`;
 }
 function oasRender(){
   const el=$("oneAgentSetupBody"); if(!el) return;
-  el.innerHTML = oasStep===1 ? oasStep1HTML() : oasStep2HTML();
+  el.innerHTML = oasBodyHTML();
 }
 window.oasPickBar=(style, val)=>{
   if(!oasState) return;
   oasState.styles[style] = {bar:val, never:false};
+  // The existing rule: 60-or-below switches Cinema on, unless this style's alerts have already been
+  // touched (by hand, or carried over from a real agent via oasPrefillFromAgent) — never overwrite that.
+  if(val<=60 && !oasState.touched[style]){
+    const al=oasState.alerts[style] || (oasState.alerts[style]={cinema:false,rent:false,stream:false});
+    al.cinema=true;
+  }
   oasRender();
 };
 window.oasToggleNever=(style)=>{
   if(!oasState) return;
   const st=oasState.styles[style];
   oasState.styles[style] = st.never
-    ? {bar: ONE_AGENT_SETUP_DEFAULT_BAR[style]!=null ? ONE_AGENT_SETUP_DEFAULT_BAR[style] : 50, never:false}
+    ? {bar: ONE_AGENT_SETUP_DEFAULT_BAR, never:false}
     : {bar:null, never:true};
   oasRender();
 };
@@ -20915,11 +20946,11 @@ window.oasToggleAlert=(style, win)=>{
   if(!oasState) return;
   const al=oasState.alerts[style] || (oasState.alerts[style]={cinema:false,rent:false,stream:false});
   al[win]=!al[win];
+  oasState.touched[style]=true;
   oasRender();
 };
 window.oasGoStep2=()=>{ oasStep=2; oasRender(); };
 window.oasGoStep1=()=>{ oasStep=1; oasRender(); };
-window.oasCancel=()=>{ oasClose(); };
 window.oasOpen=(opts)=>{
   opts=opts||{};
   oasState = opts.prefill || oasDefaultState();
