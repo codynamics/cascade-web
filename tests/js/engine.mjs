@@ -322,6 +322,10 @@ if(typeof window.CascadeAuth === "undefined"){
   oaOnRelease: (input) => window.oaOnRelease(input),
   oaApplySuggestion: (style, to) => window.oaApplySuggestion(style, to),
   oaDismissSuggestion: (style) => window.oaDismissSuggestion(style),
+  // CAS-1345 Part 5: the suggestion callout's own collapsed/open state, same get/wrap pair oaOpenStyle and
+  // oaToggleStyle just above use.
+  get oaSuggestionOpen(){ return oaSuggestionOpen; },
+  oaToggleSuggestion: () => window.oaToggleSuggestion(),
   oaToggleAlert: (style, win) => window.oaToggleAlert(style, win),
   // CAS-1340: Score adjustments section — the pure building blocks (combo enumeration/sort, bar/value/row
   // HTML, the nav-dot question) exported directly, the wire mutators window-assigned, the same two

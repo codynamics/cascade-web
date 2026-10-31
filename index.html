@@ -3198,8 +3198,8 @@
   .oabox{position:relative;flex:1;height:16px;border-radius:3px;overflow:hidden;
     border:1px solid color-mix(in srgb, var(--bc) 65%, transparent);background:transparent}
   .oafill{position:absolute;top:0;right:0;bottom:0;background:var(--bc)}
-  .oastripfull .oabox{height:34px;border-radius:5px}
-  .oalbl{position:relative;z-index:2;display:block;margin:3px 0 0 4px;font-size:10px;font-weight:800;
+  .oastripfull .oabox{height:22px;border-radius:4px}
+  .oalbl{position:relative;z-index:2;display:block;margin:4px 0 0 4px;font-size:9px;font-weight:700;
     color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
   .oaopen{padding:2px 4px 16px}
   .oasechdr{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
@@ -3208,15 +3208,15 @@
   /* The minimum-score slider — boxes drawn under a transparent range input (.rslider's own pattern), with
      only a white 14x26 pill thumb painted; the value sits in its own fixed 52px column to the right. */
   .oaslider{display:flex;align-items:center;gap:8px}
-  .oaslidewrap{position:relative;flex:1;height:34px}
+  .oaslidewrap{position:relative;flex:1;height:22px}
   .oaslidewrap .oastripfull{position:absolute;inset:0;display:flex;gap:3px;pointer-events:none}
-  .oarange{position:relative;z-index:2;width:100%;height:34px;margin:0;cursor:pointer;
+  .oarange{position:relative;z-index:2;width:100%;height:22px;margin:0;cursor:pointer;
     -webkit-appearance:none;appearance:none;background:transparent}
-  .oarange::-webkit-slider-runnable-track{height:34px;background:transparent}
-  .oarange::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:26px;border-radius:7px;
-    background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:grab;margin-top:4px}
-  .oarange::-moz-range-track{height:34px;background:transparent;border:none}
-  .oarange::-moz-range-thumb{width:14px;height:26px;border-radius:7px;background:#fff;
+  .oarange::-webkit-slider-runnable-track{height:22px;background:transparent}
+  .oarange::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:20px;border-radius:6px;
+    background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:grab;margin-top:1px}
+  .oarange::-moz-range-track{height:22px;background:transparent;border:none}
+  .oarange::-moz-range-thumb{width:12px;height:20px;border-radius:6px;background:#fff;
     border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);cursor:grab}
   .oarange:focus-visible{outline:none}
   .oarange:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
@@ -3224,10 +3224,13 @@
   .oaslideval{flex:0 0 52px;width:52px;text-align:right;font-size:13px;font-weight:800;color:var(--ink)}
   .oaslideval i{display:block;font-style:normal;font-size:10.5px;font-weight:600;color:var(--faint);margin-top:1px}
   .oaslidedesc{font-size:12px;color:var(--dim);line-height:1.5;margin:8px 0 0}
-  /* Agent suggestion — a gold-bordered callout, same gold token the rest of the app marks a suggestion with. */
-  .oasuggest{margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid var(--gold);
+  /* Agent suggestion — a gold-bordered callout, same gold token the rest of the app marks a suggestion with.
+     CAS-1345 Part 5: collapsed to one line (padding 7px 12px) by default; .open restores room for the text
+     and buttons below the label row. */
+  .oasuggest{margin-top:10px;padding:7px 12px;border-radius:10px;border:1px solid var(--gold);
     background:rgba(245,214,117,.08)}
-  .oasuglbl{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--gold)}
+  .oasuggest.open{padding:10px 12px}
+  .oasuglbl{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--gold);cursor:pointer}
   .oasugtext{font-size:12.5px;color:var(--ink);line-height:1.5;margin-top:4px}
   .oasugbtns{display:flex;gap:8px;margin-top:9px}
   .oasugchange{flex:0 0 auto;padding:7px 12px;border-radius:8px;border:1px solid var(--accent);
@@ -3271,10 +3274,10 @@
   .oacright{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
   .oacombowrap{position:relative;flex:1;height:16px}
   .oacombobar{position:absolute;inset:0;display:flex;gap:3px}
-  .oacbox{position:relative;flex:1;height:16px;border-radius:3px;border:1px solid rgba(255,255,255,.12);background:transparent}
+  .oacbox{position:relative;flex:1;height:16px;border-radius:3px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03)}
   .oacfill{position:absolute;top:1px;bottom:1px;border-radius:2px}
-  .oacfill.up{background:#5eead4}
-  .oacfill.down{background:#f0a060}
+  .oacfill.up{background:rgba(45,212,191,.75)}
+  .oacfill.down{background:rgba(240,136,58,.8)}
   .oacfill.never{background:repeating-linear-gradient(135deg,#f0a060,#f0a060 4px,transparent 4px,transparent 8px)}
   .oacbarline{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff}
   .oacdash{position:absolute;top:-2px;bottom:-2px;width:0;border-left:2px dashed rgba(255,255,255,.6)}
@@ -3291,7 +3294,7 @@
   .oacrange:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
   .oacval{flex:0 0 auto;font-size:12.5px;font-weight:800;color:var(--ink);min-width:28px;text-align:right}
   .oacval-empty{color:var(--faint);font-weight:600}
-  .oacval-over{color:var(--gold);text-decoration:underline}
+  .oacval.up{color:#5eead4} .oacval.down{color:#f0a060} .oacval-over{color:var(--gold);text-decoration:underline}
   .oacwas{font-size:11.5px;margin:4px 0 0;line-height:1.4}
   .oacwas.up{color:#5eead4}
   .oacwas.down{color:#f0a060}
@@ -4149,11 +4152,11 @@
      approved prototype — applied verbatim. The two below are this ticket's own: the box's collapsed-only
      visibility already comes from that last EXACT rule, so oneScoreTextHTML(m)'s expanded-card companion
      (.qonetext) just needs the opposite — hidden collapsed, its own full-width line in the scores row open. */
-  .qone{position:absolute;top:4px;right:0;width:42px;height:40px}
-  .qone .qpub{position:absolute;left:0;top:7px;background:var(--panel)}
-  .qone.up .qpub{top:0} .qone.down .qpub{top:14px}
-  .qone .qghost{position:absolute;left:0;top:7px;width:42px;height:26px;border-radius:7px;border:1.5px dashed rgba(255,255,255,.28);box-sizing:border-box}
-  .qone.up .qpub{box-shadow:0 3px 8px rgba(0,0,0,.45)} .qone.down .qpub{box-shadow:0 -3px 8px rgba(0,0,0,.45)}
+  .qone{position:absolute;top:2px;right:0;width:44px;height:50px}
+  .qone .qpub{position:absolute;left:0;top:8px;z-index:1;background:var(--panel);border:1.5px solid rgba(255,255,255,.3)}
+  .qone.up .qpub{top:0;border-color:#5eead4} .qone.down .qpub{top:16px;border-color:#f0a060}
+  .qone .qghost{position:absolute;left:0;top:8px;width:44px;height:34px;border-radius:8px;border:1.5px dashed rgba(255,255,255,.6);box-sizing:border-box}
+  .qone.up .qghost{top:16px} .qone.down .qghost{top:0}
   .qone.up .qpub small{color:#5eead4;opacity:1} .qone.down .qpub small{color:#f0a060;opacity:1}
   .card.expanded .qone{display:none}
   .card:not(.expanded) .qonetext{display:none}
@@ -19813,17 +19816,22 @@ function oaAlertDotsHTML(c, style){
   if(!active.length) return "";
   return `<span class="oaalertmark" aria-hidden="true">🔔${active.map(w=>`<i class="oadot" style="background:${w.color}"></i>`).join("")}</span>`;
 }
-// AGENT SUGGESTION — only when barAdvice(style) has something to say; raise/lower read straight off its
-// own lo/hi evidence groups, per the ticket's worked copy.
+// AGENT SUGGESTION — only when barAdvice(style) has something to say. CAS-1345 Part 5: collapsed to a
+// single row by default (oaSuggestionOpen, reset on every style open by oaToggleStyle above); tapping it
+// opens the short message + the two action buttons.
 function oaSuggestionHTML(style){
   const adv=barAdvice(style);
   if(!adv) return "";
-  const x=oneTopPct(style, adv.to);
+  if(!oaSuggestionOpen){
+    return `<div class="oasuggest">
+      <div class="oasuglbl" role="button" tabindex="0" onclick="oaToggleSuggestion()">AGENT SUGGESTION ›</div>
+    </div>`;
+  }
   const text = adv.dir==="up"
-    ? `Raise to <b>${adv.to}+</b> (top ${x}%). You liked ${adv.hi.filter(e=>e.good).length} of ${adv.hi.length} at ${adv.to}+, only ${adv.lo.filter(e=>e.good).length} of ${adv.lo.length} below.`
-    : `Lower to <b>${adv.to}+</b> (top ${x}%). You liked ${adv.lo.filter(e=>e.good).length} of ${adv.lo.length} just under ${adv.from}.`;
-  return `<div class="oasuggest">
-      <div class="oasuglbl">AGENT SUGGESTION</div>
+    ? `Your verdicts suggest <b>${adv.to}+</b> would suit you better.`
+    : `Your verdicts suggest <b>${adv.to}+</b> would show you more of what you like.`;
+  return `<div class="oasuggest open">
+      <div class="oasuglbl" role="button" tabindex="0" onclick="oaToggleSuggestion()">AGENT SUGGESTION ⌄</div>
       <div class="oasugtext">${text}</div>
       <div class="oasugbtns">
         <button type="button" class="oasugchange" onclick="oaApplySuggestion('${escA(style)}',${adv.to})">Change to ${adv.to}+</button>
@@ -19831,6 +19839,7 @@ function oaSuggestionHTML(style){
       </div>
     </div>`;
 }
+window.oaToggleSuggestion=()=>{ oaSuggestionOpen=!oaSuggestionOpen; renderAgentsScreen(); };
 function oaAlertsHTML(c, style){
   const al=((c.styles||{})[style]||{}).al || {};
   return `<div class="oaalerts">${ONE_AGENT_WINDOWS.map(w=>{
@@ -19909,6 +19918,7 @@ window.oaToggleStyle=(style)=>{
   // CAS-1340: section 3's own "Show all"/open-film-chips state is per open style, not per account — start
   // fresh every time a style opens (or closes), the same way oaOrderSnapshot does above.
   oaShowAllAdj=false; oaComboFilmsOpen.clear();
+  oaSuggestionOpen=false;   // CAS-1345 Part 5: the suggestion callout starts collapsed every time, too.
   renderAgentsScreen();
 };
 // Live drag feedback (oninput) — redraws the slider's own boxes/value/description text in place, without a
@@ -19982,6 +19992,9 @@ window.oaToggleAlert=(style,win)=>{
 // here, and oneScorePartsFor's own override blend already covers a numeric one.
 let oaShowAllAdj = false;             // "Show all <n>" expansion — one open style at a time, reset on open/close
 const oaComboFilmsOpen = new Set();   // which combo rows (by key) have their liked/not film chips open
+// CAS-1345 Part 5: the AGENT SUGGESTION callout's collapsed/open state — one open style at a time, held in
+// memory only (never saved) and reset to collapsed every time a style opens, same as oaShowAllAdj above.
+let oaSuggestionOpen = false;
 
 function oaFmtPoints(p){ return p>0 ? `+${p}` : p<0 ? `−${Math.abs(p)}` : "±0"; }
 // The SAME value->position mapping section 1's own native range input uses (min 50, max 100) — every mark
@@ -20084,7 +20097,7 @@ function oaComboBarHTML(c, style, r){
 function oaComboValueHTML(r){
   if(r.n===0 && !r.overridden && !r.never) return `<span class="oacval oacval-empty">—</span>`;
   const text = r.never ? "Never" : oaFmtPoints(r.points);
-  return `<span class="oacval${r.overridden||r.never?" oacval-over":""}">${text}</span>`;
+  return `<span class="oacval${r.overridden||r.never?" oacval-over":(r.points>0?" up":r.points<0?" down":"")}">${text}</span>`;
 }
 // Left column (104px) of an overridden (or "never") row — replaces the liked/not link entirely.
 function oaOverrideLeftHTML(r){
@@ -20160,6 +20173,10 @@ function updateAgentNavDot(){
   if(!btn || !btn.classList) return;
   const c = oneAgentCriteria();
   btn.classList.toggle("oa-adjusted", !!(c && oaAnyAdjusted(c)));
+  // CAS-1345 Part 3: a v2 account has one agent, so the nav label reads "Agent" (singular); every other
+  // account keeps "Agents".
+  const label = c ? "Agent" : "Agents";
+  btn.querySelectorAll(".mclabel").forEach(el=>{ el.textContent=label; });
 }
 window.oaToggleComboFilms=(key)=>{
   if(oaComboFilmsOpen.has(key)) oaComboFilmsOpen.delete(key); else oaComboFilmsOpen.add(key);
@@ -20227,6 +20244,12 @@ window.oaComboOnRelease=(input)=>{
 const ONE_AGENT_MOOD_BUILTINS=[
   {id:"releases", name:"Latest"},
   {id:"starred", name:"Starred", starredOnly:true},
+  // CAS-1345 Part 2: CAS-1341's own spec for a new v2 account's starter moods — Order Score, Show best 20,
+  // added here so setup (CAS-1342's watchMoods=oamMoodDefaultsNow() call) provisions all six in order.
+  {id:"action", name:"Action", styles:["Action","Thriller","Crime","War","Western"], show:"20"},
+  {id:"imagine", name:"Imagine", styles:["Science Fiction","Fantasy","Adventure"], show:"20"},
+  {id:"fun", name:"Fun", styles:["Comedy","Animation","Romance"], show:"20"},
+  {id:"family", name:"Family", styles:["Family","Animation","Adventure","Comedy"], ages:["G","PG"], show:"20"},
 ];
 function oamMoodDefaultFields(){
   return {v2:true, handOnly:false, styles:[], minScore:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[]};
@@ -26102,6 +26125,23 @@ function acctFetchKeepalive(init){
           watchMoods=[...watchMoods.slice(0,at), starred, ...watchMoods.slice(at)];
         }
         moodsProvisionPending={moods:watchMoods.map(m=>({...m})), moodsProvisioned:3};
+      }
+      // CAS-1345 Part 2: a v2 account whose stored moods are still exactly the pre-fix two built-ins (the
+      // shape CAS-1342's setup wrote before this ticket added the four catalogue starters to
+      // ONE_AGENT_MOOD_BUILTINS, e.g. lee+c21/lee+c23) gets the four added once, on load, and saved — riding
+      // the same piggyback-on-next-write idiom as the v1 steps above (CAS-1218: a load must never write).
+      // Never touches an account that has created, renamed or deleted a v2 mood.
+      if(watchMoodsHasV2){
+        const v2Moods=watchMoods.filter(m=>m && m.v2);
+        const isPreFixDefault = v2Moods.length===2
+          && v2Moods[0] && v2Moods[0].id==="releases" && v2Moods[0].name==="Latest"
+          && v2Moods[1] && v2Moods[1].id==="starred" && v2Moods[1].name==="Starred";
+        if(isPreFixDefault){
+          const added=ONE_AGENT_MOOD_BUILTINS.filter(b=>b.id!=="releases" && b.id!=="starred")
+            .map(b=>({...oamMoodDefaultFields(), ...b}));
+          watchMoods=[...watchMoods, ...added];
+          moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
+        }
       }
       // CAS-1295 Change 1: view.starred adopted with the other view fields — a genuinely absent (never
       // saved) array is left alone, same "no answer yet" rule as every other field here (CAS-775).

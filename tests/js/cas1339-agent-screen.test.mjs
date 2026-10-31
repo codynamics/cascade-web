@@ -182,9 +182,17 @@ test("CAS-1339 AC4: a fixture barAdvice({dir:up}) renders the suggestion text, a
       const c = E.cascades[0];
       const adv = E.barAdvice(style);
       assert.deepEqual({ ...adv, lo:undefined, hi:undefined }, { dir:"up", from:65, to:80, lo:undefined, hi:undefined });
+      // CAS-1345 Part 5: collapsed by default — just the label row, no text or buttons yet.
+      assert.equal(E.oaSuggestionOpen, false);
+      const collapsed = E.oaSuggestionHTML(style);
+      assert.ok(collapsed.includes("AGENT SUGGESTION ›"));
+      assert.ok(!collapsed.includes("oasugtext") && !collapsed.includes("Change to"));
+      // Tapping the row opens it: the short message, then the two buttons.
+      E.oaToggleSuggestion();
+      assert.equal(E.oaSuggestionOpen, true);
       const html = E.oaSuggestionHTML(style);
-      assert.ok(html.includes("AGENT SUGGESTION"));
-      assert.ok(html.includes("Raise to <b>80+</b>"));
+      assert.ok(html.includes("AGENT SUGGESTION ⌄"));
+      assert.ok(html.includes("Your verdicts suggest <b>80+</b> would suit you better."));
       assert.ok(html.includes("Change to 80+"));
       assert.ok(html.includes("Keep 65+"));
       // "Change to <to>+" sets the bar.
@@ -196,6 +204,7 @@ test("CAS-1339 AC4: a fixture barAdvice({dir:up}) renders the suggestion text, a
       assert.ok(c.dismissed.includes("bar:"+style));
       assert.equal(E.barAdvice(style), null, "a dismissed suggestion is silenced");
       assert.equal(E.oaSuggestionHTML(style), "", "the box itself disappears once dismissed");
+      E.oaToggleSuggestion(); // leave it collapsed again for any test that runs after this one.
     });
   });
 });
