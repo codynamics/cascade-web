@@ -20178,8 +20178,8 @@ function oaAdjustSectionHTML(c, style){
   const name = oneAgentShortName(style);
   const bar = oaBar(c, style);
   if(bar==null){
-    return `<div class="oasechdr">SCORE ADJUSTMENTS</div>
-      <p class="oacintro">Turn ${esc(name)} on (set a minimum score, above) to see its score adjustments.</p>`;
+    return `<div class="oaadjust" id="oaAdjustSection"><div class="oasechdr">SCORE ADJUSTMENTS</div>
+      <p class="oacintro">Turn ${esc(name)} on (set a minimum score, above) to see its score adjustments.</p></div>`;
   }
   const rows = oaComboStats(c, style).sort(oaComboSort);
   const adjustedN = rows.filter(r=>r.adjusted).length;
@@ -20190,12 +20190,14 @@ function oaAdjustSectionHTML(c, style){
     </div>` : "";
   const showAllHTML = (!oaShowAllAdj && rows.length>8)
     ? `<button type="button" class="oacshowall" onclick="oaToggleShowAllAdj()">Show all ${rows.length}</button>` : "";
-  return `<div class="oasechdr">SCORE ADJUSTMENTS</div>
+  // CAS-1349: wrapped in one #oaAdjustSection container (heading through rows) so the v2 guided tour can
+  // spotlight the whole section as a single anchor, same as tutUnionRect does for a multi-element step.
+  return `<div class="oaadjust" id="oaAdjustSection"><div class="oasechdr">SCORE ADJUSTMENTS</div>
     <p class="oacintro">Your agent is automatically adjusting movie scores, up or down, for films that combine ${esc(name)} with these styles, based on your verdicts on films you've watched. The adjusted score is the one you see in Watch. Tap a row to see the films behind it.</p>
     ${seenBox}
     <div class="oaclist">${shown.map(r=>oaComboRowHTML(c, style, r)).join("")}</div>
     ${showAllHTML}
-    <p class="oacfoot">The white line is ${esc(name)}'s ${bar}+. Drag a row to set it yourself; all the way left means never list it. Your agent keeps learning underneath and tells you if your verdicts start to disagree.</p>`;
+    <p class="oacfoot">The white line is ${esc(name)}'s ${bar}+. Drag a row to set it yourself; all the way left means never list it. Your agent keeps learning underneath and tells you if your verdicts start to disagree.</p></div>`;
 }
 // Gold dot on the Agent nav chip — pure DOM sync, called from both the full render() and the lean verdict-
 // repaint path (repaintAfterOpinion's fastPatchFindRow branch skips a full render()).
@@ -21293,6 +21295,10 @@ window.oafStartWatching=()=>{
   oasState=null; oafState=null;
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
   if(typeof render==="function") render();
+  // CAS-1349: the v2 guided tour's one automatic trigger point for a brand-new v2 account — straight after
+  // this screen's own render() has painted Watch, same "first listing paint" rule CAS-976 used for the
+  // non-v2 tour from membStartWork.
+  maybeStartTutorial();
 };
 
 // ================= CAS-636: Moving — the alert feed made visible =================
@@ -23193,7 +23199,97 @@ const TOUR_STEPS = [
   {text:"You're all set. Your agents report every day at 5pm.",
     before(){ closeSettings(); showAgentsHome(); }, center:true},
 ];
-let tutIdx=-1, tutCurrent=null;
+// ---- GUIDED TOUR v2 (CAS-1349, v2/one-agent accounts only) -------------------------------------------
+// Replaces the script above for a v2 account (oneAgentCriteria() non-null) — the mechanism (.tutscrim/
+// .tuthole spotlight, one .tutcard, Skip/Back/Next/Done) is shared via tutSteps/tutV2Active below; only
+// the script, and a couple of v2-specific capture/skip rules, differ. A non-v2 account on the same device
+// is untouched: it still runs TOUR_STEPS above, gated by tutorialSeen(), exactly as CAS-1317 shipped it.
+// CAS-1222's reasoning for in-memory-only seen state applies here too: tourV2Seen is adopted off
+// user_prefs.view.tourV2Seen by loadUserPrefs(), never inherited from whoever was signed in before.
+let tourV2SeenFlag=false;
+function tourV2Seen(){ return tourV2SeenFlag; }
+function markTourV2Seen(){ tourV2SeenFlag=true; pushViewField("tourV2Seen", true); }
+// Card text for this script is set via innerHTML (the ticket's own "¶ = <br><br>" rule, spec verbatim) —
+// splits on the literal ¶, escapes each paragraph, and rejoins with a blank line between them.
+function v2CardHTML(raw){
+  return raw.split("¶").map(p=>esc(p.trim())).join("<br><br>");
+}
+// Steps 6-11's one tour card: the first visible card on Releases whose score was raised (a .qone.up box),
+// else the first visible card — same shape as tutCaptureCard above, and reuses tutExpandCard as-is since
+// that only ever reads/writes the shared tourCardEl/tourCardId pair.
+function v2CaptureCard(){
+  tourCardEl=null; tourCardId=null;
+  let fallback=null;
+  for(const el of document.querySelectorAll("#groups .card")){
+    const r=el.getBoundingClientRect();
+    if(r.width<=0 || r.height<=0) continue;
+    if(!fallback) fallback=el;
+    if(el.querySelector(".qone.up")){ tourCardEl=el; break; }
+  }
+  if(!tourCardEl) tourCardEl=fallback;
+  if(tourCardEl){ const m=/card-(\d+)/.exec(tourCardEl.id); tourCardId = m ? Number(m[1]) : null; }
+}
+// Step 16: opens the first ON style (oaComputeOrder's own on-styles-first order; "on" = oaBar non-null),
+// so the Score adjustments section it spotlights is never the "turn this on first" copy. A fresh account
+// with nothing on yet simply leaves #oaAdjustSection unrendered, and the step is skipped like any other
+// (tutorialAdvance's own rule below — nothing v2-specific needed here).
+function v2OpenFirstOnStyle(){
+  const c=oneAgentCriteria(); if(!c) return;
+  const order=oaComputeOrder(c);
+  const style=order.find(s=>oaBar(c,s)!=null);
+  if(!style) return;
+  oaOrderSnapshot=order; oaOpenStyle=style;
+  oaShowAllAdj=false; oaComboFilmsOpen.clear(); oaSuggestionOpen=false;
+  renderAgentsScreen();
+}
+// Lee approved 31 Oct 2026. Steps 7-16 (0-based 6-15) drive the same tour card tutCaptureCard/tutExpandCard
+// already use for the non-v2 script above. Step 7's invite button needs a signed-in account (inviteFilmHTML
+// renders nothing signed out) and is the one step this script ever skips — see v2InviteSkipped below.
+const V2_TOUR_STEPS = [
+  {html:v2CardHTML("You're all set. Here's a one-minute tour of how Cascade works."), center:true},
+  {html:v2CardHTML("Cascade has four places. Here's what each one does."), sel:[".hdr-actions"]},
+  {html:v2CardHTML("Watch: every film your agent has found for you."), sel:["#moviesBtn"]},
+  {html:v2CardHTML("Moods are filtered collections of movies. A number have been created for you, which you can change, and you can create your own. ¶ Releases is special: it gives you every movie release, upcoming, current and recent. ¶ Tap a mood to change it, or + Mood to make your own."),
+    sel:[".moodrow"]},
+  {html:v2CardHTML("Each mood lets you see its movies by viewing status."), sel:[".stgroups"]},
+  {html:v2CardHTML("This is a film card. Tap it to expand and see details such as director, cast and awards, and to watch trailers."),
+    before(){ setWatchMood("releases"); showAgentsHome(); v2CaptureCard(); }, wholeCard:true},
+  {html:v2CardHTML("Watching with someone? Invite a friend to watch this. They get a link with the film and a simple Yes / No, no app needed, so you can see who's in."),
+    before(){ tutExpandCard(true); }, after(){ tutExpandCard(false); }, scope:"card", sel:[".exsharebtn"]},
+  {html:v2CardHTML("The Cascade score is built from public and critics' opinion. Once you start telling Cascade which movies you like, scores are adjusted up or down to give you much more personal recommendations. Above a dotted outline: raised for you. Below: lowered."),
+    before(){ tutExpandCard(false); }, scope:"card", sel:[".qone"]},
+  {html:v2CardHTML("Watch On: your agent suggests where to watch each movie, but you can set it yourself for any movie you like."),
+    scope:"card", sel:[".ctl.notify"]},
+  {html:v2CardHTML("Add to mood: put any film in a mood by hand, or take it out."), scope:"card", sel:[".ctl.oamlist"]},
+  {html:v2CardHTML("Seen it? Say what you thought. Every verdict teaches your agent your taste."), scope:"card", sel:[".ctl.watch"]},
+  {html:v2CardHTML("Alerts: films arriving where you watch, in the styles you asked to hear about, plus anything you added by hand. We email them to you too."),
+    before(){ closeSettings(); openMovingScreen(); }, after(){ showAgentsHome(); }, sel:["#movingBtn"]},
+  {html:v2CardHTML("Find any film in Cascade, whether your agent picked it or not."),
+    before(){ closeSettings(); openFindScreen(); }, after(){ showAgentsHome(); }, sel:["#findSearchInput"]},
+  {html:v2CardHTML("Your agent. Each style has a minimum score, and the bells show which availability statuses alert you. Tap a style to change it."),
+    before(){ closeSettings(); oaOpenStyle=null; oaOrderSnapshot=null; openAgentsScreen(); },
+    after(){ oaOpenStyle=null; oaOrderSnapshot=null; showAgentsHome(); }, sel:["#oaList .oarow"]},
+  {html:v2CardHTML("Most movies have a main style, listed first, and other styles after it: a Sci-fi that is also a Thriller, a Comedy that is also a Romance. ¶ Your Cascade agent studies those combinations in what you watch and rate, and works out which ones you're most and least likely to enjoy."),
+    center:true},
+  {html:v2CardHTML("So your agent tracks each main style together with the styles that come with it. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here, and you can override any of them."),
+    before(){ v2OpenFirstOnStyle(); }, sel:["#oaAdjustSection"]},
+  {html:v2CardHTML("That's it. Your agent checks the whole catalogue every day and reports at 5pm."),
+    before(){ oaOpenStyle=null; oaOrderSnapshot=null; closeSettings(); showAgentsHome(); }, center:true},
+];
+let tutSteps=TOUR_STEPS, tutV2Active=false, tutIdx=-1, tutCurrent=null;
+// Set once, when the v2 tour starts (startTutorialV2) — the invite step (index 6) is the only step this
+// script ever skips, so "n of N" never counts it once it's known to be unreachable, instead of the raw
+// index silently jumping 6 of 17 -> 8 of 17 the way a non-v2 skip would (CAS-1349 AC: "n of N must not
+// count it").
+let v2InviteSkipped=false;
+const V2_INVITE_STEP_IDX=6;
+function tutDisplayN(){
+  if(!tutV2Active || !v2InviteSkipped || tutIdx<=V2_INVITE_STEP_IDX) return tutIdx+1;
+  return tutIdx;
+}
+function tutDisplayTotal(){
+  return tutV2Active ? (tutSteps.length - (v2InviteSkipped?1:0)) : tutSteps.length;
+}
 // Resolves one step's anchor(s) against the live DOM — never cached across steps, since most of the script
 // only exists once its own before() has opened the screen it lives on. A condensed ("cinfo") card hides its
 // own .r-scores via display:none rather than removing it (same trap CAS-976's tutorialResolveAnchor noted),
@@ -23225,9 +23321,18 @@ function tutResolveStep(step){
 // and actually added .filmpage.open — the invite page is a share-link recipient's whole reason for being
 // here, and the tour must never show on top of it.
 function maybeStartTutorial(){
-  if(!onboardingSeen() || !cascades.length || tutorialSeen()) return;
+  if(!onboardingSeen() || !cascades.length) return;
   if(filmRouteId()!=null || document.querySelector(".uscreen.open,.modal.open,.wsheetscrim.open,.filmpage.open")) return;
-  requestAnimationFrame(()=>requestAnimationFrame(startTutorial));
+  // CAS-1349: a v2 account (oneAgentCriteria() non-null) gets the v2 script, gated on tourV2Seen instead of
+  // tutorialSeen — a non-v2 account on the same device keeps the CAS-1317 script and its own seen-flag,
+  // untouched.
+  if(oneAgentCriteria()){
+    if(tourV2Seen()) return;
+    requestAnimationFrame(()=>requestAnimationFrame(startTutorialV2));
+  } else {
+    if(tutorialSeen()) return;
+    requestAnimationFrame(()=>requestAnimationFrame(startTutorial));
+  }
 }
 // Resolution happens here, not at the gate above, so it always runs one full layout past whatever just
 // painted the listing — same double-rAF reasoning as membStart's own proceed() a few lines up.
@@ -23237,11 +23342,24 @@ function startTutorial(){
   // see CAS-437) must still win, so the one check that matters here runs again right before the tour
   // actually shows.
   if(filmRouteId()!=null || document.querySelector(".filmpage.open")) return;
+  tutSteps=TOUR_STEPS; tutV2Active=false; v2InviteSkipped=false;
   tutIdx=-1; tutCurrent=null;
   window.addEventListener("resize", tutorialReposition);
   window.addEventListener("scroll", tutorialReposition, true);
   $("tutScrim").classList.add("open");
   if(!tutorialAdvance(1)) endTutorial(false);   // step 1 is always centred/anchorless, so this never misses
+}
+// CAS-1349: the v2 script's own entry point — same shape as startTutorial above, plus the one-time invite-
+// step skip check so tutDisplayN/tutDisplayTotal know, for this whole run, whether step 7 will ever resolve.
+function startTutorialV2(){
+  if(filmRouteId()!=null || document.querySelector(".filmpage.open")) return;
+  tutSteps=V2_TOUR_STEPS; tutV2Active=true;
+  v2InviteSkipped = !(window.CascadePersistence && window.CascadePersistence.accountActive());
+  tutIdx=-1; tutCurrent=null;
+  window.addEventListener("resize", tutorialReposition);
+  window.addEventListener("scroll", tutorialReposition, true);
+  $("tutScrim").classList.add("open");
+  if(!tutorialAdvance(1)) endTutorial(false);
 }
 // Runs the next (dir>0) or previous (dir<0) step's before(), skipping any step whose anchor doesn't resolve
 // once before() has run — CAS-976's "skip a card whose anchor isn't there" rule, extended to a tour that
@@ -23251,8 +23369,8 @@ function startTutorial(){
 // skipping forward or jumping back mid-script never needs its own clean-up pass here.
 function tutorialAdvance(dir){
   let idx=tutIdx+dir;
-  while(idx>=0 && idx<TOUR_STEPS.length){
-    const step=TOUR_STEPS[idx];
+  while(idx>=0 && idx<tutSteps.length){
+    const step=tutSteps[idx];
     if(step.before) step.before();
     const resolved=tutResolveStep(step);
     if(resolved){ tutIdx=idx; tutCurrent=resolved; showTutorialCard(); return true; }
@@ -23261,10 +23379,10 @@ function tutorialAdvance(dir){
   return false;
 }
 function showTutorialCard(){
-  const step=TOUR_STEPS[tutIdx];
-  $("tutText").textContent=step.text;
-  $("tutProg").textContent=`${tutIdx+1} of ${TOUR_STEPS.length}`;
-  $("tutNextBtn").textContent = (tutIdx===TOUR_STEPS.length-1) ? "Done" : "Next";
+  const step=tutSteps[tutIdx];
+  if(step.html) $("tutText").innerHTML=step.html; else $("tutText").textContent=step.text;
+  $("tutProg").textContent=`${tutDisplayN()} of ${tutDisplayTotal()}`;
+  $("tutNextBtn").textContent = (tutIdx===tutSteps.length-1) ? "Done" : "Next";
   $("tutBackBtn").style.display = tutIdx===0 ? "none" : "";
   const el = tutCurrent && tutCurrent.els ? tutCurrent.els[0] : null;
   if(el) el.scrollIntoView({block:"center", inline:"center"});
@@ -23348,8 +23466,8 @@ function endTutorial(markSeen){
   // step's own before() (step 10 collapsing what step 8 expanded, each screen-open step closing the last),
   // so after() is written to be a safe no-op when there's nothing left for it to undo; running them all
   // unconditionally is simpler than tracking exactly which one is still "outstanding".
-  TOUR_STEPS.forEach(step=>{ if(step.after) step.after(); });
-  if(markSeen) markTutorialSeen();
+  tutSteps.forEach(step=>{ if(step.after) step.after(); });
+  if(markSeen){ if(tutV2Active) markTourV2Seen(); else markTutorialSeen(); }
   tutIdx=-1; tutCurrent=null; tourCardEl=null; tourCardId=null;
 }
 // Replay (from the Help screen's "Still stuck?" row — CAS-1126 moved it here from Account's old Help &
@@ -23358,11 +23476,13 @@ function endTutorial(markSeen){
 // is open underneath it, and closing Help alone would just uncover that screen instead. showAgentsHome() is
 // the same "uncover the Watch listing" call applyDeepLink() already uses for the same reason — closes
 // Moving/Agents if either is open, then Help's own close reveals the listing underneath both.
-// Bypasses tutorialSeen() on purpose, same as any other explicit "show me that again" control.
+// Bypasses tutorialSeen()/tourV2Seen() on purpose, same as any other explicit "show me that again" control.
+// CAS-1349: plays the v2 script on a v2 account, the CAS-1317 script on every other account.
 function replayTutorial(){
   closeHelp();
   showAgentsHome();
-  requestAnimationFrame(()=>requestAnimationFrame(startTutorial));
+  const startFn = oneAgentCriteria() ? startTutorialV2 : startTutorial;
+  requestAnimationFrame(()=>requestAnimationFrame(startFn));
 }
 async function membStartWork(viaNewSignup){
   try{ localStorage.setItem("cascade_onboarded","1"); }catch(e){}
@@ -25385,6 +25505,7 @@ function acctFetchKeepalive(init){
     activeId=null; activeIds=[];
     for(const k in watchMineOnly) watchMineOnly[k]=true;
     tutorialSeenFlag=false;
+    tourV2SeenFlag=false;
     reviewPromptSessionsCount=0; reviewSessionBumpPending=false; reviewSessionsPushPending=false; reviewPromptAskedVer=null;
     Object.assign(agentState, loadAgentState());
     Object.keys(admitDrift).forEach(k=>delete admitDrift[k]); admitDriftSaved=null;
@@ -26515,6 +26636,7 @@ function acctFetchKeepalive(init){
       watchMoodSel = (typeof v.mood==="string" && watchMoods.some(m=>m.id===v.mood)) ? v.mood : watchMoods[0].id;
       applyMoodToState(currentMood());
       if(typeof v.tutorialSeen==="boolean") tutorialSeenFlag = v.tutorialSeen;
+      if(typeof v.tourV2Seen==="boolean") tourV2SeenFlag = v.tourV2Seen;
       // CAS-1222: a bump queued before this load resolved is replayed ON TOP of the account's real count,
       // never trusting this session's bare local default — see bumpReviewPromptSessionCount's own comment.
       // CAS-1243 round 2: computed here, but the write itself rides piggyback on the next real view-field
