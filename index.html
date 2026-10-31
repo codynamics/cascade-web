@@ -10896,7 +10896,10 @@ function moodSource(mood){ return mood.id==="releases" ? (mood.sourceChosen ? mo
 // CAS-1328: the display name for Latest — "Latest" even when the stored record still reads the pre-rename
 // "Releases" (never rewritten on load). CAS-1331: once the person has actually saved a name from the sheet
 // (nameChosen:true, stamped by saveMoodFromSheet), it is always shown verbatim, including "Releases".
-function moodDisplayName(mood){ return (mood.id==="releases" && mood.name==="Releases" && !mood.nameChosen) ? "Latest" : mood.name; }
+// CAS-1348: a v2 mood (its own, unrelated "releases" builtin — see ONE_AGENT_MOOD_BUILTINS) has no
+// nameChosen/sheet-save path to opt out of this fallback, so it must be excluded outright; its stored
+// name is shown verbatim.
+function moodDisplayName(mood){ return (!mood.v2 && mood.id==="releases" && mood.name==="Releases" && !mood.nameChosen) ? "Latest" : mood.name; }
 // CAS-1328: Latest's own pool restriction — a real cinema release (cinema_release) whose cinema_date falls
 // in the 12 months before today or any time after it. Applies only to the built-in Latest mood (id
 // "releases"), never to any other catalogue mood (Starred/Action/Imagine/Fun carry no such window).
@@ -20270,7 +20273,7 @@ window.oaComboOnRelease=(input)=>{
 // cascades load — see loadUserPrefs' own v.moods adoption) so a v1 account's data is never touched by any of
 // this (AC6). Nothing in this section runs unless oneAgentCriteria() is non-null.
 const ONE_AGENT_MOOD_BUILTINS=[
-  {id:"releases", name:"Latest"},
+  {id:"releases", name:"Releases"},
   {id:"starred", name:"Starred", starredOnly:true},
   // CAS-1345 Part 2: CAS-1341's own spec for a new v2 account's starter moods — Order Score, Show best 20,
   // added here so setup (CAS-1342's watchMoods=oamMoodDefaultsNow() call) provisions all six in order.
@@ -20657,9 +20660,9 @@ function oamFilmHandTouched(id){
 function oamListChipHTML(id){
   const c=oneAgentCriteria(); if(!c) return "";
   const moods=oamMoodsForFilm(id, c);
-  const lbl = moods.length ? (moods.length>1 ? `${moods[0].name} +${moods.length-1}` : moods[0].name) : "Add to list";
+  const lbl = moods.length ? (moods.length>1 ? `${moods[0].name} +${moods.length-1}` : moods[0].name) : "Add to mood";
   const hand=oamFilmHandTouched(id);
-  const title = moods.length ? `In your lists: ${moods.map(m=>m.name).join(", ")}. Tap to change.` : "Not in any list yet. Tap to add.";
+  const title = moods.length ? `In your moods: ${moods.map(m=>m.name).join(", ")}. Tap to change.` : "Not in any mood yet. Tap to add.";
   return `<button type="button" class="ctl oamlist${hand?" handmark":""}${filmIsNew(id)?" isnew":""}" data-lid="${id}" onclick="openOamListPanel(${id},this)"
       aria-haspopup="true" aria-expanded="false" title="${escA(title)}" aria-label="${escA(title)}">
     <span class="cmini"><i class="cfill" style="width:${moods.length?100:0}%;background:var(--accent)"></i>
@@ -20708,7 +20711,7 @@ function oamListPanelRowsHTML(id){
     <div class="oamlistagent">Your agent: ${reason.ok?"&check;":"&cross;"} ${esc(reason.text)}</div>
     <div class="oamlistscore">${oneScoreTextHTML(m)}</div>
     <div class="oamlistrows">${rows}</div>
-    <div class="oamlistnote">Adding keeps a film in a list whatever its score, and it will alert you when it lands somewhere you watch. Taking it out keeps it out.</div>
+    <div class="oamlistnote">Adding keeps a film in a mood whatever its score, and it will alert you when it lands somewhere you watch. Taking it out keeps it out.</div>
   </div>`;
 }
 window.openOamListPanel=(id, btn)=>{
@@ -26295,8 +26298,11 @@ function acctFetchKeepalive(init){
     oneAgentRepairPending=false;
     const c=oneAgentCriteria(); if(!c) return;
     const v2Moods=watchMoods.filter(m=>m && m.v2);
+    // CAS-1348: the builtin's default name is now "Releases", not "Latest" — a record renamed by
+    // CAS-1348's own one-time migration (or already provisioned post-rename) must still read as
+    // "untouched by the person" here, same as the pre-rename "Latest" shape did.
     const isPreFixDefault = v2Moods.length===2
-      && v2Moods[0] && v2Moods[0].id==="releases" && v2Moods[0].name==="Latest"
+      && v2Moods[0] && v2Moods[0].id==="releases" && (v2Moods[0].name==="Latest" || v2Moods[0].name==="Releases")
       && v2Moods[1] && v2Moods[1].id==="starred" && v2Moods[1].name==="Starred";
     if(!isPreFixDefault) return;
     const isStyleOn = style => { const st=(c.styles||{})[style]; return !!(st && st.bar!=null); };
@@ -26485,10 +26491,20 @@ function acctFetchKeepalive(init){
       // actual, style-aware repair.
       if(watchMoodsHasV2){
         const v2Moods=watchMoods.filter(m=>m && m.v2);
+        // CAS-1348: see oneAgentApplyStarterRepair's own comment — "Releases" is this check's other
+        // valid default name now, alongside the pre-rename "Latest".
         const isPreFixDefault = v2Moods.length===2
-          && v2Moods[0] && v2Moods[0].id==="releases" && v2Moods[0].name==="Latest"
+          && v2Moods[0] && v2Moods[0].id==="releases" && (v2Moods[0].name==="Latest" || v2Moods[0].name==="Releases")
           && v2Moods[1] && v2Moods[1].id==="starred" && v2Moods[1].name==="Starred";
         if(isPreFixDefault) oneAgentRepairPending=true;
+        // CAS-1348: a v2 "releases" mood still carrying the pre-rename default name "Latest" (never
+        // chosen by the person — the v2 mood sheet has no nameChosen distinction, so this only matches
+        // the still-literally-default name) is renamed once, in memory and piggybacked onto the next
+        // real view write. A mood renamed by hand to anything else is left alone.
+        if(watchMoods.some(m=>m && m.v2 && m.id==="releases" && m.name==="Latest")){
+          watchMoods = watchMoods.map(m=>(m && m.v2 && m.id==="releases" && m.name==="Latest") ? {...m, name:"Releases"} : m);
+          moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
+        }
       }
       // CAS-1295 Change 1: view.starred adopted with the other view fields — a genuinely absent (never
       // saved) array is left alone, same "no answer yet" rule as every other field here (CAS-775).
