@@ -118,25 +118,25 @@ test("CAS-1340 AC1b: an override within 5 of learned shows 'let the agent decide
   assert.ok(!leftHTML.includes("your verdicts say"), "the close-override branch skips the learned comparison clause");
 });
 
-// ---- AC2: dragging a combo to the far left saves "never" and the admission gate drops its films -------------
+// ---- AC2 (CAS-1351): dragging a combo to the far left saves "never" and the admission gate drops its films ---
 
-test("CAS-1340 AC2: releasing a combo's range at 49 saves \"never\" and matchesCriteria rejects its films", () => {
+test("CAS-1351 AC2: releasing a combo's range at share 0 (far left) saves \"never\" and matchesCriteria rejects its films", () => {
   withCascades([oneAgent({ styles: { "Adventure": { bar:60, al:{cinema:false,rent:false,stream:false} } } })], () => {
     const c = E.cascades[0];
     const key = "Adventure|Animation";
-    E.oaComboOnRelease({ dataset:{ style:"Adventure", key } , value:"49" });
+    E.oaComboOnRelease({ dataset:{ style:"Adventure", key } , value:"0" });
     assert.equal(c.combo[key], "never", "the release handler writes the literal sentinel, not a number");
     const film = scoredFilm(["Adventure","Animation"], 90);
     assert.equal(E.matchesCriteria(film, c), false, "a 'never' combo's films are not admitted (CAS-1337's own gate)");
   });
 });
 
-test("CAS-1340 AC2b: releasing above 49 writes a numeric combo[k] = value - bar", () => {
+test("CAS-1351 AC2b: releasing above 0 writes a numeric combo[k] = bar - oneBarForTopPct(style, pct)", () => {
   withCascades([oneAgent({ styles: { "Adventure": { bar:60, al:{cinema:false,rent:false,stream:false} } } })], () => {
     const c = E.cascades[0];
     const key = "Adventure|Fantasy";
     E.oaComboOnRelease({ dataset:{ style:"Adventure", key }, value:"75" });
-    assert.equal(c.combo[key], 15, "75 - bar(60) = 15");
+    assert.equal(c.combo[key], 60 - E.oneBarForTopPct("Adventure", 75), "bar(60) - oneBarForTopPct(Adventure, 75)");
   });
 });
 
@@ -226,9 +226,10 @@ test("CAS-1340: oaComboSort puts adjusted rows first, then sorts by |points| des
 
 // ---- Geometry: every mark this section draws shares section 1's own value->position formula -----------------
 
-test("CAS-1340 AC4 (arithmetic half only — see file header): oaTrackPct matches a 50-100 range input's own domain", () => {
-  assert.equal(E.oaTrackPct(50), 0);
+test("CAS-1351 AC4 (arithmetic half only — see file header): oaTrackPct matches section 1's own 0-100 SHARE domain", () => {
+  assert.equal(E.oaTrackPct(0), 0);
   assert.equal(E.oaTrackPct(100), 100);
-  assert.equal(E.oaTrackPct(75), 50);
-  assert.equal(E.oaTrackPct(40), 0, "clamped — section 3's own override range can go to 49, section 1's bar mark never needs to");
+  assert.equal(E.oaTrackPct(50), 50);
+  assert.equal(E.oaTrackPct(-10), 0, "clamped");
+  assert.equal(E.oaTrackPct(110), 100, "clamped");
 });

@@ -3198,6 +3198,9 @@
   .oabox{position:relative;flex:1;height:16px;border-radius:3px;overflow:hidden;
     border:1px solid color-mix(in srgb, var(--bc) 65%, transparent);background:transparent}
   .oafill{position:absolute;top:0;right:0;bottom:0;background:var(--bc)}
+  /* CAS-1351: the share-based boxes (setup/Agent-row/open-slider) fill from the LEFT instead — a modifier so
+     CAS-1341's own mood-sheet style rows (still raw-score, still right-anchored) are untouched. */
+  .oafill.oafleft{right:auto;left:0}
   .oastripfull .oabox{height:22px;border-radius:4px}
   .oalbl{position:relative;z-index:2;display:block;margin:4px 0 0 4px;font-size:9px;font-weight:700;
     color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
@@ -3340,13 +3343,13 @@
   .onbtrack{display:flex;width:200%;transition:transform .35s ease}
   .onbbody.s2 .onbtrack{transform:translateX(-50%)}
   .onbpane{width:50%;display:grid;align-items:center;gap:6px}
-  .onbpane.p1{grid-template-columns:minmax(0,1fr) 26px}
+  .onbpane.p1{grid-template-columns:26px minmax(0,1fr)}
   .onbpane.p2{grid-template-columns:40px minmax(0,1fr)}
   .onbboxes{display:flex;gap:3px}
   .obx{position:relative;flex:1;height:24px;border-radius:5px;overflow:hidden;cursor:pointer;padding:0;
     border:1px solid color-mix(in srgb, var(--bc) 65%, transparent);background:transparent}
-  .obx.picked{box-shadow:inset 3px 0 0 #fff}
-  .obxfill{position:absolute;top:0;right:0;bottom:0;background:var(--bc)}
+  .obx.picked{box-shadow:inset -3px 0 0 #fff}
+  .obxfill{position:absolute;top:0;left:0;bottom:0;background:var(--bc)}
   .obxlbl{position:relative;z-index:2;display:block;margin:2px 0 0 4px;font-size:10px;font-weight:700;
     font-style:normal;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
   .onbnever{flex:0 0 auto;width:26px;height:26px;border-radius:13px;border:1px solid var(--line);
@@ -12217,6 +12220,24 @@ function oneTopPct(style, score){
   });
   return total ? Math.round(100*top/total) : 0;
 }
+// oneBarForTopPct(style, pct): oneTopPct's own inverse — the score such that at least pct% of this style's
+// scored catalogue clears it: sort this style's scores descending, take the top ceil(pct% of total) of them,
+// and return the lowest score inside that group (CAS-1351). Picking a box on the setup/Agent/slider screens
+// sets bar to this; the display always reads it back out through oneTopPct, so the two round-trip (±1 from
+// integer rounding) by construction.
+function oneBarForTopPct(style, pct){
+  const scores=[];
+  MOVIES.forEach(m => {
+    if(!(m.genres && m.genres.length) || m.genres[0]!==style) return;
+    const pub = cascadeScore(m);
+    if(pub < 0) return;
+    scores.push(pub);
+  });
+  if(!scores.length) return 50;
+  scores.sort((a,b)=>b-a);
+  const idx = Math.max(0, Math.min(scores.length-1, Math.ceil(pct/100*scores.length)-1));
+  return scores[idx];
+}
 // oneAgentAlerts(m, window): the per-style alert switch CAS-1343's monitor gating calls — the account's
 // one agent, the film's own main style, the window asked about ("cinema"/"rent"/"stream").
 function oneAgentAlerts(m, window){
@@ -19818,6 +19839,37 @@ function oaBoxesHTML(bar, opts){
     `<span class="oabox" style="--bc:${b.color}">${labels?`<i class="oalbl">${b.lo}</i>`:""}<i class="oafill" style="width:${oaBoxPct(bar,b)}%"></i></span>`
   ).join("");
 }
+// CAS-1351: the setup scores step, the Agent screen's rows/open slider — share of the catalogue, growing
+// left to right, replacing the raw-score boxes above wherever a person actually PICKS a genre's minimum
+// score. oaBoxPct/oaBoxesHTML (just above) keep their old raw-score behaviour unchanged for the CAS-1341
+// mood sheet's own style rows and its cross-genre "mood minimum score" slider, which this ticket's spec
+// never names and which have no single consistent share meaning across styles anyway.
+const ONE_AGENT_SHARE_BRACKETS=[
+  {pct:20, lo:0,  hi:20,  color:"#138c7d"},
+  {pct:40, lo:20, hi:40,  color:"#3f8f62"},
+  {pct:60, lo:40, hi:60,  color:"#7f8540"},
+  {pct:80, lo:60, hi:80,  color:"#a0732e"},
+  {pct:100,lo:80, hi:100, color:"#b65a1c"},
+];
+// Fill from the left: a box is fully lit once the share clears its own upper bound (it's a subset of a more
+// generous share), empty until the share reaches its lower bound, partial — anchored to the box's own left
+// edge (the .oafleft/.obxfill CSS) — in between, so the lit region is always one continuous block from 0%.
+function oaShareBoxPct(share, b){
+  if(share==null) return 0;
+  if(share>=b.hi) return 100;
+  if(share<=b.lo) return 0;
+  return Math.round(100*(share-b.lo)/(b.hi-b.lo));
+}
+function oaShareLabel(pct){ return pct>=100 ? "All" : `${pct}%`; }
+// bar is a raw score (or null = never); share is derived through oneTopPct so the boxes, the slider thumb
+// and the value label can never quietly disagree about what share a given bar represents.
+function oaShareBoxesHTML(style, bar, opts){
+  const labels = opts && opts.labels;
+  const share = bar==null ? 0 : oneTopPct(style, bar);
+  return ONE_AGENT_SHARE_BRACKETS.map(b=>
+    `<span class="oabox" style="--bc:${b.color}">${labels?`<i class="oalbl">${oaShareLabel(b.pct)}</i>`:""}<i class="oafill oafleft" style="width:${oaShareBoxPct(share,b)}%"></i></span>`
+  ).join("");
+}
 // Row order: on styles (a bar set) by bar ascending then name, then off styles (never listed) A-Z.
 function oaComputeOrder(c){
   const on=[], off=[];
@@ -19858,15 +19910,18 @@ function oaSuggestionHTML(style){
       <div class="oasuglbl" role="button" tabindex="0" onclick="oaToggleSuggestion()">AGENT SUGGESTION ›</div>
     </div>`;
   }
+  // CAS-1351: the suggestion names the share, not the score — barAdvice's own from/to stay raw scores
+  // (oaApplySuggestion still sets the bar to the exact score, no share round-trip), only the copy changes.
+  const toPct = oneTopPct(style, adv.to), fromPct = oneTopPct(style, adv.from);
   const text = adv.dir==="up"
-    ? `Your verdicts suggest <b>${adv.to}+</b> would suit you better.`
-    : `Your verdicts suggest <b>${adv.to}+</b> would show you more of what you like.`;
+    ? `Your verdicts suggest <b>Top ${toPct}%</b> would suit you better.`
+    : `Your verdicts suggest <b>Top ${toPct}%</b> would show you more of what you like.`;
   return `<div class="oasuggest open">
       <div class="oasuglbl" role="button" tabindex="0" onclick="oaToggleSuggestion()">AGENT SUGGESTION ⌄</div>
       <div class="oasugtext">${text}</div>
       <div class="oasugbtns">
-        <button type="button" class="oasugchange" onclick="oaApplySuggestion('${escA(style)}',${adv.to})">Change to ${adv.to}+</button>
-        <button type="button" class="oasugkeep" onclick="oaDismissSuggestion('${escA(style)}')">Keep ${adv.from}+</button>
+        <button type="button" class="oasugchange" onclick="oaApplySuggestion('${escA(style)}',${adv.to})">Change to Top ${toPct}%</button>
+        <button type="button" class="oasugkeep" onclick="oaDismissSuggestion('${escA(style)}')">Keep Top ${fromPct}%</button>
       </div>
     </div>`;
 }
@@ -19894,12 +19949,12 @@ function oaOpenBodyHTML(c, style){
       <div class="oasechdr">MOVIE MINIMUM SCORE</div>
       <div class="oaslider">
         <div class="oaslidewrap">
-          <div class="oastrip oastripfull">${oaBoxesHTML(bar,{labels:true})}</div>
-          <input type="range" class="oarange" min="50" max="100" step="1" value="${bar==null?100:bar}"
+          <div class="oastrip oastripfull">${oaShareBoxesHTML(style, bar, {labels:true})}</div>
+          <input type="range" class="oarange" min="0" max="100" step="1" value="${bar==null?0:top}"
             data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
             aria-label="${escA(name)} minimum score">
         </div>
-        <span class="oaslideval" id="oaSliderVal">${bar==null?"Off":`${bar}+<i>top ${top}%</i>`}</span>
+        <span class="oaslideval" id="oaSliderVal">${bar==null?"Never":`Top ${top}%<i>score ${bar}+</i>`}</span>
       </div>
       <p class="oaslidedesc" id="oaSliderDesc">${desc}</p>
       ${oaSuggestionHTML(style)}
@@ -19915,8 +19970,8 @@ function oaRowHTML(c, style, filmCount){
   const filmsLine = bar==null ? "never listed" : `${filmCount} film${filmCount===1?"":"s"}`;
   const rowTop = bar==null ? 0 : oneTopPct(style,bar);
   const strip = open ? `<span class="oarowstrip"></span><span class="oarowval"></span>`
-    : `<span class="oarowstrip">${oaBoxesHTML(bar)}</span>
-       <span class="oarowval">${bar==null?"Off":`${bar}+<i>top ${rowTop}%</i>`}</span>`;
+    : `<span class="oarowstrip">${oaShareBoxesHTML(style, bar)}</span>
+       <span class="oarowval">${bar==null?"Never":`Top ${rowTop}%<i>score ${bar}+</i>`}</span>`;
   const head=`
     <button type="button" class="oarowhead" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
       <span class="oarowleft">
@@ -19936,8 +19991,8 @@ function renderOneAgentScreen(c){
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">Your agent</h2></div>
     <p class="ossub">${n} verdict${n===1?"":"s"} learned<button type="button" class="oaspreview" onclick="oasOpenPreview()">Preview setup ›</button></p>
-    <div class="oacolhdr"><span>STYLE</span><span>LISTS FILMS SCORING</span></div>
-    <div class="oalist" id="oaList" role="list" aria-label="Your agent's styles">${rows}</div>`;
+    <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
+    <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
 }
 // Opening a style freezes the row order NOW (as if nothing were open), so switching straight from one open
 // style to another never shows an intermediate resort — only closing (oaOpenStyle back to null) lets the
@@ -19956,33 +20011,33 @@ window.oaToggleStyle=(style)=>{
 // full re-render, so neither the drag gesture nor the frozen row order is disturbed mid-drag.
 window.oaOnDrag=(input)=>{
   const style=input.dataset.style;
-  const v=parseInt(input.value,10);
-  const bar = v>=100 ? null : v;
+  const share=Math.max(0, Math.min(100, parseInt(input.value,10)));
   const wrap=input.closest(".oaslidewrap");
   const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
-  ONE_AGENT_SCORE_BRACKETS.forEach((b,i)=>{
+  ONE_AGENT_SHARE_BRACKETS.forEach((b,i)=>{
     const fill=boxes[i] && boxes[i].querySelector(".oafill");
-    if(fill) fill.style.width=oaBoxPct(bar,b)+"%";
+    if(fill) fill.style.width=oaShareBoxPct(share,b)+"%";
   });
-  const top = bar==null ? 0 : oneTopPct(style, bar);
+  const bar = share<=0 ? null : oneBarForTopPct(style, share);
   const name=oneAgentShortName(style);
   const valEl=$("oaSliderVal");
-  if(valEl) valEl.innerHTML = bar==null ? "Off" : `${bar}+<i>top ${top}%</i>`;
+  if(valEl) valEl.innerHTML = bar==null ? "Never" : `Top ${share}%<i>score ${bar}+</i>`;
   const descEl=$("oaSliderDesc");
   if(descEl) descEl.textContent = bar==null
     ? `Off: no ${name} films are listed. Drag left to turn it on.`
-    : `${name} films scoring ${bar} or more are listed: the top ${top}% of ${name}.`;
+    : `${name} films scoring ${bar} or more are listed: the top ${share}% of ${name}.`;
 };
 // Release (onchange) — the one point this screen actually saves: CAS-1339's own "every change saves
 // immediately... no Save button", through the same saveCascades()/render() chokepoint every other agent
-// edit already uses.
+// edit already uses. CAS-1351: the slider now carries a SHARE (0 Never .. 100 All); the stored bar is still
+// a raw score, converted through oneBarForTopPct so criteria.styles[S].bar never changes shape.
 window.oaOnRelease=(input)=>{
   const style=input.dataset.style;
   const c=oneAgentCriteria(); if(!c) return;
-  const v=parseInt(input.value,10);
+  const share=Math.max(0, Math.min(100, parseInt(input.value,10)));
   c.styles=c.styles||{};
   const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
-  st.bar = v>=100 ? null : v;
+  st.bar = share<=0 ? null : oneBarForTopPct(style, share);
   saveCascades();
   if(typeof render==="function") render();
   renderAgentsScreen();
@@ -20028,10 +20083,16 @@ const oaComboFilmsOpen = new Set();   // which combo rows (by key) have their li
 let oaSuggestionOpen = false;
 
 function oaFmtPoints(p){ return p>0 ? `+${p}` : p<0 ? `−${Math.abs(p)}` : "±0"; }
-// The SAME value->position mapping section 1's own native range input uses (min 50, max 100) — every mark
-// section 3 draws (the style's own bar line, a combo's value, an override/was dashed mark) is placed with
-// this one formula, so it always lines up under section 1's thumb at the same value (within rounding).
-function oaTrackPct(v){ return Math.max(0, Math.min(100, (v-50)/50*100)); }
+// CAS-1351: section 1's own native range input (and its share boxes) now run 0-100 directly in SHARE space,
+// so a mark's position IS its share value, clamped — the same formula every mark section 3 draws (the
+// style's own bar line, a combo's value, an override/was dashed mark) still goes through, so they all line
+// up under section 1's thumb at the same share.
+function oaTrackPct(v){ return Math.max(0, Math.min(100, v)); }
+// A combo's points, projected onto the share axis the same way picking it back off the slider works in
+// reverse (oaComboOnRelease): points = bar - oneBarForTopPct(style, pct), so a raise (+n, lets more of the
+// combo through, as a lower minimum would) reads further right at oneTopPct(style, bar-n), and a drop (-n)
+// reads further left at oneTopPct(style, bar+n).
+function oaComboMarkShare(style, bar, points){ return oneTopPct(style, bar-points); }
 // Every (style, other) combo that appears in the catalogue, with its learned/override points and verdict/
 // film counts — the row set section 3 draws from. One MOVIES pass (same shape as oaFilmCounts above).
 function oaComboStats(c, style){
@@ -20105,18 +20166,17 @@ function oaComboBarHTML(c, style, r){
   if(bar==null || (r.n===0 && !r.overridden && !r.never)){
     return `<span class="oacombowrap oacombo-empty"><span class="oacombobar">${boxesHTML}</span></span>`;
   }
-  const barPct = oaTrackPct(bar);
-  const valuePos = r.never ? 49 : bar+r.points;
-  const valuePct = oaTrackPct(valuePos);
+  const barPct = oaTrackPct(oneTopPct(style, bar));
+  const valuePct = r.never ? 0 : oaTrackPct(oaComboMarkShare(style, bar, r.points));
   const lo = Math.min(barPct,valuePct), hi = Math.max(barPct,valuePct);
   const fillHTML = r.never
     ? `<i class="oacfill down never" style="left:0%;width:${barPct}%"></i>`
     : `<i class="oacfill ${r.points>=0?"up":"down"}" style="left:${lo}%;width:${hi-lo}%"></i>`;
   let marks = `<i class="oacbarline" style="left:${barPct}%"></i>`;
-  if(r.overridden || r.never) marks += `<i class="oacdash" style="left:${oaTrackPct(bar+r.learned)}%"></i>`;
-  else if(r.adjusted) marks += `<i class="oacdash" style="left:${oaTrackPct(bar+r.seen)}%"></i>`;
-  const inputVal = Math.max(49, Math.min(100, Math.round(r.never ? 49 : bar+r.points)));
-  const rangeHTML = `<input type="range" class="oacrange" min="49" max="100" step="1" value="${inputVal}"
+  if(r.overridden || r.never) marks += `<i class="oacdash" style="left:${oaTrackPct(oaComboMarkShare(style, bar, r.learned))}%"></i>`;
+  else if(r.adjusted) marks += `<i class="oacdash" style="left:${oaTrackPct(oaComboMarkShare(style, bar, r.seen))}%"></i>`;
+  const inputVal = r.never ? 0 : Math.max(0, Math.min(100, Math.round(oaComboMarkShare(style, bar, r.points))));
+  const rangeHTML = `<input type="range" class="oacrange" min="0" max="100" step="1" value="${inputVal}"
       data-style="${escA(style)}" data-key="${escA(r.key)}"
       oninput="oaComboOnDrag(this)" onchange="oaComboOnRelease(this)"
       aria-label="${escA(style)}, ${escA(r.other)} score adjustment">`;
@@ -20158,7 +20218,7 @@ function oaComboRowHTML(c, style, r){
   const chipsHTML = chipsOpen ? `<div class="oacchips">${films.map(f=>
       `<span class="oacchip ${f.good?"up":"down"}">${esc(f.title)} · ${esc((OPINIONS.find(o=>o.key===f.kind)||{}).lbl||f.kind)}</span>`).join("")}</div>` : "";
   return `<div class="oacrow${rowEmpty?" oacrow-empty":""}" data-key="${escA(r.key)}">
-      <div class="oactitle">${esc(style)}, ${esc(r.other)}${tagHTML}</div>
+      <div class="oactitle">${esc(style)} with ${esc(r.other)}${tagHTML}</div>
       <div class="oacline2">${leftHTML}
         <span class="oacright">${oaComboBarHTML(c, style, r)}${oaComboValueHTML(r)}</span>
       </div>
@@ -20193,7 +20253,7 @@ function oaAdjustSectionHTML(c, style){
   // CAS-1349: wrapped in one #oaAdjustSection container (heading through rows) so the v2 guided tour can
   // spotlight the whole section as a single anchor, same as tutUnionRect does for a multi-element step.
   return `<div class="oaadjust" id="oaAdjustSection"><div class="oasechdr">SCORE ADJUSTMENTS</div>
-    <p class="oacintro">Your agent is automatically adjusting movie scores, up or down, for films that combine ${esc(name)} with these styles, based on your verdicts on films you've watched. The adjusted score is the one you see in Watch. Tap a row to see the films behind it.</p>
+    <p class="oacintro">Your agent adjusts the scores of ${esc(name)} films up or down by their sub-genres, based on your verdicts on films you've watched. The adjusted score is the one you see in Watch. Tap a row to see the films behind it.</p>
     ${seenBox}
     <div class="oaclist">${shown.map(r=>oaComboRowHTML(c, style, r)).join("")}</div>
     ${showAllHTML}
@@ -20238,30 +20298,34 @@ window.oaMarkSeenAdjusted=(style)=>{
   renderAgentsScreen();
 };
 // Live drag feedback (oninput) — redraws just this row's fill in place, the same convention oaOnDrag (section
-// 1) uses for its own boxes.
+// 1) uses for its own boxes. CAS-1351: the range is now a SHARE (0 never .. 100), the same axis section 1's
+// own slider runs.
 window.oaComboOnDrag=(input)=>{
   const c=oneAgentCriteria(); if(!c) return;
-  const bar=oaBar(c, input.dataset.style); if(bar==null) return;
-  const v=parseInt(input.value,10);
+  const style=input.dataset.style;
+  const bar=oaBar(c, style); if(bar==null) return;
+  const v=Math.max(0, Math.min(100, parseInt(input.value,10)));
   const wrap=input.closest(".oacombowrap");
   const barEl=wrap && wrap.querySelector(".oacombobar");
   const fill=barEl && barEl.querySelector(".oacfill");
   if(!fill) return;
-  const barPct=oaTrackPct(bar);
-  if(v<=49){ fill.className="oacfill down never"; fill.style.left="0%"; fill.style.width=barPct+"%"; return; }
+  const barShare=oneTopPct(style, bar);
+  const barPct=oaTrackPct(barShare);
+  if(v<=0){ fill.className="oacfill down never"; fill.style.left="0%"; fill.style.width=barPct+"%"; return; }
   const valuePct=oaTrackPct(v);
   const lo=Math.min(barPct,valuePct), hi=Math.max(barPct,valuePct);
-  fill.className="oacfill "+(v>=bar?"up":"down");
+  fill.className="oacfill "+(v>=barShare?"up":"down");
   fill.style.left=lo+"%"; fill.style.width=(hi-lo)+"%";
 };
-// Release (onchange) — the ticket's own rule verbatim: combo[k] = value - bar; at 49, combo[k] = "never".
+// Release (onchange) — the ticket's own rule verbatim: points = bar - oneBarForTopPct(style, pct); at the
+// far left (0), combo[k] = "never".
 window.oaComboOnRelease=(input)=>{
   const c=oneAgentCriteria(); if(!c) return;
   const style=input.dataset.style, key=input.dataset.key;
   const bar=oaBar(c, style); if(bar==null) return;
-  const v=parseInt(input.value,10);
+  const v=Math.max(0, Math.min(100, parseInt(input.value,10)));
   c.combo=c.combo||{};
-  c.combo[key] = v<=49 ? "never" : v-bar;
+  c.combo[key] = v<=0 ? "never" : bar - oneBarForTopPct(style, v);
   saveCascades();
   if(typeof render==="function") render();
   renderAgentsScreen();
@@ -20553,7 +20617,7 @@ function renderOamMoodSheetBody(){
     </div>
     ${d.handOnly ? "" : `
     <div class="wsheetsec">
-      <div class="wsheethd"><span>STYLES &middot; ${kOn} of ${onStyles.length}</span>
+      <div class="wsheethd"><span>GENRES &middot; ${kOn} of ${onStyles.length}</span>
         <div class="wsheetlinks">
           <button type="button" class="linkbtn" onclick="selectAllOamDraftStyles()">All</button>
           <button type="button" class="linkbtn" onclick="clearAllOamDraftStyles()">None</button>
@@ -20678,7 +20742,7 @@ function oneAgentAdmitReason(m){
   const c=oneAgentCriteria();
   if(!c) return {ok:false, text:""};
   const {main}=mainOtherCombos(m);
-  if(main===undefined) return {ok:false, text:"has no listed style"};
+  if(main===undefined) return {ok:false, text:"has no listed genre"};
   const name=oneAgentShortName(main);
   const style=(c.styles||{})[main];
   if(!style || style.bar==null) return {ok:false, text:`${name} isn't on`};
@@ -20827,32 +20891,36 @@ function onbRevealGridHTML(c){
 // runs setup is never touched (AC5). The actual account change is ONE atomic commit (oneAgentCommit below,
 // fired by screen 6's "Start watching") — this screen itself only ever edits the in-memory draft (oasState).
 const ONE_AGENT_SETUP_STYLES = Object.keys(TASTE_SHORT);   // the exact 19, in TASTE_SHORT's own order
-const ONE_AGENT_SETUP_DEFAULT_BAR = 70;   // CAS-1346: every style starts here on a fresh account — no per-style map
-const ONE_AGENT_SETUP_BAR_LABELS = {50:"Anything", 60:"Most", 70:"The good ones", 80:"Only the best", 90:"Must-sees"};
+const ONE_AGENT_SETUP_DEFAULT_SHARE = 60;   // CAS-1351: every genre starts at Top 60% on a fresh account
+function oasDefaultBarFor(style){ return oneBarForTopPct(style, ONE_AGENT_SETUP_DEFAULT_SHARE); }
 
-let oasState = null;     // {styles:{style:{bar,never}}, alerts:{style:{cinema,rent,stream}}, touched:{style:bool}} — null when closed
+let oasState = null;     // {styles:{style:{bar,pct,never}}, alerts:{style:{cinema,rent,stream}}, touched:{style:bool}} — null when closed
 let oasStep = 1;
 let oasSetupQueryConsumed = false;   // the ?oneagent=setup gate fires at most once per page load (afterSignIn)
 
 function oasDefaultState(){
   const styles={}, alerts={}, touched={};
   ONE_AGENT_SETUP_STYLES.forEach(s=>{
-    styles[s] = {bar: ONE_AGENT_SETUP_DEFAULT_BAR, never:false};
+    styles[s] = {bar: oasDefaultBarFor(s), pct: ONE_AGENT_SETUP_DEFAULT_SHARE, never:false};
     alerts[s] = {cinema:false, rent:false, stream:false};
     touched[s] = false;
   });
   return {styles, alerts, touched};
 }
-// Re-run prefill (AC4): bars round DOWN to the decade and clamp into the picker's 50-90 range; alerts carry
-// the current agent's own switches verbatim (never re-applies the new-account preset over a real account's
-// actual choices). A style arriving with any alert already on is `touched`, so tapping its bar down to 60
-// in this run never clobbers a choice the real agent already made (the "unless already set" guard below).
+// Re-run prefill (AC4): shares round DOWN to the nearest box and clamp into the picker's 20-100 range; alerts
+// carry the current agent's own switches verbatim (never re-applies the new-account preset over a real
+// account's actual choices). A style arriving with any alert already on is `touched`, so tapping its share
+// down in this run never clobbers a choice the real agent already made (the "unless already set" guard below).
 function oasPrefillFromAgent(c){
   const styles={}, alerts={}, touched={};
   ONE_AGENT_SETUP_STYLES.forEach(s=>{
     const st=(c.styles||{})[s];
-    const bar = (st && st.bar!=null) ? Math.max(50, Math.min(90, Math.floor(st.bar/10)*10)) : null;
-    styles[s] = {bar, never: bar==null};
+    let pct = null, bar = null;
+    if(st && st.bar!=null){
+      pct = Math.max(20, Math.min(100, Math.floor(oneTopPct(s, st.bar)/20)*20));
+      bar = oneBarForTopPct(s, pct);
+    }
+    styles[s] = {bar, pct, never: bar==null};
     const al = (st && st.al) || {};
     alerts[s] = {cinema:!!al.cinema, rent:!!al.rent, stream:!!al.stream};
     touched[s] = alerts[s].cinema || alerts[s].rent || alerts[s].stream;
@@ -20860,19 +20928,19 @@ function oasPrefillFromAgent(c){
   return {styles, alerts, touched};
 }
 function oasRowSubHTML(style, st){
-  if(st.never) return "never";
-  return `${esc(ONE_AGENT_SETUP_BAR_LABELS[st.bar]||"")} · top ${oneTopPct(style, st.bar)}%`;
+  if(st.never) return "Never";
+  return `${esc(oaShareLabel(st.pct))} · score ${st.bar}+`;
 }
-// The five tappable boxes for one style row's pane 1 — oaBoxPct (CAS-1339) gives a full/empty fill for every
-// bracket against a bar that always lands exactly on a bracket's own `lo`.
+// The five tappable boxes for one style row's pane 1 — oaShareBoxPct (CAS-1339/CAS-1351) gives a full/empty
+// fill for every bracket against a share that always lands exactly on a bracket's own `pct`.
 function oasRowBoxesHTML(style, st){
-  return ONE_AGENT_SCORE_BRACKETS.map(b=>{
-    const picked = st.bar===b.lo;
-    const pct = oaBoxPct(st.bar, b);
+  return ONE_AGENT_SHARE_BRACKETS.map(b=>{
+    const picked = st.pct===b.pct;
+    const pct = oaShareBoxPct(st.never?0:st.pct, b);
     return `<button type="button" class="obx${picked?" picked":""}" style="--bc:${b.color}"
-        onclick="oasPickBar('${escA(style)}',${b.lo})" aria-pressed="${picked}"
-        aria-label="${escA(oneAgentShortName(style))} minimum score ${b.lo}">
-        <i class="obxfill" style="width:${pct}%"></i><i class="obxlbl">${b.lo}</i>
+        onclick="oasPickBar('${escA(style)}',${b.pct})" aria-pressed="${picked}"
+        aria-label="${escA(oneAgentShortName(style))} minimum score ${oaShareLabel(b.pct)}">
+        <i class="obxfill" style="width:${pct}%"></i><i class="obxlbl">${oaShareLabel(b.pct)}</i>
       </button>`;
   }).join("");
 }
@@ -20888,7 +20956,7 @@ function oafActiveWindows(){
 // style.
 function oasPaneTwoHTML(style, st, al){
   const windows = oafActiveWindows();
-  const score = st.never ? "–" : `${st.bar}+`;
+  const score = st.never ? "Never" : oaShareLabel(st.pct);
   const inner = st.never
     ? `<span class="onbnv">Never listed</span>`
     : windows.map(w=>{
@@ -20908,9 +20976,9 @@ function oasRowHTML(style){
       <span class="onbname">${esc(oneAgentShortName(style))}<span class="onbnamesub">${oasRowSubHTML(style, st)}</span></span>
       <span class="onbwin"><span class="onbtrack">
         <span class="onbpane p1">
-          <span class="onbboxes">${oasRowBoxesHTML(style, st)}</span>
           <button type="button" class="onbnever${st.never?" on":""}" onclick="oasToggleNever('${escA(style)}')"
               aria-pressed="${st.never}" aria-label="Never show ${escA(oneAgentShortName(style))}">⊘</button>
+          <span class="onbboxes">${oasRowBoxesHTML(style, st)}</span>
         </span>
         <span class="onbpane p2">${oasPaneTwoHTML(style, st, al)}</span>
       </span></span>
@@ -20926,14 +20994,14 @@ function oasHeaderHTML(){
   return `<div class="onbhdr">
       <span></span>
       <span class="onbwin"><span class="onbtrack">
-        <span class="onbpane p1"><span class="onbhdrarrows"><span>← more films</span><span>only the best →</span></span><span></span></span>
-        <span class="onbpane p2"><span class="onbfrom">From</span><span class="onbwinheads" style="grid-template-columns:repeat(${windows.length},1fr)">${heads}</span></span>
+        <span class="onbpane p1"><span></span><span class="onbhdrarrows"><span>← only the best</span><span>more films →</span></span></span>
+        <span class="onbpane p2"><span class="onbfrom">Top</span><span class="onbwinheads" style="grid-template-columns:repeat(${windows.length},1fr)">${heads}</span></span>
       </span></span>
     </div>`;
 }
 function oasHeadHTML(){
   return oasStep===1
-    ? `<b>How keen are you on each style?</b><span>Tap where you'd start watching. Further left, more films; further right, only the best. ⊘ means never.</span>`
+    ? `<b>How keen are you on each genre?</b><span>Tap where you'd start watching. Further left, only the best; further right, more films. ⊘ means never.</span>`
     : `<b>Which should tell you when they arrive?</b><span>Pick the windows you want a heads-up for. Everything else just appears in Watch.</span>`;
 }
 // CAS-1347 points 1-2-6: this screen's own step label (replacing STEP n OF 2), a Back button on step 1
@@ -20965,13 +21033,13 @@ function oasRender(){
   const el=$("oneAgentSetupBody"); if(!el) return;
   el.innerHTML = oasBodyHTML();
 }
-window.oasPickBar=(style, val)=>{
+window.oasPickBar=(style, pct)=>{
   if(!oasState) return;
-  oasState.styles[style] = {bar:val, never:false};
-  // The existing rule: 60-or-below switches Cinema on, unless this style's alerts have already been
-  // touched (by hand, or carried over from a real agent via oasPrefillFromAgent) — never overwrite that.
-  // CAS-1347 point 5: only applies at all if Cinema was picked on screen 2.
-  if(val<=60 && !oasState.touched[style] && oafActiveWindows().some(w=>w.key==="cinema")){
+  oasState.styles[style] = {bar: oneBarForTopPct(style, pct), pct, never:false};
+  // CAS-1351: picking 80% or All means "I want more of this genre" (the "keen" rule), unless this style's
+  // alerts have already been touched (by hand, or carried over from a real agent via oasPrefillFromAgent) —
+  // never overwrite that. CAS-1347 point 5: only applies at all if Cinema was picked on screen 2.
+  if(pct>=80 && !oasState.touched[style] && oafActiveWindows().some(w=>w.key==="cinema")){
     const al=oasState.alerts[style] || (oasState.alerts[style]={cinema:false,rent:false,stream:false});
     al.cinema=true;
   }
@@ -20981,8 +21049,8 @@ window.oasToggleNever=(style)=>{
   if(!oasState) return;
   const st=oasState.styles[style];
   oasState.styles[style] = st.never
-    ? {bar: ONE_AGENT_SETUP_DEFAULT_BAR, never:false}
-    : {bar:null, never:true};
+    ? {bar: oasDefaultBarFor(style), pct: ONE_AGENT_SETUP_DEFAULT_SHARE, never:false}
+    : {bar:null, pct:null, never:true};
   oasRender();
 };
 window.oasToggleAlert=(style, win)=>{
@@ -21188,7 +21256,7 @@ function oafDoneHTML(){
   const n = Object.values(oasState.styles).filter(st=>!st.never).length;
   const draft = oneAgentBuildDraft();
   return `<h2 class="osh">Your agent is set to work.</h2>
-    <p class="obintrotext">It's watching <b>${n} style${n===1?"":"s"}</b> across the whole catalogue, every day.</p>
+    <p class="obintrotext">It's watching <b>${n} genre${n===1?"":"s"}</b> across the whole catalogue, every day.</p>
     <div class="svcsec"><div class="svcsech">It will tell you when these arrive</div>${oafAlertRowsHTML()}</div>
     <div class="svcsec"><div class="svcsech">Your moods in Watch</div>
       <div class="chips">${draft.moods.map(m=>`<span class="chip gen on">${esc(m.name)}</span>`).join("")}</div></div>`;
