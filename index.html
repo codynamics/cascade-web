@@ -19988,8 +19988,9 @@ function renderOneAgentScreen(c){
   const order=oaOrder(c);
   const n=tasteProfile().n;
   const rows=order.map(style=>oaRowHTML(c, style, counts[style]||0)).join("");
+  const title = (c.name||"").trim() || "Your agent";   // CAS-1352: unnamed agents keep the generic title
   $("agentsBody").innerHTML=`
-    <div class="agshdr"><h2 class="osh">Your agent</h2></div>
+    <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">${n} verdict${n===1?"":"s"} learned<button type="button" class="oaspreview" onclick="oasOpenPreview()">Preview setup ›</button></p>
     <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
@@ -21001,8 +21002,8 @@ function oasHeaderHTML(){
 }
 function oasHeadHTML(){
   return oasStep===1
-    ? `<b>How keen are you on each genre?</b><span>Tap where you'd start watching. Further left, only the best; further right, more films. ⊘ means never.</span>`
-    : `<b>Which should tell you when they arrive?</b><span>Pick the windows you want a heads-up for. Everything else just appears in Watch.</span>`;
+    ? `<b>Your favourite genres?</b><span>Adjust the genre settings below. Turn off genres you don't like with the ⊘ button. If you really love a genre, select a higher share of the catalogue.</span>`
+    : `<b>Set alerts for your favourite genres.</b><span>Some genres may be a must-watch at the cinema or on rental. You can also set alerts for individual movies.</span>`;
 }
 // CAS-1347 points 1-2-6: this screen's own step label (replacing STEP n OF 2), a Back button on step 1
 // (going to screen 3, or screen 2 if screen 3 was skipped — there is no Cancel, by design, so this is the
@@ -21017,7 +21018,7 @@ function oasTopHTML(){
        <button type="button" class="onbbtn primary" onclick="oafGoFromAlerts()">Next ›</button>`;
   return `<div class="stepprog" style="position:sticky;top:-1px;z-index:4"><i style="width:${pct}%"></i></div>
     <div class="onbtop" style="top:3px">
-      <span class="oassteplbl">${oasStep===1 ? "Your agent · scores" : "Your agent · alerts"}</span>
+      <span class="oassteplbl">${oasStep===1 ? "Your agent · genres" : "Your agent · alerts"}</span>
       <span class="onbtopbtns">${right}</span>
     </div>`;
 }
@@ -21101,7 +21102,8 @@ function oneAgentBuildDraft(){
   const isStyleOn = style => { const st=oasState.styles[style]; return !!(st && !st.never); };
   const who = {partner: oafState.who.has("partner"), kids: oafState.who.has("kids")};
   const moods = oneAgentStarterMoods(isStyleOn, who);
-  return {styles, moods};
+  const name = (oafState.name||"").trim();
+  return {styles, moods, name};
 }
 // ---- The one atomic account change (the ticket's own numbered steps 1-5), now fed by the draft above -------
 function oneAgentCommit(draft){
@@ -21114,7 +21116,8 @@ function oneAgentCommit(draft){
   // reads as "adjusted since you last looked" on day one (CAS-1340's own oaComboStats comparison).
   const seenAdj={};
   MOVIES.forEach(m=>{ mainOtherCombos(m).keys.forEach(({key})=>{ if(!(key in seenAdj)) seenAdj[key]=oneComboAdj(key); }); });
-  const agent={id:cascadeNewId(), name:"My agent", v:2, styles:draft.styles, combo:{}, seenAdj, seenAdjAt:{}, dismissed:[]};
+  // CAS-1352: the agent's name is now whatever "Name your agent" collected, not a hard-coded default.
+  const agent={id:cascadeNewId(), name:draft.name||"My agent", v:2, styles:draft.styles, combo:{}, seenAdj, seenAdjAt:{}, dismissed:[]};
   cascades.push(agent);
   saveCascades();
   setActive(agent.id);
@@ -21146,7 +21149,7 @@ function oafHasServicesStep(){ return oafState.where.has("rent") || oafState.whe
 function oafCountedKeys(){
   const keys=["welcome","where"];
   if(oafHasServicesStep()) keys.push("services");
-  keys.push("scores","alerts","who","done");
+  keys.push("genresintro","scores","alerts","who","nameAgent","done");
   return keys;
 }
 function oafProgressPct(key){
@@ -21171,12 +21174,12 @@ function oafWireMultiOpt(containerId, set){
 }
 function oafWelcomeHTML(){
   return `<h2 class="osh">Let's get you set up.</h2>
-    <p class="obintrotext">Your Cascade agent hunts thousands of new and catalogue movies for you, and tells you when the ones you'd want arrive.</p>
+    <p class="obintrotext">Your Cascade agent hunts thousands of new and catalogue movies for you.</p>
     <p class="obintrotext">A few quick questions and it goes to work.</p>`;
 }
 function oafWhereHTML(){
   return `<h2 class="osh">Where do you watch movies?</h2>
-    <p class="ossub">Pick all that apply. Your agent only tells you about films where you watch them.</p>
+    <p class="ossub">Pick all that apply. Your agent only tells you about films at selected stages.</p>
     <div class="obopts" id="oafWhereOpts">${oafOptHTML(ONE_AGENT_FLOW_WHERE, oafState.where)}</div>`;
 }
 // Same lists, primary-first ordering, "+ n more" and prefs.store/prefs.sub writes as v2_services — see
@@ -21185,7 +21188,7 @@ function oafServicesHTML(){
   const showRent = oafState.where.has("rent");
   const showStream = oafState.where.has("stream");
   return `<h2 class="osh">Which services do you have?</h2>
-    <p class="ossub">Your agent only offers you what you can actually press play on.</p>
+    <p class="ossub">Your agent only offers movies that are available on your services.</p>
     ${showRent ? `<div class="svcsec"><div class="svcsech">My Rental Services</div><div class="chips" id="oafSvcStores"></div></div>` : ""}
     ${showStream ? `<div class="svcsec"><div class="svcsech">My Streaming Services</div><div class="chips" id="oafSvcSubs"></div></div>` : ""}`;
 }
@@ -21231,8 +21234,58 @@ function oafWireServices(){
 }
 function oafWhoHTML(){
   return `<h2 class="osh">Who do you watch with?</h2>
-    <p class="ossub">Pick all that apply. Each one gets its own mood in Watch: a ready-made list you can open any time.</p>
+    <p class="ossub">Pick all that apply. Each one gets its own mood in Cascade: a ready-made list you can open any time.</p>
     <div class="obopts" id="oafWhoOpts">${oafOptHTML(ONE_AGENT_FLOW_WHO, oafState.who)}</div>`;
+}
+// New screen (CAS-1352): the explainer between services and the genre-score picker — same frame as welcome
+// (.sharpstep + header + Continue), no wiring of its own. Continue enters #oneAgentSetupScreen (oafEnterSetup);
+// that screen's own '‹ Back' (oafBackFromSetup) returns here.
+function oafGenresIntroHTML(){
+  return `<h2 class="osh">Genres and scores</h2>
+    <p class="obintrotext">Cascade uses a dynamic score for each movie, built from public and critics' ratings.</p>
+    <p class="obintrotext">On the next screen you'll choose which movie genres you don't like, and which you like the most. This sets the minimum score a movie needs to be offered to you.</p>
+    <p class="obintrotext">Once you start rating movies you've watched, your agent will suggest adjustments. It even analyses your sub-genre preferences: you might love Action Thrillers, but not Action Comedies.</p>
+    <p class="obintrotext">The more you use Cascade, the more your agent tunes in to you, so it offers the movies you'd most want to watch.</p>`;
+}
+// New screen (CAS-1352): between who and done. Continue stays disabled until a trimmed name exists (oafBlocked).
+// Typing and chip-picking both write oafState.name directly and patch just the CTA/chip DOM (deleteAcctGate's
+// pattern) rather than a full oafPaint() repaint, so the input never loses focus/cursor mid-keystroke.
+const ONE_AGENT_NAME_CHIPS = ["Archie","Rocco","Felix","Ruby","Luna","Coco"];
+const ONE_AGENT_NAME_MAXLEN = 24;
+function oafNameAgentHTML(){
+  const name = oafState.name || "";
+  return `<h2 class="osh">Name your agent</h2>
+    <p class="ossub">Type a name, or pick one.</p>
+    <input type="text" class="osfield" id="oafNameInput" placeholder="Type a name" maxlength="${ONE_AGENT_NAME_MAXLEN}"
+           autocomplete="off" value="${escA(name)}" aria-label="Name your agent">
+    <div class="chips" id="oafNameChips">${ONE_AGENT_NAME_CHIPS.map(n=>
+      `<button type="button" class="chip${name===n?" on":""}" data-name="${escA(n)}">${esc(n)}</button>`).join("")}</div>`;
+}
+function oafNameAgentSyncChips(name){
+  const chips=$("oafNameChips"); if(!chips) return;
+  chips.querySelectorAll(".chip[data-name]").forEach(c=>c.classList.toggle("on", c.dataset.name===name));
+}
+function oafNameAgentSyncCta(){
+  const cta=$("oafCta"); if(!cta) return;
+  const blocked=oafBlocked();
+  cta.disabled=blocked;
+  cta.classList.toggle("blocked", blocked);
+}
+function oafWireNameAgent(){
+  const input=$("oafNameInput"); if(!input) return;
+  input.oninput=()=>{
+    oafState.name=input.value;
+    oafNameAgentSyncChips(input.value.trim());
+    oafNameAgentSyncCta();
+  };
+  $("oafNameChips").querySelectorAll(".chip[data-name]").forEach(c=>{
+    c.onclick=()=>{
+      oafState.name=c.dataset.name;
+      input.value=c.dataset.name;
+      oafNameAgentSyncChips(c.dataset.name);
+      oafNameAgentSyncCta();
+    };
+  });
 }
 // "It will tell you when these arrive" — one row per active window carrying any on alert, in ONE_AGENT_WINDOWS
 // order; never-styles are excluded (they carry no entry in the eventual draft either — see oneAgentBuildDraft).
@@ -21255,21 +21308,24 @@ function oafAlertRowsHTML(){
 function oafDoneHTML(){
   const n = Object.values(oasState.styles).filter(st=>!st.never).length;
   const draft = oneAgentBuildDraft();
-  return `<h2 class="osh">Your agent is set to work.</h2>
+  return `<h2 class="osh">Your agent is set up.</h2>
+    <p class="ossub">Name: ${esc(draft.name)}</p>
     <p class="obintrotext">It's watching <b>${n} genre${n===1?"":"s"}</b> across the whole catalogue, every day.</p>
-    <div class="svcsec"><div class="svcsech">It will tell you when these arrive</div>${oafAlertRowsHTML()}</div>
-    <div class="svcsec"><div class="svcsech">Your moods in Watch</div>
+    <div class="svcsec"><div class="svcsech">Alerts have been set up for</div>${oafAlertRowsHTML()}</div>
+    <div class="svcsec"><div class="svcsech">Your mood lists created</div>
       <div class="chips">${draft.moods.map(m=>`<span class="chip gen on">${esc(m.name)}</span>`).join("")}</div></div>`;
 }
 function oafBlocked(){
   if(oafStep==="where") return oafState.where.size===0;
   if(oafStep==="who") return oafState.who.size===0;
+  if(oafStep==="nameAgent") return !(oafState.name||"").trim();
   return false;
 }
 // Paints the current step into #oafInner plus the shared header/footer chrome — never touches scroll
 // position, so a chip toggle's own repaint (oafWireMultiOpt) doesn't jump the screen back to the top.
 function oafPaint(){
-  const fns = {welcome:oafWelcomeHTML, where:oafWhereHTML, services:oafServicesHTML, who:oafWhoHTML, done:oafDoneHTML};
+  const fns = {welcome:oafWelcomeHTML, where:oafWhereHTML, services:oafServicesHTML, genresintro:oafGenresIntroHTML,
+    who:oafWhoHTML, nameAgent:oafNameAgentHTML, done:oafDoneHTML};
   const inner=$("oafInner"); if(!inner) return;
   inner.innerHTML = fns[oafStep]();
   $("oafBack").hidden = oafStep==="welcome";
@@ -21283,6 +21339,7 @@ function oafPaint(){
   if(oafStep==="where") oafWireMultiOpt("oafWhereOpts", oafState.where);
   else if(oafStep==="who") oafWireMultiOpt("oafWhoOpts", oafState.who);
   else if(oafStep==="services") oafWireServices();
+  else if(oafStep==="nameAgent") oafWireNameAgent();
 }
 function oafShow(key){
   oafStep=key;
@@ -21292,15 +21349,19 @@ function oafShow(key){
 window.oafGoContinue=()=>{
   if(oafBlocked()) return;
   if(oafStep==="welcome") return oafShow("where");
-  if(oafStep==="where") return oafHasServicesStep() ? oafShow("services") : oafEnterSetup();
-  if(oafStep==="services") return oafEnterSetup();
-  if(oafStep==="who") return oafShow("done");   // CAS-1350: Continue on Who did nothing
+  if(oafStep==="where") return oafShow(oafHasServicesStep() ? "services" : "genresintro");
+  if(oafStep==="services") return oafShow("genresintro");
+  if(oafStep==="genresintro") return oafEnterSetup();
+  if(oafStep==="who") return oafShow("nameAgent");   // CAS-1350: Continue on Who did nothing
+  if(oafStep==="nameAgent") return oafShow("done");
 };
 window.oafGoBack=()=>{
   if(oafStep==="where") return oafShow("welcome");
   if(oafStep==="services") return oafShow("where");
+  if(oafStep==="genresintro") return oafShow(oafHasServicesStep() ? "services" : "where");
   if(oafStep==="who") return oafReenterSetupStep2();
-  if(oafStep==="done") return oafShow("who");
+  if(oafStep==="nameAgent") return oafShow("who");
+  if(oafStep==="done") return oafShow("nameAgent");
 };
 // Hands off from #oafScreen to #oneAgentSetupScreen (4a) — oasState is only (re)initialised the first time;
 // going back to screen 3/2 and forward again re-enters on whatever the draft already holds.
@@ -21313,12 +21374,13 @@ function oafEnterSetup(){
   $("oneAgentSetupScreen").scrollTop=0;
   $("oneAgentSetupScreen").classList.add("open");
 }
-// CAS-1347 point 2: 4a's own Back — to screen 3 if it was shown, else screen 2.
+// CAS-1347 point 2 / CAS-1352: 4a's own Back — to the Genres and scores explainer, which now always sits
+// directly before this screen.
 window.oafBackFromSetup=()=>{
   $("oneAgentSetupScreen").classList.remove("open");
   $("oafScreen").classList.add("open");   // CAS-1350: oafEnterSetup removed it; the step below paints into #oafScreen
   $("oafHdr").hidden=false; $("oafNav").hidden=false;
-  oafShow(oafHasServicesStep() ? "services" : "where");
+  oafShow("genresintro");
 };
 // CAS-1347 point 3: 4b's "Next ›" — on to screen 5. oasState/oasStep are left exactly as they are, so
 // oafReenterSetupStep2 (screen 5's own Back) returns to the same pane.
@@ -21340,7 +21402,9 @@ function oafReenterSetupStep2(){
 // (pre-filled from the current agent, oasPrefillFromAgent unchanged — see oasOpenPreview below).
 window.oafOpen=(opts)=>{
   opts=opts||{};
-  oafState = {where:new Set(), who:new Set(), prefillAgent: opts.prefillAgent || null};
+  // CAS-1352: a re-run from "Preview setup ›" pre-fills Name your agent from the current agent's own name.
+  oafState = {where:new Set(), who:new Set(), name: (opts.prefillAgent && opts.prefillAgent.name) || "",
+    prefillAgent: opts.prefillAgent || null};
   oasState = null;
   oafStep="welcome";
   $("oafHdr").hidden=false; $("oafNav").hidden=false;
@@ -23313,18 +23377,21 @@ function v2OpenFirstOnStyle(){
   oaShowAllAdj=false; oaComboFilmsOpen.clear(); oaSuggestionOpen=false;
   renderAgentsScreen();
 }
-// Lee approved 31 Oct 2026. Steps 7-16 (0-based 6-15) drive the same tour card tutCaptureCard/tutExpandCard
-// already use for the non-v2 script above. Step 7's invite button needs a signed-in account (inviteFilmHTML
-// renders nothing signed out) and is the one step this script ever skips — see v2InviteSkipped below.
+// Lee's revisions of 1 Nov 2026 (CAS-1353), on top of the 31 Oct script (CAS-1349). Steps 8-17 (0-based
+// 7-16) drive the same tour card tutCaptureCard/tutExpandCard already use for the non-v2 script above.
+// Step 8's invite button needs a signed-in account (inviteFilmHTML renders nothing signed out) and is the
+// one step this script ever skips — see v2InviteSkipped/V2_INVITE_STEP_IDX below.
 const V2_TOUR_STEPS = [
   {html:v2CardHTML("You're all set. Here's a one-minute tour of how Cascade works."), center:true},
   {html:v2CardHTML("Cascade has four places. Here's what each one does."), sel:[".hdr-actions"]},
   {html:v2CardHTML("Watch: every film your agent has found for you."), sel:["#moviesBtn"]},
-  {html:v2CardHTML("Moods are filtered collections of movies. A number have been created for you, which you can change, and you can create your own. ¶ Releases is special: it gives you every movie release, upcoming, current and recent. ¶ Tap a mood to change it, or + Mood to make your own."),
+  {html:v2CardHTML("Moods are filtered collections of movies. A number have been created for you, which you can change, and you can create your own. ¶ Releases is special: it gives you every movie release, upcoming, current and recent. Starred holds every movie you star. ¶ Tap a mood to change it, or + Mood to make your own."),
     sel:[".moodrow"]},
   {html:v2CardHTML("Each mood lets you see its movies by viewing status."), sel:[".stgroups"]},
   {html:v2CardHTML("This is a film card. Tap it to expand and see details such as director, cast and awards, and to watch trailers."),
     before(){ setWatchMood("releases"); showAgentsHome(); v2CaptureCard(); }, wholeCard:true},
+  {html:v2CardHTML("Tap ☆ to star a movie. Starred movies go into your Starred mood, so you can find them again."),
+    scope:"card", sel:[".starbtn"]},
   {html:v2CardHTML("Watching with someone? Invite a friend to watch this. They get a link with the film and a simple Yes / No, no app needed, so you can see who's in."),
     before(){ tutExpandCard(true); }, after(){ tutExpandCard(false); }, scope:"card", sel:[".exsharebtn"]},
   {html:v2CardHTML("The Cascade score is built from public and critics' opinion. Once you start telling Cascade which movies you like, scores are adjusted up or down to give you much more personal recommendations. Above a dotted outline: raised for you. Below: lowered."),
@@ -23333,27 +23400,27 @@ const V2_TOUR_STEPS = [
     scope:"card", sel:[".ctl.notify"]},
   {html:v2CardHTML("Add to mood: put any film in a mood by hand, or take it out."), scope:"card", sel:[".ctl.oamlist"]},
   {html:v2CardHTML("Seen it? Say what you thought. Every verdict teaches your agent your taste."), scope:"card", sel:[".ctl.watch"]},
-  {html:v2CardHTML("Alerts: films arriving where you watch, in the styles you asked to hear about, plus anything you added by hand. We email them to you too."),
+  {html:v2CardHTML("Alerts: films arriving where you watch, in the genres you asked to hear about, plus anything you added by hand. We email them to you too."),
     before(){ closeSettings(); openMovingScreen(); }, after(){ showAgentsHome(); }, sel:["#movingBtn"]},
   {html:v2CardHTML("Find any film in Cascade, whether your agent picked it or not."),
     before(){ closeSettings(); openFindScreen(); }, after(){ showAgentsHome(); }, sel:["#findSearchInput"]},
-  {html:v2CardHTML("Your agent. Each style has a minimum score, and the bells show which availability statuses alert you. Tap a style to change it."),
+  {html:v2CardHTML("Your agent. Each genre shows how much of the catalogue you want, and the bells show which availability statuses alert you. Tap a genre to change it."),
     before(){ closeSettings(); oaOpenStyle=null; oaOrderSnapshot=null; openAgentsScreen(); },
     after(){ oaOpenStyle=null; oaOrderSnapshot=null; showAgentsHome(); }, sel:["#oaList .oarow"]},
-  {html:v2CardHTML("Most movies have a main style, listed first, and other styles after it: a Sci-fi that is also a Thriller, a Comedy that is also a Romance. ¶ Your Cascade agent studies those combinations in what you watch and rate, and works out which ones you're most and least likely to enjoy."),
+  {html:v2CardHTML("Most movies have a main genre, listed first, and sub-genres after it: a Sci-fi that is also a Thriller, a Comedy that is also a Romance. ¶ Your Cascade agent studies those combinations in what you watch and rate, and works out which ones you're most and least likely to enjoy."),
     center:true},
-  {html:v2CardHTML("So your agent tracks each main style together with the styles that come with it. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here, and you can override any of them."),
+  {html:v2CardHTML("So your agent tracks each genre together with its sub-genres. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here, and you can override any of them."),
     before(){ v2OpenFirstOnStyle(); }, sel:["#oaAdjustSection"]},
   {html:v2CardHTML("That's it. Your agent checks the whole catalogue every day and reports at 5pm."),
     before(){ oaOpenStyle=null; oaOrderSnapshot=null; closeSettings(); showAgentsHome(); }, center:true},
 ];
 let tutSteps=TOUR_STEPS, tutV2Active=false, tutIdx=-1, tutCurrent=null;
-// Set once, when the v2 tour starts (startTutorialV2) — the invite step (index 6) is the only step this
-// script ever skips, so "n of N" never counts it once it's known to be unreachable, instead of the raw
-// index silently jumping 6 of 17 -> 8 of 17 the way a non-v2 skip would (CAS-1349 AC: "n of N must not
-// count it").
+// Set once, when the v2 tour starts (startTutorialV2) — the invite step (index 7, CAS-1353's new star
+// step at index 6 shifted it from CAS-1349's index 6) is the only step this script ever skips, so "n of N"
+// never counts it once it's known to be unreachable, instead of the raw index silently jumping forward the
+// way a non-v2 skip would (CAS-1349 AC: "n of N must not count it").
 let v2InviteSkipped=false;
-const V2_INVITE_STEP_IDX=6;
+const V2_INVITE_STEP_IDX=7;
 function tutDisplayN(){
   if(!tutV2Active || !v2InviteSkipped || tutIdx<=V2_INVITE_STEP_IDX) return tutIdx+1;
   return tutIdx;
