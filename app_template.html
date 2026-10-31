@@ -21226,6 +21226,7 @@ window.oafGoContinue=()=>{
   if(oafStep==="welcome") return oafShow("where");
   if(oafStep==="where") return oafHasServicesStep() ? oafShow("services") : oafEnterSetup();
   if(oafStep==="services") return oafEnterSetup();
+  if(oafStep==="who") return oafShow("done");   // CAS-1350: Continue on Who did nothing
 };
 window.oafGoBack=()=>{
   if(oafStep==="where") return oafShow("welcome");
@@ -21247,6 +21248,7 @@ function oafEnterSetup(){
 // CAS-1347 point 2: 4a's own Back — to screen 3 if it was shown, else screen 2.
 window.oafBackFromSetup=()=>{
   $("oneAgentSetupScreen").classList.remove("open");
+  $("oafScreen").classList.add("open");   // CAS-1350: oafEnterSetup removed it; the step below paints into #oafScreen
   $("oafHdr").hidden=false; $("oafNav").hidden=false;
   oafShow(oafHasServicesStep() ? "services" : "where");
 };
@@ -21254,6 +21256,7 @@ window.oafBackFromSetup=()=>{
 // oafReenterSetupStep2 (screen 5's own Back) returns to the same pane.
 window.oafGoFromAlerts=()=>{
   $("oneAgentSetupScreen").classList.remove("open");
+  $("oafScreen").classList.add("open");   // CAS-1350: oafEnterSetup/oafReenterSetupStep2 removed it
   $("oafHdr").hidden=false; $("oafNav").hidden=false;
   oafShow("who");
 };
