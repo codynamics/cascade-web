@@ -1,15 +1,15 @@
 {
-  "date": "2026-10-29",
+  "date": "2026-10-30",
   "tmdb": {
-    "calls": 6909,
+    "calls": 6912,
     "errors": 0,
     "not_found": 0,
     "status_counts": {}
   },
   "watchmode": {
     "quota": 2500,
-    "quota_used": 1206,
-    "remaining_monthly_credits": 1294,
+    "quota_used": 1278,
+    "remaining_monthly_credits": 1222,
     "calls": 72,
     "errors": 0,
     "mismatch": 0,
