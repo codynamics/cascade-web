@@ -820,6 +820,10 @@ if(typeof window.CascadeAuth === "undefined"){
   attributionHTML, commitDraft, watchNavKey,
   get draft(){ return draft; },
   setDraft(d){ draft = d; },
+  // CAS-1363: oamMoodBarFor is the v2 mood sheet's own reinstated "mood limit" rule (whichever of the
+  // agent's own bar and the mood's topShare-derived bar is stricter) — exported so a test can assert it
+  // directly against a fixture criteria/mood pair, the same convention oaBar/oneBarForTopPct above use.
+  oamMoodBarFor,
 };
 `;
 
