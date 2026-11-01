@@ -308,6 +308,23 @@ def canon_age_rating(cert):
     return AGE_RATING_CANON.get(cert, cert)
 
 
+def _build_videos(vids: list) -> list:
+    """CAS-1359: up to 6 YouTube Trailers/Teasers from a TMDB videos.results list, ordered
+    official Trailers newest first, then other Trailers, then official Teasers, then other
+    Teasers."""
+    candidates = [v for v in vids
+                  if v.get("site") == "YouTube" and v.get("type") in ("Trailer", "Teaser") and v.get("key")]
+
+    # stable sort: newest-first within each group, then group by (type, official) — Trailer
+    # before Teaser, official before non-official.
+    by_date = sorted(candidates, key=lambda v: v.get("published_at") or "", reverse=True)
+    ordered = sorted(by_date, key=lambda v: (0 if v["type"] == "Trailer" else 1,
+                                              0 if v.get("official") else 1))
+    return [{"key": v["key"], "name": v.get("name") or "", "type": v["type"],
+             "official": bool(v.get("official")), "published": (v.get("published_at") or "")[:10]}
+            for v in ordered[:6]]
+
+
 def _tmdb_record(detail: dict) -> dict:
     """Map one TMDB detail payload to our skeleton record."""
     cinema_date, age_rating = None, None
@@ -328,9 +345,8 @@ def _tmdb_record(detail: dict) -> dict:
                     age_rating = canon_age_rating(cert)
     lang = detail.get("original_language")
     countries = [c["iso_3166_1"] for c in detail.get("production_countries", [])]
-    vids = (detail.get("videos") or {}).get("results", [])
-    trailers = [v["key"] for v in vids
-                if v.get("site") == "YouTube" and v.get("type") in ("Trailer", "Teaser") and v.get("key")][:4]
+    videos = _build_videos((detail.get("videos") or {}).get("results", []))
+    trailers = [v["key"] for v in videos][:4]
     credits = detail.get("credits") or {}
     directors = [c["name"] for c in credits.get("crew", []) if c.get("job") == "Director"]
     cast = [c["name"] for c in sorted(credits.get("cast", []),
@@ -356,6 +372,7 @@ def _tmdb_record(detail: dict) -> dict:
         "culture": _culture(lang, countries),
         "poster": detail.get("poster_path"),
         "trailers": trailers,
+        "videos": videos,
         "director": ", ".join(directors[:2]) or None,
         "cast": cast,
     }
