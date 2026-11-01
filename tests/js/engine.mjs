@@ -824,6 +824,12 @@ if(typeof window.CascadeAuth === "undefined"){
   // agent's own bar and the mood's topShare-derived bar is stricter) — exported so a test can assert it
   // directly against a fixture criteria/mood pair, the same convention oaBar/oneBarForTopPct above use.
   oamMoodBarFor,
+  // CAS-1364: oamFilmMeetsMoodRules/filmInOneAgentMood are mood membership's own RULES/full-membership
+  // layers (filmInOneAgentMood wraps oamFilmMeetsMoodRules with the hand add/take-out override) — exported
+  // so a test can assert the mood's own watched:true|false switch against a fixture film/mood/criteria
+  // triple directly, the same convention oamMoodBarFor above uses. oamMoodDefaultFields is the blank mood
+  // shape (handOnly/watched/etc.) a fixture mood is built from.
+  oamFilmMeetsMoodRules, filmInOneAgentMood, oamMoodDefaultFields,
 };
 `;
 
