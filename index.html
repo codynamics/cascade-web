@@ -20578,7 +20578,7 @@ const ONE_AGENT_MOOD_BUILTINS=[
   {id:"family", name:"Family", styles:["Family","Animation","Adventure","Comedy"], ages:["G","PG"], show:"20"},
 ];
 function oamMoodDefaultFields(){
-  return {v2:true, handOnly:false, styles:[], topShare:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[]};
+  return {v2:true, handOnly:false, watched:false, styles:[], topShare:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[]};
 }
 function oamMoodDefaultsNow(){ return ONE_AGENT_MOOD_BUILTINS.map(b=>({...oamMoodDefaultFields(), ...b})); }
 // The account's own saved v2 moods — falls back (in memory only, never written: CAS-1218/1243) to the two
@@ -20616,8 +20616,12 @@ function oamFilmMatchesAwards(m, awards){
 }
 // The RULES half of membership — admission, style, score, ages, awards, how-far-back. Hand add/take-out
 // (filmInOneAgentMood, below) always wins over this.
+// CAS-1364: a mood with watched:true judges a watched film as if it were unwatched — the admission check
+// alone gets excludeWatched:false, scoped to this one call so the agent's own criteria (and so alerts,
+// which never go through here) are never touched.
 function oamFilmMeetsMoodRules(m, mood, c){
-  if(!matchesCriteriaOneAgent(m, c, false)) return false;
+  const admitC = mood.watched ? {...c, excludeWatched:false} : c;
+  if(!matchesCriteriaOneAgent(m, admitC, false)) return false;
   const {main}=mainOtherCombos(m);
   if(main===undefined) return false;
   if(!oamMoodStyles(mood, c).includes(main)) return false;
@@ -20708,6 +20712,7 @@ function oamMoodDraftFrom(mood){
     editingId: mood ? mood.id : null,
     name: mood ? moodDisplayName(mood) : "",
     handOnly: mood ? !!mood.handOnly : false,
+    watched: mood ? !!mood.watched : false,
     stylesAll: mood ? !(mood.styles && mood.styles.length) : true,
     styles: new Set(mood && mood.styles ? mood.styles : []),
     bars: {},   // CAS-1358: draft agent-bar overrides from this sheet's own genre strips, by style; written
@@ -20757,6 +20762,7 @@ window.openOamMoodSheetForNew=()=>{
 };
 window.setOamDraftName=v=>{ if(oamDraft) oamDraft.name=v; };
 window.toggleOamDraftHandOnly=()=>{ if(!oamDraft) return; oamDraft.handOnly=!oamDraft.handOnly; renderOamMoodSheetBody(); };
+window.toggleOamDraftWatched=()=>{ if(!oamDraft) return; oamDraft.watched=!oamDraft.watched; renderOamMoodSheetBody(); };
 window.toggleOamDraftStyle=style=>{
   const d=oamDraft; if(!d) return;
   const c=oneAgentCriteria(); if(!c) return;
@@ -20943,6 +20949,10 @@ function renderOamMoodSheetBody(){
         <button type="button" class="mftog${d.handOnly?" on":""}" role="switch" aria-checked="${!!d.handOnly}"
           aria-label="Only films I add by hand" onclick="toggleOamDraftHandOnly()"><i></i></button>
       </div>
+      ${d.handOnly ? "" : `<div class="mfrow"><span>Include films I've watched</span>
+        <button type="button" class="mftog${d.watched?" on":""}" role="switch" aria-checked="${!!d.watched}"
+          aria-label="Include films I've watched" onclick="toggleOamDraftWatched()"><i></i></button>
+      </div>`}
     </div>
     ${d.handOnly ? "" : `
     <div class="wsheetsec">
@@ -21006,6 +21016,7 @@ window.oamSaveMoodFromSheet=()=>{
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
     name, v2:true,
     handOnly: !!d.handOnly,
+    watched: !!d.watched,
     styles: d.stylesAll ? [] : [...d.styles],
     topShare: d.topShare==null ? null : d.topShare,
     ages: [...d.ages],
@@ -21207,6 +21218,14 @@ function oamWilCase(m, c){
       buttons:[{label:"Undo Never", action:`oamWilUndoNever(${id})`}]};
   }
   if(watched.has(id)){
+    // CAS-1364: a mood whose own watched switch is off would otherwise show this film by its rules — offer
+    // the one-tap fix that flips that switch on, same shape as every other oamWil* case.
+    const wouldMood=oamMoodsListReal().find(mood=>!mood.watched && filmInOneAgentMood(m, {...mood, watched:true}, c));
+    if(wouldMood){
+      const name=esc(moodDisplayName(wouldMood));
+      return {sentence:notListed(`It would be in ${name}, but that mood doesn't include watched films.`),
+        buttons:[{label:`Include watched films in ${name}`, primary:true, action:`oamWilIncludeWatched(${id},'${escA(wouldMood.id)}')`}]};
+    }
     return {sentence:notListed("You've watched it."), buttons:[]};
   }
   const ps=primaryStatus(m);
@@ -21329,6 +21348,13 @@ window.oamWilWidenGenre=(id, style, score)=>{
   oamWilRepaint(id);
   const y=oneTopPct(style, score);
   toast(`${oneAgentShortName(style)} widened to Top ${y}% · score ${score}+`);
+};
+window.oamWilIncludeWatched=(id, moodId)=>{
+  const mood=oamMoodsListReal().find(x=>x.id===moodId);
+  oamMutateMood(moodId, mo=>{ mo.watched=true; });
+  if(typeof render==="function") render();
+  oamWilRepaint(id);
+  toast(mood ? `Watched films included in ${moodDisplayName(mood)}` : "Watched films included");
 };
 window.oamWilAddToMood=(id)=>{
   const btn=document.querySelector(`#findList .oamlist[data-lid="${id}"]`) || document.querySelector(`.oamlist[data-lid="${id}"]`);
