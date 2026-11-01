@@ -3391,6 +3391,23 @@
   .oamlistbtn{flex:0 0 auto;padding:6px 10px;font-size:11.5px;border-radius:8px}
   .ctl.oamlist.handmark .cmini{box-shadow:inset 0 0 0 1.5px var(--gold)}
 
+  /* ---- CAS-1357: "Where it lists" — joins the bottom of a Find result card/stub (v2 accounts). The row
+     above loses its own bottom margin/radius (.haswil) so this panel reads as one continuous shape with it,
+     set off only by its own panel2 fill and line border. ---- */
+  .card.haswil,.stub.haswil{border-radius:16px 16px 0 0;margin-bottom:0}
+  .wilpanel{background:var(--panel2);border:1px solid var(--line);border-radius:0 0 16px 16px;
+    margin:0 0 11px;padding:11px 13px 12px}
+  .wilhdr{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--faint);text-transform:uppercase}
+  .wilsentence{margin:5px 0 0;font-size:13px;color:var(--ink);line-height:1.5}
+  .wilnot{color:#f0a060;font-weight:700}
+  .willisted{color:var(--green);font-weight:700}
+  .wilbtns{display:flex;flex-direction:column;gap:6px;margin-top:9px}
+  .wilbtn{width:100%;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);
+    color:var(--ink);font-size:12.5px;font-weight:700;cursor:pointer}
+  .wilbtn.primary{border-color:var(--accent);background:var(--accent);color:#fff}
+  .wilbtn.wilsec{border:0;background:none;color:var(--dim);padding:5px 0}
+  .wilhighlight{box-shadow:0 0 0 2px var(--gold);transition:box-shadow .2s ease}
+
   /* ---- CAS-775: Occasions screen — same .ucard/.urow row language as Account, plus rename/delete
      affordances no other .urow row needs (an Occasion is a thing you can rename or remove yourself). ---- */
   .listact{flex:0 0 auto;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);
@@ -20807,6 +20824,186 @@ window.openOamListPanel=(id, btn)=>{
   btn.classList.add("open"); btn.setAttribute("aria-expanded","true");
   snapToWatchPanelAnchor();
 };
+
+// ---- CAS-1357: "Where it lists" — a panel under every Find result (v2 accounts) saying why a film is or
+// isn't listed, with one-tap fixes that write through the same paths the Agent screen itself uses. The case
+// order below mirrors matchesCriteriaOneAgent's own checks exactly (ticket's own instruction), with the
+// mood-membership check (which can override every one of them by hand) tried first, and the "agent lists it
+// but no mood includes it" / "no score yet" cases appended for what's left once every exclusion is cleared. ----
+const OAM_WIL_STATUS_LABEL = {
+  upcoming:"Upcoming", opening_week:"In Cinema", in_cinema:"In Cinema",
+  pvod:"Premium", rental:"Rental", included_streaming:"Streaming"
+};
+// Which Watch stop (setWatchStage's own key) a film's current status lands on — see watchStageStopsNow.
+function oamWilStageKeyFor(m){
+  const ps=primaryStatus(m);
+  if(ps==="upcoming") return "upcoming";
+  if(ps==="opening_week"||ps==="in_cinema") return "in_cinema";
+  if(ps==="pvod") return "premium";
+  if(ps==="rental") return "rent";
+  if(ps==="included_streaming") return "stream";
+  return null;
+}
+function oamWilCase(m, c){
+  const id=m.tmdb_id;
+  const moods=oamMoodsForFilm(id, c);
+  if(moods.length){
+    const names=moods.map(x=>`<b>${esc(moodDisplayName(x))}</b>`).join(", ");
+    const status=OAM_WIL_STATUS_LABEL[primaryStatus(m)];
+    return {sentence:`<span class="willisted">Listed in</span> ${names}${status?" &middot; "+esc(status):""}`,
+      buttons:[{label:"Show in Watch ›", primary:true, action:`oamWilShowInWatch(${id})`}]};
+  }
+  const notListed = sentence => `<span class="wilnot">Not listed.</span> ${sentence}`;
+  if(blocked.has(id)){
+    return {sentence:notListed("You chose Never for this film."),
+      buttons:[{label:"Undo Never", action:`oamWilUndoNever(${id})`}]};
+  }
+  if(watched.has(id)){
+    return {sentence:notListed("You've watched it."), buttons:[]};
+  }
+  const ps=primaryStatus(m);
+  if(c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)){
+    const offer=(m.offers||[]).find(o=>windowOf(o)===ps) || (m.offers||[])[0];
+    const svc = offer ? svcName(offer.service) : "";
+    const btns = offer ? [{label:`Add ${svc}`, primary:true,
+      action:`oamWilAddService(${id},'${escA(offer.service)}','${escA(offer.type)}')`}] : [];
+    return {sentence:notListed(svc ? `It's on ${esc(svc)}, which isn't one of your services.` : "It isn't on one of your services."),
+      buttons:btns};
+  }
+  const {main, keys} = mainOtherCombos(m);
+  if(main===undefined){
+    return {sentence:notListed("It has no score yet."),
+      buttons:[{label:"Add to a mood by hand", action:`oamWilAddToMood(${id})`}]};
+  }
+  const name=oneAgentShortName(main);
+  const style=(c.styles||{})[main];
+  if(!style || style.bar==null){
+    return {sentence:notListed(`${esc(name)} is set to never in your agent.`),
+      buttons:[{label:`Turn ${esc(name)} on`, primary:true, action:`oamWilTurnOnGenre(${id},'${escA(main)}')`}]};
+  }
+  const combo=c.combo||{};
+  const neverPair=keys.find(({key})=>combo[key]==="never");
+  if(neverPair){
+    return {sentence:notListed(`${esc(name)} with ${esc(oneAgentShortName(neverPair.other))} is set to never.`),
+      buttons:[{label:"Let the agent decide", action:`oamWilLetAgentDecide(${id},'${escA(neverPair.key)}')`}]};
+  }
+  const score=oneScoreFor(m,c);
+  if(score===-1){
+    return {sentence:notListed("It has no score yet."),
+      buttons:[{label:"Add to a mood by hand", action:`oamWilAddToMood(${id})`}]};
+  }
+  if(score<style.bar){
+    const x=oneTopPct(main, style.bar), y=oneTopPct(main, score);
+    return {sentence:notListed(`${esc(name)} lists Top ${x}% (score ${style.bar}+). This scores ${score}.`),
+      buttons:[
+        {label:`Widen ${esc(name)} to Top ${y}%`, primary:true, action:`oamWilWidenGenre(${id},'${escA(main)}',${score})`},
+        {label:"Add to a mood by hand", action:`oamWilAddToMood(${id})`}
+      ]};
+  }
+  // The agent admits it (every check above passed) but it isn't in any mood, by hand or by rule.
+  return {sentence:`Not in a mood. Your agent lists it, but none of your moods include ${esc(name)}.`,
+    buttons:[{label:"Add to a mood", action:`oamWilAddToMood(${id})`}]};
+}
+function oamWilButtonHTML(b){
+  return `<button type="button" class="wilbtn${b.primary?" primary":" wilsec"}" onclick="${b.action}">${esc(b.label)}</button>`;
+}
+function oamWhereItListsHTML(m, c){
+  const r=oamWilCase(m, c);
+  const btns=r.buttons.map(oamWilButtonHTML).join("");
+  return `<div class="wilpanel">
+    <div class="wilhdr">WHERE IT LISTS</div>
+    <p class="wilsentence">${r.sentence}</p>
+    ${btns?`<div class="wilbtns">${btns}</div>`:""}
+  </div>`;
+}
+// Inserts "haswil" as the row's own first class, so .card.haswil/.stub.haswil (CSS above) squares off its
+// bottom edge for the panel this ticket joins underneath it.
+function oamWilAddHasWil(html){ return html.replace('<div class="', '<div class="haswil '); }
+// Re-renders just one Find row (card/stub + its own panel) in place after a fix button writes through —
+// the ticket's own "re-render the result in place" — without touching the rest of the list.
+function oamWilRepaint(id){
+  const c=oneAgentCriteria(); if(!c) return;
+  const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
+  const row=rowFor(id); if(!row) return;
+  const wil=row.nextElementSibling;
+  const hasWil=!!(wil && wil.classList && wil.classList.contains("wilpanel"));
+  const t=document.createElement("template");
+  t.innerHTML=oamWilAddHasWil(showsStub(m)?stubHTML(m):cardHTML(m, isFresh(m))).trim();
+  observeLazyPosters(t.content);
+  const freshRow=t.content.firstElementChild;
+  row.replaceWith(freshRow);
+  const wilHtml=oamWhereItListsHTML(m, c);
+  if(hasWil) wil.outerHTML=wilHtml; else freshRow.insertAdjacentHTML("afterend", wilHtml);
+}
+window.oamWilUndoNever=(id)=>{
+  setOpinion(id, "notfor");   // already "notfor" — the toggle clears it, same as pressing a lit verdict anywhere else
+  oamWilRepaint(id);
+  toast("Never undone");
+};
+window.oamWilAddService=(id, service, type)=>{
+  const key=svcCanon(service);
+  const set=(type==="sub"||type==="free") ? prefs.sub : prefs.store;
+  const autoOn=!prefs.touched && !prefs.on && servicesPicked();   // same smart default onChipToggle applies
+  set.add(key);
+  if(autoOn) prefs.on=true;
+  savePrefs(); syncServiceChips();
+  const cols=["sub_services","store_services"]; if(autoOn) cols.push("services_only");
+  pushPrefsCols(cols);
+  if(typeof render==="function") render();
+  oamWilRepaint(id);
+  toast(`${svcName(key)} added to your services`);
+};
+window.oamWilTurnOnGenre=(id, style)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  c.styles=c.styles||{};
+  const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
+  st.bar=oneBarForTopPct(style, 60);
+  saveCascades();
+  if(typeof render==="function") render();
+  oamWilRepaint(id);
+  toast(`${oneAgentShortName(style)} turned on · Top 60%`);
+};
+window.oamWilLetAgentDecide=(id, key)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  if(c.combo) delete c.combo[key];
+  saveCascades();
+  if(typeof render==="function") render();
+  oamWilRepaint(id);
+  toast("Let the agent decide");
+};
+window.oamWilWidenGenre=(id, style, score)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  c.styles=c.styles||{};
+  const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
+  st.bar=score;
+  saveCascades();
+  if(typeof render==="function") render();
+  oamWilRepaint(id);
+  const y=oneTopPct(style, score);
+  toast(`${oneAgentShortName(style)} widened to Top ${y}% · score ${score}+`);
+};
+window.oamWilAddToMood=(id)=>{
+  const btn=document.querySelector(`#findList .oamlist[data-lid="${id}"]`) || document.querySelector(`.oamlist[data-lid="${id}"]`);
+  if(btn) openOamListPanel(id, btn);
+};
+// Closes Find, lands Watch on the film's first mood and its current status, then scrolls to and rings the
+// card — the ticket's own "Show in Watch ›" behaviour.
+window.oamWilShowInWatch=(id)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
+  const moods=oamMoodsForFilm(id, c); if(!moods.length) return;
+  closeFindScreen();
+  setWatchMood(moods[0].id);
+  const stage=oamWilStageKeyFor(m);
+  if(stage) setWatchStage(stage);
+  requestAnimationFrame(()=>{
+    const row=rowFor(id); if(!row) return;
+    row.scrollIntoView({block:"center", behavior: REDUCE_MOTION.matches ? "auto" : "smooth"});
+    row.classList.add("wilhighlight");
+    setTimeout(()=>row.classList.remove("wilhighlight"), 2000);
+  });
+};
+
 function oamMutateMood(moodId, fn){
   const list=oamMoodsListReal();
   const idx=list.findIndex(m=>m.id===moodId); if(idx<0) return;
@@ -21890,8 +22087,15 @@ function findRenderList(){
 function findRenderMore(){
   const listEl=$("findList"); if(!listEl || findShown>=findRowsCache.length) return;
   const end=Math.min(findRowsCache.length, findShown+FIND_BATCH);
+  // CAS-1357: a v2 account (oneAgentCriteria() non-null) gets a "Where it lists" panel joined under every
+  // row — non-v2 accounts are untouched (AC4).
+  const c=oneAgentCriteria();
   let buf="";
-  for(let i=findShown; i<end; i++){ const m=findRowsCache[i]; buf += showsStub(m) ? stubHTML(m) : cardHTML(m, isFresh(m)); }
+  for(let i=findShown; i<end; i++){
+    const m=findRowsCache[i];
+    const row=showsStub(m) ? stubHTML(m) : cardHTML(m, isFresh(m));
+    buf += c ? oamWilAddHasWil(row) + oamWhereItListsHTML(m, c) : row;
+  }
   listEl.insertAdjacentHTML("beforeend", buf);
   observeLazyPosters(listEl);
   findShown=end;
