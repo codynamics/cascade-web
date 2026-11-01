@@ -10,7 +10,7 @@
     "test:scheduler": "node --test cloudflare/scheduler/test/scheduler.test.mjs",
     "test:data": "python -m unittest discover -s tests",
     "test:monitor": "python -m unittest discover -s monitor/tests",
-    "test:e2e": "node scripts/test-e2e.mjs tests/e2e/smoke.spec.mjs",
+    "test:e2e": "node scripts/test-e2e.mjs tests/e2e/smoke.spec.mjs tests/e2e/CAS-1350.spec.mjs",
     "test:e2e:full": "node scripts/test-e2e.mjs",
     "test": "npm run test:engine && npm run test:e2e",
     "test:agents": "node tests/js/run-agent-suite.mjs",

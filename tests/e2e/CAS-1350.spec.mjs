@@ -5,6 +5,7 @@
 // is the entry point itself (neither the account's ?oneagent=setup URL param nor "Preview setup ›" gate it),
 // so this drives it directly in guest mode, exactly as CAS-1349's own first-run trigger does — every click from
 // there on is the real UI, per helpers.mjs's "anything a person does, the test clicks" rule.
+// CAS-1354: this spec now runs in CI as part of `npm run test:e2e` on every staging push.
 import { test, expect } from "@playwright/test";
 import { freshApp } from "./helpers.mjs";
 
