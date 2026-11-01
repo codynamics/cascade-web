@@ -820,9 +820,9 @@ if(typeof window.CascadeAuth === "undefined"){
   attributionHTML, commitDraft, watchNavKey,
   get draft(){ return draft; },
   setDraft(d){ draft = d; },
-  // CAS-1363: oamMoodBarFor is the v2 mood sheet's own reinstated "mood limit" rule (whichever of the
-  // agent's own bar and the mood's topShare-derived bar is stricter) — exported so a test can assert it
-  // directly against a fixture criteria/mood pair, the same convention oaBar/oneBarForTopPct above use.
+  // CAS-1365: oamMoodBarFor is the v2 mood sheet's own reinstated "mood minimum score" rule (the higher of
+  // the agent's own bar and the mood's minScore) — exported so a test can assert it directly against a
+  // fixture criteria/mood pair, the same convention oaBar above uses.
   oamMoodBarFor,
   // CAS-1364: oamFilmMeetsMoodRules/filmInOneAgentMood are mood membership's own RULES/full-membership
   // layers (filmInOneAgentMood wraps oamFilmMeetsMoodRules with the hand add/take-out override) — exported
