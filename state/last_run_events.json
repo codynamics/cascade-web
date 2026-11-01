@@ -1,95 +1,64 @@
 [
   {
-    "tmdb_id": 1294189,
-    "title": "The Mongoose",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-10-30"
-  },
-  {
-    "tmdb_id": 1294189,
-    "title": "The Mongoose",
+    "tmdb_id": 345887,
+    "title": "The Equalizer 2",
     "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-10-30"
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-31"
   },
   {
-    "tmdb_id": 1564614,
-    "title": "Leviticus",
+    "tmdb_id": 514847,
+    "title": "The Hunt",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-31"
+  },
+  {
+    "tmdb_id": 1284016,
+    "title": "Power Ballad",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
-      "HBO Max Amazon Channel"
+      "Stan"
     ],
-    "detected": "2026-10-30"
+    "detected": "2026-10-31"
   },
   {
-    "tmdb_id": 1564614,
-    "title": "Leviticus",
+    "tmdb_id": 1284016,
+    "title": "Power Ballad",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-10-30"
+    "detected": "2026-10-31"
   },
   {
-    "tmdb_id": 340611,
-    "title": "Indignation",
+    "tmdb_id": 1186532,
+    "title": "The Forge",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
-      "Amazon Prime Video",
-      "Amazon Prime Video with Ads"
+      "Netflix"
     ],
-    "detected": "2026-10-30"
+    "detected": "2026-10-31"
   },
   {
-    "tmdb_id": 340611,
-    "title": "Indignation",
+    "tmdb_id": 1186532,
+    "title": "The Forge",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-10-30"
+    "detected": "2026-10-31"
   },
   {
-    "tmdb_id": 468213,
-    "title": "Human Flow",
-    "kind": "arrived",
-    "new_window": "included_streaming",
+    "tmdb_id": 595680,
+    "title": "The Great Spirit",
+    "kind": "left",
+    "lost_window": "included_streaming",
     "label": "Included Streaming",
-    "services": [
-      "Amazon Prime Video",
-      "Amazon Prime Video with Ads"
-    ],
-    "detected": "2026-10-30"
-  },
-  {
-    "tmdb_id": 468213,
-    "title": "Human Flow",
-    "kind": "left",
-    "lost_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "detected": "2026-10-30"
-  },
-  {
-    "tmdb_id": 1532997,
-    "title": "Dead Howling",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-10-30"
-  },
-  {
-    "tmdb_id": 1532997,
-    "title": "Dead Howling",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-10-30"
+    "detected": "2026-10-31"
   }
 ]

@@ -22105,5 +22105,67 @@
     "lost_window": "upcoming",
     "label": "Upcoming",
     "detected": "2026-10-30"
+  },
+  {
+    "tmdb_id": 345887,
+    "title": "The Equalizer 2",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-31"
+  },
+  {
+    "tmdb_id": 514847,
+    "title": "The Hunt",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-31"
+  },
+  {
+    "tmdb_id": 1284016,
+    "title": "Power Ballad",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Stan"
+    ],
+    "detected": "2026-10-31"
+  },
+  {
+    "tmdb_id": 1284016,
+    "title": "Power Ballad",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-10-31"
+  },
+  {
+    "tmdb_id": 1186532,
+    "title": "The Forge",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Netflix"
+    ],
+    "detected": "2026-10-31"
+  },
+  {
+    "tmdb_id": 1186532,
+    "title": "The Forge",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-10-31"
+  },
+  {
+    "tmdb_id": 595680,
+    "title": "The Great Spirit",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-10-31"
   }
 ]
