@@ -3369,10 +3369,21 @@
      the handful of classes below (oam*) are new. */
   .oamhead{display:flex;align-items:center;gap:10px}
   .oamhead .mfinput{flex:1}
-  .oamstylerow{display:grid;grid-template-columns:18px 104px 1fr 52px;align-items:center;gap:8px;
-    padding:8px 4px;border-bottom:1px solid var(--line);cursor:pointer}
-  .oamstylerow input[type=checkbox]{width:16px;height:16px}
+  .oamgenreintro{font-size:12px;color:var(--dim);line-height:1.5;margin:4px 0 8px}
+  /* CAS-1358: a row's own section label ("IN THIS MOOD" / "NOT IN THIS MOOD") — the two sections are frozen
+     for the life of the sheet (oamFreezeMoodRowOrder), so this heading never moves once drawn. */
+  .oamsechd{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--faint);
+    margin:14px 0 4px;padding:0 4px}
+  .oamsechd:first-child{margin-top:0}
+  /* CAS-1358: two separate tap targets per row (AC3) — the left label (tick+name) is its own element,
+     the right strip (.oamstripcol, a CAS-1339 .oaslidewrap) is a sibling, never nested inside the label. */
+  .oamstylerow{display:grid;grid-template-columns:150px 1fr 52px;align-items:center;gap:8px;
+    padding:8px 4px;border-bottom:1px solid var(--line)}
+  .oamstylerow input[type=checkbox]{width:16px;height:16px;flex:0 0 auto}
   .oamstylerow.off{opacity:.45}
+  .oamstylerow.never .oamstyleleftwrap{opacity:.7}
+  .oamstyleleftwrap{display:flex;align-items:center;gap:8px;min-width:0;cursor:pointer}
+  .oamstylerow.never .oamstyleleftwrap{cursor:default}
   .oamstyleleft{min-width:0}
   .oamstylename{display:block;font-size:13.5px;font-weight:800;color:var(--ink);overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
@@ -20376,7 +20387,7 @@ const ONE_AGENT_MOOD_BUILTINS=[
   {id:"family", name:"Family", styles:["Family","Animation","Adventure","Comedy"], ages:["G","PG"], show:"20"},
 ];
 function oamMoodDefaultFields(){
-  return {v2:true, handOnly:false, styles:[], minScore:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[]};
+  return {v2:true, handOnly:false, styles:[], ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[]};
 }
 function oamMoodDefaultsNow(){ return ONE_AGENT_MOOD_BUILTINS.map(b=>({...oamMoodDefaultFields(), ...b})); }
 // The account's own saved v2 moods — falls back (in memory only, never written: CAS-1218/1243) to the two
@@ -20396,13 +20407,9 @@ function oamMoodStyles(mood, c){
   if(!mood.styles || !mood.styles.length) return onStyles;
   return onStyles.filter(g=>mood.styles.includes(g));
 }
-// The bar actually applied to a style inside this mood — the mood's own minScore only ever RAISES the
-// agent's, never lowers it.
-function oamMoodBarFor(mood, c, style){
-  const agentBar=oaBar(c, style);
-  if(agentBar==null) return null;
-  return mood.minScore!=null ? Math.max(agentBar, mood.minScore) : agentBar;
-}
+// The bar actually applied to a style inside this mood. CAS-1358 removes the mood's own minimum-score
+// slider: a mood's bar is simply the agent's own, and any `minScore` stored on an old mood row is ignored.
+function oamMoodBarFor(mood, c, style){ return oaBar(c, style); }
 function oamFilmAge(m){ return AGE_RATING_CANON[m.age_rating] || m.age_rating; }
 function oamFilmMatchesAwards(m, awards){
   if(awards==="won") return m.award==="won";
@@ -20505,7 +20512,9 @@ function oamMoodDraftFrom(mood){
     handOnly: mood ? !!mood.handOnly : false,
     stylesAll: mood ? !(mood.styles && mood.styles.length) : true,
     styles: new Set(mood && mood.styles ? mood.styles : []),
-    minScore: mood && mood.minScore!=null ? mood.minScore : null,
+    bars: {},   // CAS-1358: draft agent-bar overrides from this sheet's own genre strips, by style; written
+                // to the agent (alongside the mood) only on Save — see oamDraftBar/oamSaveMoodFromSheet.
+    rowOrder: null,   // frozen IN THIS MOOD / NOT IN THIS MOOD section membership — see oamFreezeMoodRowOrder
     ages: new Set(mood ? (mood.ages||[]) : []),
     awards: mood ? (mood.awards||"any") : "any",
     years: mood ? (mood.years||0) : 0,
@@ -20515,15 +20524,35 @@ function oamMoodDraftFrom(mood){
     out: [...(mood ? (mood.out||[]) : [])],
   };
 }
+// The bar a style shows in the sheet: a draft strip edit if the user has dragged it this session, else the
+// agent's own current bar. Never written straight to `c` — only oamSaveMoodFromSheet does that, on Save.
+function oamDraftBar(d, c, style){
+  return (d.bars && Object.prototype.hasOwnProperty.call(d.bars, style)) ? d.bars[style] : oaBar(c, style);
+}
+// IN THIS MOOD / NOT IN THIS MOOD section membership, frozen the moment the sheet opens (behaviour 1: rows
+// don't move while the sheet is open — ticking or dragging a strip only changes a row's own tick/dimming,
+// never its section or position; the sections re-sort on the next open). Keeps the agent's own row order
+// (oaComputeOrder: on styles by bar ascending then name, then never styles A-Z) within each section.
+function oamFreezeMoodRowOrder(){
+  const d=oamDraft; if(!d) return;
+  const c=oneAgentCriteria();
+  if(!c){ d.rowOrder={inMood:[], notInMood:[]}; return; }
+  const order=oaComputeOrder(c);
+  const inMood=order.filter(g=>oaBar(c,g)!=null && (d.stylesAll || d.styles.has(g)));
+  const notInMood=order.filter(g=>!inMood.includes(g));
+  d.rowOrder={inMood, notInMood};
+}
 window.openOamMoodSheetFor=id=>{
   const mood=oamMoodsListReal().find(m=>m.id===id); if(!mood) return;
   oamDraft=oamMoodDraftFrom(mood);
+  oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
   openWatchSheet();
 };
 window.openOamMoodSheetForNew=()=>{
   if(oamMoodsListReal().length>=MOOD_MAX) return;
   oamDraft=oamMoodDraftFrom(null);
+  oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
   openWatchSheet();
 };
@@ -20532,7 +20561,8 @@ window.toggleOamDraftHandOnly=()=>{ if(!oamDraft) return; oamDraft.handOnly=!oam
 window.toggleOamDraftStyle=style=>{
   const d=oamDraft; if(!d) return;
   const c=oneAgentCriteria(); if(!c) return;
-  const onStyles=ALL_GENRES.filter(g=>oaBar(c,g)!=null);
+  if(oamDraftBar(d,c,style)==null) return;   // disabled for never genres (behaviour 2)
+  const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
   if(d.stylesAll){
     d.stylesAll=false;
     d.styles=new Set(onStyles.filter(g=>g!==style));
@@ -20546,22 +20576,39 @@ window.toggleOamDraftStyle=style=>{
 };
 window.selectAllOamDraftStyles=()=>{ if(!oamDraft) return; oamDraft.stylesAll=true; oamDraft.styles=new Set(); renderOamMoodSheetBody(); };
 window.clearAllOamDraftStyles=()=>{ if(!oamDraft) return; oamDraft.stylesAll=false; oamDraft.styles=new Set(); renderOamMoodSheetBody(); };
-window.oamMinScoreOnDrag=input=>{
-  const v=parseInt(input.value,10);
-  const bar=v>=100?null:v;
+// CAS-1358: the mood sheet's own genre-row strip — the CAS-1351 share control, but editing the AGENT's bar
+// for that style (behaviour 2), held in the draft and only written to `c` on Save (behaviour 4). Dragging a
+// strip to Never also takes the genre out of this mood's draft ticks, the same "turn off" shape
+// toggleOamDraftStyle already uses.
+window.oamStyleOnDrag=(input)=>{
+  const style=input.dataset.style;
+  const share=Math.max(0, Math.min(100, parseInt(input.value,10)));
   const wrap=input.closest(".oaslidewrap");
-  const boxes=wrap?wrap.querySelectorAll(".oabox"):[];
-  ONE_AGENT_SCORE_BRACKETS.forEach((b,i)=>{ const fill=boxes[i]&&boxes[i].querySelector(".oafill"); if(fill) fill.style.width=oaBoxPct(bar,b)+"%"; });
-  const valEl=$("oamMinScoreVal");
-  if(valEl) valEl.innerHTML = bar==null ? `Agent's<i>no extra</i>` : `${bar}+<i>this mood</i>`;
+  const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
+  ONE_AGENT_SHARE_BRACKETS.forEach((b,i)=>{
+    const fill=boxes[i] && boxes[i].querySelector(".oafill");
+    if(fill) fill.style.width=oaShareBoxPct(share,b)+"%";
+  });
+  const bar = share<=0 ? null : oneBarForTopPct(style, share);
+  const row=input.closest(".oamstylerow");
+  const valEl=row && row.querySelector(".oarowval");
+  if(valEl) valEl.innerHTML = bar==null ? "Never" : `Top ${share}%<i>score ${bar}+</i>`;
 };
-window.oamMinScoreOnRelease=input=>{
+window.oamStyleOnRelease=(input)=>{
   const d=oamDraft; if(!d) return;
-  const v=parseInt(input.value,10);
-  d.minScore = v>=100?null:v;
+  const c=oneAgentCriteria(); if(!c) return;
+  const style=input.dataset.style;
+  const share=Math.max(0, Math.min(100, parseInt(input.value,10)));
+  const bar = share<=0 ? null : oneBarForTopPct(style, share);
+  d.bars=d.bars||{};
+  d.bars[style]=bar;
+  if(bar==null){
+    const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
+    if(d.stylesAll){ d.stylesAll=false; d.styles=new Set(onStyles); }
+    else { d.styles.delete(style); }
+  }
   renderOamMoodSheetBody();
 };
-window.oamClearMinScore=()=>{ if(!oamDraft) return; oamDraft.minScore=null; renderOamMoodSheetBody(); };
 window.toggleOamDraftAge=a=>{ if(!oamDraft) return; oamDraft.ages.has(a)?oamDraft.ages.delete(a):oamDraft.ages.add(a); renderOamMoodSheetBody(); };
 window.setOamDraftAwards=v=>{ if(!oamDraft) return; oamDraft.awards=v; renderOamMoodSheetBody(); };
 window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMoodSheetBody(); };
@@ -20572,43 +20619,35 @@ function oamStylesAlsoIn(style, excludeId){
   return oamMoodsListReal().filter(m=>m.id!==excludeId && !m.handOnly && m.id!=="releases" && m.id!=="starred"
     && (!m.styles || !m.styles.length || m.styles.includes(style))).map(m=>m.name);
 }
+// A row's own two tap targets (behaviour 2): the left label (tick + name + also-in/never line) toggles
+// membership and is disabled for a never genre; the right strip is the CAS-1351 share control for the
+// AGENT's own bar, never the tick — dragging it never toggles the checkbox (AC3), and dragging it to Never
+// also drops the genre out of this mood's draft ticks (oamStyleOnRelease, above).
 function oamStyleRowHTML(c, d, style){
-  const agentBar=oaBar(c, style);
-  const effBar = d.minScore!=null ? Math.max(agentBar, d.minScore) : agentBar;
-  const on = d.stylesAll || d.styles.has(style);
+  const bar=oamDraftBar(d, c, style);
+  const never = bar==null;
+  const on = !never && (d.stylesAll || d.styles.has(style));
   const name=oneAgentShortName(style);
-  const raised = d.minScore!=null && d.minScore>agentBar;
-  const valText = raised ? `${effBar}+<i>agent ${agentBar}+</i>` : `${agentBar}+`;
+  const top = bar==null ? 0 : oneTopPct(style, bar);
+  const valText = bar==null ? "Never" : `Top ${top}%<i>score ${bar}+</i>`;
   const alsoIn=oamStylesAlsoIn(style, d.editingId).filter(n=>n!==d.name);
-  const alsoText = alsoIn.length ? `also in ${alsoIn.join(", ")}` : "";
-  return `<label class="oamstylerow${on?"":" off"}">
-      <input type="checkbox" ${on?"checked":""} onchange="toggleOamDraftStyle('${escA(style)}')" aria-label="${escA(name)}">
-      <span class="oamstyleleft">
-        <span class="oamstylename">${esc(name)}</span>
-        ${alsoText?`<span class="oamalso">${esc(alsoText)}</span>`:""}
-      </span>
-      <span class="oarowstrip">${oaBoxesHTML(effBar)}</span>
-      <span class="oarowval">${valText}</span>
-    </label>`;
-}
-function oamMinScoreSectionHTML(d){
-  const bar=d.minScore;
-  const raised = bar!=null;
-  const val = raised ? `${bar}+<i>this mood</i>` : `Agent's<i>no extra</i>`;
-  const desc = raised
-    ? `Styles your agent lists below ${bar} are lifted to ${bar}+ in this mood. <button type="button" class="linkbtn" onclick="oamClearMinScore()">Remove</button>`
-    : `Drag to make this mood pickier than your agent. All the way right takes it off.`;
-  return `<div class="wsheetsec">
-      <div class="wsheethd"><span>MOOD MINIMUM SCORE &middot; only ever raises your agent's</span></div>
-      <div class="oaslider">
-        <div class="oaslidewrap">
-          <div class="oastrip oastripfull">${oaBoxesHTML(bar,{labels:true})}</div>
-          <input type="range" class="oarange" min="50" max="100" step="1" value="${bar==null?100:bar}"
-            oninput="oamMinScoreOnDrag(this)" onchange="oamMinScoreOnRelease(this)" aria-label="Mood minimum score">
-        </div>
-        <span class="oaslideval" id="oamMinScoreVal">${val}</span>
+  const subText = never ? "never in your agent" : (alsoIn.length ? `also in ${alsoIn.join(", ")}` : "");
+  return `<div class="oamstylerow${on?"":" off"}${never?" never":""}">
+      <label class="oamstyleleftwrap">
+        <input type="checkbox" ${on?"checked":""} ${never?"disabled":""}
+          onchange="toggleOamDraftStyle('${escA(style)}')" aria-label="${escA(name)}">
+        <span class="oamstyleleft">
+          <span class="oamstylename">${esc(name)}</span>
+          ${subText?`<span class="oamalso">${esc(subText)}</span>`:""}
+        </span>
+      </label>
+      <div class="oaslidewrap">
+        <div class="oastrip oastripfull">${oaShareBoxesHTML(style, bar)}</div>
+        <input type="range" class="oarange" min="0" max="100" step="1" value="${bar==null?0:top}"
+          data-style="${escA(style)}" oninput="oamStyleOnDrag(this)" onchange="oamStyleOnRelease(this)"
+          aria-label="${escA(name)} share of catalogue">
       </div>
-      <p class="oaslidedesc">${desc}</p>
+      <span class="oarowval">${valText}</span>
     </div>`;
 }
 const OAM_AGE_OPTS=TASTE_AGE_ORDER;
@@ -20621,9 +20660,12 @@ function renderOamMoodSheetBody(){
   const c=oneAgentCriteria(); if(!c){ closeWatchSheet(); return; }
   const isBuiltin = d.editingId==="releases" || d.editingId==="starred";
   const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "Mood" : "New mood";
-  const onStyles=ALL_GENRES.filter(g=>oaBar(c,g)!=null);
+  const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
   const kOn = d.stylesAll ? onStyles.length : d.styles.size;
-  const styleRows = onStyles.map(g=>oamStyleRowHTML(c, d, g)).join("");
+  const order = d.rowOrder || {inMood:[], notInMood:[]};
+  const styleRows = `
+    ${order.inMood.length ? `<div class="oamsechd">IN THIS MOOD</div>${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}` : ""}
+    ${order.notInMood.length ? `<div class="oamsechd">NOT IN THIS MOOD</div>${order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}` : ""}`;
   const seg=(opts, cur, setter, label)=>`<div class="mfseg" role="group" aria-label="${escA(label)}">
       ${opts.map(([k,l])=>{ const on=cur===k; return `<button type="button" aria-pressed="${on}" class="${on?"on":""}"
         onclick="${setter}(${typeof k==="number"?k:`'${k}'`})">${esc(l)}</button>`; }).join("")}
@@ -20650,9 +20692,9 @@ function renderOamMoodSheetBody(){
           <button type="button" class="linkbtn" onclick="clearAllOamDraftStyles()">None</button>
         </div>
       </div>
+      <p class="oamgenreintro">Tick to include a genre in this mood. The strip is your agent's setting for that genre: changing it applies to your agent and every mood.</p>
       <div class="oalist">${styleRows}</div>
     </div>
-    ${oamMinScoreSectionHTML(d)}
     <div class="wsheetsec">
       <div class="wsheethd"><span>WHO'S WATCHING: AGE RATINGS</span></div>
       <div class="chips">${OAM_AGE_OPTS.map(a=>{ const on=d.ages.has(a); return `<button type="button" class="chip${on?" on":""}"
@@ -20688,12 +20730,22 @@ window.oamSaveMoodFromSheet=()=>{
   const d=oamDraft; if(!d) return;
   const name=(d.name||"").trim();
   if(!name){ const inp=$("oamMoodName"); if(inp) inp.focus(); return; }
+  // CAS-1358: the sheet's own genre-strip drags are drafted on the agent's bars, not the mood — write them
+  // to the agent now, alongside the mood itself, through the same saveCascades() chokepoint oaOnRelease uses.
+  const c=oneAgentCriteria();
+  if(c && d.bars && Object.keys(d.bars).length){
+    c.styles=c.styles||{};
+    Object.keys(d.bars).forEach(style=>{
+      const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
+      st.bar=d.bars[style];
+    });
+    saveCascades();
+  }
   const mood={
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
     name, v2:true,
     handOnly: !!d.handOnly,
     styles: d.stylesAll ? [] : [...d.styles],
-    minScore: d.minScore,
     ages: [...d.ages],
     awards: d.awards,
     years: d.years,
