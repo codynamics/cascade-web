@@ -4160,17 +4160,16 @@
   .qpub.intitle{top:40px}
   /* ==== ONE AGENT: SINGLE SCORE BOX (CAS-1338, Lee, 30 Oct 2026) ========================================
      A v2 (one-agent) account's card shows ONE score box, oneScoreBoxHTML(m), instead of the You+Public
-     pair above. The six rules up to and including ".card.expanded .qone{display:none}" are EXACT, from the
-     approved prototype — applied verbatim. The two below are this ticket's own: the box's collapsed-only
-     visibility already comes from that last EXACT rule, so oneScoreTextHTML(m)'s expanded-card companion
-     (.qonetext) just needs the opposite — hidden collapsed, its own full-width line in the scores row open. */
+     pair above. CAS-1355 (Lee, 1 Nov) brought the box back onto the expanded card: .title and .metaline
+     already carry an unconditional padding-right (CAS-1263, above) sized for this box's 44px width, on
+     both the collapsed and expanded card, so the box needs no card-state rule of its own — it just stays
+     visible always. oneScoreTextHTML(m)'s (.qonetext) expanded-card companion is unchanged. */
   .qone{position:absolute;top:2px;right:0;width:44px;height:50px}
   .qone .qpub{position:absolute;left:0;top:8px;z-index:1;background:var(--panel);border:1.5px solid rgba(255,255,255,.3)}
   .qone.up .qpub{top:0;border-color:#5eead4} .qone.down .qpub{top:16px;border-color:#f0a060}
   .qone .qghost{position:absolute;left:0;top:8px;width:44px;height:34px;border-radius:8px;border:1.5px dashed rgba(255,255,255,.6);box-sizing:border-box}
   .qone.up .qghost{top:16px} .qone.down .qghost{top:0}
   .qone.up .qpub small{color:#5eead4;opacity:1} .qone.down .qpub small{color:#f0a060;opacity:1}
-  .card.expanded .qone{display:none}
   .card:not(.expanded) .qonetext{display:none}
   .ctop.hasmatch .mrow.r-scores .qonetext{order:5;flex:1 1 100%;font:500 12px/1.4 var(--font-body);color:var(--dim)}
   .card:not(.expanded) .wline{display:block;flex:1 1 0;min-width:0;margin:0}
@@ -4178,6 +4177,9 @@
   .card:not(.expanded) .avail2{gap:0}
   .card:not(.expanded) .avail2 > .reldate{margin-right:3px}
   .card:not(.expanded) .avail2 > .cap{margin-left:0;flex:0 1 auto;padding:1px 6px;gap:3px}
+  .card:not(.expanded) .cap.captog .capdate{display:none}   /* Lee, 1 Nov: service name over arrival date when collapsed */
+  .card:not(.expanded) .cap.captog .capdiv{display:none}
+  .card:not(.expanded) .actions .ctl.notify,.card:not(.expanded) .actions .ctl.oamlist,.card:not(.expanded) .actions .ctl.watch{flex:1 1 0;min-width:0}
   .card:not(.expanded) .ctl .cmini .cfill{display:none}
   .card:not(.expanded) .ctl .cmini,.card:not(.expanded) .ctl.watch .cmini,
   .card:not(.expanded) .ctl.notify.wsrc-auto .cmini,.card:not(.expanded) .ctl.casc.csrc-auto .cmini{
