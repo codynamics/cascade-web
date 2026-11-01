@@ -612,7 +612,7 @@
   "675871": {
     "upcoming": "2026-07-20",
     "in_cinema": "2026-08-12",
-    "rental": "2026-09-22"
+    "pvod": "2026-11-01"
   },
   "1240889": {
     "upcoming": "2026-07-20",
@@ -843,7 +843,8 @@
   },
   "1204680": {
     "upcoming": "2026-07-20",
-    "in_cinema": "2026-09-17"
+    "in_cinema": "2026-09-17",
+    "rental": "2026-11-01"
   },
   "1251608": {
     "upcoming": "2026-07-20",
@@ -1052,7 +1053,7 @@
     "included_streaming": "2026-07-22"
   },
   "560016": {
-    "included_streaming": "2026-07-22"
+    "rental": "2026-11-01"
   },
   "1235746": {
     "included_streaming": "2026-07-22"
@@ -1215,7 +1216,7 @@
     "included_streaming": "2026-07-22"
   },
   "1455079": {
-    "rental": "2026-07-22"
+    "included_streaming": "2026-11-01"
   },
   "1075175": {
     "included_streaming": "2026-07-22"
@@ -2886,7 +2887,7 @@
     "included_streaming": "2026-07-22"
   },
   "800513": {
-    "rental": "2026-07-22"
+    "included_streaming": "2026-11-01"
   },
   "1032472": {
     "included_streaming": "2026-07-22"
@@ -8843,7 +8844,7 @@
     "included_streaming": "2026-08-05"
   },
   "1500536": {
-    "rental": "2026-08-05"
+    "included_streaming": "2026-11-01"
   },
   "1558796": {
     "included_streaming": "2026-08-05"
@@ -9585,7 +9586,7 @@
     "included_streaming": "2026-08-05"
   },
   "1571485": {
-    "included_streaming": "2026-08-05"
+    "rental": "2026-11-01"
   },
   "1557993": {
     "included_streaming": "2026-08-05"
@@ -9690,7 +9691,7 @@
     "included_streaming": "2026-08-05"
   },
   "1358491": {
-    "rental": "2026-08-05"
+    "included_streaming": "2026-11-01"
   },
   "972445": {
     "included_streaming": "2026-08-05"
@@ -18908,7 +18909,8 @@
   },
   "1228682": {
     "upcoming": "2026-08-16",
-    "in_cinema": "2026-09-12"
+    "in_cinema": "2026-09-12",
+    "rental": "2026-11-01"
   },
   "1408207": {
     "upcoming": "2026-08-16"
@@ -25109,7 +25111,7 @@
     "included_streaming": "2026-09-17"
   },
   "730009": {
-    "included_streaming": "2026-10-06"
+    "rental": "2026-11-01"
   },
   "890601": {
     "included_streaming": "2026-09-17"
@@ -33041,5 +33043,17 @@
   },
   "1515692": {
     "included_streaming": "2026-10-30"
+  },
+  "1507696": {
+    "included_streaming": "2026-11-01"
+  },
+  "1571955": {
+    "included_streaming": "2026-11-01"
+  },
+  "1541477": {
+    "included_streaming": "2026-11-01"
+  },
+  "1378537": {
+    "included_streaming": "2026-11-01"
   }
 }
