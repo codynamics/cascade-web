@@ -10547,10 +10547,17 @@ function wireMoodRowDrag(row){
 }
 // Reorders watchMoods to match an id order from a drag drop or a Move left/right tap, persists it the same
 // way Save/Delete already do (one pushViewField("moods", ...)), and repaints the row.
+// CAS-1356: idsInOrder always comes from the RENDERED row, i.e. watchMoodsList() (oamMoodsListReal() for a
+// v2 account, which falls back in-memory to the builtins — CAS-1218/1243's "never auto-write" — until the
+// account's own watchMoods actually holds v2 records). Looking the dragged ids up in bare `watchMoods`, as
+// this used to, mismatches that fallback case (watchMoods is `[]` or still v1-shaped) so every v2 reorder
+// either silently no-ops or, worse, pushes an empty moods array. oamSaveMoodFromSheet/oamHandleMoodDeleteBtn
+// already provision watchMoods from this same list on any v2 write; this now does the same.
 function commitMoodOrder(idsInOrder){
-  const byId=new Map(watchMoods.map(m=>[m.id,m]));
+  const list=watchMoodsList();
+  const byId=new Map(list.map(m=>[m.id,m]));
   const reordered=idsInOrder.map(id=>byId.get(id)).filter(Boolean);
-  if(reordered.length!==watchMoods.length) return;
+  if(reordered.length!==list.length) return;
   watchMoods=reordered;
   pushViewField("moods", watchMoods.map(m=>({...m})));
   renderWatchTop();

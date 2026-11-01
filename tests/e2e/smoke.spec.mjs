@@ -2289,6 +2289,56 @@ test("CAS-1296 AC4: Releases is pinned first with a divider, and a drag can't mo
   expect(chipIdsAfter[0]).toBe("releases");
 });
 
+// CAS-1356: a v2 (one-agent) account whose watchMoods has never actually been written — a real, supported
+// state (oamMoodsListReal's own in-memory "CAS-1218/1243: never auto-write" fallback to the builtins) —
+// used to lose a mood-row drag silently: commitMoodOrder looked the dragged ids up in bare `watchMoods`,
+// which held none of them (it was `[]`), so the reorder either no-oped or pushed an empty moods array.
+// Fixed by having it read/write through watchMoodsList() (oamMoodsListReal() for a v2 account) instead.
+test("CAS-1356 AC1/AC4: a v2 account's mood row can be reordered, and the order persists", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  await page.evaluate(() => {
+    cascades.length = 0;
+    cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
+    saveCascades();
+    setActive(cascades[0].id);
+    watchMoods = [];   // never provisioned — oamMoodsListReal() must fall back to the in-memory builtins
+    watchMoodSel = "releases";
+    render();
+  });
+
+  const chipIdsBefore = await page.locator(".moodrow .moodchip").evaluateAll(els => els.map(el => el.dataset.mood));
+  expect(chipIdsBefore.length).toBeGreaterThan(2);
+  expect(chipIdsBefore[0]).toBe("releases");
+
+  // Press-and-hold the first non-pinned chip (MOOD_LIFT_MS=450ms) and drag it past its neighbour.
+  const second = page.locator(".moodrow .moodchip").nth(1);
+  const box = await second.boundingBox();
+  const third = page.locator(".moodrow .moodchip").nth(2);
+  const box3 = await third.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(600);
+  await page.mouse.move(box3.x + box3.width - 2, box.y + box.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+
+  const chipIdsAfter = await page.locator(".moodrow .moodchip").evaluateAll(els => els.map(el => el.dataset.mood));
+  expect(chipIdsAfter[0]).toBe("releases");
+  expect(chipIdsAfter[1]).toBe(chipIdsBefore[2]);   // the dragged chip actually moved past its neighbour
+
+  // AC1: the drop committed into watchMoods itself (what gets pushed to user_prefs.view.moods), not just
+  // the on-screen chips — and a fresh render (standing in for a reload re-reading this same array) keeps
+  // the new order rather than resetting to the builtins' fixed default order.
+  const persisted = await page.evaluate(() => watchMoods.map(m => m.id));
+  expect(persisted).toEqual(chipIdsAfter);
+  await page.evaluate(() => render());
+  const chipIdsReloaded = await page.locator(".moodrow .moodchip").evaluateAll(els => els.map(el => el.dataset.mood));
+  expect(chipIdsReloaded).toEqual(chipIdsAfter);
+});
+
 // CAS-765 AC7: the silent guest-mode drop is gone. If the vendored client library ever fails to define
 // window.supabase.createClient — forced here by serving a broken bundle in place of the real one — the
 // failure must be visible on screen, not just a console.warn no user will ever read.
