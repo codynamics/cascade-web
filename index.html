@@ -20578,7 +20578,7 @@ const ONE_AGENT_MOOD_BUILTINS=[
   {id:"family", name:"Family", styles:["Family","Animation","Adventure","Comedy"], ages:["G","PG"], show:"20"},
 ];
 function oamMoodDefaultFields(){
-  return {v2:true, handOnly:false, styles:[], ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[]};
+  return {v2:true, handOnly:false, styles:[], topShare:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[]};
 }
 function oamMoodDefaultsNow(){ return ONE_AGENT_MOOD_BUILTINS.map(b=>({...oamMoodDefaultFields(), ...b})); }
 // The account's own saved v2 moods — falls back (in memory only, never written: CAS-1218/1243) to the two
@@ -20598,9 +20598,16 @@ function oamMoodStyles(mood, c){
   if(!mood.styles || !mood.styles.length) return onStyles;
   return onStyles.filter(g=>mood.styles.includes(g));
 }
-// The bar actually applied to a style inside this mood. CAS-1358 removes the mood's own minimum-score
-// slider: a mood's bar is simply the agent's own, and any `minScore` stored on an old mood row is ignored.
-function oamMoodBarFor(mood, c, style){ return oaBar(c, style); }
+// The bar actually applied to a style inside this mood. CAS-1358 removed the mood's own minimum-score
+// slider; CAS-1363 reinstates it on the CAS-1351 share scale as `mood.topShare` (1-99, or null) — when set,
+// the mood can only ever narrow the agent further, never widen it, so the bar used is whichever of the
+// agent's own bar and the mood's own share-derived bar is stricter (the higher raw score). Any `minScore`
+// stored on an old mood row stays ignored.
+function oamMoodBarFor(mood, c, style){
+  const bar=oaBar(c, style);
+  if(bar==null || mood.topShare==null) return bar;
+  return Math.max(bar, oneBarForTopPct(style, mood.topShare));
+}
 function oamFilmAge(m){ return AGE_RATING_CANON[m.age_rating] || m.age_rating; }
 function oamFilmMatchesAwards(m, awards){
   if(awards==="won") return m.award==="won";
@@ -20705,6 +20712,7 @@ function oamMoodDraftFrom(mood){
     styles: new Set(mood && mood.styles ? mood.styles : []),
     bars: {},   // CAS-1358: draft agent-bar overrides from this sheet's own genre strips, by style; written
                 // to the agent (alongside the mood) only on Save — see oamDraftBar/oamSaveMoodFromSheet.
+    topShare: mood ? (mood.topShare==null ? null : mood.topShare) : null,   // CAS-1363: the mood's own limit
     rowOrder: null,   // frozen IN THIS MOOD / NOT IN THIS MOOD section membership — see oamFreezeMoodRowOrder
     ages: new Set(mood ? (mood.ages||[]) : []),
     awards: mood ? (mood.awards||"any") : "any",
@@ -20822,7 +20830,12 @@ function oamStyleRowHTML(c, d, style){
   const top = bar==null ? 0 : oneTopPct(style, bar);
   const valText = bar==null ? "Never" : `Top ${top}%<i>score ${bar}+</i>`;
   const alsoIn=oamStylesAlsoIn(style, d.editingId).filter(n=>n!==d.name);
-  const subText = never ? "never in your agent" : (alsoIn.length ? `also in ${alsoIn.join(", ")}` : "");
+  let subText = never ? "never in your agent" : (alsoIn.length ? `also in ${alsoIn.join(", ")}` : "");
+  // CAS-1363: the mood limit only ever narrows the agent's own bar further — show it on the row only when
+  // it's actually the stricter of the two, so the row explains why fewer films show than the strip alone implies.
+  if(!never && d.topShare!=null && oneBarForTopPct(style, d.topShare)>bar){
+    subText = subText ? `${subText} · mood: Top ${d.topShare}%` : `mood: Top ${d.topShare}%`;
+  }
   return `<div class="oamstylerow${on?"":" off"}${never?" never":""}">
       <label class="oamstyleleftwrap">
         <input type="checkbox" ${on?"checked":""} ${never?"disabled":""}
@@ -20841,6 +20854,62 @@ function oamStyleRowHTML(c, d, style){
       <span class="oarowval">${valText}</span>
     </div>`;
 }
+// CAS-1363: the mood's own limit — the same CAS-1351 share scale, but mood-wide rather than per-genre, so it
+// is converted to a per-style bar (oneBarForTopPct) only inside oamMoodBarFor when actually applied. share
+// here is a flat percentage (1-99), never a style-specific bar; 100 means "All" — no mood limit.
+function oamLimitBoxesHTML(share){
+  return ONE_AGENT_SHARE_BRACKETS.map(b=>
+    `<span class="oabox" style="--bc:${b.color}"><i class="oalbl">${oaShareLabel(b.pct)}</i><i class="oafill oafleft" style="width:${oaShareBoxPct(share,b)}%"></i></span>`
+  ).join("");
+}
+function oamLimitNoteHTML(topShare){
+  return topShare==null
+    ? "Drag left to make this mood pickier than your agent."
+    : `In this mood each genre shows only its top ${topShare}%, or fewer where your agent is already pickier. `
+      + `<button type="button" class="linkbtn" style="vertical-align:baseline" onclick="oamClearMoodLimit()">Remove</button>`;
+}
+function oamMoodLimitSectionHTML(d){
+  const share = d.topShare==null ? 100 : d.topShare;
+  const valTop = d.topShare==null ? "Agent's" : `Top ${d.topShare}%`;
+  const valSub = d.topShare==null ? "no extra limit" : "of each genre";
+  return `<div class="wsheetsec">
+    <div class="wsheethd"><span>MOOD LIMIT &middot; only ever narrows your agent</span></div>
+    <div class="oaslider">
+      <div class="oaslidewrap">
+        <div class="oastrip oastripfull">${oamLimitBoxesHTML(share)}</div>
+        <input type="range" class="oarange" min="1" max="100" step="1" value="${share}"
+          oninput="oamLimitOnDrag(this)" onchange="oamLimitOnRelease(this)"
+          aria-label="Mood limit share of catalogue">
+      </div>
+      <span class="oaslideval" id="oamLimitVal">${valTop}<i>${valSub}</i></span>
+    </div>
+    <p class="oaslidedesc" id="oamLimitNote">${oamLimitNoteHTML(d.topShare)}</p>
+  </div>`;
+}
+// Live drag feedback, same shape as oaOnDrag/oamStyleOnDrag — redraws the boxes/value in place without a
+// full re-render so the gesture is never disturbed mid-drag.
+window.oamLimitOnDrag=(input)=>{
+  const share=Math.max(1, Math.min(100, parseInt(input.value,10)));
+  const wrap=input.closest(".oaslidewrap");
+  const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
+  ONE_AGENT_SHARE_BRACKETS.forEach((b,i)=>{
+    const fill=boxes[i] && boxes[i].querySelector(".oafill");
+    if(fill) fill.style.width=oaShareBoxPct(share,b)+"%";
+  });
+  const valEl=$("oamLimitVal");
+  if(valEl) valEl.innerHTML = share>=100 ? "Agent's<i>no extra limit</i>" : `Top ${share}%<i>of each genre</i>`;
+};
+window.oamLimitOnRelease=(input)=>{
+  const d=oamDraft; if(!d) return;
+  const share=Math.max(1, Math.min(100, parseInt(input.value,10)));
+  d.topShare = share>=100 ? null : share;
+  renderOamMoodSheetBody();
+};
+window.oamClearMoodLimit=()=>{
+  const d=oamDraft; if(!d) return;
+  d.topShare=null;
+  renderOamMoodSheetBody();
+};
 const OAM_AGE_OPTS=TASTE_AGE_ORDER;
 const OAM_AWARDS_OPTS=[["any","Any"],["nominated","Nominated or won"],["won","Won"]];
 const OAM_YEARS_OPTS=[[0,"Any"],[10,"10 yrs"],[5,"5 yrs"],[3,"3 yrs"],[2,"2 yrs"],[1,"1 yr"]];
@@ -20886,6 +20955,7 @@ function renderOamMoodSheetBody(){
       <p class="oamgenreintro">Tick to include a genre in this mood. The strip is your agent's setting for that genre: changing it applies to your agent and every mood.</p>
       <div class="oalist">${styleRows}</div>
     </div>
+    ${oamMoodLimitSectionHTML(d)}
     <div class="wsheetsec">
       <div class="wsheethd"><span>WHO'S WATCHING: AGE RATINGS</span></div>
       <div class="chips">${OAM_AGE_OPTS.map(a=>{ const on=d.ages.has(a); return `<button type="button" class="chip${on?" on":""}"
@@ -20937,6 +21007,7 @@ window.oamSaveMoodFromSheet=()=>{
     name, v2:true,
     handOnly: !!d.handOnly,
     styles: d.stylesAll ? [] : [...d.styles],
+    topShare: d.topShare==null ? null : d.topShare,
     ages: [...d.ages],
     awards: d.awards,
     years: d.years,
