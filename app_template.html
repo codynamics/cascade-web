@@ -3393,10 +3393,11 @@
   .onbwh{display:flex;align-items:center;justify-content:center;gap:4px;color:var(--wc);font-weight:800}
   .onbdot{width:7px;height:7px;border-radius:50%;background:var(--wc);display:inline-block}
   .onblist{display:flex;flex-direction:column}
-  .onb10{display:grid;grid-template-columns:104px minmax(0,1fr);gap:8px;align-items:center;padding:6px 0;
-    border-top:1px solid var(--line);min-height:52px}
-  .onbname{font-size:13px;font-weight:800;color:var(--ink)}
-  .onbnamesub{display:block;font-size:11px;font-weight:600;color:var(--faint);margin-top:2px}
+  .onb10{display:grid;grid-template-columns:104px minmax(0,1fr);gap:8px;align-items:center;padding:3px 0;
+    border-top:1px solid var(--line);min-height:44px}
+  .onbname{font-size:15px;font-weight:800;color:var(--ink)}
+  .onbnamesub{display:block;font-size:11.5px;font-weight:600;color:var(--faint);margin-top:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .onbwin{overflow:hidden;display:block}
   .onbtrack{display:flex;width:200%;transition:transform .35s ease}
   .onbbody.s2 .onbtrack{transform:translateX(-50%)}
@@ -3404,23 +3405,24 @@
   .onbpane.p1{grid-template-columns:26px minmax(0,1fr)}
   .onbpane.p2{grid-template-columns:40px minmax(0,1fr)}
   .onbboxes{display:flex;gap:3px}
-  .obx{position:relative;flex:1;height:24px;border-radius:5px;overflow:hidden;cursor:pointer;padding:0;
+  .obx{position:relative;flex:1;height:20px;border-radius:4px;overflow:hidden;cursor:pointer;padding:0;
     border:1px solid color-mix(in srgb, var(--bc) 65%, transparent);background:transparent}
   .obx.picked{box-shadow:inset -3px 0 0 #fff}
   .obxfill{position:absolute;top:0;left:0;bottom:0;background:var(--bc)}
   .obxlbl{position:relative;z-index:2;display:block;margin:2px 0 0 4px;font-size:10px;font-weight:700;
     font-style:normal;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
-  .onbnever{flex:0 0 auto;width:26px;height:26px;border-radius:13px;border:1px solid var(--line);
-    background:var(--panel2);color:var(--faint);font-size:12px;line-height:24px;cursor:pointer;padding:0}
+  .onbnever{flex:0 0 auto;width:22px;height:22px;border-radius:11px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--faint);font-size:12px;line-height:20px;cursor:pointer;padding:0}
   .onbnever.on{border-color:var(--amber);color:var(--amber);box-shadow:0 0 0 2px var(--amber)}
   .onbpick{font:700 14px var(--font-body);color:#fff;text-align:left}
   .onbbells{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
-  .onbbell{height:26px;border-radius:13px;font-size:11px;cursor:pointer;padding:0;background:transparent;
+  .onbbell{height:22px;border-radius:11px;font-size:11px;cursor:pointer;padding:0;background:transparent;
     color:var(--faint);border:1px solid color-mix(in srgb, var(--wc) 35%, var(--line))}
   .onbbell.on{background:color-mix(in srgb, var(--wc) 22%, transparent);border-color:var(--wc);color:#fff}
   .onbnv{grid-column:1/4;font:500 11.5px var(--font-body);color:var(--faint)}
   .oaspreview{background:none;border:0;color:var(--accent);font-size:12.5px;font-weight:800;cursor:pointer;
     padding:0;margin-left:6px}
+  #oafNameChips{margin-top:12px}
 
   /* ---- CAS-1341: moods as lists — the v2 mood sheet and the card's list sheet. Reuses CAS-1339's .oarowstrip/
      .oabox/.oafill/.oaslider* geometry verbatim for the read-only style rows and the mood-minimum slider; only
@@ -4885,7 +4887,7 @@
   </div>
   <div class="stepprog" role="progressbar" aria-label="Setup progress" id="oafProg"><i id="oafFill"></i></div>
 </div>
-<div class="sharpstep" id="oafScreen" role="dialog" aria-modal="true" aria-label="Set up your agent">
+<div class="sharpstep chromed" id="oafScreen" role="dialog" aria-modal="true" aria-label="Set up your agent">
   <div class="osstage"><div class="osinner" id="oafInner"></div></div>
 </div>
 <div class="stepnav" id="oafNav" hidden>
@@ -21379,6 +21381,9 @@ function oasRowSubHTML(style, st){
   if(st.never) return "Never";
   return `${esc(oaShareLabel(st.pct))} · score ${st.bar}+`;
 }
+// CAS-1361 part 4.2: the boxes/alerts column read the bare number ("20".."80","All") — oaShareLabel's "%"
+// stays everywhere else (the row's own sub-line, every other share display in the app).
+function oasShareLabelNoPct(pct){ return pct>=100 ? "All" : `${pct}`; }
 // The five tappable boxes for one style row's pane 1 — oaShareBoxPct (CAS-1339/CAS-1351) gives a full/empty
 // fill for every bracket against a share that always lands exactly on a bracket's own `pct`.
 function oasRowBoxesHTML(style, st){
@@ -21388,7 +21393,7 @@ function oasRowBoxesHTML(style, st){
     return `<button type="button" class="obx${picked?" picked":""}" style="--bc:${b.color}"
         onclick="oasPickBar('${escA(style)}',${b.pct})" aria-pressed="${picked}"
         aria-label="${escA(oneAgentShortName(style))} minimum score ${oaShareLabel(b.pct)}">
-        <i class="obxfill" style="width:${pct}%"></i><i class="obxlbl">${oaShareLabel(b.pct)}</i>
+        <i class="obxfill" style="width:${pct}%"></i><i class="obxlbl">${oasShareLabelNoPct(b.pct)}</i>
       </button>`;
   }).join("");
 }
@@ -21404,7 +21409,7 @@ function oafActiveWindows(){
 // style.
 function oasPaneTwoHTML(style, st, al){
   const windows = oafActiveWindows();
-  const score = st.never ? "Never" : oaShareLabel(st.pct);
+  const score = st.never ? "Never" : oasShareLabelNoPct(st.pct);
   const inner = st.never
     ? `<span class="onbnv">Never listed</span>`
     : windows.map(w=>{
@@ -21452,26 +21457,32 @@ function oasHeadHTML(){
     ? `<b>Your favourite genres?</b><span>Adjust the genre settings below. Turn off genres you don't like with the ⊘ button. If you really love a genre, select a higher share of the catalogue.</span>`
     : `<b>Set alerts for your favourite genres.</b><span>Some genres may be a must-watch at the cinema or on rental. You can also set alerts for individual movies.</span>`;
 }
+// CAS-1361 part 4.1: this screen is reached with #oafHdr already hidden (oafEnterSetup), so without its own
+// title it's the one first-run screen with no "Set up your agent" at all. Same 19px/500 .osh + thin rail as
+// #oafHdr's own steprow/stepprog, just not fixed — .uwrap already carries the safe-area-inset-top padding
+// #oafHdr's .steprow would otherwise double up (the #movingScreen/#findScreen padding-top:0 fix, same bug).
+function oasHdrHTML(){
+  const pct = oafProgressPct(oasStep===1 ? "scores" : "alerts");
+  return `<div class="ostop"><span class="osh">Set up your agent</span></div>
+    <div class="stepprog"><i style="width:${pct}%"></i></div>`;
+}
 // CAS-1347 points 1-2-6: this screen's own step label (replacing STEP n OF 2), a Back button on step 1
 // (going to screen 3, or screen 2 if screen 3 was skipped — there is no Cancel, by design, so this is the
-// only way out of step 1), and a thin progress rail sitting above the sticky .onbtop bar — offset by the
-// rail's own 3px height (inline `top:3px`) so the two never overlap.
+// only way out of step 1).
 function oasTopHTML(){
-  const pct = oafProgressPct(oasStep===1 ? "scores" : "alerts");
   const right = oasStep===1
     ? `<button type="button" class="onbbtn ghost" onclick="oafBackFromSetup()">‹ Back</button>
        <button type="button" class="onbbtn primary" onclick="oasGoStep2()">Next: alerts ›</button>`
     : `<button type="button" class="onbbtn ghost" onclick="oasGoStep1()">‹ Back</button>
        <button type="button" class="onbbtn primary" onclick="oafGoFromAlerts()">Next ›</button>`;
-  return `<div class="stepprog" style="position:sticky;top:-1px;z-index:4"><i style="width:${pct}%"></i></div>
-    <div class="onbtop" style="top:3px">
+  return `<div class="onbtop">
       <span class="oassteplbl">${oasStep===1 ? "Your agent · genres" : "Your agent · alerts"}</span>
       <span class="onbtopbtns">${right}</span>
     </div>`;
 }
 function oasBodyHTML(){
-  return `${oasTopHTML()}
-    <div class="onbhead">${oasHeadHTML()}</div>
+  return `<div id="oasTop">${oasHdrHTML()}${oasTopHTML()}</div>
+    <div class="onbhead" id="oasHead">${oasHeadHTML()}</div>
     <div class="onbbody${oasStep===2?" s2":""}">
       ${oasHeaderHTML()}
       <div class="onblist">${ONE_AGENT_SETUP_STYLES.map(oasRowHTML).join("")}</div>
@@ -21480,6 +21491,19 @@ function oasBodyHTML(){
 function oasRender(){
   const el=$("oneAgentSetupBody"); if(!el) return;
   el.innerHTML = oasBodyHTML();
+}
+// CAS-1361 part 4.4: Next/Back must slide the already-painted rows (every row carries both panes already,
+// see oasRowHTML), not repaint them — a full oasRender() replaces the DOM outright, which is why the
+// .onbtrack transition CSS (CAS-1346) never actually ran. Toggling .s2 on the existing .onbbody is the only
+// DOM change the rows themselves see; the chrome around them (title rail/step label/buttons/head text) is
+// cheap to repaint in place since none of it is part of the sliding track.
+function oasGoToStep(step){
+  if(!oasState) return;
+  oasStep=step;
+  const el=$("oneAgentSetupBody"); if(!el) return;
+  const top=el.querySelector("#oasTop"); if(top) top.innerHTML = oasHdrHTML()+oasTopHTML();
+  const head=el.querySelector("#oasHead"); if(head) head.innerHTML = oasHeadHTML();
+  const body=el.querySelector(".onbbody"); if(body) body.classList.toggle("s2", step===2);
 }
 window.oasPickBar=(style, pct)=>{
   if(!oasState) return;
@@ -21508,8 +21532,8 @@ window.oasToggleAlert=(style, win)=>{
   oasState.touched[style]=true;
   oasRender();
 };
-window.oasGoStep2=()=>{ oasStep=2; oasRender(); };
-window.oasGoStep1=()=>{ oasStep=1; oasRender(); };
+window.oasGoStep2=()=>oasGoToStep(2);
+window.oasGoStep1=()=>oasGoToStep(1);
 
 // ================= CAS-1347: the mood rules shared by screen 6's summary, oneAgentCommit, and the CAS-1345
 // starter repair — so the summary chip list can never disagree with what actually gets saved. =================
@@ -21873,6 +21897,7 @@ window.oafStartWatching=()=>{
   const draft = oneAgentBuildDraft();
   oneAgentCommit(draft);
   $("oafScreen").classList.remove("open");
+  $("oafHdr").hidden=true; $("oafNav").hidden=true;   // Lee, 1 Nov: these stayed over Watch after Start watching
   lockBodyScroll(false);
   oasState=null; oafState=null;
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
