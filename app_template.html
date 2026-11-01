@@ -20990,6 +20990,23 @@ function oamMoodsForFilm(id, c){
   const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return [];
   return oamMoodsListReal().filter(mood=>filmInOneAgentMood(m, mood, c));
 }
+// Whether `m` is actually rendered in `mood`'s own Watch list right now — not just whether it passes the
+// mood's rules (oamMoodsForFilm), but whether it also survives the mood's own Best N cut, in the stage its
+// current status belongs to (CAS-1362 cause 1: "Listed in X" claimed a film was shown whenever it passed
+// X's rules, even when X's Best 20 cut it from the page). Same save/swap/restore device watchStageCountFor
+// uses above, so this can never drift from what oamVisibleRows() itself renders.
+function oamFilmShownInMood(id, mood, c){
+  const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return false;
+  const stageKey=oamWilStageKeyFor(m); if(!stageKey) return false;
+  const stop=watchStageStopsNow().find(s=>s.key===stageKey); if(!stop) return false;
+  const savedTab=watchTab, savedStage=watchCinemaStage, savedMood=watchMoodSel;
+  watchTab=stop.tabKey;
+  if(stop.tabKey==="in_cinema") watchCinemaStage = stop.key==="upcoming" ? "upcoming" : "in_cinema";
+  watchMoodSel=mood.id;
+  const shown=oamVisibleRows().rows.some(r=>r.tmdb_id===id);
+  watchTab=savedTab; watchCinemaStage=savedStage; watchMoodSel=savedMood;
+  return shown;
+}
 function oamFilmHandTouched(id){
   return oamMoodsListReal().some(mood=>(mood.in||[]).includes(id) || (mood.out||[]).includes(id));
 }
@@ -21077,24 +21094,41 @@ const OAM_WIL_STATUS_LABEL = {
   upcoming:"Upcoming", opening_week:"In Cinema", in_cinema:"In Cinema",
   pvod:"Premium", rental:"Rental", included_streaming:"Streaming"
 };
-// Which Watch stop (setWatchStage's own key) a film's current status lands on — see watchStageStopsNow.
+// Which Watch stop (setWatchStage's own key) a film's current status lands on. Derived from
+// watchStageStopsNow()'s own live list and filmMatchesWatchTab's own tab-standing test, never a separate
+// hard-coded status->key table (CAS-1362 cause 2: a table entry can name a stop watchStageStopsNow() isn't
+// currently carrying at all — e.g. its window switched off in Where & when — leaving setWatchStage's own
+// `if(!stop) return` silently stuck on whatever stage was already showing).
 function oamWilStageKeyFor(m){
-  const ps=primaryStatus(m);
-  if(ps==="upcoming") return "upcoming";
-  if(ps==="opening_week"||ps==="in_cinema") return "in_cinema";
-  if(ps==="pvod") return "premium";
-  if(ps==="rental") return "rent";
-  if(ps==="included_streaming") return "stream";
-  return null;
+  const stops=watchStageStopsNow();
+  if(filmMatchesWatchTab(m, "in_cinema")){
+    const key = primaryStatus(m)==="upcoming" ? "upcoming" : "in_cinema";
+    return stops.some(s=>s.key===key) ? key : null;
+  }
+  const stop=stops.find(s=>filmMatchesWatchTab(m, s.tabKey));
+  return stop ? stop.key : null;
 }
 function oamWilCase(m, c){
   const id=m.tmdb_id;
   const moods=oamMoodsForFilm(id, c);
   if(moods.length){
-    const names=moods.map(x=>`<b>${esc(moodDisplayName(x))}</b>`).join(", ");
-    const status=OAM_WIL_STATUS_LABEL[primaryStatus(m)];
-    return {sentence:`<span class="willisted">Listed in</span> ${names}${status?" &middot; "+esc(status):""}`,
-      buttons:[{label:"Show in Watch ›", primary:true, action:`oamWilShowInWatch(${id})`}]};
+    const shown=moods.filter(mood=>oamFilmShownInMood(id, mood, c));
+    if(shown.length){
+      const names=shown.map(x=>`<b>${esc(moodDisplayName(x))}</b>`).join(", ");
+      const status=OAM_WIL_STATUS_LABEL[primaryStatus(m)];
+      return {sentence:`<span class="willisted">Listed in</span> ${names}${status?" &middot; "+esc(status):""}`,
+        buttons:[{label:"Show in Watch ›", primary:true, action:`oamWilShowInWatch(${id})`}]};
+    }
+    // CAS-1362 cause 1: it passes a mood's rules but none of them actually show it — almost always the
+    // mood's own Best N cut. Name the first mood with a numeric cut (the one actually responsible),
+    // falling back to the first rule-passing mood if every one is uncapped and some other reason (held
+    // status, search) is keeping it off the page — still a correct "not shown" either way.
+    const cutMood=moods.find(mo=>["10","20","40"].includes(mo.show)) || moods[0];
+    const n=cutMood.show==="10"?10:cutMood.show==="20"?20:cutMood.show==="40"?40:null;
+    const name=esc(moodDisplayName(cutMood));
+    const explain = n!=null ? `It's in ${name}'s rules but below its best ${n}.` : `It's in ${name}'s rules but not shown right now.`;
+    return {sentence:`<span class="wilnot">Not shown.</span> ${explain}`,
+      buttons:[{label:`Add it to ${name}`, primary:true, action:`oamAddIn(${id},'${escA(cutMood.id)}')`}]};
   }
   const notListed = sentence => `<span class="wilnot">Not listed.</span> ${sentence}`;
   if(blocked.has(id)){
@@ -21234,18 +21268,39 @@ window.oamWilAddToMood=(id)=>{
 window.oamWilShowInWatch=(id)=>{
   const c=oneAgentCriteria(); if(!c) return;
   const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
-  const moods=oamMoodsForFilm(id, c); if(!moods.length) return;
+  const moods=oamMoodsForFilm(id, c).filter(mood=>oamFilmShownInMood(id, mood, c));
+  if(!moods.length) return;
   closeFindScreen();
   setWatchMood(moods[0].id);
   const stage=oamWilStageKeyFor(m);
   if(stage) setWatchStage(stage);
-  requestAnimationFrame(()=>{
+  // CAS-1362 cause 3: outrun jumpToSection's own settle chase (started above by setWatchStage, when the
+  // stage switch lands via jumpToSection/landWatchList) — uncancelled, its own setTimeout-driven corrections
+  // keep running for up to ~3.6s and would land back on the stage's section heading well after our own
+  // row-settle below has already finished and declared victory.
+  cancelPendingSectionJump();
+  oamWilSettleScrollTo(id);
+};
+// CAS-1362 cause 3: cards are content-visibility:auto with estimated heights (contain-intrinsic-size), so
+// a card's real position keeps moving as cards above it swap from their placeholder to their real height
+// on later frames — a single scrollIntoView lands short. Scrolls instantly (never smooth, so it never
+// races its own next correction), then re-centres on every frame until the row's top holds steady two
+// frames running, capped at ~500ms so a row that genuinely never settles doesn't spin forever.
+function oamWilSettleScrollTo(id){
+  const start=performance.now();
+  let lastTop=null;
+  const settle=()=>{
     const row=rowFor(id); if(!row) return;
-    row.scrollIntoView({block:"center", behavior: REDUCE_MOTION.matches ? "auto" : "smooth"});
+    row.scrollIntoView({block:"center", behavior:"auto"});
+    const top=row.getBoundingClientRect().top;
+    const stable=lastTop!=null && Math.abs(top-lastTop)<0.5;
+    lastTop=top;
+    if(!stable && performance.now()-start<500){ requestAnimationFrame(settle); return; }
     row.classList.add("wilhighlight");
     setTimeout(()=>row.classList.remove("wilhighlight"), 2000);
-  });
-};
+  };
+  requestAnimationFrame(settle);
+}
 
 function oamMutateMood(moodId, fn){
   const list=oamMoodsListReal();
@@ -24785,7 +24840,15 @@ function jumpOccludedBottom(chromeId){
 // is byte-for-byte the same jump it always did. Moving passes its own groups selector, #movingHead as the
 // occluding chrome, and #movingScreen as the scroller, since that screen is its own fixed overflow-y:auto
 // box (CAS-852) rather than sharing the page's own scroll the way the Watch listing does.
+// CAS-1362: jumpToSection's own settle() below can keep correcting for up to ~3.6s (40 tries, 80ms apart,
+// after an initial 420ms wait) — long enough for a later, more precise scroll owner (oamWilShowInWatch's
+// own row-centering) to finish and declare victory well before this chase is done, only for this chase to
+// then land back on the section heading underneath it. cancelPendingSectionJump lets that later owner
+// invalidate any chase already in flight; a fresh jumpToSection call always wins over an older one too.
+let _sectionJumpToken = 0;
+function cancelPendingSectionJump(){ _sectionJumpToken++; }
 window.jumpToSection = (k, opts) => {
+  const token = ++_sectionJumpToken;
   const {groupsSel="#groups .group", chromeId="cascbar", scrollerId=null, instant=false} = opts||{};
   const scroller = scrollerId ? document.getElementById(scrollerId) : window;
   if(!scroller) return;
@@ -24800,6 +24863,7 @@ window.jumpToSection = (k, opts) => {
   scroller.scrollBy({top:first, behavior: (instant || REDUCE_MOTION.matches) ? "auto" : "smooth"});
   let tries=0;
   const settle=()=>{
+    if(token!==_sectionJumpToken) return;   // superseded by a newer jump, or explicitly cancelled
     const d=delta();
     if(d===null || Math.abs(d)<=4 || tries++>=40) return;   // arrived, gone, or given up rather than loop
     scroller.scrollBy(0,d);
