@@ -429,7 +429,7 @@
   #filmInvite.open{z-index:91}
   /* CAS-1077: Delete account opens from renderAccount()'s #accountScreen — a .uscreen, z-index:84 — same
      over-the-launching-surface treatment as #contact.open/#feedback.open above. Audited every other .modal
-     (builder, filters, prefs, saveAs, recommend, logModal, videoModal): none of them can currently open
+     (builder, filters, prefs, saveAs, recommend, logModal): none of them can currently open
      while a full z-index:84 .uscreen is on screen — they only open from another modal, from the plain
      listing, from the nav menu (which the header carries, and the header sits under every full .uscreen),
      or from #movingScreen/#agentsScreen, which are the one pair of .uscreen deliberately kept below the
@@ -826,16 +826,74 @@
     padding:0;cursor:pointer;font:inherit}
   .trailer .play{width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;font-size:12px;border:1px solid rgba(255,255,255,.45)}
   .notrailer{font-size:12px;color:var(--faint)}
-  /* CAS-438: the in-app video window — an embedded player up top (16:9, via padding-top so it reflows with
-     card width) and the film's other videos below it as the same thumbnail tile the card trailers use,
-     just wrapping instead of scrolling. Swapping the active one only ever changes vidFrame's src. */
-  .vidwrap{position:relative;width:100%;padding-top:56.25%;background:#000;border-radius:10px;overflow:hidden;margin-bottom:14px}
-  .vidwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
-  .vidlist{display:flex;flex-wrap:wrap;gap:8px}
-  .vidthumb{position:relative;width:calc(50% - 4px);height:76px;border-radius:9px;border:1px solid var(--line);
-    background:var(--panel2) center/cover no-repeat;display:grid;place-items:center;padding:0;cursor:pointer;font:inherit}
-  .vidthumb.active{border-color:var(--accent)}
-  .vidthumb .play{width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;font-size:11px;border:1px solid rgba(255,255,255,.45)}
+  /* CAS-1359: THEATRE — full-viewport player that replaced the old #videoModal column (CAS-438). Fixed to
+     the viewport, not the app's 480px .modal column, above every other layer except .buildgate (200) — see
+     that rule's own comment on why 200 sits above literally everything. Portrait: stage then a scrolling
+     info column. Landscape-phone and desktop get their own layout via the media queries below. */
+  .theatre{position:fixed;inset:0;z-index:130;background:#000;display:none;flex-direction:column}
+  .theatre.open{display:flex}
+  .theatrestage{position:relative;width:100%;aspect-ratio:16/9;background:#000;flex-shrink:0}
+  .theatrestage iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .theatreoverlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;
+    transition:opacity .25s ease}
+  .theatreoverlay.hide{opacity:0}
+  .theatrebar{display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;
+    background:linear-gradient(rgba(0,0,0,.65),transparent)}
+  .theatrebarmid{flex:1;min-width:0;text-align:center}
+  .theatretitle{font-size:14px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .theatresub{font-size:11.5px;color:rgba(255,255,255,.72);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .theatreicon{flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;
+    border:1px solid rgba(255,255,255,.3);display:grid;place-items:center;font-size:15px;cursor:pointer;padding:0}
+  .theatrenav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;
+    background:rgba(0,0,0,.5);color:#fff;border:1px solid rgba(255,255,255,.3);font-size:20px;line-height:1;
+    display:grid;place-items:center;cursor:pointer;padding:0}
+  .theatrenav.prev{left:10px} .theatrenav.next{right:10px}
+  .theatrenav[hidden]{display:none}
+  .theatreinfo{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:16px 16px calc(24px + env(safe-area-inset-bottom,0px))}
+  .theatremeta{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
+  .theatrechip{flex:0 0 auto;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;
+    padding:3px 8px;border-radius:6px;margin-top:2px}
+  .theatrechip.trailer{background:rgba(164,134,240,.22);color:var(--purple)}
+  .theatrechip.teaser{background:rgba(240,163,54,.22);color:var(--amber)}
+  .theatrename{font-size:16px;font-weight:800;color:var(--ink)}
+  .theatredate{font-size:12.5px;color:var(--dim);margin-top:2px}
+  .theatrebtns{display:flex;gap:8px;margin-bottom:22px}
+  .theatrebtns .theatrestar,.theatreinvite,.theatreyt{flex:1;height:42px;border-radius:11px;display:flex;
+    align-items:center;justify-content:center;gap:6px;font-size:13.5px;font-weight:700;border:1px solid var(--line);
+    background:var(--panel2);color:var(--ink);cursor:pointer;text-decoration:none;font-family:inherit}
+  .theatrebtns .theatrestar.on{border-color:#f5c542;color:#f5c542}
+  .theatreyt{background:transparent;color:var(--dim)}
+  .theatremorelbl{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);font-weight:700;margin-bottom:8px}
+  .theatrestrip{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding-bottom:2px}
+  .theatrestrip::-webkit-scrollbar{display:none}
+  .theatrethumb{display:block;flex:0 0 auto;width:168px;scroll-snap-align:start;border-radius:10px;overflow:hidden;
+    border:2px solid transparent;padding:0;cursor:pointer;font:inherit;text-align:left;background:var(--panel)}
+  .theatrethumb.active{border-color:var(--accent)}
+  .theatrethumbimg{position:relative;width:100%;padding-top:56.25%;background:var(--panel2) center/cover no-repeat}
+  .theatreplaying{position:absolute;top:6px;left:6px;background:var(--accent);color:#fff;font-size:9px;font-weight:800;
+    padding:2px 6px;border-radius:5px;text-transform:uppercase;letter-spacing:.3px}
+  .theatrethumbmeta{padding:6px 8px 8px}
+  .theatrethumbname{font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .theatrethumbsub{font-size:10.5px;color:var(--faint);margin-top:1px}
+  /* Landscape phone (short viewport height): the stage alone fills the screen at the largest 16:9 that
+     fits, letterboxed within safe-area insets; the info column (desktop/portrait only) steps aside. The
+     900px desktop breakpoint below never matches here too, since a desktop window is never this short. */
+  @media (orientation:landscape) and (max-height:500px){
+    .theatreinfo{display:none}
+    .theatrestage{aspect-ratio:auto;flex:1 1 auto;display:flex;align-items:center;justify-content:center;
+      padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);box-sizing:border-box}
+    .theatrestage iframe{position:static;aspect-ratio:16/9;width:auto;height:100%;max-width:100%}
+  }
+  /* Desktop/wide: cinema width, centred, capped so a huge window doesn't stretch the stage past a
+     sensible viewing size; info/strip stay readable at a fixed max width underneath. */
+  @media (min-width:900px){
+    .theatre{align-items:center;justify-content:flex-start;padding-top:28px;box-sizing:border-box}
+    .theatrestage{width:auto;flex-shrink:0;aspect-ratio:16/9;max-width:min(100%,1600px);
+      height:min(calc(100vh - 260px),calc(100vw*9/16));
+      height:min(calc(100dvh - 260px),calc(100vw*9/16))}
+    .theatreinfo{width:100%;max-width:1100px;flex:none}
+  }
   /* CAS-1182: share, in the opened card. Full-width and accent-coloured so it reads clearly against the
      card, without the weight of a primary CTA — a full-height target rather than a bare glyph. */
   .exshare{margin-top:14px}
@@ -4679,13 +4737,39 @@
   </div>
 </div>
 
-<!-- VIDEO WINDOW modal (CAS-438) — tapping a trailer plays it in here instead of leaving for YouTube.
-     The chosen video plays embedded at the top; the film's other videos are listed below and swap into
-     the same player when tapped. -->
-<div class="modal" id="videoModal">
-  <div class="modalhead"><h3>Videos</h3><button class="donebtn" id="videoModalClose">Done</button></div>
-  <div class="vidwrap"><iframe id="vidFrame" src="" title="Video player" allow="autoplay; encrypted-media" allowfullscreen></iframe></div>
-  <div class="vidlist" id="vidList"></div>
+<!-- THEATRE (CAS-1359) — full-viewport trailer/teaser player, replacing the CAS-438 #videoModal column.
+     Opened from a card's trailer thumbnails (openVideoModal(id,key), unchanged entry point). Stage up top
+     (the embed, with a tap-to-toggle control overlay), the film's other videos in a strip below. -->
+<div class="theatre" id="theatre" role="dialog" aria-modal="true" aria-label="Video player">
+  <div class="theatrestage" id="theatreStage" onclick="theatreStageTap(event)">
+    <iframe id="theatreFrame" src="" title="Video player"
+      allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
+    <div class="theatreoverlay" id="theatreOverlay">
+      <div class="theatrebar">
+        <button type="button" class="theatreicon" id="theatreClose" aria-label="Close">✕</button>
+        <div class="theatrebarmid">
+          <div class="theatretitle" id="theatreTitle"></div>
+          <div class="theatresub" id="theatreSub"></div>
+        </div>
+        <button type="button" class="theatreicon" id="theatreFull" onclick="theatreToggleFullscreen()" aria-label="Full screen">⤢</button>
+      </div>
+      <button type="button" class="theatrenav prev" id="theatrePrev" onclick="theatrePrevVideo()" aria-label="Previous video">‹</button>
+      <button type="button" class="theatrenav next" id="theatreNext" onclick="theatreNextVideo()" aria-label="Next video">›</button>
+    </div>
+  </div>
+  <div class="theatreinfo" id="theatreInfo">
+    <div class="theatremeta">
+      <span class="theatrechip" id="theatreChip"></span>
+      <div><div class="theatrename" id="theatreName"></div><div class="theatredate" id="theatreDate"></div></div>
+    </div>
+    <div class="theatrebtns">
+      <button type="button" class="theatrestar" id="theatreStar" onclick="theatreToggleStar()"></button>
+      <button type="button" class="theatreinvite" id="theatreInvite" onclick="theatreInviteFilm()">Invite</button>
+      <a class="theatreyt" id="theatreYt" href="#" target="_blank" rel="noopener">YouTube ↗</a>
+    </div>
+    <div class="theatremorelbl">More videos</div>
+    <div class="theatrestrip" id="theatreStrip"></div>
+  </div>
 </div>
 
 </div>
@@ -6842,7 +6926,9 @@ function openModal(el){ el.classList.add("open"); lockBodyScroll(true); }
 // is still open, and the user would come back to a list that had moved.
 function closeModal(el){
   el.classList.remove("open");
-  if(!document.querySelector(".modal.open")) lockBodyScroll(false);
+  // CAS-1359: Theatre can have a .modal (e.g. the invite sheet) stacked on top of it — don't release the
+  // lock just because that modal closed while Theatre is still open underneath.
+  if(!document.querySelector(".modal.open") && !$("theatre").classList.contains("open")) lockBodyScroll(false);
   if(typeof fireScreenResume==="function") fireScreenResume();   // CAS-206/CAS-1126: Account or Settings steps aside for a modal, then resumes
 }
 // CAS-150: the Filters button is gone from the header — the selection engine is the Cascade itself, and a
@@ -8800,33 +8886,136 @@ function trailersHTML(m, expanded){
     : `<div class="notrailer">No trailer available yet.</div>`;
   return `<div class="exhead">Trailers</div>${body}`;
 }
-// CAS-438: the in-app video window. Opened from a trailer thumbnail, it plays the tapped video embedded
-// (youtube-nocookie, so no tracking cookie until playback starts) and lists the rest of the film's videos
-// below it — tapping one just swaps vidFrame's src, same window, same modal. videoModalVids holds the
-// open film's video keys so the list can re-render with the new active tile without re-reading MOVIES.
-let videoModalVids=[];
-function videoListHTML(vids, activeKey){
-  return vids.map(k=>`<button type="button" class="vidthumb${k===activeKey?" active":""}" onclick="playVideo('${k}')"
-    style="background-image:url(https://img.youtube.com/vi/${k}/mqdefault.jpg)" aria-label="Play video"><span class="play">▶</span></button>`).join("");
+// CAS-1359: THEATRE — the full-viewport player that replaced the CAS-438 #videoModal column. Opened from a
+// trailer thumbnail (openVideoModal(id,key), same entry point as before), it plays the tapped video embedded
+// (youtube-nocookie, no tracking cookie until playback starts) with the film's other videos in a strip below,
+// swapping the active one by reloading theatreFrame's src — never a second iframe.
+let theatreVideos=[], theatreIndex=0, theatreFilmId=null, theatreFilmTitle="", theatreOverlayTimer=null,
+    theatrePlaybackStarted=false, theatreTouchStartX=null;
+const theatreFullscreenSupported = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+// `m.videos` (CAS-1359) when present, else a minimal shape built from the older `m.trailers` key list, so a
+// record from before the data change (or an old cached catalogue) still opens a working player.
+function filmVideos(m){
+  if(Array.isArray(m.videos) && m.videos.length) return m.videos;
+  return (m.trailers||[]).map(k=>({key:k, name:"Trailer", type:"Trailer", official:false, published:null}));
 }
-window.playVideo=key=>{
-  $("vidFrame").src=`https://www.youtube-nocookie.com/embed/${key}?autoplay=1`;
-  $("vidList").innerHTML=videoListHTML(videoModalVids, key);
+function fmtVideoDate(iso){
+  if(!iso) return "";
+  const [y,mo,d]=iso.split("-");
+  return `${+d} ${MONTHS[+mo-1]} ${y.slice(2)}`;
+}
+function theatreStripHTML(){
+  return theatreVideos.map((v,i)=>`<button type="button" class="theatrethumb${i===theatreIndex?" active":""}" onclick="theatreGoTo(${i})"
+      aria-label="${escA(v.name||"Play video")}">
+      <div class="theatrethumbimg" style="background-image:url(https://img.youtube.com/vi/${v.key}/mqdefault.jpg)">
+        ${i===theatreIndex?'<span class="theatreplaying">Playing</span>':""}
+      </div>
+      <div class="theatrethumbmeta"><div class="theatrethumbname">${esc(v.name||"")}</div>
+        <div class="theatrethumbsub">${v.type==="Teaser"?"Teaser":"Trailer"}${v.published?` · ${fmtVideoDate(v.published)}`:""}</div></div>
+    </button>`).join("");
+}
+function updateTheatreStar(){
+  const b=$("theatreStar"); if(!b || theatreFilmId==null) return;
+  const on=isStarred(theatreFilmId);
+  b.classList.toggle("on", on);
+  b.setAttribute("aria-pressed", on);
+  b.innerHTML = on ? "★ Starred" : "☆ Star";
+}
+window.theatreToggleStar=()=>{ if(theatreFilmId!=null){ toggleStarred(theatreFilmId); updateTheatreStar(); } };
+window.theatreInviteFilm=()=>{ if(theatreFilmId!=null) openFilmInvite(theatreFilmId); };
+// CAS-1359: the overlay (close/title/fullscreen, ‹ › arrows) fades out 3s after the CURRENT video actually
+// starts playing, detected via the embed's own postMessage state events below — not a flat timer from open,
+// which would hide the controls over a video still buffering. Tapping the stage toggles it back any time.
+function showTheatreOverlay(){ $("theatreOverlay").classList.remove("hide"); }
+function theatreArmAutoHide(){
+  clearTimeout(theatreOverlayTimer);
+  theatreOverlayTimer=setTimeout(()=>$("theatreOverlay").classList.add("hide"), 3000);
+}
+window.theatreStageTap=e=>{
+  if(e.target.closest("button")) return;   // the control buttons handle their own clicks
+  const ov=$("theatreOverlay");
+  if(ov.classList.contains("hide")){ showTheatreOverlay(); if(theatrePlaybackStarted) theatreArmAutoHide(); }
+  else { ov.classList.add("hide"); clearTimeout(theatreOverlayTimer); }
 };
+function theatreRenderInfo(){
+  const v=theatreVideos[theatreIndex], n=theatreVideos.length;
+  $("theatreTitle").textContent=theatreFilmTitle;
+  $("theatreSub").textContent=`${v.name||"Video"} · ${theatreIndex+1} of ${n}`;
+  const chip=$("theatreChip"), isTeaser=v.type==="Teaser";
+  chip.textContent=isTeaser?"TEASER":"TRAILER";
+  chip.className="theatrechip "+(isTeaser?"teaser":"trailer");
+  $("theatreName").textContent=v.name||"";
+  $("theatreDate").textContent=fmtVideoDate(v.published);
+  $("theatreYt").href=`https://www.youtube.com/watch?v=${v.key}`;
+  $("theatrePrev").hidden=theatreIndex===0;
+  $("theatreNext").hidden=theatreIndex===n-1;
+  $("theatreFull").hidden=!theatreFullscreenSupported;
+  $("theatreStrip").innerHTML=theatreStripHTML();
+  updateTheatreStar();
+}
+function theatreLoad(i){
+  theatreIndex=Math.max(0, Math.min(i, theatreVideos.length-1));
+  theatrePlaybackStarted=false;
+  clearTimeout(theatreOverlayTimer);
+  showTheatreOverlay();
+  const v=theatreVideos[theatreIndex];
+  $("theatreFrame").src=`https://www.youtube-nocookie.com/embed/${v.key}?autoplay=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1`;
+  theatreRenderInfo();
+}
+window.theatreGoTo=i=>{ if(i>=0 && i<theatreVideos.length) theatreLoad(i); };
+window.theatrePrevVideo=()=>theatreGoTo(theatreIndex-1);
+window.theatreNextVideo=()=>theatreGoTo(theatreIndex+1);
+window.theatreToggleFullscreen=()=>{
+  if(document.fullscreenElement){ if(document.exitFullscreen) document.exitFullscreen(); }
+  else { const el=$("theatreStage"); if(el.requestFullscreen) el.requestFullscreen(); }
+};
+// CAS-1359: auto-advance via the embed's own postMessage state events — {"event":"listening"} once the
+// iframe has loaded, per the CSP comment above (no external IFrame API script, so script-src stays
+// unchanged). playerState 0 is "ended"; 1 is "playing", which is what arms the 3s overlay auto-hide.
+$("theatreFrame").addEventListener("load", ()=>{
+  const win=$("theatreFrame").contentWindow;
+  if(win) try{ win.postMessage(JSON.stringify({event:"listening", id:"theatreFrame"}), "https://www.youtube-nocookie.com"); }catch(e){}
+});
+window.addEventListener("message", e=>{
+  if(!/^https:\/\/(www\.)?youtube-nocookie\.com$/.test(e.origin)) return;
+  if(!$("theatre").classList.contains("open")) return;
+  let data;
+  try{ data = typeof e.data==="string" ? JSON.parse(e.data) : e.data; }catch(err){ return; }
+  const state = data && data.info && typeof data.info==="object" ? data.info.playerState : undefined;
+  if(state===0 && theatreIndex<theatreVideos.length-1) theatreGoTo(theatreIndex+1);
+  else if(state===1 && !theatrePlaybackStarted){ theatrePlaybackStarted=true; theatreArmAutoHide(); }
+});
+// CAS-1359: a horizontal swipe on the info column changes video — the iframe itself swallows touches, so
+// this and the ‹ › arrows are the only ways to change video besides tapping a strip thumbnail.
+$("theatreInfo").addEventListener("touchstart", e=>{ theatreTouchStartX=e.touches[0].clientX; }, {passive:true});
+$("theatreInfo").addEventListener("touchend", e=>{
+  if(theatreTouchStartX==null) return;
+  const dx=e.changedTouches[0].clientX-theatreTouchStartX;
+  theatreTouchStartX=null;
+  if(Math.abs(dx)<40) return;
+  dx<0 ? theatreNextVideo() : theatrePrevVideo();
+}, {passive:true});
 window.openVideoModal=(id,key)=>{
   const m=MOVIES.find(x=>x.tmdb_id===id);
-  const vids=(m&&m.trailers)||[];
+  const vids=m?filmVideos(m):[];
   if(!vids.length) return;
-  videoModalVids=vids;
-  playVideo(vids.includes(key)?key:vids[0]);
-  openModal($("videoModal"));
+  theatreFilmId=id;
+  theatreFilmTitle=m.title;
+  theatreVideos=vids;
+  const startIdx=Math.max(0, vids.findIndex(v=>v.key===key));
+  $("theatre").classList.add("open");
+  lockBodyScroll(true);
+  theatreLoad(startIdx);
   logEvent("video_opened",{id});
 };
 window.closeVideoModal=()=>{
-  closeModal($("videoModal"));
-  $("vidFrame").src="";   // stop playback — an emptied src beats a paused iframe still holding the stream open
+  $("theatre").classList.remove("open");
+  $("theatreFrame").src="";   // stop playback — an emptied src beats a paused iframe still holding the stream open
+  clearTimeout(theatreOverlayTimer);
+  if(!document.querySelector(".modal.open")) lockBodyScroll(false);
 };
-$("videoModalClose").onclick=closeVideoModal;
+$("theatreClose").onclick=closeVideoModal;
+document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $("theatre").classList.contains("open")) closeVideoModal(); });
 // ---- CAS-1103: lazy posters ------------------------------------------------------------------
 // Card, film-page (cardTopHTML is shared by both, CAS-1119) and splash-wall posters are TMDB images with no
 // lazy loading today — a long listing or the 54-tile splash wall fetched every poster on paint, most of
