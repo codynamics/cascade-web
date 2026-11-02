@@ -150,20 +150,63 @@ test("CAS-1339 AC2: oaRowHTML hides the collapsed strip/value while its own styl
   });
 });
 
-// ---- AC3 (CAS-1351): releasing fully left (share 0) turns the style off; its films leave admission ----------
+// ---- CAS-1367: the slider no longer goes to off; releasing at its far left clamps to Top 20% -----------------
 
-test("CAS-1351 AC2: releasing a drag at share 0 (far left) turns the style off (bar null) and the film is no longer admitted", () => {
+test("CAS-1367: releasing a drag at share 0 clamps to the slider's own floor (Top 20%), it does not turn the style off", () => {
   withCascades([oneAgent({ styles: { "War": styleOn(50) } })], () => {
     const c = E.cascades[0];
-    const film = scoredFilm(["War","Drama"], 70);
+    E.oaOnRelease({ dataset:{style:"War"}, value:"0" });
+    assert.equal(c.styles.War.bar, E.oneBarForTopPct("War", 20), "clamped to share 20, not Never");
+    assert.notEqual(c.styles.War.bar, null);
+  });
+});
+
+// ---- CAS-1367 AC1/AC2: the row's own tick is the only way a style turns off, and it remembers its share -----
+
+test("CAS-1367 AC1: unticking a style off removes its films from admission; ticking it back on restores its prior bar", () => {
+  withCascades([oneAgent({ styles: { "Horror": styleOn(50) } })], () => {
+    const c = E.cascades[0];
+    const film = scoredFilm(["Horror","Drama"], 70);
     withMovies([film], () => {
-      assert.equal(E.matchesCriteria(film, c), true, "sanity: admitted while War is on");
-      E.oaOnRelease({ dataset:{style:"War"}, value:"0" });
-      assert.equal(c.styles.War.bar, null, "0 (far left) commits as Never, not a literal 0 score");
-      assert.equal(E.matchesCriteria(film, c), false, "the film leaves admission once the style is off");
-      const html = E.oaRowHTML(c, "War", 0);
-      assert.ok(html.includes("Never") && html.includes("never listed"));
+      assert.equal(E.matchesCriteria(film, c), true, "sanity: admitted while Horror is on");
+      E.oaToggleStyleOn("Horror");
+      assert.equal(c.styles.Horror.bar, null, "the tick turns it off");
+      assert.equal(c.styles.Horror.lastBar, 50, "its prior bar is remembered as lastBar");
+      assert.equal(E.matchesCriteria(film, c), false, "the film leaves admission once off");
+      E.oaToggleStyleOn("Horror");
+      assert.equal(c.styles.Horror.bar, 50, "ticking it back on restores the remembered bar");
+      assert.equal(E.matchesCriteria(film, c), true, "the film is admitted again");
     });
+  });
+});
+
+test("CAS-1367 AC1: a style with no remembered bar turns on at score 80", () => {
+  withCascades([oneAgent({ styles: {} })], () => {
+    const c = E.cascades[0];
+    E.oaToggleStyleOn("Horror");
+    assert.equal(c.styles.Horror.bar, 80);
+  });
+});
+
+test("CAS-1367 AC2: the collapsed row shows Off (not Never) once a style is off, and dims", () => {
+  withCascades([oneAgent({ styles: { "War": styleOn(50) } })], () => {
+    const c = E.cascades[0];
+    E.oaToggleStyleOn("War");
+    const html = E.oaRowHTML(c, "War", 0);
+    assert.ok(html.includes(">Off<"), "the value reads Off");
+    assert.ok(!html.includes("Never"), "no Never text remains on the row");
+    assert.ok(html.includes('class="oarow off"'), "the row carries the off modifier class");
+  });
+});
+
+test("CAS-1367 AC2: the open body has no slider (and no Never text) once a style is off", () => {
+  withCascades([oneAgent({ styles: { "War": styleOn(50) } })], () => {
+    const c = E.cascades[0];
+    E.oaToggleStyleOn("War");
+    const html = E.oaOpenBodyHTML(c, "War");
+    assert.ok(!html.includes("oarange"), "no range input renders while off");
+    assert.ok(!html.includes("Never"));
+    assert.ok(html.includes("is off"));
   });
 });
 

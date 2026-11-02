@@ -327,6 +327,10 @@ if(typeof window.CascadeAuth === "undefined"){
   oaToggleStyle: (style) => window.oaToggleStyle(style),
   oaOnDrag: (input) => window.oaOnDrag(input),
   oaOnRelease: (input) => window.oaOnRelease(input),
+  // CAS-1367: the row's own tick (on/off) and the shared turn-on rule (restore lastBar, else score 80) that
+  // it shares with Find's "Turn <Genre> on" button — exported the same way the other wire mutators above are.
+  oaToggleStyleOn: (style) => window.oaToggleStyleOn(style),
+  oaTurnStyleOn,
   oaApplySuggestion: (style, to) => window.oaApplySuggestion(style, to),
   oaDismissSuggestion: (style) => window.oaDismissSuggestion(style),
   // CAS-1345 Part 5: the suggestion callout's own collapsed/open state, same get/wrap pair oaOpenStyle and
