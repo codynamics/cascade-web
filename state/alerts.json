@@ -22316,5 +22316,65 @@
     "lost_window": "included_streaming",
     "label": "Included Streaming",
     "detected": "2026-11-01"
+  },
+  {
+    "tmdb_id": 497828,
+    "title": "Triangle of Sadness",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-02"
+  },
+  {
+    "tmdb_id": 1100099,
+    "title": "We Live in Time",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-02"
+  },
+  {
+    "tmdb_id": 1263012,
+    "title": "Dead Man's Wire",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Netflix",
+      "Netflix Standard with Ads"
+    ],
+    "detected": "2026-11-02"
+  },
+  {
+    "tmdb_id": 1263012,
+    "title": "Dead Man's Wire",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-11-02"
+  },
+  {
+    "tmdb_id": 832964,
+    "title": "Lee",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-02"
+  },
+  {
+    "tmdb_id": 1095234,
+    "title": "Sunflower",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-02"
+  },
+  {
+    "tmdb_id": 768331,
+    "title": "The Inner Cage",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-02"
   }
 ]
