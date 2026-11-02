@@ -779,6 +779,8 @@
   .cert{flex:none;display:inline-block;font-size:10.5px;font-weight:800;padding:1px 6px;border-radius:5px;
     border:1px solid #5b6472;color:#d6dce6;background:#232a35;vertical-align:middle;letter-spacing:.3px;white-space:nowrap}
   .cert.mature{border-color:#c0563f;color:#ffb9a6;background:rgba(192,86,63,.16)}
+  /* CAS-1370: unrated is a non-finding, not a rating — the same small chip, dimmed rather than coloured. */
+  .cert.unrated{border-color:#3d4452;color:var(--faint);background:transparent}
   /* CAS-486: the notify-test harness's fixture films (?fixtures=1) stay visually unmistakable
      wherever they render — deliberately loud (unlike .cert) so it can never read as real data. */
   .fixturebadge{flex:none;display:inline-block;font-size:10px;font-weight:800;padding:1px 6px;
@@ -9057,7 +9059,10 @@ function observeLazyPosters(root){
 function cardTopHTML(m, inWatch=false){
   const id=m.tmdb_id;
   const syn = m.synopsis ? `<p class="synopsis">${esc(m.synopsis)}</p>` : "";
-  const cert = m.age_rating ? `<span class="cert ${MATURE.has(m.age_rating)?'mature':''}">${m.age_rating}</span>` : "";
+  // CAS-1370: an unrated film still shows something where the certificate normally sits, in the same
+  // small style, so people can judge for themselves rather than have the film silently vanish.
+  const cert = m.age_rating ? `<span class="cert ${MATURE.has(m.age_rating)?'mature':''}">${m.age_rating}</span>`
+    : `<span class="cert unrated">Not rated</span>`;
   // CAS-486: a fixture film from the notify-test harness's ?fixtures=1 merge stays visually marked
   // wherever it renders — this badge, plus the "TEST FIXTURE" director credit in About & credits.
   const fixtureBadge = m._fixture ? `<span class="fixturebadge" title="${escA(FIXTURE_MARKER)}">TEST</span>` : "";
@@ -20671,7 +20676,10 @@ function oamFilmMeetsMoodRules(m, mood, c){
   if(bar==null) return false;
   const score=oneScoreFor(m, c);
   if(score===-1 || score<bar) return false;
-  if(mood.ages && mood.ages.length && !mood.ages.includes(oamFilmAge(m))) return false;
+  // CAS-1370: a film with no age_rating at all is not assumed unsuitable — the ages gate only ever
+  // excludes a film it can actually rate, never one it has no certificate for.
+  const age=oamFilmAge(m);
+  if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
   if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
   if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
   return true;
@@ -20688,7 +20696,9 @@ function oamFilmMeetsReleasesRules(m, mood, c){
   const {main}=mainOtherCombos(m);
   if(main===undefined || oaBar(c, main)==null) return false;
   if(!oamMoodStyles(mood, c).includes(main)) return false;
-  if(mood.ages && mood.ages.length && !mood.ages.includes(oamFilmAge(m))) return false;
+  // CAS-1370: same no-rating-no-exclusion rule as oamFilmMeetsMoodRules above.
+  const age=oamFilmAge(m);
+  if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
   if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
   if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
   return true;
@@ -21221,6 +21231,29 @@ const OAM_WIL_STATUS_LABEL = {
 // hard-coded status->key table (CAS-1362 cause 2: a table entry can name a stop watchStageStopsNow() isn't
 // currently carrying at all — e.g. its window switched off in Where & when — leaving setWatchStage's own
 // `if(!stop) return` silently stuck on whatever stage was already showing).
+// CAS-1370: when the agent admits a film but no mood lists it, the generic "none of your moods include
+// <genre>" reason is only true if no mood actually has that genre ticked. A mood CAN have the genre ticked
+// and still exclude the film on ages/awards/years alone — in that case the true reason is the gate that
+// actually fired, named by mood, not a blanket claim the genre itself is missing everywhere.
+function oamWilMoodGateReason(m, c, main){
+  for(const mood of oamMoodsListReal()){
+    if(!oamMoodStyles(mood, c).includes(main)) continue;
+    if(mood.id==="releases" && !filmInLatestWindow(m)) continue;
+    const name=esc(moodDisplayName(mood));
+    const age=oamFilmAge(m);
+    if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)){
+      return `<span class="wilnot">Not shown in ${name}:</span> it's rated ${esc(age)} and this mood shows ${esc(mood.ages.join(", "))}.`;
+    }
+    if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)){
+      const word = mood.awards==="won" ? "award winners" : "award-nominated films";
+      return `<span class="wilnot">Not shown in ${name}:</span> this mood only shows ${word}.`;
+    }
+    if(mood.years && !releasedSince(m, yearsCutoff(mood.years))){
+      return `<span class="wilnot">Not shown in ${name}:</span> it's older than this mood's last ${esc(String(mood.years))} years.`;
+    }
+  }
+  return null;
+}
 function oamWilStageKeyFor(m){
   const stops=watchStageStopsNow();
   if(filmMatchesWatchTab(m, "in_cinema")){
@@ -21308,6 +21341,10 @@ function oamWilCase(m, c){
       ]};
   }
   // The agent admits it (every check above passed) but it isn't in any mood, by hand or by rule.
+  // CAS-1370: before blaming the genre, check whether some mood actually has it ticked and is excluding
+  // the film on ages/awards/years alone — that is the true reason, not "none of your moods include".
+  const gate=oamWilMoodGateReason(m, c, main);
+  if(gate) return {sentence:gate, buttons:[{label:"Add to a mood by hand", action:`oamWilAddToMood(${id})`}]};
   return {sentence:`Not in a mood. Your agent lists it, but none of your moods include ${esc(name)}.`,
     buttons:[{label:"Add to a mood", action:`oamWilAddToMood(${id})`}]};
 }
@@ -21457,6 +21494,7 @@ window.oamAddIn=(id, moodId)=>{
   logEvent("watch_mood", {action:"hand_add"});
   closeWatchPanel();
   keepRowInPlace(id, ()=>repaintAfterOpinion(id));
+  renderWatchTop();   // CAS-1372: stage counts reflect the hand add immediately, without the full-list jump a render() would cause
 };
 window.oamTakeOut=(id, moodId)=>{
   oamMutateMood(moodId, mood=>{
@@ -21466,12 +21504,14 @@ window.oamTakeOut=(id, moodId)=>{
   logEvent("watch_mood", {action:"hand_out"});
   closeWatchPanel();
   keepRowInPlace(id, ()=>repaintAfterOpinion(id));
+  renderWatchTop();   // CAS-1372: stage counts reflect the hand take-out immediately, without the full-list jump a render() would cause
 };
 window.oamPutBack=(id, moodId)=>{
   oamMutateMood(moodId, mood=>{ mood.out=mood.out.filter(x=>x!==id); });
   logEvent("watch_mood", {action:"hand_clear"});
   closeWatchPanel();
   keepRowInPlace(id, ()=>repaintAfterOpinion(id));
+  renderWatchTop();   // CAS-1372: stage counts reflect the hand clear immediately, without the full-list jump a render() would cause
 };
 
 // ---- CAS-909: onboarding v2's agent reveal — the app's own Agents-screen row, assembled in front of the
@@ -24725,6 +24765,21 @@ function watchNavKey(){
     // the fields above by applyMoodToState() the moment a mood is selected or saved, so only identity
     // (added/removed/reordered/renamed) needs its own entry.
     watchMoods.map(m=>[m.id, m.name]),
+    // CAS-1372: a v2 mood's own settings (styles/show/sort/minScore/ages/awards/years/watched/handOnly/
+    // starredOnly/in/out) and the agent's own genre bars/combo overrides are exactly what filmInOneAgentMood/
+    // oamApplyShowCap read — none of them were fingerprinted above (every entry above was written for v1
+    // moods), so saving either left Watch showing the stale list until a mood switch (which "fixed" it only
+    // because that touches watchMoodSel, already fingerprinted above).
+    (()=>{
+      const c=oneAgentCriteria(); if(!c) return null;
+      const mood=currentOamMood();
+      return [
+        mood && [mood.styles, mood.show, mood.sort, mood.minScore, mood.ages, mood.awards, mood.years,
+                 mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out],
+        ALL_GENRES.map(g=>oaBar(c,g)),
+        c.combo,
+      ];
+    })(),
   ]);
 }
 // CAS-1236: forces the NEXT render() to run a full rebuild regardless of watchNavKey() — for the handful
