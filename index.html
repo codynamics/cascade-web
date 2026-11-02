@@ -3237,8 +3237,14 @@
   .oacolhdr span:last-child{grid-column:2 / span 3;text-align:right}
   .oalist{display:flex;flex-direction:column}
   .oarow{border-bottom:1px solid var(--line)}
+  /* CAS-1367: the tick sits outside the row's own <button> (a checkbox can't legally nest inside one) in a
+     thin flex wrapper, so the button keeps native keyboard/activation behaviour for the rest of the row. */
+  .oarowwrap{display:flex;align-items:center}
+  .oarowtick{display:flex;align-items:center;flex:0 0 auto;padding:11px 2px 11px 4px;cursor:pointer}
+  .oarowtick input{width:18px;height:18px;accent-color:var(--cyan);cursor:pointer}
+  .oarow.off .oarowhead{opacity:.55}
   .oarowhead{display:grid;grid-template-columns:104px 1fr 52px 28px;align-items:center;gap:8px;
-    padding:11px 4px;cursor:pointer;background:none;border:0;width:100%;text-align:left;font:inherit;color:inherit}
+    padding:11px 4px;cursor:pointer;background:none;border:0;flex:1;min-width:0;text-align:left;font:inherit;color:inherit}
   .oarowhead:hover,.oarowhead:focus-visible{background:rgba(255,255,255,.03)}
   .oarowhead:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
   .oarowleft{min-width:0}
@@ -20126,7 +20132,9 @@ function oaFilmCounts(c){
   return counts;
 }
 // The small 🔔 + one 7px dot per alerting window, shown after the style name when any window alert is on.
+// CAS-1367: an off style shows no dots — there is nothing to alert on while it is off.
 function oaAlertDotsHTML(c, style){
+  if(oaBar(c, style)==null) return "";
   const al=((c.styles||{})[style]||{}).al || {};
   const active=ONE_AGENT_WINDOWS.filter(w=>al[w.key]);
   if(!active.length) return "";
@@ -20171,50 +20179,63 @@ function oaAlertsHTML(c, style){
 }
 // Section 1 (MOVIE MINIMUM SCORE) + section 2 (FILM ALERTS) for the one open style, then CAS-1340's own
 // section 3 (SCORE ADJUSTMENTS, oaAdjustSectionHTML further down this file).
+// CAS-1367: a style with no bar is off (the row's own tick is the only way there, not this slider), so this
+// body has no "drag to Never" branch any more — just a short message in the slider's place.
 function oaOpenBodyHTML(c, style){
   const bar=oaBar(c, style);
-  const top = bar==null ? 0 : oneTopPct(style, bar);
   const name=oneAgentShortName(style);
-  const desc = bar==null
-    ? `Off: no ${esc(name)} films are listed. Drag left to turn it on.`
-    : `${esc(name)} films scoring ${bar} or more are listed: the top ${top}% of ${esc(name)}.`;
+  const sectionHTML = bar==null
+    ? `<p class="oaslidedesc" id="oaSliderDesc">${esc(name)} is off. Tick it on, above, to set a minimum score.</p>`
+    : (()=>{
+        const top = oneTopPct(style, bar);
+        return `<div class="oaslider">
+            <div class="oaslidewrap">
+              <div class="oastrip oastripfull">${oaShareBoxesHTML(style, bar, {labels:true})}</div>
+              <input type="range" class="oarange" min="20" max="100" step="1" value="${top}"
+                data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
+                aria-label="${escA(name)} minimum score">
+            </div>
+            <span class="oaslideval" id="oaSliderVal">Top ${top}%<i>score ${bar}+</i></span>
+          </div>
+          <p class="oaslidedesc" id="oaSliderDesc">${esc(name)} films scoring ${bar} or more are listed: the top ${top}% of ${esc(name)}.</p>`;
+      })();
   return `<div class="oaopen">
       <div class="oasechdr">MOVIE MINIMUM SCORE</div>
-      <div class="oaslider">
-        <div class="oaslidewrap">
-          <div class="oastrip oastripfull">${oaShareBoxesHTML(style, bar, {labels:true})}</div>
-          <input type="range" class="oarange" min="0" max="100" step="1" value="${bar==null?0:top}"
-            data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
-            aria-label="${escA(name)} minimum score">
-        </div>
-        <span class="oaslideval" id="oaSliderVal">${bar==null?"Never":`Top ${top}%<i>score ${bar}+</i>`}</span>
-      </div>
-      <p class="oaslidedesc" id="oaSliderDesc">${desc}</p>
+      ${sectionHTML}
       ${oaSuggestionHTML(style)}
       <div class="oasechdr">FILM ALERTS</div>
       ${oaAlertsHTML(c, style)}
       ${oaAdjustSectionHTML(c, style)}
     </div>`;
 }
+// CAS-1367: the tick before the name is the row's own on/off switch — a genre with bar null is off, and the
+// tick is now the only way there (the open slider below runs Top 20%..All only, never down to off).
 function oaRowHTML(c, style, filmCount){
   const open = oaOpenStyle===style;
   const bar=oaBar(c, style);
+  const on = bar!=null;
   const name=oneAgentShortName(style);
-  const filmsLine = bar==null ? "never listed" : `${filmCount} film${filmCount===1?"":"s"}`;
-  const rowTop = bar==null ? 0 : oneTopPct(style,bar);
+  const filmsLine = on ? `${filmCount} film${filmCount===1?"":"s"}` : "off";
+  const rowTop = on ? oneTopPct(style,bar) : 0;
   const strip = open ? `<span class="oarowstrip"></span><span class="oarowval"></span>`
     : `<span class="oarowstrip">${oaShareBoxesHTML(style, bar)}</span>
-       <span class="oarowval">${bar==null?"Never":`Top ${rowTop}%<i>score ${bar}+</i>`}</span>`;
+       <span class="oarowval">${on?`Top ${rowTop}%<i>score ${bar}+</i>`:"Off"}</span>`;
+  const tick=`<label class="oarowtick">
+      <input type="checkbox" ${on?"checked":""} onchange="oaToggleStyleOn('${escA(style)}')" aria-label="Turn ${escA(name)} on or off">
+    </label>`;
   const head=`
-    <button type="button" class="oarowhead" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
-      <span class="oarowleft">
-        <span class="oastyname">${esc(name)}${oaAlertDotsHTML(c, style)}</span>
-        <span class="oarowfilms">${filmsLine}${oaAdjustedBadgeHTML(c, style)}</span>
-      </span>
-      ${strip}
-      <span class="oachev" aria-hidden="true">${open?"▴":"▾"}</span>
-    </button>`;
-  return `<div class="oarow" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
+    <div class="oarowwrap">
+      ${tick}
+      <button type="button" class="oarowhead" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
+        <span class="oarowleft">
+          <span class="oastyname">${esc(name)}${oaAlertDotsHTML(c, style)}</span>
+          <span class="oarowfilms">${filmsLine}${oaAdjustedBadgeHTML(c, style)}</span>
+        </span>
+        ${strip}
+        <span class="oachev" aria-hidden="true">${open?"▴":"▾"}</span>
+      </button>
+    </div>`;
+  return `<div class="oarow${on?"":" off"}" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
 }
 function renderOneAgentScreen(c){
   const counts=oaFilmCounts(c);
@@ -20243,35 +20264,50 @@ window.oaToggleStyle=(style)=>{
 };
 // Live drag feedback (oninput) — redraws the slider's own boxes/value/description text in place, without a
 // full re-render, so neither the drag gesture nor the frozen row order is disturbed mid-drag.
+// CAS-1367: the slider's range is now Top 20%..All only — it never produces off (bar null) any more, so
+// there is no "Never" branch here; the row's own tick is the only way to turn a style off.
 window.oaOnDrag=(input)=>{
   const style=input.dataset.style;
-  const share=Math.max(0, Math.min(100, parseInt(input.value,10)));
+  const share=Math.max(20, Math.min(100, parseInt(input.value,10)));
   const wrap=input.closest(".oaslidewrap");
   const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
   ONE_AGENT_SHARE_BRACKETS.forEach((b,i)=>{
     const fill=boxes[i] && boxes[i].querySelector(".oafill");
     if(fill) fill.style.width=oaShareBoxPct(share,b)+"%";
   });
-  const bar = share<=0 ? null : oneBarForTopPct(style, share);
+  const bar = oneBarForTopPct(style, share);
   const name=oneAgentShortName(style);
   const valEl=$("oaSliderVal");
-  if(valEl) valEl.innerHTML = bar==null ? "Never" : `Top ${share}%<i>score ${bar}+</i>`;
+  if(valEl) valEl.innerHTML = `Top ${share}%<i>score ${bar}+</i>`;
   const descEl=$("oaSliderDesc");
-  if(descEl) descEl.textContent = bar==null
-    ? `Off: no ${name} films are listed. Drag left to turn it on.`
-    : `${name} films scoring ${bar} or more are listed: the top ${share}% of ${name}.`;
+  if(descEl) descEl.textContent = `${name} films scoring ${bar} or more are listed: the top ${share}% of ${name}.`;
 };
 // Release (onchange) — the one point this screen actually saves: CAS-1339's own "every change saves
 // immediately... no Save button", through the same saveCascades()/render() chokepoint every other agent
-// edit already uses. CAS-1351: the slider now carries a SHARE (0 Never .. 100 All); the stored bar is still
-// a raw score, converted through oneBarForTopPct so criteria.styles[S].bar never changes shape.
+// edit already uses. CAS-1351: the slider carries a SHARE; the stored bar is still a raw score, converted
+// through oneBarForTopPct so criteria.styles[S].bar never changes shape. CAS-1367: clamped to 20..100 — the
+// slider can no longer turn a style off (the tick does that; see oaToggleStyleOn below).
 window.oaOnRelease=(input)=>{
   const style=input.dataset.style;
   const c=oneAgentCriteria(); if(!c) return;
-  const share=Math.max(0, Math.min(100, parseInt(input.value,10)));
+  const share=Math.max(20, Math.min(100, parseInt(input.value,10)));
   c.styles=c.styles||{};
   const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
-  st.bar = share<=0 ? null : oneBarForTopPct(style, share);
+  st.bar = oneBarForTopPct(style, share);
+  saveCascades();
+  if(typeof render==="function") render();
+  renderAgentsScreen();
+};
+// CAS-1367: the row's tick — the only way a style turns off. Switching off remembers the bar as lastBar so
+// switching back on restores the same share; a style that has never had one starts at score 80. Shared with
+// Find's "Turn <Genre> on" button (oamWilTurnOnGenre, below), so both paths restore the same way.
+function oaTurnStyleOn(st){ st.bar = st.lastBar!=null ? st.lastBar : 80; }
+window.oaToggleStyleOn=(style)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  c.styles=c.styles||{};
+  const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
+  if(st.bar!=null){ st.lastBar=st.bar; st.bar=null; }
+  else { oaTurnStyleOn(st); }
   saveCascades();
   if(typeof render==="function") render();
   renderAgentsScreen();
@@ -20857,7 +20893,7 @@ function oamStyleRowHTML(c, d, style){
   const top = bar==null ? 0 : oneTopPct(style, bar);
   const valText = bar==null ? "Never" : `Top ${top}%<i>score ${bar}+</i>`;
   const alsoIn=oamStylesAlsoIn(style, d.editingId).filter(n=>n!==d.name);
-  let subText = never ? "never in your agent" : (alsoIn.length ? `also in ${alsoIn.join(", ")}` : "");
+  let subText = never ? "off in your agent" : (alsoIn.length ? `also in ${alsoIn.join(", ")}` : "");
   // CAS-1365: the mood minimum only ever raises the agent's own bar — show it on the row only when it's
   // actually higher than this genre's agent bar, so the row explains why fewer films show than the strip alone implies.
   if(!never && d.minScore!=null && d.minScore>bar){
@@ -21249,7 +21285,7 @@ function oamWilCase(m, c){
   const name=oneAgentShortName(main);
   const style=(c.styles||{})[main];
   if(!style || style.bar==null){
-    return {sentence:notListed(`${esc(name)} is set to never in your agent.`),
+    return {sentence:notListed(`${esc(name)} is off in your agent.`),
       buttons:[{label:`Turn ${esc(name)} on`, primary:true, action:`oamWilTurnOnGenre(${id},'${escA(main)}')`}]};
   }
   const combo=c.combo||{};
@@ -21324,15 +21360,17 @@ window.oamWilAddService=(id, service, type)=>{
   oamWilRepaint(id);
   toast(`${svcName(key)} added to your services`);
 };
+// CAS-1367: "sets it on as above" — the same restore-lastBar-else-80 rule the Agent screen's own tick uses
+// (oaTurnStyleOn), so a genre turned on from Find lands at the same share it would from the Agent screen.
 window.oamWilTurnOnGenre=(id, style)=>{
   const c=oneAgentCriteria(); if(!c) return;
   c.styles=c.styles||{};
   const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
-  st.bar=oneBarForTopPct(style, 60);
+  oaTurnStyleOn(st);
   saveCascades();
   if(typeof render==="function") render();
   oamWilRepaint(id);
-  toast(`${oneAgentShortName(style)} turned on · Top 60%`);
+  toast(`${oneAgentShortName(style)} turned on · Top ${oneTopPct(style, st.bar)}%`);
 };
 window.oamWilLetAgentDecide=(id, key)=>{
   const c=oneAgentCriteria(); if(!c) return;
