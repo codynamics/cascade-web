@@ -20336,12 +20336,17 @@ window.oaOnRelease=(input)=>{
 // CAS-1367: the row's tick — the only way a style turns off. Switching off remembers the bar as lastBar so
 // switching back on restores the same share; a style that has never had one starts at score 80. Shared with
 // Find's "Turn <Genre> on" button (oamWilTurnOnGenre, below), so both paths restore the same way.
-function oaTurnStyleOn(st){ st.bar = st.lastBar!=null ? st.lastBar : 80; }
+// CAS-1373: switching off also remembers the alerts as lastAl; turning back on restores them, or defaults
+// to Cinema/Rent/Stream all on for a style that has never had alerts set.
+function oaTurnStyleOn(st){
+  st.bar = st.lastBar!=null ? st.lastBar : 80;
+  st.al = st.lastAl ? {...st.lastAl} : {cinema:true, rent:true, stream:true};
+}
 window.oaToggleStyleOn=(style)=>{
   const c=oneAgentCriteria(); if(!c) return;
   c.styles=c.styles||{};
   const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
-  if(st.bar!=null){ st.lastBar=st.bar; st.bar=null; }
+  if(st.bar!=null){ st.lastBar=st.bar; st.lastAl={...(st.al||{})}; st.bar=null; }
   else { oaTurnStyleOn(st); }
   saveCascades();
   if(typeof render==="function") render();
