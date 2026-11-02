@@ -1378,6 +1378,10 @@
   .ebtn:hover{border-color:var(--accent)}
   .ebtn b{color:#a7eccb;white-space:nowrap}
   .ebtn.ghost{justify-content:center;color:var(--faint);border-style:dashed}
+  /* CAS-1371: the delete-mood button's armed ("tap again to delete") state needs its own visible colour —
+     the plain text swap it had before was too easy to miss, especially next to #moodDeleteBtn's own
+     tap-triggered :focus-visible ring (removed below) sitting right on top of this same dashed border. */
+  #moodDeleteBtn.armed{color:#e5484d;border-color:#e5484d;background:rgba(229,72,77,.12)}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;display:none}
   .overlay.open{display:block}
   /* CAS-553: diagnostics panel — a centered box inside the shared .overlay backdrop, not a full-bleed
@@ -4489,7 +4493,8 @@
     </div>
     <div class="wsheetbody" id="watchSheetBody"></div>
     <div class="wsheetfoot">
-      <button type="button" class="ebtn ghost" id="moodDeleteBtn" onclick="handleMoodDeleteBtn()">Delete mood</button>
+      <button type="button" class="ebtn ghost" id="moodDeleteBtn" onpointerdown="this._ptr=true"
+        onfocus="if(this._ptr){this._ptr=false;this.blur();}" onclick="handleMoodDeleteBtn()">Delete mood</button>
       <button type="button" class="donebtn" id="moodSaveBtn" onclick="saveMoodFromSheet()">Save mood</button>
     </div>
   </div>
@@ -10735,9 +10740,16 @@ function wireMoodRowDrag(row){
       return;
     }
     if(press && press.pointerId===e.pointerId){
+      // CAS-1371: preventDefault on every move while a hold is still undecided — touch or mouse — so the
+      // row's own native pan/scroll gesture (iOS: a UIScrollView recognizer that can claim the touch well
+      // before MOOD_LIFT_MS elapses, cancelling the pointer stream outright) never gets a chance to engage
+      // ahead of our own timer. A genuine swipe is unaffected: it falls into the `pan` branch below, which
+      // has always called preventDefault() and driven row.scrollLeft by hand instead of relying on native
+      // scroll — now that branch covers touch too, not just the mouse case it used to be limited to.
+      e.preventDefault();
       const dx=e.clientX-press.startX, dy=e.clientY-press.startY;
       if(Math.hypot(dx,dy)>MOOD_LIFT_SLOP){
-        if(press.pointerType==="mouse" && row.scrollWidth>row.clientWidth){
+        if(row.scrollWidth>row.clientWidth){
           pan={id:press.pointerId, startX:e.clientX, startScrollLeft:row.scrollLeft};
           row._moodSuppressClick=true;
         }
@@ -10793,6 +10805,20 @@ function commitMoodOrder(idsInOrder){
   renderWatchTop();
   logEvent("watch_mood", {action:"reorder"});
 }
+// CAS-1371: the sheet's own "Move left"/"Move right" fallback — a one-step swap with the neighbour in the
+// SAME non-pinned ordering commitMoodOrder/wireMoodRowDrag use, so it can never put anything ahead of a
+// pinned Releases and always lands exactly where a drag to that spot would have.
+window.oamMoveMood=dir=>{
+  const d=oamDraft; if(!d || !d.editingId || d.editingId==="releases") return;
+  const list=oamMoodsListReal();
+  const pinnedId = list.some(m=>m.id==="releases") ? "releases" : null;
+  const ids = (pinnedId ? list.filter(m=>m.id!==pinnedId) : list).map(m=>m.id);
+  const idx = ids.indexOf(d.editingId), to = idx+dir;
+  if(idx<0 || to<0 || to>=ids.length) return;
+  [ids[idx], ids[to]] = [ids[to], ids[idx]];
+  commitMoodOrder(pinnedId ? [pinnedId, ...ids] : ids);
+  renderOamMoodSheetBody();
+};
 // CAS-718: the search box's placeholder/value follow whichever tab is active — restoring the raw text you
 // left in THAT tab (not the lowercased match term, so casing/whitespace survive a tab switch) is the same
 // "leave and come back" rule the old per-list search always followed.
@@ -11526,8 +11552,12 @@ function renderMoodSheetBody(){
     </div>`;
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
-    if(!d.editingId){ delBtn.textContent="Cancel"; delBtn.disabled=false; }
-    else { delBtn.textContent = moodDeleteArmed ? "Tap again to delete" : "Delete mood"; delBtn.disabled = watchMoods.length<=1; }
+    if(!d.editingId){ delBtn.textContent="Cancel"; delBtn.disabled=false; delBtn.classList.remove("armed"); }
+    else {
+      delBtn.textContent = moodDeleteArmed ? "Tap again to delete" : "Delete mood";
+      delBtn.disabled = watchMoods.length<=1;
+      delBtn.classList.toggle("armed", moodDeleteArmed);
+    }
   }
   const saveBtn=$("moodSaveBtn");
   if(saveBtn) saveBtn.disabled = noAgentsSelected;
@@ -20972,6 +21002,11 @@ function renderOamMoodSheetBody(){
   const d=oamDraft; if(!d) return;
   const c=oneAgentCriteria(); if(!c){ closeWatchSheet(); return; }
   const isBuiltin = d.editingId==="releases" || d.editingId==="starred";
+  // CAS-1371: a reliable fallback for press-and-hold reorder, which iOS Safari's own long-press/scroll
+  // gesture arbitration can preempt — Releases is always pinned first in the row (CAS-1296) and never
+  // part of this ordering, so it gets no Position row of its own.
+  const posList = oamMoodsListReal().filter(m=>m.id!=="releases");
+  const posIdx = d.editingId ? posList.findIndex(m=>m.id===d.editingId) : -1;
   const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "Mood" : "New mood";
   const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
   const kOn = d.stylesAll ? onStyles.length : d.styles.size;
@@ -21034,12 +21069,23 @@ function renderOamMoodSheetBody(){
       ${seg(OAM_SHOW_OPTS, d.show, "setOamDraftShow", "Show")}
       <div class="mfrow"><span>ORDER</span></div>
       ${seg(OAM_SORT_OPTS, d.sort, "setOamDraftSort", "Order")}
-    </div>`;
+    </div>
+    ${posIdx>=0 ? `<div class="wsheetsec">
+      <div class="wsheethd"><span>Position in your mood row</span></div>
+      <div class="mfseg" role="group" aria-label="Position">
+        <button type="button" ${posIdx<=0?"disabled":""} onclick="oamMoveMood(-1)">&lsaquo; Move left</button>
+        <button type="button" ${posIdx>=posList.length-1?"disabled":""} onclick="oamMoveMood(1)">Move right &rsaquo;</button>
+      </div>
+    </div>` : ""}`;
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
     delBtn.style.display="";
-    if(isBuiltin){ delBtn.textContent="Delete this mood"; delBtn.disabled=true; }
-    else { delBtn.textContent = oamDeleteArmed ? "Tap again to delete" : "Delete this mood"; delBtn.disabled=false; }
+    if(isBuiltin){ delBtn.textContent="Delete this mood"; delBtn.disabled=true; delBtn.classList.remove("armed"); }
+    else {
+      delBtn.textContent = oamDeleteArmed ? "Tap again to delete" : "Delete this mood";
+      delBtn.disabled=false;
+      delBtn.classList.toggle("armed", oamDeleteArmed);
+    }
   }
   const saveBtn=$("moodSaveBtn");
   if(saveBtn) saveBtn.style.display="none";

@@ -2339,6 +2339,147 @@ test("CAS-1356 AC1/AC4: a v2 account's mood row can be reordered, and the order 
   expect(chipIdsReloaded).toEqual(chipIdsAfter);
 });
 
+// CAS-1371: on iPhone Safari (Lee, lee+c21), tapping "Delete this mood" only ever showed a stray
+// :focus-visible ring and a plain text swap to "Tap again to delete" — easy to miss, so the second tap
+// (arming it is a one-shot 4s window) often never landed and it read as doing nothing at all. Code tracing
+// found both the tap-reaching-the-handler and the re-render-updating-the-label paths already worked; the
+// actual gap was AC1's own requirement — a visibly red armed state, with the ring suppressed on tap.
+// Playwright's touchscreen API has no "tap, wait, tap again" primitive, so this dispatches pointerType
+// "touch" events directly at the button, the same way the app's own pointerdown/click listeners read them.
+test("CAS-1371 AC1: Delete this mood arms visibly red on a touch tap, and a second deletes it", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  await page.evaluate(() => {
+    cascades.length = 0;
+    cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
+    saveCascades();
+    setActive(cascades[0].id);
+    watchMoods = [];   // never provisioned — oamMoodsListReal() falls back to the in-memory builtins
+    watchMoodSel = "action";
+    render();
+    window.openOamMoodSheetFor("action");
+  });
+  await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+
+  const delBtn = page.locator("#moodDeleteBtn");
+  await expect(delBtn).toHaveText("Delete this mood");
+  await expect(delBtn).not.toHaveClass(/armed/);
+
+  const tapDelete = () => page.evaluate(() => {
+    const el = document.getElementById("moodDeleteBtn");
+    el.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 101, pointerType: "touch", bubbles: true, cancelable: true }));
+    el.focus();   // a real tap also focuses the button — this is what used to leave the stray ring
+    el.dispatchEvent(new PointerEvent("pointerup", { pointerId: 101, pointerType: "touch", bubbles: true, cancelable: true }));
+    el.click();
+  });
+
+  await tapDelete();
+  await expect(delBtn).toHaveText("Tap again to delete");
+  await expect(delBtn).toHaveClass(/armed/);
+  const focusedAfterTap = await page.evaluate(() => document.activeElement === document.getElementById("moodDeleteBtn"));
+  expect(focusedAfterTap).toBe(false);   // AC1: no dashed ring left behind by a tap
+
+  await tapDelete();
+  await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
+  const ids = await page.evaluate(() => watchMoods.map(m => m.id));
+  expect(ids).not.toContain("action");
+});
+
+// CAS-1371 AC3: a Position row with Move left/Move right is the reliable fallback for press-and-hold
+// reorder on iOS Safari — it swaps with the neighbour in the same non-pinned order a drag uses, so it can
+// never land ahead of a pinned Releases, which never gets this row at all.
+test("CAS-1371 AC3: Move left / Move right in the mood sheet reorders", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  await page.evaluate(() => {
+    cascades.length = 0;
+    cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
+    saveCascades();
+    setActive(cascades[0].id);
+    watchMoods = [];
+    watchMoodSel = "action";
+    render();
+    window.openOamMoodSheetFor("action");
+  });
+  await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+
+  const before = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
+  expect(before.indexOf("action")).toBeGreaterThan(0);
+
+  await page.locator('#watchSheetBody button:has-text("Move right")').click();
+  const afterRight = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
+  expect(afterRight.indexOf("action")).toBe(before.indexOf("action") + 1);
+
+  await page.locator('#watchSheetBody button:has-text("Move left")').click();
+  const afterLeft = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
+  expect(afterLeft).toEqual(before);
+
+  // Releases is pinned first in the row and never reorders, so its own sheet gets no Position row.
+  await page.evaluate(() => window.openOamMoodSheetFor("releases"));
+  await expect(page.locator('#watchSheetBody .wsheethd:has-text("Position")')).toHaveCount(0);
+});
+
+// CAS-1371 AC2: a still hold on a mood chip lifts it and a drag with it reorders. Real iOS Safari can
+// cancel the pointer stream before MOOD_LIFT_MS (450ms) elapses — a native gesture-arbitration race
+// Playwright's own WebKit build doesn't reproduce — so this instead exercises the JS fix directly
+// (pointermove now preventDefault()s through the whole undecided hold, and the manual-pan fallback that
+// used to be mouse-only now covers touch) by dispatching pointerType "touch" events at the chip and row.
+test("CAS-1371 AC2: a still touch hold lifts a mood chip and dragging it reorders", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  await page.evaluate(() => {
+    cascades.length = 0;
+    cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
+    saveCascades();
+    setActive(cascades[0].id);
+    watchMoods = [];
+    watchMoodSel = "releases";
+    render();
+  });
+
+  const chipIdsBefore = await page.locator(".moodrow .moodchip").evaluateAll(els => els.map(el => el.dataset.mood));
+  expect(chipIdsBefore.length).toBeGreaterThan(2);
+  const second = page.locator(".moodrow .moodchip").nth(1);
+  const third = page.locator(".moodrow .moodchip").nth(2);
+  const box = await second.boundingBox();
+  const box3 = await third.boundingBox();
+
+  await page.evaluate(({ x, y }) => {
+    const row = document.querySelector(".moodrow");
+    const chip = row.querySelectorAll(".moodchip:not(.pinned)")[0];
+    chip.dispatchEvent(new PointerEvent("pointerdown", {
+      pointerId: 202, pointerType: "touch", clientX: x, clientY: y, bubbles: true, cancelable: true,
+    }));
+  }, { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+
+  await page.waitForTimeout(600);   // MOOD_LIFT_MS=450ms, a still hold, no pointermove at all
+  const lifted = await page.evaluate(() => document.querySelector(".moodrow .moodchip.lifted") != null);
+  expect(lifted).toBe(true);
+
+  await page.evaluate(({ x, y }) => {
+    document.querySelector(".moodrow").dispatchEvent(new PointerEvent("pointermove", {
+      pointerId: 202, pointerType: "touch", clientX: x, clientY: y, bubbles: true, cancelable: true,
+    }));
+  }, { x: box3.x + box3.width - 2, y: box.y + box.height / 2 });
+
+  await page.evaluate(() => {
+    document.querySelector(".moodrow").dispatchEvent(new PointerEvent("pointerup", {
+      pointerId: 202, pointerType: "touch", bubbles: true, cancelable: true,
+    }));
+  });
+  await page.waitForTimeout(150);
+
+  const chipIdsAfter = await page.locator(".moodrow .moodchip").evaluateAll(els => els.map(el => el.dataset.mood));
+  expect(chipIdsAfter[0]).toBe("releases");
+  expect(chipIdsAfter[1]).toBe(chipIdsBefore[2]);
+});
+
 // CAS-765 AC7: the silent guest-mode drop is gone. If the vendored client library ever fails to define
 // window.supabase.createClient — forced here by serving a broken bundle in place of the real one — the
 // failure must be visible on screen, not just a console.warn no user will ever read.
