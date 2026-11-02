@@ -11162,9 +11162,14 @@ function applyMoodToState(mood){
   if(moodSource(mood)!=="catalogue" && cascades.length && cascades.every(c=>watchAgentOff.has(c.id))){
     watchAgentOff.clear();
   }
+  // CAS-1366: a v2 mood's own `watched` is a boolean ("Include films I've watched"), not the v1 verdict-key
+  // array this Set expects — `new Set(true)` throws (true isn't iterable), so turning the switch on and
+  // tapping Save crashed here, before the write ever reached pushViewField, and nothing was saved. Translate
+  // it the same way MOOD_DEFAULTS' own Starred record already uses to mean "every verdict, i.e. unfiltered".
+  const watchedKeys = mood.v2 ? (mood.watched ? REVIEW_STEPS.map(v=>v.key) : []) : (mood.watched||[]);
   WATCH_LEVEL_KEYS.forEach(tab=>{
     watchPickedBy[tab]=mood.pickedBy||"all";
-    watchWatchedSel[tab]=new Set(mood.watched||[]);
+    watchWatchedSel[tab]=new Set(watchedKeys);
     watchGenreOff[tab]=new Set(mood.stylesOff||[]);   // CAS-1284: reverses CAS-1273 — styles are back
     watchBadgeSel[tab]=new Set();   // CAS-1281: moods no longer filter by badge; mood.badges is ignored
     watchMineOnly[tab]=mood.mineOnly!==false;
@@ -20039,7 +20044,7 @@ const ONE_AGENT_SCORE_BRACKETS=[
 ];
 // Only the three styles the ticket names actually need a short form — every other TMDB genre name already
 // reads short enough to show as-is in the row's own 104px column.
-const ONE_AGENT_SHORT_NAMES={"Science Fiction":"Sci-fi","Documentary":"Doco","TV Movie":"TV movie"};
+const ONE_AGENT_SHORT_NAMES={"Science Fiction":"Sci-fi","TV Movie":"TV movie"};
 function oneAgentShortName(style){ return ONE_AGENT_SHORT_NAMES[style] || style; }
 // amber cinema / blue rent / green stream — the same WINDOW_COLOR palette the rest of the app already
 // alerts with, keyed the way CAS-1337's styles[s].al object is (cinema/rent/stream, not in_cinema/pvod).
@@ -20568,7 +20573,10 @@ window.oaComboOnRelease=(input)=>{
 // cascades load — see loadUserPrefs' own v.moods adoption) so a v1 account's data is never touched by any of
 // this (AC6). Nothing in this section runs unless oneAgentCriteria() is non-null.
 const ONE_AGENT_MOOD_BUILTINS=[
-  {id:"releases", name:"Releases"},
+  // CAS-1366: Releases opens by release date, not score — a blank sort/show here used to fall back to
+  // oamMoodDefaultFields()'s score/all, so a never-saved Releases mood opened (and, once saved, stayed) in
+  // score order.
+  {id:"releases", name:"Releases", sort:"release", show:"all"},
   {id:"starred", name:"Starred", starredOnly:true},
   // CAS-1345 Part 2: CAS-1341's own spec for a new v2 account's starter moods — Order Score, Show best 20,
   // added here so setup (CAS-1342's watchMoods=oamMoodDefaultsNow() call) provisions all six in order.
@@ -20632,6 +20640,23 @@ function oamFilmMeetsMoodRules(m, mood, c){
   if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
   return true;
 }
+// CAS-1366: Releases' own rules — the same genre-tick/ages/awards/how-far-back gates as
+// oamFilmMeetsMoodRules, but admission by the latest-release window (any score, once the main genre is on
+// in the agent) replaces admission by score: neither the agent's bar nor the mood's own minimum score ever
+// applied to Releases. The watched switch applies the same excludeWatched override oamFilmMeetsMoodRules
+// uses, so "Include films I've watched" finally does something for this mood too.
+function oamFilmMeetsReleasesRules(m, mood, c){
+  if(!filmInLatestWindow(m)) return false;
+  const admitC = mood.watched ? {...c, excludeWatched:false} : c;
+  if(admitC.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
+  const {main}=mainOtherCombos(m);
+  if(main===undefined || oaBar(c, main)==null) return false;
+  if(!oamMoodStyles(mood, c).includes(main)) return false;
+  if(mood.ages && mood.ages.length && !mood.ages.includes(oamFilmAge(m))) return false;
+  if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
+  if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
+  return true;
+}
 // Full membership: a hand choice always beats the rules (ticket's own words). Latest/Starred keep today's
 // behaviour — see each ticket line in CAS-1341's description for what that means for each.
 function filmInOneAgentMood(m, mood, c){
@@ -20639,11 +20664,7 @@ function filmInOneAgentMood(m, mood, c){
   if((mood.out||[]).includes(id)) return false;
   if((mood.in||[]).includes(id)) return true;
   if(mood.handOnly) return false;
-  if(mood.id==="releases"){
-    if(!filmInLatestWindow(m)) return false;
-    const {main}=mainOtherCombos(m);
-    return main!==undefined && oaBar(c, main)!=null;
-  }
+  if(mood.id==="releases") return oamFilmMeetsReleasesRules(m, mood, c);
   if(mood.id==="starred" || mood.starredOnly) return starredIds.has(id);
   return oamFilmMeetsMoodRules(m, mood, c);
 }
@@ -20721,7 +20742,9 @@ function oamMoodDraftFrom(mood){
     awards: mood ? (mood.awards||"any") : "any",
     years: mood ? (mood.years||0) : 0,
     show: mood ? (mood.show||"all") : "all",
-    sort: mood ? (mood.sort||"score") : "score",
+    // CAS-1366: a Releases mood with no sort field at all falls back to release order, not score, same as
+    // the built-in's own default (ONE_AGENT_MOOD_BUILTINS) — everything else still falls back to score.
+    sort: mood ? (mood.sort || (mood.id==="releases" ? "release" : "score")) : "score",
     in: [...(mood ? (mood.in||[]) : [])],
     out: [...(mood ? (mood.out||[]) : [])],
   };
@@ -21005,6 +21028,9 @@ window.oamSaveMoodFromSheet=()=>{
     in: [...d.in], out: [...d.out],
   };
   if(mood.id==="starred") mood.starredOnly=true;
+  // CAS-1366: a save always stamps Releases' own repair marker, whichever sort was actually picked, so the
+  // one-time load repair below (loadUserPrefs) never reverts a deliberate choice of Score back to release.
+  if(mood.id==="releases") mood.releasesSortV=1;
   const list=oamMoodsListReal();
   const idx=list.findIndex(m=>m.id===mood.id);
   watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
@@ -27380,6 +27406,17 @@ function acctFetchKeepalive(init){
         // real view write. A mood renamed by hand to anything else is left alone.
         if(watchMoods.some(m=>m && m.v2 && m.id==="releases" && m.name==="Latest")){
           watchMoods = watchMoods.map(m=>(m && m.v2 && m.id==="releases" && m.name==="Latest") ? {...m, name:"Releases"} : m);
+          moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
+        }
+        // CAS-1366: a v2 Releases mood saved before this ticket added its own sort default
+        // (ONE_AGENT_MOOD_BUILTINS) still carries the old "score" order — repaired to "release" once, in
+        // memory, piggybacked onto the next real view write (a load must never write — CAS-1218/1243).
+        // Stamped with releasesSortV so a person who has (or later does) deliberately choose Score again
+        // keeps it — oamSaveMoodFromSheet stamps the same marker on every Releases save, regardless of
+        // which sort was picked.
+        if(watchMoods.some(m=>m && m.v2 && m.id==="releases" && m.sort==="score" && !m.releasesSortV)){
+          watchMoods = watchMoods.map(m=>(m && m.v2 && m.id==="releases" && m.sort==="score" && !m.releasesSortV)
+            ? {...m, sort:"release", releasesSortV:1} : m);
           moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
         }
       }

@@ -830,6 +830,12 @@ if(typeof window.CascadeAuth === "undefined"){
   // triple directly, the same convention oamMoodBarFor above uses. oamMoodDefaultFields is the blank mood
   // shape (handOnly/watched/etc.) a fixture mood is built from.
   oamFilmMeetsMoodRules, filmInOneAgentMood, oamMoodDefaultFields,
+  // CAS-1366: oamFilmMeetsReleasesRules is Releases' own RULES layer, alongside oamFilmMeetsMoodRules above
+  // (filmInOneAgentMood dispatches to one or the other by mood.id). ONE_AGENT_MOOD_BUILTINS is the builtin
+  // mood list a never-saved v2 account's defaults are built from (oamMoodDefaultsNow); oamMoodDraftFrom is
+  // the v2 mood sheet's own draft-building function, the same convention moodDraftFrom (v1) is exported for
+  // above. oamMoodsListReal is the account's own real v2 mood list (falling back to the builtins in memory).
+  oamFilmMeetsReleasesRules, ONE_AGENT_MOOD_BUILTINS, oamMoodDraftFrom, oamMoodsListReal,
 };
 `;
 
