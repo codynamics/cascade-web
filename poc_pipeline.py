@@ -301,11 +301,28 @@ TMDB_BASE = "https://api.themoviedb.org/3"
 # is ever written the un-canonical way.
 AGE_RATING_CANON = {"MA15+": "MA 15+", "R18+": "R 18+"}
 
+# CAS-1370: most titles carry no AU classification at all (TMDB only has one for titles that had an
+# AU theatrical/cinema release). Rather than leave age_rating null — which silently drops the title from
+# every mood with ages set — fall back to the US (MPAA) certification, then GB (BBFC), mapped onto the
+# same AU scale the rest of the app already filters on.
+US_AGE_RATING_MAP = {"G": "G", "PG": "PG", "PG-13": "M", "R": "MA 15+", "NC-17": "R 18+"}
+GB_AGE_RATING_MAP = {"U": "G", "PG": "PG", "12": "M", "12A": "M", "15": "MA 15+", "18": "R 18+"}
+
 
 def canon_age_rating(cert):
     """The canonical spelling for a raw AU classification string, or `cert` unchanged if it is
     already canonical (or not one of the known duplicate spellings)."""
     return AGE_RATING_CANON.get(cert, cert)
+
+
+def _first_certification(release_dates: list) -> str | None:
+    """The first non-blank certification among one country's TMDB release_dates entries, or
+    None if it has none."""
+    for rd in release_dates:
+        cert = (rd.get("certification") or "").strip()
+        if cert:
+            return cert
+    return None
 
 
 def _build_videos(vids: list) -> list:
@@ -327,7 +344,8 @@ def _build_videos(vids: list) -> list:
 
 def _tmdb_record(detail: dict) -> dict:
     """Map one TMDB detail payload to our skeleton record."""
-    cinema_date, age_rating = None, None
+    cinema_date, age_rating, age_rating_src = None, None, None
+    us_cert, gb_cert = None, None
     # CAS-360: every AU release_dates entry (all types 1-6), kept for future use — only type 3
     # (general theatrical) is acted on today, via cinema_release below.
     release_dates, cinema_release = [], False
@@ -343,6 +361,17 @@ def _tmdb_record(detail: dict) -> dict:
                 cert = (rd.get("certification") or "").strip()
                 if cert and not age_rating:      # AU classification (G/PG/M/MA15+/R18+)
                     age_rating = canon_age_rating(cert)
+                    age_rating_src = "AU"
+        # CAS-1370: US/GB certifications, captured from this same append_to_response payload — used only
+        # when AU has none at all (below), never to override a real AU classification.
+        elif entry["iso_3166_1"] == "US" and not us_cert:
+            us_cert = _first_certification(entry["release_dates"])
+        elif entry["iso_3166_1"] == "GB" and not gb_cert:
+            gb_cert = _first_certification(entry["release_dates"])
+    if not age_rating and us_cert and US_AGE_RATING_MAP.get(us_cert):
+        age_rating, age_rating_src = US_AGE_RATING_MAP[us_cert], "US"
+    if not age_rating and gb_cert and GB_AGE_RATING_MAP.get(gb_cert):
+        age_rating, age_rating_src = GB_AGE_RATING_MAP[gb_cert], "GB"
     lang = detail.get("original_language")
     countries = [c["iso_3166_1"] for c in detail.get("production_countries", [])]
     videos = _build_videos((detail.get("videos") or {}).get("results", []))
@@ -362,6 +391,8 @@ def _tmdb_record(detail: dict) -> dict:
         "cinema_release": cinema_release,     # CAS-360: had an AU type-3 (general theatrical) release
         "release_dates": release_dates,       # CAS-360: every AU release_dates type, stored for future use
         "age_rating": age_rating,
+        "age_rating_src": age_rating_src,    # CAS-1370: which classification this came from (AU/US/GB), or
+                                              # None when no region had one at all
         "worldwide_gross": detail.get("revenue") or None,   # single global number, often incomplete
         "budget": detail.get("budget") or None,             # TMDB budget (0 when unknown) — a badge, never a ranker:
                                                             # TMDB knows it for only ~5 of our 12 upcoming titles

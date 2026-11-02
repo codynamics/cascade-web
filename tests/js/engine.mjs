@@ -840,6 +840,11 @@ if(typeof window.CascadeAuth === "undefined"){
   // the v2 mood sheet's own draft-building function, the same convention moodDraftFrom (v1) is exported for
   // above. oamMoodsListReal is the account's own real v2 mood list (falling back to the builtins in memory).
   oamFilmMeetsReleasesRules, ONE_AGENT_MOOD_BUILTINS, oamMoodDraftFrom, oamMoodsListReal,
+  // CAS-1370: oamFilmAge is the canonical age_rating a mood's ages gate actually compares against (null
+  // for an unrated film, so the gate above knows not to exclude it); oamWilCase is "Where it lists"'s own
+  // per-film reasoning — exported so a test can assert its sentence text directly, the same convention
+  // oamFilmMeetsMoodRules above uses.
+  oamFilmAge, oamWilCase,
 };
 `;
 
