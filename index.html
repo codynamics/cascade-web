@@ -20749,10 +20749,11 @@ function filmInOneAgentMood(m, mood, c){
   if(mood.id==="starred" || mood.starredOnly) return starredIds.has(id);
   return oamFilmMeetsMoodRules(m, mood, c);
 }
-// Show cap — All/Best 10/20/40 by oneScore, applied AFTER membership. Hand-added films always show and count
-// towards the limit (ticket's own words): they're never cut, and they eat into the N rule-based films get.
+// Show cap — All/Best 20/40/60/80 by oneScore, applied AFTER membership. Hand-added films always show and
+// count towards the limit (ticket's own words): they're never cut, and they eat into the N rule-based films
+// get.
 function oamApplyShowCap(rows, mood, c, heldThisTab){
-  const n = mood.show==="10"?10 : mood.show==="20"?20 : mood.show==="40"?40 : null;
+  const n = OAM_SHOW_N[mood.show] || null;
   if(n==null) return rows;
   const handIds=new Set(mood.in||[]);
   const hand=rows.filter(m=>handIds.has(m.tmdb_id));
@@ -20822,7 +20823,8 @@ function oamMoodDraftFrom(mood){
     ages: new Set(mood ? (mood.ages||[]) : []),
     awards: mood ? (mood.awards||"any") : "any",
     years: mood ? (mood.years||0) : 0,
-    show: mood ? (mood.show||"all") : "all",
+    // CAS-1374: Best 10 is retired — a mood still carrying the old value opens as Best 20.
+    show: mood ? (mood.show==="10" ? "20" : (mood.show||"all")) : "all",
     // CAS-1366: a Releases mood with no sort field at all falls back to release order, not score, same as
     // the built-in's own default (ONE_AGENT_MOOD_BUILTINS) — everything else still falls back to score.
     sort: mood ? (mood.sort || (mood.id==="releases" ? "release" : "score")) : "score",
@@ -21001,7 +21003,10 @@ window.oamClearMinScore=()=>{ if(!oamDraft) return; oamDraft.minScore=null; rend
 const OAM_AGE_OPTS=TASTE_AGE_ORDER;
 const OAM_AWARDS_OPTS=[["any","Any"],["nominated","Nominated or won"],["won","Won"]];
 const OAM_YEARS_OPTS=[[0,"Any"],[10,"10 yrs"],[5,"5 yrs"],[3,"3 yrs"],[2,"2 yrs"],[1,"1 yr"]];
-const OAM_SHOW_OPTS=[["all","All"],["10","Best 10"],["20","Best 20"],["40","Best 40"]];
+// CAS-1374: Best 10 is retired — OAM_SHOW_N is the one place every show-cap reader (oamApplyShowCap,
+// oamWilRankInMood) maps a draft's `show` value through, so a new tier only ever needs adding here.
+const OAM_SHOW_OPTS=[["all","All"],["20","Best 20"],["40","Best 40"],["60","Best 60"],["80","Best 80"]];
+const OAM_SHOW_N={"20":20,"40":40,"60":60,"80":80};
 const OAM_SORT_OPTS=[["score","Score"],["release","Release date"],["title","A–Z"]];
 function renderOamMoodSheetBody(){
   const d=oamDraft; if(!d) return;
@@ -21277,6 +21282,18 @@ const OAM_WIL_STATUS_LABEL = {
   upcoming:"Upcoming", opening_week:"In Cinema", in_cinema:"In Cinema",
   pvod:"Premium", rental:"Rental", included_streaming:"Streaming"
 };
+// CAS-1374: the plain-English reason a film holds NO Watch stage at all (oamWilStageKeyFor returns null) —
+// "released" (cinema run over 90 days behind it, no offer yet) is the only status this actually happens for
+// today, but a status with no sentence of its own still gets a true one rather than silently falling through
+// to the cut-mood guess below.
+const OAM_WIL_NO_STAGE_SENTENCE = {
+  released: "Its cinema run has ended and it has no rent or stream date yet."
+};
+// 1st/2nd/3rd/4th… — only ever used for Find's "ranks Nth" wording below.
+function oamOrdinal(n){
+  const SUFFIX=["th","st","nd","rd"], v=n%100;
+  return n + (SUFFIX[(v-20)%10] || SUFFIX[v] || SUFFIX[0]);
+}
 // Which Watch stop (setWatchStage's own key) a film's current status lands on. Derived from
 // watchStageStopsNow()'s own live list and filmMatchesWatchTab's own tab-standing test, never a separate
 // hard-coded status->key table (CAS-1362 cause 2: a table entry can name a stop watchStageStopsNow() isn't
@@ -21314,6 +21331,27 @@ function oamWilStageKeyFor(m){
   const stop=stops.find(s=>filmMatchesWatchTab(m, s.tabKey));
   return stop ? stop.key : null;
 }
+// CAS-1374: `m`'s own 1-indexed rank among the rule-passing, non-hand films `mood`'s Best N cut actually
+// competes over — the same save/swap/restore device oamFilmShownInMood uses to put watchTab/watchCinemaStage/
+// watchMoodSel on the film's own stage before reading oamVisibleRows(), so this can never name a rank that
+// disagrees with what the cut itself would keep or drop. Hand-added films are never part of the ranking
+// (oamApplyShowCap's own rule: a hand add always shows and is never cut), so they're excluded here too.
+// Returns null for a mood with no numeric cut, or when (unexpectedly) `m` isn't in its own ranked pool.
+function oamWilRankInMood(m, mood, c, stageKey){
+  const n=OAM_SHOW_N[mood.show]; if(n==null) return null;
+  const stop=watchStageStopsNow().find(s=>s.key===stageKey); if(!stop) return null;
+  const savedTab=watchTab, savedStage=watchCinemaStage, savedMood=watchMoodSel;
+  watchTab=stop.tabKey;
+  if(stop.tabKey==="in_cinema") watchCinemaStage = stop.key==="upcoming" ? "upcoming" : "in_cinema";
+  watchMoodSel=mood.id;
+  const {preSheetRows}=oamVisibleRows();
+  watchTab=savedTab; watchCinemaStage=savedStage; watchMoodSel=savedMood;
+  const handIds=new Set(mood.in||[]);
+  const rest=preSheetRows.filter(x=>!handIds.has(x.tmdb_id))
+    .sort((a,b)=>{ const d=oneScoreFor(b,c)-oneScoreFor(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
+  const idx=rest.findIndex(x=>x.tmdb_id===m.tmdb_id);
+  return idx>=0 ? {rank:idx+1, n} : null;
+}
 function oamWilCase(m, c){
   const id=m.tmdb_id;
   const moods=oamMoodsForFilm(id, c);
@@ -21325,16 +21363,34 @@ function oamWilCase(m, c){
       return {sentence:`<span class="willisted">Listed in</span> ${names}${status?" &middot; "+esc(status):""}`,
         buttons:[{label:"Show in Watch ›", primary:true, action:`oamWilShowInWatch(${id})`}]};
     }
-    // CAS-1362 cause 1: it passes a mood's rules but none of them actually show it — almost always the
-    // mood's own Best N cut. Name the first mood with a numeric cut (the one actually responsible),
-    // falling back to the first rule-passing mood if every one is uncapped and some other reason (held
-    // status, search) is keeping it off the page — still a correct "not shown" either way.
-    const cutMood=moods.find(mo=>["10","20","40"].includes(mo.show)) || moods[0];
-    const n=cutMood.show==="10"?10:cutMood.show==="20"?20:cutMood.show==="40"?40:null;
-    const name=esc(moodDisplayName(cutMood));
-    const explain = n!=null ? `It's in ${name}'s rules but below its best ${n}.` : `It's in ${name}'s rules but not shown right now.`;
-    return {sentence:`<span class="wilnot">Not shown.</span> ${explain}`,
-      buttons:[{label:`Add it to ${name}`, primary:true, action:`oamAddIn(${id},'${escA(cutMood.id)}')`}]};
+    // CAS-1374: it passes a mood's rules but none of them actually show it. Check the real reasons in
+    // order, the first that applies wins — never the old guess (CAS-1362 cause 1) of blaming "the first
+    // mood with a numeric cut" regardless of whether that cut is actually responsible.
+    const stageKey=oamWilStageKeyFor(m);
+    if(!stageKey){
+      // Reason 1: the film holds no Watch stage at all — no mood can ever show it, so adding it to one
+      // wouldn't help (no button).
+      const sentence = OAM_WIL_NO_STAGE_SENTENCE[primaryStatus(m)]
+        || `Its status is ${esc(OAM_WIL_STATUS_LABEL[primaryStatus(m)] || primaryStatus(m))}.`;
+      return {sentence:`<span class="wilnot">Not shown.</span> ${sentence}`, buttons:[]};
+    }
+    // Reason 2: a mood that would show the film if its own Best N cut were larger — i.e. the film is
+    // genuinely in that mood's own ranked pool, ranking below N.
+    let cut=null, cutMood=null;
+    for(const mood of moods){
+      const r=oamWilRankInMood(m, mood, c, stageKey);
+      if(r && r.rank>r.n){ cut=r; cutMood=mood; break; }
+    }
+    if(cutMood){
+      const name=esc(moodDisplayName(cutMood));
+      return {sentence:`<span class="wilnot">Not shown.</span> It's in ${name}'s rules but ranks ${oamOrdinal(cut.rank)}, below its best ${cut.n}.`,
+        buttons:[{label:`Add it to ${name}`, primary:true, action:`oamAddIn(${id},'${escA(cutMood.id)}')`}]};
+    }
+    // Reason 3: something else is keeping it off the page (held status, search) — still correctly "not
+    // shown", just without a specific explanation to give.
+    const name=esc(moodDisplayName(moods[0]));
+    return {sentence:`<span class="wilnot">Not shown.</span> It's in ${name}'s rules but not shown right now.`,
+      buttons:[{label:`Add it to ${name}`, primary:true, action:`oamAddIn(${id},'${escA(moods[0].id)}')`}]};
   }
   const notListed = sentence => `<span class="wilnot">Not listed.</span> ${sentence}`;
   if(blocked.has(id)){
@@ -27561,6 +27617,12 @@ function acctFetchKeepalive(init){
         if(watchMoods.some(m=>m && m.v2 && m.id==="releases" && m.sort==="score" && !m.releasesSortV)){
           watchMoods = watchMoods.map(m=>(m && m.v2 && m.id==="releases" && m.sort==="score" && !m.releasesSortV)
             ? {...m, sort:"release", releasesSortV:1} : m);
+          moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
+        }
+        // CAS-1374: Best 10 is retired — a v2 mood still saved with show:"10" reads as "20" once, in
+        // memory, piggybacked onto the next real view write (a load must never write — CAS-1218/1243).
+        if(watchMoods.some(m=>m && m.v2 && m.show==="10")){
+          watchMoods = watchMoods.map(m=>(m && m.v2 && m.show==="10") ? {...m, show:"20"} : m);
           moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
         }
       }

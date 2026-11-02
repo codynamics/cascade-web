@@ -845,6 +845,11 @@ if(typeof window.CascadeAuth === "undefined"){
   // per-film reasoning — exported so a test can assert its sentence text directly, the same convention
   // oamFilmMeetsMoodRules above uses.
   oamFilmAge, oamWilCase,
+  // CAS-1374: OAM_SHOW_OPTS/oamApplyShowCap are the mood sheet's Show row and its own cut — exported so a
+  // test can assert the All/Best 20/40/60/80 tiers and the cut's cardinality directly, the same convention
+  // OAM_WIL_STATUS_LABEL-adjacent exports above use. watchSearch is already exported above (CAS-718) but
+  // reused here for the "anything else" Find reason.
+  OAM_SHOW_OPTS, oamApplyShowCap,
 };
 `;
 
