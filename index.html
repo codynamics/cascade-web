@@ -21494,6 +21494,7 @@ window.oamAddIn=(id, moodId)=>{
   logEvent("watch_mood", {action:"hand_add"});
   closeWatchPanel();
   keepRowInPlace(id, ()=>repaintAfterOpinion(id));
+  renderWatchTop();   // CAS-1372: stage counts reflect the hand add immediately, without the full-list jump a render() would cause
 };
 window.oamTakeOut=(id, moodId)=>{
   oamMutateMood(moodId, mood=>{
@@ -21503,12 +21504,14 @@ window.oamTakeOut=(id, moodId)=>{
   logEvent("watch_mood", {action:"hand_out"});
   closeWatchPanel();
   keepRowInPlace(id, ()=>repaintAfterOpinion(id));
+  renderWatchTop();   // CAS-1372: stage counts reflect the hand take-out immediately, without the full-list jump a render() would cause
 };
 window.oamPutBack=(id, moodId)=>{
   oamMutateMood(moodId, mood=>{ mood.out=mood.out.filter(x=>x!==id); });
   logEvent("watch_mood", {action:"hand_clear"});
   closeWatchPanel();
   keepRowInPlace(id, ()=>repaintAfterOpinion(id));
+  renderWatchTop();   // CAS-1372: stage counts reflect the hand clear immediately, without the full-list jump a render() would cause
 };
 
 // ---- CAS-909: onboarding v2's agent reveal — the app's own Agents-screen row, assembled in front of the
@@ -24762,6 +24765,21 @@ function watchNavKey(){
     // the fields above by applyMoodToState() the moment a mood is selected or saved, so only identity
     // (added/removed/reordered/renamed) needs its own entry.
     watchMoods.map(m=>[m.id, m.name]),
+    // CAS-1372: a v2 mood's own settings (styles/show/sort/minScore/ages/awards/years/watched/handOnly/
+    // starredOnly/in/out) and the agent's own genre bars/combo overrides are exactly what filmInOneAgentMood/
+    // oamApplyShowCap read — none of them were fingerprinted above (every entry above was written for v1
+    // moods), so saving either left Watch showing the stale list until a mood switch (which "fixed" it only
+    // because that touches watchMoodSel, already fingerprinted above).
+    (()=>{
+      const c=oneAgentCriteria(); if(!c) return null;
+      const mood=currentOamMood();
+      return [
+        mood && [mood.styles, mood.show, mood.sort, mood.minScore, mood.ages, mood.awards, mood.years,
+                 mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out],
+        ALL_GENRES.map(g=>oaBar(c,g)),
+        c.combo,
+      ];
+    })(),
   ]);
 }
 // CAS-1236: forces the NEXT render() to run a full rebuild regardless of watchNavKey() — for the handful
