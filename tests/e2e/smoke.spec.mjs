@@ -970,10 +970,17 @@ test("CAS-747 AC5: the Movie Budget card renders the includeUnbudgeted switch, a
   // listedBy itself so the clone can only be excluded or admitted by the switch under test, and assert the
   // donor is actually listed before the switch is touched rather than finding out from a misleading
   // before===after.
+  // CAS-1377 round 2: requiring the DONOR to already carry a real budget/gross >= $1M was vestigial —
+  // the clone always zeroes budget/worldwide_gross regardless of what the donor had, and selScaleMatch's
+  // inference branch never runs on a released film at all (see its own comment), so !isPreRelease alone
+  // already guarantees the clone gets no inference. That extra clause just narrowed the donor pool to
+  // "lists AND happens to carry real financial data" — on 3 Nov 2026 none of this agent's listed films did,
+  // so the precondition assertion (correctly) found nothing and failed loud. Dropped; any listedBy-passing,
+  // non-fixture, non-pre-release film is a valid donor to clone into an unbudgeted fixture.
   await page.evaluate(() => {
     const c = {...onbApply()};
-    const donor = MOVIES.find(m => !m._fixture && !isPreRelease(m) && (m.budget || m.worldwide_gross || 0) >= 1000000 && listedBy(m, c));
-    if(!donor) throw new Error("test setup: no gate-clean donor in today's catalogue (listedBy + budget >= $1M)");
+    const donor = MOVIES.find(m => !m._fixture && !isPreRelease(m) && listedBy(m, c));
+    if(!donor) throw new Error("test setup: no gate-clean donor in today's catalogue (listedBy, released, not a fixture)");
     if(!listedBy(donor, c)) throw new Error(`test setup: donor ${donor.tmdb_id} is not actually listed before the switch is touched`);
     MOVIES.push({...donor, tmdb_id: 900000747, title: "CAS-1262 unbudgeted fixture", budget: null, worldwide_gross: null, _fixture: true});
     invalidateComputeCaches();
