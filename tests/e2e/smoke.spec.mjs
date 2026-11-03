@@ -958,12 +958,23 @@ test("CAS-747 AC5: the Movie Budget card renders the includeUnbudgeted switch, a
 
   // CAS-1262: whether today's catalogue holds a film this agent lists that has no budget, no takings and no
   // inference is a daily-data coincidence (on 14 Oct 2026 it held none, so the count stayed 14 both ways and
-  // the gate went red). Plant one: a clone of a released film this agent already lists, with its budget and
-  // takings removed, so the switch always has exactly the film it governs to move.
+  // the gate went red). Plant one: a clone of a film this agent already LISTS, with its budget and takings
+  // removed, so the switch always has exactly the film it governs to move.
+  // CAS-1377: watchesFilm(m,c) alone (matchesTaste + inScope) is the WATCH question — "is a window this
+  // agent cares about still ahead of the film" — broader than listedBy's LIST question (matchesCriteria +
+  // awardsListOK + inScope + listWindowOK, the exact chain onbShownCount routes every mission count
+  // through). A donor can clear watchesFilm yet never list: on 3 Nov 2026 it picked tmdb_id 1368337 ("The
+  // Odyssey"), a `released`-status film that passed matchesCriteria/inScope but failed listWindowOK —
+  // `released` (CAS-1375's own "Rental soon" class) is not one of this agent's listed windows, so the
+  // cloned donor inherited a failure the switch could never fix and before===after every time. Pick with
+  // listedBy itself so the clone can only be excluded or admitted by the switch under test, and assert the
+  // donor is actually listed before the switch is touched rather than finding out from a misleading
+  // before===after.
   await page.evaluate(() => {
     const c = {...onbApply()};
-    const donor = MOVIES.find(m => !m._fixture && watchesFilm(m, c) && !isPreRelease(m) && (m.budget || m.worldwide_gross || 0) >= 1000000);
-    if(!donor) throw new Error("test setup: no released, budgeted film on this agent to clone");
+    const donor = MOVIES.find(m => !m._fixture && !isPreRelease(m) && (m.budget || m.worldwide_gross || 0) >= 1000000 && listedBy(m, c));
+    if(!donor) throw new Error("test setup: no gate-clean donor in today's catalogue (listedBy + budget >= $1M)");
+    if(!listedBy(donor, c)) throw new Error(`test setup: donor ${donor.tmdb_id} is not actually listed before the switch is touched`);
     MOVIES.push({...donor, tmdb_id: 900000747, title: "CAS-1262 unbudgeted fixture", budget: null, worldwide_gross: null, _fixture: true});
     invalidateComputeCaches();
   });
