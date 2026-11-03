@@ -1,23 +1,95 @@
 {
-  "date": "2026-11-02",
+  "date": "2026-11-03",
   "tmdb": {
-    "calls": 6913,
+    "calls": 6912,
     "errors": 0,
     "not_found": 0,
     "status_counts": {}
   },
   "watchmode": {
     "quota": 2500,
-    "quota_used": 1496,
-    "remaining_monthly_credits": 1004,
+    "quota_used": 1569,
+    "remaining_monthly_credits": 931,
     "calls": 73,
     "errors": 0,
     "mismatch": 0,
     "mismatch_ids": [],
-    "quarantined": 20
+    "quarantined": 21
   },
   "oscarbase": {
     "calls": 750,
     "errors": 0
+  },
+  "cinema_chains": {
+    "chains": {
+      "hoyts": {
+        "fetched": 51,
+        "matched": 30,
+        "unmatched": 21,
+        "unmatched_titles": [
+          "Scene (Tamil, Eng Sub)",
+          "Ramayana: Rise Of A Legend (Hindi, Eng Sub)",
+          "The Songs of John Farnham: Celebration Concert Encore",
+          "Aadarsha Kutumbam House No: 47 #AK47 (Telugu, Eng Sub)",
+          "Ramayana: Rise Of A Legend (Telugu, Eng Sub)",
+          "Karaoke Murder (Vietnamese, Eng Sub)",
+          "STRAY KIDS WORLD TOUR <RUN IT> LIVE VIEWING",
+          "Kabaddi 5 (Nepali, Eng Sub)",
+          "Stray Kids World Tour <Run It> Live Viewing (Encore)",
+          "Udta Teer (Hindi, Eng Sub)",
+          "Ramayana: Rise Of A Legend (Tamil, Eng Sub)",
+          "Hadestown: The Musical",
+          "Always Yours, Never Mine (Tagalog, Eng Sub)",
+          "Rammstein - Live in Mexico City",
+          "Ramayana: Rise Of A Legend (English Dub)",
+          "Chha Maya Chhapakkai 2",
+          "Ramayana: Rise Of A Legend (Kannada, Eng Sub)",
+          "Matloob Aelian (Arabic, Eng Sub)",
+          "Tad Jones and The Magic Lamp",
+          "Ramayana: Rise Of A Legend (Malayalam, Eng Sub)",
+          "(LFF) Liste De Marriage"
+        ],
+        "ignored": false
+      },
+      "event": {
+        "fetched": 57,
+        "matched": 26,
+        "unmatched": 31,
+        "unmatched_titles": [
+          "Kabaddi 5",
+          "Aadarsha Kutumbam House No: 47",
+          "Hadestown: The Musical",
+          "The Songs of John Farnham - A Living Legend",
+          "Rammstein - Live in Mexico City",
+          "Love Actually",
+          "The Rosie Awards - Rosemeadow Public School",
+          "Home Alone",
+          "Chha Maya Chhapakkai 2",
+          "The Irregular at Magic High School THE MOVIE - Yotsuba Succession Arc",
+          "Udta Teer",
+          "Elf",
+          "The Polar Express",
+          "Arthur Christmas",
+          "Home Alone 2 - Lost In New York",
+          "The Holiday",
+          "Always Yours Never Mine",
+          "Days of Being Wild",
+          "You Can't Leave",
+          "3D Under the Sea",
+          "3D Deep Sea",
+          "How The Grinch Stole Christmas",
+          "Mr & Mrs Pardon",
+          "TFF - Bitter Christmas",
+          "TFF - Fjord",
+          "TFF - La Bola Negra",
+          "TFF - Minotaur",
+          "TFF - No Good Men + Short Film",
+          "TFF - Silent Friend + Short Film",
+          "TFF - The Cycle of Love",
+          "TFF - Whistle + Short Film"
+        ],
+        "ignored": false
+      }
+    }
   }
 }
