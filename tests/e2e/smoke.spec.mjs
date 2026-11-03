@@ -958,31 +958,29 @@ test("CAS-747 AC5: the Movie Budget card renders the includeUnbudgeted switch, a
 
   // CAS-1262: whether today's catalogue holds a film this agent lists that has no budget, no takings and no
   // inference is a daily-data coincidence (on 14 Oct 2026 it held none, so the count stayed 14 both ways and
-  // the gate went red). Plant one: a clone of a film this agent already LISTS, with its budget and takings
-  // removed, so the switch always has exactly the film it governs to move.
-  // CAS-1377: watchesFilm(m,c) alone (matchesTaste + inScope) is the WATCH question — "is a window this
-  // agent cares about still ahead of the film" — broader than listedBy's LIST question (matchesCriteria +
-  // awardsListOK + inScope + listWindowOK, the exact chain onbShownCount routes every mission count
-  // through). A donor can clear watchesFilm yet never list: on 3 Nov 2026 it picked tmdb_id 1368337 ("The
-  // Odyssey"), a `released`-status film that passed matchesCriteria/inScope but failed listWindowOK —
-  // `released` (CAS-1375's own "Rental soon" class) is not one of this agent's listed windows, so the
-  // cloned donor inherited a failure the switch could never fix and before===after every time. Pick with
-  // listedBy itself so the clone can only be excluded or admitted by the switch under test, and assert the
-  // donor is actually listed before the switch is touched rather than finding out from a misleading
-  // before===after.
-  // CAS-1377 round 2: requiring the DONOR to already carry a real budget/gross >= $1M was vestigial —
-  // the clone always zeroes budget/worldwide_gross regardless of what the donor had, and selScaleMatch's
-  // inference branch never runs on a released film at all (see its own comment), so !isPreRelease alone
-  // already guarantees the clone gets no inference. That extra clause just narrowed the donor pool to
-  // "lists AND happens to carry real financial data" — on 3 Nov 2026 none of this agent's listed films did,
-  // so the precondition assertion (correctly) found nothing and failed loud. Dropped; any listedBy-passing,
-  // non-fixture, non-pre-release film is a valid donor to clone into an unbudgeted fixture.
+  // the gate went red). CAS-1377 (rounds 1-3) tried picking a real catalogue film to clone — first with
+  // watchesFilm, then with listedBy, then dropping a vestigial budget clause — and still went red three
+  // times on three different days, each time because the pool of real films clearing every one of
+  // listedBy's gates (status window, age, years-back, cinemaReleaseOnly AND the agent's own score floor) is
+  // itself daily-data-dependent. A `_fixture` film is exempt from rederiveStatuses() (app_template.html's
+  // own skip), so every field below is read back exactly as set — build the fixture from nothing instead of
+  // searching the live catalogue for a donor to clone, so this can never again depend on what today's data
+  // happens to hold: a guaranteed-passing `included_streaming` title, max Cascade score (clears any agent's
+  // floor), no language/genre/rating restriction can exclude it, non-pre-release, with a cinema release and
+  // a recent date so yearsBack/cinemaReleaseOnly both clear — only budget/worldwide_gross are left null,
+  // the one thing the switch under test governs.
   await page.evaluate(() => {
     const c = {...onbApply()};
-    const donor = MOVIES.find(m => !m._fixture && !isPreRelease(m) && listedBy(m, c));
-    if(!donor) throw new Error("test setup: no gate-clean donor in today's catalogue (listedBy, released, not a fixture)");
-    if(!listedBy(donor, c)) throw new Error(`test setup: donor ${donor.tmdb_id} is not actually listed before the switch is touched`);
-    MOVIES.push({...donor, tmdb_id: 900000747, title: "CAS-1262 unbudgeted fixture", budget: null, worldwide_gross: null, _fixture: true});
+    const fixture = {
+      tmdb_id: 900000747, title: "CAS-1262 unbudgeted fixture", _fixture: true,
+      status: ["included_streaming"], cinema_release: true, cinema_date: addDays(TODAY, -365),
+      genres: [], age_rating: null, language: "xx", availability_confidence: "confirmed",
+      offers: [{ service: "Test", type: "sub", price: null, format: null }],
+      wm_user_rating: 10, wm_critic_score: 100,
+      budget: null, worldwide_gross: null,
+    };
+    if(!listedBy(fixture, c)) throw new Error("test setup: synthetic fixture is not listed before the switch is touched");
+    MOVIES.push(fixture);
     invalidateComputeCaches();
   });
 
