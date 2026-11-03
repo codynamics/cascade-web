@@ -3385,55 +3385,34 @@
   .oaadjup{color:#5eead4}
   .oaadjdown{color:#f0a060}
 
-  /* ---- CAS-1346: the one-agent setup wizard — one screen for both steps (CAS-1342's separate step1/step2
-     screens retired). Every style row renders once; step 2 slides its track left by half (translateX(-50%))
-     rather than swapping to a different list, so a row's own box never moves between steps (AC1). Reuses
-     CAS-1339's ONE_AGENT_SCORE_BRACKETS colours (--bc) and ONE_AGENT_WINDOWS colours (--wc). */
-  .oassteplbl{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--gold);margin:0}
-  .onbtop{position:sticky;top:-1px;z-index:3;display:flex;justify-content:space-between;align-items:center;
-    padding:6px 0 8px;background:var(--panel)}
-  .onbtopbtns{display:flex;align-items:center;gap:10px}
-  .onbbtn{padding:8px 14px;border-radius:999px;font-size:13px;font-weight:800;cursor:pointer}
-  .onbbtn.primary{border:1px solid var(--accent);background:var(--accent);color:#fff}
-  .onbbtn.ghost{border:0;background:none;color:var(--dim);padding:8px 4px}
-  .onbhead{min-height:112px}
-  .onbhead b{display:block;font:700 20px/1.25 var(--font-display);color:#fff;margin-bottom:6px}
-  .onbhead span{font:500 13px/1.4 var(--font-body);color:var(--dim)}
-  .onbhdr{display:grid;grid-template-columns:104px minmax(0,1fr);gap:8px;margin:16px 0 6px;
-    font-size:10.5px;font-weight:700;color:var(--faint)}
-  .onbhdrarrows{display:flex;justify-content:space-between}
-  .onbfrom{font-size:10.5px;font-weight:700;color:var(--faint)}
-  .onbwinheads{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
-  .onbwh{display:flex;align-items:center;justify-content:center;gap:4px;color:var(--wc);font-weight:800}
+  /* ---- CAS-1368: first run — favourite genres (two-column ♥/✓ grid), then single-select age/partner/
+     children cards (shared .obopt/.obradio skin, unchanged) and the tick grids Date night/Family genres use.
+     Replaces the CAS-1346/1347 scores+alerts wizard and the "Who do you watch with?" step entirely. */
+  .favlegend{display:flex;flex-wrap:wrap;gap:10px 18px;margin:2px 0 14px;font-size:11.5px;font-weight:700}
+  .favleg.fav{color:#e0567a}
+  .favleg.incl{color:var(--accent)}
+  .favgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .favcell{display:flex;align-items:center;justify-content:space-between;gap:6px;height:38px;
+    padding:0 6px 0 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2)}
+  .favcell.fav{border-color:#e0567a;background:color-mix(in srgb, #e0567a 12%, transparent)}
+  .favcell.incl{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent)}
+  .favname{font-size:13px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .favbtns{display:flex;gap:4px;flex:0 0 auto}
+  .favbtn{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--panel);
+    color:var(--faint);font-size:13px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0}
+  .favbtn.heart.on{border-color:#e0567a;background:#e0567a;color:#fff}
+  .favbtn.check.on{border-color:var(--accent);background:var(--accent);color:#fff}
+  .tickgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tickcell{display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border-radius:10px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--dim);font-size:13px;font-weight:700;
+    cursor:pointer;text-align:left}
+  .tickcell.on{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent);color:var(--ink)}
+  .tickbox{width:16px;height:16px;border-radius:4px;border:1px solid var(--line);flex:0 0 auto;
+    display:grid;place-items:center;font-size:11px;line-height:1;color:#fff}
+  .tickcell.on .tickbox{border-color:var(--accent);background:var(--accent)}
+  /* .onbdot: still used by the Done screen's per-window alert rows (oafAlertRowsHTML). */
   .onbdot{width:7px;height:7px;border-radius:50%;background:var(--wc);display:inline-block}
-  .onblist{display:flex;flex-direction:column}
-  .onb10{display:grid;grid-template-columns:104px minmax(0,1fr);gap:8px;align-items:center;padding:3px 0;
-    border-top:1px solid var(--line);min-height:44px}
-  .onbname{font-size:15px;font-weight:800;color:var(--ink)}
-  .onbnamesub{display:block;font-size:11.5px;font-weight:600;color:var(--faint);margin-top:2px;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .onbwin{overflow:hidden;display:block}
-  .onbtrack{display:flex;width:200%;transition:transform .35s ease}
-  .onbbody.s2 .onbtrack{transform:translateX(-50%)}
-  .onbpane{width:50%;display:grid;align-items:center;gap:6px}
-  .onbpane.p1{grid-template-columns:26px minmax(0,1fr)}
-  .onbpane.p2{grid-template-columns:40px minmax(0,1fr)}
-  .onbboxes{display:flex;gap:3px}
-  .obx{position:relative;flex:1;height:20px;border-radius:4px;overflow:hidden;cursor:pointer;padding:0;
-    border:1px solid color-mix(in srgb, var(--bc) 65%, transparent);background:transparent}
-  .obx.picked{box-shadow:inset -3px 0 0 #fff}
-  .obxfill{position:absolute;top:0;left:0;bottom:0;background:var(--bc)}
-  .obxlbl{position:relative;z-index:2;display:block;margin:2px 0 0 4px;font-size:10px;font-weight:700;
-    font-style:normal;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
-  .onbnever{flex:0 0 auto;width:22px;height:22px;border-radius:11px;border:1px solid var(--line);
-    background:var(--panel2);color:var(--faint);font-size:12px;line-height:20px;cursor:pointer;padding:0}
-  .onbnever.on{border-color:var(--amber);color:var(--amber);box-shadow:0 0 0 2px var(--amber)}
-  .onbpick{font:700 14px var(--font-body);color:#fff;text-align:left}
-  .onbbells{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
-  .onbbell{height:22px;border-radius:11px;font-size:11px;cursor:pointer;padding:0;background:transparent;
-    color:var(--faint);border:1px solid color-mix(in srgb, var(--wc) 35%, var(--line))}
-  .onbbell.on{background:color-mix(in srgb, var(--wc) 22%, transparent);border-color:var(--wc);color:#fff}
-  .onbnv{grid-column:1/4;font:500 11.5px var(--font-body);color:var(--faint)}
+  /* .oaspreview: the Agent screen's "Preview setup ›" link (oasOpenPreview), until CAS-1344 retires it. */
   .oaspreview{background:none;border:0;color:var(--accent);font-size:12.5px;font-weight:800;cursor:pointer;
     padding:0;margin-left:6px}
   #oafNameChips{margin-top:12px}
@@ -4883,18 +4862,11 @@
   <div class="uwrap" id="agentsBody"></div>
 </div>
 
-<!-- ONE-AGENT SETUP (CAS-1342): the two-step wizard that creates the v2 agent and switches the account over.
-     Reached only via the CAS-1347 first run below (oafEnterSetup/oafReenterSetupStep2) — screens 4a/4b of
-     that flow. Body rendered by oasRender(). -->
-<div class="uscreen" id="oneAgentSetupScreen" role="dialog" aria-modal="true" aria-label="Set up your agent">
-  <div class="uwrap" id="oneAgentSetupBody"></div>
-</div>
-
-<!-- ONE-AGENT FIRST RUN (CAS-1347): screens 1,2,3,5,6 of the six-screen wrapper around the CAS-1346 setup
-     screen above (its own 4a/4b). Own stephdr/sharpstep/stepnav markup — same CSS classes the v2_about
-     FLOWS/gotoStep engine's #stepHdr/#onbStep/#stepNav use, but entirely separate elements/ids/state, so
-     this flow can never entangle with (or be entangled by) that untouched engine. Body rendered by
-     oafRender(); opened by oafOpen() — see ?oneagent=setup and oasOpenPreview(). -->
+<!-- ONE-AGENT FIRST RUN (CAS-1347/CAS-1368): welcome → where → (services) → favourites → age → partner →
+     (together) → (children) → (family) → name → done. Own stephdr/sharpstep/stepnav markup — same CSS
+     classes the v2_about FLOWS/gotoStep engine's #stepHdr/#onbStep/#stepNav use, but entirely separate
+     elements/ids/state, so this flow can never entangle with (or be entangled by) that untouched engine.
+     Body rendered by oafRender(); opened by oafOpen() — see ?oneagent=setup and oasOpenPreview(). -->
 <div class="stephdr" id="oafHdr" hidden>
   <div class="steprow">
     <button class="osback" type="button" id="oafBack" onclick="oafGoBack()" aria-label="Back" hidden>←</button>
@@ -20681,13 +20653,9 @@ const ONE_AGENT_MOOD_BUILTINS=[
   // oamMoodDefaultFields()'s score/all, so a never-saved Releases mood opened (and, once saved, stayed) in
   // score order.
   {id:"releases", name:"Releases", sort:"release", show:"all"},
+  // CAS-1368: Best of the best — every on genre, raised to a floor of 85 regardless of its own bar, Best 40.
+  {id:"best", name:"Best of the best", minScore:85, show:"40"},
   {id:"starred", name:"Starred", starredOnly:true},
-  // CAS-1345 Part 2: CAS-1341's own spec for a new v2 account's starter moods — Order Score, Show best 20,
-  // added here so setup (CAS-1342's watchMoods=oamMoodDefaultsNow() call) provisions all six in order.
-  {id:"action", name:"Action", styles:["Action","Thriller","Crime","War","Western"], show:"20"},
-  {id:"imagine", name:"Imagine", styles:["Science Fiction","Fantasy","Adventure"], show:"20"},
-  {id:"fun", name:"Fun", styles:["Comedy","Animation","Romance"], show:"20"},
-  {id:"family", name:"Family", styles:["Family","Animation","Adventure","Comedy"], ages:["G","PG"], show:"20"},
 ];
 function oamMoodDefaultFields(){
   return {v2:true, handOnly:false, watched:false, styles:[], minScore:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[]};
@@ -21713,245 +21681,128 @@ function onbRevealGridHTML(c){
   return films.length
     ? `<div class="rvgrid rvgridtop">${films.slice(0, REVEAL_POSTERS).map(rvPosterHTML).join("")}</div>` : "";
 }
-// ================= CAS-1342/CAS-1347: one-agent setup, wrapped in a six-screen first run =====================
-// Two steps — style bars (with ⊘ never), then per-style/per-window alerts — are screens 4a/4b of CAS-1347's
-// wrapper (oafOpen below): welcome, where-you-watch, services, THIS screen (step 1 then step 2), who-you-
-// watch-with, done. Nothing here runs unless the wizard is actually open (oafOpen), so an account that never
-// runs setup is never touched (AC5). The actual account change is ONE atomic commit (oneAgentCommit below,
-// fired by screen 6's "Start watching") — this screen itself only ever edits the in-memory draft (oasState).
+// ================= CAS-1347/CAS-1368: one-agent setup, wrapped in the first-run flow =====================
+// welcome, where-you-watch, (services), favourites, age, partner, (together), (children), (family), name,
+// done. Nothing here runs unless the wizard is actually open (oafOpen), so an account that never runs setup
+// is never touched (AC5). The actual account change is ONE atomic commit (oneAgentCommit below, fired by the
+// done screen's "Start watching") — every screen before that only ever edits the in-memory draft (oafState).
 const ONE_AGENT_SETUP_STYLES = Object.keys(TASTE_SHORT);   // the exact 19, in TASTE_SHORT's own order
-const ONE_AGENT_SETUP_DEFAULT_SHARE = 60;   // CAS-1351: every genre starts at Top 60% on a fresh account
-function oasDefaultBarFor(style){ return oneBarForTopPct(style, ONE_AGENT_SETUP_DEFAULT_SHARE); }
 
-let oasState = null;     // {styles:{style:{bar,pct,never}}, alerts:{style:{cinema,rent,stream}}, touched:{style:bool}} — null when closed
-let oasStep = 1;
+let oafState = null;   // see oafOpen below for the full shape — null when closed
+let oafStep = "welcome";
 let oasSetupQueryConsumed = false;   // the ?oneagent=setup gate fires at most once per page load (afterSignIn)
-
-function oasDefaultState(){
-  const styles={}, alerts={}, touched={};
-  ONE_AGENT_SETUP_STYLES.forEach(s=>{
-    styles[s] = {bar: oasDefaultBarFor(s), pct: ONE_AGENT_SETUP_DEFAULT_SHARE, never:false};
-    alerts[s] = {cinema:false, rent:false, stream:false};
-    touched[s] = false;
-  });
-  return {styles, alerts, touched};
-}
-// Re-run prefill (AC4): shares round DOWN to the nearest box and clamp into the picker's 20-100 range; alerts
-// carry the current agent's own switches verbatim (never re-applies the new-account preset over a real
-// account's actual choices). A style arriving with any alert already on is `touched`, so tapping its share
-// down in this run never clobbers a choice the real agent already made (the "unless already set" guard below).
-function oasPrefillFromAgent(c){
-  const styles={}, alerts={}, touched={};
-  ONE_AGENT_SETUP_STYLES.forEach(s=>{
-    const st=(c.styles||{})[s];
-    let pct = null, bar = null;
-    if(st && st.bar!=null){
-      pct = Math.max(20, Math.min(100, Math.floor(oneTopPct(s, st.bar)/20)*20));
-      bar = oneBarForTopPct(s, pct);
-    }
-    styles[s] = {bar, pct, never: bar==null};
-    const al = (st && st.al) || {};
-    alerts[s] = {cinema:!!al.cinema, rent:!!al.rent, stream:!!al.stream};
-    touched[s] = alerts[s].cinema || alerts[s].rent || alerts[s].stream;
-  });
-  return {styles, alerts, touched};
-}
-function oasRowSubHTML(style, st){
-  if(st.never) return "Never";
-  return `${esc(oaShareLabel(st.pct))} · score ${st.bar}+`;
-}
-// CAS-1361 part 4.2: the boxes/alerts column read the bare number ("20".."80","All") — oaShareLabel's "%"
-// stays everywhere else (the row's own sub-line, every other share display in the app).
-function oasShareLabelNoPct(pct){ return pct>=100 ? "All" : `${pct}`; }
-// The five tappable boxes for one style row's pane 1 — oaShareBoxPct (CAS-1339/CAS-1351) gives a full/empty
-// fill for every bracket against a share that always lands exactly on a bracket's own `pct`.
-function oasRowBoxesHTML(style, st){
-  return ONE_AGENT_SHARE_BRACKETS.map(b=>{
-    const picked = st.pct===b.pct;
-    const pct = oaShareBoxPct(st.never?0:st.pct, b);
-    return `<button type="button" class="obx${picked?" picked":""}" style="--bc:${b.color}"
-        onclick="oasPickBar('${escA(style)}',${b.pct})" aria-pressed="${picked}"
-        aria-label="${escA(oneAgentShortName(style))} minimum score ${oaShareLabel(b.pct)}">
-        <i class="obxfill" style="width:${pct}%"></i><i class="obxlbl">${oasShareLabelNoPct(b.pct)}</i>
-      </button>`;
-  }).join("");
-}
-// CAS-1347 point 4: only the windows picked on screen 2 (oafState.where) get a column here — in the header
-// row (oasHeaderHTML) and in every row's pane 2. A window not picked is never set on: oneAgentBuildDraft
-// below strips any alert flag outside this list before it ever reaches the commit, whatever oasState itself
-// still carries (a prefilled agent's own alert for a window this run didn't pick, say).
+const ONE_AGENT_FLOW_WHERE = [
+  ["cinema", "At the cinema", "Often enough to plan around it"],
+  ["rent", "Renting or buying", "Apple, Prime Video, Google and the like"],
+  ["stream", "On my streaming services", "Netflix, Disney+, Stan and the like"],
+];
+const ONE_AGENT_FAMILY_DEFAULT = ["Family","Animation","Adventure","Comedy"];
+function oafHasServicesStep(){ return oafState.where.has("rent") || oafState.where.has("stream"); }
+function oafHasChildrenStep(){ return oafState.age==="18plus"; }
+// Only the windows picked on the where step ever carry an alert — a window not picked is never set on, in
+// the done screen's own alert rows and in oneAgentBuildDraft's styles[s].al, whatever oafState itself holds.
 function oafActiveWindows(){
   const where = oafState ? oafState.where : null;
   return where ? ONE_AGENT_WINDOWS.filter(w=>where.has(w.key)) : ONE_AGENT_WINDOWS;
 }
-// Pane 2: the chosen score plus the active-window alert pills, or "Never listed" in their place for a never
-// style.
-function oasPaneTwoHTML(style, st, al){
-  const windows = oafActiveWindows();
-  const score = st.never ? "Never" : oasShareLabelNoPct(st.pct);
-  const inner = st.never
-    ? `<span class="onbnv">Never listed</span>`
-    : windows.map(w=>{
-        const on=!!al[w.key];
-        return `<button type="button" class="onbbell${on?" on":""}" style="--wc:${w.color}"
-            onclick="oasToggleAlert('${escA(style)}','${w.key}')" aria-pressed="${on}"
-            aria-label="${escA(oneAgentShortName(style))} ${w.label} alert">${on?"🔔":""}</button>`;
-      }).join("");
-  return `<span class="onbpick">${score}</span><span class="onbbells" style="grid-template-columns:repeat(${windows.length},1fr)">${inner}</span>`;
+// The counted sequence the progress rail reads its position from — grows as the partner/age answers reveal
+// more of the branch actually ahead, the same approximate-until-answered shape "services" already had.
+function oafCountedKeys(){
+  const keys=["welcome","where"];
+  if(oafHasServicesStep()) keys.push("services");
+  keys.push("favourites","age","partner");
+  if(oafState.partner==="yes") keys.push("together");
+  if(oafHasChildrenStep()) keys.push("children");
+  if(oafState.children==="yes") keys.push("family");
+  keys.push("nameAgent","done");
+  return keys;
 }
-// One row — both panes always render; only the track's own transform (driven by .onbbody's s2 class) decides
-// which is visible, so a row's own box never changes size or position when the step changes (AC1).
-function oasRowHTML(style){
-  const st=oasState.styles[style];
-  const al=oasState.alerts[style];
-  return `<div class="onb10" data-style="${escA(style)}">
-      <span class="onbname">${esc(oneAgentShortName(style))}<span class="onbnamesub">${oasRowSubHTML(style, st)}</span></span>
-      <span class="onbwin"><span class="onbtrack">
-        <span class="onbpane p1">
-          <button type="button" class="onbnever${st.never?" on":""}" onclick="oasToggleNever('${escA(style)}')"
-              aria-pressed="${st.never}" aria-label="Never show ${escA(oneAgentShortName(style))}">⊘</button>
-          <span class="onbboxes">${oasRowBoxesHTML(style, st)}</span>
-        </span>
-        <span class="onbpane p2">${oasPaneTwoHTML(style, st, al)}</span>
-      </span></span>
-    </div>`;
+function oafProgressPct(key){
+  const keys=oafCountedKeys();
+  const i=keys.indexOf(key);
+  return Math.round(((i<0?0:i)+1)/keys.length*100);
 }
-// The header row above the styles — same 104px/track split as a style row, so its two labels (step 1) or
-// three window headings (step 2) line up with the boxes/pills beneath them.
-function oasHeaderHTML(){
-  const windows = oafActiveWindows();
-  const heads = windows.map(w=>
-    `<span class="onbwh" style="--wc:${w.color}"><i class="onbdot" style="background:${w.color}"></i>${esc(w.label)}</span>`
-  ).join("");
-  return `<div class="onbhdr">
-      <span></span>
-      <span class="onbwin"><span class="onbtrack">
-        <span class="onbpane p1"><span></span><span class="onbhdrarrows"><span>← only the best</span><span>more films →</span></span></span>
-        <span class="onbpane p2"><span class="onbfrom">Top</span><span class="onbwinheads" style="grid-template-columns:repeat(${windows.length},1fr)">${heads}</span></span>
-      </span></span>
-    </div>`;
+// Multi-select cards — the same .obopt/.obradio skin obOptHTML uses for a single-select radio, over a Set
+// instead of one current value, with independent (not mutually-exclusive) toggling. Used by "where".
+function oafOptHTML(defs, set){
+  return defs.map(([val,label,sub])=>`<button type="button" class="obopt${set.has(val)?" on":""}" role="checkbox"
+      aria-checked="${set.has(val)}" data-val="${escA(val)}">
+    <span class="obradio" aria-hidden="true"></span>
+    <span class="obopttext"><span class="obopttitle">${esc(label)}</span>${sub?`<span class="oboptsub">${sub}</span>`:""}</span>
+  </button>`).join("");
 }
-function oasHeadHTML(){
-  return oasStep===1
-    ? `<b>Your favourite genres?</b><span>Adjust the genre settings below. Turn off genres you don't like with the ⊘ button. If you really love a genre, select a higher share of the catalogue.</span>`
-    : `<b>Set alerts for your favourite genres.</b><span>Some genres may be a must-watch at the cinema or on rental. You can also set alerts for individual movies.</span>`;
+function oafWireMultiOpt(containerId, set){
+  const el=$(containerId); if(!el) return;
+  el.querySelectorAll(".obopt[data-val]").forEach(b=>{
+    b.onclick=()=>{ const v=b.dataset.val; set.has(v) ? set.delete(v) : set.add(v); oafPaint(); };
+  });
 }
-// CAS-1361 part 4.1: this screen is reached with #oafHdr already hidden (oafEnterSetup), so without its own
-// title it's the one first-run screen with no "Set up your agent" at all. Same 19px/500 .osh + thin rail as
-// #oafHdr's own steprow/stepprog, just not fixed — .uwrap already carries the safe-area-inset-top padding
-// #oafHdr's .steprow would otherwise double up (the #movingScreen/#findScreen padding-top:0 fix, same bug).
-function oasHdrHTML(){
-  const pct = oafProgressPct(oasStep===1 ? "scores" : "alerts");
-  return `<div class="ostop"><span class="osh">Set up your agent</span></div>
-    <div class="stepprog"><i style="width:${pct}%"></i></div>`;
+// The Date night/Family tick grids — a two-column single-tick cell over a Set, the same toggle shape
+// oafWireMultiOpt above uses just rendered differently (the favourites grid's ♥/✓ pair, below, is its own thing).
+function oafTickCellHTML(style, set){
+  const on=set.has(style);
+  return `<button type="button" class="tickcell${on?" on":""}" role="checkbox" aria-checked="${on}"
+      data-style="${escA(style)}">
+    <span class="tickbox" aria-hidden="true">${on?"✓":""}</span>
+    <span>${esc(oneAgentShortName(style))}</span>
+  </button>`;
 }
-// CAS-1347 points 1-2-6: this screen's own step label (replacing STEP n OF 2), a Back button on step 1
-// (going to screen 3, or screen 2 if screen 3 was skipped — there is no Cancel, by design, so this is the
-// only way out of step 1).
-function oasTopHTML(){
-  const right = oasStep===1
-    ? `<button type="button" class="onbbtn ghost" onclick="oafBackFromSetup()">‹ Back</button>
-       <button type="button" class="onbbtn primary" onclick="oasGoStep2()">Next: alerts ›</button>`
-    : `<button type="button" class="onbbtn ghost" onclick="oasGoStep1()">‹ Back</button>
-       <button type="button" class="onbbtn primary" onclick="oafGoFromAlerts()">Next ›</button>`;
-  return `<div class="onbtop">
-      <span class="oassteplbl">${oasStep===1 ? "Your agent · genres" : "Your agent · alerts"}</span>
-      <span class="onbtopbtns">${right}</span>
-    </div>`;
+function oafTickGridHTML(set){
+  return `<div class="tickgrid">${ONE_AGENT_SETUP_STYLES.map(s=>oafTickCellHTML(s,set)).join("")}</div>`;
 }
-function oasBodyHTML(){
-  return `<div id="oasTop">${oasHdrHTML()}${oasTopHTML()}</div>
-    <div class="onbhead" id="oasHead">${oasHeadHTML()}</div>
-    <div class="onbbody${oasStep===2?" s2":""}">
-      ${oasHeaderHTML()}
-      <div class="onblist">${ONE_AGENT_SETUP_STYLES.map(oasRowHTML).join("")}</div>
-    </div>`;
+function oafWireTickGrid(containerId, set){
+  const el=$(containerId); if(!el) return;
+  el.querySelectorAll(".tickcell[data-style]").forEach(b=>{
+    b.onclick=()=>{ const v=b.dataset.style; set.has(v) ? set.delete(v) : set.add(v); oafPaint(); };
+  });
 }
-function oasRender(){
-  const el=$("oneAgentSetupBody"); if(!el) return;
-  el.innerHTML = oasBodyHTML();
-}
-// CAS-1361 part 4.4: Next/Back must slide the already-painted rows (every row carries both panes already,
-// see oasRowHTML), not repaint them — a full oasRender() replaces the DOM outright, which is why the
-// .onbtrack transition CSS (CAS-1346) never actually ran. Toggling .s2 on the existing .onbbody is the only
-// DOM change the rows themselves see; the chrome around them (title rail/step label/buttons/head text) is
-// cheap to repaint in place since none of it is part of the sliding track.
-function oasGoToStep(step){
-  if(!oasState) return;
-  oasStep=step;
-  const el=$("oneAgentSetupBody"); if(!el) return;
-  const top=el.querySelector("#oasTop"); if(top) top.innerHTML = oasHdrHTML()+oasTopHTML();
-  const head=el.querySelector("#oasHead"); if(head) head.innerHTML = oasHeadHTML();
-  const body=el.querySelector(".onbbody"); if(body) body.classList.toggle("s2", step===2);
-}
-window.oasPickBar=(style, pct)=>{
-  if(!oasState) return;
-  oasState.styles[style] = {bar: oneBarForTopPct(style, pct), pct, never:false};
-  // CAS-1351: picking 80% or All means "I want more of this genre" (the "keen" rule), unless this style's
-  // alerts have already been touched (by hand, or carried over from a real agent via oasPrefillFromAgent) —
-  // never overwrite that. CAS-1347 point 5: only applies at all if Cinema was picked on screen 2.
-  if(pct>=80 && !oasState.touched[style] && oafActiveWindows().some(w=>w.key==="cinema")){
-    const al=oasState.alerts[style] || (oasState.alerts[style]={cinema:false,rent:false,stream:false});
-    al.cinema=true;
-  }
-  oasRender();
-};
-window.oasToggleNever=(style)=>{
-  if(!oasState) return;
-  const st=oasState.styles[style];
-  oasState.styles[style] = st.never
-    ? {bar: oasDefaultBarFor(style), pct: ONE_AGENT_SETUP_DEFAULT_SHARE, never:false}
-    : {bar:null, pct:null, never:true};
-  oasRender();
-};
-window.oasToggleAlert=(style, win)=>{
-  if(!oasState) return;
-  const al=oasState.alerts[style] || (oasState.alerts[style]={cinema:false,rent:false,stream:false});
-  al[win]=!al[win];
-  oasState.touched[style]=true;
-  oasRender();
-};
-window.oasGoStep2=()=>oasGoToStep(2);
-window.oasGoStep1=()=>oasGoToStep(1);
-
-// ================= CAS-1347: the mood rules shared by screen 6's summary, oneAgentCommit, and the CAS-1345
-// starter repair — so the summary chip list can never disagree with what actually gets saved. =================
-const ONE_AGENT_DATE_MOOD = {id:"date", name:"Date night", styles:[], ages:["M","MA 15+"], show:"20"};
-const ONE_AGENT_STARTER_GROUPS = {
-  action:  ["Action","Thriller","Crime","War","Western"],
-  imagine: ["Science Fiction","Fantasy","Adventure"],
-  fun:     ["Comedy","Animation","Romance"],
-};
-// `isStyleOn(style)` abstracts over the two shapes this runs against: oasState.styles (the live draft, where
-// a style is on when !st.never) and a committed cascade's own c.styles (where an off style has no entry at
-// all — see oneAgentBuildDraft below). `who` ({partner, kids}) is omitted entirely by the CAS-1345 repair,
-// which has no "who" answers to draw on — that alone is why it can never add Date night or Family.
-function oneAgentStarterMoods(isStyleOn, who){
+// ================= CAS-1347/CAS-1368: the mood rules shared by the done screen's summary, oneAgentCommit,
+// and the CAS-1345 starter repair — so the summary chip list can never disagree with what actually gets
+// saved. `who` carries {partner, kids, dateStyles, familyStyles}, all omitted by the CAS-1345 repair (which
+// has no partner/children answers to draw on) so it can never add Date night or Family on its own. =========
+function oneAgentStarterMoods(who, ages){
   who = who || {};
-  const pick = id => ({...oamMoodDefaultFields(), ...ONE_AGENT_MOOD_BUILTINS.find(b=>b.id===id)});
-  const list = [pick("releases"), pick("starred")];
-  if(ONE_AGENT_STARTER_GROUPS.action.some(isStyleOn)) list.push(pick("action"));
-  if(ONE_AGENT_STARTER_GROUPS.imagine.some(isStyleOn)) list.push(pick("imagine"));
-  if(ONE_AGENT_STARTER_GROUPS.fun.some(isStyleOn)) list.push(pick("fun"));
-  if(who.partner) list.push({...oamMoodDefaultFields(), ...ONE_AGENT_DATE_MOOD});
-  if(who.kids) list.push(pick("family"));
+  ages = ages || [];
+  const pick = id => ({...oamMoodDefaultFields(), ...ONE_AGENT_MOOD_BUILTINS.find(b=>b.id===id), ages, watched:true});
+  const list = [pick("releases"), pick("best"),
+    {...oamMoodDefaultFields(), id:"me", name:"Me", show:"40", ages, watched:true}];
+  if(who.partner) list.push({...oamMoodDefaultFields(), id:"date", name:"Date night",
+    styles:[...(who.dateStyles||[])], show:"40", ages, watched:true});
+  if(who.kids) list.push({...oamMoodDefaultFields(), id:"family", name:"Family",
+    styles:[...(who.familyStyles||[])], show:"40", ages:["G","PG","M"], watched:true});
+  list.push(pick("starred"));
   return list;
 }
-// The draft: everything screen 6 needs to show and Start Watching needs to save, built fresh from the live
-// wizard state but with no side effect of its own (CAS-1347's "expose the draft and the commit separately").
+// The draft: everything the done screen needs to show and Start Watching needs to save, built fresh from the
+// live wizard state but with no side effect of its own (CAS-1347's "expose the draft and the commit
+// separately").
 function oneAgentBuildDraft(){
   const windows = oafActiveWindows();
   const styles={};
   ONE_AGENT_SETUP_STYLES.forEach(s=>{
-    const st=oasState.styles[s];
-    if(st.bar==null) return;   // never: no entry at all — matchesCriteriaOneAgent's own "no style" gate
+    const pick = oafState.favs[s];
+    if(!pick) return;   // unmarked: no entry at all — matchesCriteriaOneAgent's own "no style" gate
     const al={};
-    ONE_AGENT_WINDOWS.forEach(w=>{ al[w.key] = windows.some(x=>x.key===w.key) && !!(oasState.alerts[s]||{})[w.key]; });
-    styles[s]={bar:st.bar, al};
+    ONE_AGENT_WINDOWS.forEach(w=>{ al[w.key] = windows.some(x=>x.key===w.key) && pick==="fav"; });
+    styles[s] = pick==="fav" ? {bar:60, al, fav:true} : {bar:80, al};
   });
-  const isStyleOn = style => { const st=oasState.styles[style]; return !!(st && !st.never); };
-  const who = {partner: oafState.who.has("partner"), kids: oafState.who.has("kids")};
-  const moods = oneAgentStarterMoods(isStyleOn, who);
+  // CAS-1368: a genre ticked for Date night/Family that isn't already on turns on at bar 80, no alerts —
+  // never overrides a genre already marked ♥/✓ above.
+  const turnOn = style => {
+    if(styles[style]) return;
+    const al={}; ONE_AGENT_WINDOWS.forEach(w=>{ al[w.key]=false; });
+    styles[style] = {bar:80, al};
+  };
+  if(oafState.partner==="yes") oafState.together.forEach(turnOn);
+  if(oafState.children==="yes") oafState.family.forEach(turnOn);
+  const ages = oafState.age==="under18" ? ["PG","M","MA 15+"] : ["M","MA 15+","R 18+"];
+  const who = {
+    partner: oafState.partner==="yes",
+    kids: oafHasChildrenStep() && oafState.children==="yes",
+    dateStyles: oafState.partner==="yes" ? [...oafState.together] : [],
+    familyStyles: oafState.children==="yes" ? [...oafState.family] : [],
+  };
+  const moods = oneAgentStarterMoods(who, ages);
   const name = (oafState.name||"").trim();
   return {styles, moods, name};
 }
@@ -21978,50 +21829,9 @@ function oneAgentCommit(draft){
   pushViewField("mood", watchMoodSel);
 }
 
-// ================= CAS-1347: the first run itself — screens 1,2,3,5,6 wrapping 4a/4b above ===================
-// Own state, entirely separate from onbFlow/FLOWS/gotoStep — today's first run (v2_about … v2_done) is not
-// touched by this ticket and must never be able to see this flow running. oafState is null when closed.
-let oafState = null;     // {where:Set<"cinema"|"rent"|"stream">, who:Set<"solo"|"partner"|"kids">, prefillAgent:cascade|null}
-let oafStep = "welcome"; // the key of whichever of THIS screen's steps is showing — "scores"/"alerts" live in #oneAgentSetupScreen instead
-const ONE_AGENT_FLOW_WHERE = [
-  ["cinema", "At the cinema", "Often enough to plan around it"],
-  ["rent", "Renting or buying", "Apple, Prime Video, Google and the like"],
-  ["stream", "On my streaming services", "Netflix, Disney+, Stan and the like"],
-];
-const ONE_AGENT_FLOW_WHO = [
-  ["solo", "On my own", ""],
-  ["partner", "With a partner", "Adds a <b>Date night</b> mood"],
-  ["kids", "With children", "Adds a <b>Family</b> mood, G and PG only"],
-];
-function oafHasServicesStep(){ return oafState.where.has("rent") || oafState.where.has("stream"); }
-// The counted sequence (AC1's seven panels, less a skipped screen 3) — the one place both the progress rail
-// here and the thin rail inside #oneAgentSetupScreen (oasTopHTML) read their position from.
-function oafCountedKeys(){
-  const keys=["welcome","where"];
-  if(oafHasServicesStep()) keys.push("services");
-  keys.push("genresintro","scores","alerts","who","nameAgent","done");
-  return keys;
-}
-function oafProgressPct(key){
-  const keys=oafCountedKeys();
-  const i=keys.indexOf(key);
-  return Math.round(((i<0?0:i)+1)/keys.length*100);
-}
-// Multi-select cards — the same .obopt/.obradio skin obOptHTML uses for a single-select radio, over a Set
-// instead of one current value, with independent (not mutually-exclusive) toggling.
-function oafOptHTML(defs, set){
-  return defs.map(([val,label,sub])=>`<button type="button" class="obopt${set.has(val)?" on":""}" role="checkbox"
-      aria-checked="${set.has(val)}" data-val="${escA(val)}">
-    <span class="obradio" aria-hidden="true"></span>
-    <span class="obopttext"><span class="obopttitle">${esc(label)}</span>${sub?`<span class="oboptsub">${sub}</span>`:""}</span>
-  </button>`).join("");
-}
-function oafWireMultiOpt(containerId, set){
-  const el=$(containerId); if(!el) return;
-  el.querySelectorAll(".obopt[data-val]").forEach(b=>{
-    b.onclick=()=>{ const v=b.dataset.val; set.has(v) ? set.delete(v) : set.add(v); oafPaint(); };
-  });
-}
+// ================= CAS-1347/CAS-1368: the first run's own screen bodies — welcome/where/services share
+// oafState with the rest of the flow above; today's old first run (v2_about … v2_done) is not touched by
+// this ticket and must never be able to see this flow running. ===========================================
 function oafWelcomeHTML(){
   return `<h2 class="osh">Let's get you set up.</h2>
     <p class="obintrotext">Your Cascade agent hunts thousands of new and catalogue movies for you.</p>
@@ -22082,22 +21892,72 @@ function oafWireServices(){
   if($("oafSvcStores")) draw("oafSvcStores", STORE_SERVICES, prefs.store);
   if($("oafSvcSubs"))   draw("oafSvcSubs",   SUB_SERVICES,   prefs.sub, PRIMARY_SUB_SERVICES);
 }
-function oafWhoHTML(){
-  return `<h2 class="osh">Who do you watch with?</h2>
-    <p class="ossub">Pick all that apply. Each one gets its own mood in Cascade: a ready-made list you can open any time.</p>
-    <div class="obopts" id="oafWhoOpts">${oafOptHTML(ONE_AGENT_FLOW_WHO, oafState.who)}</div>`;
+// Favourites — tapping ♥ or ✓ sets that genre's one pick; tapping the same button again clears it. A genre's
+// pick is only ever "fav", "incl" or absent, never both, so picking one always replaces the other.
+function oafFavCount(){ return ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]).length; }
+function oafFavCellHTML(style){
+  const pick = oafState.favs[style] || null;
+  const name = oneAgentShortName(style);
+  return `<div class="favcell${pick?" "+pick:""}" data-style="${escA(style)}">
+      <span class="favname">${esc(name)}</span>
+      <span class="favbtns">
+        <button type="button" class="favbtn heart${pick==="fav"?" on":""}" data-pick="fav"
+            aria-pressed="${pick==="fav"}" aria-label="${escA(name)} favourite">♥</button>
+        <button type="button" class="favbtn check${pick==="incl"?" on":""}" data-pick="incl"
+            aria-pressed="${pick==="incl"}" aria-label="${escA(name)} include">✓</button>
+      </span>
+    </div>`;
 }
-// New screen (CAS-1352): the explainer between services and the genre-score picker — same frame as welcome
-// (.sharpstep + header + Continue), no wiring of its own. Continue enters #oneAgentSetupScreen (oafEnterSetup);
-// that screen's own '‹ Back' (oafBackFromSetup) returns here.
-function oafGenresIntroHTML(){
-  return `<h2 class="osh">Genres and scores</h2>
-    <p class="obintrotext">Cascade uses a dynamic score for each movie, built from public and critics' ratings.</p>
-    <p class="obintrotext">On the next screen you'll choose which movie genres you don't like, and which you like the most. This sets the minimum score a movie needs to be offered to you.</p>
-    <p class="obintrotext">Once you start rating movies you've watched, your agent will suggest adjustments. It even analyses your sub-genre preferences: you might love Action Thrillers, but not Action Comedies.</p>
-    <p class="obintrotext">The more you use Cascade, the more your agent tunes in to you, so it offers the movies you'd most want to watch.</p>`;
+function oafFavouritesHTML(){
+  const n = oafFavCount();
+  return `<h2 class="osh">Your favourite genres</h2>
+    <p class="ossub">Tap ♥ for your absolute favourites (two or three is ideal) and ✓ for others you'd watch if they're really good. Leave the rest.</p>
+    <div class="favlegend"><span class="favleg fav">♥ Favourite · plenty of choice</span><span class="favleg incl">✓ Include · only the best</span></div>
+    <div class="favgrid" id="oafFavGrid">${ONE_AGENT_SETUP_STYLES.map(oafFavCellHTML).join("")}</div>
+    <p class="ossub" style="margin-top:10px">${n} favourite${n===1?"":"s"}${n>3?" · fewer gives sharper lists":""}</p>`;
 }
-// New screen (CAS-1352): between who and done. Continue stays disabled until a trimmed name exists (oafBlocked).
+function oafWireFavourites(){
+  const grid=$("oafFavGrid"); if(!grid) return;
+  grid.querySelectorAll(".favcell[data-style]").forEach(cell=>{
+    const style=cell.dataset.style;
+    cell.querySelectorAll(".favbtn[data-pick]").forEach(btn=>{
+      btn.onclick=()=>{
+        const pick=btn.dataset.pick;
+        oafState.favs[style] = oafState.favs[style]===pick ? null : pick;
+        oafPaint();
+      };
+    });
+  });
+}
+function oafAgeHTML(){
+  return `<h2 class="osh">How old are you?</h2>
+    <p class="ossub">So we show the right age ratings. You can change them on any mood.</p>
+    <div class="obopts" id="oafAgeOpts">${obOptHTML([
+      ["18plus", "18 or over", "M, MA 15+ and R 18+"],
+      ["under18", "Under 18", "PG, M and MA 15+"],
+    ], oafState.age)}</div>`;
+}
+function oafPartnerHTML(){
+  return `<h2 class="osh">Do you watch with a partner?</h2>
+    <p class="ossub">If you do, we'll make a <b>Date night</b> mood.</p>
+    <div class="obopts" id="oafPartnerOpts">${obOptHTML([["yes","Yes"],["no","No"]], oafState.partner)}</div>`;
+}
+function oafTogetherHTML(){
+  return `<h2 class="osh">What do you watch together?</h2>
+    <p class="ossub">Tick the genres for <b>Date night</b>.</p>
+    <div id="oafTogetherGrid">${oafTickGridHTML(oafState.together)}</div>`;
+}
+function oafChildrenHTML(){
+  return `<h2 class="osh">Do you watch with children?</h2>
+    <p class="ossub">If you do, we'll make a <b>Family</b> mood, rated G, PG and M.</p>
+    <div class="obopts" id="oafChildrenOpts">${obOptHTML([["yes","Yes"],["no","No"]], oafState.children)}</div>`;
+}
+function oafFamilyHTML(){
+  return `<h2 class="osh">What do you watch as a family?</h2>
+    <p class="ossub">We've ticked the usual ones. Change them as you like.</p>
+    <div id="oafFamilyGrid">${oafTickGridHTML(oafState.family)}</div>`;
+}
+// New screen (CAS-1352): between family/partner and done. Continue stays disabled until a trimmed name exists (oafBlocked).
 // Typing and chip-picking both write oafState.name directly and patch just the CTA/chip DOM (deleteAcctGate's
 // pattern) rather than a full oafPaint() repaint, so the input never loses focus/cursor mid-keystroke.
 const ONE_AGENT_NAME_CHIPS = ["Archie","Rocco","Felix","Ruby","Luna","Coco"];
@@ -22137,45 +21997,43 @@ function oafWireNameAgent(){
     };
   });
 }
-// "It will tell you when these arrive" — one row per active window carrying any on alert, in ONE_AGENT_WINDOWS
-// order; never-styles are excluded (they carry no entry in the eventual draft either — see oneAgentBuildDraft).
+// "Alerts for your favourites" — one row per active window, naming every ♥ genre (the only genres that ever
+// get an alert — see oneAgentBuildDraft).
 function oafAlertRowsHTML(){
-  const rows = oafActiveWindows().map(w=>{
-    const styles = ONE_AGENT_SETUP_STYLES.filter(s=>{
-      const st=oasState.styles[s];
-      return st && !st.never && oasState.alerts[s] && oasState.alerts[s][w.key];
-    });
-    return styles.length ? {w, styles} : null;
-  }).filter(Boolean);
-  if(!rows.length) return `<p class="ossub">No alerts yet. Turn them on any time in Agent.</p>`;
-  return rows.map(({w,styles})=>
+  const favs = ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]==="fav");
+  if(!favs.length) return `<p class="ossub">No favourites, so no alerts yet.</p>`;
+  return oafActiveWindows().map(w=>
     `<p class="ossub" style="display:flex;align-items:center;gap:6px;margin:0 0 6px">
        <i class="onbdot" style="background:${w.color}"></i><b style="color:${w.color}">${esc(w.label)}</b>
-       <span>${styles.map(s=>esc(oneAgentShortName(s))).join(", ")}</span>
+       <span>${favs.map(s=>esc(oneAgentShortName(s))).join(", ")}</span>
      </p>`
   ).join("");
 }
 function oafDoneHTML(){
-  const n = Object.values(oasState.styles).filter(st=>!st.never).length;
+  const n = oafFavCount();
   const draft = oneAgentBuildDraft();
   return `<h2 class="osh">Your agent is set up.</h2>
     <p class="ossub">Name: ${esc(draft.name)}</p>
     <p class="obintrotext">It's watching <b>${n} genre${n===1?"":"s"}</b> across the whole catalogue, every day.</p>
-    <div class="svcsec"><div class="svcsech">Alerts have been set up for</div>${oafAlertRowsHTML()}</div>
-    <div class="svcsec"><div class="svcsech">Your mood lists created</div>
+    <div class="svcsec"><div class="svcsech">Alerts for your favourites</div>${oafAlertRowsHTML()}</div>
+    <div class="svcsec"><div class="svcsech">Your moods</div>
       <div class="chips">${draft.moods.map(m=>`<span class="chip gen on">${esc(m.name)}</span>`).join("")}</div></div>`;
 }
 function oafBlocked(){
   if(oafStep==="where") return oafState.where.size===0;
-  if(oafStep==="who") return oafState.who.size===0;
+  if(oafStep==="favourites") return oafFavCount()===0;
+  if(oafStep==="age") return !oafState.age;
+  if(oafStep==="partner") return !oafState.partner;
+  if(oafStep==="children") return !oafState.children;
   if(oafStep==="nameAgent") return !(oafState.name||"").trim();
   return false;
 }
 // Paints the current step into #oafInner plus the shared header/footer chrome — never touches scroll
 // position, so a chip toggle's own repaint (oafWireMultiOpt) doesn't jump the screen back to the top.
 function oafPaint(){
-  const fns = {welcome:oafWelcomeHTML, where:oafWhereHTML, services:oafServicesHTML, genresintro:oafGenresIntroHTML,
-    who:oafWhoHTML, nameAgent:oafNameAgentHTML, done:oafDoneHTML};
+  const fns = {welcome:oafWelcomeHTML, where:oafWhereHTML, services:oafServicesHTML, favourites:oafFavouritesHTML,
+    age:oafAgeHTML, partner:oafPartnerHTML, together:oafTogetherHTML, children:oafChildrenHTML,
+    family:oafFamilyHTML, nameAgent:oafNameAgentHTML, done:oafDoneHTML};
   const inner=$("oafInner"); if(!inner) return;
   inner.innerHTML = fns[oafStep]();
   $("oafBack").hidden = oafStep==="welcome";
@@ -22187,8 +22045,29 @@ function oafPaint(){
   cta.disabled = blocked;
   cta.classList.toggle("blocked", blocked);
   if(oafStep==="where") oafWireMultiOpt("oafWhereOpts", oafState.where);
-  else if(oafStep==="who") oafWireMultiOpt("oafWhoOpts", oafState.who);
   else if(oafStep==="services") oafWireServices();
+  else if(oafStep==="favourites") oafWireFavourites();
+  else if(oafStep==="age") wireObOpt($("oafAgeOpts"), val=>{ oafState.age=val; oafPaint(); });
+  else if(oafStep==="partner") wireObOpt($("oafPartnerOpts"), val=>{
+      oafState.partner=val;
+      // Pre-tick Date night with the person's own ♥/✓ genres the first time Yes is picked — never again, so
+      // a later edit to the grid survives tapping Yes/No/Yes.
+      if(val==="yes" && !oafState.togetherInit){
+        oafState.together=new Set(ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]));
+        oafState.togetherInit=true;
+      }
+      oafPaint();
+    });
+  else if(oafStep==="together") oafWireTickGrid("oafTogetherGrid", oafState.together);
+  else if(oafStep==="children") wireObOpt($("oafChildrenOpts"), val=>{
+      oafState.children=val;
+      if(val==="yes" && !oafState.familyInit){
+        oafState.family=new Set(ONE_AGENT_FAMILY_DEFAULT);
+        oafState.familyInit=true;
+      }
+      oafPaint();
+    });
+  else if(oafStep==="family") oafWireTickGrid("oafFamilyGrid", oafState.family);
   else if(oafStep==="nameAgent") oafWireNameAgent();
 }
 function oafShow(key){
@@ -22199,63 +22078,52 @@ function oafShow(key){
 window.oafGoContinue=()=>{
   if(oafBlocked()) return;
   if(oafStep==="welcome") return oafShow("where");
-  if(oafStep==="where") return oafShow(oafHasServicesStep() ? "services" : "genresintro");
-  if(oafStep==="services") return oafShow("genresintro");
-  if(oafStep==="genresintro") return oafEnterSetup();
-  if(oafStep==="who") return oafShow("nameAgent");   // CAS-1350: Continue on Who did nothing
+  if(oafStep==="where") return oafShow(oafHasServicesStep() ? "services" : "favourites");
+  if(oafStep==="services") return oafShow("favourites");
+  if(oafStep==="favourites") return oafShow("age");
+  if(oafStep==="age") return oafShow("partner");
+  if(oafStep==="partner") return oafShow(oafState.partner==="yes" ? "together" : (oafHasChildrenStep() ? "children" : "nameAgent"));
+  if(oafStep==="together") return oafShow(oafHasChildrenStep() ? "children" : "nameAgent");
+  if(oafStep==="children") return oafShow(oafState.children==="yes" ? "family" : "nameAgent");
+  if(oafStep==="family") return oafShow("nameAgent");
   if(oafStep==="nameAgent") return oafShow("done");
 };
 window.oafGoBack=()=>{
   if(oafStep==="where") return oafShow("welcome");
   if(oafStep==="services") return oafShow("where");
-  if(oafStep==="genresintro") return oafShow(oafHasServicesStep() ? "services" : "where");
-  if(oafStep==="who") return oafReenterSetupStep2();
-  if(oafStep==="nameAgent") return oafShow("who");
+  if(oafStep==="favourites") return oafShow(oafHasServicesStep() ? "services" : "where");
+  if(oafStep==="age") return oafShow("favourites");
+  if(oafStep==="partner") return oafShow("age");
+  if(oafStep==="together") return oafShow("partner");
+  if(oafStep==="children") return oafShow(oafState.partner==="yes" ? "together" : "partner");
+  if(oafStep==="family") return oafShow("children");
+  if(oafStep==="nameAgent"){
+    if(oafState.children==="yes") return oafShow("family");
+    if(oafHasChildrenStep()) return oafShow("children");
+    if(oafState.partner==="yes") return oafShow("together");
+    return oafShow("partner");
+  }
   if(oafStep==="done") return oafShow("nameAgent");
 };
-// Hands off from #oafScreen to #oneAgentSetupScreen (4a) — oasState is only (re)initialised the first time;
-// going back to screen 3/2 and forward again re-enters on whatever the draft already holds.
-function oafEnterSetup(){
-  if(!oasState) oasState = (oafState.prefillAgent ? oasPrefillFromAgent(oafState.prefillAgent) : oasDefaultState());
-  oasStep=1;
-  oasRender();
-  $("oafScreen").classList.remove("open");
-  $("oafHdr").hidden=true; $("oafNav").hidden=true;
-  $("oneAgentSetupScreen").scrollTop=0;
-  $("oneAgentSetupScreen").classList.add("open");
-}
-// CAS-1347 point 2 / CAS-1352: 4a's own Back — to the Genres and scores explainer, which now always sits
-// directly before this screen.
-window.oafBackFromSetup=()=>{
-  $("oneAgentSetupScreen").classList.remove("open");
-  $("oafScreen").classList.add("open");   // CAS-1350: oafEnterSetup removed it; the step below paints into #oafScreen
-  $("oafHdr").hidden=false; $("oafNav").hidden=false;
-  oafShow("genresintro");
-};
-// CAS-1347 point 3: 4b's "Next ›" — on to screen 5. oasState/oasStep are left exactly as they are, so
-// oafReenterSetupStep2 (screen 5's own Back) returns to the same pane.
-window.oafGoFromAlerts=()=>{
-  $("oneAgentSetupScreen").classList.remove("open");
-  $("oafScreen").classList.add("open");   // CAS-1350: oafEnterSetup/oafReenterSetupStep2 removed it
-  $("oafHdr").hidden=false; $("oafNav").hidden=false;
-  oafShow("who");
-};
-function oafReenterSetupStep2(){
-  oasStep=2;
-  oasRender();
-  $("oafScreen").classList.remove("open");
-  $("oafHdr").hidden=true; $("oafNav").hidden=true;
-  $("oneAgentSetupScreen").scrollTop=0;
-  $("oneAgentSetupScreen").classList.add("open");
-}
 // Entry point — a signed-in account's ?oneagent=setup, or the Agent screen's "Preview setup ›" link
-// (pre-filled from the current agent, oasPrefillFromAgent unchanged — see oasOpenPreview below).
+// (pre-filled from the current agent — see oasOpenPreview below). A prefilled re-run can only recover the
+// genre fav/incl split (c.styles[s].fav, written by oneAgentBuildDraft above); age/partner/children were
+// never saved on the agent itself, so a re-run always asks them fresh.
 window.oafOpen=(opts)=>{
   opts=opts||{};
-  // CAS-1352: a re-run from "Preview setup ›" pre-fills Name your agent from the current agent's own name.
-  oafState = {where:new Set(), who:new Set(), name: (opts.prefillAgent && opts.prefillAgent.name) || "",
-    prefillAgent: opts.prefillAgent || null};
-  oasState = null;
+  const prefillAgent = opts.prefillAgent || null;
+  oafState = {
+    where: new Set(), favs: {}, age: null, partner: null, children: null,
+    together: new Set(), togetherInit: false, family: new Set(), familyInit: false,
+    name: (prefillAgent && prefillAgent.name) || "",
+    prefillAgent,
+  };
+  if(prefillAgent){
+    ONE_AGENT_SETUP_STYLES.forEach(s=>{
+      const st=(prefillAgent.styles||{})[s];
+      if(st && st.bar!=null) oafState.favs[s] = st.fav ? "fav" : "incl";
+    });
+  }
   oafStep="welcome";
   $("oafHdr").hidden=false; $("oafNav").hidden=false;
   $("oafScreen").scrollTop=0;
@@ -22263,22 +22131,22 @@ window.oafOpen=(opts)=>{
   lockBodyScroll(true);
   oafPaint();
 };
-// The Agent screen's own "Preview setup ›" link (until CAS-1344) — re-runs the whole flow, with 4a/4b
+// The Agent screen's own "Preview setup ›" link (until CAS-1344) — re-runs the whole flow, with favourites
 // pre-filled from the account's current v2 agent.
 window.oasOpenPreview=()=>{
   const c=oneAgentCriteria(); if(!c) return;
   oafOpen({prefillAgent:c});
 };
-// Screen 6's "Start watching" — builds the draft, commits it (oneAgentCommit), then closes everything and
-// lands on Watch, same tail as the wizard always had.
+// The done screen's "Start watching" — builds the draft, commits it (oneAgentCommit), then closes everything
+// and lands on Watch, same tail as the wizard always had.
 window.oafStartWatching=()=>{
-  if(!oasState || !oafState) return;
+  if(!oafState) return;
   const draft = oneAgentBuildDraft();
   oneAgentCommit(draft);
   $("oafScreen").classList.remove("open");
   $("oafHdr").hidden=true; $("oafNav").hidden=true;   // Lee, 1 Nov: these stayed over Watch after Start watching
   lockBodyScroll(false);
-  oasState=null; oafState=null;
+  oafState=null;
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
   if(typeof render==="function") render();
   // CAS-1349: the v2 guided tour's one automatic trigger point for a brand-new v2 account — straight after
@@ -27444,8 +27312,9 @@ function acctFetchKeepalive(init){
   // so cascades is trustworthy here. Re-checks isPreFixDefault against the now-current watchMoods — the
   // account's own next real write may have already landed (another device, or this one mid-flow) and moved
   // it on, in which case this must do nothing, the same "never touches an account that has edited its v2
-  // moods" rule the flag-setting comment names. Builds the add-list with oneAgentStarterMoods and no "who"
-  // answers (an empty object), so it can never add Date night or Family on its own.
+  // moods" rule the flag-setting comment names. CAS-1368: builds the add-list with oneAgentStarterMoods and
+  // no who/ages (both default to "none") — it can never add Date night or Family, and the Best/Me it does
+  // add carry no age gate, since this repair has no age answer to draw on either.
   function oneAgentApplyStarterRepair(){
     if(!oneAgentRepairPending) return;
     oneAgentRepairPending=false;
@@ -27458,8 +27327,7 @@ function acctFetchKeepalive(init){
       && v2Moods[0] && v2Moods[0].id==="releases" && (v2Moods[0].name==="Latest" || v2Moods[0].name==="Releases")
       && v2Moods[1] && v2Moods[1].id==="starred" && v2Moods[1].name==="Starred";
     if(!isPreFixDefault) return;
-    const isStyleOn = style => { const st=(c.styles||{})[style]; return !!(st && st.bar!=null); };
-    const added = oneAgentStarterMoods(isStyleOn, {}).filter(m=>m.id!=="releases" && m.id!=="starred");
+    const added = oneAgentStarterMoods().filter(m=>m.id!=="releases" && m.id!=="starred");
     if(!added.length) return;
     watchMoods=[...watchMoods, ...added];
     moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
