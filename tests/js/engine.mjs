@@ -338,6 +338,8 @@ if(typeof window.CascadeAuth === "undefined"){
   get oaSuggestionOpen(){ return oaSuggestionOpen; },
   oaToggleSuggestion: () => window.oaToggleSuggestion(),
   oaToggleAlert: (style, win) => window.oaToggleAlert(style, win),
+  // CAS-1369: the ♥ toggle — window-assigned, wrapped the same way the other wire mutators above are.
+  oaToggleFav: (style) => window.oaToggleFav(style),
   // CAS-1340: Score adjustments section — the pure building blocks (combo enumeration/sort, bar/value/row
   // HTML, the nav-dot question) exported directly, the wire mutators window-assigned, the same two
   // conventions CAS-1339's own exports just above use. verdictAt is exposed by reference (same convention
@@ -850,6 +852,12 @@ if(typeof window.CascadeAuth === "undefined"){
   // OAM_WIL_STATUS_LABEL-adjacent exports above use. watchSearch is already exported above (CAS-718) but
   // reused here for the "anything else" Find reason.
   OAM_SHOW_OPTS, oamApplyShowCap,
+  // CAS-1369: oaFav is the ♥ favourite read (c.styles[style].fav); oamOrderScore is the ordering lift on
+  // top of oneScoreFor (ordering/the Best-N cut only, never membership/the score box); OAM_FAV_LIFT is the
+  // lift's own +5 — exported so a test can assert each directly, the same convention oaBar/oneScore above
+  // use. oamWilRankInMood is "Where it lists"'s own per-film rank within a mood's Best-N cut, exported so a
+  // test can assert it stays honest to oamApplyShowCap's watched-doesn't-count rule.
+  oaFav, oamOrderScore, OAM_FAV_LIFT, oamWilRankInMood,
 };
 `;
 

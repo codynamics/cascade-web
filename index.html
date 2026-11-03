@@ -3250,6 +3250,11 @@
   .oarowwrap{display:flex;align-items:center}
   .oarowtick{display:flex;align-items:center;flex:0 0 auto;padding:11px 2px 11px 4px;cursor:pointer}
   .oarowtick input{width:18px;height:18px;accent-color:var(--cyan);cursor:pointer}
+  /* CAS-1369: the ♥ favourite toggle — faint until marked, pink to match .favleg.fav/.favcell.fav's colour
+     once it is. Only ever rendered on an ON row (oaRowHTML's own gate). */
+  .oarowfav{display:flex;align-items:center;justify-content:center;flex:0 0 auto;width:22px;height:22px;
+    padding:0;margin-right:2px;border:0;background:none;font-size:15px;line-height:1;color:var(--faint);cursor:pointer}
+  .oarowfav.on{color:#e0567a}
   .oarow.off .oarowhead{opacity:.55}
   .oarowhead{display:grid;grid-template-columns:104px 1fr 52px 28px;align-items:center;gap:8px;
     padding:11px 4px;cursor:pointer;background:none;border:0;flex:1;min-width:0;text-align:left;font:inherit;color:inherit}
@@ -7391,9 +7396,11 @@ function sortMoviesBy(a,b,key){
       // CAS-1338 §8: on a v2 account the "you" sort becomes Score — oneScore(m), ties broken on Public —
       // the same oneAgentCriteria() gate oneScoreParts/oneScoreBoxHTML use, so a non-v2 account
       // (oneAgentCriteria() null) falls straight through to today's tasteMatch-based comparison, untouched.
+      // CAS-1369: oamOrderScore applies the ♥ ordering lift on top of oneScore for this comparison only —
+      // the score itself (oneScoreBoxHTML, alerts, membership) is never touched.
       const oneC = oneAgentCriteria();
       if(oneC){
-        const va=oneScore(a,oneC), vb=oneScore(b,oneC);
+        const va=oamOrderScore(a,oneC), vb=oamOrderScore(b,oneC);
         if(va===-1 && vb===-1) return sortMoviesBy(a,b,"cascade");
         if(va===-1) return 1;
         if(vb===-1) return -1;
@@ -20098,6 +20105,10 @@ let oaOpenStyle=null;       // the one open style row at a time (null = none ope
 let oaOrderSnapshot=null;   // the row order, frozen the moment a style opens — see oaOrder() below
 
 function oaBar(c, style){ const s=(c.styles||{})[style]; return (s && s.bar!=null) ? s.bar : null; }
+// CAS-1369: whether `style` is a ♥ favourite in the agent — set by CAS-1368's first run or the ongoing
+// Agent screen's ♥ toggle (oaToggleFav below). Drives the ordering lift (oamOrderScore) only; it never
+// changes the bar itself.
+function oaFav(c, style){ return !!((c.styles||{})[style] || {}).fav; }
 // The share of a style's score 50-99 covered by each of the five boxes, for a given bar (or null = off,
 // every box empty). Shared by the collapsed row's strip, the open slider's boxes and oaOnDrag's live redraw,
 // so the three can never quietly compute a fill percentage three different ways.
@@ -20258,9 +20269,13 @@ function oaRowHTML(c, style, filmCount){
   const tick=`<label class="oarowtick">
       <input type="checkbox" ${on?"checked":""} onchange="oaToggleStyleOn('${escA(style)}')" aria-label="Turn ${escA(name)} on or off">
     </label>`;
+  // CAS-1369: the ♥ toggle only ever appears on an ON row — turning it on sets fav without touching the bar.
+  const favBtn = on ? `<button type="button" class="oarowfav${oaFav(c,style)?" on":""}"
+      onclick="oaToggleFav('${escA(style)}')" aria-pressed="${oaFav(c,style)}" aria-label="${escA(name)} favourite">♥</button>` : "";
   const head=`
     <div class="oarowwrap">
       ${tick}
+      ${favBtn}
       <button type="button" class="oarowhead" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
         <span class="oarowleft">
           <span class="oastyname">${esc(name)}${oaAlertDotsHTML(c, style)}</span>
@@ -20376,6 +20391,18 @@ window.oaToggleAlert=(style,win)=>{
   st.al=st.al||{};
   st.al[win]=!st.al[win];
   saveCascades();
+  renderAgentsScreen();
+};
+// CAS-1369: the ♥ toggle — sets/clears fav without touching the bar (the agent screen's own on/off tick,
+// oaToggleStyleOn above, is the only thing that does that). Re-renders the Watch list too: the mood lists
+// this feeds read the lift live, same as oaToggleStyleOn's render() call.
+window.oaToggleFav=(style)=>{
+  const c=oneAgentCriteria(); if(!c) return;
+  c.styles=c.styles||{};
+  const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
+  st.fav=!st.fav;
+  saveCascades();
+  if(typeof render==="function") render();
   renderAgentsScreen();
 };
 
@@ -20745,9 +20772,20 @@ function filmInOneAgentMood(m, mood, c){
   if(mood.id==="starred" || mood.starredOnly) return starredIds.has(id);
   return oamFilmMeetsMoodRules(m, mood, c);
 }
-// Show cap — All/Best 20/40/60/80 by oneScore, applied AFTER membership. Hand-added films always show and
-// count towards the limit (ticket's own words): they're never cut, and they eat into the N rule-based films
-// get.
+// CAS-1369: the ordering lift — in any mood sorted by score, a film whose MAIN genre is a ♥ favourite in
+// the agent (oaFav) ranks as if its score were OAM_FAV_LIFT higher. Ordering and the Best-N cut ONLY: the
+// score box, "score N+" text, membership and alerts all read oneScoreFor/oneScore untouched — nothing here
+// ever writes back through those.
+const OAM_FAV_LIFT = 5;
+function oamOrderScore(m, c){
+  const score=oneScoreFor(m, c);
+  if(score===-1) return score;
+  const {main}=mainOtherCombos(m);
+  return (main!==undefined && oaFav(c, main)) ? score+OAM_FAV_LIFT : score;
+}
+// Show cap — All/Best 20/40/60/80 by oamOrderScore (CAS-1369's lifted order), applied AFTER membership.
+// Hand-added films always show and count towards the limit (ticket's own words): they're never cut, and
+// they eat into the N rule-based films get.
 function oamApplyShowCap(rows, mood, c, heldThisTab){
   const n = OAM_SHOW_N[mood.show] || null;
   if(n==null) return rows;
@@ -20759,9 +20797,21 @@ function oamApplyShowCap(rows, mood, c, heldThisTab){
   // this is a no-op for every other tab's rows.
   const soon=rows.filter(m=>!handIds.has(m.tmdb_id) && primaryStatus(m)==="released");
   const rest=rows.filter(m=>!handIds.has(m.tmdb_id) && primaryStatus(m)!=="released")
-    .sort((a,b)=>{ const d=oneScoreFor(b,c)-oneScoreFor(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
+    .sort((a,b)=>{ const d=oamOrderScore(b,c)-oamOrderScore(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
   const remaining=Math.max(0, n-hand.length);
-  const keep=new Set([...hand, ...soon, ...rest.slice(0,remaining)].map(m=>m.tmdb_id));
+  // CAS-1369: a watched film ranked among `rest` (only possible with mood.watched:true — its own
+  // excludeWatched:false override is what let it reach membership at all) is kept in its own score
+  // position but never spends a slot of `remaining` — walk the sorted list, counting only unwatched films
+  // against the budget, so "Best 40" means the 40 best unwatched films plus any watched ones that rank
+  // among them, same example the ticket gives.
+  const ranked=[];
+  let unwatchedKept=0;
+  for(const m of rest){
+    if(unwatchedKept>=remaining) break;
+    ranked.push(m);
+    if(!watched.has(m.tmdb_id)) unwatchedKept++;
+  }
+  const keep=new Set([...hand, ...soon, ...ranked].map(m=>m.tmdb_id));
   rows.forEach(m=>{ if(heldThisTab.has(m.tmdb_id)) keep.add(m.tmdb_id); });
   return rows.filter(m=>keep.has(m.tmdb_id));
 }
@@ -21354,9 +21404,14 @@ function oamWilRankInMood(m, mood, c, stageKey){
   // — excluded here too, or this could tell a real rank-based film it's competing against a film the cut
   // never actually counted against it.
   const rest=preSheetRows.filter(x=>!handIds.has(x.tmdb_id) && primaryStatus(x)!=="released")
-    .sort((a,b)=>{ const d=oneScoreFor(b,c)-oneScoreFor(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
+    .sort((a,b)=>{ const d=oamOrderScore(b,c)-oamOrderScore(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
   const idx=rest.findIndex(x=>x.tmdb_id===m.tmdb_id);
-  return idx>=0 ? {rank:idx+1, n} : null;
+  if(idx<0) return null;
+  // CAS-1369: a watched film ahead of `m` never spends a Best-N slot (oamApplyShowCap's own rule above) —
+  // only the unwatched films ranked ahead of it count, so this stays exactly as true to the cut as the
+  // comment above this function promises.
+  const rank = rest.slice(0, idx).filter(x=>!watched.has(x.tmdb_id)).length + 1;
+  return {rank, n};
 }
 function oamWilCase(m, c){
   const id=m.tmdb_id;
