@@ -652,7 +652,7 @@
   .gdot.opening_week{background:var(--open)} .gdot.in_cinema{background:var(--amber)}
   .gdot.pvod{background:var(--purple)} .gdot.rental{background:var(--blue)}
   .gdot.included_streaming{background:var(--green)} .gdot.upcoming{background:var(--upcoming)}
-  .gdot.upcoming_soon{background:var(--upcoming)}
+  .gdot.upcoming_soon{background:var(--upcoming)} .gdot.rental_soon{background:var(--upcoming)}
   .gcount{color:var(--faint);font-weight:700}
   /* CAS-204: the cards take the full page width. 10px of side gutter on a 360px phone is 20px of nothing
      either side of every card, which is a poster's worth of width spent on air. 5px keeps the cards from
@@ -1293,7 +1293,8 @@
   .cap>.saveline,.cap>.saveline.plain{margin-top:0;padding:0;background:transparent;border:0;border-radius:0;
     flex:1 1 auto;min-width:0;color:inherit}
   .cap>.saveline b,.cap>.saveline.plain b{color:inherit}
-  .cap.w-cin-upcoming{color:var(--upcoming-ink);border-color:var(--upcoming);background:rgba(var(--upcoming-rgb),.22)}
+  /* CAS-1375: w-cin-released shares the Upcoming purple verbatim — Lee's decision reuses that token rather than minting a new one. */
+  .cap.w-cin-upcoming,.cap.w-cin-released{color:var(--upcoming-ink);border-color:var(--upcoming);background:rgba(var(--upcoming-rgb),.22)}
   .cap.w-cin-opening{color:#ffc2c2;border-color:var(--open);background:rgba(255,107,107,.2)}
   .cap.w-cin-cinema{color:#ffce8f;border-color:rgba(240,163,54,.65);background:rgba(240,163,54,.18)}
   .cap.w-pvod{color:#d3c2ff;border-color:rgba(164,134,240,.65);background:rgba(164,134,240,.18)}
@@ -2686,6 +2687,7 @@
   #groups .group[data-g=opening_week]{--gc:var(--open)}
   #groups .group[data-g=in_cinema]{--gc:var(--amber)} #groups .group[data-g=pvod]{--gc:var(--purple)}
   #groups .group[data-g=rental]{--gc:var(--blue)} #groups .group[data-g=included_streaming]{--gc:var(--green)}
+  #groups .group[data-g=rental_soon]{--gc:var(--upcoming)}
   #groups .group{margin-top:18px}
   #groups .grouphead:not(.sub){margin:0 10px 6px;padding:8px 12px;border-radius:10px;gap:8px;
     font:800 15px/1.15 var(--font-body);letter-spacing:.1px;color:var(--ink);
@@ -5308,6 +5310,9 @@ const STATUS_LABEL = {
   // CAS-1309: the Cinema tab's Upcoming stage splits into this section (cinema_date due within 7 days)
   // ahead of "upcoming" itself — only ever a listingGroups section key, never a primaryStatus value.
   upcoming_soon:"Next week",
+  // CAS-1375: the Rental tab's own equivalent split — `released` films ahead of the ones with a real rental
+  // offer — same "listingGroups section key, never a primaryStatus value" rule as upcoming_soon above.
+  rental_soon:"Rental soon",
   // Not an availability window (it isn't in CASCADE, so it is never a status a film HOLDS) — it's a moment,
   // and this is the label the alerts and the report print for it.
   past_opening:"Past opening weekend"
@@ -5330,6 +5335,10 @@ function watchTabsNow(){
 function filmMatchesWatchTab(m, tab){
   const ps=primaryStatus(m);
   if(tab==="in_cinema") return ps==="upcoming" || ps==="opening_week" || ps==="in_cinema";
+  // CAS-1375: `released` (cinema run over 90 days behind it, no offer yet) is not a CASCADE window and so
+  // owns no stage of its own — it lists in Rental, ahead of the films with a real rental offer, as "Rental
+  // soon" (listingGroups' own "rental_soon" split below).
+  if(tab==="rent" && ps==="released") return true;
   return ps===WATCH_TAB_OWN_STANDING[tab];
 }
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -7538,6 +7547,9 @@ function cinemaState(m){
   const p=primaryStatus(m);
   if(p==="upcoming")     return {label:"Upcoming", key:"upcoming"};
   if(p==="opening_week") return {label:"Opening",  key:"opening"};
+  // CAS-1375: `released` never reads "In cinemas" again — its own capsule state, styled in the Upcoming
+  // purple (CAP_LABEL.released/WIN_ICON.released, .cap.w-cin-released below).
+  if(p==="released")     return {label:"Rental soon", key:"released"};
   return {label:"Cinema", key:"cinema"};   // in_cinema, or already past cinema
 }
 function curSlot(m){   // which of the 4 slots is the film's current stage
@@ -7640,10 +7652,13 @@ function cinemaInfoRowHTML(m){
 // date and, fused on, the how-to-watch/services line. The rest of the windows' dates move to the
 // expander's Windows line (windowsLineHTML) rather than repeating four date lines on the card face.
 const CAP_LABEL={upcoming:"Upcoming",opening:"Opening",cinema:"In cinemas",
-  pvod:"Premium",rental:"Rent",included_streaming:"Streaming"};
+  pvod:"Premium",rental:"Rent",included_streaming:"Streaming",
+  // CAS-1375: the `released` capsule's own label — cinemaState(m).key reads this one, never "cinema".
+  released:"Rental soon"};
 // CAS-429: the streaming icon is a plain ▶ (no VS16), not the "▶️" emoji — most fonts render that as a
 // boxed white-triangle-on-blue glyph, which reads as its own icon rather than the capsule's own green tint.
-const WIN_ICON={upcoming:"🗓️",opening:"🎬",cinema:"🎬",pvod:"⭐",rental:"🎫",included_streaming:"▶"};
+const WIN_ICON={upcoming:"🗓️",opening:"🎬",cinema:"🎬",pvod:"⭐",rental:"🎫",included_streaming:"▶",
+  released:"🎫"};
 // CAS-847: an upcoming film's lozenge reads "Upcoming" unless the film is within a week of its published
 // opening date AND the account has "Opening next week" switched on, in which case it reads "Next week" —
 // the one thing about an unreleased film the reader cannot see for themselves. CAS-847 also gave "When
@@ -10575,7 +10590,10 @@ function watchStageCountFor(stop){
   watchTab=stop.tabKey;
   if(stop.tabKey==="in_cinema") watchCinemaStage = stop.key==="upcoming" ? "upcoming" : "in_cinema";
   const {rows}=watchVisibleRows();
-  const n = stop.tabKey!=="in_cinema" ? watchGroupRows(rows, WATCH_TAB_OWN_STANDING[stop.tabKey]).length
+  // CAS-1375: a non-Cinema tab's `rows` is already exactly what that tab shows (filmMatchesWatchTab is the
+  // only filter), so the count is the whole list, not just its own-standing group — the Rental stop's count
+  // must also carry its "Rental soon" rows, which hold a different primaryStatus (`released`) entirely.
+  const n = stop.tabKey!=="in_cinema" ? rows.length
     : stop.key==="upcoming" ? watchGroupRows(rows, "upcoming").length
     : watchGroupRows(rows, "opening_week").length + watchGroupRows(rows, "in_cinema").length;
   watchTab=savedTab; watchCinemaStage=savedStage;
@@ -12037,7 +12055,14 @@ const hasConfirmedOffer = m => !isEstimated(m) && (m.offers||[]).length>0;
 // against. That is the same evidence this file already accepts from a confirmed title, so accepting it here
 // is consistency rather than a new claim; every other estimated window stays out, untouched.
 const inCinemaConfirmed = m => inCinemaWindow(m) && (!isEstimated(m) || inCinemaRun(m));
-const showable = m => isUpcoming(m) || hasConfirmedOffer(m) || inCinemaConfirmed(m);
+// CAS-1375 (Lee, 3 Nov 2026 — supersedes CAS-999 AC3's "never showable" rule for this status): a film whose
+// cinema run has ended with no offer yet is no longer nothing to watch — it lists in Rental as "Rental
+// soon". Unlike CAS-170's doctrine elsewhere, this is NOT gated on CONFIRMED: offerlessWindow's `released`
+// fallback is a pure cinema_date-vs-offers read, honest regardless of availability_confidence (The Odyssey,
+// this ticket's own motivating bug, is itself an ESTIMATED title) — "Rental soon" claims nothing about
+// availability today, only a forecast off a real opening date, the same kind of honest non-claim CAS-170
+// already carves out for Upcoming.
+const showable = m => isUpcoming(m) || hasConfirmedOffer(m) || inCinemaConfirmed(m) || primaryStatus(m)==="released";
 // The real size of the catalogue as far as any user is concerned. Every "of N" on the page counts this, not
 // MOVIES.length, or the denominator would promise films no screen can ever reach.
 const SHOWABLE_N = MOVIES.filter(showable).length;
@@ -20757,10 +20782,15 @@ function oamApplyShowCap(rows, mood, c, heldThisTab){
   if(n==null) return rows;
   const handIds=new Set(mood.in||[]);
   const hand=rows.filter(m=>handIds.has(m.tmdb_id));
-  const rest=rows.filter(m=>!handIds.has(m.tmdb_id))
+  // CAS-1375: a Rental soon film (primaryStatus "released") is kept off the cut entirely — ON TOP of the N
+  // rule-based films a Best N mood promises, unlike a hand add, which eats into that same N. Only ever
+  // populated on the Rental tab (filmMatchesWatchTab/oamStagePool are the only source of these rows), so
+  // this is a no-op for every other tab's rows.
+  const soon=rows.filter(m=>!handIds.has(m.tmdb_id) && primaryStatus(m)==="released");
+  const rest=rows.filter(m=>!handIds.has(m.tmdb_id) && primaryStatus(m)!=="released")
     .sort((a,b)=>{ const d=oneScoreFor(b,c)-oneScoreFor(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
   const remaining=Math.max(0, n-hand.length);
-  const keep=new Set([...hand, ...rest.slice(0,remaining)].map(m=>m.tmdb_id));
+  const keep=new Set([...hand, ...soon, ...rest.slice(0,remaining)].map(m=>m.tmdb_id));
   rows.forEach(m=>{ if(heldThisTab.has(m.tmdb_id)) keep.add(m.tmdb_id); });
   return rows.filter(m=>keep.has(m.tmdb_id));
 }
@@ -20768,12 +20798,11 @@ function oamApplyShowCap(rows, mood, c, heldThisTab){
 // (watchScopeRows' own "catalogue" branch), reused verbatim since a v2 account's one mood pool is always
 // catalogue-wide.
 function oamStagePool(){
-  const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
   return MOVIES.filter(m=>{
     if(!showable(m) || !passesTasteBase(m)) return false;
-    const ps=primaryStatus(m);
-    const standing = watchTab==="in_cinema" ? (ps==="upcoming" || ps==="opening_week" || ps==="in_cinema") : ps===ownStanding;
-    return standing && watchStageMatches(m);
+    // CAS-1375: calls the shared standing test rather than re-deriving it, so the Rental tab's own
+    // `released` widening (filmMatchesWatchTab) is never a second copy that could drift from it.
+    return filmMatchesWatchTab(m, watchTab) && watchStageMatches(m);
   });
 }
 // watchVisibleRows()'s v2 replacement — gated in by watchVisibleRows itself below. Mirrors its v1 shape
@@ -21280,12 +21309,15 @@ window.openOamListPanel=(id, btn)=>{
 // but no mood includes it" / "no score yet" cases appended for what's left once every exclusion is cleared. ----
 const OAM_WIL_STATUS_LABEL = {
   upcoming:"Upcoming", opening_week:"In Cinema", in_cinema:"In Cinema",
-  pvod:"Premium", rental:"Rental", included_streaming:"Streaming"
+  pvod:"Premium", rental:"Rental", included_streaming:"Streaming",
+  // CAS-1375: supersedes CAS-1374's no-stage sentence below for `released` — it now has a real stage
+  // (Rental's own "Rental soon" section), so "Listed in <mood>" names it same as every other status.
+  released:"Rental soon"
 };
-// CAS-1374: the plain-English reason a film holds NO Watch stage at all (oamWilStageKeyFor returns null) —
-// "released" (cinema run over 90 days behind it, no offer yet) is the only status this actually happens for
-// today, but a status with no sentence of its own still gets a true one rather than silently falling through
-// to the cut-mood guess below.
+// CAS-1374: the plain-English reason a film holds NO Watch stage at all (oamWilStageKeyFor returns null).
+// CAS-1375 gave `released` a real stage (Rental's "Rental soon"), so this entry is now unreachable while
+// the Rental window is switched on — it stays live only for the edge case of Rental itself switched off in
+// Where & when, when a `released` film once again has nowhere at all to list.
 const OAM_WIL_NO_STAGE_SENTENCE = {
   released: "Its cinema run has ended and it has no rent or stream date yet."
 };
@@ -21347,7 +21379,10 @@ function oamWilRankInMood(m, mood, c, stageKey){
   const {preSheetRows}=oamVisibleRows();
   watchTab=savedTab; watchCinemaStage=savedStage; watchMoodSel=savedMood;
   const handIds=new Set(mood.in||[]);
-  const rest=preSheetRows.filter(x=>!handIds.has(x.tmdb_id))
+  // CAS-1375: a Rental soon film is never part of the ranked pool either (oamApplyShowCap's own rule above)
+  // — excluded here too, or this could tell a real rank-based film it's competing against a film the cut
+  // never actually counted against it.
+  const rest=preSheetRows.filter(x=>!handIds.has(x.tmdb_id) && primaryStatus(x)!=="released")
     .sort((a,b)=>{ const d=oneScoreFor(b,c)-oneScoreFor(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
   const idx=rest.findIndex(x=>x.tmdb_id===m.tmdb_id);
   return idx>=0 ? {rank:idx+1, n} : null;
@@ -24738,6 +24773,9 @@ function cascadeRankTint(c){
 // its button reads (CAS-1329: there is no other section to head any more — a film never again appears
 // earlier than the stage it is actually in).
 function watchGroupHeading(g){
+  // CAS-1375: the Rental soon split heads itself, same as upcoming_soon does on the Cinema tab — every
+  // other Rental row still heads with the tab's own name, handled by the branch below.
+  if(g==="rental_soon") return STATUS_LABEL.rental_soon;
   if(watchTab==="in_cinema") return STATUS_LABEL[g];
   return WATCH_TAB_LABEL[watchTab];
 }
@@ -24791,6 +24829,15 @@ function listingGroups(rows, ac){
       if(later.length) split.push({g:"upcoming", items:later});
       groups.splice(idx, 1, ...split);
     }
+  }
+  // CAS-1375: the Rental tab's own equivalent split. A `released` film (filmMatchesWatchTab's own widening)
+  // never matches any literal LISTING_ORDER key, so the pass above never puts it in a group at all — carved
+  // out of `rows` directly instead, sorted by cinema_date newest first (the ticket's own order), ahead of
+  // the ordinary Rental section built from the films that actually have a rental offer.
+  if(watchTab==="rent"){
+    const soon=rows.filter(m=>primaryStatus(m)==="released")
+      .sort((a,b)=>(b.cinema_date||"").localeCompare(a.cinema_date||""));
+    if(soon.length) groups.unshift({g:"rental_soon", items:soon});
   }
   return groups;
 }

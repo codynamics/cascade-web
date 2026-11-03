@@ -256,8 +256,8 @@ test("windows: no listed film sits outside the agent's listed windows", () => {
   }
 });
 
-// ---- 6. AVAILABILITY IS BACKED BY SOMETHING (CAS-170 / CAS-155 / CAS-227) -------------------------------
-test("availability: every showable film is unreleased, offered, or in a cinema run", () => {
+// ---- 6. AVAILABILITY IS BACKED BY SOMETHING (CAS-170 / CAS-155 / CAS-227 / CAS-1375) ----------------------
+test("availability: every showable film is unreleased, offered, in a cinema run, or released-with-no-offer-yet", () => {
   for(const m of E.MOVIES){
     if(!E.showable(m)) continue;
     const upcoming   = (m.status || []).includes("upcoming");
@@ -268,7 +268,12 @@ test("availability: every showable film is unreleased, offered, or in a cinema r
     // real opening date and no digital listing, and whether the pipeline or the front end read that
     // evidence changes nothing about it. Every other estimated window is still excluded (CAS-170).
     const inCinema   = E.inCinemaWindow(m) && (!E.isEstimated(m) || E.inCinemaRun(m));
-    assert.ok(upcoming || offered || inCinema,
+    // CAS-1375: a fourth case — `released` (cinema run over, no offer yet) is not gated on CONFIRMED the
+    // way the other cases are: offerlessWindow's `released` fallback is a pure cinema_date-vs-offers read
+    // (The Odyssey, this ticket's own motivating bug, is itself an ESTIMATED title), and "Rental soon"
+    // claims nothing about availability today, only a forecast off a real opening date.
+    const released   = E.primaryStatus(m)==="released";
+    assert.ok(upcoming || offered || inCinema || released,
       `${m.title} is listable on nothing: status ${(m.status||[]).join(",")}, ${(m.offers||[]).length} offers`);
     // CAS-155's fault in one line: a film with a rent or stream offer must never be filed under the big screen.
     if(inCinema) assert.ok(!(m.offers || []).length,
