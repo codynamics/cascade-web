@@ -5522,7 +5522,10 @@ function deriveStatus(m){
   // CAS-395: the pipeline is the authority that a CONFIRMED film's theatrical run is still current
   // (claimedStatus holds in_cinema) — trust that alongside whatever the offers below resolve to, rather
   // than only when there are no offers at all. A film can be on a screen and already have a home offer.
-  if(claimed.includes("in_cinema") && inCinemaRun(m)) s.add(cinemaRungFor(m));
+  // CAS-1376: m.on_screen is the pipeline's own chain-scraped confirmation, which is allowed to outlast
+  // CINEMA_RUN_DAYS (that is the whole point of it) — inCinemaRun(m)'s date window is the only gate here
+  // otherwise, and it is exactly the guess a scraped sighting is meant to override.
+  if(claimed.includes("in_cinema") && (inCinemaRun(m) || m.on_screen)) s.add(cinemaRungFor(m));
   if(!hasSub && ((dearestBuy!=null&&dearestBuy>=PVOD_MIN)||(cheapestRent!=null&&cheapestRent>=PVOD_MIN))) s.add("pvod");
   if(cheapestRent!=null && cheapestRent<=RENTAL_MAX) s.add("rental");
   if(hasSub) s.add("included_streaming");

@@ -1,0 +1,112 @@
+{
+  "Success": true,
+  "Data": {
+    "Movies": [
+      {
+        "Id": 21438,
+        "Name": "Primetime",
+        "ReleasedAt": "2026-10-29T00:00",
+        "MovieUrl": "/movie/primetime",
+        "Rating": "MA15+"
+      },
+      {
+        "Id": 19799,
+        "Name": "Clayface",
+        "ReleasedAt": "2026-10-22T00:00",
+        "MovieUrl": "/movie/clayface",
+        "Rating": "MA15+"
+      },
+      {
+        "Id": 21014,
+        "Name": "Pressure",
+        "ReleasedAt": "2026-10-29T00:00",
+        "MovieUrl": "/movie/pressure",
+        "Rating": "M"
+      },
+      {
+        "Id": 19398,
+        "Name": "Street Fighter",
+        "ReleasedAt": "2026-10-15T00:00",
+        "MovieUrl": "/movie/street-fighter",
+        "Rating": "M"
+      },
+      {
+        "Id": 21371,
+        "Name": "Wildwood",
+        "ReleasedAt": "2026-10-22T00:00",
+        "MovieUrl": "/movie/wildwood",
+        "Rating": "M"
+      },
+      {
+        "Id": 20941,
+        "Name": "Verity",
+        "ReleasedAt": "2026-10-01T00:00",
+        "MovieUrl": "/movie/verity",
+        "Rating": "MA15+"
+      },
+      {
+        "Id": 20699,
+        "Name": "Sense and Sensibility",
+        "ReleasedAt": "2026-10-15T00:00",
+        "MovieUrl": "/movie/sense-and-sensibility",
+        "Rating": "PG"
+      },
+      {
+        "Id": 21391,
+        "Name": "Crawlers",
+        "ReleasedAt": "2026-10-29T00:00",
+        "MovieUrl": "/movie/crawlers",
+        "Rating": "MA15+"
+      },
+      {
+        "Id": 21189,
+        "Name": "Heart of the Beast",
+        "ReleasedAt": "2026-09-24T00:00",
+        "MovieUrl": "/movie/heart-of-the-beast",
+        "Rating": "M"
+      },
+      {
+        "Id": 19798,
+        "Name": "Paw Patrol: The Dino Movie",
+        "ReleasedAt": "2026-09-10T00:00",
+        "MovieUrl": "/movie/paw-patrol-the-dino-movie",
+        "Rating": "G"
+      },
+      {
+        "Id": 20697,
+        "Name": "Other Mommy",
+        "ReleasedAt": "2026-10-08T00:00",
+        "MovieUrl": "/movie/other-mommy",
+        "Rating": "MA15+"
+      },
+      {
+        "Id": 20184,
+        "Name": "Resident Evil",
+        "ReleasedAt": "2026-09-17T00:00",
+        "MovieUrl": "/movie/resident-evil",
+        "Rating": "MA15+"
+      },
+      {
+        "Id": 21100,
+        "Name": "Klara and the Sun",
+        "ReleasedAt": "2026-10-22T00:00",
+        "MovieUrl": "/movie/klara-and-the-sun",
+        "Rating": "M"
+      },
+      {
+        "Id": 21594,
+        "Name": "Kabaddi 5",
+        "ReleasedAt": "2026-10-29T00:00",
+        "MovieUrl": "/movie/kabaddi-5",
+        "Rating": "M"
+      },
+      {
+        "Id": 19797,
+        "Name": "The Odyssey",
+        "ReleasedAt": "2026-07-16T00:00",
+        "MovieUrl": "/movie/the-odyssey",
+        "Rating": "M"
+      }
+    ]
+  }
+}

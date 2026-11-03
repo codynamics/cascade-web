@@ -33,7 +33,7 @@ to compare against. Output for the app front-end is written to movies.json.
 """
 
 from __future__ import annotations
-import os, sys, csv, io, re, json, time, shutil, hashlib, calendar, datetime, subprocess, urllib.parse, urllib.request, urllib.error
+import os, sys, csv, io, re, json, time, shutil, hashlib, calendar, datetime, subprocess, urllib.parse, urllib.request, urllib.error, html
 from collections import Counter
 
 import runstats
@@ -90,6 +90,15 @@ STATE_DIR = os.path.join(os.path.dirname(__file__), "state")
 SNAPSHOT_FILE = os.path.join(STATE_DIR, "last_snapshot.json")
 ALERTS_FILE   = os.path.join(STATE_DIR, "alerts.json")
 WM_CACHE_FILE = os.path.join(STATE_DIR, "watchmode_ids.json")   # imdb_id -> watchmode_id (never changes)
+CINEMA_CHAINS_STATE_FILE = os.path.join(STATE_DIR, "cinema_chains_state.json")
+
+# CAS-1376: the AU chains' own Now Showing lists, read straight off their public pages — a confirmed
+# sighting, not a date guess, so it is allowed to override CINEMA_RUN_DAYS the way CAS-395 originally
+# intended. See fetch_hoyts_now_showing/fetch_event_now_showing and update_now_showing below.
+NOW_SHOWING_USER_AGENT = "CascadeBot/1.0 (+https://cascademovies.com)"
+NOW_SHOWING_MIN_FILMS = 10          # ignore a chain's page this run if it returns fewer titles than this
+NOW_SHOWING_MATCH_WINDOW_DAYS = 365  # only accept a title match within 1 year of the film's cinema_date
+NOW_SHOWING_ALL_FAILED_GRACE_DAYS = 3  # consecutive all-chains-failed runs before falling back to the date rule
 WINDOW_DATES_FILE = os.path.join(STATE_DIR, "window_dates.json")  # tmdb_id -> {window: first_seen_date}
 API_BUDGET_FILE = os.path.join(STATE_DIR, "api_budget.json")    # CAS-384: today's cross-run provider spend
 WM_MONTHLY_FILE = os.path.join(STATE_DIR, "watchmode_monthly.json")   # CAS-974: cumulative spend this month
@@ -2123,6 +2132,11 @@ def derive_from_providers(movie: dict, prov: dict, today: datetime.date) -> list
     # CAS-418 (walk back CAS-395): in_cinema is EXCLUSIVE with home offers — a film with a rent/stream/
     # buy offer is never filed under the big screen (engine invariant #55). So the offer-less fallback
     # only ever runs when NO home window resolved.
+    # CAS-1376: a chain's own Now Showing list is a CONFIRMED sighting, not the date guess CAS-418
+    # walked back — so a scraped on_screen film restores CAS-395's simultaneous rule for itself alone,
+    # whatever else derive_from_providers found.
+    if movie.get("on_screen"):
+        windows.append("in_cinema")
     if not windows:
         windows.append(_offerless_window(movie.get("cinema_date"), today,
                                           _record_year(movie), movie.get("release_dates")))
@@ -2203,6 +2217,11 @@ def derive_status(movie: dict, offers: list[dict], today: datetime.date) -> list
     if has_sub:
         status.add("included_streaming")
 
+    # CAS-1376: see derive_from_providers' matching comment — a confirmed on-screen sighting restores
+    # CAS-395's simultaneous rule for this film alone.
+    if movie.get("on_screen"):
+        status.add("in_cinema")
+
     # CAS-608: date-only, same as derive_from_providers' offer-less fallback — a title past its
     # cinema run with no priced offer is released-and-unavailable, not upcoming.
     if not status:
@@ -2260,6 +2279,213 @@ def apply_monotonic_status(m: dict, candidate: list[str], confidence: str, today
         m.pop("pending_downgrade", None)
     else:
         m["pending_downgrade"] = pending   # held back — m["status"] stays at `prev`
+
+
+# ---------------------------------------------------------------------------
+# 4c. NOW SHOWING (CAS-1376) — read the AU chains' own Now Showing lists so a title that is
+#     genuinely still on a screen is never taken out of in_cinema on CINEMA_RUN_DAYS' guess alone
+#     (The Odyssey was still on Hoyts' list 110 days after it opened). Stdlib-only, same get_text/
+#     get_json helpers as the rest of the pipeline — no HTML-parsing dependency this repo doesn't
+#     already have, since both chains' pages are regular/regex-friendly (one server-rendered list,
+#     one small JSON endpoint).
+# ---------------------------------------------------------------------------
+_LANGUAGE_SUFFIX_RE = re.compile(
+    r"\s*\([^()]*\b(?:hindi|tamil|telugu|malayalam|kannada|punjabi|japanese|korean|mandarin|"
+    r"cantonese|english|eng|dub(?:bed)?|sub(?:bed|titled)?|original)\b[^()]*\)\s*$",
+    re.IGNORECASE)
+_TITLE_PUNCT_RE = re.compile(r"[^\w\s]", re.UNICODE)
+
+
+def normalize_cinema_title(title: str | None) -> str:
+    """CAS-1376: lower-case, drop a trailing language/subtitle qualifier such as '(Hindi, Eng Sub)',
+    then strip punctuation and collapse whitespace — so our catalogue's title and a chain's own
+    listing of the same film compare equal regardless of case, a dub/sub qualifier, or stray
+    punctuation either side does or doesn't carry."""
+    t = _LANGUAGE_SUFFIX_RE.sub("", title or "")
+    t = _TITLE_PUNCT_RE.sub(" ", t.lower())
+    return " ".join(t.split())
+
+
+_MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August",
+                "September", "October", "November", "December"]
+_MONTH_NUMBER = {}
+for _i, _name in enumerate(_MONTH_NAMES, start=1):
+    _MONTH_NUMBER[_name.lower()] = _i
+    _MONTH_NUMBER[_name[:3].lower()] = _i
+_CHAIN_DATE_RE = re.compile(r"^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$")
+
+
+def _parse_chain_date(text: str | None) -> str | None:
+    """'16 July 2026' or '15 Oct 2026' -> '2026-07-16'. None if unparseable. Avoids a locale-
+    dependent strptime, since the month name/abbreviation has to match regardless of the host's
+    own locale."""
+    m = _CHAIN_DATE_RE.match((text or "").strip())
+    if not m:
+        return None
+    day, month_name, year = m.groups()
+    month = _MONTH_NUMBER.get(month_name.lower())
+    if not month:
+        return None
+    try:
+        return datetime.date(int(year), month, int(day)).isoformat()
+    except ValueError:
+        return None
+
+
+_HOYTS_CARD_RE = re.compile(
+    r'movies-list__link"[^>]*>([^<]+)</a>.*?movies-list__release-date">([^<]+)<', re.DOTALL)
+
+
+def fetch_hoyts_now_showing() -> list[dict]:
+    """hoyts.com.au/movies renders its Now Showing list server-side (robots.txt allows this path);
+    one request, no HTML-parsing dependency needed — the title/release-date pair for each card sits
+    a short, fixed distance apart in the markup."""
+    page = get_text("https://www.hoyts.com.au/movies", retries=1,
+                     headers={"User-Agent": NOW_SHOWING_USER_AGENT})
+    return [{"title": html.unescape(m.group(1)).strip(),
+             "release_date": _parse_chain_date(m.group(2))}
+            for m in _HOYTS_CARD_RE.finditer(page)]
+
+
+def fetch_event_now_showing() -> list[dict]:
+    """eventcinemas.com.au/Movies builds its list with JavaScript; /movies/getnowshowing is the
+    JSON endpoint that page itself calls (found in its site bundle's getMovies() lookup) — robots.txt
+    disallows only /ticketing/ and /tickets/, not this path."""
+    data = get_json("https://www.eventcinemas.com.au/movies/getnowshowing", retries=1,
+                     headers={"User-Agent": NOW_SHOWING_USER_AGENT,
+                              "X-Requested-With": "XMLHttpRequest"})
+    out = []
+    for film in ((data.get("Data") or {}).get("Movies") or []):
+        name = film.get("Name")
+        if not name:
+            continue
+        released = (film.get("ReleasedAt") or "").split("T")[0]
+        out.append({"title": html.unescape(name).strip(), "release_date": released or None})
+    return out
+
+
+CINEMA_CHAIN_FETCHERS = {
+    "hoyts": fetch_hoyts_now_showing,
+    "event": fetch_event_now_showing,
+    # Village (villagecinemas.com.au) and Reading (readingcinemas.com.au) are both fully
+    # client-rendered SPAs with no server-rendered list and no JSON endpoint visible in their
+    # initial HTML/JS bundle — checked 3 Nov 2026 (Village) and 4 Nov 2026 (Reading). Neither is
+    # "reachable" per the ticket's own condition, so neither is wired in here.
+}
+
+
+def _load_cinema_chains_state() -> dict:
+    if not os.path.exists(CINEMA_CHAINS_STATE_FILE):
+        return {}
+    try:
+        return json.load(open(CINEMA_CHAINS_STATE_FILE, encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_cinema_chains_state(state: dict) -> None:
+    os.makedirs(STATE_DIR, exist_ok=True)
+    json.dump(state, open(CINEMA_CHAINS_STATE_FILE, "w", encoding="utf-8"), indent=2)
+
+
+def _best_cinema_match(candidates: list[dict], release_date: str | None) -> dict | None:
+    """First candidate (by normalised title) whose cinema_date, if both sides have one, is within
+    NOW_SHOWING_MATCH_WINDOW_DAYS of the chain's own release date — the disambiguator for same-
+    titled films. A candidate with no cinema_date, or a chain date of None, matches on title alone."""
+    for cand in candidates:
+        cd = cand.get("cinema_date")
+        if release_date and cd:
+            delta = abs((datetime.date.fromisoformat(release_date)
+                         - datetime.date.fromisoformat(cd)).days)
+            if delta > NOW_SHOWING_MATCH_WINDOW_DAYS:
+                continue
+        return cand
+    return None
+
+
+def update_now_showing(records: list[dict], today: datetime.date) -> dict:
+    """CAS-1376: fetch every wired chain's Now Showing list, match each title into `records`, and
+    set on_screen/on_screen_src/on_screen_checked for exactly the films THIS run confirms — clearing
+    them from any film no usable chain re-confirms. A record whose on_screen flag actually changes
+    gets its status recommitted via apply_monotonic_status (CAS-355's guard still applies to any
+    resulting downgrade), so a stale film never skips the normal confirmation wait on its way back
+    off a screen.
+
+    A chain that raises, or returns fewer than NOW_SHOWING_MIN_FILMS titles, is ignored for this run
+    (one bad chain must never cost the others). If every chain is ignored, nothing is touched for up
+    to NOW_SHOWING_ALL_FAILED_GRACE_DAYS consecutive runs; past that, on_screen is cleared catalogue-
+    wide and CINEMA_RUN_DAYS' date rule is the only source of truth again until a chain answers.
+
+    Returns the per-chain report ({chain: {fetched, matched, unmatched, ignored}}) for the run log."""
+    report = {}
+    usable = {}
+    for chain, fetch in CINEMA_CHAIN_FETCHERS.items():
+        try:
+            films = fetch()
+        except Exception:
+            report[chain] = {"fetched": 0, "matched": 0, "unmatched": 0,
+                              "unmatched_titles": [], "ignored": True}
+            continue
+        fetched = len(films)
+        ignored = fetched < NOW_SHOWING_MIN_FILMS
+        report[chain] = {"fetched": fetched, "matched": 0, "unmatched": 0,
+                          "unmatched_titles": [], "ignored": ignored}
+        if not ignored:
+            usable[chain] = films
+
+    state = _load_cinema_chains_state()
+    if not usable:
+        # CAS-1376 safety: never mark the whole catalogue off screen because a page changed — hold
+        # yesterday's on_screen values for a few days, then fall back to the date rule.
+        consecutive = state.get("consecutive_all_failed", 0) + 1
+        state["consecutive_all_failed"] = consecutive
+        _save_cinema_chains_state(state)
+        if consecutive > NOW_SHOWING_ALL_FAILED_GRACE_DAYS:
+            for m in records:
+                if "on_screen" not in m:
+                    continue
+                m.pop("on_screen", None)
+                m.pop("on_screen_src", None)
+                m.pop("on_screen_checked", None)
+                apply_monotonic_status(m, derive_status(m, m.get("offers", []), today),
+                                        m.get("availability_confidence") or "estimated", today)
+        return report
+    state["consecutive_all_failed"] = 0
+    _save_cinema_chains_state(state)
+
+    by_title = {}
+    for m in records:
+        by_title.setdefault(normalize_cinema_title(m.get("title")), []).append(m)
+
+    sources_by_id = {}
+    for chain, films in usable.items():
+        for film in films:
+            hit = _best_cinema_match(by_title.get(normalize_cinema_title(film["title"]), []),
+                                      film.get("release_date"))
+            if hit is None:
+                report[chain]["unmatched"] += 1
+                report[chain]["unmatched_titles"].append(film["title"])
+                continue
+            report[chain]["matched"] += 1
+            sources_by_id.setdefault(hit["tmdb_id"], set()).add(chain)
+
+    for m in records:
+        tid = m["tmdb_id"]
+        was_on_screen = bool(m.get("on_screen"))
+        if tid in sources_by_id:
+            m["on_screen"] = True
+            m["on_screen_src"] = sorted(sources_by_id[tid])
+            m["on_screen_checked"] = today.isoformat()
+            if not was_on_screen:
+                apply_monotonic_status(m, derive_status(m, m.get("offers", []), today),
+                                        "confirmed", today)
+        elif was_on_screen:
+            m.pop("on_screen", None)
+            m.pop("on_screen_src", None)
+            m.pop("on_screen_checked", None)
+            apply_monotonic_status(m, derive_status(m, m.get("offers", []), today),
+                                    m.get("availability_confidence") or "estimated", today)
+    return report
 
 
 # ---------------------------------------------------------------------------
@@ -2339,7 +2565,7 @@ def diff_and_alert(today_records: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------------------
 REFRESH_LOG_BOOKKEEPING_FIELDS = {
     "last_polled", "last_probed", "probe_count", "cache_stamped_at",
-    "wm_fields_fetched_at", "poll_tier", "tmdb_not_found_streak",
+    "wm_fields_fetched_at", "poll_tier", "tmdb_not_found_streak", "on_screen_checked",
 }
 REFRESH_LOG_WATCHMODE_FIELDS = {"wm_user_rating", "wm_critic_score", "wm_popularity_percentile"}
 REFRESH_LOG_OSCARBASE_FIELDS = {"award", "award_text"}
@@ -3469,6 +3695,16 @@ def run(simulate_day: bool = False):
         print(f"watchmode cycle {cycle['cycle_start']}..{cycle['cycle_end']} quota={cycle['quota']} "
               f"spent={sum(cycle['days'].values())} run_pot={wm_pot} "
               f"today_spent={today_total_spent}")
+
+    # CAS-1376: read the AU chains' own Now Showing lists — live only, same as every other
+    # network-calling enrichment pass; --build-html's code-only rebuild never reaches this branch.
+    if LIVE:
+        now_showing_report = update_now_showing(records, today)
+        runstats.set_value("cinema_chains", chains=now_showing_report)
+        for chain, stats in now_showing_report.items():
+            tag = " (ignored)" if stats["ignored"] else ""
+            print(f"[now_showing] {chain}{tag}: fetched={stats['fetched']} "
+                  f"matched={stats['matched']} unmatched={stats['unmatched']}")
 
     # CAS-608: how much of the published catalogue is genuinely upcoming vs. released-with-no-AU-
     # offer vs. on the short 7-day Watchmode ladder — the counts this ticket exists to shrink.
