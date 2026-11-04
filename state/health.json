@@ -1,24 +1,6 @@
 {
-  "checked_at": "2026-11-03T21:02:19.350784+00:00",
+  "checked_at": "2026-11-04T06:01:46.806052+00:00",
   "checks": [
-    {
-      "name": "email_send",
-      "ok": null,
-      "value": 0,
-      "threshold": 0,
-      "detail": "no email attempted this run \u2014 unavailable.",
-      "status": "unknown",
-      "checked_at": "2026-11-03T06:01:58.356659+00:00"
-    },
-    {
-      "name": "push_send",
-      "ok": null,
-      "value": 0,
-      "threshold": 0,
-      "detail": "APNs configured but no push attempted this run \u2014 unavailable.",
-      "status": "unknown",
-      "checked_at": "2026-11-03T06:01:58.356659+00:00"
-    },
     {
       "name": "catalogue_size",
       "ok": true,
@@ -171,6 +153,24 @@
       "detail": "5.2% of weekly-TTL film(s) stale past 14d, 60.1% of film(s) released within 365d stale past 45d, oldest stamp in the catalogue is 54 day(s) old.",
       "status": "fail",
       "checked_at": "2026-11-03T21:02:19.350784+00:00"
+    },
+    {
+      "name": "email_send",
+      "ok": null,
+      "value": 0,
+      "threshold": 0,
+      "detail": "no email attempted this run \u2014 unavailable.",
+      "status": "unknown",
+      "checked_at": "2026-11-04T06:01:46.806052+00:00"
+    },
+    {
+      "name": "push_send",
+      "ok": null,
+      "value": 0,
+      "threshold": 0,
+      "detail": "APNs configured but no push attempted this run \u2014 unavailable.",
+      "status": "unknown",
+      "checked_at": "2026-11-04T06:01:46.806052+00:00"
     }
   ],
   "ok": false
