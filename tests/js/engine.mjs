@@ -338,6 +338,8 @@ if(typeof window.CascadeAuth === "undefined"){
   get oaSuggestionOpen(){ return oaSuggestionOpen; },
   oaToggleSuggestion: () => window.oaToggleSuggestion(),
   oaToggleAlert: (style, win) => window.oaToggleAlert(style, win),
+  // CAS-1369: the ♥ toggle — window-assigned, wrapped the same way the other wire mutators above are.
+  oaToggleFav: (style) => window.oaToggleFav(style),
   // CAS-1340: Score adjustments section — the pure building blocks (combo enumeration/sort, bar/value/row
   // HTML, the nav-dot question) exported directly, the wire mutators window-assigned, the same two
   // conventions CAS-1339's own exports just above use. verdictAt is exposed by reference (same convention
@@ -850,6 +852,25 @@ if(typeof window.CascadeAuth === "undefined"){
   // OAM_WIL_STATUS_LABEL-adjacent exports above use. watchSearch is already exported above (CAS-718) but
   // reused here for the "anything else" Find reason.
   OAM_SHOW_OPTS, oamApplyShowCap,
+  // CAS-1369: oaFav is the ♥ favourite read (c.styles[style].fav); oamOrderScore is the ordering lift on
+  // top of oneScoreFor (ordering/the Best-N cut only, never membership/the score box); OAM_FAV_LIFT is the
+  // lift's own +5 — exported so a test can assert each directly, the same convention oaBar/oneScore above
+  // use. oamWilRankInMood is "Where it lists"'s own per-film rank within a mood's Best-N cut, exported so a
+  // test can assert it stays honest to oamApplyShowCap's watched-doesn't-count rule.
+  oaFav, oamOrderScore, OAM_FAV_LIFT, oamWilRankInMood,
+  // CAS-1379: filmMatchesSearch is the shared title/director/cast matcher Find's findSortedRows and the
+  // listing's own filt.search test both call — exported directly so a test can assert the matching rule
+  // itself against the real catalogue, rather than only through either call site's combined output.
+  filmMatchesSearch,
+  // CAS-1382: collectionFilmsSorted is the Series row's own release-order member list (shared with Find's
+  // collection-mode findSortedRows branch) — exported so a test can assert the sort directly. findCollectionFilter
+  // is reassigned wholesale by openFindCollection/clearFindCollectionFilter (both window-assigned wire code,
+  // wrapped the same way toggleFilmOpt elsewhere in this file is), so it's exposed through a getter, like
+  // watchTab elsewhere in this file.
+  collectionFilmsSorted,
+  get findCollectionFilter(){ return findCollectionFilter; },
+  openFindCollection: (id) => window.openFindCollection(id),
+  clearFindCollectionFilter: () => window.clearFindCollectionFilter(),
 };
 `;
 

@@ -33,7 +33,7 @@ to compare against. Output for the app front-end is written to movies.json.
 """
 
 from __future__ import annotations
-import os, sys, csv, io, re, json, time, shutil, hashlib, calendar, datetime, subprocess, urllib.parse, urllib.request, urllib.error
+import os, sys, csv, io, re, json, time, shutil, hashlib, calendar, datetime, subprocess, urllib.parse, urllib.request, urllib.error, html
 from collections import Counter
 
 import runstats
@@ -90,6 +90,15 @@ STATE_DIR = os.path.join(os.path.dirname(__file__), "state")
 SNAPSHOT_FILE = os.path.join(STATE_DIR, "last_snapshot.json")
 ALERTS_FILE   = os.path.join(STATE_DIR, "alerts.json")
 WM_CACHE_FILE = os.path.join(STATE_DIR, "watchmode_ids.json")   # imdb_id -> watchmode_id (never changes)
+CINEMA_CHAINS_STATE_FILE = os.path.join(STATE_DIR, "cinema_chains_state.json")
+
+# CAS-1376: the AU chains' own Now Showing lists, read straight off their public pages — a confirmed
+# sighting, not a date guess, so it is allowed to override CINEMA_RUN_DAYS the way CAS-395 originally
+# intended. See fetch_hoyts_now_showing/fetch_event_now_showing and update_now_showing below.
+NOW_SHOWING_USER_AGENT = "CascadeBot/1.0 (+https://cascademovies.com)"
+NOW_SHOWING_MIN_FILMS = 10          # ignore a chain's page this run if it returns fewer titles than this
+NOW_SHOWING_MATCH_WINDOW_DAYS = 365  # only accept a title match within 1 year of the film's cinema_date
+NOW_SHOWING_ALL_FAILED_GRACE_DAYS = 3  # consecutive all-chains-failed runs before falling back to the date rule
 WINDOW_DATES_FILE = os.path.join(STATE_DIR, "window_dates.json")  # tmdb_id -> {window: first_seen_date}
 API_BUDGET_FILE = os.path.join(STATE_DIR, "api_budget.json")    # CAS-384: today's cross-run provider spend
 WM_MONTHLY_FILE = os.path.join(STATE_DIR, "watchmode_monthly.json")   # CAS-974: cumulative spend this month
@@ -139,7 +148,7 @@ CASCADE_SPINE = os.getenv("CASCADE_SPINE", "tmdb")
 
 # CAS-109 — poll-tiering + free-tier-capped scheduler (staging prototype).
 import poll_scheduler as ps
-CATALOGUE_TARGET = int(os.getenv("CATALOGUE_TARGET", "7000"))
+CATALOGUE_TARGET = int(os.getenv("CATALOGUE_TARGET", "12000"))
                          # CAS-128: persistent browsable catalogue size — was pinned to MAX_TITLES (the
                          # theatrical-pass cap) so the ~300 cap was gone and the full ingested AU set held.
                          # CAS-422: decoupled from MAX_TITLES — theatrical+upcoming+streaming can now sum
@@ -151,6 +160,9 @@ CATALOGUE_TARGET = int(os.getenv("CATALOGUE_TARGET", "7000"))
                          # CAS-1327: raised to 7,000 — lowering WM_PUBLISH_FLOOR to the app's own
                          # TRACK_MIN (50, was 60) makes ~6,180 titles scoreable instead of ~5,970, and
                          # this ceiling must not cut any of the newly-scoreable ones back out.
+                         # CAS-1383: raised to 12,000 (Lee's decision, 2026-11-07) — CAS-1380's back-
+                         # catalogue growth (~2,000 scored films/month) would hit 7,000 within weeks and
+                         # start pushing out older back-catalogue titles on the popularity cut.
 
 # CAS-127 — TMDB Watch Providers is the primary availability source (free, no quota).
 # It runs once per released title per day across the WHOLE catalogue, so pace it politely
@@ -380,6 +392,12 @@ def _tmdb_record(detail: dict) -> dict:
     directors = [c["name"] for c in credits.get("crew", []) if c.get("job") == "Director"]
     cast = [c["name"] for c in sorted(credits.get("cast", []),
                                       key=lambda c: c.get("order", 999))][:4]
+    # CAS-1381: TMDB's belongs_to_collection names the franchise/series a film belongs to, when
+    # it has one. Keep only id/name — poster_path/backdrop_path are out of scope.
+    btc = detail.get("belongs_to_collection")
+    collection = None
+    if isinstance(btc, dict) and isinstance(btc.get("id"), int) and (btc.get("name") or "").strip():
+        collection = {"id": btc["id"], "name": btc["name"].strip()}
     return {
         "tmdb_id": detail["id"],
         "cache_stamped_at": _RUN_DATE,   # CAS-772: this fetch just confirmed every field below is fresh
@@ -406,6 +424,7 @@ def _tmdb_record(detail: dict) -> dict:
         "videos": videos,
         "director": ", ".join(directors[:2]) or None,
         "cast": cast,
+        "collection": collection,
     }
 
 
@@ -754,6 +773,17 @@ SCOREABILITY_RECOVERY_DAYS = 90                              # tier 3: no_score 
 # target=backcatalogue) stops spending once Watchmode's live remaining-credits figure drops below
 # this — the floor nightly upkeep (WM_NIGHTLY_MAX_CREDITS/CAS-987 pacing) still needs.
 WM_BACKCAT_UPKEEP_FLOOR = 300
+# CAS-1380: tier 2's deliberate probe order — 2023 onwards first, then 2010-2015, then 2016-2022
+# (whose 6.5+ films are already in from the original CAS-989 enumerate), then five-year blocks
+# going back to 1930-1934. `None` as a block's end means "the current year". A candidate's year
+# is matched against these in order; the first block it falls in is its rank (lower = sooner).
+BACKCAT_PROBE_BLOCKS = [
+    (2023, None), (2010, 2015), (2016, 2022),
+    (2005, 2009), (2000, 2004), (1995, 1999), (1990, 1994),
+    (1985, 1989), (1980, 1984), (1975, 1979), (1970, 1974),
+    (1965, 1969), (1960, 1964), (1955, 1959), (1950, 1954),
+    (1945, 1949), (1940, 1944), (1935, 1939), (1930, 1934),
+]
 USER_HELD_IDS_FILE = os.path.join(STATE_DIR, "user_held_ids.json")   # CAS-986: monitor/store.py writes this
 SCOREABLE_SHIM = os.path.join(os.path.dirname(__file__), "scripts", "scoreable_shim.mjs")
 
@@ -1166,8 +1196,17 @@ def merge_backcatalogue_candidates(candidates: dict, today_iso: str, path: str |
             stats["no_tmdb_id"] += 1
             continue
         key = str(tmdb_id)
+        row_band = row.get("rating_band")
         if key in candidates:
             stats["already_known"] += 1
+            # CAS-1380: carry a raised rating_band onto an already-known row too, so tier 2's
+            # probe order sees it — but only while still unprobed, and never touching
+            # outcome/last_probed/probe_count, which this merge has never owned.
+            existing = candidates[key]
+            if row_band is not None and existing.get("outcome") == "unprobed":
+                prior_band = existing.get("rating_band")
+                existing["rating_band"] = (row_band if prior_band is None
+                                            else max(prior_band, row_band))
             continue
         # CAS-992: `status` must be a list — primaryStatus()/isScoreable() index into it and throw
         # on None/missing, which took down scoreable_ids()'s whole batch call. `popularity` is
@@ -1187,6 +1226,8 @@ def merge_backcatalogue_candidates(candidates: dict, today_iso: str, path: str |
             "probe_count": 0,
             "outcome": "unprobed",
         }
+        if row_band is not None:
+            candidates[key]["rating_band"] = row_band
         stats["merged"] += 1
 
     print(f"backcat_merged={stats['merged']} already_known={stats['already_known']} "
@@ -1265,6 +1306,35 @@ def reclassify_stale_scored_candidates(candidates: dict) -> int:
     return fixed
 
 
+def _backcat_block_rank(year, today: datetime.date) -> int:
+    """CAS-1380: index into BACKCAT_PROBE_BLOCKS of the first block `year` falls in — lower ranks
+    sooner. A year outside every block (and a missing/unparseable year, e.g. the "----"
+    placeholder) ranks last, one past the final block."""
+    if year is not None:
+        for i, (start, end) in enumerate(BACKCAT_PROBE_BLOCKS):
+            hi = today.year if end is None else end
+            if start <= year <= hi:
+                return i
+    return len(BACKCAT_PROBE_BLOCKS)
+
+
+def _candidate_year_int(c: dict):
+    try:
+        return int(c.get("year"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _backcat_probe_sort_key(c: dict, today: datetime.date) -> tuple:
+    """CAS-1380 tier 2 only: block rank first (see BACKCAT_PROBE_BLOCKS), then rating_band
+    descending (a missing band sorts below the weakest real gate, 5.5), then popularity
+    descending, as before."""
+    band = c.get("rating_band")
+    return (_backcat_block_rank(_candidate_year_int(c), today),
+            -(band if band is not None else -1),
+            -(c.get("popularity") or 0))
+
+
 def _scoreability_recovery_due(c: dict, today: datetime.date) -> bool:
     """Tier 3: a no_score candidate is only re-probed once SCOREABILITY_RECOVERY_DAYS have passed
     since its last probe — recovers the tail without re-asking every night."""
@@ -1288,8 +1358,9 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
          `tv_tmdb_ids`), forced stale regardless of how recently that bad fetch happened.
       1. published titles (`published_ids` — yesterday's movies.json) whose Watchmode fields are
          stale (30 days, or 7 for the CAS-1139 weekly-refresh cohort — _is_wm_weekly_cohort) —
-         first, because letting a published title's fields expire silently removes it from the
-         app. CAS-1139: spent weekly-refresh titles first, then titles released within
+         first, so a published title's fields are kept current (CAS-1383: expiry does NOT remove
+         a title from the app — a stale published title stays published; this tier just refreshes
+         it). CAS-1139: spent weekly-refresh titles first, then titles released within
          WM_RECENT_YEAR_DAYS, then the rest — stalest wm_fields_fetched_at first within each
          group, NOT by popularity (the ticket's own Change #3; tiers 0, 2 and 3 stay popularity-
          ordered, unchanged).
@@ -1340,8 +1411,11 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
                                if not _is_wm_weekly_cohort(c, today)
                                and not _is_recent_release(c, today, WM_RECENT_YEAR_DAYS))
     tier1 = tier1_weekly + tier1_year + tier1_rest
-    tier2 = _by_popularity(c for c in candidates.values()
-                           if c.get("outcome") == "unprobed" and _not_quarantined(c))
+    # CAS-1380: tier 2 only, deliberate order — year block, then rating_band, then popularity.
+    # Tiers 0, 1 and 3 keep _by_popularity, unchanged.
+    tier2 = sorted(
+        (c for c in candidates.values() if c.get("outcome") == "unprobed" and _not_quarantined(c)),
+        key=lambda c: _backcat_probe_sort_key(c, today))
     tier3 = _by_popularity(c for c in candidates.values() if c.get("outcome") == "no_score"
                            and _scoreability_recovery_due(c, today) and _not_quarantined(c))
 
@@ -2123,6 +2197,11 @@ def derive_from_providers(movie: dict, prov: dict, today: datetime.date) -> list
     # CAS-418 (walk back CAS-395): in_cinema is EXCLUSIVE with home offers — a film with a rent/stream/
     # buy offer is never filed under the big screen (engine invariant #55). So the offer-less fallback
     # only ever runs when NO home window resolved.
+    # CAS-1376: a chain's own Now Showing list is a CONFIRMED sighting, not the date guess CAS-418
+    # walked back — so a scraped on_screen film restores CAS-395's simultaneous rule for itself alone,
+    # whatever else derive_from_providers found.
+    if movie.get("on_screen"):
+        windows.append("in_cinema")
     if not windows:
         windows.append(_offerless_window(movie.get("cinema_date"), today,
                                           _record_year(movie), movie.get("release_dates")))
@@ -2203,6 +2282,11 @@ def derive_status(movie: dict, offers: list[dict], today: datetime.date) -> list
     if has_sub:
         status.add("included_streaming")
 
+    # CAS-1376: see derive_from_providers' matching comment — a confirmed on-screen sighting restores
+    # CAS-395's simultaneous rule for this film alone.
+    if movie.get("on_screen"):
+        status.add("in_cinema")
+
     # CAS-608: date-only, same as derive_from_providers' offer-less fallback — a title past its
     # cinema run with no priced offer is released-and-unavailable, not upcoming.
     if not status:
@@ -2260,6 +2344,213 @@ def apply_monotonic_status(m: dict, candidate: list[str], confidence: str, today
         m.pop("pending_downgrade", None)
     else:
         m["pending_downgrade"] = pending   # held back — m["status"] stays at `prev`
+
+
+# ---------------------------------------------------------------------------
+# 4c. NOW SHOWING (CAS-1376) — read the AU chains' own Now Showing lists so a title that is
+#     genuinely still on a screen is never taken out of in_cinema on CINEMA_RUN_DAYS' guess alone
+#     (The Odyssey was still on Hoyts' list 110 days after it opened). Stdlib-only, same get_text/
+#     get_json helpers as the rest of the pipeline — no HTML-parsing dependency this repo doesn't
+#     already have, since both chains' pages are regular/regex-friendly (one server-rendered list,
+#     one small JSON endpoint).
+# ---------------------------------------------------------------------------
+_LANGUAGE_SUFFIX_RE = re.compile(
+    r"\s*\([^()]*\b(?:hindi|tamil|telugu|malayalam|kannada|punjabi|japanese|korean|mandarin|"
+    r"cantonese|english|eng|dub(?:bed)?|sub(?:bed|titled)?|original)\b[^()]*\)\s*$",
+    re.IGNORECASE)
+_TITLE_PUNCT_RE = re.compile(r"[^\w\s]", re.UNICODE)
+
+
+def normalize_cinema_title(title: str | None) -> str:
+    """CAS-1376: lower-case, drop a trailing language/subtitle qualifier such as '(Hindi, Eng Sub)',
+    then strip punctuation and collapse whitespace — so our catalogue's title and a chain's own
+    listing of the same film compare equal regardless of case, a dub/sub qualifier, or stray
+    punctuation either side does or doesn't carry."""
+    t = _LANGUAGE_SUFFIX_RE.sub("", title or "")
+    t = _TITLE_PUNCT_RE.sub(" ", t.lower())
+    return " ".join(t.split())
+
+
+_MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August",
+                "September", "October", "November", "December"]
+_MONTH_NUMBER = {}
+for _i, _name in enumerate(_MONTH_NAMES, start=1):
+    _MONTH_NUMBER[_name.lower()] = _i
+    _MONTH_NUMBER[_name[:3].lower()] = _i
+_CHAIN_DATE_RE = re.compile(r"^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$")
+
+
+def _parse_chain_date(text: str | None) -> str | None:
+    """'16 July 2026' or '15 Oct 2026' -> '2026-07-16'. None if unparseable. Avoids a locale-
+    dependent strptime, since the month name/abbreviation has to match regardless of the host's
+    own locale."""
+    m = _CHAIN_DATE_RE.match((text or "").strip())
+    if not m:
+        return None
+    day, month_name, year = m.groups()
+    month = _MONTH_NUMBER.get(month_name.lower())
+    if not month:
+        return None
+    try:
+        return datetime.date(int(year), month, int(day)).isoformat()
+    except ValueError:
+        return None
+
+
+_HOYTS_CARD_RE = re.compile(
+    r'movies-list__link"[^>]*>([^<]+)</a>.*?movies-list__release-date">([^<]+)<', re.DOTALL)
+
+
+def fetch_hoyts_now_showing() -> list[dict]:
+    """hoyts.com.au/movies renders its Now Showing list server-side (robots.txt allows this path);
+    one request, no HTML-parsing dependency needed — the title/release-date pair for each card sits
+    a short, fixed distance apart in the markup."""
+    page = get_text("https://www.hoyts.com.au/movies", retries=1,
+                     headers={"User-Agent": NOW_SHOWING_USER_AGENT})
+    return [{"title": html.unescape(m.group(1)).strip(),
+             "release_date": _parse_chain_date(m.group(2))}
+            for m in _HOYTS_CARD_RE.finditer(page)]
+
+
+def fetch_event_now_showing() -> list[dict]:
+    """eventcinemas.com.au/Movies builds its list with JavaScript; /movies/getnowshowing is the
+    JSON endpoint that page itself calls (found in its site bundle's getMovies() lookup) — robots.txt
+    disallows only /ticketing/ and /tickets/, not this path."""
+    data = get_json("https://www.eventcinemas.com.au/movies/getnowshowing", retries=1,
+                     headers={"User-Agent": NOW_SHOWING_USER_AGENT,
+                              "X-Requested-With": "XMLHttpRequest"})
+    out = []
+    for film in ((data.get("Data") or {}).get("Movies") or []):
+        name = film.get("Name")
+        if not name:
+            continue
+        released = (film.get("ReleasedAt") or "").split("T")[0]
+        out.append({"title": html.unescape(name).strip(), "release_date": released or None})
+    return out
+
+
+CINEMA_CHAIN_FETCHERS = {
+    "hoyts": fetch_hoyts_now_showing,
+    "event": fetch_event_now_showing,
+    # Village (villagecinemas.com.au) and Reading (readingcinemas.com.au) are both fully
+    # client-rendered SPAs with no server-rendered list and no JSON endpoint visible in their
+    # initial HTML/JS bundle — checked 3 Nov 2026 (Village) and 4 Nov 2026 (Reading). Neither is
+    # "reachable" per the ticket's own condition, so neither is wired in here.
+}
+
+
+def _load_cinema_chains_state() -> dict:
+    if not os.path.exists(CINEMA_CHAINS_STATE_FILE):
+        return {}
+    try:
+        return json.load(open(CINEMA_CHAINS_STATE_FILE, encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_cinema_chains_state(state: dict) -> None:
+    os.makedirs(STATE_DIR, exist_ok=True)
+    json.dump(state, open(CINEMA_CHAINS_STATE_FILE, "w", encoding="utf-8"), indent=2)
+
+
+def _best_cinema_match(candidates: list[dict], release_date: str | None) -> dict | None:
+    """First candidate (by normalised title) whose cinema_date, if both sides have one, is within
+    NOW_SHOWING_MATCH_WINDOW_DAYS of the chain's own release date — the disambiguator for same-
+    titled films. A candidate with no cinema_date, or a chain date of None, matches on title alone."""
+    for cand in candidates:
+        cd = cand.get("cinema_date")
+        if release_date and cd:
+            delta = abs((datetime.date.fromisoformat(release_date)
+                         - datetime.date.fromisoformat(cd)).days)
+            if delta > NOW_SHOWING_MATCH_WINDOW_DAYS:
+                continue
+        return cand
+    return None
+
+
+def update_now_showing(records: list[dict], today: datetime.date) -> dict:
+    """CAS-1376: fetch every wired chain's Now Showing list, match each title into `records`, and
+    set on_screen/on_screen_src/on_screen_checked for exactly the films THIS run confirms — clearing
+    them from any film no usable chain re-confirms. A record whose on_screen flag actually changes
+    gets its status recommitted via apply_monotonic_status (CAS-355's guard still applies to any
+    resulting downgrade), so a stale film never skips the normal confirmation wait on its way back
+    off a screen.
+
+    A chain that raises, or returns fewer than NOW_SHOWING_MIN_FILMS titles, is ignored for this run
+    (one bad chain must never cost the others). If every chain is ignored, nothing is touched for up
+    to NOW_SHOWING_ALL_FAILED_GRACE_DAYS consecutive runs; past that, on_screen is cleared catalogue-
+    wide and CINEMA_RUN_DAYS' date rule is the only source of truth again until a chain answers.
+
+    Returns the per-chain report ({chain: {fetched, matched, unmatched, ignored}}) for the run log."""
+    report = {}
+    usable = {}
+    for chain, fetch in CINEMA_CHAIN_FETCHERS.items():
+        try:
+            films = fetch()
+        except Exception:
+            report[chain] = {"fetched": 0, "matched": 0, "unmatched": 0,
+                              "unmatched_titles": [], "ignored": True}
+            continue
+        fetched = len(films)
+        ignored = fetched < NOW_SHOWING_MIN_FILMS
+        report[chain] = {"fetched": fetched, "matched": 0, "unmatched": 0,
+                          "unmatched_titles": [], "ignored": ignored}
+        if not ignored:
+            usable[chain] = films
+
+    state = _load_cinema_chains_state()
+    if not usable:
+        # CAS-1376 safety: never mark the whole catalogue off screen because a page changed — hold
+        # yesterday's on_screen values for a few days, then fall back to the date rule.
+        consecutive = state.get("consecutive_all_failed", 0) + 1
+        state["consecutive_all_failed"] = consecutive
+        _save_cinema_chains_state(state)
+        if consecutive > NOW_SHOWING_ALL_FAILED_GRACE_DAYS:
+            for m in records:
+                if "on_screen" not in m:
+                    continue
+                m.pop("on_screen", None)
+                m.pop("on_screen_src", None)
+                m.pop("on_screen_checked", None)
+                apply_monotonic_status(m, derive_status(m, m.get("offers", []), today),
+                                        m.get("availability_confidence") or "estimated", today)
+        return report
+    state["consecutive_all_failed"] = 0
+    _save_cinema_chains_state(state)
+
+    by_title = {}
+    for m in records:
+        by_title.setdefault(normalize_cinema_title(m.get("title")), []).append(m)
+
+    sources_by_id = {}
+    for chain, films in usable.items():
+        for film in films:
+            hit = _best_cinema_match(by_title.get(normalize_cinema_title(film["title"]), []),
+                                      film.get("release_date"))
+            if hit is None:
+                report[chain]["unmatched"] += 1
+                report[chain]["unmatched_titles"].append(film["title"])
+                continue
+            report[chain]["matched"] += 1
+            sources_by_id.setdefault(hit["tmdb_id"], set()).add(chain)
+
+    for m in records:
+        tid = m["tmdb_id"]
+        was_on_screen = bool(m.get("on_screen"))
+        if tid in sources_by_id:
+            m["on_screen"] = True
+            m["on_screen_src"] = sorted(sources_by_id[tid])
+            m["on_screen_checked"] = today.isoformat()
+            if not was_on_screen:
+                apply_monotonic_status(m, derive_status(m, m.get("offers", []), today),
+                                        "confirmed", today)
+        elif was_on_screen:
+            m.pop("on_screen", None)
+            m.pop("on_screen_src", None)
+            m.pop("on_screen_checked", None)
+            apply_monotonic_status(m, derive_status(m, m.get("offers", []), today),
+                                    m.get("availability_confidence") or "estimated", today)
+    return report
 
 
 # ---------------------------------------------------------------------------
@@ -2339,7 +2630,7 @@ def diff_and_alert(today_records: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------------------
 REFRESH_LOG_BOOKKEEPING_FIELDS = {
     "last_polled", "last_probed", "probe_count", "cache_stamped_at",
-    "wm_fields_fetched_at", "poll_tier", "tmdb_not_found_streak",
+    "wm_fields_fetched_at", "poll_tier", "tmdb_not_found_streak", "on_screen_checked",
 }
 REFRESH_LOG_WATCHMODE_FIELDS = {"wm_user_rating", "wm_critic_score", "wm_popularity_percentile"}
 REFRESH_LOG_OSCARBASE_FIELDS = {"award", "award_text"}
@@ -3469,6 +3760,16 @@ def run(simulate_day: bool = False):
         print(f"watchmode cycle {cycle['cycle_start']}..{cycle['cycle_end']} quota={cycle['quota']} "
               f"spent={sum(cycle['days'].values())} run_pot={wm_pot} "
               f"today_spent={today_total_spent}")
+
+    # CAS-1376: read the AU chains' own Now Showing lists — live only, same as every other
+    # network-calling enrichment pass; --build-html's code-only rebuild never reaches this branch.
+    if LIVE:
+        now_showing_report = update_now_showing(records, today)
+        runstats.set_value("cinema_chains", chains=now_showing_report)
+        for chain, stats in now_showing_report.items():
+            tag = " (ignored)" if stats["ignored"] else ""
+            print(f"[now_showing] {chain}{tag}: fetched={stats['fetched']} "
+                  f"matched={stats['matched']} unmatched={stats['unmatched']}")
 
     # CAS-608: how much of the published catalogue is genuinely upcoming vs. released-with-no-AU-
     # offer vs. on the short 7-day Watchmode ladder — the counts this ticket exists to shrink.

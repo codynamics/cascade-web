@@ -958,13 +958,29 @@ test("CAS-747 AC5: the Movie Budget card renders the includeUnbudgeted switch, a
 
   // CAS-1262: whether today's catalogue holds a film this agent lists that has no budget, no takings and no
   // inference is a daily-data coincidence (on 14 Oct 2026 it held none, so the count stayed 14 both ways and
-  // the gate went red). Plant one: a clone of a released film this agent already lists, with its budget and
-  // takings removed, so the switch always has exactly the film it governs to move.
+  // the gate went red). CAS-1377 (rounds 1-3) tried picking a real catalogue film to clone — first with
+  // watchesFilm, then with listedBy, then dropping a vestigial budget clause — and still went red three
+  // times on three different days, each time because the pool of real films clearing every one of
+  // listedBy's gates (status window, age, years-back, cinemaReleaseOnly AND the agent's own score floor) is
+  // itself daily-data-dependent. A `_fixture` film is exempt from rederiveStatuses() (app_template.html's
+  // own skip), so every field below is read back exactly as set — build the fixture from nothing instead of
+  // searching the live catalogue for a donor to clone, so this can never again depend on what today's data
+  // happens to hold: a guaranteed-passing `included_streaming` title, max Cascade score (clears any agent's
+  // floor), no language/genre/rating restriction can exclude it, non-pre-release, with a cinema release and
+  // a recent date so yearsBack/cinemaReleaseOnly both clear — only budget/worldwide_gross are left null,
+  // the one thing the switch under test governs.
   await page.evaluate(() => {
     const c = {...onbApply()};
-    const donor = MOVIES.find(m => !m._fixture && watchesFilm(m, c) && !isPreRelease(m) && (m.budget || m.worldwide_gross || 0) >= 1000000);
-    if(!donor) throw new Error("test setup: no released, budgeted film on this agent to clone");
-    MOVIES.push({...donor, tmdb_id: 900000747, title: "CAS-1262 unbudgeted fixture", budget: null, worldwide_gross: null, _fixture: true});
+    const fixture = {
+      tmdb_id: 900000747, title: "CAS-1262 unbudgeted fixture", _fixture: true,
+      status: ["included_streaming"], cinema_release: true, cinema_date: addDays(TODAY, -365),
+      genres: [], age_rating: null, language: "xx", availability_confidence: "confirmed",
+      offers: [{ service: "Test", type: "sub", price: null, format: null }],
+      wm_user_rating: 10, wm_critic_score: 100,
+      budget: null, worldwide_gross: null,
+    };
+    if(!listedBy(fixture, c)) throw new Error("test setup: synthetic fixture is not listed before the switch is touched");
+    MOVIES.push(fixture);
     invalidateComputeCaches();
   });
 
@@ -2357,9 +2373,9 @@ test("CAS-1371 AC1: Delete this mood arms visibly red on a touch tap, and a seco
     saveCascades();
     setActive(cascades[0].id);
     watchMoods = [];   // never provisioned — oamMoodsListReal() falls back to the in-memory builtins
-    watchMoodSel = "action";
+    watchMoodSel = "best";
     render();
-    window.openOamMoodSheetFor("action");
+    window.openOamMoodSheetFor("best");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
@@ -2384,7 +2400,7 @@ test("CAS-1371 AC1: Delete this mood arms visibly red on a touch tap, and a seco
   await tapDelete();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
   const ids = await page.evaluate(() => watchMoods.map(m => m.id));
-  expect(ids).not.toContain("action");
+  expect(ids).not.toContain("best");
 });
 
 // CAS-1371 AC3: a Position row with Move left/Move right is the reliable fallback for press-and-hold
@@ -2401,18 +2417,18 @@ test("CAS-1371 AC3: Move left / Move right in the mood sheet reorders", async ({
     saveCascades();
     setActive(cascades[0].id);
     watchMoods = [];
-    watchMoodSel = "action";
+    watchMoodSel = "best";
     render();
-    window.openOamMoodSheetFor("action");
+    window.openOamMoodSheetFor("best");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
   const before = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
-  expect(before.indexOf("action")).toBeGreaterThan(0);
+  expect(before.indexOf("best")).toBeGreaterThan(0);
 
   await page.locator('#watchSheetBody button:has-text("Move right")').click();
   const afterRight = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
-  expect(afterRight.indexOf("action")).toBe(before.indexOf("action") + 1);
+  expect(afterRight.indexOf("best")).toBe(before.indexOf("best") + 1);
 
   await page.locator('#watchSheetBody button:has-text("Move left")').click();
   const afterLeft = await page.evaluate(() => oamMoodsListReal().map(m => m.id));

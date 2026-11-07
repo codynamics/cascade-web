@@ -1,23 +1,107 @@
 {
-  "date": "2026-11-02",
+  "date": "2026-11-06",
   "tmdb": {
-    "calls": 6913,
-    "errors": 0,
+    "calls": 6916,
+    "errors": 1,
     "not_found": 0,
-    "status_counts": {}
+    "status_counts": {
+      "other": 1
+    }
   },
   "watchmode": {
     "quota": 2500,
-    "quota_used": 1496,
-    "remaining_monthly_credits": 1004,
-    "calls": 73,
+    "quota_used": 1790,
+    "remaining_monthly_credits": 710,
+    "calls": 74,
     "errors": 0,
     "mismatch": 0,
     "mismatch_ids": [],
-    "quarantined": 20
+    "quarantined": 23
   },
   "oscarbase": {
     "calls": 750,
     "errors": 0
+  },
+  "cinema_chains": {
+    "chains": {
+      "hoyts": {
+        "fetched": 53,
+        "matched": 30,
+        "unmatched": 23,
+        "unmatched_titles": [
+          "Ramayana: Rise Of A Legend (Hindi, Eng Sub)",
+          "The Songs of John Farnham: Celebration Concert Encore",
+          "George Michael: The Faith Tour",
+          "Scene (Tamil, Eng Sub)",
+          "Parkway Drive: Home",
+          "Ramayana: Rise Of A Legend (Telugu, Eng Sub)",
+          "Aadarsha Kutumbam House No: 47 #AK47 (Telugu, Eng Sub)",
+          "STRAY KIDS WORLD TOUR <RUN IT> LIVE VIEWING",
+          "Stray Kids World Tour <Run It> Live Viewing (Encore)",
+          "Karaoke Murder (Vietnamese, Eng Sub)",
+          "Traces Of Justice (Mandarin, Eng Sub)",
+          "Hadoota (Arabic, Eng Sub)",
+          "Kabaddi 5 (Nepali, Eng Sub)",
+          "Udta Teer (Hindi, Eng Sub)",
+          "Rammstein - Live in Mexico City",
+          "Always Yours, Never Mine (Tagalog, Eng Sub)",
+          "Hadestown: The Musical",
+          "Ramayana: Rise Of A Legend (English Dub)",
+          "Ramayana: Rise Of A Legend (Tamil, Eng Sub)",
+          "Ramayana: Rise Of A Legend (Kannada, Eng Sub)",
+          "Matloob Aelian (Arabic, Eng Sub)",
+          "Ramayana: Rise Of A Legend (Malayalam, Eng Sub)",
+          "(LFF) Liste De Marriage"
+        ],
+        "ignored": false
+      },
+      "event": {
+        "fetched": 67,
+        "matched": 28,
+        "unmatched": 39,
+        "unmatched_titles": [
+          "Ramayana - Rise of a Legend (Hindi)",
+          "Scene (Tamil)",
+          "Kabaddi 5",
+          "STRAY KIDS WORLD TOUR <RUN IT> LIVE VIEWING",
+          "Ramayana - Rise of a Legend (Telugu)",
+          "Ramayana - Rise of a Legend (Tamil)",
+          "Aadarsha Kutumbam House No: 47",
+          "Disco",
+          "Ramayana - Rise of a Legend (Malayalam)",
+          "Love Actually",
+          "Hadestown: The Musical",
+          "The Rosie Awards - Rosemeadow Public School",
+          "Home Alone",
+          "Summer Holidays",
+          "Rammstein - Live in Mexico City",
+          "Ramayana - Rise of a Legend (English)",
+          "Scene (Telugu)",
+          "The Songs of John Farnham - A Living Legend",
+          "Elf",
+          "Made in the West",
+          "The Polar Express",
+          "Arthur Christmas",
+          "Home Alone 2 - Lost In New York",
+          "The Holiday",
+          "Udta Teer",
+          "EXO PLANET #6 - EXhOrizon [dot] in CINEMAS",
+          "Westec",
+          "3D Under the Sea",
+          "3D Deep Sea",
+          "How The Grinch Stole Christmas",
+          "TFF - Bitter Christmas",
+          "TFF - Fatherland",
+          "TFF - Fjord",
+          "TFF - La Bola Negra",
+          "TFF - Minotaur",
+          "TFF - No Good Men + Short Film",
+          "TFF - Silent Friend + Short Film",
+          "TFF - The Cycle of Love",
+          "TFF - The Fox"
+        ],
+        "ignored": false
+      }
+    }
   }
 }

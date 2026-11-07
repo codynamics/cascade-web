@@ -73,11 +73,16 @@ _DRY_RUN_COUNTS = {
     (2020, None): 812, (2020, 5.5): 340, (2020, 6.5): 145,
     (2021, None): 790, (2021, 5.5): 322, (2021, 6.5): 138,
 }
+# "rating" is the fixture's own stand-in for Watchmode's real user_rating, used only to decide
+# which gate a dry-run title clears (title["rating"] >= gate) — real /list-titles rows never carry
+# this field themselves; the gate is what selected them server-side.
 _DRY_RUN_TITLES = [
     {"id": 1001, "title": "Dry Run Feature", "year": 2020, "imdb_id": "tt0000001",
-     "tmdb_id": 111, "tmdb_type": "movie", "type": "movie", "popularity_percentile": 62},
+     "tmdb_id": 111, "tmdb_type": "movie", "type": "movie", "popularity_percentile": 62,
+     "rating": 7.2},
     {"id": 1002, "title": "Second Fixture Film", "year": 2020, "imdb_id": "tt0000002",
-     "tmdb_id": 222, "tmdb_type": "movie", "type": "movie", "popularity_percentile": 41},
+     "tmdb_id": 222, "tmdb_type": "movie", "type": "movie", "popularity_percentile": 41,
+     "rating": 6.0},
 ]
 
 
@@ -96,6 +101,13 @@ def parse_rating_gates(raw: str) -> list:
 
 def gate_label(gate) -> str:
     return "no gate" if gate is None else f"user_rating_low={gate}"
+
+
+def sort_gates_highest_first(gates: list) -> list:
+    """CAS-1380: enumerate must probe-order titles by the highest rating gate they clear, so the
+    gates themselves are walked highest first — `None` ("no gate") is the weakest selectivity and
+    always sorts last."""
+    return sorted(gates, key=lambda g: (g is None, -g if g is not None else 0.0))
 
 
 def _count_url(year: int, gate) -> str:
@@ -131,8 +143,13 @@ def _titles_url(year_start: int, year_end: int, gate, page: int,
 def fetch_titles_page(year_start: int, year_end: int, gate, page: int,
                        dry_run: bool = False) -> dict:
     if dry_run:
-        return {"titles": _DRY_RUN_TITLES if page == 1 else [],
-                 "total_results": len(_DRY_RUN_TITLES), "total_pages": 1}
+        if page != 1:
+            titles = []
+        elif gate is None:
+            titles = _DRY_RUN_TITLES
+        else:
+            titles = [t for t in _DRY_RUN_TITLES if t["rating"] >= gate]
+        return {"titles": titles, "total_results": len(titles), "total_pages": 1}
     return pp.get_json(_titles_url(year_start, year_end, gate, page))
 
 
@@ -206,28 +223,44 @@ def save_candidates(path: str, records: list) -> None:
         fh.write("\n")
 
 
-def _candidate_row(title: dict) -> dict:
-    return {
+def _candidate_row(title: dict, rating_band=None) -> dict:
+    row = {
         "id": title["id"],
         "tmdb_id": title.get("tmdb_id"),
         "year": title.get("year"),
         "title": title.get("title"),
         "popularity_percentile": title.get("popularity_percentile"),
     }
+    if rating_band is not None:
+        row["rating_band"] = rating_band
+    return row
 
 
 def merge_candidates(existing: list, new_rows: list) -> tuple:
     """Keyed by Watchmode `id` — a rerun over an overlapping range updates the existing entry in
-    place rather than duplicating it. Returns (merged, added, updated)."""
+    place rather than duplicating it. CAS-1380: a row's `rating_band` (the highest gate a title
+    appeared under across every gate processed, highest first, this run — see run_enumerate) only
+    ever raises the merged entry's band, never lowers it, so a rerun under a weaker gate can't
+    undo an earlier run's stronger finding. Returns (merged, added, updated)."""
     by_id = {row["id"]: row for row in existing}
     added = updated = 0
     for row in new_rows:
-        if row["id"] in by_id:
-            if by_id[row["id"]] != row:
+        rid = row["id"]
+        if rid in by_id:
+            prior = by_id[rid]
+            new_row = dict(row)
+            prior_band = prior.get("rating_band")
+            new_band = new_row.get("rating_band")
+            if prior_band is not None or new_band is not None:
+                merged_band = (new_band if prior_band is None
+                               else prior_band if new_band is None
+                               else max(prior_band, new_band))
+                new_row["rating_band"] = merged_band
+            if new_row != prior:
                 updated += 1
-            by_id[row["id"]] = row
+            by_id[rid] = new_row
         else:
-            by_id[row["id"]] = row
+            by_id[rid] = row
             added += 1
     return list(by_id.values()), added, updated
 
@@ -239,7 +272,9 @@ def run_enumerate(year_start: int, year_end: int, gates: list, max_credits: int,
     all_new_rows = []
     credits_spent = 0
     stopped = False
-    for gate in gates:
+    # CAS-1380: highest gate first, so a title that clears a stronger gate is stamped with that
+    # band even though every weaker gate's call also returns it.
+    for gate in sort_gates_highest_first(gates):
         if stopped:
             break
         page = 1
@@ -250,7 +285,7 @@ def run_enumerate(year_start: int, year_end: int, gates: list, max_credits: int,
             data = fetch_titles_page(year_start, year_end, gate, page, dry_run=dry_run)
             credits_spent += 1
             titles = data.get("titles") or []
-            all_new_rows.extend(_candidate_row(t) for t in titles)
+            all_new_rows.extend(_candidate_row(t, gate) for t in titles)
             total_pages = data.get("total_pages") or 1
             if page >= total_pages or not titles:
                 break

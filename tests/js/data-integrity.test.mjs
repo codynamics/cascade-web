@@ -50,14 +50,16 @@ test("status: every film resolves to one labelled window that it actually holds"
   for(const m of E.MOVIES){
     const st = m.status || [];
     assert.ok(st.length > 0, `${m.title} holds no window at all`);
-    // CAS-999: "released" is a deliberate, legitimate terminal status — poc_pipeline.py's offerless-window
-    // fallback for a title whose cinema run is over with no AU offer behind it, mirrored exactly by the
-    // front end's own offerlessWindow(). It is not a CASCADE window (nothing plays there) and always
-    // arrives alone (deriveStatus/derive_from_providers only ever emit it as the sole element of that
-    // fallback), so it is exempt from the window-order/label checks below. What must still hold is AC3:
-    // a film in this state has nothing to watch, so it must never be showable — never reach a Watch window.
+    // CAS-999 (reversed by CAS-1375): "released" is a deliberate, legitimate terminal status —
+    // poc_pipeline.py's offerless-window fallback for a title whose cinema run is over with no AU offer
+    // behind it, mirrored exactly by the front end's own offerlessWindow(). It is not a CASCADE window
+    // (nothing plays there) and always arrives alone (deriveStatus/derive_from_providers only ever emit it
+    // as the sole element of that fallback), so it is exempt from the window-order/label checks below.
+    // CAS-999 AC3 required it never be showable, on the grounds that a film in this state has nothing to
+    // watch; CAS-1375 (Lee, 3 Nov 2026) reverses that call — these films now list in Rental as "Rental
+    // soon" ahead of their real rental offer, so one must BE showable, or that placement could never render.
     if(st.length === 1 && st[0] === "released"){
-      assert.ok(!E.showable(m), `${m.title} holds only "released" but is still showable — it would reach a Watch window with nothing to watch`);
+      assert.ok(E.showable(m), `${m.title} holds only "released" but is not showable — it would never reach Rental's "Rental soon" section`);
       continue;
     }
     for(const w of st) assert.ok(order.has(w), `${m.title} holds unknown window ${w}`);
@@ -144,11 +146,13 @@ test("listing: a stuck-upcoming, estimated title with no cinema run never reache
 // observation log and filed 1,614 of 1,961 titles onto streaming. These are the assertions that would have
 // caught it, and neither of them pins a number: the first says the window exists, the second says nothing
 // silently falls out of it between the catalogue and the screen.
+// CAS-1385: a film the pipeline has chain-scraped as still on screen (m.on_screen) is allowed to outlast
+// inCinemaRun's date window (CAS-1376) — only a film with neither a confirmed run nor that override is a bug.
 test("in cinema: the catalogue holds films that are on a screen right now", () => {
   const onScreen = E.MOVIES.filter(m => E.showable(m) && E.inCinemaWindow(m));
   assert.ok(onScreen.length > 0,
     "not one film in the whole catalogue is in a cinema window — the window estimator has collapsed (CAS-237)");
-  for(const m of onScreen) assert.ok(E.inCinemaRun(m),
+  for(const m of onScreen) assert.ok(E.inCinemaRun(m) || m.on_screen,
     `${m.title} is filed In Cinema on an opening date of ${m.cinema_date}, outside the run`);
 });
 

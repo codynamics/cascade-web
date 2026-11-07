@@ -30,23 +30,23 @@ function withV2Agent(E, fn){
 test("CAS-1372 AC1: watchNavKey() changes when the selected v2 mood's Show is changed from Best 20 to Best 40 and saved", () => {
   const E = loadEngine();
   withV2Agent(E, () => {
-    // First save establishes "action" (a built-in, show:"20") as the stored, SELECTED mood, so the second
+    // First save establishes "best" (a built-in, show:"40") as the stored, SELECTED mood, so the second
     // save below changes only its Show field — isolated from the mood-switch effect watchMoodSel already covers.
-    E.window.openOamMoodSheetFor("action");
+    E.window.openOamMoodSheetFor("best");
     E.window.oamSaveMoodFromSheet();
-    const stored = E.watchMoods.find(m => m.id === "action" && m.v2);
-    assert.equal(stored.show, "20", "sanity: the built-in starts at Best 20");
-    assert.equal(E.watchMoodSel, "action", "sanity: saving must select the mood it just saved");
+    const stored = E.watchMoods.find(m => m.id === "best" && m.v2);
+    assert.equal(stored.show, "40", "sanity: the built-in starts at Best 40");
+    assert.equal(E.watchMoodSel, "best", "sanity: saving must select the mood it just saved");
 
     const before = E.watchNavKey();
-    E.window.openOamMoodSheetFor("action");
-    E.window.setOamDraftShow("40");
+    E.window.openOamMoodSheetFor("best");
+    E.window.setOamDraftShow("20");
     E.window.oamSaveMoodFromSheet();
 
     const after = E.watchNavKey();
-    const resaved = E.watchMoods.find(m => m.id === "action" && m.v2);
-    assert.equal(resaved.show, "40", "sanity: the Show change must actually have saved");
-    assert.equal(E.watchMoodSel, "action", "sanity: the selected mood must not itself have changed");
+    const resaved = E.watchMoods.find(m => m.id === "best" && m.v2);
+    assert.equal(resaved.show, "20", "sanity: the Show change must actually have saved");
+    assert.equal(E.watchMoodSel, "best", "sanity: the selected mood must not itself have changed");
     assert.notEqual(after, before, "AC1: changing the selected mood's Show and saving must change the nav key");
   });
 });
@@ -54,12 +54,12 @@ test("CAS-1372 AC1: watchNavKey() changes when the selected v2 mood's Show is ch
 test("CAS-1372 AC2: watchNavKey() changes after changing the mood's ages, awards, years, minScore and watched, and saving", () => {
   const E = loadEngine();
   withV2Agent(E, () => {
-    E.window.openOamMoodSheetFor("action");
+    E.window.openOamMoodSheetFor("best");
     E.window.oamSaveMoodFromSheet();
-    assert.equal(E.watchMoodSel, "action");
+    assert.equal(E.watchMoodSel, "best");
 
     const before = E.watchNavKey();
-    E.window.openOamMoodSheetFor("action");
+    E.window.openOamMoodSheetFor("best");
     E.window.toggleOamDraftAge("PG");
     E.window.setOamDraftAwards("won");
     E.window.setOamDraftYears(5);
@@ -68,7 +68,7 @@ test("CAS-1372 AC2: watchNavKey() changes after changing the mood's ages, awards
     E.window.oamSaveMoodFromSheet();
 
     const after = E.watchNavKey();
-    const saved = E.watchMoods.find(m => m.id === "action" && m.v2);
+    const saved = E.watchMoods.find(m => m.id === "best" && m.v2);
     assert.deepEqual([...saved.ages], ["PG"], "sanity: ages must have saved");
     assert.equal(saved.awards, "won", "sanity: awards must have saved");
     assert.equal(saved.years, 5, "sanity: years must have saved");

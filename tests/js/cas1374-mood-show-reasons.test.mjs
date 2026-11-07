@@ -69,17 +69,20 @@ test("CAS-1374 AC1: Best 60 and 80 cut the list at 60 and 80", () => {
 
 // ---- 2. Find's three real "not shown" reasons -------------------------------------------------------------
 
-test("CAS-1374 AC2: a film with no Watch stage (the Odyssey bug) gives the no-stage sentence and no Add button", () => {
+// CAS-1375 supersedes this AC for `released` films specifically: filmMatchesWatchTab now maps `released` to
+// the Rental tab's own "Rental soon" stage (the Odyssey now has somewhere to list), so the no-stage sentence
+// below no longer fires for it while the Rental window stays switched on. See
+// cas1375-rental-soon.test.mjs for the new behaviour.
+test("CAS-1374 AC2 (superseded by CAS-1375): a `released` film now gets the Rental tab's Rental soon stage, not the no-stage sentence", () => {
   const c = criteriaWith("Action", 1);
   const mood = moodWith({ show:"all" });
-  // `released`: opened long enough ago that its cinema run is over, and it has no offers at all — the one
-  // status filmMatchesWatchTab matches to no Watch stop (oamWilStageKeyFor returns null).
   const film = filmWith({ status:["released"], offers:[] });
   withMoviesAndMoods(c, [film], [mood], () => {
     assert.equal(E.filmInOneAgentMood(film, mood, c), true, "sanity: it still passes the mood's own rules");
     const r = E.oamWilCase(film, c);
-    assert.match(r.sentence, /Not shown\.<\/span> Its cinema run has ended and it has no rent or stream date yet\./);
-    assert.equal(r.buttons.length, 0);
+    assert.match(r.sentence, /Listed in<\/span> <b>Me<\/b> &middot; Rental soon/);
+    assert.equal(r.buttons.length, 1);
+    assert.equal(r.buttons[0].label, "Show in Watch ›");
   });
 });
 
