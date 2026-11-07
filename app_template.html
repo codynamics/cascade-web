@@ -7169,6 +7169,17 @@ const taggedOut = m => !!opinionOf(m.tmdb_id);
 // every one of them; every count/filter still reads taggedOut directly, since an opened stub is still watched.
 const showsStub = m => taggedOut(m) && !stubOpenSet.has(m.tmdb_id);
 let ignoreTagged=false;   // set only by passesOrStub(), so the counters that call passes() are unaffected
+// CAS-1379: title-only search missed a named actor or director entirely. One normaliser (lowercase, then
+// strip NFD diacritic marks) so "penelope cruz" matches "Penélope Cruz", shared by the listing's filt.search
+// test and Find's own findSortedRows — the data (director/cast) is per-film already, no pipeline change.
+function normSearchText(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); }
+function filmMatchesSearch(m, q){
+  const nq = normSearchText(q).trim();
+  if(!nq) return true;
+  if(normSearchText(m.title).includes(nq)) return true;
+  if(m.director && normSearchText(m.director).includes(nq)) return true;
+  return (m.cast||[]).some(c=>normSearchText(c).includes(nq));
+}
 // ---- The status gate (CAS-148) -------------------------------------------------
 // A Cascade's window scope is a WATCH scope, not a display filter. A cinema-window Cascade is watching 26
 // films — the 21 on screens now AND the ~5 still on their way to one — but the listing tested the film's
@@ -7195,7 +7206,7 @@ function passes(m){
   const ps=primaryStatus(m);
   if(!ignoreScope && scopedFor(ps) && !matchesServices(m, ps)) return false;
   if(filt.foundOnly && !found.has(id)) return false;
-  if(filt.search && !m.title.toLowerCase().includes(filt.search)) return false;
+  if(filt.search && !filmMatchesSearch(m, filt.search)) return false;
   if(!statusOK(m)) return false;
   if(filt.year.size && !filt.year.has(yearOf(m))) return false;
   if(filt.age.size && !filt.age.has(m.age_rating)) return false;
@@ -22624,7 +22635,7 @@ let findRowsCache = [];   // the current search's sorted result set
 let findShown = 0;        // how many of findRowsCache are in the DOM right now
 function findSortedRows(){
   const q = findSearch;
-  const rows = q ? MOVIES.filter(m=>m.title.toLowerCase().includes(q)) : MOVIES.slice();
+  const rows = q ? MOVIES.filter(m=>filmMatchesSearch(m, q)) : MOVIES.slice();
   // Cascade score, highest first; no score (cascadeScore's -1 sentinel) sorts last; ties by title A-Z.
   return rows.sort((a,b)=>{
     const sa=cascadeScore(a), sb=cascadeScore(b);
@@ -22661,12 +22672,26 @@ function findRenderMore(){
   let buf="";
   for(let i=findShown; i<end; i++){
     const m=findRowsCache[i];
-    const row=showsStub(m) ? stubHTML(m) : cardHTML(m, isFresh(m));
+    let row=showsStub(m) ? stubHTML(m) : cardHTML(m, isFresh(m));
+    const reason=findMatchReasonHTML(m, findSearch);
+    if(reason) row=row.replace(/<\/div>\s*$/, reason+"</div>");
     buf += c ? oamWilAddHasWil(row) + oamWhereItListsHTML(m, c) : row;
   }
   listEl.insertAdjacentHTML("beforeend", buf);
   observeLazyPosters(listEl);
   findShown=end;
+}
+// CAS-1379: why a film matched when it wasn't by title — Find only. Reuses the expanded card's own
+// .credit/.cval styling (not .clbl: the label is baked into the sentence, e.g. "Director: ... · Cast: ...").
+// Returns "" when the title itself matched (no reason line needed) or when q is empty.
+function findMatchReasonHTML(m, q){
+  const nq = normSearchText(q).trim();
+  if(!nq || normSearchText(m.title).includes(nq)) return "";
+  const parts=[];
+  if(m.director && normSearchText(m.director).includes(nq)) parts.push(`Director: ${esc(m.director)}`);
+  const castHit=(m.cast||[]).filter(c=>normSearchText(c).includes(nq));
+  if(castHit.length) parts.push(`Cast: ${esc(castHit.join(", "))}`);
+  return parts.length ? `<div class="credit"><span class="cval">${parts.join(" · ")}</span></div>` : "";
 }
 window.setFindSearch=raw=>{
   findSearchRaw=raw;
@@ -22685,7 +22710,7 @@ function renderFindScreen(){
     <h2 class="osh">Find</h2>
     <div class="watchsearchwrap" id="findSearchWrap">
       <input id="findSearchInput" class="search" type="text" inputmode="search" autocomplete="off"
-             placeholder="Search all movies" aria-label="Search all movies" oninput="setFindSearch(this.value)">
+             placeholder="Search movies, actors, directors" aria-label="Search movies, actors, directors" oninput="setFindSearch(this.value)">
       <button class="searchclear" id="findSearchClear" aria-label="Clear search" type="button" hidden
               onclick="clearFindSearch()">×</button>
     </div>

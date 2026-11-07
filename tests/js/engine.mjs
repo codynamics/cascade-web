@@ -858,6 +858,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // use. oamWilRankInMood is "Where it lists"'s own per-film rank within a mood's Best-N cut, exported so a
   // test can assert it stays honest to oamApplyShowCap's watched-doesn't-count rule.
   oaFav, oamOrderScore, OAM_FAV_LIFT, oamWilRankInMood,
+  // CAS-1379: filmMatchesSearch is the shared title/director/cast matcher Find's findSortedRows and the
+  // listing's own filt.search test both call — exported directly so a test can assert the matching rule
+  // itself against the real catalogue, rather than only through either call site's combined output.
+  filmMatchesSearch,
 };
 `;
 
