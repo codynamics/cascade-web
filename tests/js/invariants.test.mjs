@@ -267,7 +267,9 @@ test("availability: every showable film is unreleased, offered, in a cinema run,
     // inside the run. That is not a weaker claim, it is the same claim: the evidence for "on a screen" is a
     // real opening date and no digital listing, and whether the pipeline or the front end read that
     // evidence changes nothing about it. Every other estimated window is still excluded (CAS-170).
-    const inCinema   = E.inCinemaWindow(m) && (!E.isEstimated(m) || E.inCinemaRun(m));
+    // CAS-1385/CAS-1376: m.on_screen is the pipeline's own chain-scraped confirmation, which also admits
+    // an estimated title into the window regardless of inCinemaRun's date check.
+    const inCinema   = E.inCinemaWindow(m) && (!E.isEstimated(m) || E.inCinemaRun(m) || m.on_screen);
     // CAS-1375: a fourth case — `released` (cinema run over, no offer yet) is not gated on CONFIRMED the
     // way the other cases are: offerlessWindow's `released` fallback is a pure cinema_date-vs-offers read
     // (The Odyssey, this ticket's own motivating bug, is itself an ESTIMATED title), and "Rental soon"
@@ -275,8 +277,9 @@ test("availability: every showable film is unreleased, offered, in a cinema run,
     const released   = E.primaryStatus(m)==="released";
     assert.ok(upcoming || offered || inCinema || released,
       `${m.title} is listable on nothing: status ${(m.status||[]).join(",")}, ${(m.offers||[]).length} offers`);
-    // CAS-155's fault in one line: a film with a rent or stream offer must never be filed under the big screen.
-    if(inCinema) assert.ok(!(m.offers || []).length,
+    // CAS-155's fault in one line: a film with a rent or stream offer must never be filed under the big screen —
+    // unless on_screen (CAS-1376/CAS-1385) overrode the window, in which case CAS-395 lets a home offer coexist.
+    if(inCinema && !m.on_screen) assert.ok(!(m.offers || []).length,
       `${m.title} is in a cinema window while holding ${(m.offers||[]).length} digital offers`);
     if(inCinema) assert.ok(m.cinema_date, `${m.title} is in a cinema window with no opening date`);
   }

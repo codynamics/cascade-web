@@ -146,11 +146,13 @@ test("listing: a stuck-upcoming, estimated title with no cinema run never reache
 // observation log and filed 1,614 of 1,961 titles onto streaming. These are the assertions that would have
 // caught it, and neither of them pins a number: the first says the window exists, the second says nothing
 // silently falls out of it between the catalogue and the screen.
+// CAS-1385: a film the pipeline has chain-scraped as still on screen (m.on_screen) is allowed to outlast
+// inCinemaRun's date window (CAS-1376) — only a film with neither a confirmed run nor that override is a bug.
 test("in cinema: the catalogue holds films that are on a screen right now", () => {
   const onScreen = E.MOVIES.filter(m => E.showable(m) && E.inCinemaWindow(m));
   assert.ok(onScreen.length > 0,
     "not one film in the whole catalogue is in a cinema window — the window estimator has collapsed (CAS-237)");
-  for(const m of onScreen) assert.ok(E.inCinemaRun(m),
+  for(const m of onScreen) assert.ok(E.inCinemaRun(m) || m.on_screen,
     `${m.title} is filed In Cinema on an opening date of ${m.cinema_date}, outside the run`);
 });
 
