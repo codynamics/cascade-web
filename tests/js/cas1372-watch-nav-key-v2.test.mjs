@@ -1,6 +1,6 @@
 // CAS-1372: watchNavKey() (app_template.html, CAS-1236's settled-list fingerprint) listed only v1 mood
 // fields (watchMoodSel/moodTopYouEffectiveN/moodTopPublicN/moodSource) — none of a v2 mood's own settings
-// (styles/show/sort/minScore/ages/awards/years/watched/handOnly/starredOnly/in/out) or the agent's own
+// (styles/show/sort/topShare/ages/awards/years/watched/handOnly/starredOnly/in/out) or the agent's own
 // genre bars/combo overrides. So saving a v2 mood's settings, or changing the agent's genre share/on-off
 // from the Agent screen, left render() on the light reconcilePatchSettledList() path — Watch kept showing
 // the stale list until a mood switch touched watchMoodSel (already fingerprinted), which is why that
@@ -51,7 +51,7 @@ test("CAS-1372 AC1: watchNavKey() changes when the selected v2 mood's Show is ch
   });
 });
 
-test("CAS-1372 AC2: watchNavKey() changes after changing the mood's ages, awards, years, minScore and watched, and saving", () => {
+test("CAS-1372 AC2: watchNavKey() changes after changing the mood's ages, awards, years, topShare and watched, and saving", () => {
   const E = loadEngine();
   withV2Agent(E, () => {
     E.window.openOamMoodSheetFor("best");
@@ -63,7 +63,7 @@ test("CAS-1372 AC2: watchNavKey() changes after changing the mood's ages, awards
     E.window.toggleOamDraftAge("PG");
     E.window.setOamDraftAwards("won");
     E.window.setOamDraftYears(5);
-    E.window.oamMinScoreOnRelease({ value: "70" });
+    E.window.oamFilterOnRelease({ value: "70" });
     E.window.toggleOamDraftWatched();
     E.window.oamSaveMoodFromSheet();
 
@@ -72,9 +72,9 @@ test("CAS-1372 AC2: watchNavKey() changes after changing the mood's ages, awards
     assert.deepEqual([...saved.ages], ["PG"], "sanity: ages must have saved");
     assert.equal(saved.awards, "won", "sanity: awards must have saved");
     assert.equal(saved.years, 5, "sanity: years must have saved");
-    assert.equal(saved.minScore, 70, "sanity: minScore must have saved");
+    assert.equal(saved.topShare, 70, "sanity: topShare must have saved");
     assert.equal(saved.watched, true, "sanity: watched must have saved");
-    assert.notEqual(after, before, "AC2: changing ages/awards/years/minScore/watched and saving must change the nav key");
+    assert.notEqual(after, before, "AC2: changing ages/awards/years/topShare/watched and saving must change the nav key");
   });
 });
 
