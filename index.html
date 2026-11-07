@@ -7198,12 +7198,16 @@ let ignoreTagged=false;   // set only by passesOrStub(), so the counters that ca
 // strip NFD diacritic marks) so "penelope cruz" matches "Penélope Cruz", shared by the listing's filt.search
 // test and Find's own findSortedRows — the data (director/cast) is per-film already, no pipeline change.
 function normSearchText(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); }
+// CAS-1387: a comma splits the query into separate exact-phrase terms, ANDed together — never split on
+// spaces, so "cruise tom" stays one phrase that won't match "Tom Cruise" in cast.
 function filmMatchesSearch(m, q){
-  const nq = normSearchText(q).trim();
-  if(!nq) return true;
-  if(normSearchText(m.title).includes(nq)) return true;
-  if(m.director && normSearchText(m.director).includes(nq)) return true;
-  return (m.cast||[]).some(c=>normSearchText(c).includes(nq));
+  const parts = String(q||"").split(",").map(p=>normSearchText(p.trim())).filter(Boolean);
+  if(!parts.length) return true;
+  return parts.every(nq=>
+    normSearchText(m.title).includes(nq) ||
+    (m.director && normSearchText(m.director).includes(nq)) ||
+    (m.cast||[]).some(c=>normSearchText(c).includes(nq))
+  );
 }
 // ---- The status gate (CAS-148) -------------------------------------------------
 // A Cascade's window scope is a WATCH scope, not a display filter. A cinema-window Cascade is watching 26
@@ -22745,7 +22749,7 @@ let findRowsCache = [];   // the current search's sorted result set
 let findShown = 0;        // how many of findRowsCache are in the DOM right now
 // CAS-1382: set by tapping a card's Series value (openFindCollection) — {id, name} of the collection being
 // browsed, or null for the normal all-movies list. Cleared by the chip's × (clearFindCollectionFilter) or by
-// typing in the search box (setFindSearch), per the ticket's "typing clears the filter first" rule.
+// running a search (setFindSearch), per the ticket's "a search clears the filter first" rule.
 let findCollectionFilter = null;
 // CAS-1384: session only, never saved, never sent anywhere — one streaming service or null ("All"), reset
 // to null every time Find opens (setFindSvc/openFindScreen/openFindCollection).
@@ -22800,32 +22804,31 @@ function findRenderMore(){
   let buf="";
   for(let i=findShown; i<end; i++){
     const m=findRowsCache[i];
-    let row=showsStub(m) ? stubHTML(m) : cardHTML(m, isFresh(m));
-    const reason=findMatchReasonHTML(m, findSearch);
-    if(reason) row=row.replace(/<\/div>\s*$/, reason+"</div>");
+    const row=showsStub(m) ? stubHTML(m) : cardHTML(m, isFresh(m));
     buf += c ? oamWilAddHasWil(row) + oamWhereItListsHTML(m, c) : row;
   }
   listEl.insertAdjacentHTML("beforeend", buf);
   observeLazyPosters(listEl);
   findShown=end;
 }
-// CAS-1379: why a film matched when it wasn't by title — Find only. Reuses the expanded card's own
-// .credit/.cval styling (not .clbl: the label is baked into the sentence, e.g. "Director: ... · Cast: ...").
-// Returns "" when the title itself matched (no reason line needed) or when q is empty.
-function findMatchReasonHTML(m, q){
-  const nq = normSearchText(q).trim();
-  if(!nq || normSearchText(m.title).includes(nq)) return "";
-  const parts=[];
-  if(m.director && normSearchText(m.director).includes(nq)) parts.push(`Director: ${esc(m.director)}`);
-  const castHit=(m.cast||[]).filter(c=>normSearchText(c).includes(nq));
-  if(castHit.length) parts.push(`Cast: ${esc(castHit.join(", "))}`);
-  return parts.length ? `<div class="credit"><span class="cval">${parts.join(" · ")}</span></div>` : "";
-}
 window.setFindSearch=raw=>{
   findCollectionFilter=null;   // CAS-1382: typing clears an active Series filter before searching
   findSearchRaw=raw;
   findSearch=raw.trim().toLowerCase();
   findRenderList();
+};
+// CAS-1387: typing only updates the box (onFindSearchInput's cheap × toggle, no list render); running the
+// search — the Search button or the keyboard's Search/Enter key — is what actually calls setFindSearch.
+window.onFindSearchInput=val=>{
+  const clr=$("findSearchClear"); if(clr){ clr.hidden=!val; clr.classList.toggle("show", !!val); }
+};
+window.runFindSearch=()=>{
+  const input=$("findSearchInput"); if(!input) return;
+  setFindSearch(input.value);
+  input.blur();   // closes the on-device keyboard so the results are visible
+};
+window.onFindSearchKeydown=e=>{
+  if(e.key==="Enter"){ e.preventDefault(); runFindSearch(); }
 };
 // CAS-1384: single-select, session only — never written to the mood/account.
 window.setFindSvc=svc=>{
@@ -22884,9 +22887,12 @@ function renderFindScreen(){
     <h2 class="osh">Find</h2>
     <div class="watchsearchwrap" id="findSearchWrap">
       <input id="findSearchInput" class="search" type="text" inputmode="search" autocomplete="off"
-             placeholder="Search movies, actors, directors" aria-label="Search movies, actors, directors" oninput="setFindSearch(this.value)">
+             enterkeyhint="search"
+             placeholder="Search titles, actors, directors — commas to combine" aria-label="Search titles, actors, directors — commas to combine"
+             oninput="onFindSearchInput(this.value)" onkeydown="onFindSearchKeydown(event)">
       <button class="searchclear" id="findSearchClear" aria-label="Clear search" type="button" hidden
               onclick="clearFindSearch()">×</button>
+      <button class="ca-btn" id="findSearchBtn" type="button" onclick="runFindSearch()">Search</button>
     </div>
     ${findSvcFiltHTML()}
     <div class="flabel" id="findCount"></div>
