@@ -389,6 +389,12 @@ def _tmdb_record(detail: dict) -> dict:
     directors = [c["name"] for c in credits.get("crew", []) if c.get("job") == "Director"]
     cast = [c["name"] for c in sorted(credits.get("cast", []),
                                       key=lambda c: c.get("order", 999))][:4]
+    # CAS-1381: TMDB's belongs_to_collection names the franchise/series a film belongs to, when
+    # it has one. Keep only id/name — poster_path/backdrop_path are out of scope.
+    btc = detail.get("belongs_to_collection")
+    collection = None
+    if isinstance(btc, dict) and isinstance(btc.get("id"), int) and (btc.get("name") or "").strip():
+        collection = {"id": btc["id"], "name": btc["name"].strip()}
     return {
         "tmdb_id": detail["id"],
         "cache_stamped_at": _RUN_DATE,   # CAS-772: this fetch just confirmed every field below is fresh
@@ -415,6 +421,7 @@ def _tmdb_record(detail: dict) -> dict:
         "videos": videos,
         "director": ", ".join(directors[:2]) or None,
         "cast": cast,
+        "collection": collection,
     }
 
 
