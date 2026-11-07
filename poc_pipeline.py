@@ -763,6 +763,17 @@ SCOREABILITY_RECOVERY_DAYS = 90                              # tier 3: no_score 
 # target=backcatalogue) stops spending once Watchmode's live remaining-credits figure drops below
 # this — the floor nightly upkeep (WM_NIGHTLY_MAX_CREDITS/CAS-987 pacing) still needs.
 WM_BACKCAT_UPKEEP_FLOOR = 300
+# CAS-1380: tier 2's deliberate probe order — 2023 onwards first, then 2010-2015, then 2016-2022
+# (whose 6.5+ films are already in from the original CAS-989 enumerate), then five-year blocks
+# going back to 1930-1934. `None` as a block's end means "the current year". A candidate's year
+# is matched against these in order; the first block it falls in is its rank (lower = sooner).
+BACKCAT_PROBE_BLOCKS = [
+    (2023, None), (2010, 2015), (2016, 2022),
+    (2005, 2009), (2000, 2004), (1995, 1999), (1990, 1994),
+    (1985, 1989), (1980, 1984), (1975, 1979), (1970, 1974),
+    (1965, 1969), (1960, 1964), (1955, 1959), (1950, 1954),
+    (1945, 1949), (1940, 1944), (1935, 1939), (1930, 1934),
+]
 USER_HELD_IDS_FILE = os.path.join(STATE_DIR, "user_held_ids.json")   # CAS-986: monitor/store.py writes this
 SCOREABLE_SHIM = os.path.join(os.path.dirname(__file__), "scripts", "scoreable_shim.mjs")
 
@@ -1175,8 +1186,17 @@ def merge_backcatalogue_candidates(candidates: dict, today_iso: str, path: str |
             stats["no_tmdb_id"] += 1
             continue
         key = str(tmdb_id)
+        row_band = row.get("rating_band")
         if key in candidates:
             stats["already_known"] += 1
+            # CAS-1380: carry a raised rating_band onto an already-known row too, so tier 2's
+            # probe order sees it — but only while still unprobed, and never touching
+            # outcome/last_probed/probe_count, which this merge has never owned.
+            existing = candidates[key]
+            if row_band is not None and existing.get("outcome") == "unprobed":
+                prior_band = existing.get("rating_band")
+                existing["rating_band"] = (row_band if prior_band is None
+                                            else max(prior_band, row_band))
             continue
         # CAS-992: `status` must be a list — primaryStatus()/isScoreable() index into it and throw
         # on None/missing, which took down scoreable_ids()'s whole batch call. `popularity` is
@@ -1196,6 +1216,8 @@ def merge_backcatalogue_candidates(candidates: dict, today_iso: str, path: str |
             "probe_count": 0,
             "outcome": "unprobed",
         }
+        if row_band is not None:
+            candidates[key]["rating_band"] = row_band
         stats["merged"] += 1
 
     print(f"backcat_merged={stats['merged']} already_known={stats['already_known']} "
@@ -1274,6 +1296,35 @@ def reclassify_stale_scored_candidates(candidates: dict) -> int:
     return fixed
 
 
+def _backcat_block_rank(year, today: datetime.date) -> int:
+    """CAS-1380: index into BACKCAT_PROBE_BLOCKS of the first block `year` falls in — lower ranks
+    sooner. A year outside every block (and a missing/unparseable year, e.g. the "----"
+    placeholder) ranks last, one past the final block."""
+    if year is not None:
+        for i, (start, end) in enumerate(BACKCAT_PROBE_BLOCKS):
+            hi = today.year if end is None else end
+            if start <= year <= hi:
+                return i
+    return len(BACKCAT_PROBE_BLOCKS)
+
+
+def _candidate_year_int(c: dict):
+    try:
+        return int(c.get("year"))
+    except (TypeError, ValueError):
+        return None
+
+
+def _backcat_probe_sort_key(c: dict, today: datetime.date) -> tuple:
+    """CAS-1380 tier 2 only: block rank first (see BACKCAT_PROBE_BLOCKS), then rating_band
+    descending (a missing band sorts below the weakest real gate, 5.5), then popularity
+    descending, as before."""
+    band = c.get("rating_band")
+    return (_backcat_block_rank(_candidate_year_int(c), today),
+            -(band if band is not None else -1),
+            -(c.get("popularity") or 0))
+
+
 def _scoreability_recovery_due(c: dict, today: datetime.date) -> bool:
     """Tier 3: a no_score candidate is only re-probed once SCOREABILITY_RECOVERY_DAYS have passed
     since its last probe — recovers the tail without re-asking every night."""
@@ -1349,8 +1400,11 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
                                if not _is_wm_weekly_cohort(c, today)
                                and not _is_recent_release(c, today, WM_RECENT_YEAR_DAYS))
     tier1 = tier1_weekly + tier1_year + tier1_rest
-    tier2 = _by_popularity(c for c in candidates.values()
-                           if c.get("outcome") == "unprobed" and _not_quarantined(c))
+    # CAS-1380: tier 2 only, deliberate order — year block, then rating_band, then popularity.
+    # Tiers 0, 1 and 3 keep _by_popularity, unchanged.
+    tier2 = sorted(
+        (c for c in candidates.values() if c.get("outcome") == "unprobed" and _not_quarantined(c)),
+        key=lambda c: _backcat_probe_sort_key(c, today))
     tier3 = _by_popularity(c for c in candidates.values() if c.get("outcome") == "no_score"
                            and _scoreability_recovery_due(c, today) and _not_quarantined(c))
 
