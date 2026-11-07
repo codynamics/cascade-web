@@ -5488,7 +5488,11 @@ function deriveStatus(m){
   // and the closing fallback declared the film "in cinemas" on the strength of nothing but an old opening
   // date. That mislabelled 257 of 1954 titles — every rental/pvod record in the catalogue — while the data
   // said `rental`, which is how a film that dropped to rent in July 2026 was filed under In Cinema.
-  const claimed = CASCADE.filter(x=>m.claimedStatus.includes(x));
+  // CAS-1393: that same authority can never hand this function an in_cinema claim with no opening date to
+  // back it — _best_cinema_match's title-only fallback used to let a dateless record gain exactly that via
+  // on_screen, which fed through to the pipeline's own `status`. A claim this hollow is screened out here,
+  // before it reaches either the on_screen branch below or the pipeline-trust fallback at the end.
+  const claimed = CASCADE.filter(x=>m.claimedStatus.includes(x) && (x!=="in_cinema" || m.cinema_date));
   // CAS-237: …except when the window the pipeline estimated is one the film's own opening date denies. The
   // estimator learns its cinema→home offsets from window_dates, which is an OBSERVATION log rather than a
   // journey, so eighteen days into that log it had learned that rent arrives 0 days after the cinema and
