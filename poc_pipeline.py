@@ -148,7 +148,7 @@ CASCADE_SPINE = os.getenv("CASCADE_SPINE", "tmdb")
 
 # CAS-109 — poll-tiering + free-tier-capped scheduler (staging prototype).
 import poll_scheduler as ps
-CATALOGUE_TARGET = int(os.getenv("CATALOGUE_TARGET", "7000"))
+CATALOGUE_TARGET = int(os.getenv("CATALOGUE_TARGET", "12000"))
                          # CAS-128: persistent browsable catalogue size — was pinned to MAX_TITLES (the
                          # theatrical-pass cap) so the ~300 cap was gone and the full ingested AU set held.
                          # CAS-422: decoupled from MAX_TITLES — theatrical+upcoming+streaming can now sum
@@ -160,6 +160,9 @@ CATALOGUE_TARGET = int(os.getenv("CATALOGUE_TARGET", "7000"))
                          # CAS-1327: raised to 7,000 — lowering WM_PUBLISH_FLOOR to the app's own
                          # TRACK_MIN (50, was 60) makes ~6,180 titles scoreable instead of ~5,970, and
                          # this ceiling must not cut any of the newly-scoreable ones back out.
+                         # CAS-1383: raised to 12,000 (Lee's decision, 2026-11-07) — CAS-1380's back-
+                         # catalogue growth (~2,000 scored films/month) would hit 7,000 within weeks and
+                         # start pushing out older back-catalogue titles on the popularity cut.
 
 # CAS-127 — TMDB Watch Providers is the primary availability source (free, no quota).
 # It runs once per released title per day across the WHOLE catalogue, so pace it politely
@@ -1355,8 +1358,9 @@ def probe_candidates(candidates: dict, today: datetime.date, budget: int, wm_idm
          `tv_tmdb_ids`), forced stale regardless of how recently that bad fetch happened.
       1. published titles (`published_ids` — yesterday's movies.json) whose Watchmode fields are
          stale (30 days, or 7 for the CAS-1139 weekly-refresh cohort — _is_wm_weekly_cohort) —
-         first, because letting a published title's fields expire silently removes it from the
-         app. CAS-1139: spent weekly-refresh titles first, then titles released within
+         first, so a published title's fields are kept current (CAS-1383: expiry does NOT remove
+         a title from the app — a stale published title stays published; this tier just refreshes
+         it). CAS-1139: spent weekly-refresh titles first, then titles released within
          WM_RECENT_YEAR_DAYS, then the rest — stalest wm_fields_fetched_at first within each
          group, NOT by popularity (the ticket's own Change #3; tiers 0, 2 and 3 stay popularity-
          ordered, unchanged).
