@@ -569,6 +569,11 @@
   /* the one criterion that SUBTRACTS (CAS-71) — so it must not wear the same colour as the ones that add */
   .chip.on.exc{background:rgba(192,86,63,.22);border-color:#c0563f;color:#ffb9a6}
   .chip.on.svc{background:rgba(72,199,142,.2);border-color:var(--green);color:#a7eccb}
+  /* CAS-1384: Find's own "ON <service>" row — deliberately its own class name, not the Service analysis
+     rows' class (~line 2632 below). Pill chips, same violet-haze selected style the mood/stage chips use. */
+  .svcfilt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 2px}
+  .svcfiltchip{height:26px;line-height:14px;display:inline-flex;align-items:center}
+  .svcfiltchip.on{background:var(--sel-bg);border-color:var(--sel-bd);color:#fff}
   /* CAS-562: the per-language title count riding inside a Languages chip, and the "More languages" expander
      chip beside it — a plain unselected .chip is already a legible affordance, so chipmore adds nothing but
      a dashed border to read as "reveals more" rather than "a language". */
@@ -3916,6 +3921,8 @@
   .stgroups .stagestop.on{background:var(--sel-bg);border-color:var(--sel-bd);color:#fff}
   .stgroups .stagestop.on .stagename{font-weight:700;color:#fff}
   .stgroups .stagestop.on .stagecount{color:var(--dim)}
+  /* CAS-1384: a stage emptied by the active mood's own streaming service — dimmed and untappable (disabled) */
+  .stgroups .stagestop.svcdim{opacity:.35;cursor:default}
   /* phones narrower than 380px: the four stage names still fit on one line */
   @media (max-width:379px){
     .stgrp{padding:4px}
@@ -3938,6 +3945,9 @@
     align-items:center;justify-content:center}
   .moodchip.on .moodedit{display:flex}
   .moodchip .moodedit svg{width:12px;height:12px}
+  /* CAS-1384: the mood chip's own "on Netflix"-type tag, right after its name */
+  .oamsvctag{font:700 10px/1 var(--font-body);padding:2px 6px;border-radius:999px;background:rgba(255,255,255,.14);
+    color:inherit;white-space:nowrap}
   .moodadd{flex:none;height:34px;padding:0 12px;border-radius:10px;border:1px dashed #4a5263;background:none;
     color:var(--dim);font:600 12.5px/1 var(--font-body);cursor:pointer;white-space:nowrap;
     user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
@@ -5619,6 +5629,11 @@ const SVC_SHORT = {"Amazon Prime Video":"Prime","Disney Plus":"Disney","Apple TV
   "Paramount Plus":"Paramount","HBO Max":"Max","BINGE":"Binge","Stan":"Stan","Netflix":"Netflix",
   "Google Play Movies":"Google","YouTube":"YouTube","Foxtel Now":"Foxtel","BritBox":"BritBox"};
 const svcShort=s=>SVC_SHORT[svcCanon(s)]||svcName(s);
+// CAS-1384: the mood sheet's/Find's own short labels for a service CHIP — deliberately its own small map,
+// not SVC_SHORT above (that one's abbreviations, e.g. "Max"/"Apple", read wrong as a filter's own name).
+// Only the two genuinely-long names get shortened; every other service keeps its full name.
+const OAM_SVC_CHIP_LABEL = {"Amazon Prime Video":"Prime", "Disney Plus":"Disney+"};
+const oamSvcChipLabel = s => OAM_SVC_CHIP_LABEL[s] || s;
 // CAS-1014: svcCanon's rules strip known billing/reseller suffixes, but they don't catch two spellings of
 // the SAME name that differ only in spacing, case or punctuation — e.g. the feed's "CuriosityStream Amazon
 // Channel" strips to "CuriosityStream", one word, while its plain "Curiosity Stream" listing keeps the
@@ -10625,21 +10640,61 @@ function watchTopAgentsRanked(){ return [...cascades].sort(cascadeOrderCmp); }
 // stage+agent rail (CAS-1223/1226). A group's flex is the sum, over its own stops, of the wider of 8 or the
 // stop's own (possibly renamed) label length, so neither group's buttons ever overhang their own box.
 const STAGE_GROUP_FLEX = label => Math.max(8, label.length);
+// CAS-1384: the currently-selected v2 mood's own effective service, or null — the one thing both the stage
+// strip's dimming below and the mood chip's own tag need to know, read once per render.
+function oamActiveMoodSvc(){
+  if(!oneAgentCriteria()) return null;
+  const mood=currentOamMood(); if(!mood) return null;
+  return oamMoodEffectiveSvc(mood);
+}
+// A stop's count AS IF the active mood's service weren't set — only ever called while that service IS set
+// (oamActiveMoodSvc already gated it), so the whole app's own single-mood-pool rule never races this
+// save/mutate/restore against anything else reading `mood` in between.
+function oamStageCountWithoutSvc(stop){
+  const mood=currentOamMood(); if(!mood) return watchStageCountFor(stop);
+  const prevSvc=mood.svc;
+  mood.svc=null;
+  const n=watchStageCountFor(stop);
+  mood.svc=prevSvc;
+  return n;
+}
+function oamFirstNonEmptyHomeStage(){
+  const home=watchStageStopsNow().filter(s=>s.tabKey!=="in_cinema");
+  return home.find(s=>watchStageCountFor(s)>0) || null;
+}
+// CAS-1384: called right after a mood is selected or saved — lands on the first non-empty Home stage
+// instead of a now-dimmed, disabled one, the same "because of the service" test the stage strip itself uses.
+function oamEnsureStageNotDimmedForMood(mood){
+  if(!oneAgentCriteria() || !mood) return;
+  const svc=oamMoodEffectiveSvc(mood); if(!svc) return;
+  const curKey=watchTab==="in_cinema" ? watchCinemaStage : watchTab;
+  const curStop=watchStageStopsNow().find(s=>s.key===curKey); if(!curStop) return;
+  if(watchStageCountFor(curStop)>0) return;
+  if(oamStageCountWithoutSvc(curStop)<=0) return;   // genuinely empty, not because of the service
+  const next=oamFirstNonEmptyHomeStage(); if(!next) return;
+  watchTab=next.tabKey;
+  if(next.tabKey==="in_cinema") watchCinemaStage=next.key;
+}
 function renderWatchTop(){
   const el=$("watchTop"); if(!el) return;
   const stops=watchStageStopsNow();
   if(!stops.length){ el.hidden=true; el.innerHTML=""; return; }
   el.hidden=false;
   const curKey = watchTab==="in_cinema" ? watchCinemaStage : watchTab;
+  const activeSvc=oamActiveMoodSvc();
   // "In Cinema"'s stop label becomes "Now showing" here and in #wtMini only — the section heading in the
   // list itself (LISTING_ORDER's own group header) is untouched.
   const stopLabel = s => s.key==="in_cinema" ? "Now showing" : s.label;
   const stopHTML = s => {
     const on=s.key===curKey;
-    return `<button type="button" class="stagestop${on?" on":""}" data-stage="${s.key}"
-        aria-pressed="${on}" onclick="setWatchStage('${s.key}')">
+    const n=watchStageCountFor(s);
+    // CAS-1384: a stop reads as "empty because of the service" only when it would hold films WITHOUT it —
+    // a stop that's just genuinely empty (an off genre, a tight bar) stays its ordinary, tappable self.
+    const dimmed = !!(activeSvc && n===0 && oamStageCountWithoutSvc(s)>0);
+    return `<button type="button" class="stagestop${on?" on":""}${dimmed?" svcdim":""}" data-stage="${s.key}"
+        aria-pressed="${on}" ${dimmed?"disabled":""} onclick="setWatchStage('${s.key}')">
       <span class="stagename">${esc(stopLabel(s))}</span>
-      <span class="stagecount"><span class="gdot ${s.dot}" aria-hidden="true"></span>${watchStageCountFor(s)}</span>
+      <span class="stagecount"><span class="gdot ${s.dot}" aria-hidden="true"></span>${n}</span>
     </button>`;
   };
   const groupHTML = (label, groupStops) => {
@@ -10656,8 +10711,11 @@ function renderWatchTop(){
   const moods=watchMoodsList();
   const moodChipHTML=(m, pinned)=>{
     const on=m.id===watchMoodSel;
+    // CAS-1384: a mood with an effective service carries a small tag naming it, right after its name.
+    const svc=oamMoodEffectiveSvc(m);
+    const svcTag=svc ? `<span class="oamsvctag">${esc(oamSvcChipLabel(svc))}</span>` : "";
     return `<button type="button" class="moodchip${on?" on":""}${pinned?" pinned":""}" data-mood="${escA(m.id)}" aria-pressed="${on}"
-        onclick="onMoodChipTap('${escA(m.id)}')">${esc(moodDisplayName(m))}<span class="moodedit" aria-hidden="true">${MOOD_EDIT_SVG}</span></button>`;
+        onclick="onMoodChipTap('${escA(m.id)}')">${esc(moodDisplayName(m))}${svcTag}<span class="moodedit" aria-hidden="true">${MOOD_EDIT_SVG}</span></button>`;
   };
   // CAS-1296 Change 4: Releases, if the account has one, always renders first — pinned outside the
   // draggable set, with a divider after it — the rest keep their saved order.
@@ -11262,6 +11320,7 @@ window.setWatchMood = id => {
   const mood=watchMoods.find(m=>m.id===id); if(!mood || id===watchMoodSel) return;
   watchMoodSel=id;
   applyMoodToState(mood);
+  oamEnsureStageNotDimmedForMood(mood);   // CAS-1384
   pushViewField("mood", id);   // C4: selecting a different mood
   logEvent("watch_mood", {action:"select"});
   render();
@@ -20721,7 +20780,7 @@ const ONE_AGENT_MOOD_BUILTINS=[
   {id:"starred", name:"Starred", starredOnly:true},
 ];
 function oamMoodDefaultFields(){
-  return {v2:true, handOnly:false, watched:false, styles:[], minScore:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[]};
+  return {v2:true, handOnly:false, watched:false, styles:[], minScore:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[], svc:null};
 }
 function oamMoodDefaultsNow(){ return ONE_AGENT_MOOD_BUILTINS.map(b=>({...oamMoodDefaultFields(), ...b})); }
 // The account's own saved v2 moods — falls back (in memory only, never written: CAS-1218/1243) to the two
@@ -20750,6 +20809,13 @@ function oamMoodBarFor(mood, c, style){
   return mood.minScore!=null ? Math.max(agentBar, mood.minScore) : agentBar;
 }
 function oamFilmAge(m){ return AGE_RATING_CANON[m.age_rating] || m.age_rating; }
+// CAS-1384: a saved svc that's no longer one of the account's own services (prefs.sub) reads as null —
+// "any of mine" — without ever rewriting the stored mood (oamSaveMoodFromSheet is the only writer).
+function oamMoodEffectiveSvc(mood){ return (mood && mood.svc && prefs.sub.has(mood.svc)) ? mood.svc : null; }
+// "Included streaming" on a service: a sub/free offer whose canonical name matches. Rent/buy never count.
+function filmIncludedOnService(m, service){
+  return (m.offers||[]).some(o => (o.type==="sub" || o.type==="free") && svcCanon(o.service)===service);
+}
 function oamFilmMatchesAwards(m, awards){
   if(awards==="won") return m.award==="won";
   if(awards==="nominated") return awardRank(m)>=1;
@@ -20804,6 +20870,10 @@ function filmInOneAgentMood(m, mood, c){
   if((mood.out||[]).includes(id)) return false;
   if((mood.in||[]).includes(id)) return true;
   if(mood.handOnly) return false;
+  // CAS-1384: a mood's own optional streaming service — included (sub/free) offers only, applied to every
+  // rule branch below (ordinary moods, Releases and Starred alike).
+  const svc=oamMoodEffectiveSvc(mood);
+  if(svc && !filmIncludedOnService(m, svc)) return false;
   if(mood.id==="releases") return oamFilmMeetsReleasesRules(m, mood, c);
   if(mood.id==="starred" || mood.starredOnly) return starredIds.has(id);
   return oamFilmMeetsMoodRules(m, mood, c);
@@ -20916,6 +20986,9 @@ function oamMoodDraftFrom(mood){
     sort: mood ? (mood.sort || (mood.id==="releases" ? "release" : "score")) : "score",
     in: [...(mood ? (mood.in||[]) : [])],
     out: [...(mood ? (mood.out||[]) : [])],
+    // CAS-1384: the sheet always shows the EFFECTIVE service (null if the stored one was dropped from
+    // prefs.sub) — reading it here never rewrites the stored mood; only a Save does that.
+    svc: mood ? oamMoodEffectiveSvc(mood) : null,
   };
 }
 // The bar a style shows in the sheet: a draft strip edit if the user has dragged it this session, else the
@@ -21008,6 +21081,7 @@ window.toggleOamDraftAge=a=>{ if(!oamDraft) return; oamDraft.ages.has(a)?oamDraf
 window.setOamDraftAwards=v=>{ if(!oamDraft) return; oamDraft.awards=v; renderOamMoodSheetBody(); };
 window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMoodSheetBody(); };
 window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMoodSheetBody(); };
+window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; renderOamMoodSheetBody(); };
 window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
 // Every other saved mood that would ALSO list this style — "also in <names>" under a style row.
 function oamStylesAlsoIn(style, excludeId){
@@ -21133,6 +21207,15 @@ function renderOamMoodSheetBody(){
       </div>`}
     </div>
     ${d.handOnly ? "" : `
+    ${prefs.sub.size ? `<div class="wsheetsec">
+      <div class="wsheethd"><span>STREAMING ON</span></div>
+      <div class="chips">
+        <button type="button" class="chip${d.svc?"":" on"}" aria-pressed="${!d.svc}" onclick="setOamDraftSvc(null)">Any of mine</button>
+        ${SUB_SERVICES.filter(s=>prefs.sub.has(s)).map(s=>{ const on=d.svc===s; return `<button type="button" class="chip${on?" on":""}"
+          aria-pressed="${on}" onclick="setOamDraftSvc('${escA(s)}')">${esc(oamSvcChipLabel(s))}</button>`; }).join("")}
+      </div>
+      <p class="oamgenreintro">Only films included on this service. Cinema and Rental stay empty while a service is set.</p>
+    </div>` : ""}
     <div class="wsheetsec">
       <div class="wsheethd"><span>GENRES &middot; ${kOn} of ${onStyles.length}</span>
         <div class="wsheetlinks">
@@ -21214,6 +21297,7 @@ window.oamSaveMoodFromSheet=()=>{
     show: d.show,
     sort: d.sort,
     in: [...d.in], out: [...d.out],
+    svc: d.svc || null,
   };
   if(mood.id==="starred") mood.starredOnly=true;
   // CAS-1366: a save always stamps Releases' own repair marker, whichever sort was actually picked, so the
@@ -21225,6 +21309,7 @@ window.oamSaveMoodFromSheet=()=>{
   const selectionChanged = watchMoodSel!==mood.id;
   watchMoodSel=mood.id;
   applyMoodToState(mood);
+  oamEnsureStageNotDimmedForMood(mood);   // CAS-1384
   pushViewField("moods", watchMoods.map(m=>({...m})));
   if(selectionChanged) pushViewField("mood", mood.id);
   logEvent("watch_mood", {action: d.editingId ? "save" : "create"});
@@ -22662,18 +22747,25 @@ let findShown = 0;        // how many of findRowsCache are in the DOM right now
 // browsed, or null for the normal all-movies list. Cleared by the chip's × (clearFindCollectionFilter) or by
 // typing in the search box (setFindSearch), per the ticket's "typing clears the filter first" rule.
 let findCollectionFilter = null;
+// CAS-1384: session only, never saved, never sent anywhere — one streaming service or null ("All"), reset
+// to null every time Find opens (setFindSvc/openFindScreen/openFindCollection).
+let findSvc = null;
 function findSortedRows(){
-  if(findCollectionFilter) return collectionFilmsSorted(findCollectionFilter.id);   // release order, not score
-  const q = findSearch;
-  const rows = q ? MOVIES.filter(m=>filmMatchesSearch(m, q)) : MOVIES.slice();
-  // Cascade score, highest first; no score (cascadeScore's -1 sentinel) sorts last; ties by title A-Z.
-  return rows.sort((a,b)=>{
-    const sa=cascadeScore(a), sb=cascadeScore(b);
-    const na=sa<0, nb=sb<0;
-    if(na!==nb) return na ? 1 : -1;
-    if(sa!==sb) return sb-sa;
-    return a.title.localeCompare(b.title);
-  });
+  let rows;
+  if(findCollectionFilter){ rows=collectionFilmsSorted(findCollectionFilter.id); }   // release order, not score
+  else {
+    const q = findSearch;
+    rows = (q ? MOVIES.filter(m=>filmMatchesSearch(m, q)) : MOVIES.slice())
+      // Cascade score, highest first; no score (cascadeScore's -1 sentinel) sorts last; ties by title A-Z.
+      .sort((a,b)=>{
+        const sa=cascadeScore(a), sb=cascadeScore(b);
+        const na=sa<0, nb=sb<0;
+        if(na!==nb) return na ? 1 : -1;
+        if(sa!==sb) return sb-sa;
+        return a.title.localeCompare(b.title);
+      });
+  }
+  return findSvc ? rows.filter(m=>filmIncludedOnService(m, findSvc)) : rows;
 }
 // Renders just the list portion (count line + rows), leaving the head/input alone so a keystroke never
 // steals focus from the box that caused it. Called on open and on every search change.
@@ -22685,7 +22777,8 @@ function findRenderList(){
   const chip = findCollectionFilter
     ? `<button type="button" class="findchip" onclick="clearFindCollectionFilter()">Series: ${esc(findCollectionFilter.name)} ×</button>`
     : "";
-  const countEl=$("findCount"); if(countEl) countEl.innerHTML = `${chip}<span class="findcounttext">${n} movie${n===1?"":"s"}</span>`;
+  const svcTxt = findSvc ? ` on ${esc(findSvc)}` : "";
+  const countEl=$("findCount"); if(countEl) countEl.innerHTML = `${chip}<span class="findcounttext">${n} movie${n===1?"":"s"}${svcTxt}</span>`;
   const clr=$("findSearchClear"); if(clr){ clr.hidden=!findSearchRaw; clr.classList.toggle("show", !!findSearchRaw); }
   const wrap=$("findListWrap"); if(!wrap) return;
   findShown=0;
@@ -22734,6 +22827,15 @@ window.setFindSearch=raw=>{
   findSearch=raw.trim().toLowerCase();
   findRenderList();
 };
+// CAS-1384: single-select, session only — never written to the mood/account.
+window.setFindSvc=svc=>{
+  findSvc=svc||null;
+  findRenderList();
+  const row=$("findSvcFilt"); if(row) row.querySelectorAll(".svcfiltchip").forEach(b=>{
+    const on=b.dataset.svc===(svc||"");
+    b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on));
+  });
+};
 window.clearFindSearch=()=>{
   $("findSearchInput").value="";
   findSearchRaw=""; findSearch="";
@@ -22750,6 +22852,7 @@ window.openFindCollection=collectionId=>{
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
   if($("movingScreen").classList.contains("open")) closeMovingScreen();
   findSearchRaw=""; findSearch="";
+  findSvc=null;   // CAS-1384: Find's own service chip always resets to All on open
   findCollectionFilter={id:collectionId, name:sample.collection.name.replace(/\s+Collection$/,"")};
   renderFindScreen();
   $("findScreen").scrollTop=0;
@@ -22763,6 +22866,19 @@ window.clearFindCollectionFilter=()=>{
   findRenderList();
 };
 // Builds the head (title, search box, count) once per open and fills the list below it.
+// CAS-1384: hidden entirely when the account has no own services picked at all.
+function findSvcFiltHTML(){
+  if(!prefs.sub.size) return "";
+  const chip=(svc, label)=>{
+    const on=findSvc===svc;
+    return `<button type="button" class="chip svcfiltchip${on?" on":""}" data-svc="${escA(svc||"")}"
+      aria-pressed="${on}" onclick="setFindSvc(${svc?`'${escA(svc)}'`:"null"})">${esc(label)}</button>`;
+  };
+  return `<div class="svcfilt" id="findSvcFilt">
+    <span class="stgrplbl">ON</span>
+    <div class="chips">${chip(null,"All")}${SUB_SERVICES.filter(s=>prefs.sub.has(s)).map(s=>chip(s, oamSvcChipLabel(s))).join("")}</div>
+  </div>`;
+}
 function renderFindScreen(){
   $("findBody").innerHTML = `
     <h2 class="osh">Find</h2>
@@ -22772,6 +22888,7 @@ function renderFindScreen(){
       <button class="searchclear" id="findSearchClear" aria-label="Clear search" type="button" hidden
               onclick="clearFindSearch()">×</button>
     </div>
+    ${findSvcFiltHTML()}
     <div class="flabel" id="findCount"></div>
     <div id="findListWrap"></div>`;
   findRenderList();
@@ -22781,6 +22898,7 @@ window.openFindScreen=()=>{
   if($("movingScreen").classList.contains("open")) closeMovingScreen();
   findSearchRaw=""; findSearch="";   // AC9: always reopens with an empty box and the list at the top
   findCollectionFilter=null;   // CAS-1382: opening Find any other way starts with no collection filter
+  findSvc=null;   // CAS-1384: Find's own service chip always resets to All on open
   renderFindScreen();
   $("findScreen").scrollTop=0;
   $("findScreen").classList.add("open"); lockBodyScroll(true);
