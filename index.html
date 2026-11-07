@@ -21583,17 +21583,6 @@ function oamWilCase(m, c){
     return {sentence:notListed("You chose Never for this film."),
       buttons:[{label:"Undo Never", action:`oamWilUndoNever(${id})`}]};
   }
-  if(watched.has(id)){
-    // CAS-1364: a mood whose own watched switch is off would otherwise show this film by its rules — offer
-    // the one-tap fix that flips that switch on, same shape as every other oamWil* case.
-    const wouldMood=oamMoodsListReal().find(mood=>!mood.watched && filmInOneAgentMood(m, {...mood, watched:true}, c));
-    if(wouldMood){
-      const name=esc(moodDisplayName(wouldMood));
-      return {sentence:notListed(`It would be in ${name}, but that mood doesn't include watched films.`),
-        buttons:[{label:`Include watched films in ${name}`, primary:true, action:`oamWilIncludeWatched(${id},'${escA(wouldMood.id)}')`}]};
-    }
-    return {sentence:notListed("You've watched it."), buttons:[]};
-  }
   const ps=primaryStatus(m);
   if(c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)){
     const offer=(m.offers||[]).find(o=>windowOf(o)===ps) || (m.offers||[])[0];
@@ -21632,6 +21621,17 @@ function oamWilCase(m, c){
         {label:`Widen ${esc(name)} to Top ${y}%`, primary:true, action:`oamWilWidenGenre(${id},'${escA(main)}',${score})`},
         {label:"Add to a mood by hand", action:`oamWilAddToMood(${id})`}
       ]};
+  }
+  if(watched.has(id)){
+    // CAS-1364: a mood whose own watched switch is off would otherwise show this film by its rules — offer
+    // the one-tap fix that flips that switch on, same shape as every other oamWil* case.
+    const wouldMood=oamMoodsListReal().find(mood=>!mood.watched && filmInOneAgentMood(m, {...mood, watched:true}, c));
+    if(wouldMood){
+      const name=esc(moodDisplayName(wouldMood));
+      return {sentence:notListed(`It would be in ${name}, but that mood doesn't include watched films.`),
+        buttons:[{label:`Include watched films in ${name}`, primary:true, action:`oamWilIncludeWatched(${id},'${escA(wouldMood.id)}')`}]};
+    }
+    return {sentence:notListed("You've watched it."), buttons:[]};
   }
   // The agent admits it (every check above passed) but it isn't in any mood, by hand or by rule.
   // CAS-1370: before blaming the genre, check whether some mood actually has it ticked and is excluding

@@ -92,3 +92,69 @@ test("CAS-1370 AC4: Find still uses the generic genre-missing reason when no moo
     E.watchMoods.length = 0; E.watchMoods.push(...savedMoods);
   }
 });
+
+// CAS-1388: a watched film blocked by services was reported as "You've watched it." — the watched.has(id)
+// branch used to return before the services/genre-off/never-combo/score-bar checks ran below it, so the
+// real blocker never had a chance to surface. Those checks now run for a watched film exactly as they do
+// for an unwatched one; only once none of them applies does the watched-specific handling (CAS-1364's
+// "Include watched films in <mood>" offer, else "You've watched it.") take over.
+test("CAS-1388 AC1: a watched film blocked by services names the real reason, not the generic watched line", () => {
+  const savedMoods = [...E.watchMoods].map(m => ({ ...m }));
+  const savedOn = E.prefs.on;
+  const savedSub = new Set(E.prefs.sub);
+  E.watchMoods.length = 0;
+  // A mood that already includes watched films — present to prove the services reason wins even though a
+  // watched-inclusive mood exists, not because the film ever reaches that branch.
+  E.watchMoods.push(moodWith({ name:"Movie night", watched:true, styles:["Action"] }));
+  E.prefs.on = true;
+  E.prefs.sub.clear();
+  const c = criteriaWith("Action", 1);
+  const film = filmWith({ _fixture:false, offers:[{service:"BINGE", type:"sub", price:null, format:null}] });
+  E.watched.add(film.tmdb_id);
+  try{
+    const r = E.oamWilCase(film, c);
+    assert.match(r.sentence, /isn't one of your services/);
+    assert.doesNotMatch(r.sentence, /You've watched it/);
+  } finally {
+    E.watched.delete(film.tmdb_id);
+    E.watchMoods.length = 0; E.watchMoods.push(...savedMoods);
+    E.prefs.on = savedOn;
+    E.prefs.sub.clear(); savedSub.forEach(s => E.prefs.sub.add(s));
+  }
+});
+
+test("CAS-1388 AC2: a watched film that clears every check still returns \"You've watched it.\" when no mood includes watched films", () => {
+  const savedMoods = [...E.watchMoods].map(m => ({ ...m }));
+  E.watchMoods.length = 0;
+  // Genre-mismatched on purpose: even with watched flipped true, this mood would never admit an Action
+  // film, so no wouldMood exists — unlike leaving watchMoods empty, which falls back to the "Releases"
+  // builtin (styles:[] admits every genre) and would wrongly satisfy the CAS-1364 offer instead.
+  E.watchMoods.push(moodWith({ name:"Comedies only", watched:false, styles:["Comedy"] }));
+  const c = criteriaWith("Action", 1);
+  const film = filmWith({});
+  E.watched.add(film.tmdb_id);
+  try{
+    const r = E.oamWilCase(film, c);
+    assert.match(r.sentence, /You've watched it\./);
+  } finally {
+    E.watched.delete(film.tmdb_id);
+    E.watchMoods.length = 0; E.watchMoods.push(...savedMoods);
+  }
+});
+
+test("CAS-1388 AC3: the CAS-1364 \"Include watched films in <mood>\" offer still wins when that's the only reason", () => {
+  const savedMoods = [...E.watchMoods].map(m => ({ ...m }));
+  E.watchMoods.length = 0;
+  E.watchMoods.push(moodWith({ name:"Movie night", watched:false, styles:["Action"] }));
+  const c = criteriaWith("Action", 1);
+  const film = filmWith({});
+  E.watched.add(film.tmdb_id);
+  try{
+    const r = E.oamWilCase(film, c);
+    assert.match(r.sentence, /It would be in Movie night, but that mood doesn't include watched films\./);
+    assert.ok(r.buttons.some(b => b.label === "Include watched films in Movie night"));
+  } finally {
+    E.watched.delete(film.tmdb_id);
+    E.watchMoods.length = 0; E.watchMoods.push(...savedMoods);
+  }
+});
