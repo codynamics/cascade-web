@@ -66,6 +66,27 @@ test("CAS-1293 AC1: youScore against the ticket's own four worked cases", () => 
   assert.equal(E.youScore({pub:97, pairs:[{sum:8,n:8}], b:0.6}).value, 99);
 });
 
+// CAS-1392: an unjudged pair (n:0) counts as neutral evidence (lean b, weight TASTE_K) instead of being
+// ignored outright, so it softens a film's judged pairs rather than letting the judged pair alone decide.
+test("CAS-1392 AC1: an unjudged pair alongside a judged one softens the adjustment towards neutral", () => {
+  const b = 0.670097215245237;
+  const diluted = E.youScore({pub:79, pairs:[{sum:0,n:0},{sum:-3.5,n:4}], b});
+  assert.equal(diluted.value, 62);
+  assert.ok(diluted.adj > -18 && diluted.adj < -17);
+});
+
+test("CAS-1392 AC2: a film whose only pair is judged is unchanged", () => {
+  const b = 0.670097215245237;
+  assert.equal(E.youScore({pub:79, pairs:[{sum:-3.5,n:4}], b}).value, 44);
+});
+
+test("CAS-1392 AC3: every pair unjudged leaves the Public score untouched", () => {
+  const b = 0.670097215245237;
+  const r = E.youScore({pub:79, pairs:[{sum:0,n:0},{sum:0,n:0}], b});
+  assert.equal(r.value, Math.round(79));
+  assert.equal(r.adj, 0);
+});
+
 // AC2: against a strong positive baseline (20x Wow on Action/Comedy), a combination rated So-so every
 // time (5x, Drama/Crime) scores well over 20 below its own Public — the person's baseline pulls the
 // smoothed lean up, but not enough to erase 5 straight So-sos pulling it the other way. The baseline's
