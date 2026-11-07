@@ -259,6 +259,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // shared verbatim with filmPageHTML (the invite/share-link page) — exported together so a test can assert
   // the invite page's rendered top literally contains the same cardTopHTML(m) output, not a re-derived copy.
   cardTopHTML, filmPageHTML,
+  // CAS-1389: cardHTML/stubHTML — the expanded card and the condensed watched-row render — exported so a
+  // test can assert the watch-next star renders on one and not the other, directly off their own output.
+  cardHTML, stubHTML,
   inferredScale, inferScaleWhy, budgetCell, moneyRowHTML, SCALE_INFER_MIN_PEERS, popOf, scaleTier,
   // CAS-1234: TENT_BADGE is scaleTier's own icon/label lookup (the card badge's exact source) — exported so
   // a test can assert the Badges sheet section names the same icon/label scaleTier(m) implies.

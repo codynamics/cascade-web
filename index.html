@@ -5245,9 +5245,9 @@ const ICON = {
   // CAS-183 "so-so": the same 24px circle the block mark uses, with a flat mouth — neither thumb, because
   // it is neither answer, and a half-turned thumb would read as a weak version of one of them.
   soso:    svgIcon(`<circle cx="12" cy="12" r="8.6"/><path d="M8.6 14.6h6.8"/><path d="M9.4 9.6h.01"/><path d="M14.6 9.6h.01"/>`),
-  // CAS-278 "Wow!": a star, on the same 24px grid at the same stroke weight as the thumbs and the circles,
-  // so the top of the scale is drawn in the same hand as the rest of it rather than borrowing an emoji.
-  wow:     svgIcon(`<path d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 16.9l-5.2 2.7 1-5.75-4.2-4.1 5.8-.85z"/>`),
+  // CAS-278 "Wow!", redrawn by CAS-1389 as a lightning bolt — the star collided with the watch-next star
+  // (CAS-1295). Same 24px grid and stroke weight as the rest of the set.
+  wow:     svgIcon(`<path d="M13.2 2.8 5.6 13.2h5.6l-1 8 7.6-10.4h-5.6z"/>`),
   // CAS-349 "Enjoyed": a heart, on the same 24px grid and stroke weight as the rest of the set — the answer
   // sits between Watch Again and So-so, so its mark has to read as its own thing rather than a weak star.
   heart:   svgIcon(`<path d="M12 19.5c-.3 0-.6-.1-.8-.3-1.6-1.4-3-2.7-4.2-3.9-3-3-4.5-5.6-4.5-8.1 0-2.4 1.9-4.3 4.3-4.3 1.5 0 2.9.8 3.7 2 .3.4.9.4 1.2 0 .8-1.2 2.2-2 3.7-2 2.4 0 4.3 1.9 4.3 4.3 0 2.5-1.5 5.1-4.5 8.1-1.2 1.2-2.6 2.5-4.2 3.9-.2.2-.5.3-.8.3z"/>`),
@@ -10071,16 +10071,12 @@ function stubHTML(m){
   const isNever=cur==="notfor";
   const title=op?`${op.lbl} — tap to ${isNever?"undo":"change"}`:"Say what you made of it";
   const onclick=isNever?`setOpinion(${id},'notfor')`:`openWatchPanel(${id},this)`;
-  // CAS-1295: the same star as the card, before the verdict icon — same storage, same toggle.
-  const starOn=isStarred(id);
-  const starBtn=`<button type="button" class="ctl actbtn stubstar starbtn${starOn?" on":""}" data-star="${id}"
-    aria-pressed="${starOn}" onclick="toggleStarred(${id})" title="${starOn?"Unstar":"Star"}"
-    aria-label="${starOn?"Unstar":"Star"}">${starOn?"★":"☆"}</button>`;
+  // CAS-1389: the watch-next star (CAS-1295) lives on the normal card only — a tap-opened stub renders
+  // cardHTML and keeps its star there.
   return `<div class="stub" id="card-${id}" onclick="stubTap(event,${id})">
     <span class="stubname">${esc(m.title)}</span>
     <span class="stubwhy">${lbl}</span>
     <span class="actions">
-      ${starBtn}
       <button type="button" class="ctl actbtn stubbtn${op?" on "+op.key:""}" onclick="${onclick}"
         ${isNever?"":'aria-haspopup="true" aria-expanded="false"'}
         title="${escA(title)}" aria-label="${escA(title)}">${op?ICON[op.ico]:ICON.eye}</button>
