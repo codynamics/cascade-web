@@ -862,6 +862,15 @@ if(typeof window.CascadeAuth === "undefined"){
   // listing's own filt.search test both call — exported directly so a test can assert the matching rule
   // itself against the real catalogue, rather than only through either call site's combined output.
   filmMatchesSearch,
+  // CAS-1382: collectionFilmsSorted is the Series row's own release-order member list (shared with Find's
+  // collection-mode findSortedRows branch) — exported so a test can assert the sort directly. findCollectionFilter
+  // is reassigned wholesale by openFindCollection/clearFindCollectionFilter (both window-assigned wire code,
+  // wrapped the same way toggleFilmOpt elsewhere in this file is), so it's exposed through a getter, like
+  // watchTab elsewhere in this file.
+  collectionFilmsSorted,
+  get findCollectionFilter(){ return findCollectionFilter; },
+  openFindCollection: (id) => window.openFindCollection(id),
+  clearFindCollectionFilter: () => window.clearFindCollectionFilter(),
 };
 `;
 
