@@ -5245,9 +5245,9 @@ const ICON = {
   // CAS-183 "so-so": the same 24px circle the block mark uses, with a flat mouth — neither thumb, because
   // it is neither answer, and a half-turned thumb would read as a weak version of one of them.
   soso:    svgIcon(`<circle cx="12" cy="12" r="8.6"/><path d="M8.6 14.6h6.8"/><path d="M9.4 9.6h.01"/><path d="M14.6 9.6h.01"/>`),
-  // CAS-278 "Wow!": a star, on the same 24px grid at the same stroke weight as the thumbs and the circles,
-  // so the top of the scale is drawn in the same hand as the rest of it rather than borrowing an emoji.
-  wow:     svgIcon(`<path d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.75L12 16.9l-5.2 2.7 1-5.75-4.2-4.1 5.8-.85z"/>`),
+  // CAS-278 "Wow!", redrawn by CAS-1389 as a lightning bolt — the star collided with the watch-next star
+  // (CAS-1295). Same 24px grid and stroke weight as the rest of the set.
+  wow:     svgIcon(`<path d="M13.2 2.8 5.6 13.2h5.6l-1 8 7.6-10.4h-5.6z"/>`),
   // CAS-349 "Enjoyed": a heart, on the same 24px grid and stroke weight as the rest of the set — the answer
   // sits between Watch Again and So-so, so its mark has to read as its own thing rather than a weak star.
   heart:   svgIcon(`<path d="M12 19.5c-.3 0-.6-.1-.8-.3-1.6-1.4-3-2.7-4.2-3.9-3-3-4.5-5.6-4.5-8.1 0-2.4 1.9-4.3 4.3-4.3 1.5 0 2.9.8 3.7 2 .3.4.9.4 1.2 0 .8-1.2 2.2-2 3.7-2 2.4 0 4.3 1.9 4.3 4.3 0 2.5-1.5 5.1-4.5 8.1-1.2 1.2-2.6 2.5-4.2 3.9-.2.2-.5.3-.8.3z"/>`),
@@ -10071,16 +10071,12 @@ function stubHTML(m){
   const isNever=cur==="notfor";
   const title=op?`${op.lbl} — tap to ${isNever?"undo":"change"}`:"Say what you made of it";
   const onclick=isNever?`setOpinion(${id},'notfor')`:`openWatchPanel(${id},this)`;
-  // CAS-1295: the same star as the card, before the verdict icon — same storage, same toggle.
-  const starOn=isStarred(id);
-  const starBtn=`<button type="button" class="ctl actbtn stubstar starbtn${starOn?" on":""}" data-star="${id}"
-    aria-pressed="${starOn}" onclick="toggleStarred(${id})" title="${starOn?"Unstar":"Star"}"
-    aria-label="${starOn?"Unstar":"Star"}">${starOn?"★":"☆"}</button>`;
+  // CAS-1389: the watch-next star (CAS-1295) lives on the normal card only — a tap-opened stub renders
+  // cardHTML and keeps its star there.
   return `<div class="stub" id="card-${id}" onclick="stubTap(event,${id})">
     <span class="stubname">${esc(m.title)}</span>
     <span class="stubwhy">${lbl}</span>
     <span class="actions">
-      ${starBtn}
       <button type="button" class="ctl actbtn stubbtn${op?" on "+op.key:""}" onclick="${onclick}"
         ${isNever?"":'aria-haspopup="true" aria-expanded="false"'}
         title="${escA(title)}" aria-label="${escA(title)}">${op?ICON[op.ico]:ICON.eye}</button>
@@ -20784,7 +20780,7 @@ const ONE_AGENT_MOOD_BUILTINS=[
   {id:"starred", name:"Starred", starredOnly:true},
 ];
 function oamMoodDefaultFields(){
-  return {v2:true, handOnly:false, watched:false, styles:[], minScore:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[], svc:null};
+  return {v2:true, handOnly:false, watched:false, styles:[], minScore:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[], svc:null, people:""};
 }
 function oamMoodDefaultsNow(){ return ONE_AGENT_MOOD_BUILTINS.map(b=>({...oamMoodDefaultFields(), ...b})); }
 // The account's own saved v2 moods — falls back (in memory only, never written: CAS-1218/1243) to the two
@@ -20846,6 +20842,7 @@ function oamFilmMeetsMoodRules(m, mood, c){
   if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
   if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
   if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
+  if(mood.people && !filmMatchesSearch(m, mood.people)) return false;
   return true;
 }
 // CAS-1366: Releases' own rules — the same genre-tick/ages/awards/how-far-back gates as
@@ -20865,6 +20862,7 @@ function oamFilmMeetsReleasesRules(m, mood, c){
   if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
   if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
   if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
+  if(mood.people && !filmMatchesSearch(m, mood.people)) return false;
   return true;
 }
 // Full membership: a hand choice always beats the rules (ticket's own words). Latest/Starred keep today's
@@ -20993,6 +20991,8 @@ function oamMoodDraftFrom(mood){
     // CAS-1384: the sheet always shows the EFFECTIVE service (null if the stored one was dropped from
     // prefs.sub) — reading it here never rewrites the stored mood; only a Save does that.
     svc: mood ? oamMoodEffectiveSvc(mood) : null,
+    // CAS-1390: title/actor/director text filter, same comma-AND matcher as Find (filmMatchesSearch).
+    people: mood ? (mood.people||"") : "",
   };
 }
 // The bar a style shows in the sheet: a draft strip edit if the user has dragged it this session, else the
@@ -21087,6 +21087,7 @@ window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMo
 window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMoodSheetBody(); };
 window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; renderOamMoodSheetBody(); };
 window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
+window.setOamDraftPeople=v=>{ if(oamDraft) oamDraft.people=v; };
 // Every other saved mood that would ALSO list this style — "also in <names>" under a style row.
 function oamStylesAlsoIn(style, excludeId){
   return oamMoodsListReal().filter(m=>m.id!==excludeId && !m.handOnly && m.id!=="releases" && m.id!=="starred"
@@ -21230,6 +21231,12 @@ function renderOamMoodSheetBody(){
       <p class="oamgenreintro">Tick to include a genre in this mood. The strip is your agent's setting for that genre: changing it applies to your agent and every mood.</p>
       <div class="oalist">${styleRows}</div>
     </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>TITLE, ACTOR OR DIRECTOR</span></div>
+      <input class="search" type="text" enterkeyhint="done" placeholder="e.g. Tom Cruise, Russo"
+        value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
+      <p class="oamgenreintro">Commas combine — every part must match.</p>
+    </div>
     ${oamMinScoreSectionHTML(d)}
     <div class="wsheetsec">
       <div class="wsheethd"><span>WHO'S WATCHING: AGE RATINGS</span></div>
@@ -21302,6 +21309,7 @@ window.oamSaveMoodFromSheet=()=>{
     sort: d.sort,
     in: [...d.in], out: [...d.out],
     svc: d.svc || null,
+    people: (d.people||"").trim(),
   };
   if(mood.id==="starred") mood.starredOnly=true;
   // CAS-1366: a save always stamps Releases' own repair marker, whichever sort was actually picked, so the
@@ -21496,6 +21504,9 @@ function oamWilMoodGateReason(m, c, main){
     }
     if(mood.years && !releasedSince(m, yearsCutoff(mood.years))){
       return `<span class="wilnot">Not shown in ${name}:</span> it's older than this mood's last ${esc(String(mood.years))} years.`;
+    }
+    if(mood.people && !filmMatchesSearch(m, mood.people)){
+      return `<span class="wilnot">Not shown in ${name}:</span> it doesn't match this mood's "${esc("PEOPLE")}" filter.`;
     }
   }
   return null;
@@ -25063,7 +25074,7 @@ function watchNavKey(){
       const mood=currentOamMood();
       return [
         mood && [mood.styles, mood.show, mood.sort, mood.minScore, mood.ages, mood.awards, mood.years,
-                 mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out],
+                 mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out, mood.people],
         ALL_GENRES.map(g=>oaBar(c,g)),
         c.combo,
       ];
