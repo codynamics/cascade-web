@@ -12414,8 +12414,11 @@ function tasteProfile(){
 function youScore({pub, pairs, b}){
   let s = 0, n = 0;
   pairs.forEach(r => {
+    // CAS-1392: an unjudged pair (n:0) counts as NEUTRAL evidence — lean b, weight TASTE_K — rather than
+    // being ignored, so it softens the judged pairs instead of letting them stand alone.
+    const w = r.n === 0 ? TASTE_K : r.n;
     const lean = (r.sum + TASTE_K*b) / (r.n + TASTE_K);
-    s += lean * r.n; n += r.n;
+    s += lean * w; n += w;
   });
   const d = n ? s/n - b : 0;
   const adj = d < 0 ? 45*d : 20*d;
@@ -12536,7 +12539,9 @@ function oneScorePartsFor(m, c){
     value = ys.value; adj = ys.adj;
   } else {
     let wsum=0, wtot=0;
-    parts.forEach(p => { const w = p.overridden ? Math.max(4,p.n) : p.n; wsum += p.points*w; wtot += w; });
+    // CAS-1392: an unjudged, non-overridden pair dilutes the override blend the same way youScore()
+    // dilutes the learned path — weight TASTE_K instead of its real n:0.
+    parts.forEach(p => { const w = p.overridden ? Math.max(4,p.n) : (p.n===0 ? TASTE_K : p.n); wsum += p.points*w; wtot += w; });
     adj = wtot ? wsum/wtot : 0;
     value = Math.max(1, Math.min(99, Math.round(pub + adj)));
   }
@@ -20685,7 +20690,7 @@ function oaAdjustSectionHTML(c, style){
   // CAS-1349: wrapped in one #oaAdjustSection container (heading through rows) so the v2 guided tour can
   // spotlight the whole section as a single anchor, same as tutUnionRect does for a multi-element step.
   return `<div class="oaadjust" id="oaAdjustSection"><div class="oasechdr">SCORE ADJUSTMENTS</div>
-    <p class="oacintro">Your agent adjusts the scores of ${esc(name)} films up or down by their sub-genres, based on your verdicts on films you've watched. The adjusted score is the one you see in Watch. Tap a row to see the films behind it.</p>
+    <p class="oacintro">Your agent adjusts the scores of ${esc(name)} films up or down by their sub-genres, based on your verdicts on films you've watched. The adjusted score is the one you see in Watch. Tap a row to see the films behind it. Sub-genres with no verdicts yet count as neutral, so they soften the others.</p>
     ${seenBox}
     <div class="oaclist">${shown.map(r=>oaComboRowHTML(c, style, r)).join("")}</div>
     ${showAllHTML}
