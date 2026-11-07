@@ -2373,9 +2373,9 @@ test("CAS-1371 AC1: Delete this mood arms visibly red on a touch tap, and a seco
     saveCascades();
     setActive(cascades[0].id);
     watchMoods = [];   // never provisioned — oamMoodsListReal() falls back to the in-memory builtins
-    watchMoodSel = "action";
+    watchMoodSel = "best";
     render();
-    window.openOamMoodSheetFor("action");
+    window.openOamMoodSheetFor("best");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
@@ -2400,7 +2400,7 @@ test("CAS-1371 AC1: Delete this mood arms visibly red on a touch tap, and a seco
   await tapDelete();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
   const ids = await page.evaluate(() => watchMoods.map(m => m.id));
-  expect(ids).not.toContain("action");
+  expect(ids).not.toContain("best");
 });
 
 // CAS-1371 AC3: a Position row with Move left/Move right is the reliable fallback for press-and-hold
@@ -2417,18 +2417,18 @@ test("CAS-1371 AC3: Move left / Move right in the mood sheet reorders", async ({
     saveCascades();
     setActive(cascades[0].id);
     watchMoods = [];
-    watchMoodSel = "action";
+    watchMoodSel = "best";
     render();
-    window.openOamMoodSheetFor("action");
+    window.openOamMoodSheetFor("best");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
   const before = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
-  expect(before.indexOf("action")).toBeGreaterThan(0);
+  expect(before.indexOf("best")).toBeGreaterThan(0);
 
   await page.locator('#watchSheetBody button:has-text("Move right")').click();
   const afterRight = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
-  expect(afterRight.indexOf("action")).toBe(before.indexOf("action") + 1);
+  expect(afterRight.indexOf("best")).toBe(before.indexOf("best") + 1);
 
   await page.locator('#watchSheetBody button:has-text("Move left")').click();
   const afterLeft = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
