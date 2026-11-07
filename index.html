@@ -20780,7 +20780,7 @@ const ONE_AGENT_MOOD_BUILTINS=[
   {id:"starred", name:"Starred", starredOnly:true},
 ];
 function oamMoodDefaultFields(){
-  return {v2:true, handOnly:false, watched:false, styles:[], minScore:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[], svc:null};
+  return {v2:true, handOnly:false, watched:false, styles:[], minScore:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[], svc:null, people:""};
 }
 function oamMoodDefaultsNow(){ return ONE_AGENT_MOOD_BUILTINS.map(b=>({...oamMoodDefaultFields(), ...b})); }
 // The account's own saved v2 moods — falls back (in memory only, never written: CAS-1218/1243) to the two
@@ -20842,6 +20842,7 @@ function oamFilmMeetsMoodRules(m, mood, c){
   if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
   if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
   if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
+  if(mood.people && !filmMatchesSearch(m, mood.people)) return false;
   return true;
 }
 // CAS-1366: Releases' own rules — the same genre-tick/ages/awards/how-far-back gates as
@@ -20861,6 +20862,7 @@ function oamFilmMeetsReleasesRules(m, mood, c){
   if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
   if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
   if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
+  if(mood.people && !filmMatchesSearch(m, mood.people)) return false;
   return true;
 }
 // Full membership: a hand choice always beats the rules (ticket's own words). Latest/Starred keep today's
@@ -20989,6 +20991,8 @@ function oamMoodDraftFrom(mood){
     // CAS-1384: the sheet always shows the EFFECTIVE service (null if the stored one was dropped from
     // prefs.sub) — reading it here never rewrites the stored mood; only a Save does that.
     svc: mood ? oamMoodEffectiveSvc(mood) : null,
+    // CAS-1390: title/actor/director text filter, same comma-AND matcher as Find (filmMatchesSearch).
+    people: mood ? (mood.people||"") : "",
   };
 }
 // The bar a style shows in the sheet: a draft strip edit if the user has dragged it this session, else the
@@ -21083,6 +21087,7 @@ window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMo
 window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMoodSheetBody(); };
 window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; renderOamMoodSheetBody(); };
 window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
+window.setOamDraftPeople=v=>{ if(oamDraft) oamDraft.people=v; };
 // Every other saved mood that would ALSO list this style — "also in <names>" under a style row.
 function oamStylesAlsoIn(style, excludeId){
   return oamMoodsListReal().filter(m=>m.id!==excludeId && !m.handOnly && m.id!=="releases" && m.id!=="starred"
@@ -21226,6 +21231,12 @@ function renderOamMoodSheetBody(){
       <p class="oamgenreintro">Tick to include a genre in this mood. The strip is your agent's setting for that genre: changing it applies to your agent and every mood.</p>
       <div class="oalist">${styleRows}</div>
     </div>
+    <div class="wsheetsec">
+      <div class="wsheethd"><span>TITLE, ACTOR OR DIRECTOR</span></div>
+      <input class="search" type="text" enterkeyhint="done" placeholder="e.g. Tom Cruise, Russo"
+        value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
+      <p class="oamgenreintro">Commas combine — every part must match.</p>
+    </div>
     ${oamMinScoreSectionHTML(d)}
     <div class="wsheetsec">
       <div class="wsheethd"><span>WHO'S WATCHING: AGE RATINGS</span></div>
@@ -21298,6 +21309,7 @@ window.oamSaveMoodFromSheet=()=>{
     sort: d.sort,
     in: [...d.in], out: [...d.out],
     svc: d.svc || null,
+    people: (d.people||"").trim(),
   };
   if(mood.id==="starred") mood.starredOnly=true;
   // CAS-1366: a save always stamps Releases' own repair marker, whichever sort was actually picked, so the
@@ -21492,6 +21504,9 @@ function oamWilMoodGateReason(m, c, main){
     }
     if(mood.years && !releasedSince(m, yearsCutoff(mood.years))){
       return `<span class="wilnot">Not shown in ${name}:</span> it's older than this mood's last ${esc(String(mood.years))} years.`;
+    }
+    if(mood.people && !filmMatchesSearch(m, mood.people)){
+      return `<span class="wilnot">Not shown in ${name}:</span> it doesn't match this mood's "${esc("PEOPLE")}" filter.`;
     }
   }
   return null;
@@ -25059,7 +25074,7 @@ function watchNavKey(){
       const mood=currentOamMood();
       return [
         mood && [mood.styles, mood.show, mood.sort, mood.minScore, mood.ages, mood.awards, mood.years,
-                 mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out],
+                 mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out, mood.people],
         ALL_GENRES.map(g=>oaBar(c,g)),
         c.combo,
       ];
