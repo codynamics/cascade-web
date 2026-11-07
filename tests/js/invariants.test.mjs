@@ -1070,6 +1070,37 @@ function unseedFirstFound(films){
   films.forEach(m => { delete E.firstFound[String(m.tmdb_id)]; delete E.movingSeen[String(m.tmdb_id)]; });
   disownFilms(films);
 }
+// CAS-1386: a hand-built fixture, never a catalogue donor. CAS-1377's three rounds showed that even a donor
+// chosen to clear one specific gate still carries other catalogue-sourced fields (offers, availability_
+// confidence, language, score) that can fail a DIFFERENT gate on a different day, as CAS-1375/CAS-1376
+// changing which films carry which status just did to this file's own unwatchedFilms()/
+// pastCinemaUnwatchedFilm() donors. `_fixture` is exempt from rederiveStatuses() (app_template.html's own
+// skip), so every field below is read back exactly as set: `status` is caller-chosen and never recomputed,
+// language "xx" clears passesTasteBase and any language filter, a real confirmed offer clears showable(),
+// no genre/age/culture/year/awards value can exclude it, and a high Watchmode score clears any ordinary
+// floor — only a caller that deliberately zeroes wm_user_rating/wm_critic_score afterwards can still fail it.
+function fixtureFilm(tmdbId, status, extra){
+  return {
+    tmdb_id: tmdbId, title: `CAS-1386 fixture ${tmdbId}`, _fixture: true,
+    status, genres: [], age_rating: null, language: "xx",
+    availability_confidence: "confirmed",
+    offers: [{ service: "Test", type: "sub", price: null, format: null }],
+    wm_user_rating: 90, wm_critic_score: 90,
+    ...extra,
+  };
+}
+// Pushes a fixture into E.MOVIES and returns a cleanup function that removes exactly it and invalidates the
+// caches a fixture's arrival/departure can affect — the same push/invalidate, length-restoring finally shape
+// CAS-724/CAS-748 AC1's own MOVIES fixtures already use elsewhere in this file.
+function seedFixture(film){
+  E.MOVIES.push(film);
+  E.invalidateComputeCaches();
+  return () => {
+    const i = E.MOVIES.indexOf(film);
+    if(i >= 0) E.MOVIES.splice(i, 1);
+    E.invalidateComputeCaches();
+  };
+}
 
 test("CAS-671 AC1: app_template.html contains no since_last or movingVisitCutoff", () => {
   const src = fs.readFileSync(path.join(ROOT, "app_template.html"), "utf8");
@@ -1116,24 +1147,34 @@ test("CAS-1197 AC3: openMovingScreen always opens pinned to Today, with no prior
 });
 
 test("CAS-668: rendering a window does not clear the unseen state of rows outside it", () => {
-  const [filmA, filmB] = unwatchedFilms(2);
+  // CAS-1386: synthesized rather than picked off unwatchedFilms(2) — this test needs filmOwnerCascade to
+  // actually resolve MOVING_OWNER as owner (listedBy must clear for both), which real catalogue donors no
+  // longer guarantee since CAS-1375/CAS-1376 (see the fixtureFilm comment above). The window placement
+  // itself is driven entirely by seedFirstFound's own daysAgo stamps below, not by anything about the films.
+  const filmA = fixtureFilm(-138601, ["included_streaming"]);
+  const filmB = fixtureFilm(-138602, ["included_streaming"]);
+  const unseedA = seedFixture(filmA), unseedB = seedFixture(filmB);
   const idA = String(filmA.tmdb_id), idB = String(filmB.tmdb_id);
 
-  seedFirstFound([filmB], 10);   // aged 10 days — inside 2weeks/month, outside today/week
-  seedFirstFound([filmA], 20);   // aged 20 days — inside month only, outside 2weeks
+  try {
+    seedFirstFound([filmB], 10);   // aged 10 days — inside 2weeks/month, outside today/week
+    seedFirstFound([filmA], 20);   // aged 20 days — inside month only, outside 2weeks
 
-  E.openMovingScreen();
-  E.setMovingWindow("2weeks");
-  assert.equal(E.movingWindow, "2weeks", "sanity: switched to the 2 weeks window");
-  const { shownRows } = E.movingWindowRows("2weeks");
-  const shownIds = shownRows.map(r => r.filmId);
-  assert.ok(shownIds.includes(idB) && !shownIds.includes(idA), "sanity: filmB is in the 2 weeks window, filmA is not");
+    E.openMovingScreen();
+    E.setMovingWindow("2weeks");
+    assert.equal(E.movingWindow, "2weeks", "sanity: switched to the 2 weeks window");
+    const { shownRows } = E.movingWindowRows("2weeks");
+    const shownIds = shownRows.map(r => r.filmId);
+    assert.ok(shownIds.includes(idB) && !shownIds.includes(idA), "sanity: filmB is in the 2 weeks window, filmA is not");
 
-  assert.equal(E.movingSeen[idB], "new", "the row actually shown in the rendered window must be marked seen");
-  assert.ok(!(idA in E.movingSeen), "a row outside the rendered window must not have its unseen state touched");
-  E.closeMovingScreen();
+    assert.equal(E.movingSeen[idB], "new", "the row actually shown in the rendered window must be marked seen");
+    assert.ok(!(idA in E.movingSeen), "a row outside the rendered window must not have its unseen state touched");
+    E.closeMovingScreen();
 
-  unseedFirstFound([filmA, filmB]);
+    unseedFirstFound([filmA, filmB]);
+  } finally {
+    unseedA(); unseedB();
+  }
 });
 
 test("CAS-668: an empty window's badge reads 0, not a count borrowed from a different window", () => {
@@ -2355,13 +2396,13 @@ test("CAS-728 AC3: raising the floor past a film's stored admission_score drops 
 
 test("CAS-728 AC4: a floor below the stored admission_score keeps the film — the stored score, not a live one", () => withCas728State(() => {
   withWatchPrefs(STICKY_WATCH_PREFS, () => {
-    const film = pastCinemaUnwatchedFilm();
+    // CAS-1386: synthesized rather than picked off pastCinemaUnwatchedFilm() — see the fixtureFilm comment
+    // above. Built already-zeroed (no Watchmode signal at all), so a re-test that wrongly read the live
+    // score (CAS-919: cascadeScore reads wm_user_rating/wm_critic_score) would fail at ANY floor; only a
+    // re-test against the stored admission_score of 90 can pass.
+    const film = fixtureFilm(-138603, ["rental"], { wm_user_rating: null, wm_critic_score: null });
+    const unseedFilm = seedFixture(film);
     const id = film.tmdb_id;
-    const saved = { wm_user_rating: film.wm_user_rating, wm_critic_score: film.wm_critic_score };
-    // Zero the film's LIVE cascadeScore to -1 — no Watchmode signal at all (CAS-919: cascadeScore now reads
-    // wm_user_rating/wm_critic_score, not rt_critic/metacritic/imdb_votes) — so a re-test that wrongly read
-    // the live score would fail at ANY floor. Only a re-test against the stored admission_score of 90 can pass.
-    film.wm_user_rating = null; film.wm_critic_score = null;
     assert.equal(E.cascadeScore(film), -1, "this test's own setup must actually zero out the live score");
     const c = stickyTestCascade("cas728-ac4", 99);
     E.cascades.push(c);
@@ -2374,7 +2415,7 @@ test("CAS-728 AC4: a floor below the stored admission_score keeps the film — t
       const row = E.CascadePersistence.agentFilmsFor(c.id).find(r => r.movie_id === String(id));
       assert.ok(row, "a floor of 80 against a stored admission_score of 90 must keep the film — a live-score " +
         "re-test would fail unconditionally here (-1), so this only passes off the stored score");
-    } finally { unseedCascade(c.id); Object.assign(film, saved); }
+    } finally { unseedCascade(c.id); unseedFilm(); }
   });
 }));
 
@@ -2441,7 +2482,11 @@ test("CAS-728 AC6: a cascSigOf change on one agent never re-evaluates another ag
 // (see the comment at the derivation site in recomputeFound).
 test("CAS-736 AC2: earned derives from the stored admission_score and the owner's CURRENT watchMarkers, never a cached local field", () => withCas728State(() => {
   withWatchPrefs(STICKY_WATCH_PREFS, () => {
-    const film = pastCinemaUnwatchedFilm();
+    // CAS-1386: synthesized rather than picked off pastCinemaUnwatchedFilm() — see the fixtureFilm comment
+    // above. Also pins the film's own primaryStatus at "rental" for good (never recomputed), so the two
+    // recomputeFound() calls below can't have a date rollover change the film's OWN standing mid-test.
+    const film = fixtureFilm(-138604, ["rental"]);
+    const unseedFilm = seedFixture(film);
     const id = film.tmdb_id;
     const c = stickyTestCascade("cas736-ac2", 99);
     E.cascades.push(c);
@@ -2460,7 +2505,7 @@ test("CAS-736 AC2: earned derives from the stored admission_score and the owner'
       c.watchMarkers.rent = 92;   // 90 no longer clears Rental
       E.recomputeFound();
       assert.equal(E.notify[id].wins.stream, true, "raising the Rental marker past the stored score must move earned to Streaming");
-    } finally { unseedCascade(c.id); delete E.notify[id]; }
+    } finally { unseedCascade(c.id); delete E.notify[id]; unseedFilm(); }
   });
 }));
 
@@ -3092,12 +3137,14 @@ test("CAS-715 AC6a: a film admitted while its owning agent's signature is unchan
 
 test("CAS-715 AC6b: the same film re-admitted in a pass where its owning agent's signature changed reads isnew false", () => withCas728State(() => {
   withWatchPrefs(STICKY_WATCH_PREFS, () => {
-    const film = pastCinemaUnwatchedFilm();
+    // CAS-1386: synthesized rather than picked off pastCinemaUnwatchedFilm() — see the fixtureFilm comment
+    // above. Built already-zeroed (no Watchmode signal at all, CAS-919's cascadeScore basis — the stale
+    // rt_critic/metacritic/imdb_votes fields this test zeroed pre-CAS-919 feed nothing any more), so a
+    // re-test that wrongly read the live score would fail at ANY floor — same recipe as CAS-728 AC4.
+    const film = fixtureFilm(-138605, ["rental"], { wm_user_rating: null, wm_critic_score: null });
+    const unseedFilm = seedFixture(film);
     const id = film.tmdb_id;
-    const saved = { rt_critic: film.rt_critic, metacritic: film.metacritic, imdb_votes: film.imdb_votes };
-    // Zero the film's LIVE score so only the STORED admission_score (90) can keep it in — same recipe as
-    // CAS-728 AC4 — so this test's "stillIn" outcome cannot be an accident of the live catalogue.
-    film.rt_critic = null; film.metacritic = null; film.imdb_votes = 0;
+    assert.equal(E.cascadeScore(film), -1, "this test's own setup must actually zero out the live score");
     const c = stickyTestCascade("cas715-ac6b", 99);
     E.cascades.push(c);
     const sigBefore = E.cascSigOf(c);
@@ -3113,7 +3160,7 @@ test("CAS-715 AC6b: the same film re-admitted in a pass where its owning agent's
       assert.equal(E.filmIsNew(id), false,
         "a film re-confirmed under a just-changed agent signature must not read isnew");
     } finally {
-      unseedCascade(c.id); delete E.notify[id]; Object.assign(film, saved);
+      unseedCascade(c.id); delete E.notify[id]; unseedFilm();
       if(savedFirstFound === undefined) delete E.firstFound[id]; else E.firstFound[id] = savedFirstFound;
       if(savedDrift === undefined) delete E.admitDrift[id]; else E.admitDrift[id] = savedDrift;
     }
@@ -3122,7 +3169,10 @@ test("CAS-715 AC6b: the same film re-admitted in a pass where its owning agent's
 
 test("CAS-715 AC6c: a newly created agent's first intake reads isnew false", () => withCas728State(() => {
   withWatchPrefs(STICKY_WATCH_PREFS, () => {
-    const film = pastCinemaUnwatchedFilm();
+    // CAS-1386: synthesized rather than picked off pastCinemaUnwatchedFilm() — see the fixtureFilm comment
+    // above.
+    const film = fixtureFilm(-138606, ["rental"]);
+    const unseedFilm = seedFixture(film);
     const id = film.tmdb_id;
     // Floor 0, deliberately permissive — unlike the CAS-728 tests' floor of 99, this one WANTS a real,
     // unseeded arrival: the point under test is recomputeFound's own "no prior rows at all" reading.
@@ -3140,7 +3190,7 @@ test("CAS-715 AC6c: a newly created agent's first intake reads isnew false", () 
         "a brand-new agent's very first intake must be flagged — it has no prior signature to compare against");
       assert.equal(E.filmIsNew(id), false, "and must therefore not read isnew");
     } finally {
-      unseedCascade(c.id); delete E.notify[id];
+      unseedCascade(c.id); delete E.notify[id]; unseedFilm();
       if(savedFirstFound === undefined) delete E.firstFound[id]; else E.firstFound[id] = savedFirstFound;
       if(savedDrift === undefined) delete E.admitDrift[id]; else E.admitDrift[id] = savedDrift;
     }
