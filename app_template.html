@@ -544,6 +544,11 @@
     padding:4px 10px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);
     color:var(--ink);cursor:pointer;margin-bottom:8px;-webkit-tap-highlight-color:transparent}
   .findcounttext{display:block}
+  /* CAS-1395: Save as mood sits to the right of the count text, inside the same #findCount block the
+     Series chip (above) already shares. */
+  .findcountrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .findcountrow .findcounttext{flex:1 1 auto}
+  .findcountrow .ca-btn{flex-shrink:0}
   /* One visible focus ring for every interactive thing the new UI added. A control you can Tab to but
      can't SEE that you've Tabbed to is not keyboard-operable in any way that matters. */
   .chip:focus-visible,.qpill:focus-visible,.hatch:focus-visible,.ebtn:focus-visible,
@@ -3471,7 +3476,7 @@
   .oarowval .was{display:block;font-style:normal;font-size:10px;color:var(--faint);text-decoration:line-through}
   /* CAS-1391: "the first main section after the head has no top border" — whichever mainsec actually
      renders first (Genres/Streaming both hide for a hand-only mood, so it can be HOW MANY instead). */
-  .oamhead+.wsheetsec.mainsec{border-top:0}
+  .oamhead+.wsheetsec.mainsec,.oamhead+.fromfindline+.wsheetsec.mainsec{border-top:0}
   /* CAS-1358: two separate tap targets per row (AC3) — the left label (tick+name) is its own element,
      the right strip (.oamstripcol, a CAS-1339 .oaslidewrap) is a sibling, never nested inside the label. */
   .oamstylerow{display:grid;grid-template-columns:150px 1fr 52px;align-items:center;gap:8px;
@@ -21078,6 +21083,53 @@ window.openOamMoodSheetForNew=()=>{
   oamNotInMoodOpen=false; oamMoreFiltersOpen=false;
   openWatchSheet();
 };
+// CAS-1395: the new-mood draft's own people/svc/name/watched fields, built from Find's current search and
+// service — pulled out standalone so it can be asserted directly, without going through the sheet at all.
+function oamFindPrefillFields(search, svc){
+  const people=(search||"").trim();
+  const name = people ? people.slice(0,24) : (svc ? oamSvcChipLabel(svc) : "");
+  return {people, svc: svc||null, name, watched:false};
+}
+// CAS-1395: Find's own "Save as mood" button — a v2 account, an applied search or service (not
+// unsubmitted typing), no Series filter and the mood row not already full.
+function findSaveAsMoodVisible(c, search, svc, collectionFilter, moodCount){
+  if(!c) return false;
+  if(collectionFilter) return false;
+  if(!search && !svc) return false;
+  if(moodCount>=MOOD_MAX) return false;
+  return true;
+}
+// CAS-1395: shared by the mood sheet's "will show N of T" line and its own test — how many of a given
+// film list would actually land in the mood a draft/criteria pair describes.
+function oamFromFindCount(list, mood, c){
+  return list.filter(m=>filmInOneAgentMood(m, mood, c)).length;
+}
+// CAS-1395: the dim line's own text, recomputed on every sheet re-render from the live draft — never
+// written anywhere, same discipline as the rest of the sheet before Save.
+function oamFromFindLineText(d, c){
+  if(!d.fromFind) return "";
+  const T=d.fromFind.total;
+  const N=oamFromFindCount(findRowsCache, oamMoodFromDraft(d), c);
+  let text=`This mood will show ${N} of the ${T} films Find listed.`;
+  if(N<T) text+=" The rest are below your agent's scores or genres, or already watched.";
+  return text;
+}
+// CAS-1395: Find's "Save as mood" tap — closes Find through its own existing close path, then opens a new-
+// mood draft pre-filled from the applied search/service, remembering Find's result count for the sheet's
+// own "will show N of T" line.
+window.openOamMoodSheetFromFind=()=>{
+  if(oamMoodsListReal().length>=MOOD_MAX) return;
+  const fields=oamFindPrefillFields(findSearchRaw, findSvc);
+  const total=findRowsCache.length;
+  closeFindScreen();
+  oamDraft={...oamMoodDraftFrom(null), ...fields};
+  oamDraft.fromFind={total, label:fields.name};
+  oamFreezeMoodRowOrder();
+  oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false;
+  openWatchSheet();
+  logEvent("mood_from_find");
+};
 window.toggleOamNotInMood=()=>{ oamNotInMoodOpen=!oamNotInMoodOpen; renderOamMoodSheetBody(); };
 window.toggleOamMoreFilters=()=>{ oamMoreFiltersOpen=!oamMoreFiltersOpen; renderOamMoodSheetBody(); };
 window.setOamDraftName=v=>{ if(oamDraft) oamDraft.name=v; };
@@ -21324,6 +21376,7 @@ function renderOamMoodSheetBody(){
         value="${escA(d.name)}" oninput="setOamDraftName(this.value)">
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
+    ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
     <div class="wsheetsec mainsec">
       <div class="wsheethd"><span>AGENT GENRES<span class="cnt">${kOn} of ${onStyles.length} in this mood</span></span>
         <div class="wsheetlinks">
@@ -21418,6 +21471,23 @@ function renderOamMoodSheetBody(){
   const saveBtn=$("moodSaveBtn");
   if(saveBtn) saveBtn.style.display="none";
 }
+// CAS-1395: the mood-shaped object filmInOneAgentMood/oamFilmMeetsMoodRules actually read, built live from
+// the sheet's own working draft — shared by Save (below) and the "will show N of T" line's own count, so
+// the two can never drift apart on which draft fields matter to membership.
+function oamMoodFromDraft(d){
+  return {
+    handOnly: !!d.handOnly,
+    watched: !!d.watched,
+    styles: d.stylesAll ? [] : [...d.styles],
+    topShare: d.topShare,
+    ages: [...d.ages],
+    awards: d.awards,
+    years: d.years,
+    in: [...d.in], out: [...d.out],
+    svc: d.svc || null,
+    people: (d.people||"").trim(),
+  };
+}
 window.oamSaveMoodFromSheet=()=>{
   const d=oamDraft; if(!d) return;
   const name=(d.name||"").trim();
@@ -21436,18 +21506,9 @@ window.oamSaveMoodFromSheet=()=>{
   const mood={
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
     name, v2:true,
-    handOnly: !!d.handOnly,
-    watched: !!d.watched,
-    styles: d.stylesAll ? [] : [...d.styles],
-    topShare: d.topShare,
-    ages: [...d.ages],
-    awards: d.awards,
-    years: d.years,
     show: d.show,
     sort: d.sort,
-    in: [...d.in], out: [...d.out],
-    svc: d.svc || null,
-    people: (d.people||"").trim(),
+    ...oamMoodFromDraft(d),
   };
   if(mood.id==="starred") mood.starredOnly=true;
   // CAS-1366: a save always stamps Releases' own repair marker, whichever sort was actually picked, so the
@@ -22931,7 +22992,11 @@ function findRenderList(){
     ? `<button type="button" class="findchip" onclick="clearFindCollectionFilter()">Series: ${esc(findCollectionFilter.name)} ×</button>`
     : "";
   const svcTxt = findSvc ? ` on ${esc(findSvc)}` : "";
-  const countEl=$("findCount"); if(countEl) countEl.innerHTML = `${chip}<span class="findcounttext">${n} movie${n===1?"":"s"}${svcTxt}</span>`;
+  // CAS-1395: Save as mood rides the count line itself, right of the count text.
+  const showSaveAsMood = findSaveAsMoodVisible(oneAgentCriteria(), findSearch, findSvc, findCollectionFilter, oamMoodsListReal().length);
+  const saveAsMoodHTML = showSaveAsMood
+    ? `<button type="button" class="ca-btn" id="findSaveAsMoodBtn" onclick="openOamMoodSheetFromFind()">Save as mood</button>` : "";
+  const countEl=$("findCount"); if(countEl) countEl.innerHTML = `${chip}<div class="findcountrow"><span class="findcounttext">${n} movie${n===1?"":"s"}${svcTxt}</span>${saveAsMoodHTML}</div>`;
   const clr=$("findSearchClear"); if(clr){ clr.hidden=!findSearchRaw; clr.classList.toggle("show", !!findSearchRaw); }
   const wrap=$("findListWrap"); if(!wrap) return;
   findShown=0;

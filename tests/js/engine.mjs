@@ -845,6 +845,16 @@ if(typeof window.CascadeAuth === "undefined"){
   // the v2 mood sheet's own draft-building function, the same convention moodDraftFrom (v1) is exported for
   // above. oamMoodsListReal is the account's own real v2 mood list (falling back to the builtins in memory).
   oamFilmMeetsReleasesRules, ONE_AGENT_MOOD_BUILTINS, oamMoodDraftFrom, oamMoodsListReal,
+  // CAS-1395: oamMoodFromDraft is the mood-shape builder Save and the "will show N of T" count share;
+  // MOOD_MAX is the mood-row cap the visibility helper below also gates on; oamSvcChipLabel is the mood
+  // sheet's/Find's own short service-chip label (the prefill's own name fallback reads it too) — exported
+  // directly so a test can assert each against a fixture rather than re-deriving them.
+  oamMoodFromDraft, MOOD_MAX, oamSvcChipLabel,
+  // CAS-1395: Find's "Save as mood" — oamFindPrefillFields (the pre-filled draft's people/svc/name/watched),
+  // oamFromFindCount (the sheet's own live count against a film list) and findSaveAsMoodVisible (the
+  // button's own show/hide rule) — exported so a test can assert each directly against a fixture, the same
+  // convention oamFilmMeetsMoodRules above uses.
+  oamFindPrefillFields, oamFromFindCount, findSaveAsMoodVisible,
   // CAS-1370: oamFilmAge is the canonical age_rating a mood's ages gate actually compares against (null
   // for an unrated film, so the gate above knows not to exclude it); oamWilCase is "Where it lists"'s own
   // per-film reasoning — exported so a test can assert its sentence text directly, the same convention
