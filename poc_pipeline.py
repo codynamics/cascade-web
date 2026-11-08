@@ -2284,7 +2284,10 @@ def derive_status(movie: dict, offers: list[dict], today: datetime.date) -> list
 
     # CAS-1376: see derive_from_providers' matching comment — a confirmed on-screen sighting restores
     # CAS-395's simultaneous rule for this film alone.
-    if movie.get("on_screen"):
+    # CAS-1393: ...but only alongside the film's own cinema_date — with _best_cinema_match's fix, on_screen
+    # should never be true without one, but this is the same invariant app_template.html's deriveStatus
+    # enforces at the claimed-status level, so a stale on_screen+no-date record can't sneak back in here.
+    if movie.get("on_screen") and cd:
         status.add("in_cinema")
 
     # CAS-608: date-only, same as derive_from_providers' offer-less fallback — a title past its
@@ -2456,10 +2459,14 @@ def _save_cinema_chains_state(state: dict) -> None:
 def _best_cinema_match(candidates: list[dict], release_date: str | None) -> dict | None:
     """First candidate (by normalised title) whose cinema_date, if both sides have one, is within
     NOW_SHOWING_MATCH_WINDOW_DAYS of the chain's own release date — the disambiguator for same-
-    titled films. A candidate with no cinema_date, or a chain date of None, matches on title alone."""
+    titled films. A candidate with no cinema_date of its own has no way to confirm it's the same
+    release the chain is listing, so it is never matched (CAS-1393); a chain date of None still
+    matches on title alone, since the candidate's own date is all there is to go on."""
     for cand in candidates:
         cd = cand.get("cinema_date")
-        if release_date and cd:
+        if not cd:
+            continue
+        if release_date:
             delta = abs((datetime.date.fromisoformat(release_date)
                          - datetime.date.fromisoformat(cd)).days)
             if delta > NOW_SHOWING_MATCH_WINDOW_DAYS:
