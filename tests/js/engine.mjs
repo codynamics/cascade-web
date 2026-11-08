@@ -43,12 +43,20 @@ const node = () => new Proxy(function(){}, {
 // version" actually survives a reload, not just a second call within the same load. Optional and unused
 // by every existing test, which keeps getting its own private Map exactly as before.
 function makeContext(localStorageStore){
+  // CAS-1399: visibilityState is a real, mutable value (default "visible", the common case every existing
+  // test implicitly ran under) rather than falling through to the permissive node() stub below — the prefs
+  // poll's own gate reads it directly, so a test needs to flip it to "hidden" and back for real.
+  let docVisibilityState = "visible";
   const doc = new Proxy({}, {
     get(t, k){
       if(k === "querySelectorAll" || k === "getElementsByClassName" || k === "getElementsByTagName") return () => [];
+      if(k === "visibilityState") return docVisibilityState;
       return node();
     },
-    set(){ return true; },
+    set(t, k, v){
+      if(k === "visibilityState"){ docVisibilityState = v; return true; }
+      return true;
+    },
   });
   const store = localStorageStore || new Map();
   const sessionStore = new Map();
@@ -845,6 +853,16 @@ if(typeof window.CascadeAuth === "undefined"){
   // the v2 mood sheet's own draft-building function, the same convention moodDraftFrom (v1) is exported for
   // above. oamMoodsListReal is the account's own real v2 mood list (falling back to the builtins in memory).
   oamFilmMeetsReleasesRules, ONE_AGENT_MOOD_BUILTINS, oamMoodDraftFrom, oamMoodsListReal,
+  // CAS-1395: oamMoodFromDraft is the mood-shape builder Save and the "will show N of T" count share;
+  // MOOD_MAX is the mood-row cap the visibility helper below also gates on; oamSvcChipLabel is the mood
+  // sheet's/Find's own short service-chip label (the prefill's own name fallback reads it too) — exported
+  // directly so a test can assert each against a fixture rather than re-deriving them.
+  oamMoodFromDraft, MOOD_MAX, oamSvcChipLabel,
+  // CAS-1395: Find's "Save as mood" — oamFindPrefillFields (the pre-filled draft's people/svc/name/watched),
+  // oamFromFindCount (the sheet's own live count against a film list) and findSaveAsMoodVisible (the
+  // button's own show/hide rule) — exported so a test can assert each directly against a fixture, the same
+  // convention oamFilmMeetsMoodRules above uses.
+  oamFindPrefillFields, oamFromFindCount, findSaveAsMoodVisible,
   // CAS-1370: oamFilmAge is the canonical age_rating a mood's ages gate actually compares against (null
   // for an unrated film, so the gate above knows not to exclude it); oamWilCase is "Where it lists"'s own
   // per-film reasoning — exported so a test can assert its sentence text directly, the same convention
@@ -874,6 +892,16 @@ if(typeof window.CascadeAuth === "undefined"){
   get findCollectionFilter(){ return findCollectionFilter; },
   openFindCollection: (id) => window.openFindCollection(id),
   clearFindCollectionFilter: () => window.clearFindCollectionFilter(),
+  // CAS-1399: the prefs-only poll's own visible/hidden gate reads document.visibilityState directly —
+  // exposed read/write, same shape as every other test seam here (e.g. SAVING_INDICATOR_DELAY_MS in
+  // app_template.html's own CascadePersistence export), so a test can flip it without a real tab switch.
+  get documentVisibilityState(){ return document.visibilityState; },
+  setDocumentVisibilityState(v){ document.visibilityState = v; },
+  // CAS-1399: the real #watchSheet open/close chokepoints, wrapped the same way toggleFilmOpt/
+  // toggleWatchAgent elsewhere in this file are, so a test can drive the poll's "skip while the mood sheet
+  // is open" guard through the actual window.watchSheetOpen flag rather than a copy of it.
+  openWatchSheet: () => window.openWatchSheet(),
+  closeWatchSheet: () => window.closeWatchSheet(),
 };
 `;
 

@@ -544,6 +544,11 @@
     padding:4px 10px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);
     color:var(--ink);cursor:pointer;margin-bottom:8px;-webkit-tap-highlight-color:transparent}
   .findcounttext{display:block}
+  /* CAS-1395: Save as mood sits to the right of the count text, inside the same #findCount block the
+     Series chip (above) already shares. */
+  .findcountrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .findcountrow .findcounttext{flex:1 1 auto}
+  .findcountrow .ca-btn{flex-shrink:0}
   /* One visible focus ring for every interactive thing the new UI added. A control you can Tab to but
      can't SEE that you've Tabbed to is not keyboard-operable in any way that matters. */
   .chip:focus-visible,.qpill:focus-visible,.hatch:focus-visible,.ebtn:focus-visible,
@@ -852,7 +857,10 @@
   .theatrestage{position:relative;width:100%;aspect-ratio:16/9;background:#000;flex-shrink:0}
   .theatrestage iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
   .theatreoverlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;
-    transition:opacity .25s ease}
+    transition:opacity .25s ease;pointer-events:none}
+  /* CAS-1398: the overlay passes taps through to the YouTube embed (iOS needs the play tap to reach it);
+     only the top bar and the ‹ › arrows take taps. */
+  .theatrebar,.theatrenav{pointer-events:auto}
   .theatreoverlay.hide{opacity:0}
   .theatrebar{display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;
     background:linear-gradient(rgba(0,0,0,.65),transparent)}
@@ -871,8 +879,8 @@
   .theatremeta{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
   .theatrechip{flex:0 0 auto;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;
     padding:3px 8px;border-radius:6px;margin-top:2px}
-  .theatrechip.trailer{background:rgba(164,134,240,.22);color:var(--purple)}
-  .theatrechip.teaser{background:rgba(240,163,54,.22);color:var(--amber)}
+  .theatrechip.tchip-trailer{background:rgba(164,134,240,.22);color:var(--purple)}
+  .theatrechip.tchip-teaser{background:rgba(240,163,54,.22);color:var(--amber)}
   .theatrename{font-size:16px;font-weight:800;color:var(--ink)}
   .theatredate{font-size:12.5px;color:var(--dim);margin-top:2px}
   .theatrebtns{display:flex;gap:8px;margin-bottom:22px}
@@ -905,10 +913,10 @@
   /* Desktop/wide: cinema width, centred, capped so a huge window doesn't stretch the stage past a
      sensible viewing size; info/strip stay readable at a fixed max width underneath. */
   @media (min-width:900px){
-    .theatre{align-items:center;justify-content:flex-start;padding-top:28px;box-sizing:border-box}
+    .theatre{align-items:center;justify-content:flex-start;padding-top:28px;box-sizing:border-box;overflow-y:auto}
     .theatrestage{width:auto;flex-shrink:0;aspect-ratio:16/9;max-width:min(100%,1600px);
-      height:min(calc(100vh - 260px),calc(100vw*9/16));
-      height:min(calc(100dvh - 260px),calc(100vw*9/16))}
+      height:min(calc(100vh - 340px),calc(100vw*9/16));
+      height:min(calc(100dvh - 340px),calc(100vw*9/16))}
     .theatreinfo{width:100%;max-width:1100px;flex:none}
   }
   /* CAS-1182: share, in the opened card. Full-width and accent-coloured so it reads clearly against the
@@ -3443,6 +3451,9 @@
   .oamhead{display:flex;align-items:center;gap:10px}
   .oamhead .mfinput{flex:1}
   .oamgenreintro{font-size:12px;color:var(--dim);line-height:1.5;margin:4px 0 8px}
+  /* CAS-1396: while a title/actor/director filter is set, the genre rows and Mood Override Filter still
+     work and still save, but visually read as overridden — dimmed, not disabled. */
+  .oamdim{opacity:.45}
   /* ---- CAS-1391: the mood sheet rearranged — main/sub sections, the Mood Override Filter (replaces
      CAS-1365's minScore slider) and the collapsible Not in this mood / More filters bodies. Verbatim. ---- */
   .wsheetsec.mainsec{margin:0 0 4px;padding:16px 0 18px;border-top:1px solid var(--line)}
@@ -3463,6 +3474,19 @@
   .mfrowgrid{display:grid;grid-template-columns:150px 1fr 52px;align-items:center;gap:8px}
   .mfrowgrid .mflbl{font-size:12px;color:var(--dim);line-height:1.35}
   .mfrowgrid .mflbl b{color:var(--ink);font-size:12.5px}
+  /* CAS-1397: genre rows and the Mood Override Filter row stack — name + value on the first line,
+     the strip on its own full-width line underneath (the 3-column row was too squashed on iPhone). */
+  .oamstylerow,.mfrowgrid{grid-template-columns:1fr auto;grid-template-areas:"l v" "s s";row-gap:7px;column-gap:10px}
+  .oamstylerow{padding:10px 4px 12px}
+  .oamstyleleftwrap,.mflbl{grid-area:l;min-width:0}
+  .oamstylerow .oaslidewrap{grid-area:s;margin-left:26px}
+  .mfrowgrid .oaslidewrap{grid-area:s}
+  .oamstylerow .oarowval,.mfrowgrid .oarowval{grid-area:v;align-self:start}
+  .oamstylerow .oarowval i,.mfrowgrid .oarowval i{display:inline;margin-left:5px;font-size:11px}
+  .oamstylerow .oarowval .was{display:inline;margin-left:5px}
+  .mfrowgrid .mflbl .mfsub{display:inline;margin-left:6px}
+  .oamstylerow .oastrip .oabox,.mfrowgrid .oastrip .oabox{height:22px}
+  .mfrowgrid .oalbl{font-size:10px}
   .mfbox .mfsub{display:block;font-size:11px;color:var(--faint)}
   .mfbox .mfdesc{font-size:11.5px;color:var(--dim);line-height:1.45;margin:8px 4px 0}
   .oaslidewrap{position:relative}
@@ -3471,7 +3495,7 @@
   .oarowval .was{display:block;font-style:normal;font-size:10px;color:var(--faint);text-decoration:line-through}
   /* CAS-1391: "the first main section after the head has no top border" — whichever mainsec actually
      renders first (Genres/Streaming both hide for a hand-only mood, so it can be HOW MANY instead). */
-  .oamhead+.wsheetsec.mainsec{border-top:0}
+  .oamhead+.wsheetsec.mainsec,.oamhead+.fromfindline+.wsheetsec.mainsec{border-top:0}
   /* CAS-1358: two separate tap targets per row (AC3) — the left label (tick+name) is its own element,
      the right strip (.oamstripcol, a CAS-1339 .oaslidewrap) is a sibling, never nested inside the label. */
   .oamstylerow{display:grid;grid-template-columns:150px 1fr 52px;align-items:center;gap:8px;
@@ -9038,7 +9062,7 @@ function theatreRenderInfo(){
   $("theatreSub").textContent=`${v.name||"Video"} · ${theatreIndex+1} of ${n}`;
   const chip=$("theatreChip"), isTeaser=v.type==="Teaser";
   chip.textContent=isTeaser?"TEASER":"TRAILER";
-  chip.className="theatrechip "+(isTeaser?"teaser":"trailer");
+  chip.className="theatrechip "+(isTeaser?"tchip-teaser":"tchip-trailer");   // CAS-1398: not "trailer" — collides with the card thumbnail's global .trailer
   $("theatreName").textContent=v.name||"";
   $("theatreDate").textContent=fmtVideoDate(v.published);
   $("theatreYt").href=`https://www.youtube.com/watch?v=${v.key}`;
@@ -20871,8 +20895,24 @@ function oamFilmMatchesAwards(m, awards){
 // CAS-1364: a mood with watched:true judges a watched film as if it were unwatched — the admission check
 // alone gets excludeWatched:false, scoped to this one call so the agent's own criteria (and so alerts,
 // which never go through here) are never touched.
+// CAS-1396: a mood with a title/actor/director filter is a search, not an agent-scoped mood — it lists
+// every catalogue film matching that filter, whatever the agent's genre on/off, score bars, combo
+// `never` or the mood's own genre ticks / Mood Override Filter say. Only admission (blocked/watched/
+// services), the search text itself, and ages/awards/years still apply.
 function oamFilmMeetsMoodRules(m, mood, c){
   const admitC = mood.watched ? {...c, excludeWatched:false} : c;
+  if((mood.people||"").trim()){
+    if(c.excludeBlocked!==false && blocked.has(m.tmdb_id)) return false;
+    if(admitC.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
+    const ps=primaryStatus(m);
+    if(c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)) return false;
+    if(!filmMatchesSearch(m, mood.people)) return false;
+    const age=oamFilmAge(m);
+    if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
+    if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
+    if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
+    return true;
+  }
   if(!matchesCriteriaOneAgent(m, admitC, false)) return false;
   const {main}=mainOtherCombos(m);
   if(main===undefined) return false;
@@ -20887,7 +20927,6 @@ function oamFilmMeetsMoodRules(m, mood, c){
   if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
   if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
   if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
-  if(mood.people && !filmMatchesSearch(m, mood.people)) return false;
   return true;
 }
 // CAS-1366: Releases' own rules — the same genre-tick/ages/awards/how-far-back gates as
@@ -21078,6 +21117,53 @@ window.openOamMoodSheetForNew=()=>{
   oamNotInMoodOpen=false; oamMoreFiltersOpen=false;
   openWatchSheet();
 };
+// CAS-1395: the new-mood draft's own people/svc/name/watched fields, built from Find's current search and
+// service — pulled out standalone so it can be asserted directly, without going through the sheet at all.
+function oamFindPrefillFields(search, svc){
+  const people=(search||"").trim();
+  const name = people ? people.slice(0,24) : (svc ? oamSvcChipLabel(svc) : "");
+  return {people, svc: svc||null, name, watched:false};
+}
+// CAS-1395: Find's own "Save as mood" button — a v2 account, an applied search or service (not
+// unsubmitted typing), no Series filter and the mood row not already full.
+function findSaveAsMoodVisible(c, search, svc, collectionFilter, moodCount){
+  if(!c) return false;
+  if(collectionFilter) return false;
+  if(!search && !svc) return false;
+  if(moodCount>=MOOD_MAX) return false;
+  return true;
+}
+// CAS-1395: shared by the mood sheet's "will show N of T" line and its own test — how many of a given
+// film list would actually land in the mood a draft/criteria pair describes.
+function oamFromFindCount(list, mood, c){
+  return list.filter(m=>filmInOneAgentMood(m, mood, c)).length;
+}
+// CAS-1395: the dim line's own text, recomputed on every sheet re-render from the live draft — never
+// written anywhere, same discipline as the rest of the sheet before Save.
+function oamFromFindLineText(d, c){
+  if(!d.fromFind) return "";
+  const T=d.fromFind.total;
+  const N=oamFromFindCount(findRowsCache, oamMoodFromDraft(d), c);
+  let text=`This mood will show ${N} of the ${T} films Find listed.`;
+  if(N<T) text+=" The rest are below your agent's scores or genres, or already watched.";
+  return text;
+}
+// CAS-1395: Find's "Save as mood" tap — closes Find through its own existing close path, then opens a new-
+// mood draft pre-filled from the applied search/service, remembering Find's result count for the sheet's
+// own "will show N of T" line.
+window.openOamMoodSheetFromFind=()=>{
+  if(oamMoodsListReal().length>=MOOD_MAX) return;
+  const fields=oamFindPrefillFields(findSearchRaw, findSvc);
+  const total=findRowsCache.length;
+  closeFindScreen();
+  oamDraft={...oamMoodDraftFrom(null), ...fields};
+  oamDraft.fromFind={total, label:fields.name};
+  oamFreezeMoodRowOrder();
+  oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false;
+  openWatchSheet();
+  logEvent("mood_from_find");
+};
 window.toggleOamNotInMood=()=>{ oamNotInMoodOpen=!oamNotInMoodOpen; renderOamMoodSheetBody(); };
 window.toggleOamMoreFilters=()=>{ oamMoreFiltersOpen=!oamMoreFiltersOpen; renderOamMoodSheetBody(); };
 window.setOamDraftName=v=>{ if(oamDraft) oamDraft.name=v; };
@@ -21140,7 +21226,15 @@ window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMo
 window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMoodSheetBody(); };
 window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; renderOamMoodSheetBody(); };
 window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
-window.setOamDraftPeople=v=>{ if(oamDraft) oamDraft.people=v; };
+// CAS-1396: a people filter bypasses the agent's genre ticks and score bars entirely, so the sheet's own
+// AGENT GENRES section (note + dimmed rows) only needs to change at the moment the field crosses from
+// empty to non-empty or back — not on every keystroke in between.
+window.setOamDraftPeople=v=>{
+  if(!oamDraft) return;
+  const was=!!(oamDraft.people||"").trim();
+  oamDraft.people=v;
+  if(!!v.trim()!==was) renderOamMoodSheetBody();
+};
 // Every other saved mood that would ALSO list this style — "also in <names>" under a style row.
 function oamStylesAlsoIn(style, excludeId){
   return oamMoodsListReal().filter(m=>m.id!==excludeId && !m.handOnly && m.id!=="releases" && m.id!=="starred"
@@ -21192,11 +21286,11 @@ function oamOverrideFilterDesc(share, on){
     ? `Keeps the top ${share}% of each genre in this mood. Greyed: what your agent alone would add.`
     : `Off — every genre shows your agent's setting. Drag left to keep only the best of each genre.`;
 }
-function oamOverrideFilterHTML(d){
+function oamOverrideFilterHTML(d, dim){
   const on = d.topShare!=null;
   const share = on ? d.topShare : 100;
   const valHTML = on ? `Top ${d.topShare}%<i>each genre</i>` : `All<i>agent's</i>`;
-  return `<div class="mfbox">
+  return `<div class="mfbox${dim?" oamdim":""}">
       <div class="mfrowgrid">
         <div class="mflbl"><b>Mood Override Filter</b><span class="mfsub">${on?"on":"off"}</span></div>
         <div class="oaslidewrap">
@@ -21311,6 +21405,7 @@ function renderOamMoodSheetBody(){
   const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "Mood" : "New mood";
   const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
   const kOn = d.stylesAll ? onStyles.length : d.styles.size;
+  const peopleOn = !!(d.people||"").trim();
   const order = d.rowOrder || {inMood:[], notInMood:[]};
   const seg=(opts, cur, setter, label)=>`<div class="mfseg" role="group" aria-label="${escA(label)}">
       ${opts.map(([k,l])=>{ const on=cur===k; return `<button type="button" aria-pressed="${on}" class="${on?"on":""}"
@@ -21324,6 +21419,7 @@ function renderOamMoodSheetBody(){
         value="${escA(d.name)}" oninput="setOamDraftName(this.value)">
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
+    ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
     <div class="wsheetsec mainsec">
       <div class="wsheethd"><span>AGENT GENRES<span class="cnt">${kOn} of ${onStyles.length} in this mood</span></span>
         <div class="wsheetlinks">
@@ -21332,8 +21428,9 @@ function renderOamMoodSheetBody(){
         </div>
       </div>
       <p class="oamgenreintro">The tick is just this mood. The strip is your agent's setting: changing it changes your agent and every mood.</p>
-      ${oamOverrideFilterHTML(d)}
-      <div class="oalist">
+      ${peopleOn ? `<p class="oamgenreintro">Ignored while a title, actor or director is set — every matching film shows.</p>` : ""}
+      ${oamOverrideFilterHTML(d, peopleOn)}
+      <div class="oalist${peopleOn?" oamdim":""}">
         ${order.inMood.length ? `<div class="subhd">IN THIS MOOD</div>${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}` : ""}
         ${order.notInMood.length ? `
           <button type="button" class="oamexpand${oamNotInMoodOpen?" open":""}" onclick="toggleOamNotInMood()" aria-expanded="${oamNotInMoodOpen}">
@@ -21347,7 +21444,7 @@ function renderOamMoodSheetBody(){
       <div class="wsheethd"><span>TITLE, ACTOR OR DIRECTOR</span></div>
       <input class="search" type="text" enterkeyhint="done" placeholder="e.g. Tom Cruise, Russo"
         value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
-      <p class="oamgenreintro">Commas combine — every part must match.</p>
+      <p class="oamgenreintro">Commas combine — every part must match. Lists every matching film, not just your agent's picks.</p>
     </div>`}
     ${(!d.handOnly && prefs.sub.size) ? `<div class="wsheetsec mainsec">
       <div class="wsheethd"><span>STREAMING ON</span></div>
@@ -21418,6 +21515,23 @@ function renderOamMoodSheetBody(){
   const saveBtn=$("moodSaveBtn");
   if(saveBtn) saveBtn.style.display="none";
 }
+// CAS-1395: the mood-shaped object filmInOneAgentMood/oamFilmMeetsMoodRules actually read, built live from
+// the sheet's own working draft — shared by Save (below) and the "will show N of T" line's own count, so
+// the two can never drift apart on which draft fields matter to membership.
+function oamMoodFromDraft(d){
+  return {
+    handOnly: !!d.handOnly,
+    watched: !!d.watched,
+    styles: d.stylesAll ? [] : [...d.styles],
+    topShare: d.topShare,
+    ages: [...d.ages],
+    awards: d.awards,
+    years: d.years,
+    in: [...d.in], out: [...d.out],
+    svc: d.svc || null,
+    people: (d.people||"").trim(),
+  };
+}
 window.oamSaveMoodFromSheet=()=>{
   const d=oamDraft; if(!d) return;
   const name=(d.name||"").trim();
@@ -21436,18 +21550,9 @@ window.oamSaveMoodFromSheet=()=>{
   const mood={
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
     name, v2:true,
-    handOnly: !!d.handOnly,
-    watched: !!d.watched,
-    styles: d.stylesAll ? [] : [...d.styles],
-    topShare: d.topShare,
-    ages: [...d.ages],
-    awards: d.awards,
-    years: d.years,
     show: d.show,
     sort: d.sort,
-    in: [...d.in], out: [...d.out],
-    svc: d.svc || null,
-    people: (d.people||"").trim(),
+    ...oamMoodFromDraft(d),
   };
   if(mood.id==="starred") mood.starredOnly=true;
   // CAS-1366: a save always stamps Releases' own repair marker, whichever sort was actually picked, so the
@@ -21629,7 +21734,9 @@ function oamOrdinal(n){
 // actually fired, named by mood, not a blanket claim the genre itself is missing everywhere.
 function oamWilMoodGateReason(m, c, main){
   for(const mood of oamMoodsListReal()){
-    if(!oamMoodStyles(mood, c).includes(main)) continue;
+    // CAS-1396: a people-filter mood ignores genre ticks entirely, so its own gates (ages/awards/years/
+    // people) are checked whether or not this film's genre happens to be ticked in it.
+    if(!(mood.people||"").trim() && !oamMoodStyles(mood, c).includes(main)) continue;
     if(mood.id==="releases" && !filmInLatestWindow(m)) continue;
     const name=esc(moodDisplayName(mood));
     const age=oamFilmAge(m);
@@ -22931,7 +23038,11 @@ function findRenderList(){
     ? `<button type="button" class="findchip" onclick="clearFindCollectionFilter()">Series: ${esc(findCollectionFilter.name)} ×</button>`
     : "";
   const svcTxt = findSvc ? ` on ${esc(findSvc)}` : "";
-  const countEl=$("findCount"); if(countEl) countEl.innerHTML = `${chip}<span class="findcounttext">${n} movie${n===1?"":"s"}${svcTxt}</span>`;
+  // CAS-1395: Save as mood rides the count line itself, right of the count text.
+  const showSaveAsMood = findSaveAsMoodVisible(oneAgentCriteria(), findSearch, findSvc, findCollectionFilter, oamMoodsListReal().length);
+  const saveAsMoodHTML = showSaveAsMood
+    ? `<button type="button" class="ca-btn" id="findSaveAsMoodBtn" onclick="openOamMoodSheetFromFind()">Save as mood</button>` : "";
+  const countEl=$("findCount"); if(countEl) countEl.innerHTML = `${chip}<div class="findcountrow"><span class="findcounttext">${n} movie${n===1?"":"s"}${svcTxt}</span>${saveAsMoodHTML}</div>`;
   const clr=$("findSearchClear"); if(clr){ clr.hidden=!findSearchRaw; clr.classList.toggle("show", !!findSearchRaw); }
   const wrap=$("findListWrap"); if(!wrap) return;
   findShown=0;
@@ -26906,6 +27017,13 @@ function acctFetchKeepalive(init){
     reconcileTableSig[table]=sig;
     return false;
   }
+  // CAS-1399: factored out of reconcileOnReturn so the prefs-only poll below can reuse the exact same
+  // guard — a pull of either kind must never land on top of an edit this device made that hasn't reached
+  // the account yet.
+  function noUnsentWrite(table){
+    const acctStore = window.CascadeAccountStore;
+    return !acctStore || !acctStore.queue.some(op => op.table===table);
+  }
   // CAS-408: two devices only converge without a live subscription if SOMETHING re-pulls the account
   // — sign-in alone left a device that never signs out again permanently stuck on whatever it saw at
   // its last sign-in. Returning to the tab is the natural moment: skip it while a push from THIS
@@ -26931,8 +27049,6 @@ function acctFetchKeepalive(init){
     // Watch On and pins (film_watch/film_picks), notify prefs and the admission ledger (agent_films) were
     // the "no reconcile left to run" list the comment removed above used to name; a device left open across
     // a change made elsewhere could sit unseen for a whole session until this.
-    const acctStore = window.CascadeAccountStore;
-    const noUnsentWrite = table => !acctStore || !acctStore.queue.some(op => op.table===table);
     // CAS-1222: a view-field write is a queued "merge_user_prefs_view" rpc op, a different table name from
     // the whole-column "user_prefs" upserts above it — gated here too, or a reconcile pull landing while
     // one is still unsent would adopt the server's pre-merge row over this device's own still-in-flight
@@ -26966,7 +27082,9 @@ function acctFetchKeepalive(init){
   // trailing debounce, so two events in the very same tick are already covered, not just ones 60s apart.
   // The 3-minute heartbeat poll below stays independent of this floor, unchanged from before this ticket.
   let reconcileLastRun = 0;
-  const RECONCILE_RETURN_FLOOR_MS = 60*1000;
+  // CAS-1399: 60s -> 15s. Coming back to the tab is the natural moment someone switches devices, and 15s
+  // still coalesces a focus/visibilitychange burst (the reason the floor exists at all — CAS-1236).
+  const RECONCILE_RETURN_FLOOR_MS = 15*1000;
   function reconcileOnReturnThrottled(){
     const now = Date.now();
     if(now - reconcileLastRun < RECONCILE_RETURN_FLOOR_MS) return;
@@ -26987,6 +27105,21 @@ function acctFetchKeepalive(init){
   // this same script against a stand-in DOM) returns a Timeout object whose unref() stops a live interval
   // from holding the process open forever. Guarded so the browser path is untouched.
   if(reconcilePollHandle && typeof reconcilePollHandle.unref === "function") reconcilePollHandle.unref();
+  // CAS-1399: the 60s return floor / 3min heartbeat above still leave a tab that's already open and visible
+  // (or that last reconciled under a minute ago) showing a stale mood for up to 3 minutes after another
+  // device saves one — read as "doesn't sync" when switching devices to test. A light, prefs-only poll
+  // closes that gap without pulling every table reconcileOnReturn does. Same unsent-write guards as that
+  // function's own user_prefs pull, plus a skip while the mood sheet is open so a draft being edited is
+  // never repainted underneath the person.
+  const PREFS_POLL_MS = 30*1000;
+  // CAS-1399: named (rather than inline in the setInterval callback) so a test can call it directly instead
+  // of waiting on a real 30s timer.
+  function prefsPollTick(){
+    if(document.visibilityState!=="visible" || !accountActive() || watchSheetOpen) return;
+    if(noUnsentWrite("user_prefs") && noUnsentWrite("merge_user_prefs_view")) loadUserPrefs();
+  }
+  const prefsPollHandle = setInterval(prefsPollTick, PREFS_POLL_MS);
+  if(prefsPollHandle && typeof prefsPollHandle.unref === "function") prefsPollHandle.unref();
 
   // ==========================================================================
   // CAS-183: watch status per account (`user_films`)
@@ -28184,6 +28317,9 @@ function acctFetchKeepalive(init){
                                 // can be exercised the same way — without waiting on a real
                                 // focus/visibilitychange event.
                                 reconcileOnReturn,
+                                // CAS-1399: the 30s prefs-only poll's own tick, exposed the same way so a test
+                                // can drive it directly rather than waiting on the real interval.
+                                prefsPollTick,
                                 // CAS-1236: the render() call counter (AC2's literal wording) plus the
                                 // settled-list nav key's own fill bookkeeping, exposed the same read/write-
                                 // primitive way as every other test seam here — reset to 0 right before the
