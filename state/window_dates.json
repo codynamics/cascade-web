@@ -1070,7 +1070,7 @@
     "included_streaming": "2026-07-22"
   },
   "516729": {
-    "included_streaming": "2026-11-04"
+    "rental": "2026-11-08"
   },
   "565770": {
     "rental": "2026-07-22"
@@ -3883,7 +3883,7 @@
     "included_streaming": "2026-07-22"
   },
   "1500516": {
-    "included_streaming": "2026-07-22"
+    "rental": "2026-11-08"
   },
   "1658175": {
     "in_cinema": "2026-08-07",
@@ -4096,7 +4096,8 @@
   },
   "1673928": {
     "upcoming": "2026-07-22",
-    "in_cinema": "2026-08-14"
+    "in_cinema": "2026-08-14",
+    "released": "2026-11-08"
   },
   "1001079": {
     "rental": "2026-07-22"
@@ -4940,7 +4941,7 @@
     "released": "2026-09-16"
   },
   "1218213": {
-    "included_streaming": "2026-07-22"
+    "rental": "2026-11-08"
   },
   "805785": {
     "included_streaming": "2026-07-22"
@@ -7805,7 +7806,8 @@
     "released": "2026-09-16"
   },
   "1533387": {
-    "upcoming": "2026-07-22"
+    "upcoming": "2026-07-22",
+    "released": "2026-11-08"
   },
   "1733915": {
     "in_cinema": "2026-08-07",
@@ -11878,7 +11880,7 @@
     "included_streaming": "2026-08-05"
   },
   "1316409": {
-    "included_streaming": "2026-08-05"
+    "released": "2026-11-08"
   },
   "1695081": {
     "included_streaming": "2026-08-05"
@@ -16460,7 +16462,7 @@
     "included_streaming": "2026-08-08"
   },
   "1299040": {
-    "included_streaming": "2026-08-08"
+    "released": "2026-11-08"
   },
   "1595909": {
     "rental": "2026-08-08"
@@ -20259,7 +20261,7 @@
     "included_streaming": "2026-09-17"
   },
   "345887": {
-    "rental": "2026-10-31"
+    "included_streaming": "2026-11-08"
   },
   "363088": {
     "included_streaming": "2026-09-17"
@@ -24066,7 +24068,7 @@
     "included_streaming": "2026-09-17"
   },
   "854513": {
-    "rental": "2026-09-17"
+    "included_streaming": "2026-11-08"
   },
   "799375": {
     "included_streaming": "2026-09-17"
@@ -26946,7 +26948,7 @@
     "included_streaming": "2026-10-23"
   },
   "467649": {
-    "rental": "2026-09-17"
+    "included_streaming": "2026-11-08"
   },
   "532944": {
     "pvod": "2026-09-17"
@@ -27319,7 +27321,7 @@
     "included_streaming": "2026-09-17"
   },
   "507647": {
-    "included_streaming": "2026-09-17"
+    "rental": "2026-11-08"
   },
   "460064": {
     "included_streaming": "2026-10-14"
@@ -30259,7 +30261,7 @@
     "included_streaming": "2026-09-17"
   },
   "509250": {
-    "included_streaming": "2026-09-17"
+    "released": "2026-11-08"
   },
   "888676": {
     "rental": "2026-09-17"
@@ -30799,10 +30801,10 @@
     "included_streaming": "2026-09-17"
   },
   "655854": {
-    "included_streaming": "2026-09-17"
+    "released": "2026-11-08"
   },
   "461844": {
-    "included_streaming": "2026-09-17"
+    "rental": "2026-11-08"
   },
   "526171": {
     "included_streaming": "2026-09-17"
@@ -31811,7 +31813,7 @@
     "included_streaming": "2026-09-17"
   },
   "1014870": {
-    "rental": "2026-09-17"
+    "released": "2026-11-08"
   },
   "363498": {
     "included_streaming": "2026-09-17"
@@ -33129,5 +33131,8 @@
   },
   "1096228": {
     "upcoming": "2026-11-07"
+  },
+  "1735270": {
+    "in_cinema": "2026-11-08"
   }
 }
