@@ -3451,9 +3451,6 @@
   .oamhead{display:flex;align-items:center;gap:10px}
   .oamhead .mfinput{flex:1}
   .oamgenreintro{font-size:12px;color:var(--dim);line-height:1.5;margin:4px 0 8px}
-  /* CAS-1396: while a title/actor/director filter is set, the genre rows and Mood Override Filter still
-     work and still save, but visually read as overridden — dimmed, not disabled. */
-  .oamdim{opacity:.45}
   /* ---- CAS-1391: the mood sheet rearranged — main/sub sections, the Mood Override Filter (replaces
      CAS-1365's minScore slider) and the collapsible Not in this mood / More filters bodies. Verbatim. ---- */
   .wsheetsec.mainsec{margin:0 0 4px;padding:16px 0 18px;border-top:1px solid var(--line)}
@@ -3470,36 +3467,51 @@
   .morebody{padding:6px 2px 0}
   .morebody .wsheetsec{margin:14px 0 0}
   .morebody .wsheethd>span:first-child{font-size:11px}
-  .mfbox{margin:6px 0 10px;padding:10px 4px 6px;border-bottom:1px solid var(--line)}
-  .mfrowgrid{display:grid;grid-template-columns:150px 1fr 52px;align-items:center;gap:8px}
+  /* CAS-1400: genre rows, the column header, the Mood Override Filter row and its scale share ONE grid, so the
+     filter's strip sits in exactly the same 96px column (same left edge and width) as every genre strip. */
+  .oamstylerow,.gcolhd,.mfrowgrid,.mfscale{display:grid;grid-template-columns:minmax(0,1fr) 96px 66px;column-gap:8px}
+  .mfbox{margin:6px 0 0;padding:12px 4px 6px;border-top:1px solid var(--line)}
+  .mfrowgrid{align-items:center}
   .mfrowgrid .mflbl{font-size:12px;color:var(--dim);line-height:1.35}
   .mfrowgrid .mflbl b{color:var(--ink);font-size:12.5px}
-  /* CAS-1397: genre rows and the Mood Override Filter row stack — name + value on the first line,
-     the strip on its own full-width line underneath (the 3-column row was too squashed on iPhone). */
-  .oamstylerow,.mfrowgrid{grid-template-columns:1fr auto;grid-template-areas:"l v" "s s";row-gap:7px;column-gap:10px}
-  .oamstylerow{padding:10px 4px 12px}
-  .oamstyleleftwrap,.mflbl{grid-area:l;min-width:0}
-  .oamstylerow .oaslidewrap{grid-area:s;margin-left:26px}
-  .mfrowgrid .oaslidewrap{grid-area:s}
-  .oamstylerow .oarowval,.mfrowgrid .oarowval{grid-area:v;align-self:start}
-  .oamstylerow .oarowval i,.mfrowgrid .oarowval i{display:inline;margin-left:5px;font-size:11px}
-  .oamstylerow .oarowval .was{display:inline;margin-left:5px}
-  .mfrowgrid .mflbl .mfsub{display:inline;margin-left:6px}
-  .oamstylerow .oastrip .oabox,.mfrowgrid .oastrip .oabox{height:22px}
-  .mfrowgrid .oalbl{font-size:10px}
+  .oastrip{display:flex;gap:3px}
+  .oamstylerow .oaslidewrap{flex:none;height:12px}
+  .oamstylerow .oastrip .oabox{height:12px;border-radius:3px}
+  .mfrowgrid .oaslidewrap{flex:none;height:16px}
+  .mfrowgrid .oastrip .oabox{height:16px;border-radius:3px}
+  .mfrowgrid .oarange{height:22px;margin-top:-3px}
+  .oarowval i{white-space:nowrap}
+  .oarowval .was{display:inline;font-style:normal;font-size:inherit;color:inherit;text-decoration:line-through}
+  .gcolhd{align-items:baseline;padding:0 4px;margin:2px 0 0}
+  .gcolhd b{font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+  .gcolhd b:nth-child(1){grid-column:1;padding-left:0}
+  .gcolhd b:nth-child(2){grid-column:2/span 2}
+  .gcolhd i{display:inline;margin-left:4px;font-style:normal;font-weight:600;letter-spacing:0;text-transform:none;font-size:9px}
+  .mfscale{padding:0 0 3px}
+  .mfscale span{grid-column:2;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;text-align:center;font-size:9px;font-weight:700;color:var(--faint)}
+  .mfscale span i{font-style:normal}
+  /* CAS-1400: Genre | Keyword tabs joined to a bordered panel; the track slides, the sheet never re-renders. */
+  .mtabs{display:flex;position:relative;z-index:1}
+  .mtabs button{flex:1;border:1px solid var(--line);border-bottom:0;background:transparent;color:var(--faint);font:inherit;font-size:13.5px;font-weight:800;padding:11px 0;border-radius:12px 12px 0 0;cursor:pointer;transition:color .2s,background .2s}
+  .mtabs button+button{margin-left:-1px}
+  .mtabs button.on{background:var(--panel2);color:var(--ink);border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
+  .mtabs button:not(.on){border-color:transparent;border-bottom:1px solid color-mix(in srgb,var(--accent) 55%,var(--line))}
+  .mpanel{border:1px solid color-mix(in srgb,var(--accent) 55%,var(--line));border-top:0;border-radius:0 0 12px 12px;background:var(--panel2);overflow:hidden;transition:height .3s ease;margin-bottom:22px}
+  .mtrack{display:flex;width:200%;align-items:flex-start;transition:transform .32s cubic-bezier(.4,0,.2,1)}
+  .mtrack>section{flex:0 0 50%;box-sizing:border-box;padding:12px 6px 8px;margin:0;min-width:0}
+  .mtrack.kw{transform:translateX(-50%)}
   .mfbox .mfsub{display:block;font-size:11px;color:var(--faint)}
   .mfbox .mfdesc{font-size:11.5px;color:var(--dim);line-height:1.45;margin:8px 4px 0}
   .oaslidewrap{position:relative}
   .mfline{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;background:#e9edff;border-radius:2px;pointer-events:none;z-index:3;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
   .mfmask{position:absolute;top:0;bottom:0;pointer-events:none;z-index:2;backdrop-filter:grayscale(1) brightness(.55);-webkit-backdrop-filter:grayscale(1) brightness(.55);border-radius:4px}
-  .oarowval .was{display:block;font-style:normal;font-size:10px;color:var(--faint);text-decoration:line-through}
   /* CAS-1391: "the first main section after the head has no top border" — whichever mainsec actually
      renders first (Genres/Streaming both hide for a hand-only mood, so it can be HOW MANY instead). */
   .oamhead+.wsheetsec.mainsec,.oamhead+.fromfindline+.wsheetsec.mainsec{border-top:0}
+  .oamhead{margin-bottom:16px}
   /* CAS-1358: two separate tap targets per row (AC3) — the left label (tick+name) is its own element,
      the right strip (.oamstripcol, a CAS-1339 .oaslidewrap) is a sibling, never nested inside the label. */
-  .oamstylerow{display:grid;grid-template-columns:150px 1fr 52px;align-items:center;gap:8px;
-    padding:8px 4px;border-bottom:1px solid var(--line)}
+  .oamstylerow{align-items:center;padding:7px 4px;border-bottom:1px solid var(--line)}
   .oamstylerow input[type=checkbox]{width:16px;height:16px;flex:0 0 auto}
   .oamstylerow.off{opacity:.45}
   .oamstylerow.never .oamstyleleftwrap{opacity:.7}
@@ -3508,6 +3520,7 @@
   .oamstyleleft{min-width:0}
   .oamstylename{display:block;font-size:13.5px;font-weight:800;color:var(--ink);overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
+  .oamstylerow .oamalso{white-space:nowrap}
   .oamalso{display:block;font-size:10.5px;color:var(--faint);margin-top:1px;overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
   .oamlistpanel{padding:10px 14px;max-width:280px}
@@ -20899,9 +20912,17 @@ function oamFilmMatchesAwards(m, awards){
 // every catalogue film matching that filter, whatever the agent's genre on/off, score bars, combo
 // `never` or the mood's own genre ticks / Mood Override Filter say. Only admission (blocked/watched/
 // services), the search text itself, and ages/awards/years still apply.
+// CAS-1400: a mood finds films EITHER by genre OR by keyword, never both. `mode` is "genre"|"keyword"; absent,
+// it defaults to keyword when a people filter is set, else genre. In genre mode the stored `people` text is
+// ignored for membership (it stays stored so switching back restores it).
+function oamMoodMode(mood){
+  if(mood && (mood.mode==="genre" || mood.mode==="keyword")) return mood.mode;
+  return ((mood && mood.people)||"").trim() ? "keyword" : "genre";
+}
+function oamKeywordOn(mood){ return oamMoodMode(mood)==="keyword" && !!(mood.people||"").trim(); }
 function oamFilmMeetsMoodRules(m, mood, c){
   const admitC = mood.watched ? {...c, excludeWatched:false} : c;
-  if((mood.people||"").trim()){
+  if(oamKeywordOn(mood)){
     if(c.excludeBlocked!==false && blocked.has(m.tmdb_id)) return false;
     if(admitC.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
     const ps=primaryStatus(m);
@@ -20946,7 +20967,7 @@ function oamFilmMeetsReleasesRules(m, mood, c){
   if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
   if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
   if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
-  if(mood.people && !filmMatchesSearch(m, mood.people)) return false;
+  if(oamKeywordOn(mood) && !filmMatchesSearch(m, mood.people)) return false;
   return true;
 }
 // Full membership: a hand choice always beats the rules (ticket's own words). Latest/Starred keep today's
@@ -21062,8 +21083,8 @@ function oamMoodDraftFrom(mood){
     watched: mood ? !!mood.watched : false,
     stylesAll: mood ? !(mood.styles && mood.styles.length) : true,
     styles: new Set(mood && mood.styles ? mood.styles : []),
-    bars: {},   // CAS-1358: draft agent-bar overrides from this sheet's own genre strips, by style; written
-                // to the agent (alongside the mood) only on Save — see oamDraftBar/oamSaveMoodFromSheet.
+    // CAS-1400: genre | keyword — which way this mood finds films. Nothing stored before Save.
+    mode: mood ? oamMoodMode(mood) : "genre",
     topShare: mood ? oamMoodEffectiveTopShare(mood) : null,   // CAS-1391: the Mood Override Filter's own share
     rowOrder: null,   // frozen IN THIS MOOD / NOT IN THIS MOOD section membership — see oamFreezeMoodRowOrder
     ages: new Set(mood ? (mood.ages||[]) : []),
@@ -21083,10 +21104,9 @@ function oamMoodDraftFrom(mood){
     people: mood ? (mood.people||"") : "",
   };
 }
-// The bar a style shows in the sheet: a draft strip edit if the user has dragged it this session, else the
-// agent's own current bar. Never written straight to `c` — only oamSaveMoodFromSheet does that, on Save.
+// CAS-1400: the bar a style shows in the sheet is always the agent's own — a mood never changes the agent.
 function oamDraftBar(d, c, style){
-  return (d.bars && Object.prototype.hasOwnProperty.call(d.bars, style)) ? d.bars[style] : oaBar(c, style);
+  return oaBar(c, style);
 }
 // IN THIS MOOD / NOT IN THIS MOOD section membership, frozen the moment the sheet opens (behaviour 1: rows
 // don't move while the sheet is open — ticking or dragging a strip only changes a row's own tick/dimming,
@@ -21157,6 +21177,7 @@ window.openOamMoodSheetFromFind=()=>{
   const total=findRowsCache.length;
   closeFindScreen();
   oamDraft={...oamMoodDraftFrom(null), ...fields};
+  oamDraft.mode = fields.people ? "keyword" : "genre";   // CAS-1400
   oamDraft.fromFind={total, label:fields.name};
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
@@ -21185,72 +21206,64 @@ window.toggleOamDraftStyle=style=>{
   }
   renderOamMoodSheetBody();
 };
-window.selectAllOamDraftStyles=()=>{ if(!oamDraft) return; oamDraft.stylesAll=true; oamDraft.styles=new Set(); renderOamMoodSheetBody(); };
-window.clearAllOamDraftStyles=()=>{ if(!oamDraft) return; oamDraft.stylesAll=false; oamDraft.styles=new Set(); renderOamMoodSheetBody(); };
-// CAS-1358: the mood sheet's own genre-row strip — the CAS-1351 share control, but editing the AGENT's bar
-// for that style (behaviour 2), held in the draft and only written to `c` on Save (behaviour 4). Dragging a
-// strip to Never also takes the genre out of this mood's draft ticks, the same "turn off" shape
-// toggleOamDraftStyle already uses.
-window.oamStyleOnDrag=(input)=>{
-  const style=input.dataset.style;
-  const share=Math.max(0, Math.min(100, parseInt(input.value,10)));
-  const wrap=input.closest(".oaslidewrap");
-  const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
-  ONE_AGENT_SHARE_BRACKETS.forEach((b,i)=>{
-    const fill=boxes[i] && boxes[i].querySelector(".oafill");
-    if(fill) fill.style.width=oaShareBoxPct(share,b)+"%";
-  });
-  const bar = share<=0 ? null : oneBarForTopPct(style, share);
-  const row=input.closest(".oamstylerow");
-  const valEl=row && row.querySelector(".oarowval");
-  if(valEl) valEl.innerHTML = bar==null ? "Never" : `Top ${share}%<i>score ${bar}+</i>`;
-};
-window.oamStyleOnRelease=(input)=>{
-  const d=oamDraft; if(!d) return;
-  const c=oneAgentCriteria(); if(!c) return;
-  const style=input.dataset.style;
-  const share=Math.max(0, Math.min(100, parseInt(input.value,10)));
-  const bar = share<=0 ? null : oneBarForTopPct(style, share);
-  d.bars=d.bars||{};
-  d.bars[style]=bar;
-  if(bar==null){
-    const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
-    if(d.stylesAll){ d.stylesAll=false; d.styles=new Set(onStyles); }
-    else { d.styles.delete(style); }
-  }
-  renderOamMoodSheetBody();
-};
 window.toggleOamDraftAge=a=>{ if(!oamDraft) return; oamDraft.ages.has(a)?oamDraft.ages.delete(a):oamDraft.ages.add(a); renderOamMoodSheetBody(); };
 window.setOamDraftAwards=v=>{ if(!oamDraft) return; oamDraft.awards=v; renderOamMoodSheetBody(); };
 window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMoodSheetBody(); };
 window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMoodSheetBody(); };
 window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; renderOamMoodSheetBody(); };
 window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
-// CAS-1396: a people filter bypasses the agent's genre ticks and score bars entirely, so the sheet's own
-// AGENT GENRES section (note + dimmed rows) only needs to change at the moment the field crosses from
-// empty to non-empty or back — not on every keystroke in between.
-window.setOamDraftPeople=v=>{
-  if(!oamDraft) return;
-  const was=!!(oamDraft.people||"").trim();
-  oamDraft.people=v;
-  if(!!v.trim()!==was) renderOamMoodSheetBody();
+window.setOamDraftPeople=v=>{ if(oamDraft) oamDraft.people=v; };
+// CAS-1400: tapping a tab sets the draft's mode and slides the track WITHOUT re-rendering the sheet.
+window.setOamDraftMode=mode=>{
+  const d=oamDraft; if(!d || (mode!=="genre" && mode!=="keyword")) return;
+  d.mode=mode;
+  oamApplyModeToDOM(true);
 };
+function oamSizeMoodPanel(animate){
+  const body=$("watchSheetBody"); if(!body) return;
+  const panel=body.querySelector(".mpanel"), track=body.querySelector(".mtrack");
+  if(!panel || !track || !oamDraft) return;
+  const sec=track.children[oamDraft.mode==="keyword" ? 1 : 0]; if(!sec) return;
+  if(!animate) panel.style.transition="none";
+  panel.style.height=sec.offsetHeight+"px";
+  if(!animate){ void panel.offsetHeight; panel.style.transition=""; }
+}
+function oamApplyModeToDOM(animate){
+  const body=$("watchSheetBody"); if(!body || !oamDraft) return;
+  const kw=oamDraft.mode==="keyword";
+  const track=body.querySelector(".mtrack");
+  if(track) track.classList.toggle("kw", kw);
+  body.querySelectorAll(".mtabs button").forEach(b=>{
+    const on=(b.dataset.mode==="keyword")===kw;
+    b.classList.toggle("on", on); b.setAttribute("aria-selected", on);
+  });
+  const secs=track ? track.children : [];
+  if(secs[0]){ secs[0].setAttribute("aria-hidden", kw); secs[0].inert=kw; }
+  if(secs[1]){ secs[1].setAttribute("aria-hidden", !kw); secs[1].inert=!kw; }
+  oamSizeMoodPanel(animate);
+}
 // Every other saved mood that would ALSO list this style — "also in <names>" under a style row.
 function oamStylesAlsoIn(style, excludeId){
   return oamMoodsListReal().filter(m=>m.id!==excludeId && !m.handOnly && m.id!=="releases" && m.id!=="starred"
+    && !oamKeywordOn(m)
     && (!m.styles || !m.styles.length || m.styles.includes(style))).map(m=>m.name);
 }
-// A row's own two tap targets (behaviour 2): the left label (tick + name + also-in/never line) toggles
-// membership and is disabled for a never genre; the right strip is the CAS-1351 share control for the
-// AGENT's own bar, never the tick — dragging it never toggles the checkbox (AC3), and dragging it to Never
-// also drops the genre out of this mood's draft ticks (oamStyleOnRelease, above).
+// CAS-1400: one line per genre — tick + name (+ "also in …"), the agent's own five-box share strip (read-only:
+// a mood never changes the agent) and the value. filterShare is the Mood Override Filter's share when it
+// narrows this row (else null): the value then reads "Top 40%" over "~~100%~~ · 79+".
+function oamStyleValHTML(style, bar, filterShare){
+  if(bar==null) return "Never";
+  const agentShare=oneTopPct(style, bar);
+  if(filterShare!=null && agentShare>filterShare){
+    return `Top ${filterShare}%<i><s class="was">${agentShare}%</s> · ${oneBarForTopPct(style, filterShare)}+</i>`;
+  }
+  return `Top ${agentShare}%<i>score ${bar}+</i>`;
+}
 function oamStyleRowHTML(c, d, style){
   const bar=oamDraftBar(d, c, style);
   const never = bar==null;
   const on = !never && (d.stylesAll || d.styles.has(style));
   const name=oneAgentShortName(style);
-  const top = bar==null ? 0 : oneTopPct(style, bar);
-  const valText = bar==null ? "Never" : `Top ${top}%<i>score ${bar}+</i>`;
   const alsoIn=oamStylesAlsoIn(style, d.editingId).filter(n=>n!==d.name);
   const subText = never ? "off in your agent" : (alsoIn.length ? `also in ${alsoIn.join(", ")}` : "");
   return `<div class="oamstylerow${on?"":" off"}${never?" never":""}" data-style="${escA(style)}">
@@ -21262,13 +21275,8 @@ function oamStyleRowHTML(c, d, style){
           ${subText?`<span class="oamalso">${esc(subText)}</span>`:""}
         </span>
       </label>
-      <div class="oaslidewrap">
-        <div class="oastrip oastripfull">${oaShareBoxesHTML(style, bar)}</div>
-        <input type="range" class="oarange" min="0" max="100" step="1" value="${bar==null?0:top}"
-          data-style="${escA(style)}" oninput="oamStyleOnDrag(this)" onchange="oamStyleOnRelease(this)"
-          aria-label="${escA(name)} share of catalogue">
-      </div>
-      <span class="oarowval">${valText}</span>
+      <div class="oaslidewrap"><div class="oastrip">${oaShareBoxesHTML(style, bar)}</div></div>
+      <span class="oarowval">${oamStyleValHTML(style, bar, null)}</span>
     </div>`;
 }
 // ---- CAS-1391: the Mood Override Filter — replaces CAS-1365's cross-genre minScore slider with a per-genre
@@ -21278,19 +21286,20 @@ function oamStyleRowHTML(c, d, style){
 // (oamDrawFilterLines) so the preview the ticket asks for never waits for a full re-render.
 function oamFilterBoxesHTML(share){
   return ONE_AGENT_SHARE_BRACKETS.map(b=>
-    `<span class="oabox" style="--bc:${b.color}"><i class="oalbl">${oaShareLabel(b.pct)}</i><i class="oafill oafleft" style="width:${oaShareBoxPct(share,b)}%"></i></span>`
+    `<span class="oabox" style="--bc:${b.color}"><i class="oafill oafleft" style="width:${oaShareBoxPct(share,b)}%"></i></span>`
   ).join("");
 }
 function oamOverrideFilterDesc(share, on){
   return on
-    ? `Keeps the top ${share}% of each genre in this mood. Greyed: what your agent alone would add.`
-    : `Off — every genre shows your agent's setting. Drag left to keep only the best of each genre.`;
+    ? `Reduce the % of catalog to show only the best. Showing the top ${share}% of each genre; greyed is what your agent alone would add.`
+    : `Reduce the % of catalog to show only the best.`;
 }
-function oamOverrideFilterHTML(d, dim){
+function oamOverrideFilterHTML(d){
   const on = d.topShare!=null;
   const share = on ? d.topShare : 100;
   const valHTML = on ? `Top ${d.topShare}%<i>each genre</i>` : `All<i>agent's</i>`;
-  return `<div class="mfbox${dim?" oamdim":""}">
+  return `<div class="mfbox">
+      <div class="mfscale"><span>${ONE_AGENT_SHARE_BRACKETS.map(b=>`<i>${esc(oaShareLabel(b.pct))}</i>`).join("")}</span></div>
       <div class="mfrowgrid">
         <div class="mflbl"><b>Mood Override Filter</b><span class="mfsub">${on?"on":"off"}</span></div>
         <div class="oaslidewrap">
@@ -21328,6 +21337,8 @@ function oamDrawFilterLines(d, c, filterShare){
     const bar=oamDraftBar(d, c, style);
     const never=bar==null;
     const on=!never && (d.stylesAll || d.styles.has(style));
+    const valEl=row.querySelector(".oarowval");
+    if(valEl) valEl.innerHTML=oamStyleValHTML(style, bar, null);
     if(filterShare==null || !on) return;
     const boxes=wrap.querySelectorAll(".oabox");
     const lineLeft=oamMfBoxPos(boxes, filterShare);
@@ -21343,8 +21354,7 @@ function oamDrawFilterLines(d, c, filterShare){
       mask.style.left=maskLeft+"px";
       mask.style.width=Math.max(0, maskRight-maskLeft)+"px";
       wrap.appendChild(mask);
-      const valEl=row.querySelector(".oarowval");
-      if(valEl) valEl.innerHTML = `Top ${filterShare}%<i>score ${oneBarForTopPct(style, filterShare)}+</i><span class="was">${agentShare}%</span>`;
+      if(valEl) valEl.innerHTML=oamStyleValHTML(style, bar, filterShare);
     }
   });
 }
@@ -21367,6 +21377,7 @@ window.oamFilterOnDrag=(input)=>{
   const descEl=box && box.querySelector(".mfdesc");
   if(descEl) descEl.textContent = oamOverrideFilterDesc(share, on);
   oamDrawFilterLines(d, c, on ? share : null);
+  oamSizeMoodPanel(true);   // the description's wording (and so its height) changes with the filter
 };
 window.oamFilterOnRelease=(input)=>{
   const d=oamDraft; if(!d) return;
@@ -21404,8 +21415,7 @@ function renderOamMoodSheetBody(){
   const posIdx = d.editingId ? posList.findIndex(m=>m.id===d.editingId) : -1;
   const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "Mood" : "New mood";
   const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
-  const kOn = d.stylesAll ? onStyles.length : d.styles.size;
-  const peopleOn = !!(d.people||"").trim();
+  const kwMode = d.mode==="keyword";
   const order = d.rowOrder || {inMood:[], notInMood:[]};
   const seg=(opts, cur, setter, label)=>`<div class="mfseg" role="group" aria-label="${escA(label)}">
       ${opts.map(([k,l])=>{ const on=cur===k; return `<button type="button" aria-pressed="${on}" class="${on?"on":""}"
@@ -21420,32 +21430,33 @@ function renderOamMoodSheetBody(){
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
     ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
-    <div class="wsheetsec mainsec">
-      <div class="wsheethd"><span>AGENT GENRES<span class="cnt">${kOn} of ${onStyles.length} in this mood</span></span>
-        <div class="wsheetlinks">
-          <button type="button" class="linkbtn" onclick="selectAllOamDraftStyles()">All</button>
-          <button type="button" class="linkbtn" onclick="clearAllOamDraftStyles()">None</button>
-        </div>
-      </div>
-      <p class="oamgenreintro">The tick is just this mood. The strip is your agent's setting: changing it changes your agent and every mood.</p>
-      ${peopleOn ? `<p class="oamgenreintro">Ignored while a title, actor or director is set — every matching film shows.</p>` : ""}
-      ${oamOverrideFilterHTML(d, peopleOn)}
-      <div class="oalist${peopleOn?" oamdim":""}">
-        ${order.inMood.length ? `<div class="subhd">IN THIS MOOD</div>${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}` : ""}
-        ${order.notInMood.length ? `
-          <button type="button" class="oamexpand${oamNotInMoodOpen?" open":""}" onclick="toggleOamNotInMood()" aria-expanded="${oamNotInMoodOpen}">
-            <span>Not in this mood <b>${order.notInMood.length}</b></span><span class="chev" aria-hidden="true">&rsaquo;</span>
-          </button>
-          ${oamNotInMoodOpen ? order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("") : ""}
-        ` : ""}
+    <div class="mtabs" role="tablist">
+      <button type="button" role="tab" data-mode="genre" class="${kwMode?"":"on"}" aria-selected="${!kwMode}" onclick="setOamDraftMode('genre')">Genre</button>
+      <button type="button" role="tab" data-mode="keyword" class="${kwMode?"on":""}" aria-selected="${kwMode}" onclick="setOamDraftMode('keyword')">Keyword</button>
+    </div>
+    <div class="mpanel">
+      <div class="mtrack${kwMode?" kw":""}">
+        <section class="mgenre" aria-hidden="${kwMode}">
+          <p class="oamgenreintro">Tick the genres this mood lists. Each genre's score is set in your agent.</p>
+          <div class="gcolhd"><b>Include in mood</b><b>% of Catalog<i>(agent setting)</i></b></div>
+          <div class="oalist">
+            ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
+            ${order.notInMood.length ? `
+              <button type="button" class="oamexpand${oamNotInMoodOpen?" open":""}" onclick="toggleOamNotInMood()" aria-expanded="${oamNotInMoodOpen}">
+                <span>Not in this mood <b>${order.notInMood.length}</b></span><span class="chev" aria-hidden="true">&rsaquo;</span>
+              </button>
+              ${oamNotInMoodOpen ? order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("") : ""}
+            ` : ""}
+          </div>
+          ${oamOverrideFilterHTML(d)}
+        </section>
+        <section class="mkeyword" aria-hidden="${!kwMode}">
+          <input class="search" type="text" enterkeyhint="done" placeholder="e.g. Tom Cruise, Russo"
+            value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
+          <p class="oamgenreintro">Title, actor or director. Commas combine — every part must match. Every matching film shows, whatever your agent's genres.</p>
+        </section>
       </div>
     </div>
-    ${d.handOnly ? "" : `<div class="wsheetsec">
-      <div class="wsheethd"><span>TITLE, ACTOR OR DIRECTOR</span></div>
-      <input class="search" type="text" enterkeyhint="done" placeholder="e.g. Tom Cruise, Russo"
-        value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
-      <p class="oamgenreintro">Commas combine — every part must match. Lists every matching film, not just your agent's picks.</p>
-    </div>`}
     ${(!d.handOnly && prefs.sub.size) ? `<div class="wsheetsec mainsec">
       <div class="wsheethd"><span>STREAMING ON</span></div>
       <div class="chips">
@@ -21502,6 +21513,9 @@ function renderOamMoodSheetBody(){
       </div>` : ""}
     </div>` : ""}`;
   if(d.topShare!=null) oamDrawFilterLines(d, c, d.topShare);
+  // CAS-1400: the panel opens in the saved mode with no animation; the hidden half is inert.
+  oamApplyModeToDOM(false);
+  requestAnimationFrame(()=>{ if(oamDraft) oamSizeMoodPanel(false); });
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
     delBtn.style.display="";
@@ -21530,23 +21544,13 @@ function oamMoodFromDraft(d){
     in: [...d.in], out: [...d.out],
     svc: d.svc || null,
     people: (d.people||"").trim(),
+    mode: d.mode==="keyword" ? "keyword" : "genre",   // CAS-1400
   };
 }
 window.oamSaveMoodFromSheet=()=>{
   const d=oamDraft; if(!d) return;
   const name=(d.name||"").trim();
   if(!name){ const inp=$("oamMoodName"); if(inp) inp.focus(); return; }
-  // CAS-1358: the sheet's own genre-strip drags are drafted on the agent's bars, not the mood — write them
-  // to the agent now, alongside the mood itself, through the same saveCascades() chokepoint oaOnRelease uses.
-  const c=oneAgentCriteria();
-  if(c && d.bars && Object.keys(d.bars).length){
-    c.styles=c.styles||{};
-    Object.keys(d.bars).forEach(style=>{
-      const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
-      st.bar=d.bars[style];
-    });
-    saveCascades();
-  }
   const mood={
     id: d.editingId || ("m"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)),
     name, v2:true,
@@ -21736,7 +21740,7 @@ function oamWilMoodGateReason(m, c, main){
   for(const mood of oamMoodsListReal()){
     // CAS-1396: a people-filter mood ignores genre ticks entirely, so its own gates (ages/awards/years/
     // people) are checked whether or not this film's genre happens to be ticked in it.
-    if(!(mood.people||"").trim() && !oamMoodStyles(mood, c).includes(main)) continue;
+    if(!oamKeywordOn(mood) && !oamMoodStyles(mood, c).includes(main)) continue;
     if(mood.id==="releases" && !filmInLatestWindow(m)) continue;
     const name=esc(moodDisplayName(mood));
     const age=oamFilmAge(m);
@@ -21750,7 +21754,7 @@ function oamWilMoodGateReason(m, c, main){
     if(mood.years && !releasedSince(m, yearsCutoff(mood.years))){
       return `<span class="wilnot">Not shown in ${name}:</span> it's older than this mood's last ${esc(String(mood.years))} years.`;
     }
-    if(mood.people && !filmMatchesSearch(m, mood.people)){
+    if(oamKeywordOn(mood) && !filmMatchesSearch(m, mood.people)){
       return `<span class="wilnot">Not shown in ${name}:</span> it doesn't match this mood's "${esc("PEOPLE")}" filter.`;
     }
   }
