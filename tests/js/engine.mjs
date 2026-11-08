@@ -858,6 +858,8 @@ if(typeof window.CascadeAuth === "undefined"){
   // sheet's/Find's own short service-chip label (the prefill's own name fallback reads it too) — exported
   // directly so a test can assert each against a fixture rather than re-deriving them.
   oamMoodFromDraft, MOOD_MAX, oamSvcChipLabel,
+  // CAS-1400: the genre|keyword mode resolver.
+  oamMoodMode, oamKeywordOn,
   // CAS-1395: Find's "Save as mood" — oamFindPrefillFields (the pre-filled draft's people/svc/name/watched),
   // oamFromFindCount (the sheet's own live count against a film list) and findSaveAsMoodVisible (the
   // button's own show/hide rule) — exported so a test can assert each directly against a fixture, the same

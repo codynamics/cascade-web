@@ -2776,3 +2776,66 @@ test("CAS-1269 AC3: the Your taste switch recolours the grid with tasteColor()",
   // The browser re-serialises inline colours with spaces after the commas; compare without whitespace.
   expect(bg.replace(/\s+/g, "")).toBe(expected.replace(/\s+/g, ""));
 });
+
+// CAS-1400 AC2/AC3/AC4: the v2 mood sheet's Genre | Keyword tabs. Genre rows are one line each under a
+// single-line column header, the Mood Override Filter strip shares the genre strips' column, no range input
+// lives inside a genre row, and tapping Keyword slides the track WITHOUT re-rendering the sheet body.
+test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter strip, slide without re-render", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await page.evaluate(() => {
+    const al = { cinema:false, rent:false, stream:false };
+    cascades.length = 0;
+    cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [],
+      styles: { Action:{ bar:60, al }, Drama:{ bar:65, al }, Comedy:{ bar:70, al } } });
+    saveCascades();
+    setActive(cascades[0].id);
+    watchMoods = [];
+    watchMoodSel = "best";
+    render();
+    window.openOamMoodSheetFor("best");
+  });
+  await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+
+  const m = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll("#watchSheetBody .oamstylerow")];
+    const hd = document.querySelector("#watchSheetBody .gcolhd");
+    const hdFirst = hd.querySelector("b").getBoundingClientRect();
+    const tick = rows[0].querySelector("input[type=checkbox]").getBoundingClientRect();
+    const rowStrip = rows[0].querySelector(".oastrip").getBoundingClientRect();
+    const fStrip = document.querySelector("#watchSheetBody .mfrowgrid .oastrip").getBoundingClientRect();
+    return {
+      rowCount: rows.length,
+      rowHeights: rows.map(r => r.getBoundingClientRect().height),
+      hdHeight: hd.getBoundingClientRect().height,
+      hdVsTick: Math.abs(hdFirst.left - tick.left),
+      stripLeftDiff: Math.abs(rowStrip.left - fStrip.left),
+      stripWidthDiff: Math.abs(rowStrip.width - fStrip.width),
+      rangeInRow: document.querySelectorAll("#watchSheetBody .oamstylerow input[type=range]").length,
+      headingsInTrack: document.querySelectorAll("#watchSheetBody .mtrack .wsheethd").length,
+    };
+  });
+  expect(m.rowCount).toBeGreaterThan(0);
+  m.rowHeights.forEach(h => expect(h).toBeLessThan(52));
+  expect(m.hdHeight).toBeLessThan(16);
+  expect(m.hdVsTick).toBeLessThanOrEqual(5);
+  expect(m.stripLeftDiff).toBeLessThanOrEqual(1);
+  expect(m.stripWidthDiff).toBeLessThanOrEqual(1);
+  expect(m.rangeInRow).toBe(0);
+  expect(m.headingsInTrack).toBe(0);
+
+  // AC3: a marker set on the body's own child survives the tap — the sheet is not re-rendered.
+  await page.evaluate(() => { document.querySelector("#watchSheetBody .mpanel").dataset.marker = "kept"; });
+  await page.locator('#watchSheetBody .mtabs button[data-mode="keyword"]').click();
+  await expect(page.locator("#watchSheetBody .mtrack")).toHaveClass(/kw/);
+  const after = await page.evaluate(() => ({
+    marker: document.querySelector("#watchSheetBody .mpanel").dataset.marker,
+    mode: oamDraft.mode,
+  }));
+  expect(after.marker).toBe("kept");
+  expect(after.mode).toBe("keyword");
+  await page.evaluate(() => window.closeWatchSheet());
+});
