@@ -27017,6 +27017,13 @@ function acctFetchKeepalive(init){
     reconcileTableSig[table]=sig;
     return false;
   }
+  // CAS-1399: factored out of reconcileOnReturn so the prefs-only poll below can reuse the exact same
+  // guard — a pull of either kind must never land on top of an edit this device made that hasn't reached
+  // the account yet.
+  function noUnsentWrite(table){
+    const acctStore = window.CascadeAccountStore;
+    return !acctStore || !acctStore.queue.some(op => op.table===table);
+  }
   // CAS-408: two devices only converge without a live subscription if SOMETHING re-pulls the account
   // — sign-in alone left a device that never signs out again permanently stuck on whatever it saw at
   // its last sign-in. Returning to the tab is the natural moment: skip it while a push from THIS
@@ -27042,8 +27049,6 @@ function acctFetchKeepalive(init){
     // Watch On and pins (film_watch/film_picks), notify prefs and the admission ledger (agent_films) were
     // the "no reconcile left to run" list the comment removed above used to name; a device left open across
     // a change made elsewhere could sit unseen for a whole session until this.
-    const acctStore = window.CascadeAccountStore;
-    const noUnsentWrite = table => !acctStore || !acctStore.queue.some(op => op.table===table);
     // CAS-1222: a view-field write is a queued "merge_user_prefs_view" rpc op, a different table name from
     // the whole-column "user_prefs" upserts above it — gated here too, or a reconcile pull landing while
     // one is still unsent would adopt the server's pre-merge row over this device's own still-in-flight
@@ -27077,7 +27082,9 @@ function acctFetchKeepalive(init){
   // trailing debounce, so two events in the very same tick are already covered, not just ones 60s apart.
   // The 3-minute heartbeat poll below stays independent of this floor, unchanged from before this ticket.
   let reconcileLastRun = 0;
-  const RECONCILE_RETURN_FLOOR_MS = 60*1000;
+  // CAS-1399: 60s -> 15s. Coming back to the tab is the natural moment someone switches devices, and 15s
+  // still coalesces a focus/visibilitychange burst (the reason the floor exists at all — CAS-1236).
+  const RECONCILE_RETURN_FLOOR_MS = 15*1000;
   function reconcileOnReturnThrottled(){
     const now = Date.now();
     if(now - reconcileLastRun < RECONCILE_RETURN_FLOOR_MS) return;
@@ -27098,6 +27105,21 @@ function acctFetchKeepalive(init){
   // this same script against a stand-in DOM) returns a Timeout object whose unref() stops a live interval
   // from holding the process open forever. Guarded so the browser path is untouched.
   if(reconcilePollHandle && typeof reconcilePollHandle.unref === "function") reconcilePollHandle.unref();
+  // CAS-1399: the 60s return floor / 3min heartbeat above still leave a tab that's already open and visible
+  // (or that last reconciled under a minute ago) showing a stale mood for up to 3 minutes after another
+  // device saves one — read as "doesn't sync" when switching devices to test. A light, prefs-only poll
+  // closes that gap without pulling every table reconcileOnReturn does. Same unsent-write guards as that
+  // function's own user_prefs pull, plus a skip while the mood sheet is open so a draft being edited is
+  // never repainted underneath the person.
+  const PREFS_POLL_MS = 30*1000;
+  // CAS-1399: named (rather than inline in the setInterval callback) so a test can call it directly instead
+  // of waiting on a real 30s timer.
+  function prefsPollTick(){
+    if(document.visibilityState!=="visible" || !accountActive() || watchSheetOpen) return;
+    if(noUnsentWrite("user_prefs") && noUnsentWrite("merge_user_prefs_view")) loadUserPrefs();
+  }
+  const prefsPollHandle = setInterval(prefsPollTick, PREFS_POLL_MS);
+  if(prefsPollHandle && typeof prefsPollHandle.unref === "function") prefsPollHandle.unref();
 
   // ==========================================================================
   // CAS-183: watch status per account (`user_films`)
@@ -28295,6 +28317,9 @@ function acctFetchKeepalive(init){
                                 // can be exercised the same way — without waiting on a real
                                 // focus/visibilitychange event.
                                 reconcileOnReturn,
+                                // CAS-1399: the 30s prefs-only poll's own tick, exposed the same way so a test
+                                // can drive it directly rather than waiting on the real interval.
+                                prefsPollTick,
                                 // CAS-1236: the render() call counter (AC2's literal wording) plus the
                                 // settled-list nav key's own fill bookkeeping, exposed the same read/write-
                                 // primitive way as every other test seam here — reset to 0 right before the

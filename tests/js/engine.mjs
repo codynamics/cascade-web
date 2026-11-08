@@ -43,12 +43,20 @@ const node = () => new Proxy(function(){}, {
 // version" actually survives a reload, not just a second call within the same load. Optional and unused
 // by every existing test, which keeps getting its own private Map exactly as before.
 function makeContext(localStorageStore){
+  // CAS-1399: visibilityState is a real, mutable value (default "visible", the common case every existing
+  // test implicitly ran under) rather than falling through to the permissive node() stub below — the prefs
+  // poll's own gate reads it directly, so a test needs to flip it to "hidden" and back for real.
+  let docVisibilityState = "visible";
   const doc = new Proxy({}, {
     get(t, k){
       if(k === "querySelectorAll" || k === "getElementsByClassName" || k === "getElementsByTagName") return () => [];
+      if(k === "visibilityState") return docVisibilityState;
       return node();
     },
-    set(){ return true; },
+    set(t, k, v){
+      if(k === "visibilityState"){ docVisibilityState = v; return true; }
+      return true;
+    },
   });
   const store = localStorageStore || new Map();
   const sessionStore = new Map();
@@ -884,6 +892,16 @@ if(typeof window.CascadeAuth === "undefined"){
   get findCollectionFilter(){ return findCollectionFilter; },
   openFindCollection: (id) => window.openFindCollection(id),
   clearFindCollectionFilter: () => window.clearFindCollectionFilter(),
+  // CAS-1399: the prefs-only poll's own visible/hidden gate reads document.visibilityState directly —
+  // exposed read/write, same shape as every other test seam here (e.g. SAVING_INDICATOR_DELAY_MS in
+  // app_template.html's own CascadePersistence export), so a test can flip it without a real tab switch.
+  get documentVisibilityState(){ return document.visibilityState; },
+  setDocumentVisibilityState(v){ document.visibilityState = v; },
+  // CAS-1399: the real #watchSheet open/close chokepoints, wrapped the same way toggleFilmOpt/
+  // toggleWatchAgent elsewhere in this file are, so a test can drive the poll's "skip while the mood sheet
+  // is open" guard through the actual window.watchSheetOpen flag rather than a copy of it.
+  openWatchSheet: () => window.openWatchSheet(),
+  closeWatchSheet: () => window.closeWatchSheet(),
 };
 `;
 
