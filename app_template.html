@@ -3451,6 +3451,9 @@
   .oamhead{display:flex;align-items:center;gap:10px}
   .oamhead .mfinput{flex:1}
   .oamgenreintro{font-size:12px;color:var(--dim);line-height:1.5;margin:4px 0 8px}
+  /* CAS-1396: while a title/actor/director filter is set, the genre rows and Mood Override Filter still
+     work and still save, but visually read as overridden — dimmed, not disabled. */
+  .oamdim{opacity:.45}
   /* ---- CAS-1391: the mood sheet rearranged — main/sub sections, the Mood Override Filter (replaces
      CAS-1365's minScore slider) and the collapsible Not in this mood / More filters bodies. Verbatim. ---- */
   .wsheetsec.mainsec{margin:0 0 4px;padding:16px 0 18px;border-top:1px solid var(--line)}
@@ -20879,8 +20882,24 @@ function oamFilmMatchesAwards(m, awards){
 // CAS-1364: a mood with watched:true judges a watched film as if it were unwatched — the admission check
 // alone gets excludeWatched:false, scoped to this one call so the agent's own criteria (and so alerts,
 // which never go through here) are never touched.
+// CAS-1396: a mood with a title/actor/director filter is a search, not an agent-scoped mood — it lists
+// every catalogue film matching that filter, whatever the agent's genre on/off, score bars, combo
+// `never` or the mood's own genre ticks / Mood Override Filter say. Only admission (blocked/watched/
+// services), the search text itself, and ages/awards/years still apply.
 function oamFilmMeetsMoodRules(m, mood, c){
   const admitC = mood.watched ? {...c, excludeWatched:false} : c;
+  if((mood.people||"").trim()){
+    if(c.excludeBlocked!==false && blocked.has(m.tmdb_id)) return false;
+    if(admitC.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
+    const ps=primaryStatus(m);
+    if(c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)) return false;
+    if(!filmMatchesSearch(m, mood.people)) return false;
+    const age=oamFilmAge(m);
+    if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
+    if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
+    if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
+    return true;
+  }
   if(!matchesCriteriaOneAgent(m, admitC, false)) return false;
   const {main}=mainOtherCombos(m);
   if(main===undefined) return false;
@@ -20895,7 +20914,6 @@ function oamFilmMeetsMoodRules(m, mood, c){
   if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
   if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
   if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
-  if(mood.people && !filmMatchesSearch(m, mood.people)) return false;
   return true;
 }
 // CAS-1366: Releases' own rules — the same genre-tick/ages/awards/how-far-back gates as
@@ -21195,7 +21213,15 @@ window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMo
 window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMoodSheetBody(); };
 window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; renderOamMoodSheetBody(); };
 window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
-window.setOamDraftPeople=v=>{ if(oamDraft) oamDraft.people=v; };
+// CAS-1396: a people filter bypasses the agent's genre ticks and score bars entirely, so the sheet's own
+// AGENT GENRES section (note + dimmed rows) only needs to change at the moment the field crosses from
+// empty to non-empty or back — not on every keystroke in between.
+window.setOamDraftPeople=v=>{
+  if(!oamDraft) return;
+  const was=!!(oamDraft.people||"").trim();
+  oamDraft.people=v;
+  if(!!v.trim()!==was) renderOamMoodSheetBody();
+};
 // Every other saved mood that would ALSO list this style — "also in <names>" under a style row.
 function oamStylesAlsoIn(style, excludeId){
   return oamMoodsListReal().filter(m=>m.id!==excludeId && !m.handOnly && m.id!=="releases" && m.id!=="starred"
@@ -21247,11 +21273,11 @@ function oamOverrideFilterDesc(share, on){
     ? `Keeps the top ${share}% of each genre in this mood. Greyed: what your agent alone would add.`
     : `Off — every genre shows your agent's setting. Drag left to keep only the best of each genre.`;
 }
-function oamOverrideFilterHTML(d){
+function oamOverrideFilterHTML(d, dim){
   const on = d.topShare!=null;
   const share = on ? d.topShare : 100;
   const valHTML = on ? `Top ${d.topShare}%<i>each genre</i>` : `All<i>agent's</i>`;
-  return `<div class="mfbox">
+  return `<div class="mfbox${dim?" oamdim":""}">
       <div class="mfrowgrid">
         <div class="mflbl"><b>Mood Override Filter</b><span class="mfsub">${on?"on":"off"}</span></div>
         <div class="oaslidewrap">
@@ -21366,6 +21392,7 @@ function renderOamMoodSheetBody(){
   const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "Mood" : "New mood";
   const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
   const kOn = d.stylesAll ? onStyles.length : d.styles.size;
+  const peopleOn = !!(d.people||"").trim();
   const order = d.rowOrder || {inMood:[], notInMood:[]};
   const seg=(opts, cur, setter, label)=>`<div class="mfseg" role="group" aria-label="${escA(label)}">
       ${opts.map(([k,l])=>{ const on=cur===k; return `<button type="button" aria-pressed="${on}" class="${on?"on":""}"
@@ -21388,8 +21415,9 @@ function renderOamMoodSheetBody(){
         </div>
       </div>
       <p class="oamgenreintro">The tick is just this mood. The strip is your agent's setting: changing it changes your agent and every mood.</p>
-      ${oamOverrideFilterHTML(d)}
-      <div class="oalist">
+      ${peopleOn ? `<p class="oamgenreintro">Ignored while a title, actor or director is set — every matching film shows.</p>` : ""}
+      ${oamOverrideFilterHTML(d, peopleOn)}
+      <div class="oalist${peopleOn?" oamdim":""}">
         ${order.inMood.length ? `<div class="subhd">IN THIS MOOD</div>${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}` : ""}
         ${order.notInMood.length ? `
           <button type="button" class="oamexpand${oamNotInMoodOpen?" open":""}" onclick="toggleOamNotInMood()" aria-expanded="${oamNotInMoodOpen}">
@@ -21403,7 +21431,7 @@ function renderOamMoodSheetBody(){
       <div class="wsheethd"><span>TITLE, ACTOR OR DIRECTOR</span></div>
       <input class="search" type="text" enterkeyhint="done" placeholder="e.g. Tom Cruise, Russo"
         value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
-      <p class="oamgenreintro">Commas combine — every part must match.</p>
+      <p class="oamgenreintro">Commas combine — every part must match. Lists every matching film, not just your agent's picks.</p>
     </div>`}
     ${(!d.handOnly && prefs.sub.size) ? `<div class="wsheetsec mainsec">
       <div class="wsheethd"><span>STREAMING ON</span></div>
@@ -21693,7 +21721,9 @@ function oamOrdinal(n){
 // actually fired, named by mood, not a blanket claim the genre itself is missing everywhere.
 function oamWilMoodGateReason(m, c, main){
   for(const mood of oamMoodsListReal()){
-    if(!oamMoodStyles(mood, c).includes(main)) continue;
+    // CAS-1396: a people-filter mood ignores genre ticks entirely, so its own gates (ages/awards/years/
+    // people) are checked whether or not this film's genre happens to be ticked in it.
+    if(!(mood.people||"").trim() && !oamMoodStyles(mood, c).includes(main)) continue;
     if(mood.id==="releases" && !filmInLatestWindow(m)) continue;
     const name=esc(moodDisplayName(mood));
     const age=oamFilmAge(m);
