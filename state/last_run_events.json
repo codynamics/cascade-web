@@ -1,194 +1,69 @@
 [
   {
-    "tmdb_id": 1727734,
-    "title": "Ali G: Who Iz I?",
-    "kind": "arrived",
-    "new_window": "included_streaming",
-    "label": "Included Streaming",
-    "services": [
-      "Amazon Prime Video",
-      "Amazon Prime Video with Ads"
-    ],
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 1727734,
-    "title": "Ali G: Who Iz I?",
-    "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 980489,
-    "title": "Gran Turismo",
+    "tmdb_id": 345887,
+    "title": "The Equalizer 2",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
       "Binge Amazon Channel"
     ],
-    "detected": "2026-11-07"
+    "detected": "2026-11-08"
   },
   {
-    "tmdb_id": 980489,
-    "title": "Gran Turismo",
+    "tmdb_id": 345887,
+    "title": "The Equalizer 2",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-11-07"
+    "detected": "2026-11-08"
   },
   {
-    "tmdb_id": 1483525,
-    "title": "Possible Love",
-    "kind": "arrived",
-    "new_window": "included_streaming",
-    "label": "Included Streaming",
-    "services": [
-      "Netflix",
-      "Netflix Standard with Ads"
-    ],
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 1483525,
-    "title": "Possible Love",
-    "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 698687,
-    "title": "Transformers One",
+    "tmdb_id": 516729,
+    "title": "Paddington in Peru",
     "kind": "left",
     "lost_window": "included_streaming",
     "label": "Included Streaming",
-    "detected": "2026-11-07"
+    "detected": "2026-11-08"
   },
   {
-    "tmdb_id": 1070319,
-    "title": "From Hilde, with Love",
+    "tmdb_id": 1269325,
+    "title": "Drishyam: The Conclusion",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-11-08"
+  },
+  {
+    "tmdb_id": 854513,
+    "title": "Hallelujah: Leonard Cohen, a Journey, a Song",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
       "SBS On Demand"
     ],
-    "detected": "2026-11-07"
+    "detected": "2026-11-08"
   },
   {
-    "tmdb_id": 1070319,
-    "title": "From Hilde, with Love",
+    "tmdb_id": 854513,
+    "title": "Hallelujah: Leonard Cohen, a Journey, a Song",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-11-07"
+    "detected": "2026-11-08"
   },
   {
-    "tmdb_id": 1266805,
-    "title": "The Musicians",
-    "kind": "arrived",
-    "new_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "services": [
-      "JustWatch TV Store",
-      "Apple TV Store",
-      "Amazon Video"
-    ],
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 1266805,
-    "title": "The Musicians",
+    "tmdb_id": 507647,
+    "title": "Standing Up for Sunny",
     "kind": "left",
-    "lost_window": "released",
-    "label": "Released (no AU offer)",
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 819277,
-    "title": "Midas Man (La historia de Brian Epstein)",
-    "kind": "arrived",
-    "new_window": "included_streaming",
+    "lost_window": "included_streaming",
     "label": "Included Streaming",
-    "services": [
-      "Beamafilm",
-      "Beamafilm"
-    ],
-    "detected": "2026-11-07"
+    "detected": "2026-11-08"
   },
   {
-    "tmdb_id": 819277,
-    "title": "Midas Man (La historia de Brian Epstein)",
-    "kind": "left",
-    "lost_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 1082424,
-    "title": "Jane Austen Wrecked My Life",
-    "kind": "arrived",
-    "new_window": "included_streaming",
-    "label": "Included Streaming",
-    "services": [
-      "Paramount Plus",
-      "Paramount+ Amazon Channel",
-      "Paramount Plus Premium"
-    ],
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 1082424,
-    "title": "Jane Austen Wrecked My Life",
-    "kind": "left",
-    "lost_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 1705387,
-    "title": "Kiri and Lou Go Raaa!",
-    "kind": "arrived",
-    "new_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "services": [
-      "JustWatch TV Store",
-      "Apple TV Store"
-    ],
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 1705387,
-    "title": "Kiri and Lou Go Raaa!",
-    "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 385581,
-    "title": "The Brainwashing of My Dad",
-    "kind": "arrived",
-    "new_window": "included_streaming",
-    "label": "Included Streaming",
-    "services": [
-      "Tubi TV"
-    ],
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 385581,
-    "title": "The Brainwashing of My Dad",
-    "kind": "left",
-    "lost_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 985416,
-    "title": "Spilt Gravy on Rice",
+    "tmdb_id": 467649,
+    "title": "Fidaa",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
@@ -196,106 +71,94 @@
       "Netflix",
       "Netflix Standard with Ads"
     ],
-    "detected": "2026-11-07"
+    "detected": "2026-11-08"
   },
   {
-    "tmdb_id": 985416,
-    "title": "Spilt Gravy on Rice",
-    "kind": "left",
-    "lost_window": "released",
-    "label": "Released (no AU offer)",
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 968294,
-    "title": "Going Postal: The Legacy Foretold",
-    "kind": "arrived",
-    "new_window": "included_streaming",
-    "label": "Included Streaming",
-    "services": [
-      "Tubi TV"
-    ],
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 968294,
-    "title": "Going Postal: The Legacy Foretold",
+    "tmdb_id": 467649,
+    "title": "Fidaa",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-11-07"
+    "detected": "2026-11-08"
   },
   {
-    "tmdb_id": 1724077,
-    "title": "Tina Arena: Unravel Me",
-    "kind": "arrived",
-    "new_window": "included_streaming",
+    "tmdb_id": 1500516,
+    "title": "Not Only Fred Dagg But Also John Clarke",
+    "kind": "left",
+    "lost_window": "included_streaming",
     "label": "Included Streaming",
-    "services": [
-      "7plus"
-    ],
-    "detected": "2026-11-07"
+    "detected": "2026-11-08"
   },
   {
-    "tmdb_id": 1724077,
-    "title": "Tina Arena: Unravel Me",
+    "tmdb_id": 1673928,
+    "title": "Rod Quantock Comedy Warrior",
     "kind": "left",
     "lost_window": "in_cinema",
     "label": "In Cinema",
-    "detected": "2026-11-07"
+    "detected": "2026-11-08"
   },
   {
-    "tmdb_id": 589382,
-    "title": "The Pickup Game",
-    "kind": "arrived",
-    "new_window": "included_streaming",
+    "tmdb_id": 1299040,
+    "title": "The Girls at the Station",
+    "kind": "left",
+    "lost_window": "included_streaming",
     "label": "Included Streaming",
-    "services": [
-      "Iwonder Amazon Channel"
-    ],
-    "detected": "2026-11-07"
+    "detected": "2026-11-08"
   },
   {
-    "tmdb_id": 589382,
-    "title": "The Pickup Game",
+    "tmdb_id": 655854,
+    "title": "For the Love of Ruth",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-08"
+  },
+  {
+    "tmdb_id": 461844,
+    "title": "Liyana",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-08"
+  },
+  {
+    "tmdb_id": 509250,
+    "title": "The Kingdom: How Fungi Made Our World",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-08"
+  },
+  {
+    "tmdb_id": 1316409,
+    "title": "Darweesh",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-08"
+  },
+  {
+    "tmdb_id": 1218213,
+    "title": "The Last Journey",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-08"
+  },
+  {
+    "tmdb_id": 1014870,
+    "title": "752 Is Not a Number",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-11-07"
+    "detected": "2026-11-08"
   },
   {
-    "tmdb_id": 1653281,
-    "title": "Shadow of Hope",
-    "kind": "arrived",
-    "new_window": "included_streaming",
-    "label": "Included Streaming",
-    "services": [
-      "SBS On Demand"
-    ],
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 1653281,
-    "title": "Shadow of Hope",
+    "tmdb_id": 1533387,
+    "title": "Stringybark",
     "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 1694425,
-    "title": "Spectronizer",
-    "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-11-07"
-  },
-  {
-    "tmdb_id": 1728105,
-    "title": "Singer",
-    "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-11-07"
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-11-08"
   }
 ]
