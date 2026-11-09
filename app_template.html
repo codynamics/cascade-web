@@ -20574,13 +20574,16 @@ const ONE_AGENT_MOOD_BUILTINS=[
   // Lee, 2026-11-09: renamed "All Latest"; its window is its own How far back filter (1 yr to start) and it
   // includes films you've watched. releasesV:2 marks a record that already has these defaults (see the load
   // repair in loadUserPrefs and oamSaveMoodFromSheet's stamp).
-  {id:"releases", name:"All Latest", sort:"release", show:"all", years:1, watched:true, releasesV:2},
+  // Lee, 2026-11-09 (later): All Latest is now an ORDINARY mood, configured rather than hard-coded — the new
+  // "Only films with a cinema release" filter on, How far back 1 yr, watched films in, and the Mood Override
+  // On at 100% (every film in every on genre, whatever its score). releasesV:3.
+  {id:"releases", name:"All Latest", sort:"release", show:"all", years:1, watched:true, cinemaOnly:true, topShare:100, releasesV:3},
   // CAS-1368: Best of the best — every on genre, raised to a floor of 85 regardless of its own bar, Best 40.
   {id:"best", name:"Best of the best", topShare:20, show:"40"},
   {id:"starred", name:"Starred", starredOnly:true},
 ];
 function oamMoodDefaultFields(){
-  return {v2:true, handOnly:false, watched:false, styles:[], topShare:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[], svc:null, people:""};
+  return {v2:true, handOnly:false, watched:false, cinemaOnly:false, styles:[], topShare:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[], svc:null, people:""};
 }
 function oamMoodDefaultsNow(){ return ONE_AGENT_MOOD_BUILTINS.map(b=>({...oamMoodDefaultFields(), ...b})); }
 // The account's own saved v2 moods — falls back (in memory only, never written: CAS-1218/1243) to the two
@@ -20653,6 +20656,8 @@ function oamMoodMode(mood){
 }
 function oamKeywordOn(mood){ return oamMoodMode(mood)==="keyword" && !!(mood.people||"").trim(); }
 function oamFilmMeetsMoodRules(m, mood, c){
+  // Lee, 2026-11-09: "Only films with a cinema release" — a real cinema release with a date (past or ahead).
+  if(mood.cinemaOnly && !(m.cinema_release && m.cinema_date)) return false;
   const admitC = mood.watched ? {...c, excludeWatched:false} : c;
   if(oamKeywordOn(mood)){
     if(c.excludeBlocked!==false && blocked.has(m.tmdb_id)) return false;
@@ -20666,7 +20671,13 @@ function oamFilmMeetsMoodRules(m, mood, c){
     if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
     return true;
   }
-  if(!matchesCriteriaOneAgent(m, mood.anySvc ? {...admitC, myServices:false} : admitC, false)) return false;
+  // Lee, 2026-11-09: with the Mood Override On, the override's own bar (oamMoodBarFor, below) is the only
+  // score gate — the agent's bar must not still hold back a genre the override RAISES. Every other agent
+  // gate (blocked, watched, services, combos marked never, unscored films) still applies.
+  const ovrOn = oamMoodEffectiveTopShare(mood)!=null;
+  const gateC = ovrOn ? {...admitC, styles:Object.fromEntries(Object.entries(admitC.styles||{})
+    .map(([g,s])=>[g, (s && s.bar!=null) ? {...s, bar:0} : s]))} : admitC;
+  if(!matchesCriteriaOneAgent(m, mood.anySvc ? {...gateC, myServices:false} : gateC, false)) return false;
   const {main}=mainOtherCombos(m);
   if(main===undefined) return false;
   if(!oamMoodStyles(mood, c).includes(main)) return false;
@@ -20695,20 +20706,10 @@ function oamFilmInReleasesWindow(m, mood){
   const cut=yearsCutoff(mood.years);
   return !cut || m.cinema_date>=cut;
 }
+// Lee, 2026-11-09 (later): All Latest has no rules of its own any more — it is an ordinary mood whose
+// settings (cinemaOnly, years, watched, topShare 100) give it its shape. Kept as a name for its callers.
 function oamFilmMeetsReleasesRules(m, mood, c){
-  if(!oamFilmInReleasesWindow(m, mood)) return false;
-  const admitC = mood.watched ? {...c, excludeWatched:false} : c;
-  if(admitC.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
-  const {main}=mainOtherCombos(m);
-  if(main===undefined || oaBar(c, main)==null) return false;
-  if(!oamMoodStyles(mood, c).includes(main)) return false;
-  // CAS-1370: same no-rating-no-exclusion rule as oamFilmMeetsMoodRules above.
-  const age=oamFilmAge(m);
-  if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
-  if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
-  if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
-  if(oamKeywordOn(mood) && !filmMatchesSearch(m, mood.people)) return false;
-  return true;
+  return oamFilmMeetsMoodRules(m, mood, c);
 }
 // Full membership: a hand choice always beats the rules (ticket's own words). Latest/Starred keep today's
 // behaviour — see each ticket line in CAS-1341's description for what that means for each.
@@ -20822,6 +20823,7 @@ function oamMoodDraftFrom(mood){
     handOnly: mood ? !!mood.handOnly : false,
     // CAS-1412: a brand-new mood starts with Include watched on; editing keeps the mood's own stored value.
     watched: mood ? !!mood.watched : true,
+    cinemaOnly: mood ? !!mood.cinemaOnly : false,
     stylesAll: mood ? !(mood.styles && mood.styles.length) : true,
     styles: new Set(mood && mood.styles ? mood.styles : []),
     // CAS-1400: genre | keyword — which way this mood finds films. Nothing stored before Save.
@@ -20933,6 +20935,7 @@ window.toggleOamNotInMood=()=>{ oamNotInMoodOpen=!oamNotInMoodOpen; renderOamMoo
 window.toggleOamMoreFilters=()=>{ oamMoreFiltersOpen=!oamMoreFiltersOpen; renderOamMoodSheetBody(); };
 window.setOamDraftName=v=>{ if(oamDraft) oamDraft.name=v; };
 window.toggleOamDraftHandOnly=()=>{ if(!oamDraft) return; oamDraft.handOnly=!oamDraft.handOnly; renderOamMoodSheetBody(); };
+window.toggleOamDraftCinemaOnly=()=>{ if(!oamDraft) return; oamDraft.cinemaOnly=!oamDraft.cinemaOnly; renderOamMoodSheetBody(); };
 window.toggleOamDraftWatched=()=>{ if(!oamDraft) return; oamDraft.watched=!oamDraft.watched; renderOamMoodSheetBody(); };
 window.toggleOamDraftStyle=style=>{
   const d=oamDraft; if(!d) return;
@@ -21159,6 +21162,7 @@ function oamMoreFiltersCount(d){
   let n=0;
   if(d.handOnly) n++;
   if(d.watched) n++;
+  if(d.cinemaOnly) n++;
   if(d.ages.size) n++;
   if(d.awards!=="any") n++;
   if(d.years) n++;
@@ -21254,6 +21258,10 @@ function renderOamMoodSheetBody(){
         ${d.handOnly ? "" : `<div class="mfrow"><span>Include films I've watched</span>
           <button type="button" class="mftog${d.watched?" on":""}" role="switch" aria-checked="${!!d.watched}"
             aria-label="Include films I've watched" onclick="toggleOamDraftWatched()"><i></i></button>
+        </div>
+        <div class="mfrow"><span>Only films with a cinema release</span>
+          <button type="button" class="mftog${d.cinemaOnly?" on":""}" role="switch" aria-checked="${!!d.cinemaOnly}"
+            aria-label="Only films with a cinema release" onclick="toggleOamDraftCinemaOnly()"><i></i></button>
         </div>`}
       </div>
       <div class="wsheetsec">
@@ -21298,6 +21306,7 @@ function oamMoodFromDraft(d){
   return {
     handOnly: !!d.handOnly,
     watched: !!d.watched,
+    cinemaOnly: !!d.cinemaOnly,
     styles: d.stylesAll ? [] : [...d.styles],
     topShare: d.topShare,
     ages: [...d.ages],
@@ -21324,7 +21333,7 @@ window.oamSaveMoodFromSheet=()=>{
   if(mood.id==="starred") mood.starredOnly=true;
   // CAS-1366: a save always stamps Releases' own repair marker, whichever sort was actually picked, so the
   // one-time load repair below (loadUserPrefs) never reverts a deliberate choice of Score back to release.
-  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=2; }
+  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=3; }
   const list=oamMoodsListReal();
   const idx=list.findIndex(m=>m.id===mood.id);
   watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
@@ -21509,7 +21518,7 @@ function oamWilMoodGateReason(m, c, main){
     // CAS-1396: a people-filter mood ignores genre ticks entirely, so its own gates (ages/awards/years/
     // people) are checked whether or not this film's genre happens to be ticked in it.
     if(!oamKeywordOn(mood) && !oamMoodStyles(mood, c).includes(main)) continue;
-    if(mood.id==="releases" && !oamFilmInReleasesWindow(m, mood)) continue;
+    if(mood.cinemaOnly && !(m.cinema_release && m.cinema_date)) continue;
     const name=esc(moodDisplayName(mood));
     const age=oamFilmAge(m);
     if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)){
@@ -25011,7 +25020,7 @@ function watchNavKey(){
       const mood=currentOamMood();
       return [
         mood && [mood.styles, mood.show, mood.sort, mood.topShare, mood.ages, mood.awards, mood.years,
-                 mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out, mood.people],
+                 mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out, mood.people, mood.cinemaOnly, mood.anySvc],
         ALL_GENRES.map(g=>oaBar(c,g)),
         c.combo,
       ];
@@ -27756,10 +27765,19 @@ function acctFetchKeepalive(init){
         // and piggybacked onto the next real view write (a load must never write — CAS-1218/1243): the new
         // name (only while it still carries a default name), How far back 1 yr where it was Any (keeping the
         // one-year window the old fixed 365 days gave it), and Include films I've watched on.
-        if(watchMoods.some(m=>m && m.v2 && m.id==="releases" && !m.releasesV)){
-          watchMoods = watchMoods.map(m=>(m && m.v2 && m.id==="releases" && !m.releasesV) ? {...m,
-            name: (m.name==="Releases" || m.name==="Latest") ? "All Latest" : m.name,
-            years: m.years ? m.years : 1, watched:true, releasesV:2} : m);
+        // releasesV:3 (Lee, 2026-11-09 later): All Latest became an ordinary mood, so a record below 3 also
+        // gets cinemaOnly on and, where it has none, the Mood Override On at 100% — keeping it a list of
+        // cinema releases regardless of score. Name/years/watched still only change on a never-stamped record.
+        if(watchMoods.some(m=>m && m.v2 && m.id==="releases" && (m.releasesV||0)<3)){
+          watchMoods = watchMoods.map(m=>{
+            if(!(m && m.v2 && m.id==="releases" && (m.releasesV||0)<3)) return m;
+            const first=!m.releasesV;
+            return {...m,
+              name: (first && (m.name==="Releases" || m.name==="Latest")) ? "All Latest" : m.name,
+              years: first ? (m.years ? m.years : 1) : m.years,
+              watched: first ? true : m.watched,
+              cinemaOnly:true, topShare: m.topShare==null ? 100 : m.topShare, releasesV:3};
+          });
           moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
         }
         // CAS-1374: Best 10 is retired — a v2 mood still saved with show:"10" reads as "20" once, in
