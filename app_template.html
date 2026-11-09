@@ -4075,9 +4075,12 @@
     font:600 11.5px/1 var(--font-body);text-decoration:none;cursor:pointer;white-space:nowrap}
   .svcq .svclink i{font-style:normal;color:var(--faint);font-size:10px}
   .svcq .svcsee{margin-left:auto}
-  .svcq .svcsee .chev{display:inline-block;transition:transform .15s;color:var(--faint);font-size:10px}
+  .svcq .svcsee .chev{display:inline-block;transition:transform .15s;color:var(--faint);font-size:13px}
   .svcq.open .svcsee{background:var(--sel-bg);border-color:var(--sel-bd)}
-  .svcq.open .svcsee .chev{transform:rotate(180deg)}
+  .svcq.open .svcsee .chev{transform:rotate(90deg)}
+  /* Lee, 2026-11-09: the "See the N films" button is the row's primary action — accent-outlined, not grey. */
+  .svcq .svcsee{border-color:var(--sel-bd);color:#c9beff}
+  .svcq .svclist li span b{color:var(--ink);font-weight:700}
   .svcq .svclist{display:none;border-top:1px solid var(--line);padding:10px 12px 12px;background:rgba(0,0,0,.18)}
   .svcq.open .svclist{display:block}
   .svcq .svclisthd{font:600 11.5px/1.45 var(--font-body);color:var(--dim);margin-bottom:7px}
@@ -5012,7 +5015,7 @@
 <!-- SERVICE ANALYSIS (CAS-344) — the "which service covers what your agents found" view, given its own
      page instead of living inside Preferences. Body rendered by renderSvcAnalysis(). Reached from the top
      menu (CAS-345), its permanent entry point. -->
-<div class="uscreen" id="svcAnalysis" role="dialog" aria-modal="true" aria-label="Service analysis">
+<div class="uscreen" id="svcAnalysis" role="dialog" aria-modal="true" aria-label="Streaming service analysis">
   <div class="uwrap" id="svcAnalysisBody"></div>
 </div>
 
@@ -14750,8 +14753,6 @@ function serviceAdvice(){
     coveredHuman, coveredAgent, notCovered:total-coveredTotal, coveredTotal, coveredPct,
     mine, worth};
 }
-let svcRankBy="most";   // "most" | "least" — resets to the default every time the screen opens (AC3)
-window.svcSetRank=mode=>{ if(svcRankBy===mode) return; svcRankBy=mode; renderSvcAnalysis(); };
 // CAS-1250: which services' film lists are open, by canonical svc name — a module-level Set rather than
 // per-row state so several can be open at once and survive a re-render (rank switch, another toggle).
 // openSvcAnalysis() clears it; nothing else does, so it also survives a Most films / Least impact switch.
@@ -14765,76 +14766,72 @@ window.svcToggleList=svc=>{
   logEvent("svc_list_toggled", {svc, open});
 };
 window.svcLinkOpened=(svc, kind)=>{ logEvent("svc_link_opened", {svc, kind}); };   // link still opens normally
-// Row markup is IDENTICAL between the two sort modes — only which figure sits in the big right-hand slot
-// changes (AC3: "without adding, removing or changing any figure other than the headline one"). Both the
-// total and the "only here" count are always stated in the row body regardless of which is the headline.
-function svcRowHTML(e, mode){
-  const headline = mode==="least"
-    ? `<span class="svcnum${e.onlyHere===0?" zero":""}">${e.onlyHere}</span><span class="svcnumlbl">you'd lose</span>`
-    : `<span class="svcnum">${e.total}</span><span class="svcnumlbl">films</span>`;
-  const only = e.onlyHere===0 ? "none only here" : `${e.onlyHere} only here`;
+// Lee, 2026-11-09 (option A): every number on this screen counts the films your agent picked for you — its
+// own list with every service and window open, watched and ruled-out films left out (svcAdviceFilms). Each
+// row's big number answers the one question that row is for: a service you have shows what you'd LOSE by
+// dropping it (films no other service of yours carries); one you don't have shows what you'd GAIN. The whole
+// row opens the list of those films, and its button says so in words.
+// The list is the agent's own ranking — best first, each film's score beside its year — so it reads as
+// "the films you'd most want", not an alphabetical dump.
+function svcListHTML(heading, films){
+  const c=oneAgentCriteria();
+  const sc=m=>{ const v=c ? oneScoreFor(m, c) : -1; return v==null ? -1 : v; };
+  const ranked=[...films].sort((x,y)=> sc(y)-sc(x) || x.title.localeCompare(y.title));
+  return `<div class="svclist">
+      <div class="svclisthd">${heading}</div>
+      <ol>${ranked.map(m=>{ const v=sc(m);
+        return `<li>${esc(m.title)}<span>${esc(String(m.year||""))}${v>=0?` · <b>${Math.round(v)}</b>`:""}</span></li>`; }).join("")}</ol>
+    </div>`;
+}
+function svcSeeBtnHTML(svc, n, open){
+  return `<button type="button" class="svcsee" aria-expanded="${open}" onclick="svcToggleList('${escA(svc)}')">${
+    open ? "Hide the list" : `See the ${n} film${n===1?"":"s"}`} <span class="chev">›</span></button>`;
+}
+function svcRowHTML(e){
   const name=svcName(e.svc), links=svcLinksFor(e.svc), open=svcListOpen.has(e.svc), n=e.onlyHere;
   const loginLink = links&&links.web
     ? `<a class="svclink" href="${safeUrl(links.web)}" target="_blank" rel="noopener" onclick="svcLinkOpened('${escA(e.svc)}','login')">Log in <i>↗</i></a>` : "";
+  const why = `${e.total} of your films are on ${esc(name)}` + (e.total>n ? ` · ${e.total-n} are also on another service you have` : "");
+  const headline = `<span class="svcnum${n===0?" zero":""}">${n}</span><span class="svcnumlbl">only here</span>`;
   if(n===0){
     return `<div class="svcrow svcq">
-      <button type="button" class="svctap" disabled>
-        <div class="svcmain">
-          <span class="svcname">${esc(name)}</span>
-          <div class="svcwhy">${e.total} film${e.total===1?"":"s"} — <b>${e.human} you chose</b> · ${only}</div>
-          <span class="svcfree">free to drop</span>
-        </div>
+      <div class="svctap">
+        <div class="svcmain"><span class="svcname">${esc(name)}</span><div class="svcwhy">${why}</div>
+          <span class="svcfree">nothing only here — free to drop</span></div>
         <div class="svcheadline">${headline}</div>
-      </button>
+      </div>
       ${loginLink?`<div class="svcacts">${loginLink}</div>`:""}
     </div>`;
   }
   const heading = n===1
-    ? `Drop ${esc(name)} and you lose this one. No other service you have carries it.`
-    : `Drop ${esc(name)} and you lose these ${n}. No other service you have carries them.`;
+    ? `The one film you'd lose if you dropped ${esc(name)} — no other service you have carries it.`
+    : `The ${n} films you'd lose if you dropped ${esc(name)} — no other service you have carries them.`;
   return `<div class="svcrow svcq${open?" open":""}">
     <button type="button" class="svctap" onclick="svcToggleList('${escA(e.svc)}')">
-      <div class="svcmain">
-        <span class="svcname">${esc(name)}</span>
-        <div class="svcwhy">${e.total} film${e.total===1?"":"s"} — <b>${e.human} you chose</b> · ${only}</div>
-      </div>
+      <div class="svcmain"><span class="svcname">${esc(name)}</span><div class="svcwhy">${why}</div></div>
       <div class="svcheadline">${headline}</div>
     </button>
-    <div class="svcacts">
-      ${loginLink}
-      <button type="button" class="svcsee" aria-expanded="${open}" onclick="svcToggleList('${escA(e.svc)}')">${n} you'd lose <span class="chev">▾</span></button>
-    </div>
-    ${open?`<div class="svclist">
-      <div class="svclisthd">${heading}</div>
-      <ol>${e.onlyHereFilms.map(m=>`<li>${esc(m.title)}<span>${esc(String(m.year||""))}</span></li>`).join("")}</ol>
-    </div>`:""}
+    <div class="svcacts">${loginLink}${svcSeeBtnHTML(e.svc, n, open)}</div>
+    ${open ? svcListHTML(heading, e.onlyHereFilms) : ""}
   </div>`;
 }
 function svcWorthRowHTML(e){
   const name=svcName(e.svc), links=svcLinksFor(e.svc), open=svcListOpen.has(e.svc), n=e.marginal;
   const heading = n===1
-    ? `Add ${esc(name)} and you gain this one. Nothing you have now carries it.`
-    : `Add ${esc(name)} and you gain these ${n}. Nothing you have now carries them.`;
+    ? `The one film you'd gain with ${esc(name)} — nothing you have now carries it.`
+    : `The ${n} films you'd gain with ${esc(name)} — nothing you have now carries them.`;
   const signUpLink = links&&links.web
     ? `<a class="svclink" href="${safeUrl(links.web)}" target="_blank" rel="noopener" onclick="svcLinkOpened('${escA(e.svc)}','signup')">Sign up <i>↗</i></a>` : "";
   const appStoreLink = links&&links.app
     ? `<a class="svclink" href="${safeUrl(links.app)}" target="_blank" rel="noopener" onclick="svcLinkOpened('${escA(e.svc)}','appstore')">App Store <i>↗</i></a>` : "";
+  const why = `${e.total} of your films are on ${esc(name)}` + (e.total>n ? ` · ${e.total-n} you can already watch elsewhere` : "");
   return `<div class="svcrow svcq${open?" open":""}">
     <button type="button" class="svctap" onclick="svcToggleList('${escA(e.svc)}')">
-      <div class="svcmain">
-        <span class="svcname">${esc(name)}</span>
-        <div class="svcwhy">${e.total} film${e.total===1?"":"s"} — ${e.marginal} you can't get anywhere you subscribe</div>
-      </div>
-      <div class="svcheadline"><span class="svcnum plus">+${e.marginal}</span><span class="svcnumlbl">new to you</span></div>
+      <div class="svcmain"><span class="svcname">${esc(name)}</span><div class="svcwhy">${why}</div></div>
+      <div class="svcheadline"><span class="svcnum plus">+${n}</span><span class="svcnumlbl">you'd gain</span></div>
     </button>
-    <div class="svcacts">
-      ${signUpLink}${appStoreLink}
-      <button type="button" class="svcsee" aria-expanded="${open}" onclick="svcToggleList('${escA(e.svc)}')">${n} you'd gain <span class="chev">▾</span></button>
-    </div>
-    ${open?`<div class="svclist">
-      <div class="svclisthd">${heading}</div>
-      <ol>${e.marginalFilms.map(m=>`<li>${esc(m.title)}<span>${esc(String(m.year||""))}</span></li>`).join("")}</ol>
-    </div>`:""}
+    <div class="svcacts">${signUpLink}${appStoreLink}${svcSeeBtnHTML(e.svc, n, open)}</div>
+    ${open ? svcListHTML(heading, e.marginalFilms) : ""}
   </div>`;
 }
 function renderSvcAnalysis(){
@@ -14845,57 +14842,45 @@ function renderSvcAnalysis(){
     // Same zero-population number, two honest reasons: no agent has matched anything yet, or every match has
     // already been watched/blocked (AC7) — the copy shouldn't claim "create an agent" when one already exists.
     body = cascades.some(c=>!c.paused)
-      ? `<div class="pnote">Every film your agents matched is already watched or ruled out — nothing to
+      ? `<div class="pnote">Every film your agent picked is already watched or ruled out — nothing to
           measure your services against right now.</div>`
       : `<div class="pnote">Create an agent and it starts finding films for you — then we'll work out which
           of your services cover them, and which one might be worth adding.</div>`;
   } else {
-    const mineRows=[...a.mine].sort((x,y)=>
-      svcRankBy==="least" ? (x.onlyHere-y.onlyHere || y.total-x.total) : (y.total-x.total || x.svc.localeCompare(y.svc)));
+    // Biggest loss first, so the bottom of the list is always the cheapest service to drop.
+    const mineRows=[...a.mine].sort((x,y)=> (y.onlyHere-x.onlyHere) || (y.total-x.total) || x.svc.localeCompare(y.svc));
     const mineBody = !a.mine.length
-      ? `<div class="pnote">You haven't added any services yet — ⚙️ Services is where you tell us what you have.</div>`
-      : `<div class="svcseg" role="tablist" aria-label="Rank my services by">
-          <button type="button" role="tab" aria-selected="${svcRankBy==="most"}" class="svcsegbtn${svcRankBy==="most"?" on":""}" onclick="svcSetRank('most')">Most films</button>
-          <button type="button" role="tab" aria-selected="${svcRankBy==="least"}" class="svcsegbtn${svcRankBy==="least"?" on":""}" onclick="svcSetRank('least')">Least impact to drop</button>
-        </div>
-        ${mineRows.map(e=>svcRowHTML(e, svcRankBy)).join("")}
-        <div class="advfoot">"Only here" is what you'd lose if you dropped it — films no other service you have carries.</div>`;
+      ? `<div class="pnote">You haven't told Cascade which services you have yet — add them in My streaming services.</div>`
+      : mineRows.map(svcRowHTML).join("");
     const worthBody = !a.worth.length
-      ? `<div class="pnote">No other service would add anything you don't already have.</div>`
+      ? `<div class="pnote">No other service would add a film your agent picked that you can't already watch.</div>`
       : a.worth.map(svcWorthRowHTML).join("")
-        + `<div class="advfoot">Ranked by what each one would ADD, not by its total catalogue. We don't hold
-           subscription prices, so nothing here is a cost comparison.</div>`;
+        + `<div class="advfoot">We don't hold subscription prices, so this is films gained, not a cost comparison.</div>`;
     // CAS-1124 AC4: a streaming total of 0 (population exists, but none of it is on a streaming service)
     // replaces the numeric headline with a plain statement — there is nothing to show a bar/percentage of.
     const headline = a.total
       ? `<div class="svchead">
-          <div class="svcheadnum">${a.coveredTotal}<span class="svcheadof">of ${a.total} covered · ${a.coveredPct}%</span></div>
-          <div class="svcbar">
-            <span class="human" style="width:${a.coveredHuman/a.total*100}%"></span>
-            <span class="agent" style="width:${a.coveredAgent/a.total*100}%"></span>
-          </div>
-          <div class="svcleg"><span class="dot human"></span>${a.coveredHuman} you chose
-            <span class="dot agent"></span>${a.coveredAgent} suggested
-            <span class="dot none"></span>${a.notCovered} not covered</div>
+          <div class="svcheadnum">${a.coveredTotal}<span class="svcheadof">of ${a.total} are on your services · ${a.coveredPct}%</span></div>
+          <div class="svcbar"><span class="human" style="width:${a.coveredTotal/a.total*100}%"></span></div>
+          ${a.notCovered ? `<div class="svcleg">The other ${a.notCovered} are only on services you don't have — see what you'd gain below.</div>` : ""}
         </div>`
-      : `<div class="pnote">None of the films your agents want are on a streaming service yet.</div>`;
+      : `<div class="pnote">None of the films your agent picked are on a streaming service yet.</div>`;
     body=`
-      <div class="svcpop">Measured against the <b>${a.total}</b> film${a.total===1?"":"s"} your agents want
-        that are on a streaming service. Films you've watched are excluded.</div>
-      <div class="flabel">My services</div>
+      <div class="svcpop">Every number here counts the <b>${a.total}</b> film${a.total===1?"":"s"} your agent picked
+        for you that are on a streaming service — not the whole catalogue. Films you've watched are left out.</div>
       ${headline}
+      <div class="flabel">Services you have — what you'd lose by dropping each</div>
       ${mineBody}
-      <div class="flabel">Worth adding</div>
+      <div class="flabel">Services you don't have — what you'd gain</div>
       ${worthBody}`;
   }
   el.innerHTML=`
     <div class="ostop"><button class="osback" type="button" onclick="closeSvcAnalysis()" aria-label="Back">←</button>
-      <h2 class="osh">Service analysis</h2></div>
-    <p class="ossub">What your services actually cover, and what would change if you added or dropped one.</p>
+      <h2 class="osh">Streaming service analysis</h2></div>
+    <p class="ossub">How many of the films your agent picked you'd lose by dropping a service, or gain by adding one.</p>
     ${body}`;
 }
 window.openSvcAnalysis=()=>{
-  svcRankBy="most";
   svcListOpen.clear();   // the screen always opens with every list closed
   renderSvcAnalysis();
   $("svcAnalysis").scrollTop=0;
