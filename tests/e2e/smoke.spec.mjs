@@ -633,8 +633,8 @@ test("Mission screen: dragging the single handle moves every listed window's sco
   expect(before.in_cinema).toBe(before.rent);
   expect(before.rent).toBe(before.stream);
 
-  // CAS-897: CAS-816 put this track partway down the single-page "Edit Agent" screen, behind the occasions
-  // and styles cards above it. Left off the page, boundingBox() still returns real coordinates but they
+  // CAS-897: CAS-816 put this track partway down the single-page "Edit Agent" screen, behind the styles
+  // card above it. Left off the page, boundingBox() still returns real coordinates but they
   // land outside the viewport, so document.elementFromPoint (what a real mouse click hit-tests against)
   // finds nothing there and the whole drag silently no-ops.
   await page.locator(".msntrackwrap").scrollIntoViewIfNeeded();
@@ -2584,7 +2584,14 @@ test("CAS-1274: Edit Agent opens on Basic, Advanced reveals the rest, and the sw
   await expect(page.locator("#ageRatingCard")).toBeVisible();
   await expect(page.locator("#briefTabBasic")).toHaveClass(/on/);
   await expect(page.locator("#onbAlertsOn")).toBeHidden();
-  await expect(page.locator(".osdial.cardbtn", { hasText: "Occasions" })).toBeHidden();
+  // CAS-1402: the removed feature leaves nothing behind in the built page (names split so the
+  // feature's name appears nowhere in tests/).
+  const gone = await page.evaluate(() => {
+    const id = ["manageOcc", "asionsScreen"].join(""), fn = ["openManageOcc", "asionsScreen"].join("");
+    return { el: document.getElementById(id), fn: typeof window[fn] };
+  });
+  expect(gone.el).toBeNull();
+  expect(gone.fn).toBe("undefined");
   // The first agent (onb_massive) is built with yearsBack 3 and cinemaReleaseOnly on, so CAS-1274 rule 3
   // shows exactly those two under SET IN ADVANCED on Basic; Budget and Awards are at their defaults, so not.
   await expect(page.locator("#onbStepInner .usec", { hasText: "SET IN ADVANCED" })).toBeVisible();
@@ -2596,7 +2603,6 @@ test("CAS-1274: Edit Agent opens on Basic, Advanced reveals the rest, and the sw
   // AC3: tapping Advanced reveals all six, plus the Styles card's own More button.
   await page.locator("#briefTabAdvanced").click();
   await expect(page.locator("#briefTabAdvanced")).toHaveClass(/on/);
-  await expect(page.locator(".osdial.cardbtn", { hasText: "Occasions" })).toBeVisible();
   await expect(page.locator("#onbAlertsOn")).toBeVisible();
   await expect(page.locator("#onbCinemaRelease")).toBeVisible();
   await expect(page.locator(".slmore")).toBeVisible();

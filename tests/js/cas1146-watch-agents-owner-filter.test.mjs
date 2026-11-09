@@ -1,9 +1,9 @@
-// CAS-1146: watchScopeRows' no-occasion branch admitted a film whenever ANY still-ticked agent listed it
+// CAS-1146: watchScopeRows' agent branch admitted a film whenever ANY still-ticked agent listed it
 // (MOVIES.filter(m=>acs.some(c=>listedBy(m,c))...)), never consulting filmOwnerCascade (the film's single
 // CAS-709 global owner). So unticking an agent in "Agents to include" left its films on screen whenever a
 // still-ticked agent happened to also list the same film, under the UNTICKED agent's own name/chip. Fix:
 // once at least one agent is unticked for the tab, a film's owner must itself be ticked; all-ticked is
-// untouched. The occasion branch (CAS-793) already worked this way and is not touched by this ticket.
+// untouched.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadEngine } from "./engine.mjs";
@@ -62,7 +62,7 @@ function wireFilm(id, listingCascadeIds){
   };
 }
 
-test("CAS-1146: watchScopeRows' no-occasion branch admits a film only when its OWNER is a ticked agent", () => {
+test("CAS-1146: watchScopeRows' agent branch admits a film only when its OWNER is a ticked agent", () => {
   const a = seedCascade("cas1146-a", 0);   // lower order -> owns anything it co-lists with b
   const b = seedCascade("cas1146-b", 1);
   const savedTab = E.watchTab;

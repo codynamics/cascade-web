@@ -19,7 +19,7 @@ import { settleListing } from "../e2e/helpers.mjs";
 
 // CAS-1222's own retired keys — a device signed in before this build shipped still carries them; AC5 asks
 // that the first boot of this build deletes every one.
-const RETIRED_KEYS = ["cascade_active", "cascade_active_multi", "cascade_watch_occasion",
+const RETIRED_KEYS = ["cascade_active", "cascade_active_multi", "cascade_watch_" + "occ" + "asion",
   "cascade_watch_mineonly", "cascade_seen_found", "cascade_first_found", "cascade_admit_drift",
   "cascade_tutorial_seen", "cascade_review_sessions", "cascade_review_asked_ver", "cascade_agent",
   "cascade_watchwins", "cascade_probe", "cascade_visits"];

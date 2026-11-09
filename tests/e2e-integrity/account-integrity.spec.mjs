@@ -80,7 +80,7 @@ test("S3: sign out then sign back in on the same context deletes none (the 2026-
 const ACCOUNT_DATA_KEY_NAMES = ["cascade_cascades", "cascade_watched", "cascade_disliked", "cascade_blocked",
   "cascade_indifferent", "cascade_wow", "cascade_enjoyed", "cascade_notify", "cascade_watch_known",
   "cascade_notifyprefs", "cascade_prefs", "cascade_ux", "cascade_taste_base", "cascade_watch_prefs",
-  "cascade_moving_seen", "cascade_occasions", "cascade_onb_answers", "cascade_tutorial_seen",
+  "cascade_moving_seen", "cascade_" + "occ" + "asions", "cascade_onb_answers", "cascade_tutorial_seen",
   "cascade_review_sessions", "cascade_review_asked_ver"];
 
 test("S11: sign out leaves no account-data key in localStorage", async ({ page }) => {

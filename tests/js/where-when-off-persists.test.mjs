@@ -86,7 +86,7 @@ function signOut(E){
 function serverRow(userId, overrides){
   return { user_id: userId, sub_services: [], store_services: [], services_only: false,
     touched: true, taste: {}, watch_windows: {}, never_show: [], onb_depth: "shallow",
-    framing: false, moving_seen: {}, occasions: [], ref_code: "CAS1156REF", ...overrides };
+    framing: false, moving_seen: {}, ref_code: "CAS1156REF", ...overrides };
 }
 const selectServerRow = row => state =>
   (state.table === "user_prefs" && state.kind === "select") ? { data: [row], error: null } : { data: [], error: null };

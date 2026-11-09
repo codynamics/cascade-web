@@ -47,7 +47,7 @@ function signOut(E){
 function serverRow(userId, overrides){
   return { user_id: userId, sub_services: ["Netflix", "Stan"], store_services: [], services_only: false,
     touched: true, taste: { mood: 1 }, watch_windows: { cinema: true }, never_show: [], onb_depth: "shallow",
-    framing: false, moving_seen: { x: 1 }, occasions: [], ref_code: "CAS1045REF", ...overrides };
+    framing: false, moving_seen: { x: 1 }, ref_code: "CAS1045REF", ...overrides };
 }
 const selectServerRow = row => state =>
   (state.table === "user_prefs" && state.kind === "select") ? { data: [row], error: null } : { data: [], error: null };

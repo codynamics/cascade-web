@@ -16,7 +16,7 @@ async function buildOnboardedAccount(page){
 // renders its own .agrow/.agname markup for the first-built agent and never removes it from the DOM once
 // the flow moves on, so an unscoped page-wide .agrow query here resolved to two elements (a Playwright
 // strict-mode violation) once the real Agents screen opened: the stale reveal row (bare WHO_LABELS text,
-// no occasions or alerts) alongside the real one (occasions + "🔔 Alerts on"). The Agents screen itself was
+// no alerts) alongside the real one ("🔔 Alerts on"). The Agents screen itself was
 // correct; only this helper's own query was too broad to say "on the Agents screen" as its title claims.
 const agentRow = (page, name) => page.locator("#agentsScreen .agrow", { has: page.locator(".agname", { hasText: name }) });
 
@@ -31,23 +31,15 @@ test("CAS-1198/CAS-1297 AC6: the Agents screen shows Alerts on for every built a
   await expect(agentRow(page, "Personal Favs").locator(".agwho")).toContainText("🔔 Alerts on");
 });
 
-test("CAS-1198/CAS-1297 AC5: the Edit Agent page's ALERTS switch sits under Occasions inside Advanced, defaults on, toggles, survives Back/reopen, and has no horizontal overflow", async ({ page }) => {
+test("CAS-1198/CAS-1297 AC5: the Edit Agent page's ALERTS switch sits inside Advanced, defaults on, toggles, survives Back/reopen, and has no horizontal overflow", async ({ page }) => {
   await buildOnboardedAccount(page);
   await openAgentsScreenFromNav(page);
   await agentRow(page, "Personal Favs").locator(".ag-edit").click();
   await expect(page.locator(".osh.eahn")).toHaveText("Personal Favs");   // CAS-531: the page header IS the name
 
-  // CAS-1274: Alerts lives under the Advanced tab now, alongside Occasions — not its own collapsible
-  // section with a dedicated "ALERTS" heading.
+  // CAS-1274: Alerts lives under the Advanced tab now — not its own collapsible section with a dedicated
+  // "ALERTS" heading.
   await page.locator("#briefTabAdvanced").click();
-  const sectionOrder = await page.evaluate(() => {
-    const body = document.querySelector("#onbStepInner");
-    const occasions = body.querySelector(".osdial.cardbtn");           // occasionsCardHTML()'s own card
-    const alerts = document.querySelector("#onbAlertsOn");
-    const before = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-    return { occasionsBeforeAlerts: occasions && alerts ? before(occasions, alerts) : false };
-  });
-  expect(sectionOrder.occasionsBeforeAlerts).toBe(true);
 
   // CAS-1297: every agent, including Personal Favs, now opens with alerts on by default.
   const sw = page.locator("#onbAlertsOn");
