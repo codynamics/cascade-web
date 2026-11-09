@@ -1,15 +1,15 @@
-// CAS-1174: a brand-new signup can lose its onboarding draft — Occasions ends up empty, "only my
+// CAS-1174: a brand-new signup can lose its onboarding draft — "only my
 // services" ends up off — even though complete_membership() returns 'created' and the agents
 // themselves survive untouched. Root cause (confirmed by this test, not just read off the code):
 // reconcileOnReturn (the focus/visibilitychange/3-min-heartbeat handler, app_template.html's
 // account-sync IIFE) calls loadUserPrefs() unconditionally once a session exists — it has no
 // onbDraftModeOn guard, unlike every saveX() chokepoint the CAS-1099 draft already protects
-// (saveOccasionReg/savePrefs/saveCascades/saveNotifyPrefs/saveTasteBase). Email OTP sign-up leaves
+// (savePrefs/saveCascades/saveNotifyPrefs/saveTasteBase). Email OTP sign-up leaves
 // a session active for the whole code-entry wait (the ticket's own observed timeline), so a
 // reconcile landing in that window finds no user_prefs row yet, bootstrap-inserts an empty one
 // (user_id only — every other column at its table default), and a SECOND reconcile — the same
 // heartbeat firing again, or another tab focus — then finds that empty row and overwrites the
-// in-memory draft (occasionReg, prefs.on) with it, well before membCompleteNewMembership() ever
+// in-memory draft (prefs.on) with it, well before membCompleteNewMembership() ever
 // builds its RPC payload from that same now-corrupted memory. cascades is untouched throughout
 // (loadUserPrefs never touches it), which is why the agents themselves always survived intact.
 // Fix: loadUserPrefs() gets the same one-line "while a draft is still memory-only, a server
@@ -51,7 +51,7 @@ function fakeAccountClient({ ownerId }){
     const incoming = rows[0] || {};
     if(table === "user_prefs"){
       const defaults = { sub_services:[], store_services:[], services_only:false, touched:null,
-        taste:{}, watch_windows:{}, occasions:[], never_show:null, onb_depth:null, framing:null,
+        taste:{}, watch_windows:{}, never_show:null, onb_depth:null, framing:null,
         moving_seen:{}, ref_code:null };
       tables.user_prefs = Object.assign({}, defaults, tables.user_prefs || {}, incoming);
     } else if(table === "notify_prefs"){
@@ -77,7 +77,7 @@ function fakeAccountClient({ ownerId }){
           sub_services: p.prefs.sub_services || [], store_services: p.prefs.store_services || [],
           services_only: !!p.prefs.services_only, touched: p.prefs.touched,
           taste: p.prefs.taste || {}, watch_windows: p.prefs.watch_windows || {},
-          occasions: p.prefs.occasions || [], never_show: p.prefs.never_show || [],
+          never_show: p.prefs.never_show || [],
           onb_depth: p.prefs.onb_depth || null, framing: p.prefs.framing,
           moving_seen: {}, membership_completed_at: "2026-10-03T08:53:43.283Z", ref_code: "CAS1174REF",
         };
@@ -104,13 +104,11 @@ test("CAS-1174: a reconcile mid-wait must not discard the draft before membershi
   const SIGNUP_EMAIL = "cas1174-signup@example.com";
   const AGENT_ID = "a0000000-0000-4000-8000-00000000c001";
 
-  // The onboarding draft, exactly as v2_done + the services step leave it: one agent pointed at a
-  // freshly created "Me" occasion, services-only armed, touched.
+  // The onboarding draft, exactly as v2_done + the services step leave it: one agent,
+  // services-only armed, touched.
   const client = fakeAccountClient({ ownerId: OWNER });
   E.setOnbDraftModeOn(true);
   const agent = E.normCascade({ id: AGENT_ID, name: "Massive Movies", kind: "stream", status: [] });
-  const occ = E.createOccasion("Me");
-  agent.occasions = [occ.id];
   E.cascades.push(agent);
   // The services step: at least two streaming services and one rental service, "only my services" armed.
   const CHOSEN_SUB = E.SUB_SERVICES.slice(0, 2);
@@ -132,7 +130,6 @@ test("CAS-1174: a reconcile mid-wait must not discard the draft before membershi
   E.CascadeAuth.status = "signed-in"; E.CascadeAuth.user = { id: OWNER, email: SIGNUP_EMAIL };
 
   const before = {
-    occasionReg: JSON.stringify(E.occasionReg),
     prefsOn: E.prefs.on,
     prefsSub: JSON.stringify([...E.prefs.sub].sort()),
     prefsStore: JSON.stringify([...E.prefs.store].sort()),
@@ -148,8 +145,6 @@ test("CAS-1174: a reconcile mid-wait must not discard the draft before membershi
   await E.CascadePersistence.loadUserPrefs();
 
   // AC4: nothing about the draft may change before the code is verified.
-  assert.equal(JSON.stringify(E.occasionReg), before.occasionReg,
-    "a reconcile mid-wait must not touch the in-memory occasion register");
   assert.equal(E.prefs.on, before.prefsOn,
     "a reconcile mid-wait must not touch the in-memory services-only answer");
   assert.equal(JSON.stringify([...E.prefs.sub].sort()), before.prefsSub,
@@ -171,14 +166,6 @@ test("CAS-1174: a reconcile mid-wait must not discard the draft before membershi
   const p = call.params.p;
 
   // AC2
-  assert.ok(p.prefs.occasions.some(o => o.name === "Me"),
-    "the payload's prefs.occasions must still hold the 'Me' entry");
-  for(const a of p.agents){
-    for(const occId of (a.criteria.occasions || [])){
-      assert.ok(p.prefs.occasions.some(o => o.id === occId),
-        `agent occasion id ${occId} must resolve to an entry in prefs.occasions`);
-    }
-  }
   assert.equal(p.prefs.services_only, true, "the payload must still carry services_only: true");
   assert.deepEqual([...p.prefs.sub_services].sort(), [...CHOSEN_SUB].sort(),
     "the payload's sub_services must equal the services step's own choice");
@@ -188,11 +175,6 @@ test("CAS-1174: a reconcile mid-wait must not discard the draft before membershi
   assert.equal(p.notify.email_address, SIGNUP_EMAIL, "the payload's email must be the sign-up address");
 
   // AC3: after the stubbed RPC returns 'created' and the account fan-out has finished.
-  assert.ok(E.occasionReg.length >= 1, "occasionReg must hold at least one entry after landing");
-  const landedAgent = E.cascades[0];
-  const landedOccId = (landedAgent.occasions || [])[0];
-  assert.equal(E.occasionName(landedOccId), "Me",
-    "the first agent's occasion id must resolve to 'Me' after landing");
   assert.deepEqual([...E.prefs.sub].sort(), [...CHOSEN_SUB].sort(),
     "prefs.sub must still hold the chosen streaming services after landing");
   assert.deepEqual([...E.prefs.store].sort(), [...CHOSEN_STORE].sort(),

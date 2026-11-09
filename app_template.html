@@ -1474,7 +1474,7 @@
   .mvchip.new{background:rgba(72,199,142,.16);border-color:var(--green);color:#a7eccb}
   .mvchip.changed{background:rgba(90,169,240,.16);border-color:var(--blue);color:#bcdcff}
   /* CAS-904: the period row — one full-width labelled pill (the same .pickerwrap/.pickerbtn component
-     Watch's OCCASION/PICKED BY pills use, CAS-840), replacing the CAS-650 .chip.gen row so period
+     Watch's PICKED BY pill uses, CAS-840), replacing the CAS-650 .chip.gen row so period
      ("filters the list") and the status rail below ("jumps to a section") no longer read as two stacked
      filter rows. */
   .mvwindows{padding:0 2px 12px}
@@ -2270,7 +2270,7 @@
     text-transform:uppercase;border-radius:6px;padding:3px 7px;white-space:nowrap}
   .reqscope.accent{background:rgba(124,92,255,.16);border:1px solid var(--accent);color:var(--selink)}
   .reqscope.muted{background:rgba(255,255,255,.05);border:1px solid var(--line);color:var(--faint)}
-  /* CAS-816: Styles (and Occasions) are tappable summary cards in the same osdial shape the score/requirement
+  /* CAS-816: Styles are tappable summary cards in the same osdial shape the score/requirement
      cards use, rather than their own bespoke door style — a plain button reset plus a resting chevron.
      CAS-936: Age rating left this shape — its chips are now directly tappable in place, so it is a plain
      .osdial like Budget/Awards/How-far-back, not a .cardbtn door. */
@@ -2724,8 +2724,8 @@
   .watchsearchwrap{display:flex;align-items:center;gap:8px;margin:9px 12px 0}
   .watchsearchwrap .search{padding:9px 32px 9px 12px;font-size:14px}
   .watchsearchwrap .searchclear{width:24px;height:24px}
-  /* CAS-840: OCCASION + PICKED BY — two-line pills sharing the row's spare width (flex:1 1 0), replacing
-     both the CAS-822 invisible-<select>-stretched-over-the-pill device (Occasion) and the Filters sheet's
+  /* CAS-840: PICKED BY — a two-line pill sharing the row's spare width (flex:1 1 0), replacing
+     both the CAS-822 invisible-<select>-stretched-over-the-pill device and the Filters sheet's
      segmented control (Picked by, CAS-719) with one shared component: a real button opening an in-app
      listbox below it (.pickpop) — on desktop the native <select> opened a raw OS listbox belonging to no
      part of this app. Only tinted (.on) once its value is off the default, so two pills that are usually
@@ -2836,7 +2836,7 @@
      card's edge. The active-dot still marks "off the default"; the current choice is a tooltip (title on
      the button, set by syncSortCtl).
      CAS-1181: #sortCtl is now the real button (togglePickerFor opens the shared listbox popover, same as
-     the Occasion/Picked by pills) — the invisible <select>-stretched-over-the-icon device is gone; #sort
+     the Picked by pill) — the invisible <select>-stretched-over-the-icon device is gone; #sort
      itself survives only as inert state (hidden, tabindex="-1") for syncSortCtl's own option lookup. */
   .sortctl{position:relative}
   /* The icon is decorative (aria-hidden) and position:relative so it can anchor .sortdot. */
@@ -3553,8 +3553,7 @@
   .wilbtn.wilsec{border:0;background:none;color:var(--dim);padding:5px 0}
   .wilhighlight{box-shadow:0 0 0 2px var(--gold);transition:box-shadow .2s ease}
 
-  /* ---- CAS-775: Occasions screen — same .ucard/.urow row language as Account, plus rename/delete
-     affordances no other .urow row needs (an Occasion is a thing you can rename or remove yourself). ---- */
+  /* ---- CAS-775: rename/delete affordances for .urow rows (Manage Lists). ---- */
   .listact{flex:0 0 auto;width:30px;height:30px;border-radius:8px;border:1px solid var(--line);
     background:rgba(255,255,255,.04);color:var(--dim);cursor:pointer;display:grid;place-items:center;
     font-size:13px;line-height:1;margin-left:2px}
@@ -3586,11 +3585,6 @@
   .ymcasclist .agname{font-size:14px;line-height:1.3;flex:1 1 auto}
   .ymcasclist .agsum{font-size:11px;line-height:1.3;-webkit-line-clamp:1;flex:0 0 auto;white-space:nowrap;
     font-weight:700;color:var(--faint)}
-  /* CAS-777: Watch's own agent-narrowing row (ag-occ) stacked a second line for the agent's occasions.
-     CAS-1226 removed the row's one call site (renderWatchSheet); kept here unused, same as agentOccasionsLine
-     itself, since nothing requires either to go and CAS-779 AC2 still exercises the line builder directly. */
-  .ymcasclist .agrow.ag-occ .agmain{flex-direction:column;gap:1px}
-  .agocc{font-size:11px;line-height:1.3;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ymcasclist .ymcasctgl{width:22px;height:22px;font-size:11px}
   /* CAS-688: Edit sits between the name/count and the include tick, clearly distinct from either — same
      compact sizing as the row's other controls so a 3-control row still fits without wrapping. */
@@ -5049,14 +5043,6 @@
   <div class="uwrap" id="notifyBody"></div>
 </div>
 
-<!-- OCCASIONS (CAS-775) — manage the user's Occasions register: create, rename, delete. Replaces CAS-768's
-     derived-from-agents set, which could not hold an occasion no agent yet carried, be renamed, or be
-     deleted. Body rendered by
-     renderManageOccasionsScreen(). Reached from the top menu's Settings screen (CAS-1126). -->
-<div class="uscreen" id="manageOccasionsScreen" role="dialog" aria-modal="true" aria-label="Occasions">
-  <div class="uwrap" id="manageOccasionsBody"></div>
-</div>
-
 <!-- ABOUT (CAS-345 route shell / CAS-346 content) — the top menu's fourth surface. Holds the build
      provenance stamp (version/build/commit/env/builtAt) that used to live on the My streaming services
      modal. Body rendered by renderAbout(). -->
@@ -5149,10 +5135,10 @@ const CLIENT_HEALTH_EVENT_CAP = 10;
 let clientHealthEventCounts = {};
 // CAS-1099: true for the span of a first-run, signed-out onboarding walkthrough (set at flowStart() when
 // signed out, cleared at flowStop()) — every save*() chokepoint for the onboarding draft (agents, services,
-// taste, occasions, notify choices) checks this before touching localStorage, so none of it reaches disk
+// taste, notify choices) checks this before touching localStorage, so none of it reaches disk
 // until complete_membership() has actually run. Declared this early (flowOn/membNeedsEmail, declared much
-// further down, must never be read from inside a save*() function — migrateOccasionNamesIfNeeded() below
-// calls saveCascades() at top-level load time, before either would exist, same TDZ hazard logClientHealthEvent
+// further down, must never be read from inside a save*() function — a top-level call to
+// saveCascades() at load time would run before either exists, same TDZ hazard logClientHealthEvent
 // is commented against above) so every save*() function can check a plain boolean with no ordering risk.
 let onbDraftModeOn = false;
 // logEvent (below, ~line 5557) isn't defined yet this early — it's a hoisted function declaration, so the
@@ -5836,8 +5822,8 @@ const storageWorks = (()=>{ try{ return typeof localStorage !== "undefined"; }ca
 // Supabase SDK namespaces its own session key per project).
 // CAS-1222: shrunk to exactly these nine — every device-only UX key CAS-1220 flagged (active agent(s),
 // per-tab mine-only, the Found-as-last-looked-at snapshot, tutorial seen, the review-prompt pair, the
-// onboarding invite draft, the admission-drift diagnostic, the selected-occasion filter) now lives on the
-// account (user_prefs.view) instead, or — cascade_watch_occasion (dead since CAS-1223), cascade_watchwins
+// onboarding invite draft, the admission-drift diagnostic, the old Watch filter) now lives on the
+// account (user_prefs.view) instead, or — cascade_watch_filter (dead since CAS-1223), cascade_watchwins
 // (confirmed to have no reader), cascade_probe/cascade_visits (both confirmed dead, see storageWorks and
 // `visits` above) — was simply retired outright. What's left is either not account data (a device-only
 // fact with nowhere else to live) or acctOp's own live, unsent-writes queue.
@@ -6372,110 +6358,6 @@ reconcileActiveIds();
 // onboarding run never has it resurface.
 try{ localStorage.removeItem("cascade_onb_v2_committed"); }catch(e){}
 try{ localStorage.removeItem("cascade_onb_answers_v2"); }catch(e){}
-
-// ---- CAS-775: Occasions register — account-level, one per user, replacing CAS-768's derived-from-agents
-// set (the list of occasions was the union of what agents happened to carry, so one that no agent carried
-// could not exist, be renamed, or be deleted). c.occasions on an agent now holds REGISTER IDS, not names —
-// renaming is one edit here, no agent rewritten. Same whole-object jsonb shape and NULL-carry-up rule as
-// taste/watch_windows/moving_seen (CAS-561/742): an empty array is a real, distinct answer from "no device
-// has saved this yet", so saveOccasionReg below only skips a write when the JSON is byte-identical, never
-// when the array is empty.
-// CAS-1221: held in memory only — loadUserPrefs() (the account-sync IIFE, below) is the only thing that
-// ever populates this, straight off the account's own user_prefs.occasions column.
-function loadOccasionReg(){ return []; }
-const occasionReg = loadOccasionReg();
-function saveOccasionReg(){}
-const occasionName = id => (occasionReg.find(o=>o.id===id)||{}).name || "";
-const occasionRegSorted = () => [...occasionReg].sort((a,b)=>a.name.localeCompare(b.name));
-// AC11: an id matching no register entry is dropped on save — the one choke point commitDraft's whitelist
-// (and any other future save path) filters an agent's occasions through, so "ignored on read" (occasionName/
-// occasionsSummary above already skip an unresolvable id) and "gone after the next save" share one rule.
-// CAS-779 defect 2: that rule is only safe once this device has actually SEEN the account's register — with
-// it still in flight (window.CascadePersistence.userPrefsReady false), an empty local occasionReg is not
-// evidence an id is stale, so nothing gets pruned yet.
-const pruneOccasionIds = ids => {
-  const cp = window.CascadePersistence;
-  if(cp && cp.userPrefsReady===false) return (ids||[]).slice();
-  return (ids||[]).filter(id=>occasionReg.some(o=>o.id===id));
-};
-// NAMING RULES (CAS-775): trim, cap at 24, case-insensitive de-dup against existing entries, empty rejected.
-function normOccasionName(name){ return (name||"").trim().slice(0,24); }
-function findOccasionByName(name){
-  const nm=name.toLowerCase();
-  return occasionReg.find(o=>o.name.toLowerCase()===nm);
-}
-// Idempotent by name — typing a name that's a case-insensitive match for an existing entry ticks that
-// entry rather than creating a second one (AC7 of CAS-768, unchanged by this ticket). Writes straight to
-// the register — not to any draft — so every other agent can offer it at once.
-function createOccasion(name){
-  const nm=normOccasionName(name); if(!nm) return null;
-  const existing=findOccasionByName(nm); if(existing) return existing;
-  const o={id:cascadeNewId(), name:nm};
-  occasionReg.push(o);
-  saveOccasionReg();
-  logEvent("occasion_created",{});
-  return o;
-}
-function renameOccasion(id, name){
-  const nm=normOccasionName(name); if(!nm) return;
-  const o=occasionReg.find(x=>x.id===id); if(!o) return;
-  o.name=nm;
-  saveOccasionReg();
-  logEvent("occasion_renamed",{});
-}
-// How many agents would lose this occasion — read by the delete confirmation's own copy before anything changes.
-function occasionAgentCount(id){
-  return cascades.filter(c=>(c.occasions||[]).includes(id)).length;
-}
-// Removes the register entry AND its id from every agent carrying it. Deliberately does not touch
-// cascSigOf (occasions are excluded from it, CAS-768) or agent_films/admitDrift — an occasion carries no
-// admission criteria, so losing one must never trigger a re-review.
-function deleteOccasion(id){
-  const i=occasionReg.findIndex(x=>x.id===id); if(i<0) return;
-  occasionReg.splice(i,1);
-  saveOccasionReg();
-  cascades.forEach(c=>{
-    if(!Array.isArray(c.occasions)) return;
-    const j=c.occasions.indexOf(id);
-    if(j>=0) c.occasions.splice(j,1);
-  });
-  saveCascades();
-  if(watchOccasion===id) window.setWatchOccasion(null);
-  logEvent("occasion_deleted",{});
-}
-// CAS-779 defect 1: a v1.0.0 legacy name is a short human string; a register id is a UUID from
-// cascadeNewId(). A device whose register is empty because the ACCOUNT's copy hasn't synced yet (rather
-// than because this is a genuine v1.0.0 upgrade) still has agents carrying real ids, not names — without
-// this check every one of those ids reads as a "legacy name" and gets an id-named register entry invented
-// for it, which is the raw-UUID chip Lee saw.
-const OCCASION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isOccasionIdShape = s => typeof s==="string" && OCCASION_ID_RE.test(s);
-// MIGRATION (CAS-775): the shipped build stored occasion NAMES in c.occasions. Runs once, gated on the
-// register still being empty — once it has any entry (from this migration or from a real createOccasion
-// call) the gate never opens again, which is what makes a second call a no-op (AC8) with no separate
-// "have I migrated" flag to keep in sync.
-function migrateOccasionNamesIfNeeded(){
-  if(occasionReg.length) return;
-  const legacyNames=new Set();
-  cascades.forEach(c=>(c.occasions||[]).forEach(o=>{ if(typeof o==="string" && !isOccasionIdShape(o)) legacyNames.add(o); }));
-  if(!legacyNames.size) return;
-  const byName=new Map();
-  [...legacyNames].forEach(name=>{
-    const o={id:cascadeNewId(), name};
-    occasionReg.push(o);
-    byName.set(name, o.id);
-  });
-  saveOccasionReg();
-  cascades.forEach(c=>{
-    if(!Array.isArray(c.occasions) || !c.occasions.length) return;
-    c.occasions = c.occasions.map(name=>byName.get(name)).filter(Boolean);
-  });
-  saveCascades();
-  // CAS-1222: `watchOccasion` itself is retired to an in-memory-only null (dead since CAS-1223, which
-  // removed the Watch screen's only UI that could ever set it) — there is no longer a localStorage value
-  // for this migration to carry forward.
-}
-migrateOccasionNamesIfNeeded();
 
 // CAS-269: "Live AU data · " is gone from the freshness line for the same reason the chip is: it is a
 // constant. What is left is the one part of this line that moves.
@@ -10983,18 +10865,7 @@ window.oamMoveMood=dir=>{
 // left in THAT tab (not the lowercased match term, so casing/whitespace survive a tab switch) is the same
 // "leave and come back" rule the old per-list search always followed.
 const watchSearchRaw = {in_cinema:"", premium:"", rent:"", stream:""};
-// CAS-769: unlike every other Watch-tab control, the selected occasion is a MODE (which of your agents
-// you're watching for), not a per-tab filter — so it was a single value, sticky across tabs and reloads,
-// rather than one Set per tab. null means "All".
-// CAS-1222: dead since CAS-1223 removed the Watch screen's Occasion pill — nothing left can set this to
-// anything but null, so it stays in-memory-only rather than migrating to the account. The Occasions
-// register, Manage occasions and the agent editor's occasion card are untouched by this.
-let watchOccasion = null;
-window.setWatchOccasion = id => {
-  watchOccasion = (!id || id==="All") ? null : id;
-  render();
-};
-// CAS-1247: Watch's own search box (and the occasion row it floated over) is gone — Find is where search
+// CAS-1247: Watch's own search box (and the row it floated over) is gone — Find is where search
 // lives now. watchSearch/watchSearchRaw stay (applyMoodToState keeps them cleared; the pipeline below still
 // reads them, always empty) so neither watchVisibleRows() nor watchNavKey() needs a special case for it.
 // CAS-714/CAS-718: which genres are toggled OFF (hidden) in each Watch tab's own view — session-only, one
@@ -11053,17 +10924,12 @@ function watchPickedBySafe(tab){
 }
 window.setWatchPickedBy = key => { watchPickedBy[watchTab]=key; render(); };
 window.clearWatchPickedBy = () => { watchPickedBy[watchTab]="all"; render(); scrollWatchListingToTop(); };   // CAS-857
-// CAS-840: ONE listbox popover shared by the Occasion and Picked by pills — an anchored panel in the app's
+// CAS-840: ONE listbox popover shared by the Picked by pill — an anchored panel in the app's
 // own language (.cpop's visual treatment, opened downward via .pop-down since both pills sit at the very
-// top of the screen), replacing Occasion's invisible-<select> device and Picked by's Filters-sheet segment.
+// top of the screen), replacing Picked by's Filters-sheet segment.
 // `kind` picks which pill's own options/current value/setter apply; everything else (open/close, outside
 // click, Escape, arrow-key roving focus) is shared.
 const PICKER_KINDS = {
-  occ: {
-    items: () => [{key:"All", label:"All"}, ...occasionRegSorted().map(o=>({key:o.id, label:o.name}))],
-    current: () => watchOccasion || "All",
-    pick: key => setWatchOccasion(key),
-  },
   pickedby: {
     items: () => PICKED_BY_OPTS,
     current: () => watchPickedBySafe(watchTab),
@@ -11125,10 +10991,9 @@ window.togglePickerFor = (kind, btn) => {
   if(already) return;   // second tap closes it
   const items=cfg.items(), curKey=cfg.current();
   const pop=document.createElement("div");
-  // CAS-374 precedent: edge-aligned under the pill that opens it — .al-l for Occasion (leftmost, so the
-  // content-width panel grows rightward, clear of the screen edge), .al-r for Picked by (grows leftward,
-  // clear of the RIGHT screen edge instead, since it sits further along the row).
-  pop.className=`cpop pickpop ${kind==="occ"?"al-l":"al-r"}${kind==="sort"?" ordpop":""} pop-down`;
+  // CAS-374 precedent: edge-aligned under the pill that opens it — .al-r for Picked by (grows leftward,
+  // clear of the RIGHT screen edge, since it sits further along the row).
+  pop.className=`cpop pickpop al-r${kind==="sort"?" ordpop":""} pop-down`;
   pop.dataset.forBtn=btn.id;
   pop.setAttribute("role","listbox");
   // CAS-1181: sortCtl carries its own aria-label (no .pblbl child — it's an icon button, not a text pill).
@@ -11555,14 +11420,6 @@ window.closeWatchSheet = () => {
 };
 document.addEventListener("keydown", e=>{ if(e.key==="Escape" && watchSheetOpen) closeWatchSheet(); });
 const chipSummary = labels => labels.length<=2 ? labels.join(", ") : `${labels.slice(0,2).join(", ")} +${labels.length-2}`;
-// CAS-777: alphabetical by name (occasionRegSorted's own order), escaped per name before chipSummary's
-// "first two, then +N" join so a special character in an occasion's name can't break the row's markup.
-// CAS-1226: no longer called from renderWatchSheet (its one render call site, the agent-narrowing
-// section's row, is gone) — kept, and still exported, purely for CAS-779 AC2's own regression test below.
-const agentOccasionsLine = c => {
-  const names=(c.occasions||[]).map(occasionName).filter(Boolean).sort((a,b)=>a.localeCompare(b)).map(esc);
-  return names.length ? chipSummary(names) : "No occasion";
-};
 // CAS-718: builds the sheet's two sections (Watched, Styles) from `rows` BEFORE either narrows them — same
 // "a toggled-off option stays offerable" rule CAS-714's genre row always followed — plus the Filters
 // button's badge, the active-filter chip row, and the footer's live result count.
@@ -11737,8 +11594,8 @@ function watchScopeRows(){
   // person has chosen for it — no other mood (catalogue or agents) carries it.
   const isLatest = currentMood().id==="releases";
   // CAS-1284 Change 1: a catalogue mood's pool is every film in MOVIES standing in the current stage —
-  // decided directly off primaryStatus(m), whether or not any agent lists it — not the agent/occasion-based
-  // pool below. Agents-off, occasion and Picked by are all agent-scoped, so none of them apply here; search,
+  // decided directly off primaryStatus(m), whether or not any agent lists it — not the agent-based
+  // pool below. Agents-off and Picked by are all agent-scoped, so none of them apply here; search,
   // Styles, Watched and mine-only (watchVisibleRows below) still do, unchanged.
   if(moodSource(currentMood())==="catalogue"){
     const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
@@ -11754,18 +11611,6 @@ function watchScopeRows(){
   }
   const agentOff=watchAgentOff;
   const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
-  // CAS-793: a selected occasion narrows by the FILM'S OWNER (filmOwnerCascade — the single CAS-709 global
-  // owner; ownership is never occasion-aware) carrying the occasion, not by "some included agent lists it" —
-  // a film listed by an in-occasion agent but owned by an out-of-occasion one no longer counts (the ticket's
-  // accepted consequence). Unselected (All) is untouched: any included agent listing the film still admits it.
-  if(watchOccasion){
-    const pool=acs.filter(c=>(c.occasions||[]).includes(watchOccasion));
-    if(!pool.length) return [];
-    return MOVIES.filter(m=>{
-      const owner=filmOwnerCascade(m);
-      return owner && pool.some(c=>c.id===owner.id) && filmMatchesWatchTab(m, watchTab) && watchStageMatches(m) && (!isLatest || filmInLatestWindow(m));
-    });
-  }
   if(!acs.length) return [];
   // CAS-1226: switching an agent off must never ADD a film, so this starts from the exact all-agents-on
   // list (listedBy against the full cascades set, not just acs) and only ever subtracts — a film whose
@@ -13110,10 +12955,8 @@ function normCascade(c, opts){
   // agent never singled any out and lists everything it watches — the behaviour every agent had before this
   // field existed, so an old agent needs no migration to keep looking the same.
   c.listStatus = c.listStatus||[];
-  // CAS-768: which named Occasions (Me, Family, ...) this agent belongs to. [] = untagged, the default for
-  // every agent that predates this field. Presentation metadata only — kept out of cascSigOf on purpose,
-  // see the note there.
-  c.occasions = Array.isArray(c.occasions) ? c.occasions.filter(x=>typeof x==="string") : [];
+  // CAS-1402: agents saved with the removed tag field may still carry it — dropped here, never written back.
+  delete c[["occ","asions"].join("")];   // CAS-1402: key split on purpose — the removed field's name must not appear in this file again
   // CAS-182: genre / age carry THREE states — null = explicitly none (nothing qualifies) · [] = the
   // filter is off · [a,b] = exactly those, the same three the taste-baseline rows have used since CAS-165.
   // `||[]` would flatten null back to "off", which is the bug CAS-165 fixed on the baseline: the user
@@ -13146,7 +12989,7 @@ function normCascade(c, opts){
   // CAS-1268: a combination of two styles, keyed "A|B" (A<B) to "+" (list) or "-" (skip) — missing means
   // "follow its styles". A bad entry (wrong key shape, an unknown style, a style paired with itself, the
   // two names out of A-Z order, or a value that isn't "+"/"-") is dropped rather than carried along inert,
-  // the same discipline c.occasions above applies to a stale id. ALL_GENRES, not ONB_GENRES, because this
+  // the same discipline applied to a stale id. ALL_GENRES, not ONB_GENRES, because this
   // runs on every template at load time (CASCADE_TEMPLATES.forEach below) before ONB_GENRES exists yet —
   // same style set, just not yet sorted by popularity.
   {
@@ -13390,12 +13233,8 @@ const cascSigOf = c => JSON.stringify([c.name, c.status, c.genre, c.exclude, c.p
   // 1 week out) all resolve to the same `status`, so without this line two agents that differ only in when
   // they'd tell you would read as exact twins and the second would be silently collapsed into the first.
   c.watchWindows||{}]);
-// CAS-768: dedupe's OWN identity signature, distinct from cascSigOf. Occasions are presentation metadata
-// that must be completely inert to admission (cascSigOf drives CAS-728's re-review and CAS-715's admitDrift),
-// so they are deliberately left out of cascSigOf above. But two agents that differ ONLY by occasion —
-// "Blockbusters for Family" alongside "Blockbusters for Us" — are a legitimate pair, not a twin: dedupe needs
-// its own signature that DOES fold occasions in, so it never collapses that pair down to one.
-const cascDedupeSigOf = c => JSON.stringify([cascSigOf(c), [...(c.occasions||[])].sort()]);
+// dedupe's identity signature (CAS-768; its tag part was removed by CAS-1402).
+const cascDedupeSigOf = c => JSON.stringify([cascSigOf(c)]);
 function dedupeCascades(){
   // CAS-658: belt-and-braces for an array that already holds two entries sharing an id (a merge that
   // ran before the load-time fix above, or any other path that ever double-pushes one). Same id is the
@@ -14135,7 +13974,7 @@ function scopeEmptyHTML(){
 // listing never filters by) is touched right now — the guard for offering a "Clear filters" way out at all.
 function watchFiltersActive(){
   return !!watchSearch[watchTab] || watchPickedBy[watchTab]!=="all" || watchGenreOff[watchTab].size>0
-    || watchWatchedSel[watchTab].size>0 || watchBadgeSel[watchTab].size>0 || watchMineOnlyOn() || watchOccasion!=null;
+    || watchWatchedSel[watchTab].size>0 || watchBadgeSel[watchTab].size>0 || watchMineOnlyOn();
 }
 // CAS-1144: re-runs render()'s own Watch pipeline (watchScopeRows → search → Picked by → hidden styles →
 // Watched filter → mine-only) with every one of the tab's own narrowings cleared, so the count on "Clear
@@ -14146,14 +13985,13 @@ function watchRowsWithFiltersCleared(){
   const snap={search:watchSearch[tab], raw:watchSearchRaw[tab], pickedBy:watchPickedBy[tab],
     genreOff:new Set(watchGenreOff[tab]), watchedSel:new Set(watchWatchedSel[tab]),
     badgeSel:new Set(watchBadgeSel[tab]),
-    mineOnly:watchMineOnly[tab], occasion:watchOccasion};
+    mineOnly:watchMineOnly[tab]};
   watchSearch[tab]=""; watchSearchRaw[tab]="";
   watchPickedBy[tab]="all";
   watchGenreOff[tab].clear();
   watchWatchedSel[tab].clear();
   watchBadgeSel[tab].clear();
   watchMineOnly[tab]=false;
-  watchOccasion=null;
   let rows=watchScopeRows();
   if(watchPickedBy[tab]!=="all") rows=rows.filter(filmMatchesPickedBy);
   const genreOff=watchGenreOff[tab];
@@ -14168,7 +14006,6 @@ function watchRowsWithFiltersCleared(){
   watchWatchedSel[tab].clear(); snap.watchedSel.forEach(v=>watchWatchedSel[tab].add(v));
   watchBadgeSel[tab].clear(); snap.badgeSel.forEach(v=>watchBadgeSel[tab].add(v));
   watchMineOnly[tab]=snap.mineOnly;
-  watchOccasion=snap.occasion;
   return n;
 }
 function emptyResultsHTML(){
@@ -14318,12 +14155,6 @@ function commitDraft(){
     awards:draft.awards, cinemaReleaseOnly:draft.cinemaReleaseOnly, myServices:{...draft.myServices},
     alertsOn:draft.alertsOn,
     excludeWatched:draft.excludeWatched, excludeBlocked:draft.excludeBlocked,
-    // CAS-768: occasions travel with the agent. Left out of this whitelist, the Briefing's Occasions
-    // spoke appears to work and the tag is discarded the moment Save is pressed — the same failure
-    // listStatus (CAS-228) and watchMarkers (CAS-729) each had, for the same reason.
-    // CAS-775: an id matching no register entry is dropped here — "on the agent's next save", not on
-    // load (normCascade) — so a half-synced device never shows a phantom occasion (AC11).
-    occasions:pruneOccasionIds(draft.occasions),
     sort:draft.sort||"cascade", watchWindows:draft.watchWindows,
     // CAS-228: listStatus travels with status. Left out, the agent on disk would watch the right windows and
     // list all of them, so turning List off for one window would appear to work and then not survive a save.
@@ -15374,9 +15205,6 @@ const HELP_ARTICLES = [
   {slug:"watch-on-and-overrides", title:"Watch On and overrides",
    summary:"What Watch On is, what a hand-made override protects, and what an agent edit can and cannot undo.",
    body:"Watch On is the one answer, per film, for where you're actually going to watch it — Cinema, Premium, Rent or Stream. Cascade sets it for you automatically the moment a film is admitted, based on the window it just qualified in and the windows your agent tracks.\n\nIf you change Watch On yourself, that choice is a hand-made override: it's yours, not the agent's, and it's protected. Editing the agent afterwards — moving a marker, changing what it's tracking — can update everything the agent decided for itself, but it can never quietly undo a Watch On value you set by hand. Even if the film later leaves the agent altogether, your own choice for it stays."},
-  {slug:"occasions", title:"Occasions",
-   summary:"What they are, how they group agents, and the Watch filter they unlock.",
-   body:"An occasion is a label you can put on any agent — Me, Family, Cinema night, or anything else that makes sense for how you actually use Cascade. It doesn't change what an agent finds; it's purely a way of grouping agents that belong together so you can tell them apart at a glance.\n\nAn agent can carry as many occasions as you like, or none. Occasions live in their own register, so one you've created stays available to tag onto a new agent even before anything currently carries it, and renaming or removing one there updates every agent tagged with it.\n\nOnce you've tagged two or more, an Occasion filter appears on Watch, letting you narrow the whole screen down to just the agents carrying whichever one you pick."},
   {slug:"your-services", title:"Your services",
    summary:"Why membership ignores your services but no screen does, and the account-wide services-only switch.",
    body:"Your services — the ones you've told Cascade you actually pay for — shape almost everything you see: what an agent lists when it's scoped to them, what a film's own “where to watch” line says, and what the notify and listing screens show you. They're the lens nearly every screen in the app looks through.\n\nAn agent can scope itself to your services window by window, but there's also one account-wide switch, “Only show films on my services” — turn that on and it governs every agent's listing regardless of what any single agent has scoped for itself.\n\nMembership is the one thing that doesn't look through it. What you pay for Cascade itself is flat, whether you've told it about one service or ten — your services describe what you can watch, never what Cascade charges you to help you find it."},
@@ -18091,15 +17919,6 @@ window.ageChipToggle=k=>{
   const val=$("ageRatingVal"); if(val) val.textContent=trailAge();
   selRefresh();
 };
-// CAS-827: Occasions moves to the top of the page as a summary card in the same shape as Styles — icon,
-// title, value line, chevron — rather than the two-up .easub row it used to share with a second control.
-function occasionsCardHTML(){
-  const d=onbFlow.draft||{};
-  return `<button type="button" class="osdial cardbtn" onclick="briefGo('occasions')">
-    <span class="osdh"><span class="em">🎉</span><span class="dl">Occasions</span></span>
-    <p class="reqval">${esc(occasionsSummary(d))}</p>
-    <span class="dc">›</span></button>`;
-}
 function wireReqCards(){
   (()=>{
     const cont=CONT_DIALS.scale, r=$("onbDial_scale"); if(!r) return;
@@ -18832,7 +18651,6 @@ const SHARP_STEPS = {
           ${adv.years ? yearsCardHTML() : ""}
           ${adv.cinema ? cinemaReleaseSwitchHTML() : ""}` : ""}
         ${advanced ? `<div class="usec">ADVANCED</div>
-          ${occasionsCardHTML()}
           <div class="switch mini" id="onbAlertsOn" role="switch">
             <span>🔔 Alert me about this agent's films
               <small style="color:var(--faint)">— by email, in the app and on your phone</small></span>
@@ -18916,38 +18734,6 @@ const SHARP_STEPS = {
       };
       el.oninput=()=>{ onbFlow.name=el.value; paint(); onbRefresh(); };
       paint();
-    },
-  },
-  // ---- CAS-775: Occasions -----------------------------------------------------------------------------
-  // An Occasion is a real register entry now (see the Occasions register above), not a set derived from
-  // agents — occasionRegSorted() offers every one that exists, whether or not any agent carries it yet.
-  // Multi-select, modelled directly on the extags spoke just above: ticking adds this agent's id to the
-  // set, unticking removes it.
-  occasions: {
-    title: "Occasions",
-    noAgent: true,
-    body(){
-      const d=onbFlow.draft||{};
-      const mine=new Set(d.occasions||[]);
-      const regEntries=occasionRegSorted();
-      const rows=regEntries.map(o=>{
-        const on=mine.has(o.id);
-        return `<button type="button" class="nopt${on?" on":""}" data-id="${escA(o.id)}" style="--wwc:var(--accent)"
-          aria-pressed="${on}"
-          title="${escA(on?`Untag this agent as ${o.name}`:`Tag this agent as ${o.name}`)}">
-          <span class="wwb sq">✓</span><span class="nol">${esc(o.name)}</span></button>`;
-      }).join("");
-      const none = regEntries.length ? "" : `<div class="nopt nonone">No occasions yet — add one below.</div>`;
-      return `<p class="ossub">Tag this agent with one or more occasions — Me, Family, Cinema night, whatever
-          groupings make sense for you. An agent can carry as many as you like.</p>
-        <div class="nopts" id="onbStepOccasions">${none}${rows}</div>
-        <button type="button" class="listnewbtn" id="occNewBtn" onclick="startCreateOccasionRow()">＋ New occasion</button>`;
-    },
-    wire(){
-      const box=$("onbStepOccasions"); if(!box) return;
-      [...box.querySelectorAll("[data-id]")].forEach(b=>{
-        b.onclick=()=>briefToggleOccasion(b.dataset.id);
-      });
     },
   },
   // ---- CAS-199: My streaming services ---------------------------------------------------------------
@@ -19564,19 +19350,6 @@ const SHARP_STEPS = {
       if(!onbFlow.workingAgents){
         const agents=buildOnbAgentsV2(onbFlow.answersV2);
         agents.forEach(c=>{ c.id=cascadeNewId(); });
-        // CAS-915: the occasions these answers imply, created only now — at commit — via createOccasion()
-        // (idempotent by name; memory-only while onbDraftModeOn, see saveOccasionReg) so backing out of
-        // the flow before this screen never leaves an orphan register entry.
-        const me=createOccasion("Me");
-        const partner = onbFlow.answersV2.partner==="yes" ? createOccasion("Partner") : null;
-        const family = onbFlow.answersV2.kids==="yes" ? createOccasion("Family") : null;
-        const allOcc=[me, partner, family].filter(Boolean).map(o=>o.id);
-        agents.forEach(c=>{
-          if(c.template==="onb_massive") c.occasions=allOcc.slice();
-          else if(c.template==="onb_favs") c.occasions=[me.id];
-          else if(c.template==="onb_date" && partner) c.occasions=[partner.id];
-          else if(c.template==="onb_family" && family) c.occasions=[family.id];
-        });
         // CAS-951: first-run onboarding ESTABLISHES the device's roster — it replaces whatever
         // cascades already holds (a stale account's set, or an earlier commit this same run),
         // it never appends to it.
@@ -19724,7 +19497,7 @@ function flowStart(startKey){
   onbFlow.draft=null;          // no agent yet — nothing on the first two screens quotes a count
   onbFlow.workingAgents=null; onbFlow.reportStats=null;   // CAS-629: a fresh roster commits fresh every run
   // CAS-1099: true only for a genuinely new, signed-out run — the whole draft (agents, services, taste,
-  // occasions, notify choices, answers) lives in memory only until membership completes. False for a
+  // notify choices, answers) lives in memory only until membership completes. False for a
   // guest/no-config build (membNeedsEmail() needs CascadeAuth.enabled) and for an already-signed-in
   // "+ New Cascade"/empty-account redo, both of which keep saving/syncing exactly as before.
   onbDraftModeOn = membNeedsEmail();
@@ -19737,7 +19510,7 @@ function flowStart(startKey){
   if(!(window.CascadeAuth && window.CascadeAuth.status==="signed-in") && !onbGuestPrefsResetDone){
     prefs.sub=new Set(); prefs.store=new Set(); prefs.touched=false; savePrefs();
     // CAS-1099 AC5: the same leftover-key problem CAS-1106 found for services alone also applies to
-    // taste, notify choices and the occasions register for a configured, signed-out first run — cleared in
+    // taste and notify choices for a configured, signed-out first run — cleared in
     // memory the same way, so a device carrying any stale draft from before this ticket shipped never shows
     // a step pre-selected. onbDraftModeOn (just set above) means none of this is written back for a
     // configured build; a guest/no-config build has no draft to protect and never sets it, so it is
@@ -19745,7 +19518,6 @@ function flowStart(startKey){
     if(onbDraftModeOn){
       tasteBase=baseDefaults();
       notifyPrefs=notifyPrefsDefault();
-      occasionReg.length=0;
     }
     // CAS-1157: a signed-out first run's Where & when answer is governed entirely by the cinema/rent
     // questions still to come, not whatever this device's local cascade_watch_prefs last held. "+ New
@@ -19857,53 +19629,6 @@ window.briefToggleSvc=key=>{
   if(typeof d.myServices!=="object" || d.myServices===null) d.myServices={};
   d.myServices[key]=!d.myServices[key];
   renderOnbStep("briefing");
-};
-// CAS-775: the register (occasionReg, declared above with createOccasion/renameOccasion/deleteOccasion) is
-// now the one list of occasions — see the Occasions register section for occasionRegSorted/occasionName.
-// occasionsSummary resolves each id through the register and drops any that no longer match one (an id an
-// agent still carries after its register entry was deleted elsewhere — "ignored on read", CAS-775 AC11).
-// CAS-779 defect 3: while this device hasn't yet seen the account's register, an id this device can't
-// resolve is not evidence there are no occasions — "None yet" would be stating that as settled when it
-// isn't. Same readiness signal as pruneOccasionIds above.
-const occasionsSummary = d => {
-  const cp = window.CascadePersistence;
-  if(cp && cp.userPrefsReady===false) return "Loading…";
-  const names=(d.occasions||[]).map(occasionName).filter(Boolean);
-  return names.length ? names.join(", ") : "None yet";
-};
-// Multi-select: ticking adds the id to this agent's occasions, unticking removes it.
-window.briefToggleOccasion=id=>{
-  const d=onbFlow.draft; if(!d) return;
-  d.occasions = Array.isArray(d.occasions) ? d.occasions.slice() : [];
-  const i=d.occasions.indexOf(id);
-  if(i>=0) d.occasions.splice(i,1); else d.occasions.push(id);
-  renderOnbStep("occasions");
-};
-// "New occasion": an inline input that, on Enter or blur, trims and caps the name, writes it straight to
-// the register (available to every other agent at once — CAS-775), then ticks it on for this agent in the
-// draft.
-window.startCreateOccasionRow=()=>{
-  const btn=$("occNewBtn"); if(!btn) return;
-  btn.outerHTML=`<div class="ucard" style="margin-top:8px"><div class="urow nodiv">
-    <span class="uic">🎉</span>
-    <input type="text" class="listnamein" id="occNewInput" maxlength="24" placeholder="Occasion name" autocomplete="off"
-      onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
-      onblur="commitCreateOccasionRow(this)"></div></div>`;
-  const inp=$("occNewInput"); if(inp) inp.focus();
-};
-window.commitCreateOccasionRow=(inputEl)=>{
-  if(!inputEl || !inputEl.isConnected) return;
-  const raw=(inputEl.value||"").trim().slice(0,24);
-  const d=onbFlow.draft;
-  if(raw){
-    // createOccasion is idempotent by name (CAS-768 AC7 case-insensitive de-dup carries over unchanged).
-    const o=createOccasion(raw);
-    if(o && d){
-      d.occasions = Array.isArray(d.occasions) ? d.occasions.slice() : [];
-      if(!d.occasions.includes(o.id)) d.occasions.push(o.id);
-    }
-  }
-  renderOnbStep("occasions");
 };
 // CAS-246/CAS-934: hand the just-picked agent to the Briefing WITHOUT committing it yet. briefOpen() reads
 // a SAVED cascade off the deck; this agent has never been saved, and pushing it onto the deck here — before
@@ -20062,7 +19787,7 @@ function agentReleasedSum(c){
     : `In the last ${c.yearsBack} year${c.yearsBack===1?"":"s"}`;
 }
 // CAS-1274: one rule for what counts as "set" in Advanced, shared by the Agents card (the ADVANCED-tagged
-// rows) and Edit Agent's Basic view ("SET IN ADVANCED"). Occasions and Alerts are not part of this —
+// rows) and Edit Agent's Basic view ("SET IN ADVANCED"). Alerts is not part of this —
 // Alerts already shows on the card's who-line.
 function agentAdvancedSet(c){
   return {
@@ -20141,16 +19866,11 @@ function agentMetrics(c){
   agMetricsCache.set(c.id, {sig, metrics});
   return metrics;
 }
-// CAS-826: the Agents card header line — who-line and occasions share one line now, "who-line · occasion,
-// occasion". occasionsSummary()'s sentinel strings ("Loading…", "None yet") are for the Edit Agent screen,
-// not this header — a card must never claim "None yet" for an agent that simply hasn't loaded its
-// occasions yet, or announce a loading state as if it were content.
+// CAS-826: the Agents card header line — the who-line, plus the Alerts note.
 function agentWhoLineText(c){
-  const occ=occasionsSummary(c);
-  const occText=(occ==="Loading…" || occ==="None yet") ? "" : occ;
   // CAS-1198: the agent's own Alerts switch, named at the end of the same line — on only, never a "not
   // alerting" variant, so the line stays silent for the common (alerts-off) case rather than warning about it.
-  return [c.who ? WHO_LABELS[c.who] : "", occText, c.alertsOn ? "🔔 Alerts on" : ""].filter(Boolean).join(" · ");
+  return [c.who ? WHO_LABELS[c.who] : "", c.alertsOn ? "🔔 Alerts on" : ""].filter(Boolean).join(" · ");
 }
 const fmtAgentRate = n => String(Math.round(n));
 function agentMetricsHTML(c){
@@ -22892,7 +22612,7 @@ function renderMovingScreen(markSeen){
     saveMovingSeen();
   }
   updateMovingBadge();
-  // CAS-904: one full-width labelled pill (Watch's OCCASION/PICKED BY pattern, CAS-840) opening the same
+  // CAS-904: one full-width labelled pill (Watch's PICKED BY pattern, CAS-840) opening the same
   // shared listbox (.cpop.pickpop via togglePickerFor) — replaces the CAS-650 chip row. MOVING_WINDOWS
   // itself, its keys/labels and setMovingWindow are unchanged; this only changes the control's shape.
   const curWindow=MOVING_WINDOWS.find(w=>w.key===movingWindow);
@@ -23234,90 +22954,6 @@ window.openMovingAgent=id=>{
 };
 window.openMovingAgentEl=el=>{ openMovingAgent(el.dataset.cid); };
 
-// ================= CAS-775: Manage Occasions screen =====================================================
-// The register has no order of its own (unlike Manage Lists), so no drag/reorder — just rename, delete
-// and add, over occasionReg.
-function occasionRowHTML(o){
-  const n=occasionAgentCount(o.id);
-  return `<div class="urow nodiv occrow" data-oid="${escA(o.id)}">
-    <span class="uic">🎉</span>
-    <span class="utxt">
-      <span class="ut" data-role="name">${esc(o.name)}</span>
-      <span class="ussub">${n} agent${n===1?"":"s"}</span>
-    </span>
-    <button type="button" class="listact" onclick="startRenameOccasion('${o.id}')"
-      title="Rename ${escA(o.name)}" aria-label="Rename ${escA(o.name)}">✎</button>
-    <button type="button" class="listact danger" onclick="confirmDeleteOccasion('${o.id}')"
-      title="Delete ${escA(o.name)}" aria-label="Delete ${escA(o.name)}">🗑</button>
-  </div>`;
-}
-function renderManageOccasionsScreen(){
-  const regEntries=occasionRegSorted(), n=regEntries.length;
-  $("manageOccasionsBody").innerHTML=`
-    <div class="ostop"><button class="osback" type="button" onclick="closeManageOccasionsScreen()" aria-label="Back">←</button>
-      <h2 class="osh">Occasions</h2><span class="agscount" style="margin-left:auto">${n} occasion${n===1?"":"s"}</span></div>
-    <p class="ossub">Tags for grouping your agents — Me, Family, Cinema night, whatever makes sense for you.
-      Create one here or from an agent's Briefing; either way, every agent can select it.</p>
-    <div class="ucard">
-      ${n ? regEntries.map(occasionRowHTML).join("")
-        : `<div class="urow nodiv"><span class="utxt"><span class="ut">No occasions yet</span>
-             <span class="ussub">Add one below, or from an agent's Briefing.</span></span></div>`}
-    </div>
-    <button type="button" class="listnewbtn" id="occRegNewBtn" onclick="startCreateOccasionRegRow()">＋ New occasion</button>`;
-}
-window.openManageOccasionsScreen=()=>{
-  renderManageOccasionsScreen();
-  $("manageOccasionsScreen").scrollTop=0;
-  $("manageOccasionsScreen").classList.add("open"); lockBodyScroll(true);
-  syncWatchChip();
-  logEvent("manage_occasions_screen_opened",{count:occasionReg.length});
-};
-window.closeManageOccasionsScreen=()=>{
-  $("manageOccasionsScreen").classList.remove("open"); lockBodyScroll(false);
-  syncWatchChip();
-  fireScreenResume();   // CAS-1126: back to Settings if that's where this was opened from
-};
-window.startRenameOccasion=(id)=>{
-  const row=document.querySelector(`.occrow[data-oid="${id}"]`); if(!row) return;   // ids are our own uuids — safe unescaped in an attribute selector
-  const o=occasionReg.find(x=>x.id===id); if(!o) return;
-  const nameEl=row.querySelector('[data-role="name"]'); if(!nameEl) return;
-  nameEl.outerHTML=`<input type="text" class="listnamein" data-role="name" maxlength="24" value="${escA(o.name)}"
-    onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
-    onblur="commitRenameOccasion('${id}',this)">`;
-  const inp=row.querySelector(".listnamein");
-  if(inp){ inp.focus(); inp.select(); }
-};
-window.commitRenameOccasion=(id, inputEl)=>{
-  if(!inputEl || !inputEl.isConnected) return;
-  const name=(inputEl.value||"").trim();
-  if(name) renameOccasion(id, name);
-  renderManageOccasionsScreen();
-};
-// AC3: confirmed first, naming how many agents will lose it.
-window.confirmDeleteOccasion=(id)=>{
-  const o=occasionReg.find(x=>x.id===id); if(!o) return;
-  const n=occasionAgentCount(id);
-  if(!confirm(`Delete the occasion "${o.name}"?\n\n${n?`It's on ${n} agent${n===1?"":"s"} — `:""}This can't be undone.`)) return;
-  deleteOccasion(id);
-  renderManageOccasionsScreen();
-  if(typeof render==="function") render();
-};
-window.startCreateOccasionRegRow=()=>{
-  const btn=$("occRegNewBtn"); if(!btn) return;
-  btn.outerHTML=`<div class="ucard" style="margin-top:8px"><div class="urow nodiv">
-    <span class="uic">🎉</span>
-    <input type="text" class="listnamein" id="occRegNewInput" maxlength="24" placeholder="Occasion name" autocomplete="off"
-      onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
-      onblur="commitCreateOccasionRegRow(this)"></div></div>`;
-  const inp=$("occRegNewInput"); if(inp) inp.focus();
-};
-window.commitCreateOccasionRegRow=(inputEl)=>{
-  if(!inputEl || !inputEl.isConnected) return;
-  const name=(inputEl.value||"").trim();
-  if(name) createOccasion(name);
-  renderManageOccasionsScreen();
-};
-
 // A reordered id list, from wherever it came from (a drag or an arrow key) — always the FULL set, so a
 // short list from a stale event can never silently drop an agent from `cascades`.
 function commitAgentOrder(idsInOrder){
@@ -23458,7 +23094,7 @@ function renderAccount(){
     ${MEMBERSHIP_ENABLED ? `<p class="unone" style="margin:10px 2px 0">Prototype — no card is held and nothing is ever charged.</p>` : ""}`;
 }
 // CAS-1126: the Settings screen — the three defaults screens (Where & when, My services, Languages) plus
-// Occasions and the notification defaults, gathered in the menu's new middle group. Each row opens the
+// the notification defaults, gathered in the menu's new middle group. Each row opens the
 // exact screen the old flat menu did; openSettingsStep/settingsOpen* set screenResume="settings" first so
 // closing that screen snaps back here instead of just closing.
 function renderSettings(){
@@ -24414,7 +24050,6 @@ function discardOnbDraft(){
   prefs.on=false; prefs.touched=false; prefs.sub=new Set(); prefs.store=new Set();
   tasteBase=baseDefaults();
   notifyPrefs=notifyPrefsDefault();
-  occasionReg.length=0;
   watchPrefs=watchPrefsDefaults();   // CAS-1157: the draft's cinema/rent-derived windows go with it
   onbFlow.workingAgents=null;
 }
@@ -25288,7 +24923,6 @@ function watchNavKey(){
     [...watchWatchedSel[watchTab]].sort(),
     [...watchBadgeSel[watchTab]].sort(),
     watchMineOnlyOn(),
-    watchOccasion,
     // CAS-1247: the selected mood and its own Show top cut — every other mood field a mood switch changes
     // (agents/pickedBy/watched/styles/badges/mineOnly/order) is already one of the fields above.
     // CAS-1287: topYou/topPublic are each resolved (legacy fallback, You-availability gate) so the nav key
@@ -25663,8 +25297,8 @@ function filmInWatchRows(m){
   // person has chosen for it — see watchScopeRows' identical top-level check.
   const isLatest = currentMood().id==="releases";
   if(isLatest && !filmInLatestWindow(m)) return false;
-  // CAS-1284 Change 1: a catalogue mood's pool test — see watchScopeRows's own comment. Agents-off,
-  // occasion and Picked by are all agent-scoped, so none of them apply here.
+  // CAS-1284 Change 1: a catalogue mood's pool test — see watchScopeRows's own comment. Agents-off
+  // and Picked by are all agent-scoped, so none of them apply here.
   if(moodSource(currentMood())==="catalogue"){
     const ps=primaryStatus(m);
     const ownStanding=WATCH_TAB_OWN_STANDING[watchTab];
@@ -25673,18 +25307,12 @@ function filmInWatchRows(m){
   } else {
     const agentOff=watchAgentOff;
     const acs=agentOff.size ? cascades.filter(c=>!agentOff.has(c.id)) : cascades;
-    // CAS-793: same owner-based occasion test as watchScopeRows — see its comment.
-    if(watchOccasion){
+    // CAS-1226: same "all-agents-on list, minus an off owner, unowned films untouched" rule as
+    // watchScopeRows's identical branch — see its comment.
+    if(!cascades.some(c=>listedBy(m,c))) return false;
+    if(agentOff.size){
       const owner=filmOwnerCascade(m);
-      if(!owner || !acs.some(c=>c.id===owner.id) || !(owner.occasions||[]).includes(watchOccasion)) return false;
-    } else {
-      // CAS-1226: same "all-agents-on list, minus an off owner, unowned films untouched" rule as
-      // watchScopeRows's identical branch — see its comment.
-      if(!cascades.some(c=>listedBy(m,c))) return false;
-      if(agentOff.size){
-        const owner=filmOwnerCascade(m);
-        if(owner && agentOff.has(owner.id)) return false;
-      }
+      if(owner && agentOff.has(owner.id)) return false;
     }
     if(!filmMatchesWatchTab(m, watchTab)) return false;
     if(!watchStageMatches(m)) return false;   // CAS-1223: same Upcoming/In Cinema split watchScopeRows applies
@@ -26911,7 +26539,6 @@ function acctFetchKeepalive(init){
     tasteBase = baseDefaults();
     watchPrefs = watchPrefsDefaults();
     notifyPrefs = notifyPrefsDefault();
-    occasionReg.length = 0;
     Object.keys(movingSeen).forEach(k=>delete movingSeen[k]);
     realAlerts=[]; updateMovingBadge();
     invites=[]; invitesReady=true; updateInvitesBadge();   // CAS-886: same reasoning — nothing left to wait on
@@ -27806,10 +27433,6 @@ function acctFetchKeepalive(init){
              // taste/watch_windows above, the cheapest home for a second front-end-owned object this row
              // already carries whole.
              moving_seen:JSON.parse(JSON.stringify(movingSeen)),
-             // CAS-775: the Occasions register — same whole-object jsonb shape, but unlike taste/watch_windows/
-             // moving_seen above, an EMPTY array here is a real, distinct answer ("the account genuinely has
-             // no occasions") rather than "unanswered" — see loadUserPrefs' own carry-up check below.
-             occasions:JSON.parse(JSON.stringify(occasionReg)),
              // CAS-1121: the invite sheet's "Your name" — an account-level fact like ref_code, but (unlike
              // ref_code) travels through the normal pushUserPrefsCols(["display_name"]) seam below, since it
              // changes through an ordinary user edit (sending an invite) rather than a one-time mint.
@@ -27947,8 +27570,8 @@ function acctFetchKeepalive(init){
     setTo(prefs.sub, row.sub_services||[]);
     setTo(prefs.store, row.store_services||[]);
     prefs.on = !!row.services_only;
-    // CAS-1219: an empty `{}` IS a real answer — "the account cleared its last entry" — same as the
-    // occasions array below; only a genuinely absent/non-object column (no device has saved under this
+    // CAS-1219: an empty `{}` IS a real answer — "the account cleared its last entry";
+    // only a genuinely absent/non-object column (no device has saved under this
     // column yet) is left alone. Dropping the old Object.keys(...).length check is the actual fix: that
     // check used to read a genuine clear as "unanswered" and silently keep this device's stale value.
     if(row.taste && typeof row.taste==="object"){
@@ -27975,13 +27598,6 @@ function acctFetchKeepalive(init){
       Object.keys(movingSeen).forEach(k=>delete movingSeen[k]);
       Object.assign(movingSeen, row.moving_seen);
       saveMovingSeenLocal();
-    }
-    // CAS-775: an empty array IS a real answer here too — only a genuinely absent/non-array column (no
-    // device has saved under this column yet) is left alone.
-    if(Array.isArray(row.occasions)){
-      occasionReg.length=0;
-      row.occasions.filter(o=>o && typeof o.id==="string" && typeof o.name==="string").forEach(o=>occasionReg.push(o));
-      saveOccasionRegLocal();
     }
     // CAS-1121: adopt the account's own name once it has one — never overwritten by a device that hasn't
     // sent a name yet, same "leave alone, don't carry up" rule as every other field above.
@@ -28152,11 +27768,6 @@ function acctFetchKeepalive(init){
   const saveUxLocal = saveUx;
   // CAS-740: the framing toggle, same reasoning.
   saveUx = function(){ saveUxLocal(); pushUserPrefsCols(["framing"]); };
-  const saveOccasionRegLocal = saveOccasionReg;
-  // CAS-775: same chokepoint shape as saveTasteBase/saveWatchPrefs/saveMovingSeen above — createOccasion/
-  // renameOccasion/deleteOccasion all funnel through saveOccasionReg, so wrapping it here is the one place
-  // needed to give the whole register the same account round-trip.
-  saveOccasionReg = function(){ saveOccasionRegLocal(); pushUserPrefsCols(["occasions"]); };
 
   // CAS-1096: saveNotify is local-storage-only again — film_picks and film_watch both push per-row, from
   // the specific call sites that know which film changed (pinFilmToCascadeAndRepaint/deleteAgentAsk for

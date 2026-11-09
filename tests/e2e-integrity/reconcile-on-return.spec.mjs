@@ -18,12 +18,12 @@ async function waitForAccountLoads(page){
   }, { timeout: 30_000 });
 }
 
-test("AC1: a verdict, Watch On, a pin, the email switch, an occasion rename/delete and a friend add on A all arrive on B via reconcileOnReturn(), which sends zero non-GET requests", async ({ browser }) => {
+test("AC1: a verdict, Watch On, a pin, the email switch, a moving_seen change and a friend add on A all arrive on B via reconcileOnReturn(), which sends zero non-GET requests", async ({ browser }) => {
   const email = testEmail("cas1219-ac1");
   const user = await createTestUser(email);
   const [agent] = await seedCascades(user.id, [{ name: "AC1 agent" }]);
   await seedUserPrefs(user.id, {
-    occasions: [{ id: "occ1", name: "Original" }, { id: "occ2", name: "To delete" }],
+    moving_seen: { seed1: "new", seed2: "changed" },
   });
   await seedNotifyPrefs(user.id, { in_app: true, email_on: false, email_address: email });
 
@@ -87,22 +87,16 @@ test("AC1: a verdict, Watch On, a pin, the email switch, an occasion rename/dele
       return data && data.email_on;
     }, { timeout: 15_000 }).toBe(true);
 
-    // 5. an occasion renamed
-    await pageA.evaluate(() => { renameOccasion("occ1", "Renamed"); });
+    // 5. a moving_seen entry changed and another dropped (CAS-1402: the user_prefs jsonb round-trip example
+    // that used to be the removed register column)
+    await pageA.evaluate(() => { movingSeen.seed1 = "changed"; delete movingSeen.seed2; saveMovingSeen(); });
     await expect.poll(async () => {
-      const { data } = await admin.from("user_prefs").select("occasions").eq("user_id", user.id).maybeSingle();
-      const row = (data && data.occasions || []).find(o => o.id === "occ1");
-      return row && row.name;
-    }, { timeout: 15_000 }).toBe("Renamed");
+      const { data } = await admin.from("user_prefs").select("moving_seen").eq("user_id", user.id).maybeSingle();
+      const ms = (data && data.moving_seen) || {};
+      return [ms.seed1, "seed2" in ms];
+    }, { timeout: 15_000 }).toEqual(["changed", false]);
 
-    // 6. an occasion deleted
-    await pageA.evaluate(() => { deleteOccasion("occ2"); });
-    await expect.poll(async () => {
-      const { data } = await admin.from("user_prefs").select("occasions").eq("user_id", user.id).maybeSingle();
-      return (data && data.occasions || []).some(o => o.id === "occ2");
-    }, { timeout: 15_000 }).toBe(false);
-
-    // 7. a friend added
+    // 6. a friend added
     const { error: friendErr } = await admin.from("friends")
       .insert({ owner_id: user.id, name: "New Friend", email: "cas1219-friend@integrity.test" });
     if(friendErr) throw new Error(`seeding friend failed: ${friendErr.message}`);
@@ -120,12 +114,8 @@ test("AC1: a verdict, Watch On, a pin, the email switch, an occasion rename/dele
     await expect.poll(() => pageB.evaluate((id) => (notify[id] && notify[id].pinnedTo) || [], pinFilmId),
       { timeout: 15_000 }).toEqual([agent.id]);
     await expect.poll(() => pageB.evaluate(() => notifyPrefs.emailOn), { timeout: 15_000 }).toBe(true);
-    await expect.poll(() => pageB.evaluate(() => {
-      const o = occasionReg.find(x => x.id === "occ1");
-      return o && o.name;
-    }), { timeout: 15_000 }).toBe("Renamed");
-    await expect.poll(() => pageB.evaluate(() => occasionReg.some(o => o.id === "occ2")),
-      { timeout: 15_000 }).toBe(false);
+    await expect.poll(() => pageB.evaluate(() => [movingSeen.seed1, "seed2" in movingSeen]),
+      { timeout: 15_000 }).toEqual(["changed", false]);
     await expect.poll(() => pageB.evaluate(() => friends.some(f => f.name === "New Friend")),
       { timeout: 15_000 }).toBe(true);
 

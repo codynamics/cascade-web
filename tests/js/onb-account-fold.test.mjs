@@ -41,7 +41,7 @@ function fakeMembershipClient({ rpcResult = { data: "created", error: null }, ca
     cascades: typeof cascadesRows === "function" ? cascadesRows : () => cascadesRows,
     user_prefs: () => userPrefsRows || [{ user_id: "x", sub_services: [], store_services: [], services_only: false,
       touched: false, taste: {}, watch_windows: {}, never_show: [], onb_depth: null, framing: false,
-      moving_seen: {}, occasions: [], ref_code: "CAS1099REF" }],
+      moving_seen: {}, ref_code: "CAS1099REF" }],
     notify_prefs: () => notifyPrefsRows || [{ user_id: "x", in_app: true, email_on: false, email_address: null }],
   };
   return {

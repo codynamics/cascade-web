@@ -217,7 +217,7 @@ if(typeof window.CascadeAuth === "undefined"){
   // CAS-793: watchAgentOff (CAS-720's own "Agents to include" state, by reference — CAS-1223 made it one
   // shared Set rather than per-tab) and toggleWatchAgent (its wire mutator, wrapped like toggleFilmOpt
   // below) — so a test can drive a real untick through the real function and assert watchScopeRows' owner-
-  // based occasion filter honours it.
+  // based filter honours it.
   watchAgentOff, toggleWatchAgent: (id) => window.toggleWatchAgent(id),
   // CAS-863: WATCH_STEPS is the watched-verdict ramp the Watch On panel renders — unrelated to the retired
   // watch-list model despite once sitting next to it. YM_SVC/ymSvcOn/ymSvcToggle/ymSvcSetAll/ymWatchedOn/
@@ -458,7 +458,7 @@ if(typeof window.CascadeAuth === "undefined"){
   get activeId(){ return activeId; },
   setActive,
   // CAS-1222: agentState (the onboarding invite draft, cascade_agent before this ticket) — a plain mutable
-  // object, never reassigned, exported by reference like cascades/occasionReg elsewhere in this file.
+  // object, never reassigned, exported by reference like cascades elsewhere in this file.
   // tutorialSeen/markTutorialSeen are plain top-level functions, exported directly like reviewPromptEligible
   // and friends below.
   agentState, tutorialSeen, markTutorialSeen,
@@ -539,7 +539,7 @@ if(typeof window.CascadeAuth === "undefined"){
   listingGroups,
   // CAS-793: filmOwnerCascade/filmOwnerOrder/splitByOwner/watchScopeRows are all pure over cascades/notify/
   // MOVIES, exactly like listingGroups above — exported so a test can drive the single CAS-709 global-owner
-  // lookup and the occasion pool test directly rather than scraping rendered headings. agentChipHTML is the
+  // lookup directly rather than scraping rendered headings. agentChipHTML is the
   // one DOM-free render helper worth exporting here too, so a test can assert the chip's own name/HTML.
   filmOwnerCascade, filmOwnerOrder, splitByOwner, watchScopeRows, agentChipHTML,
   // CAS-1226: filmInWatchRows (fastPatchFindRow's own single-card membership test, same agent-off rule as
@@ -689,25 +689,6 @@ if(typeof window.CascadeAuth === "undefined"){
   // (wrapped the same way toggleFilmOpt above is) so a test can drive a real hand-placement the same way a
   // person tapping a Watch panel row does.
   deleteAgentAsk, pinFilmToCascadeAndRepaint: (id, cid) => window.pinFilmToCascadeAndRepaint(id, cid),
-  // CAS-775: the Occasions register replaces CAS-768's derived-from-agents allOccasionNames — occasionReg
-  // is exported by reference (mutated in place by create/rename/delete, never reassigned) so a test can
-  // seed/read the exact register state. create/rename/delete/
-  // occasionAgentCount/occasionName/occasionRegSorted are plain top-level functions, exported directly.
-  // migrateOccasionNamesIfNeeded is exposed so a test can call the real one-time upgrade rather than
-  // re-deriving its legacy-name detection by hand. briefToggleOccasion/commitCreateOccasionRow are
-  // window-assigned Briefing wire code (same wrap shape as ymSvcToggle above) — both now operate on ids,
-  // not names.
-  occasionReg, createOccasion, renameOccasion, deleteOccasion, occasionAgentCount, occasionName,
-  occasionRegSorted, occasionsSummary, migrateOccasionNamesIfNeeded, pruneOccasionIds,
-  // CAS-779: isOccasionIdShape is the UUID-shape test the migration now runs before treating a string as a
-  // legacy name — exported so a test can assert the shape check directly. agentOccasionsLine is the Watch
-  // "Agents to include" row's own occasion line (CAS-777) — a test can assert AC2 (never an unresolved id)
-  // against the real render helper rather than re-deriving occasionName's filter by hand.
-  isOccasionIdShape, agentOccasionsLine,
-  get watchOccasion(){ return watchOccasion; },
-  setWatchOccasion: id => window.setWatchOccasion(id),
-  briefToggleOccasion: id => window.briefToggleOccasion(id),
-  commitCreateOccasionRow: inputEl => window.commitCreateOccasionRow(inputEl),
   // CAS-787: the on-device diagnostics panel's own pure report builders (diagReport/diagReportText) and the
   // per-target status-label helper (diagSyncStatusText) — plain top-level functions, exported directly so a
   // test can assert the panel/copy-button text without a real DOM or the 5-tap gesture.

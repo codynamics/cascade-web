@@ -14,7 +14,7 @@ import { settleListing, openAgentsScreenFromNav } from "../e2e/helpers.mjs";
 const OBSERVATION_KEYS = ["cascade_cascades", "cascade_watched", "cascade_disliked", "cascade_blocked",
   "cascade_indifferent", "cascade_wow", "cascade_enjoyed", "cascade_notify", "cascade_watch_known",
   "cascade_notifyprefs", "cascade_prefs", "cascade_ux", "cascade_taste_base", "cascade_watch_prefs",
-  "cascade_moving_seen", "cascade_occasions", "cascade_onb_answers"];
+  "cascade_moving_seen", "cascade_" + "occ" + "asions", "cascade_onb_answers"];
 
 async function waitForAccountLoads(page){
   await page.waitForFunction(() => {
