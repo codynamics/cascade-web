@@ -11231,6 +11231,12 @@ const MOOD_EDIT_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 // C3: copies one mood's values into the state the pipeline already reads — the only place any of that
 // state changes now. Applied at boot (below, from the in-memory defaults), again whenever loadUserPrefs()
 // adopts view.moods/view.mood, when a mood is selected, and when one is saved.
+// CAS-1411: the one rule for the Watched selection a mood applies — applyMoodToState and the cross-mood
+// checks (oamFilmShownInMood / oamWilRankInMood) both read it so they cannot drift.
+function moodWatchedSel(mood){
+  const keys = mood.v2 ? (mood.watched ? REVIEW_STEPS.map(v=>v.key) : []) : (mood.watched||[]);
+  return new Set(keys);
+}
 function applyMoodToState(mood){
   watchAgentOff.clear();
   (mood.agentsOff||[]).forEach(id=>watchAgentOff.add(id));
@@ -11244,10 +11250,9 @@ function applyMoodToState(mood){
   // array this Set expects — `new Set(true)` throws (true isn't iterable), so turning the switch on and
   // tapping Save crashed here, before the write ever reached pushViewField, and nothing was saved. Translate
   // it the same way MOOD_DEFAULTS' own Starred record already uses to mean "every verdict, i.e. unfiltered".
-  const watchedKeys = mood.v2 ? (mood.watched ? REVIEW_STEPS.map(v=>v.key) : []) : (mood.watched||[]);
   WATCH_LEVEL_KEYS.forEach(tab=>{
     watchPickedBy[tab]=mood.pickedBy||"all";
-    watchWatchedSel[tab]=new Set(watchedKeys);
+    watchWatchedSel[tab]=moodWatchedSel(mood);
     watchGenreOff[tab]=new Set(mood.stylesOff||[]);   // CAS-1284: reverses CAS-1273 — styles are back
     watchBadgeSel[tab]=new Set();   // CAS-1281: moods no longer filter by badge; mood.badges is ignored
     watchMineOnly[tab]=mood.mineOnly!==false;
@@ -21364,12 +21369,17 @@ function oamFilmShownInMood(id, mood, c){
   const stageKey=oamWilStageKeyFor(m); if(!stageKey) return false;
   const stop=watchStageStopsNow().find(s=>s.key===stageKey); if(!stop) return false;
   const savedTab=watchTab, savedStage=watchCinemaStage, savedMood=watchMoodSel;
-  watchTab=stop.tabKey;
-  if(stop.tabKey==="in_cinema") watchCinemaStage = stop.key==="upcoming" ? "upcoming" : "in_cinema";
-  watchMoodSel=mood.id;
-  const shown=oamVisibleRows().rows.some(r=>r.tmdb_id===id);
-  watchTab=savedTab; watchCinemaStage=savedStage; watchMoodSel=savedMood;
-  return shown;
+  const savedWatched=watchWatchedSel[stop.tabKey];
+  try{
+    watchTab=stop.tabKey;
+    if(stop.tabKey==="in_cinema") watchCinemaStage = stop.key==="upcoming" ? "upcoming" : "in_cinema";
+    watchMoodSel=mood.id;
+    watchWatchedSel[stop.tabKey]=moodWatchedSel(mood);   // CAS-1411
+    return oamVisibleRows().rows.some(r=>r.tmdb_id===id);
+  } finally {
+    watchTab=savedTab; watchCinemaStage=savedStage; watchMoodSel=savedMood;
+    watchWatchedSel[stop.tabKey]=savedWatched;
+  }
 }
 function oamFilmHandTouched(id){
   return oamMoodsListReal().some(mood=>(mood.in||[]).includes(id) || (mood.out||[]).includes(id));
@@ -21525,11 +21535,18 @@ function oamWilRankInMood(m, mood, c, stageKey){
   const n=OAM_SHOW_N[mood.show]; if(n==null) return null;
   const stop=watchStageStopsNow().find(s=>s.key===stageKey); if(!stop) return null;
   const savedTab=watchTab, savedStage=watchCinemaStage, savedMood=watchMoodSel;
-  watchTab=stop.tabKey;
-  if(stop.tabKey==="in_cinema") watchCinemaStage = stop.key==="upcoming" ? "upcoming" : "in_cinema";
-  watchMoodSel=mood.id;
-  const {preSheetRows}=oamVisibleRows();
-  watchTab=savedTab; watchCinemaStage=savedStage; watchMoodSel=savedMood;
+  const savedWatched=watchWatchedSel[stop.tabKey];
+  let preSheetRows;
+  try{
+    watchTab=stop.tabKey;
+    if(stop.tabKey==="in_cinema") watchCinemaStage = stop.key==="upcoming" ? "upcoming" : "in_cinema";
+    watchMoodSel=mood.id;
+    watchWatchedSel[stop.tabKey]=moodWatchedSel(mood);   // CAS-1411
+    ({preSheetRows}=oamVisibleRows());
+  } finally {
+    watchTab=savedTab; watchCinemaStage=savedStage; watchMoodSel=savedMood;
+    watchWatchedSel[stop.tabKey]=savedWatched;
+  }
   const handIds=new Set(mood.in||[]);
   // CAS-1375: a Rental soon film is never part of the ranked pool either (oamApplyShowCap's own rule above)
   // — excluded here too, or this could tell a real rank-based film it's competing against a film the cut
