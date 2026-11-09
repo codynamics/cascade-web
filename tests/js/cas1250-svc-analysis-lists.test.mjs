@@ -127,3 +127,37 @@ test("CAS-1250 AC1/AC2: marginalFilms matches marginal, no film in it is carried
     cleanupFilms([filmC, filmD, filmC2]);
   }
 }));
+
+// CAS-1415: on a one-agent (v2) account svcAdviceFilms() is the films the person's MOODS list, watched films
+// included; only blocked ("Will never") films are left out, and a film no mood lists is not counted.
+test("CAS-1415: v2 svcAdviceFilms counts a watched film the mood lists, not a blocked film or one no mood lists", () => {
+  const c = { id:"cas1415-fixture", name:"Agent", v:2, paused:false,
+    styles:{ Action:{ bar:1, al:{cinema:false,rent:false,stream:false} } }, combo:{} };
+  const mood = { ...E.oamMoodDefaultFields(), id:"t-cas1415", name:"Me", styles:["Action"], topShare:100, watched:true };
+  const film = (id, genres) => ({ tmdb_id:id, title:"CAS-1415 fixture "+id, genres, status:["included_streaming"],
+    language:"en", wm_critic_score:null, wm_user_rating:9, _fixture:true, availability_confidence:"confirmed",
+    offers:[{service:"Amazon Prime Video", type:"sub", price:null, format:null}],
+    cinema_release:true, cinema_date:E.TODAY });
+  const listed = film(91415001, ["Action"]), blockedFilm = film(91415002, ["Action"]), other = film(91415003, ["Drama"]);
+  const savedMovies = [...E.MOVIES], savedMoods = [...E.watchMoods].map(m => ({ ...m })), savedCascades = [...E.cascades];
+  const savedWatched = new Set(E.watched), savedBlocked = new Set(E.blocked);
+  try{
+    E.MOVIES.length = 0; [listed, blockedFilm, other].forEach(m => E.MOVIES.push(m));
+    E.watchMoods.length = 0; E.watchMoods.push(mood);
+    E.cascades.length = 0; E.cascades.push(c);
+    E.watched.add(listed.tmdb_id);
+    E.blocked.add(blockedFilm.tmdb_id);
+    E.invalidateComputeCaches();
+    const ids = E.svcAdviceFilms().map(x => x.m.tmdb_id);
+    assert.ok(ids.includes(listed.tmdb_id), "a watched film the mood lists is counted");
+    assert.ok(!ids.includes(blockedFilm.tmdb_id), "a blocked film is not counted");
+    assert.ok(!ids.includes(other.tmdb_id), "a film no mood lists is not counted");
+  } finally{
+    E.MOVIES.length = 0; savedMovies.forEach(m => E.MOVIES.push(m));
+    E.watchMoods.length = 0; savedMoods.forEach(m => E.watchMoods.push(m));
+    E.cascades.length = 0; savedCascades.forEach(a => E.cascades.push(a));
+    E.watched.clear(); savedWatched.forEach(id => E.watched.add(id));
+    E.blocked.clear(); savedBlocked.forEach(id => E.blocked.add(id));
+    E.invalidateComputeCaches();
+  }
+});
