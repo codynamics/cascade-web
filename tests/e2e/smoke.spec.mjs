@@ -2886,6 +2886,9 @@ test("CAS-1403: Any service chip lists films beyond my services and clears when 
     prefs.on = true;
     watchMoods = [];
     watchMoodSel = "best";
+    // The my-services gate only bites films with streaming offers, so count on the Stream tab; the default
+    // Cinema tab's films carry no offers and read the same with or without Any service.
+    watchTab = "stream";
     render();
     window.openOamMoodSheetFor("best");
   });
