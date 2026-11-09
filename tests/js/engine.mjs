@@ -833,7 +833,7 @@ if(typeof window.CascadeAuth === "undefined"){
   // mood list a never-saved v2 account's defaults are built from (oamMoodDefaultsNow); oamMoodDraftFrom is
   // the v2 mood sheet's own draft-building function, the same convention moodDraftFrom (v1) is exported for
   // above. oamMoodsListReal is the account's own real v2 mood list (falling back to the builtins in memory).
-  oamFilmMeetsReleasesRules, ONE_AGENT_MOOD_BUILTINS, oamMoodDraftFrom, oamMoodsListReal,
+  oamFilmMeetsReleasesRules, oamFilmInReleasesWindow, oneAgentStarterMoods, ONE_AGENT_MOOD_BUILTINS, oamMoodDraftFrom, oamMoodsListReal,
   // CAS-1395: oamMoodFromDraft is the mood-shape builder Save and the "will show N of T" count share;
   // MOOD_MAX is the mood-row cap the visibility helper below also gates on; oamSvcChipLabel is the mood
   // sheet's/Find's own short service-chip label (the prefill's own name fallback reads it too) — exported

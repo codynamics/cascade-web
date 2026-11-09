@@ -20552,7 +20552,10 @@ const ONE_AGENT_MOOD_BUILTINS=[
   // CAS-1366: Releases opens by release date, not score — a blank sort/show here used to fall back to
   // oamMoodDefaultFields()'s score/all, so a never-saved Releases mood opened (and, once saved, stayed) in
   // score order.
-  {id:"releases", name:"Releases", sort:"release", show:"all"},
+  // Lee, 2026-11-09: renamed "All Latest"; its window is its own How far back filter (1 yr to start) and it
+  // includes films you've watched. releasesV:2 marks a record that already has these defaults (see the load
+  // repair in loadUserPrefs and oamSaveMoodFromSheet's stamp).
+  {id:"releases", name:"All Latest", sort:"release", show:"all", years:1, watched:true, releasesV:2},
   // CAS-1368: Best of the best — every on genre, raised to a floor of 85 regardless of its own bar, Best 40.
   {id:"best", name:"Best of the best", topShare:20, show:"40"},
   {id:"starred", name:"Starred", starredOnly:true},
@@ -20663,8 +20666,16 @@ function oamFilmMeetsMoodRules(m, mood, c){
 // in the agent) replaces admission by score: neither the agent's bar nor the mood's own minimum score ever
 // applied to Releases. The watched switch applies the same excludeWatched override oamFilmMeetsMoodRules
 // uses, so "Include films I've watched" finally does something for this mood too.
+// Lee, 2026-11-09: All Latest's window is its own How far back filter, not a fixed 365 days — every real
+// cinema release (cinema_release with a cinema_date) dated within the chosen number of years, or still
+// ahead. Any (years 0) means no limit.
+function oamFilmInReleasesWindow(m, mood){
+  if(!m.cinema_release || !m.cinema_date) return false;
+  const cut=yearsCutoff(mood.years);
+  return !cut || m.cinema_date>=cut;
+}
 function oamFilmMeetsReleasesRules(m, mood, c){
-  if(!filmInLatestWindow(m)) return false;
+  if(!oamFilmInReleasesWindow(m, mood)) return false;
   const admitC = mood.watched ? {...c, excludeWatched:false} : c;
   if(admitC.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
   const {main}=mainOtherCombos(m);
@@ -21269,7 +21280,7 @@ window.oamSaveMoodFromSheet=()=>{
   if(mood.id==="starred") mood.starredOnly=true;
   // CAS-1366: a save always stamps Releases' own repair marker, whichever sort was actually picked, so the
   // one-time load repair below (loadUserPrefs) never reverts a deliberate choice of Score back to release.
-  if(mood.id==="releases") mood.releasesSortV=1;
+  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=2; }
   const list=oamMoodsListReal();
   const idx=list.findIndex(m=>m.id===mood.id);
   watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
@@ -21449,7 +21460,7 @@ function oamWilMoodGateReason(m, c, main){
     // CAS-1396: a people-filter mood ignores genre ticks entirely, so its own gates (ages/awards/years/
     // people) are checked whether or not this film's genre happens to be ticked in it.
     if(!oamKeywordOn(mood) && !oamMoodStyles(mood, c).includes(main)) continue;
-    if(mood.id==="releases" && !filmInLatestWindow(m)) continue;
+    if(mood.id==="releases" && !oamFilmInReleasesWindow(m, mood)) continue;
     const name=esc(moodDisplayName(mood));
     const age=oamFilmAge(m);
     if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)){
@@ -24256,7 +24267,7 @@ const V2_TOUR_STEPS = [
   {html:v2CardHTML("You're all set. Here's a one-minute tour of how Cascade works."), center:true},
   {html:v2CardHTML("Cascade has four places. Here's what each one does."), sel:[".hdr-actions"]},
   {html:v2CardHTML("Watch: every film your agent has found for you."), sel:["#moviesBtn"]},
-  {html:v2CardHTML("Moods are filtered collections of movies. A number have been created for you, which you can change, and you can create your own. ¶ Releases is special: it gives you every movie release, upcoming, current and recent. Starred holds every movie you star. ¶ Tap a mood to change it, or + Mood to make your own."),
+  {html:v2CardHTML("Moods are filtered collections of movies. A number have been created for you, which you can change, and you can create your own. ¶ All Latest is special: it gives you every cinema release, upcoming, current and recent — as far back as its How far back filter, one year to start. Starred holds every movie you star. ¶ Tap a mood to change it, or + Mood to make your own."),
     sel:[".moodrow"]},
   {html:v2CardHTML("Each mood lets you see its movies by viewing status."), sel:[".stgroups"]},
   {html:v2CardHTML("This is a film card. Tap it to expand and see details such as director, cast and awards, and to watch trailers."),
@@ -27479,7 +27490,7 @@ function acctFetchKeepalive(init){
     // CAS-1348's own one-time migration (or already provisioned post-rename) must still read as
     // "untouched by the person" here, same as the pre-rename "Latest" shape did.
     const isPreFixDefault = v2Moods.length===2
-      && v2Moods[0] && v2Moods[0].id==="releases" && (v2Moods[0].name==="Latest" || v2Moods[0].name==="Releases")
+      && v2Moods[0] && v2Moods[0].id==="releases" && (v2Moods[0].name==="Latest" || v2Moods[0].name==="Releases" || v2Moods[0].name==="All Latest")
       && v2Moods[1] && v2Moods[1].id==="starred" && v2Moods[1].name==="Starred";
     if(!isPreFixDefault) return;
     const added = oneAgentStarterMoods().filter(m=>m.id!=="releases" && m.id!=="starred");
@@ -27663,7 +27674,7 @@ function acctFetchKeepalive(init){
         // CAS-1348: see oneAgentApplyStarterRepair's own comment — "Releases" is this check's other
         // valid default name now, alongside the pre-rename "Latest".
         const isPreFixDefault = v2Moods.length===2
-          && v2Moods[0] && v2Moods[0].id==="releases" && (v2Moods[0].name==="Latest" || v2Moods[0].name==="Releases")
+          && v2Moods[0] && v2Moods[0].id==="releases" && (v2Moods[0].name==="Latest" || v2Moods[0].name==="Releases" || v2Moods[0].name==="All Latest")
           && v2Moods[1] && v2Moods[1].id==="starred" && v2Moods[1].name==="Starred";
         if(isPreFixDefault) oneAgentRepairPending=true;
         // CAS-1348: a v2 "releases" mood still carrying the pre-rename default name "Latest" (never
@@ -27683,6 +27694,16 @@ function acctFetchKeepalive(init){
         if(watchMoods.some(m=>m && m.v2 && m.id==="releases" && m.sort==="score" && !m.releasesSortV)){
           watchMoods = watchMoods.map(m=>(m && m.v2 && m.id==="releases" && m.sort==="score" && !m.releasesSortV)
             ? {...m, sort:"release", releasesSortV:1} : m);
+          moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
+        }
+        // Lee, 2026-11-09: All Latest — a v2 Releases mood not yet stamped releasesV:2 gets, once, in memory
+        // and piggybacked onto the next real view write (a load must never write — CAS-1218/1243): the new
+        // name (only while it still carries a default name), How far back 1 yr where it was Any (keeping the
+        // one-year window the old fixed 365 days gave it), and Include films I've watched on.
+        if(watchMoods.some(m=>m && m.v2 && m.id==="releases" && !m.releasesV)){
+          watchMoods = watchMoods.map(m=>(m && m.v2 && m.id==="releases" && !m.releasesV) ? {...m,
+            name: (m.name==="Releases" || m.name==="Latest") ? "All Latest" : m.name,
+            years: m.years ? m.years : 1, watched:true, releasesV:2} : m);
           moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
         }
         // CAS-1374: Best 10 is retired — a v2 mood still saved with show:"10" reads as "20" once, in
