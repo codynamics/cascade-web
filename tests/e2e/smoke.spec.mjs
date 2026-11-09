@@ -2876,7 +2876,10 @@ test("CAS-1403: Any service chip lists films beyond my services and clears when 
 
   await page.evaluate(() => {
     cascades.length = 0;
-    cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
+    const al = { cinema:false, rent:false, stream:false };
+    const styles = {};
+    for (const g of ALL_GENRES) styles[g] = { bar:50, al };
+    cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
     saveCascades();
     setActive(cascades[0].id);
     prefs.sub = new Set([SUB_SERVICES[0]]);
