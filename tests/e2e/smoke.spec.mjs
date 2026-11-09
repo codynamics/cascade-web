@@ -2916,3 +2916,46 @@ test("CAS-1403: Any service chip lists films beyond my services and clears when 
   expect(await page.evaluate(() => oamDraft.anySvc)).toBe(false);
   expect(await page.evaluate(() => !!oamDraft.svc)).toBe(true);
 });
+
+// CAS-1414: starred films lead their section of a mood, and Best N never cuts a starred film the mood lists.
+test("CAS-1414: a starred film leads the mood list and survives a Best 20 cut", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  const r = await page.evaluate(() => {
+    cascades.length = 0;
+    const al = { cinema:false, rent:false, stream:false };
+    const styles = {};
+    for (const g of ALL_GENRES) styles[g] = { bar:67, al };
+    cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
+    saveCascades();
+    setActive(cascades[0].id);
+    prefs.sub = new Set(SUB_SERVICES);   // Stream-tab films only list on a service the user has
+    prefs.on = true;
+    watchMoods = [];
+    watchMoodSel = "best";
+    watchTab = "stream";
+    starredIds.clear();
+    render();
+    const c = oneAgentCriteria();
+    const mood = currentOamMood();
+    mood.show = null;   // All — no cut yet
+    const all = oamVisibleRows().rows;
+    if (all.length < 3) return { listed: all.length };
+    const lowest = all.slice().sort((a, b) => oamOrderScore(a, c) - oamOrderScore(b, c) || b.tmdb_id - a.tmdb_id)[0].tmdb_id;
+    starredIds.add(lowest);
+    saveStarred();
+    render();
+    // Starred films lead their own status section (not the whole list), so check the section holding the film.
+    const grp = listingGroups(oamVisibleRows().rows, activeCascade()).find(x => x.items.some(m => m.tmdb_id === lowest));
+    const firstId = grp ? "card-" + grp.items[0].tmdb_id : null;
+    mood.show = "20";
+    const capped = oamVisibleRows().rows;
+    return { listed: all.length, lowest, firstId, cappedHasLowest: capped.some(m => m.tmdb_id === lowest) };
+  });
+  expect(r.listed).toBeGreaterThanOrEqual(3);
+  expect(r.firstId).toBe("card-" + r.lowest);
+  // Best 20 only has something to cut when more than 20 films are admitted; either way the starred film stays.
+  expect(r.cappedHasLowest).toBe(true);
+});

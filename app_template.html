@@ -20754,6 +20754,9 @@ function oamApplyShowCap(rows, mood, c, heldThisTab){
   // populated on the Rental tab (filmMatchesWatchTab/oamStagePool are the only source of these rows), so
   // this is a no-op for every other tab's rows.
   const soon=rows.filter(m=>!handIds.has(m.tmdb_id) && primaryStatus(m)==="released");
+  // Lee, 2026-11-09: a starred film the mood lists is never cut by Best N — it shows (at the top, see
+  // listingGroups) on top of the N, like a Rental soon film.
+  const starred=rows.filter(m=>!handIds.has(m.tmdb_id) && isStarred(m.tmdb_id));
   const rest=rows.filter(m=>!handIds.has(m.tmdb_id) && primaryStatus(m)!=="released")
     .sort((a,b)=>{ const d=oamOrderScore(b,c)-oamOrderScore(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
   const remaining=Math.max(0, n-hand.length);
@@ -20769,7 +20772,7 @@ function oamApplyShowCap(rows, mood, c, heldThisTab){
     ranked.push(m);
     if(!watched.has(m.tmdb_id)) unwatchedKept++;
   }
-  const keep=new Set([...hand, ...soon, ...ranked].map(m=>m.tmdb_id));
+  const keep=new Set([...hand, ...soon, ...starred, ...ranked].map(m=>m.tmdb_id));
   rows.forEach(m=>{ if(heldThisTab.has(m.tmdb_id)) keep.add(m.tmdb_id); });
   return rows.filter(m=>keep.has(m.tmdb_id));
 }
@@ -24888,6 +24891,7 @@ function splitByOwner(items){
 }
 // CAS-662: the listing's own group partition, decided up front — pure over `rows` and the active agent's
 // order, no depth cap or floor any more (selectivity is the agent's own Mission criteria now).
+const starredFirstCmp = (a,b) => (isStarred(b.tmdb_id)?1:0) - (isStarred(a.tmdb_id)?1:0);
 function listingGroups(rows, ac){
   // CAS-819: sortPicked (declared above syncSortCtl) is set only by the Watch bar's own #sort control —
   // reading ymSort here (CAS-699's original wiring) meant this listing was actually driven by Your Movies'
@@ -24906,9 +24910,11 @@ function listingGroups(rows, ac){
       // to rank by). With no pick, agent rank still leads and the tab's own sort only breaks ties inside one
       // agent's own films, same order it read before this ticket.
       // CAS-1301: watchGroupRows is the same row-to-group test watchStageCountFor uses for the stage button.
+      // Lee, 2026-11-09: starred films lead every section of a mood, in the section's own order among
+      // themselves; unstarred films follow in that same order. (Inside one agent's run when no sort is picked.)
       return {g, items: watchGroupRows(rows, g)
-        .sort(isUserSort ? (a,b)=>cmp(a,b) || a.title.localeCompare(b.title)
-                          : (a,b)=>filmOwnerOrder(a)-filmOwnerOrder(b) || cmp(a,b))};
+        .sort(isUserSort ? (a,b)=>starredFirstCmp(a,b) || cmp(a,b) || a.title.localeCompare(b.title)
+                          : (a,b)=>filmOwnerOrder(a)-filmOwnerOrder(b) || starredFirstCmp(a,b) || cmp(a,b))};
     })
     .filter(x=>x.items.length);
   // CAS-1309: the Cinema tab's Upcoming stage alone splits its one section into "Next week" (AU cinema
