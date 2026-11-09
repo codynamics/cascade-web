@@ -2947,7 +2947,9 @@ test("CAS-1414: a starred film leads the mood list and survives a Best 20 cut", 
     starredIds.add(lowest);
     saveStarred();
     render();
-    const firstId = (document.querySelector("#list .card, .card") || {}).id;
+    // Starred films lead their own status section (not the whole list), so check the section holding the film.
+    const grp = listingGroups(oamVisibleRows().rows, activeCascade()).find(x => x.items.some(m => m.tmdb_id === lowest));
+    const firstId = grp ? "card-" + grp.items[0].tmdb_id : null;
     mood.show = "20";
     const capped = oamVisibleRows().rows;
     return { listed: all.length, lowest, firstId, cappedHasLowest: capped.some(m => m.tmdb_id === lowest) };
