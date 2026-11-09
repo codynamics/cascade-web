@@ -3469,7 +3469,17 @@
   .morebody .wsheethd>span:first-child{font-size:11px}
   /* CAS-1400: genre rows, the column header, the Mood Override Filter row and its scale share ONE grid, so the
      filter's strip sits in exactly the same 96px column (same left edge and width) as every genre strip. */
-  .oamstylerow,.gcolhd,.mfrowgrid,.mfscale{display:grid;grid-template-columns:minmax(0,1fr) 96px 66px;column-gap:8px}
+  /* Lee, 2026-11-09: the strip column widened 96px -> 116px so the share strip reads at a glance. */
+  .oamstylerow,.gcolhd,.mfrowgrid,.mfscale{display:grid;grid-template-columns:minmax(0,1fr) 116px 60px;column-gap:6px}
+  /* Lee, 2026-11-09: the Mood Override is a true override — the stretch it RAISES a genre by is marked. */
+  .mfgain{position:absolute;top:0;bottom:0;pointer-events:none;z-index:2;border-radius:4px;
+    background:repeating-linear-gradient(135deg,rgba(124,92,255,.55) 0 3px,rgba(124,92,255,.15) 3px 6px);outline:1px solid rgba(160,140,255,.8)}
+  .mfrowgrid .mflbl .mftogrow{display:flex;align-items:center;gap:8px;margin-top:4px}
+  .mfrowgrid .mftog{width:36px;height:20px}
+  .mfrowgrid .mftog i{top:2px;left:2px;width:16px;height:16px}
+  .mfrowgrid .mftog.on i{left:18px}
+  .mfbox.off .oaslidewrap{opacity:.35;filter:grayscale(1)}
+  .mfbox.off .oarange{pointer-events:none}
   .mfbox{margin:6px 0 0;padding:12px 4px 6px;border-top:1px solid var(--line)}
   .mfrowgrid{align-items:center}
   .mfrowgrid .mflbl{font-size:12px;color:var(--dim);line-height:1.35}
@@ -20599,7 +20609,9 @@ function oamMoodBarFor(mood, c, style){
   const agentBar=oaBar(c, style);
   if(agentBar==null) return null;
   const topShare=oamMoodEffectiveTopShare(mood);
-  return topShare==null ? agentBar : Math.max(agentBar, oneBarForTopPct(style, topShare));
+  // Lee, 2026-11-09: a TRUE override — every on genre in the mood is set to the same top share, raised or
+  // lowered from the agent's own bar. Off (null) leaves each genre at the agent's setting.
+  return topShare==null ? agentBar : oneBarForTopPct(style, topShare);
 }
 function oamFilmAge(m){ return AGE_RATING_CANON[m.age_rating] || m.age_rating; }
 // CAS-1384: a saved svc that's no longer one of the account's own services (prefs.sub) reads as null —
@@ -20973,8 +20985,8 @@ function oamStylesAlsoIn(style, excludeId){
 function oamStyleValHTML(style, bar, filterShare){
   if(bar==null) return "Never";
   const agentShare=oneTopPct(style, bar);
-  if(filterShare!=null && agentShare>filterShare){
-    return `Top ${filterShare}%<i><s class="was">${agentShare}%</s> · ${oneBarForTopPct(style, filterShare)}+</i>`;
+  if(filterShare!=null && agentShare!==filterShare){
+    return `${filterShare>=100?"All":`Top ${filterShare}%`}<i><s class="was">${agentShare}%</s> · ${oneBarForTopPct(style, filterShare)}+</i>`;
   }
   return `Top ${agentShare}%<i>score ${bar}+</i>`;
 }
@@ -21008,29 +21020,43 @@ function oamFilterBoxesHTML(share){
     `<span class="oabox" style="--bc:${b.color}"><i class="oafill oafleft" style="width:${oaShareBoxPct(share,b)}%"></i></span>`
   ).join("");
 }
+// Lee, 2026-11-09: a true override with its own Off switch. On, every ticked genre in this mood is set to the
+// same top share — lowered (greyed) or raised (striped) from your agent's own setting; 100 is All. Off, each
+// genre keeps the agent's setting and the strip is greyed out.
+function oamOverrideValHTML(share, on){
+  if(!on) return `Off<i>agent's</i>`;
+  return share>=100 ? `All<i>every genre</i>` : `Top ${share}%<i>every genre</i>`;
+}
 function oamOverrideFilterDesc(share, on){
   return on
-    ? `Reduce the % of catalog to show only the best. Showing the top ${share}% of each genre; greyed is what your agent alone would add.`
-    : `Reduce the % of catalog to show only the best.`;
+    ? `Every ticked genre shows its ${share>=100?"whole catalog":`top ${share}%`} in this mood, whatever your agent's own setting. Greyed is what this takes away; striped is what it adds.`
+    : `Off: each genre uses your agent's own setting. Switch on to set every genre in this mood to the same top %, higher or lower.`;
 }
 function oamOverrideFilterHTML(d){
   const on = d.topShare!=null;
-  const share = on ? d.topShare : 100;
-  const valHTML = on ? `Top ${d.topShare}%<i>each genre</i>` : `All<i>agent's</i>`;
-  return `<div class="mfbox">
+  const share = on ? d.topShare : (d.lastTopShare || 40);
+  return `<div class="mfbox${on?"":" off"}">
       <div class="mfscale"><span>${ONE_AGENT_SHARE_BRACKETS.map(b=>`<i>${esc(oaShareLabel(b.pct))}</i>`).join("")}</span></div>
       <div class="mfrowgrid">
-        <div class="mflbl"><b>Mood Override Filter</b><span class="mfsub">${on?"on":"off"}</span></div>
+        <div class="mflbl"><b>Mood Override</b>
+          <span class="mftogrow"><button type="button" class="mftog${on?" on":""}" role="switch" aria-checked="${on}"
+            aria-label="Mood Override" onclick="toggleOamOverride()"><i></i></button><span class="mfsub">${on?"On":"Off"}</span></span></div>
         <div class="oaslidewrap">
           <div class="oastrip oastripfull">${oamFilterBoxesHTML(share)}</div>
-          <input type="range" class="oarange" min="1" max="100" step="1" value="${share}"
-            oninput="oamFilterOnDrag(this)" onchange="oamFilterOnRelease(this)" aria-label="Mood Override Filter">
+          <input type="range" class="oarange" min="1" max="100" step="1" value="${share}" ${on?"":"disabled"}
+            oninput="oamFilterOnDrag(this)" onchange="oamFilterOnRelease(this)" aria-label="Mood Override share">
         </div>
-        <span class="oarowval">${valHTML}</span>
+        <span class="oarowval">${oamOverrideValHTML(share, on)}</span>
       </div>
       <p class="mfdesc">${oamOverrideFilterDesc(share, on)}</p>
     </div>`;
 }
+window.toggleOamOverride=()=>{
+  const d=oamDraft; if(!d) return;
+  if(d.topShare!=null){ d.lastTopShare=d.topShare; d.topShare=null; }
+  else d.topShare=d.lastTopShare || 40;
+  renderOamMoodSheetBody();
+};
 // The box-geometry rule the ticket gives verbatim: share p falls in box floor(p/20) at fraction (p mod 20)/20
 // of that box's own rendered width, and 100 is the right edge of the last box — reading real DOM geometry
 // (not a flat percentage of the track) so the line lines up with the box gaps exactly like the fill does.
@@ -21066,12 +21092,13 @@ function oamDrawFilterLines(d, c, filterShare){
     line.style.left=lineLeft+"px";
     wrap.appendChild(line);
     const agentShare=oneTopPct(style, bar);
-    if(agentShare>filterShare){
-      const maskLeft=lineLeft, maskRight=oamMfBoxPos(boxes, agentShare);
+    if(agentShare!==filterShare){
+      const agentPos=oamMfBoxPos(boxes, agentShare);
+      const lo=Math.min(lineLeft, agentPos), hi=Math.max(lineLeft, agentPos);
       const mask=document.createElement("div");
-      mask.className="mfmask";
-      mask.style.left=maskLeft+"px";
-      mask.style.width=Math.max(0, maskRight-maskLeft)+"px";
+      mask.className = agentShare>filterShare ? "mfmask" : "mfgain";
+      mask.style.left=lo+"px";
+      mask.style.width=Math.max(0, hi-lo)+"px";
       wrap.appendChild(mask);
       if(valEl) valEl.innerHTML=oamStyleValHTML(style, bar, filterShare);
     }
@@ -21081,7 +21108,7 @@ window.oamFilterOnDrag=(input)=>{
   const d=oamDraft; if(!d) return;
   const c=oneAgentCriteria(); if(!c) return;
   const share=Math.max(1, Math.min(100, parseInt(input.value,10)));
-  const on=share<100;
+  const on=true;
   const wrap=input.closest(".oaslidewrap");
   const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
   ONE_AGENT_SHARE_BRACKETS.forEach((b,i)=>{
@@ -21090,9 +21117,9 @@ window.oamFilterOnDrag=(input)=>{
   });
   const box=input.closest(".mfbox");
   const sub=box && box.querySelector(".mfsub");
-  if(sub) sub.textContent = on ? "on" : "off";
+  if(sub) sub.textContent = "On";
   const valEl=box && box.querySelector(".oarowval");
-  if(valEl) valEl.innerHTML = on ? `Top ${share}%<i>each genre</i>` : `All<i>agent's</i>`;
+  if(valEl) valEl.innerHTML = oamOverrideValHTML(share, true);
   const descEl=box && box.querySelector(".mfdesc");
   if(descEl) descEl.textContent = oamOverrideFilterDesc(share, on);
   oamDrawFilterLines(d, c, on ? share : null);
@@ -21101,7 +21128,7 @@ window.oamFilterOnDrag=(input)=>{
 window.oamFilterOnRelease=(input)=>{
   const d=oamDraft; if(!d) return;
   const share=Math.max(1, Math.min(100, parseInt(input.value,10)));
-  d.topShare = share>=100 ? null : share;
+  d.topShare = share;
   renderOamMoodSheetBody();
 };
 const OAM_AGE_OPTS=TASTE_AGE_ORDER;
