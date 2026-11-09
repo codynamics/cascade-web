@@ -1,164 +1,122 @@
 [
   {
-    "tmdb_id": 345887,
-    "title": "The Equalizer 2",
+    "tmdb_id": 1263337,
+    "title": "Heart of the Beast",
     "kind": "arrived",
-    "new_window": "included_streaming",
-    "label": "Included Streaming",
-    "services": [
-      "Binge Amazon Channel"
-    ],
-    "detected": "2026-11-08"
-  },
-  {
-    "tmdb_id": 345887,
-    "title": "The Equalizer 2",
-    "kind": "left",
-    "lost_window": "rental",
+    "new_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-11-08"
-  },
-  {
-    "tmdb_id": 516729,
-    "title": "Paddington in Peru",
-    "kind": "left",
-    "lost_window": "included_streaming",
-    "label": "Included Streaming",
-    "detected": "2026-11-08"
-  },
-  {
-    "tmdb_id": 1269325,
-    "title": "Drishyam: The Conclusion",
-    "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-11-08"
-  },
-  {
-    "tmdb_id": 854513,
-    "title": "Hallelujah: Leonard Cohen, a Journey, a Song",
-    "kind": "arrived",
-    "new_window": "included_streaming",
-    "label": "Included Streaming",
     "services": [
-      "SBS On Demand"
+      "JustWatch TV Store",
+      "Amazon Video"
     ],
-    "detected": "2026-11-08"
+    "detected": "2026-11-09"
   },
   {
-    "tmdb_id": 854513,
-    "title": "Hallelujah: Leonard Cohen, a Journey, a Song",
-    "kind": "left",
-    "lost_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "detected": "2026-11-08"
-  },
-  {
-    "tmdb_id": 507647,
-    "title": "Standing Up for Sunny",
-    "kind": "left",
-    "lost_window": "included_streaming",
-    "label": "Included Streaming",
-    "detected": "2026-11-08"
-  },
-  {
-    "tmdb_id": 467649,
-    "title": "Fidaa",
+    "tmdb_id": 1226863,
+    "title": "The Super Mario Galaxy Movie",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
       "Netflix",
+      "BINGE",
       "Netflix Standard with Ads"
     ],
-    "detected": "2026-11-08"
+    "detected": "2026-11-09"
   },
   {
-    "tmdb_id": 467649,
-    "title": "Fidaa",
+    "tmdb_id": 1226863,
+    "title": "The Super Mario Galaxy Movie",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-11-08"
+    "detected": "2026-11-09"
   },
   {
-    "tmdb_id": 1500516,
-    "title": "Not Only Fred Dagg But Also John Clarke",
+    "tmdb_id": 1101383,
+    "title": "The End of Oak Street",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "HBO Max"
+    ],
+    "detected": "2026-11-09"
+  },
+  {
+    "tmdb_id": 1101383,
+    "title": "The End of Oak Street",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-11-09"
+  },
+  {
+    "tmdb_id": 1011985,
+    "title": "Kung Fu Panda 4",
     "kind": "left",
     "lost_window": "included_streaming",
     "label": "Included Streaming",
-    "detected": "2026-11-08"
+    "detected": "2026-11-09"
   },
   {
-    "tmdb_id": 1673928,
-    "title": "Rod Quantock Comedy Warrior",
+    "tmdb_id": 659370,
+    "title": "Margrete: Queen of the North",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-09"
+  },
+  {
+    "tmdb_id": 1251608,
+    "title": "The Blood Countess",
     "kind": "left",
     "lost_window": "in_cinema",
     "label": "In Cinema",
-    "detected": "2026-11-08"
+    "detected": "2026-11-09"
   },
   {
-    "tmdb_id": 1299040,
-    "title": "The Girls at the Station",
+    "tmdb_id": 302528,
+    "title": "Remember",
     "kind": "left",
-    "lost_window": "included_streaming",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-11-09"
+  },
+  {
+    "tmdb_id": 1711182,
+    "title": "Pension Patta",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-11-09"
+  },
+  {
+    "tmdb_id": 1730968,
+    "title": "Lost In The Water",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-11-09"
+  },
+  {
+    "tmdb_id": 1533387,
+    "title": "Stringybark",
+    "kind": "arrived",
+    "new_window": "included_streaming",
     "label": "Included Streaming",
-    "detected": "2026-11-08"
-  },
-  {
-    "tmdb_id": 655854,
-    "title": "For the Love of Ruth",
-    "kind": "left",
-    "lost_window": "included_streaming",
-    "label": "Included Streaming",
-    "detected": "2026-11-08"
-  },
-  {
-    "tmdb_id": 461844,
-    "title": "Liyana",
-    "kind": "left",
-    "lost_window": "included_streaming",
-    "label": "Included Streaming",
-    "detected": "2026-11-08"
-  },
-  {
-    "tmdb_id": 509250,
-    "title": "The Kingdom: How Fungi Made Our World",
-    "kind": "left",
-    "lost_window": "included_streaming",
-    "label": "Included Streaming",
-    "detected": "2026-11-08"
-  },
-  {
-    "tmdb_id": 1316409,
-    "title": "Darweesh",
-    "kind": "left",
-    "lost_window": "included_streaming",
-    "label": "Included Streaming",
-    "detected": "2026-11-08"
-  },
-  {
-    "tmdb_id": 1218213,
-    "title": "The Last Journey",
-    "kind": "left",
-    "lost_window": "included_streaming",
-    "label": "Included Streaming",
-    "detected": "2026-11-08"
-  },
-  {
-    "tmdb_id": 1014870,
-    "title": "752 Is Not a Number",
-    "kind": "left",
-    "lost_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "detected": "2026-11-08"
+    "services": [
+      "Beamafilm",
+      "Beamafilm"
+    ],
+    "detected": "2026-11-09"
   },
   {
     "tmdb_id": 1533387,
     "title": "Stringybark",
     "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-11-08"
+    "lost_window": "released",
+    "label": "Released (no AU offer)",
+    "detected": "2026-11-09"
   }
 ]

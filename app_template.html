@@ -4476,14 +4476,14 @@
              agent/tab/service/watched/style/Picked-by narrowing of any kind. Same modechip construction as
              Moving; the magnifying-glass icon is the Watch search box's own glyph (CAS-150), drawn in the
              same stroke style as the other chip icons. -->
-        <div class="modechip fd" id="findBtn" title="Find" role="button" tabindex="0"
-             aria-pressed="false" aria-label="Find" onclick="openFindScreen()">
+        <div class="modechip fd" id="findBtn" title="Database" role="button" tabindex="0"
+             aria-pressed="false" aria-label="Database" onclick="openFindScreen()">
           <svg class="mcicon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <circle class="s" cx="11" cy="11" r="6.4" stroke-width="2" fill="none"/>
             <path class="s" d="M15.8 15.8 20 20" stroke-width="2" stroke-linecap="round" fill="none"/>
           </svg>
-          <span class="mclabel mclabel-full">Find</span>
-          <span class="mclabel mclabel-short">Find</span>
+          <span class="mclabel mclabel-full">Database</span>
+          <span class="mclabel mclabel-short">Database</span>
         </div>
         <!-- Agents is a main nav destination again, the fourth item (Lee, 2026-10-10). -->
         <div class="modechip ag" id="agentsBtn" title="Agents" role="button" tabindex="0"
@@ -4990,7 +4990,7 @@
      so it sits BELOW the header (top:var(--hdrh), z-index:29) rather than covering it at top:0. Body
      rendered by renderFindScreen(); the list itself is paged in by findRenderMore() as the user scrolls
      near the bottom — the whole catalogue (~5,800 films) is never rendered at once. -->
-<div class="uscreen" id="findScreen" role="dialog" aria-modal="true" aria-label="Find">
+<div class="uscreen" id="findScreen" role="dialog" aria-modal="true" aria-label="Database">
   <div class="uwrap" id="findBody"></div>
 </div>
 
@@ -12546,7 +12546,17 @@ function oneTopPct(style, score){
 // and return the lowest score inside that group (CAS-1351). Picking a box on the setup/Agent/slider screens
 // sets bar to this; the display always reads it back out through oneTopPct, so the two round-trip (±1 from
 // integer rounding) by construction.
+// Lee, 2026-11-10: memoised per (style, pct, catalogue size) — the Mood Override calls this once per film per
+// mood, and every call walked the whole catalogue (2.7s for Service analysis on Lee's account; 0.1s memoised).
+const _oneBarForTopPctCache=new Map();
 function oneBarForTopPct(style, pct){
+  const ck=style+"|"+pct+"|"+MOVIES.length;
+  if(_oneBarForTopPctCache.has(ck)) return _oneBarForTopPctCache.get(ck);
+  const v=oneBarForTopPctUncached(style, pct);
+  _oneBarForTopPctCache.set(ck, v);
+  return v;
+}
+function oneBarForTopPctUncached(style, pct){
   const scores=[];
   MOVIES.forEach(m => {
     if(!(m.genres && m.genres.length) || m.genres[0]!==style) return;
@@ -14650,6 +14660,19 @@ $("cDelete").onclick=()=>{
 // a real opinion), so one gate excludes both.
 function svcAdviceFilms(){
   const byId=new Map();   // tmdb_id -> {m, human}
+  // Lee, 2026-11-10: on a one-agent account the analysis counts the films your MOODS list — each mood's own
+  // genres, Override, filters and hand in/out — with every service and window open, and films you've WATCHED
+  // INCLUDED (only "Will never" films are left out). So a service's number always covers that service's mood.
+  const oneC=oneAgentCriteria();
+  if(oneC){
+    const scopeOff={...oneC, myServices:false, status:[], listStatus:[], excludeWatched:false};
+    const moods=oamMoodsListReal().map(md=>({...md, svc:null, anySvc:true, watched:true}));
+    MOVIES.forEach(m=>{
+      if(blocked.has(m.tmdb_id)) return;
+      if(moods.some(md=>filmInOneAgentMood(m, md, scopeOff))) byId.set(m.tmdb_id, {m, human:true});
+    });
+    return [...byId.values()];
+  }
   cascades.forEach(c=>{
     if(c.paused) return;                    // guest mode (CAS-79): watches nothing, so it advises nothing
     // CAS-853: myServices:false (not {}) — {} is a real, narrowable "no window scoped yet" agent shape and
@@ -14865,7 +14888,7 @@ function renderSvcAnalysis(){
     // Same zero-population number, two honest reasons: no agent has matched anything yet, or every match has
     // already been watched/blocked (AC7) — the copy shouldn't claim "create an agent" when one already exists.
     body = cascades.some(c=>!c.paused)
-      ? `<div class="pnote">Every film your agent picked is already watched or ruled out — nothing to
+      ? `<div class="pnote">Every film your moods list is ruled out — nothing to
           measure your services against right now.</div>`
       : `<div class="pnote">Create an agent and it starts finding films for you — then we'll work out which
           of your services cover them, and which one might be worth adding.</div>`;
@@ -14876,7 +14899,7 @@ function renderSvcAnalysis(){
       ? `<div class="pnote">You haven't told Cascade which services you have yet — add them in My streaming services.</div>`
       : mineRows.map(svcRowHTML).join("");
     const worthBody = !a.worth.length
-      ? `<div class="pnote">No other service would add a film your agent picked that you can't already watch.</div>`
+      ? `<div class="pnote">No other service would add a film your moods list that you can't already watch.</div>`
       : a.worth.map(svcWorthRowHTML).join("")
         + `<div class="advfoot">We don't hold subscription prices, so this is films gained, not a cost comparison.</div>`;
     // CAS-1124 AC4: a streaming total of 0 (population exists, but none of it is on a streaming service)
@@ -14887,10 +14910,10 @@ function renderSvcAnalysis(){
           <div class="svcbar"><span class="human" style="width:${a.coveredTotal/a.total*100}%"></span></div>
           ${a.notCovered ? `<div class="svcleg">The other ${a.notCovered} are only on services you don't have — see what you'd gain below.</div>` : ""}
         </div>`
-      : `<div class="pnote">None of the films your agent picked are on a streaming service yet.</div>`;
+      : `<div class="pnote">None of the films your moods list are on a streaming service yet.</div>`;
     body=`
-      <div class="svcpop">Every number here counts the <b>${a.total}</b> film${a.total===1?"":"s"} your agent picked
-        for you that are on a streaming service — not the whole catalogue. Films you've watched are left out.</div>
+      <div class="svcpop">Every number here counts the <b>${a.total}</b> film${a.total===1?"":"s"} your moods list
+        that are on a streaming service — not the whole catalogue. Films you've watched are included.</div>
       ${headline}
       <div class="flabel">Services you have — what you'd lose by dropping each</div>
       ${mineBody}
@@ -14900,7 +14923,7 @@ function renderSvcAnalysis(){
   el.innerHTML=`
     <div class="ostop"><button class="osback" type="button" onclick="closeSvcAnalysis()" aria-label="Back">←</button>
       <h2 class="osh">Streaming service analysis</h2></div>
-    <p class="ossub">How many of the films your agent picked you'd lose by dropping a service, or gain by adding one.</p>
+    <p class="ossub">How many of the films your moods list you'd lose by dropping a service, or gain by adding one.</p>
     ${body}`;
 }
 window.openSvcAnalysis=()=>{
@@ -22939,7 +22962,7 @@ function findSvcFiltHTML(){
 }
 function renderFindScreen(){
   $("findBody").innerHTML = `
-    <h2 class="osh">Find</h2>
+    <h2 class="osh">Database</h2>
     <div class="watchsearchwrap" id="findSearchWrap">
       <input id="findSearchInput" class="search" type="text" inputmode="search" autocomplete="off"
              enterkeyhint="search"
