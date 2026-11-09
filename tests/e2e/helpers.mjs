@@ -419,7 +419,7 @@ export async function openAgentsScreenFromNav(page){
 export async function openWhereWhenScreen(page){
   await page.locator("#navMenuBtn").click();
   await page.locator("#navMenu .navitem", { hasText: "Settings" }).click();
-  await page.locator("#settingsScreen .urow", { hasText: "Service tracking" }).click();
+  await page.locator("#settingsScreen .urow", { hasText: "Status tracking" }).click();
 }
 /** Back out of Where & when — which (CAS-1126) now resumes Settings rather than just closing, since
  * that's where this test opened it from — then back out of Settings too, landing on the listing
@@ -430,17 +430,15 @@ export async function closeWhereWhenScreen(page){
   await page.locator("#settingsScreen .osback").click();
   await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
 }
-/** CAS-1126: "My services" left the top menu for the new Settings screen too. */
+/** Lee, 2026-11-09: "My streaming services" is back in the top menu (out of Settings). */
 export async function openMyServicesScreen(page){
   await page.locator("#navMenuBtn").click();
-  await page.locator("#navMenu .navitem", { hasText: "Settings" }).click();
-  await page.locator("#settingsScreen .urow", { hasText: "My services" }).click();
+  await page.locator("#navMenu .navitem", { hasText: "My streaming services" }).click();
 }
-/** Back out of My services (its onbStep frame) then out of the Settings screen it resumes to (CAS-1126). */
+/** Back out of My streaming services (its onbStep frame) — opened from the menu, so nothing to resume. */
 export async function closeMyServicesScreen(page){
   await page.locator("#onbStep .osback").click();
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
-  await page.locator("#settingsScreen .osback").click();
   await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
 }
 /** CAS-1176: "How you're told" left the onboarding step frame for its own plain back-arrow-and-title
@@ -448,7 +446,7 @@ export async function closeMyServicesScreen(page){
 export async function openNotifyScreen(page){
   await page.locator("#navMenuBtn").click();
   await page.locator("#navMenu .navitem", { hasText: "Settings" }).click();
-  await page.locator("#settingsScreen .urow", { hasText: "How you're told" }).click();
+  await page.locator("#settingsScreen .urow", { hasText: "Notification Settings" }).click();
 }
 /** Back out of How you're told then out of the Settings screen it resumes to (CAS-1126's screenResume). */
 export async function closeNotifyScreen(page){

@@ -416,7 +416,7 @@ test("the Watch screen's tab strip follows the enabled watch windows", async ({ 
   await expect(page.locator(".stagestop", { hasText: "Premium" })).toHaveCount(0);
 
   await openWhereWhenScreen(page);
-  await expect(page.locator(".osh", { hasText: "Service tracking" })).toBeVisible();
+  await expect(page.locator(".osh", { hasText: "Status tracking" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
   await premiumLane.locator(".agwt", { hasText: "Track" }).click();
   await expect(premiumLane).toHaveClass(/on/);
@@ -506,7 +506,7 @@ test("an agent created with every window enabled lists films at rental or stream
   await toListing(page);
 
   await openWhereWhenScreen(page);
-  await expect(page.locator(".osh", { hasText: "Service tracking" })).toBeVisible();
+  await expect(page.locator(".osh", { hasText: "Status tracking" })).toBeVisible();
   const premiumLane = page.locator(".wwlane", { has: page.locator(".wwn", { hasText: "Premium" }) });
   await premiumLane.locator(".agwt", { hasText: "Track" }).click();
   await expect(premiumLane).toHaveClass(/on/);
@@ -802,7 +802,7 @@ test("'Only show films on my services' changes what a new agent finds", async ({
   const agentId = await page.evaluate(ids => cascades.map(c => c.id).find(id => !ids.includes(id)), idsSeed);
 
   await openMyServicesScreen(page);
-  await expect(page.locator(".osh", { hasText: "My services" })).toBeVisible();
+  await expect(page.locator(".osh", { hasText: "My streaming services" })).toBeVisible();
 
   if(await page.evaluate(() => prefs.on)) await page.locator("#onbSvcOnly").click();
   await expect.poll(() => page.evaluate(() => prefs.on)).toBe(false);
@@ -1685,7 +1685,7 @@ test("CAS-1176 AC3-AC6: Settings' How you're told has no onboarding chrome, emai
   await expect(page.locator("#notifyScreen")).toHaveClass(/open/);
 
   // AC3: the title, and none of the onboarding step frame's chrome.
-  await expect(page.locator("#notifyScreen .osh")).toHaveText("How you're told");
+  await expect(page.locator("#notifyScreen .osh")).toHaveText("Notification Settings");
   await expect(page.locator("#notifyScreen .oslast")).toHaveCount(0);
   await expect(page.locator("#notifyScreen .osskip")).toHaveCount(0);
   await expect(page.locator("#notifyScreen button", { hasText: "Continue" })).toHaveCount(0);

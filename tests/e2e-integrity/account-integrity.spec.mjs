@@ -594,7 +594,7 @@ test("CAS-1155 S1: a new sign-up's notify_prefs row has email alerts on, address
   // AC: Settings' "How you're told" row shows Email and the sign-up address — read from the rendered DOM,
   // not notifyPrefs, so a load that wrote the server row but never updated the in-memory copy would be caught.
   await page.evaluate(() => window.openSettings());
-  const row = page.locator("#settingsBody .urow", { hasText: "How you're told" });
+  const row = page.locator("#settingsBody .urow", { hasText: "Notification Settings" });
   await expect(row).toContainText("Email");
   await expect(row).toContainText(email);
 });
