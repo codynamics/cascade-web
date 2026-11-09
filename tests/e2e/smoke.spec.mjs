@@ -2269,6 +2269,27 @@ test(`CAS-1296 AC3: "+ Mood" opens with From = My agents and every agent chip on
   await page.evaluate(() => window.closeWatchSheet());
 });
 
+// CAS-1413: a re-render that keeps the same selected mood must keep the mood row's own scroll position.
+test("CAS-1413 AC2: re-render with an unchanged mood selection keeps the mood row's scrollLeft", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  const before = await page.evaluate(() => {
+    const row = document.querySelector(".moodrow");
+    row.scrollLeft = row.scrollWidth;
+    return { left: row.scrollLeft, sel: row.dataset.sel };
+  });
+  await page.evaluate(() => window.render());
+  const after = await page.evaluate(() => {
+    const row = document.querySelector(".moodrow");
+    return { left: row.scrollLeft, sel: row.dataset.sel };
+  });
+  expect(after.sel).toBe(before.sel);
+  expect(Math.abs(after.left - before.left)).toBeLessThanOrEqual(1);
+});
+
 // CAS-1296 Change 4: Releases (the flow view) is pinned leftmost in the mood row, outside the draggable
 // set, with a divider after it — a drag among the rest can rearrange them, but never puts anything before
 // Releases, and Releases itself never lifts.
@@ -2844,4 +2865,54 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
   expect(after.marker).toBe("kept");
   expect(after.mode).toBe("keyword");
   await page.evaluate(() => window.closeWatchSheet());
+});
+
+// CAS-1403: with the account switch "Only show films on my services" on, a mood can opt into "Any service"
+// and so list films on services the user doesn't subscribe to. Picking a single service clears it again.
+test("CAS-1403: Any service chip lists films beyond my services and clears when a single service is picked", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  await page.evaluate(() => {
+    cascades.length = 0;
+    const al = { cinema:false, rent:false, stream:false };
+    const styles = {};
+    for (const g of ALL_GENRES) styles[g] = { bar:50, al };
+    cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
+    saveCascades();
+    setActive(cascades[0].id);
+    prefs.sub = new Set([SUB_SERVICES[0]]);
+    prefs.on = true;
+    watchMoods = [];
+    watchMoodSel = "best";
+    // The my-services gate only bites films with streaming offers, so count on the Stream tab; the default
+    // Cinema tab's films carry no offers and read the same with or without Any service.
+    watchTab = "stream";
+    render();
+    window.openOamMoodSheetFor("best");
+  });
+  await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+
+  const myBtn = page.locator('#watchSheetBody .chip:text-is("My services")');
+  const anyBtn = page.locator('#watchSheetBody .chip:text-is("Any service")');
+  await expect(myBtn).toHaveAttribute("aria-pressed", "true");
+  await expect(anyBtn).toHaveAttribute("aria-pressed", "false");
+
+  const countPool = () => page.evaluate(() => {
+    const mood = currentOamMood();
+    return oamStagePool().filter(m => filmInOneAgentMood(m, mood, oneAgentCriteria())).length;
+  });
+  const before = await countPool();
+
+  await anyBtn.click();
+  await page.locator('#watchSheetBody button:text-is("Save")').click();
+  expect(await page.evaluate(() => currentOamMood().anySvc)).toBe(true);
+  const after = await countPool();
+  expect(after).toBeGreaterThan(before);
+
+  await page.evaluate(() => window.openOamMoodSheetFor("best"));
+  await page.locator("#watchSheetBody .chip[onclick^=\"setOamDraftSvc('\"]").first().click();
+  expect(await page.evaluate(() => oamDraft.anySvc)).toBe(false);
+  expect(await page.evaluate(() => !!oamDraft.svc)).toBe(true);
 });

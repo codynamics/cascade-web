@@ -8554,10 +8554,6 @@ function fpWatchOnSegmentsHTML(id){
       onclick="toggleFilmOpt(${id},'${key}')" aria-pressed="${on}"
       title="${escA(on?`${label} — tap to undo`:label)}"><span class="ci">${icon}</span><span class="cl">${esc(label)}</span></button>`;
   });
-  const never=blocked.has(id);
-  segs.push(`<button type="button" class="cseg${never?" on":""}" data-key="never" style="--segc:#d0453f;${never?"background:#d0453f;color:#fff":""}"
-    onclick="pickNever(${id})" aria-pressed="${never}"
-    title="${escA(never?"Never — tap to undo":"Not for me — excludes it from your cascades")}"><span class="ci">${ICON.block}</span><span class="cl">Never</span></button>`);
   return segs.join("");
 }
 // Rule 2's member layout: confirmation panel (only when there's something to confirm), the two columns,
@@ -8572,7 +8568,7 @@ function filmPageMemberHTML(m){
     ${bandHTML(m)}
     ${confirm}
     <div class="fpcols">
-      <div class="fpcol"><div class="fpcollead">WATCH ON</div><div class="csegs">${fpWatchOnSegmentsHTML(id)}</div></div>
+      <div class="fpcol"><div class="fpcollead">ALERT</div><div class="csegs">${fpWatchOnSegmentsHTML(id)}</div></div>
       <div class="fpcol"><div class="fpcollead">WATCHED</div><div class="csegs">${watchStepsSegmentsHTML(id)}</div></div>
     </div>
     <button type="button" class="fpcta" onclick="closeFilmPage()">Done</button>`;
@@ -9240,7 +9236,7 @@ const OPINIONS = [
   {key:"disliked", ico:"dislike", lbl:"Disliked",    on:"Disliked — tap to undo",    off:"Watched and didn't like it"},
   // CAS-349: relabelled "Won't Watch" -> "Never" (moved to the Watch control's panel; this quick strip keeps
   // the same flag/gesture for the stub and My List, where the panel isn't the surface). Same `blocked` flag.
-  {key:"notfor",   ico:"block",   lbl:"Never",       on:"Never — tap to undo",       off:"Not for me"},
+  {key:"notfor",   ico:"block",   lbl:"Will never",  on:"Will never — tap to undo",  off:"I will never watch this"},
 ];
 // ---- CAS-230: the v0.8 card controls -------------------------------------------------------------------
 // The card carried six controls in a row: the Pick badge, four verdict icons and the chevron. The v0.8
@@ -9266,7 +9262,7 @@ const OPINIONS = [
 // below, so the Your Movies Watched-section renderer can share the same ramp + Never/notfor step instead of
 // re-deriving it. Never isn't part of the watched ramp's own colour scale (it's an exclusion flag, not a
 // watched verdict) so it rides on the same red the OPINIONS/actbtn.notfor state uses everywhere else.
-const REVIEW_STEPS = [...WATCH_STEPS, {key:"notfor", lbl:"Never", cd:"#d0453f"}];
+const REVIEW_STEPS = [...WATCH_STEPS, {key:"notfor", lbl:"Will never", cd:"#d0453f"}];
 function watchChipHTML(id){
   const cur=opinionOf(id), i=WATCH_STEPS.findIndex(s=>s.key===cur), s=WATCH_STEPS[i];
   // CAS-278: WATCH_STEPS is best-first now, so the raw index runs the wrong way — read straight it would
@@ -9540,11 +9536,14 @@ function notifyChipHTML(id){
   // CAS-716: Watch On is single-select — the not-yet-reached state names the picked level (e.g. "Stream")
   // instead of the old generic "Watch On"/"Watch On · N"; "Can Watch" (reached) and plain "Watch On"
   // (nothing picked) are unchanged.
+  // Lee, 2026-11-09: the control is "Alert". It names a level only when the PERSON picked it (wsrc manual,
+  // drawn yellow); an agent-armed level, or none, reads plain "Alert".
+  const manualPick = st.key && filmWatchSource(id)==="manual";
   const lbl = st.current ? "Can Watch"
-            : (st.key ? WATCH_LEVEL_SHORT_LABEL[st.key] : "Watch On");
-  const title = st.total===0 ? "This agent isn't tracking a level for this film yet. Tap to pick where you want to watch it, or say Never."
-              : st.on===0 ? "Nothing about this film will reach you yet. Tap to choose what does."
-              : `You'll be told when this film reaches ${st.on} of ${st.total} levels you've picked. Tap to change.`;
+            : (manualPick ? WATCH_LEVEL_SHORT_LABEL[st.key] : "Alert");
+  const title = st.total===0 ? "Alert: nothing to alert you about for this film yet."
+              : st.on===0 ? "Alert: tap to choose when you want to be told about this film."
+              : `Alert: you'll be told when this film reaches the level picked. Tap to change.`;
   // CAS-349: green (not the generic gold "on") is the film's OWN colour for "you can watch this right now"
   // everywhere else on the card (the availability bar, the window lozenges) — reusing it here says the same
   // thing the same way, rather than borrowing the on-state colour every other control uses for "a choice was made".
@@ -9559,7 +9558,9 @@ function notifyChipHTML(id){
   // (filmWatchSource: the current/reached one if there is one, else the highest-priority ticked one) was
   // armed by an agent (CAS-613) or ticked by hand. null (a level ticked before this shipped, with no
   // recorded source) adds neither class and reads as plain, same as before this ticket.
-  const wsrc=filmWatchSource(id);
+  const wsrcRaw=filmWatchSource(id);
+  // Lee, 2026-11-09: only a hand-picked alert is coloured (yellow); an agent-armed one stays plain.
+  const wsrc = wsrcRaw==="manual" ? "manual" : null;
   // CAS-715: "Can Watch" (.recent) is retired from this chip outright — the film's own availability status
   // pill (.cap.recent, untouched) already says that. isnew is the new, separate glow: filmIsNew() combines
   // recency (isNewFound) with "this is news about the FILM, not about an agent you just edited" (admitDrift).
@@ -9692,14 +9693,9 @@ function watchPanelRowsHTML(id){
   });
   // CAS-280's honesty rule, restated for the new ladder: nothing to say "yes" to is still worth saying,
   // rather than opening onto a near-empty panel that reads as broken.
-  const none = levels.length ? "" : `<div class="nopt nonone">This agent isn't tracking a level for this
-    film yet — turn one on in its settings, or say Never below if you don't want it.</div>`;
-  const never=blocked.has(id);
-  const neverRow = `<button type="button" class="nopt never${never?" on":""}" style="--wwc:#d0453f"
-    data-wk="never" aria-pressed="${never}" onclick="pickNever(${id})"
-    title="${escA(never?"Never — tap to undo":"Not for me — excludes it from your cascades")}">
-    <span class="wwb">✓</span><span class="nol">Never</span></button>`;
-  return none + rows.join("") + neverRow;
+  // Lee, 2026-11-09: Never left this panel — it lives in Watched now, as "Will never".
+  const none = levels.length ? "" : `<div class="nopt nonone">Nothing to alert you about for this film yet.</div>`;
+  return none + rows.join("");
 }
 window.openNotifyPanel=(id, btn)=>{
   const open=btn.closest(".actions").querySelector(".cpop");
@@ -9978,7 +9974,15 @@ function watchStepsSegmentsHTML(id){
     return `<button type="button" class="cseg${on?" on":""}" data-key="${s.key}" style="--segc:${s.cd};${on?`background:${s.cd};color:#fff`:""}"
       onclick="pickWatch(${id},'${s.key}')" aria-pressed="${on}"
       title="${escA(on?`${s.lbl} — tap to undo`:s.lbl)}"><span class="ci">${ICON[s.ico]}</span><span class="cl">${s.lbl}</span></button>`;
-  }).join("");
+  }).join("") + willNeverSegHTML(id);
+}
+// Lee, 2026-11-09: "Will never" is the Watched panel's last option — the same blocked/"notfor" flag the old
+// Watch On panel's Never set (pickNever), so every downstream reader of that flag is unchanged.
+function willNeverSegHTML(id){
+  const never=blocked.has(id);
+  return `<button type="button" class="cseg${never?" on":""}" data-key="never" style="--segc:#d0453f;${never?"background:#d0453f;color:#fff":""}"
+    onclick="pickNever(${id})" aria-pressed="${never}"
+    title="${escA(never?"Will never — tap to undo":"I will never watch this — excludes it from your lists")}"><span class="ci">${ICON.block}</span><span class="cl">Will never</span></button>`;
 }
 window.openWatchPanel=(id, btn)=>{
   // CAS-281: "was MY panel already open?", not "was ANY panel open?". The old test closed whatever was open
@@ -9997,7 +10001,7 @@ window.openWatchPanel=(id, btn)=>{
   pop.innerHTML=`<div class="csegs">${watchStepsSegmentsHTML(id)}</div>`;
   btn.closest(".actions").appendChild(pop);
   positionPanel(pop);   // CAS-304
-  wirePanelSlide(pop, ".cseg", el=>pickWatch(id, el.dataset.key));   // CAS-282
+  wirePanelSlide(pop, ".cseg", el=>el.dataset.key==="never" ? pickNever(id) : pickWatch(id, el.dataset.key));   // CAS-282
   document.addEventListener("keydown", watchPanelKey, true);
   document.addEventListener("pointerdown", watchPanelOutsideClose, true);   // CAS-751
   btn.classList.add("open"); btn.setAttribute("aria-expanded","true");
@@ -10692,12 +10696,16 @@ function renderWatchTop(){
   // to be captured before it's thrown away and reapplied (or adjusted) on the new one below.
   const prevRow=el.querySelector(".moodrow");
   const prevScrollLeft=prevRow ? prevRow.scrollLeft : 0;
-  el.innerHTML = `<div class="moodrow" role="group" aria-label="Mood">${moodHTML}${addHTML}</div>${stageHTML}`;
+  // CAS-1413: a re-render that keeps the same selected mood (focus/visibility reconcile, prefs poll) must not
+  // move the row — only a changed selection brings the selected chip into view.
+  const prevSel=prevRow ? prevRow.dataset.sel : null;
+  el.innerHTML = `<div class="moodrow" role="group" aria-label="Mood" data-sel="${escA(watchMoodSel)}">${moodHTML}${addHTML}</div>${stageHTML}`;
   // Keeps #wtMini's own text honest immediately after a stage/mood change, independent of the next scroll
   // event — the collapse listener itself (defined later in this script) only ever touches it on scroll.
   if(typeof wtRefreshMini==="function") wtRefreshMini();
   const newRow=el.querySelector(".moodrow");
-  moodRowShowSelected(newRow, prevScrollLeft);
+  if(prevRow && prevSel===watchMoodSel) newRow.scrollLeft=prevScrollLeft;
+  else moodRowShowSelected(newRow, prevScrollLeft);
   wireMoodRowDrag(newRow);
 }
 // CAS-1300: sets .moodrow's own scrollLeft so the selected chip is fully visible, without ever touching the
@@ -20570,13 +20578,16 @@ const ONE_AGENT_MOOD_BUILTINS=[
   // Lee, 2026-11-09: renamed "All Latest"; its window is its own How far back filter (1 yr to start) and it
   // includes films you've watched. releasesV:2 marks a record that already has these defaults (see the load
   // repair in loadUserPrefs and oamSaveMoodFromSheet's stamp).
-  {id:"releases", name:"All Latest", sort:"release", show:"all", years:1, watched:true, releasesV:2},
+  // Lee, 2026-11-09 (later): All Latest is now an ORDINARY mood, configured rather than hard-coded — the new
+  // "Only films with a cinema release" filter on, How far back 1 yr, watched films in, and the Mood Override
+  // On at 100% (every film in every on genre, whatever its score). releasesV:3.
+  {id:"releases", name:"All Latest", sort:"release", show:"all", years:1, watched:true, cinemaOnly:true, topShare:100, releasesV:3},
   // CAS-1368: Best of the best — every on genre, raised to a floor of 85 regardless of its own bar, Best 40.
   {id:"best", name:"Best of the best", topShare:20, show:"40"},
   {id:"starred", name:"Starred", starredOnly:true},
 ];
 function oamMoodDefaultFields(){
-  return {v2:true, handOnly:false, watched:false, styles:[], topShare:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[], svc:null, people:""};
+  return {v2:true, handOnly:false, watched:false, cinemaOnly:false, styles:[], topShare:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[], svc:null, people:""};
 }
 function oamMoodDefaultsNow(){ return ONE_AGENT_MOOD_BUILTINS.map(b=>({...oamMoodDefaultFields(), ...b})); }
 // The account's own saved v2 moods — falls back (in memory only, never written: CAS-1218/1243) to the two
@@ -20649,12 +20660,14 @@ function oamMoodMode(mood){
 }
 function oamKeywordOn(mood){ return oamMoodMode(mood)==="keyword" && !!(mood.people||"").trim(); }
 function oamFilmMeetsMoodRules(m, mood, c){
+  // Lee, 2026-11-09: "Only films with a cinema release" — a real cinema release with a date (past or ahead).
+  if(mood.cinemaOnly && !(m.cinema_release && m.cinema_date)) return false;
   const admitC = mood.watched ? {...c, excludeWatched:false} : c;
   if(oamKeywordOn(mood)){
     if(c.excludeBlocked!==false && blocked.has(m.tmdb_id)) return false;
     if(admitC.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
     const ps=primaryStatus(m);
-    if(c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)) return false;
+    if(!mood.anySvc && c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)) return false;
     if(!filmMatchesSearch(m, mood.people)) return false;
     const age=oamFilmAge(m);
     if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
@@ -20662,7 +20675,13 @@ function oamFilmMeetsMoodRules(m, mood, c){
     if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
     return true;
   }
-  if(!matchesCriteriaOneAgent(m, admitC, false)) return false;
+  // Lee, 2026-11-09: with the Mood Override On, the override's own bar (oamMoodBarFor, below) is the only
+  // score gate — the agent's bar must not still hold back a genre the override RAISES. Every other agent
+  // gate (blocked, watched, services, combos marked never, unscored films) still applies.
+  const ovrOn = oamMoodEffectiveTopShare(mood)!=null;
+  const gateC = ovrOn ? {...admitC, styles:Object.fromEntries(Object.entries(admitC.styles||{})
+    .map(([g,s])=>[g, (s && s.bar!=null) ? {...s, bar:0} : s]))} : admitC;
+  if(!matchesCriteriaOneAgent(m, mood.anySvc ? {...gateC, myServices:false} : gateC, false)) return false;
   const {main}=mainOtherCombos(m);
   if(main===undefined) return false;
   if(!oamMoodStyles(mood, c).includes(main)) return false;
@@ -20691,20 +20710,10 @@ function oamFilmInReleasesWindow(m, mood){
   const cut=yearsCutoff(mood.years);
   return !cut || m.cinema_date>=cut;
 }
+// Lee, 2026-11-09 (later): All Latest has no rules of its own any more — it is an ordinary mood whose
+// settings (cinemaOnly, years, watched, topShare 100) give it its shape. Kept as a name for its callers.
 function oamFilmMeetsReleasesRules(m, mood, c){
-  if(!oamFilmInReleasesWindow(m, mood)) return false;
-  const admitC = mood.watched ? {...c, excludeWatched:false} : c;
-  if(admitC.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
-  const {main}=mainOtherCombos(m);
-  if(main===undefined || oaBar(c, main)==null) return false;
-  if(!oamMoodStyles(mood, c).includes(main)) return false;
-  // CAS-1370: same no-rating-no-exclusion rule as oamFilmMeetsMoodRules above.
-  const age=oamFilmAge(m);
-  if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
-  if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)) return false;
-  if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
-  if(oamKeywordOn(mood) && !filmMatchesSearch(m, mood.people)) return false;
-  return true;
+  return oamFilmMeetsMoodRules(m, mood, c);
 }
 // Full membership: a hand choice always beats the rules (ticket's own words). Latest/Starred keep today's
 // behaviour — see each ticket line in CAS-1341's description for what that means for each.
@@ -20818,6 +20827,7 @@ function oamMoodDraftFrom(mood){
     handOnly: mood ? !!mood.handOnly : false,
     // CAS-1412: a brand-new mood starts with Include watched on; editing keeps the mood's own stored value.
     watched: mood ? !!mood.watched : true,
+    cinemaOnly: mood ? !!mood.cinemaOnly : false,
     stylesAll: mood ? !(mood.styles && mood.styles.length) : true,
     styles: new Set(mood && mood.styles ? mood.styles : []),
     // CAS-1400: genre | keyword — which way this mood finds films. Nothing stored before Save.
@@ -20837,6 +20847,9 @@ function oamMoodDraftFrom(mood){
     // CAS-1384: the sheet always shows the EFFECTIVE service (null if the stored one was dropped from
     // prefs.sub) — reading it here never rewrites the stored mood; only a Save does that.
     svc: mood ? oamMoodEffectiveSvc(mood) : null,
+    // Lee, 2026-11-09: "Any service" — this mood also lists films on services you don't subscribe to,
+    // even while the account's "Only show films on my services" switch is on. Never set alongside svc.
+    anySvc: mood ? (!!mood.anySvc && !oamMoodEffectiveSvc(mood)) : false,
     // CAS-1390: title/actor/director text filter, same comma-AND matcher as Find (filmMatchesSearch).
     people: mood ? (mood.people||"") : "",
   };
@@ -20926,6 +20939,7 @@ window.toggleOamNotInMood=()=>{ oamNotInMoodOpen=!oamNotInMoodOpen; renderOamMoo
 window.toggleOamMoreFilters=()=>{ oamMoreFiltersOpen=!oamMoreFiltersOpen; renderOamMoodSheetBody(); };
 window.setOamDraftName=v=>{ if(oamDraft) oamDraft.name=v; };
 window.toggleOamDraftHandOnly=()=>{ if(!oamDraft) return; oamDraft.handOnly=!oamDraft.handOnly; renderOamMoodSheetBody(); };
+window.toggleOamDraftCinemaOnly=()=>{ if(!oamDraft) return; oamDraft.cinemaOnly=!oamDraft.cinemaOnly; renderOamMoodSheetBody(); };
 window.toggleOamDraftWatched=()=>{ if(!oamDraft) return; oamDraft.watched=!oamDraft.watched; renderOamMoodSheetBody(); };
 window.toggleOamDraftStyle=style=>{
   const d=oamDraft; if(!d) return;
@@ -20947,7 +20961,8 @@ window.toggleOamDraftAge=a=>{ if(!oamDraft) return; oamDraft.ages.has(a)?oamDraf
 window.setOamDraftAwards=v=>{ if(!oamDraft) return; oamDraft.awards=v; renderOamMoodSheetBody(); };
 window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMoodSheetBody(); };
 window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMoodSheetBody(); };
-window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; renderOamMoodSheetBody(); };
+window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; oamDraft.anySvc=false; renderOamMoodSheetBody(); };
+window.setOamDraftAnySvc=()=>{ if(!oamDraft) return; oamDraft.svc=null; oamDraft.anySvc=true; renderOamMoodSheetBody(); };
 window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
 window.setOamDraftPeople=v=>{ if(oamDraft) oamDraft.people=v; };
 // CAS-1400: tapping a tab sets the draft's mode and slides the track WITHOUT re-rendering the sheet.
@@ -21151,6 +21166,7 @@ function oamMoreFiltersCount(d){
   let n=0;
   if(d.handOnly) n++;
   if(d.watched) n++;
+  if(d.cinemaOnly) n++;
   if(d.ages.size) n++;
   if(d.awards!=="any") n++;
   if(d.years) n++;
@@ -21212,11 +21228,13 @@ function renderOamMoodSheetBody(){
     ${(!d.handOnly && prefs.sub.size) ? `<div class="wsheetsec mainsec">
       <div class="wsheethd"><span>STREAMING ON</span></div>
       <div class="chips">
-        <button type="button" class="chip${d.svc?"":" on"}" aria-pressed="${!d.svc}" onclick="setOamDraftSvc(null)">All services</button>
+        ${prefs.on ? `<button type="button" class="chip${(d.svc||d.anySvc)?"":" on"}" aria-pressed="${!d.svc&&!d.anySvc}" onclick="setOamDraftSvc(null)">My services</button>
+        <button type="button" class="chip${d.anySvc?" on":""}" aria-pressed="${!!d.anySvc}" onclick="setOamDraftAnySvc()">Any service</button>`
+        : `<button type="button" class="chip${d.svc?"":" on"}" aria-pressed="${!d.svc}" onclick="setOamDraftSvc(null)">All services</button>`}
         ${SUB_SERVICES.filter(s=>prefs.sub.has(s)).map(s=>{ const on=d.svc===s; return `<button type="button" class="chip${on?" on":""}"
           aria-pressed="${on}" onclick="setOamDraftSvc('${escA(s)}')">${esc(oamSvcChipLabel(s))}</button>`; }).join("")}
       </div>
-      <p class="oamgenreintro">Pick one service to see only what's included on it. Cinema and Rental stay empty while a service is picked.</p>
+      <p class="oamgenreintro">${prefs.on ? "Any service also lists films on services you don't have. " : ""}Pick one service to see only what's included on it. Cinema and Rental stay empty while a service is picked.</p>
     </div>` : ""}
     <div class="wsheetsec mainsec">
       <div class="wsheethd"><span>HOW MANY, AND IN WHAT ORDER</span></div>
@@ -21244,6 +21262,10 @@ function renderOamMoodSheetBody(){
         ${d.handOnly ? "" : `<div class="mfrow"><span>Include films I've watched</span>
           <button type="button" class="mftog${d.watched?" on":""}" role="switch" aria-checked="${!!d.watched}"
             aria-label="Include films I've watched" onclick="toggleOamDraftWatched()"><i></i></button>
+        </div>
+        <div class="mfrow"><span>Only films with a cinema release</span>
+          <button type="button" class="mftog${d.cinemaOnly?" on":""}" role="switch" aria-checked="${!!d.cinemaOnly}"
+            aria-label="Only films with a cinema release" onclick="toggleOamDraftCinemaOnly()"><i></i></button>
         </div>`}
       </div>
       <div class="wsheetsec">
@@ -21288,6 +21310,7 @@ function oamMoodFromDraft(d){
   return {
     handOnly: !!d.handOnly,
     watched: !!d.watched,
+    cinemaOnly: !!d.cinemaOnly,
     styles: d.stylesAll ? [] : [...d.styles],
     topShare: d.topShare,
     ages: [...d.ages],
@@ -21295,6 +21318,7 @@ function oamMoodFromDraft(d){
     years: d.years,
     in: [...d.in], out: [...d.out],
     svc: d.svc || null,
+    anySvc: !!d.anySvc && !d.svc,
     people: (d.people||"").trim(),
     mode: d.mode==="keyword" ? "keyword" : "genre",   // CAS-1400
   };
@@ -21313,7 +21337,7 @@ window.oamSaveMoodFromSheet=()=>{
   if(mood.id==="starred") mood.starredOnly=true;
   // CAS-1366: a save always stamps Releases' own repair marker, whichever sort was actually picked, so the
   // one-time load repair below (loadUserPrefs) never reverts a deliberate choice of Score back to release.
-  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=2; }
+  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=3; }
   const list=oamMoodsListReal();
   const idx=list.findIndex(m=>m.id===mood.id);
   watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
@@ -21498,7 +21522,7 @@ function oamWilMoodGateReason(m, c, main){
     // CAS-1396: a people-filter mood ignores genre ticks entirely, so its own gates (ages/awards/years/
     // people) are checked whether or not this film's genre happens to be ticked in it.
     if(!oamKeywordOn(mood) && !oamMoodStyles(mood, c).includes(main)) continue;
-    if(mood.id==="releases" && !oamFilmInReleasesWindow(m, mood)) continue;
+    if(mood.cinemaOnly && !(m.cinema_release && m.cinema_date)) continue;
     const name=esc(moodDisplayName(mood));
     const age=oamFilmAge(m);
     if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)){
@@ -25000,7 +25024,7 @@ function watchNavKey(){
       const mood=currentOamMood();
       return [
         mood && [mood.styles, mood.show, mood.sort, mood.topShare, mood.ages, mood.awards, mood.years,
-                 mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out, mood.people],
+                 mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out, mood.people, mood.cinemaOnly, mood.anySvc],
         ALL_GENRES.map(g=>oaBar(c,g)),
         c.combo,
       ];
@@ -27745,10 +27769,19 @@ function acctFetchKeepalive(init){
         // and piggybacked onto the next real view write (a load must never write — CAS-1218/1243): the new
         // name (only while it still carries a default name), How far back 1 yr where it was Any (keeping the
         // one-year window the old fixed 365 days gave it), and Include films I've watched on.
-        if(watchMoods.some(m=>m && m.v2 && m.id==="releases" && !m.releasesV)){
-          watchMoods = watchMoods.map(m=>(m && m.v2 && m.id==="releases" && !m.releasesV) ? {...m,
-            name: (m.name==="Releases" || m.name==="Latest") ? "All Latest" : m.name,
-            years: m.years ? m.years : 1, watched:true, releasesV:2} : m);
+        // releasesV:3 (Lee, 2026-11-09 later): All Latest became an ordinary mood, so a record below 3 also
+        // gets cinemaOnly on and, where it has none, the Mood Override On at 100% — keeping it a list of
+        // cinema releases regardless of score. Name/years/watched still only change on a never-stamped record.
+        if(watchMoods.some(m=>m && m.v2 && m.id==="releases" && (m.releasesV||0)<3)){
+          watchMoods = watchMoods.map(m=>{
+            if(!(m && m.v2 && m.id==="releases" && (m.releasesV||0)<3)) return m;
+            const first=!m.releasesV;
+            return {...m,
+              name: (first && (m.name==="Releases" || m.name==="Latest")) ? "All Latest" : m.name,
+              years: first ? (m.years ? m.years : 1) : m.years,
+              watched: first ? true : m.watched,
+              cinemaOnly:true, topShare: m.topShare==null ? 100 : m.topShare, releasesV:3};
+          });
           moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
         }
         // CAS-1374: Best 10 is retired — a v2 mood still saved with show:"10" reads as "20" once, in

@@ -62,8 +62,10 @@ test("CAS-1366 AC1: Releases still ignores score entirely, even once the genre/a
   const c = criteriaWith("Action", score + 1);   // a bar one point above what this fixture actually scores
   assert.equal(E.oamFilmMeetsMoodRules(m, { ...moodWith({}), id:"t-cas1366-ordinary" }, c), false,
     "sanity: an ordinary mood's own bar excludes this film");
-  assert.equal(E.oamFilmMeetsReleasesRules(m, moodWith({}), c), true,
-    "AC1: Releases must still admit it regardless of score");
+  // Lee, 2026-11-09: All Latest is an ordinary mood now — it ignores the agent's score through its Mood
+  // Override at 100%, not through rules of its own.
+  assert.equal(E.oamFilmMeetsReleasesRules(m, moodWith({ topShare:100 }), c), true,
+    "All Latest at Override 100% must still admit it regardless of the agent's score");
 });
 
 test("CAS-1366: Releases' own \"Include films I've watched\" switch now applies (previously had no effect)", () => {
@@ -212,4 +214,16 @@ test("CAS-1366 AC3: \"Documentary\" is no longer shortened to \"Doco\"", () => {
   // the other two short names this ticket explicitly keeps
   assert.equal(E.oneAgentShortName("Science Fiction"), "Sci-fi");
   assert.equal(E.oneAgentShortName("TV Movie"), "TV movie");
+});
+
+test("CAS-1410: starter All Latest is cinemaOnly + Override 100; cinemaOnly excludes a film with no cinema release", () => {
+  const s = E.oneAgentStarterMoods()[0];
+  assert.equal(s.cinemaOnly, true);
+  assert.equal(s.topShare, 100);
+  const c = criteriaWith("Action", 1);
+  const noCinema = releaseFilm("Action", { cinema_release:false, cinema_date:null });
+  const on = moodWith({ cinemaOnly:true, topShare:100 });
+  const off = moodWith({ cinemaOnly:false, topShare:100 });
+  assert.equal(E.filmInOneAgentMood(noCinema, on, c), false);
+  assert.equal(E.oamFilmMeetsMoodRules(noCinema, off, c), true, "not excluded for the cinema reason when off");
 });

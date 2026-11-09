@@ -56,7 +56,9 @@ test("Watch On: a human re-tap claims an agent-armed level; a manual level still
     e.winsSource[key] = "auto";
     repaintWatchControl(id);
   }, { id: filmId, key });
-  await expect(chip).toHaveClass(/wsrc-auto/);
+  // Lee, 2026-11-09: an agent-armed level reads plain "Alert", uncoloured — only a hand pick is yellow.
+  await expect(chip).not.toHaveClass(/wsrc-/);
+  await expect(chip.locator(".clab")).toHaveText("Alert");
 
   // AC3: tapping that same (already-on) level leaves it ticked and flips the chip to manual (gold).
   await chip.click();
