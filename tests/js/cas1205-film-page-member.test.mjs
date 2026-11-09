@@ -30,7 +30,7 @@ test("CAS-1205: signed in, no membership pitch and no visitor footer", () => {
   const html = E.filmPageHTML(m);
   assert.ok(!html.includes("Become a Cascade Member"), "a member must never see the membership pitch");
   assert.ok(!html.includes("fpfoot"), "a member must never see the visitor footer");
-  assert.ok(html.includes("WATCH ON") && html.includes("WATCHED"), "both columns must be present");
+  assert.ok(html.includes("ALERT") && html.includes("WATCHED"), "both columns must be present");
   assert.ok(/class="fpcta"[^>]*onclick="closeFilmPage\(\)">Done</.test(html), "the Done button must close the page");
 });
 

@@ -8554,10 +8554,6 @@ function fpWatchOnSegmentsHTML(id){
       onclick="toggleFilmOpt(${id},'${key}')" aria-pressed="${on}"
       title="${escA(on?`${label} — tap to undo`:label)}"><span class="ci">${icon}</span><span class="cl">${esc(label)}</span></button>`;
   });
-  const never=blocked.has(id);
-  segs.push(`<button type="button" class="cseg${never?" on":""}" data-key="never" style="--segc:#d0453f;${never?"background:#d0453f;color:#fff":""}"
-    onclick="pickNever(${id})" aria-pressed="${never}"
-    title="${escA(never?"Never — tap to undo":"Not for me — excludes it from your cascades")}"><span class="ci">${ICON.block}</span><span class="cl">Never</span></button>`);
   return segs.join("");
 }
 // Rule 2's member layout: confirmation panel (only when there's something to confirm), the two columns,
@@ -8572,7 +8568,7 @@ function filmPageMemberHTML(m){
     ${bandHTML(m)}
     ${confirm}
     <div class="fpcols">
-      <div class="fpcol"><div class="fpcollead">WATCH ON</div><div class="csegs">${fpWatchOnSegmentsHTML(id)}</div></div>
+      <div class="fpcol"><div class="fpcollead">ALERT</div><div class="csegs">${fpWatchOnSegmentsHTML(id)}</div></div>
       <div class="fpcol"><div class="fpcollead">WATCHED</div><div class="csegs">${watchStepsSegmentsHTML(id)}</div></div>
     </div>
     <button type="button" class="fpcta" onclick="closeFilmPage()">Done</button>`;
@@ -9240,7 +9236,7 @@ const OPINIONS = [
   {key:"disliked", ico:"dislike", lbl:"Disliked",    on:"Disliked — tap to undo",    off:"Watched and didn't like it"},
   // CAS-349: relabelled "Won't Watch" -> "Never" (moved to the Watch control's panel; this quick strip keeps
   // the same flag/gesture for the stub and My List, where the panel isn't the surface). Same `blocked` flag.
-  {key:"notfor",   ico:"block",   lbl:"Never",       on:"Never — tap to undo",       off:"Not for me"},
+  {key:"notfor",   ico:"block",   lbl:"Will never",  on:"Will never — tap to undo",  off:"I will never watch this"},
 ];
 // ---- CAS-230: the v0.8 card controls -------------------------------------------------------------------
 // The card carried six controls in a row: the Pick badge, four verdict icons and the chevron. The v0.8
@@ -9266,7 +9262,7 @@ const OPINIONS = [
 // below, so the Your Movies Watched-section renderer can share the same ramp + Never/notfor step instead of
 // re-deriving it. Never isn't part of the watched ramp's own colour scale (it's an exclusion flag, not a
 // watched verdict) so it rides on the same red the OPINIONS/actbtn.notfor state uses everywhere else.
-const REVIEW_STEPS = [...WATCH_STEPS, {key:"notfor", lbl:"Never", cd:"#d0453f"}];
+const REVIEW_STEPS = [...WATCH_STEPS, {key:"notfor", lbl:"Will never", cd:"#d0453f"}];
 function watchChipHTML(id){
   const cur=opinionOf(id), i=WATCH_STEPS.findIndex(s=>s.key===cur), s=WATCH_STEPS[i];
   // CAS-278: WATCH_STEPS is best-first now, so the raw index runs the wrong way — read straight it would
@@ -9540,11 +9536,14 @@ function notifyChipHTML(id){
   // CAS-716: Watch On is single-select — the not-yet-reached state names the picked level (e.g. "Stream")
   // instead of the old generic "Watch On"/"Watch On · N"; "Can Watch" (reached) and plain "Watch On"
   // (nothing picked) are unchanged.
+  // Lee, 2026-11-09: the control is "Alert". It names a level only when the PERSON picked it (wsrc manual,
+  // drawn yellow); an agent-armed level, or none, reads plain "Alert".
+  const manualPick = st.key && filmWatchSource(id)==="manual";
   const lbl = st.current ? "Can Watch"
-            : (st.key ? WATCH_LEVEL_SHORT_LABEL[st.key] : "Watch On");
-  const title = st.total===0 ? "This agent isn't tracking a level for this film yet. Tap to pick where you want to watch it, or say Never."
-              : st.on===0 ? "Nothing about this film will reach you yet. Tap to choose what does."
-              : `You'll be told when this film reaches ${st.on} of ${st.total} levels you've picked. Tap to change.`;
+            : (manualPick ? WATCH_LEVEL_SHORT_LABEL[st.key] : "Alert");
+  const title = st.total===0 ? "Alert: nothing to alert you about for this film yet."
+              : st.on===0 ? "Alert: tap to choose when you want to be told about this film."
+              : `Alert: you'll be told when this film reaches the level picked. Tap to change.`;
   // CAS-349: green (not the generic gold "on") is the film's OWN colour for "you can watch this right now"
   // everywhere else on the card (the availability bar, the window lozenges) — reusing it here says the same
   // thing the same way, rather than borrowing the on-state colour every other control uses for "a choice was made".
@@ -9559,7 +9558,9 @@ function notifyChipHTML(id){
   // (filmWatchSource: the current/reached one if there is one, else the highest-priority ticked one) was
   // armed by an agent (CAS-613) or ticked by hand. null (a level ticked before this shipped, with no
   // recorded source) adds neither class and reads as plain, same as before this ticket.
-  const wsrc=filmWatchSource(id);
+  const wsrcRaw=filmWatchSource(id);
+  // Lee, 2026-11-09: only a hand-picked alert is coloured (yellow); an agent-armed one stays plain.
+  const wsrc = wsrcRaw==="manual" ? "manual" : null;
   // CAS-715: "Can Watch" (.recent) is retired from this chip outright — the film's own availability status
   // pill (.cap.recent, untouched) already says that. isnew is the new, separate glow: filmIsNew() combines
   // recency (isNewFound) with "this is news about the FILM, not about an agent you just edited" (admitDrift).
@@ -9692,14 +9693,9 @@ function watchPanelRowsHTML(id){
   });
   // CAS-280's honesty rule, restated for the new ladder: nothing to say "yes" to is still worth saying,
   // rather than opening onto a near-empty panel that reads as broken.
-  const none = levels.length ? "" : `<div class="nopt nonone">This agent isn't tracking a level for this
-    film yet — turn one on in its settings, or say Never below if you don't want it.</div>`;
-  const never=blocked.has(id);
-  const neverRow = `<button type="button" class="nopt never${never?" on":""}" style="--wwc:#d0453f"
-    data-wk="never" aria-pressed="${never}" onclick="pickNever(${id})"
-    title="${escA(never?"Never — tap to undo":"Not for me — excludes it from your cascades")}">
-    <span class="wwb">✓</span><span class="nol">Never</span></button>`;
-  return none + rows.join("") + neverRow;
+  // Lee, 2026-11-09: Never left this panel — it lives in Watched now, as "Will never".
+  const none = levels.length ? "" : `<div class="nopt nonone">Nothing to alert you about for this film yet.</div>`;
+  return none + rows.join("");
 }
 window.openNotifyPanel=(id, btn)=>{
   const open=btn.closest(".actions").querySelector(".cpop");
@@ -9978,7 +9974,15 @@ function watchStepsSegmentsHTML(id){
     return `<button type="button" class="cseg${on?" on":""}" data-key="${s.key}" style="--segc:${s.cd};${on?`background:${s.cd};color:#fff`:""}"
       onclick="pickWatch(${id},'${s.key}')" aria-pressed="${on}"
       title="${escA(on?`${s.lbl} — tap to undo`:s.lbl)}"><span class="ci">${ICON[s.ico]}</span><span class="cl">${s.lbl}</span></button>`;
-  }).join("");
+  }).join("") + willNeverSegHTML(id);
+}
+// Lee, 2026-11-09: "Will never" is the Watched panel's last option — the same blocked/"notfor" flag the old
+// Watch On panel's Never set (pickNever), so every downstream reader of that flag is unchanged.
+function willNeverSegHTML(id){
+  const never=blocked.has(id);
+  return `<button type="button" class="cseg${never?" on":""}" data-key="never" style="--segc:#d0453f;${never?"background:#d0453f;color:#fff":""}"
+    onclick="pickNever(${id})" aria-pressed="${never}"
+    title="${escA(never?"Will never — tap to undo":"I will never watch this — excludes it from your lists")}"><span class="ci">${ICON.block}</span><span class="cl">Will never</span></button>`;
 }
 window.openWatchPanel=(id, btn)=>{
   // CAS-281: "was MY panel already open?", not "was ANY panel open?". The old test closed whatever was open
@@ -9997,7 +10001,7 @@ window.openWatchPanel=(id, btn)=>{
   pop.innerHTML=`<div class="csegs">${watchStepsSegmentsHTML(id)}</div>`;
   btn.closest(".actions").appendChild(pop);
   positionPanel(pop);   // CAS-304
-  wirePanelSlide(pop, ".cseg", el=>pickWatch(id, el.dataset.key));   // CAS-282
+  wirePanelSlide(pop, ".cseg", el=>el.dataset.key==="never" ? pickNever(id) : pickWatch(id, el.dataset.key));   // CAS-282
   document.addEventListener("keydown", watchPanelKey, true);
   document.addEventListener("pointerdown", watchPanelOutsideClose, true);   // CAS-751
   btn.classList.add("open"); btn.setAttribute("aria-expanded","true");
