@@ -3313,7 +3313,7 @@
   .oaslider{display:flex;align-items:center;gap:8px}
   .oaslidewrap{position:relative;flex:1;height:22px}
   .oaslidewrap .oastripfull{position:absolute;inset:0;display:flex;gap:3px;pointer-events:none}
-  .oarange{position:relative;z-index:2;width:100%;height:22px;margin:0;cursor:pointer;
+  .oarange{position:absolute;left:-6px;top:0;z-index:2;width:calc(100% + 12px);height:22px;margin:0;cursor:pointer;
     -webkit-appearance:none;appearance:none;background:transparent}
   .oarange::-webkit-slider-runnable-track{height:22px;background:transparent}
   .oarange::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:20px;border-radius:6px;
@@ -3368,7 +3368,8 @@
   .oactag{font-size:10px;font-weight:800;letter-spacing:.3px;padding:2px 8px;border-radius:10px;text-transform:uppercase}
   .oactag.up{background:rgba(94,234,212,.18);color:#5eead4}
   .oactag.down{background:rgba(240,160,96,.18);color:#f0a060}
-  .oacline2{display:flex;align-items:center;gap:10px;margin-top:3px}
+  .oacline2{display:flex;align-items:center;gap:8px;margin-top:3px}
+  .oactitle .oacleft{flex:0 0 auto;margin-left:auto;white-space:nowrap}
   .oacleft{flex:0 0 104px;font-size:12px;line-height:1.4;background:none;border:0;text-align:left;padding:0;
     color:var(--cyan,#22d3ee);cursor:pointer}
   .oacnoverdict{color:var(--faint);cursor:default}
@@ -3382,9 +3383,9 @@
   .oacfill.up{background:rgba(45,212,191,.75)}
   .oacfill.down{background:rgba(240,136,58,.8)}
   .oacfill.never{background:repeating-linear-gradient(135deg,#f0a060,#f0a060 4px,transparent 4px,transparent 8px)}
-  .oacbarline{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff}
+  .oacbarline{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;transform:translateX(-50%)}
   .oacdash{position:absolute;top:-2px;bottom:-2px;width:0;border-left:2px dashed rgba(255,255,255,.6)}
-  .oacrange{position:relative;z-index:2;width:100%;height:16px;margin:0;cursor:pointer;
+  .oacrange{position:absolute;left:-5px;top:0;z-index:2;width:calc(100% + 10px);height:16px;margin:0;cursor:pointer;
     -webkit-appearance:none;appearance:none;background:transparent}
   .oacrange::-webkit-slider-runnable-track{height:16px;background:transparent}
   .oacrange::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:18px;border-radius:5px;
@@ -3395,7 +3396,7 @@
   .oacrange:focus-visible{outline:none}
   .oacrange:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
   .oacrange:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
-  .oacval{flex:0 0 auto;font-size:12.5px;font-weight:800;color:var(--ink);min-width:28px;text-align:right}
+  .oacval{flex:0 0 52px;width:52px;font-size:12.5px;font-weight:800;color:var(--ink);text-align:right}
   .oacval-empty{color:var(--faint);font-weight:600}
   .oacval.up{color:#5eead4} .oacval.down{color:#f0a060} .oacval-over{color:var(--gold);text-decoration:underline}
   .oacwas{font-size:11.5px;margin:4px 0 0;line-height:1.4}
@@ -20156,7 +20157,7 @@ function oaOpenBodyHTML(c, style){
         return `<div class="oaslider">
             <div class="oaslidewrap">
               <div class="oastrip oastripfull">${oaShareBoxesHTML(style, bar, {labels:true})}</div>
-              <input type="range" class="oarange" min="20" max="100" step="1" value="${top}"
+              <input type="range" class="oarange" min="0" max="100" step="1" value="${top}"
                 data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
                 aria-label="${escA(name)} minimum score">
             </div>
@@ -20238,6 +20239,7 @@ window.oaToggleStyle=(style)=>{
 window.oaOnDrag=(input)=>{
   const style=input.dataset.style;
   const share=Math.max(20, Math.min(100, parseInt(input.value,10)));
+  input.value=share;
   const wrap=input.closest(".oaslidewrap");
   const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
   ONE_AGENT_SHARE_BRACKETS.forEach((b,i)=>{
@@ -20260,6 +20262,7 @@ window.oaOnRelease=(input)=>{
   const style=input.dataset.style;
   const c=oneAgentCriteria(); if(!c) return;
   const share=Math.max(20, Math.min(100, parseInt(input.value,10)));
+  input.value=share;
   c.styles=c.styles||{};
   const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
   st.bar = oneBarForTopPct(style, share);
@@ -20474,8 +20477,8 @@ function oaComboRowHTML(c, style, r){
   const chipsHTML = chipsOpen ? `<div class="oacchips">${films.map(f=>
       `<span class="oacchip ${f.good?"up":"down"}">${esc(f.title)} · ${esc((OPINIONS.find(o=>o.key===f.kind)||{}).lbl||f.kind)}</span>`).join("")}</div>` : "";
   return `<div class="oacrow${rowEmpty?" oacrow-empty":""}" data-key="${escA(r.key)}">
-      <div class="oactitle">${esc(style)} with ${esc(r.other)}${tagHTML}</div>
-      <div class="oacline2">${leftHTML}
+      <div class="oactitle">${esc(style)} with ${esc(r.other)}${tagHTML}${leftHTML}</div>
+      <div class="oacline2">
         <span class="oacright">${oaComboBarHTML(c, style, r)}${oaComboValueHTML(r)}</span>
       </div>
       ${wasLine}
