@@ -28,7 +28,7 @@ test("CAS-1395 AC1a: the prefill helper carries the search text and service stra
   assert.equal(fields.people, "Tom Cruise, Russo");
   assert.equal(fields.svc, "Netflix");
   assert.equal(fields.name, "Tom Cruise, Russo");
-  assert.equal(fields.watched, false);
+  assert.equal(fields.watched, true); // CAS-1412: new moods start with Include watched on
 });
 
 test("CAS-1395 AC1b: a search longer than 24 characters is cut to exactly 24 for the name", () => {

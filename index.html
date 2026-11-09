@@ -20816,7 +20816,8 @@ function oamMoodDraftFrom(mood){
     editingId: mood ? mood.id : null,
     name: mood ? moodDisplayName(mood) : "",
     handOnly: mood ? !!mood.handOnly : false,
-    watched: mood ? !!mood.watched : false,
+    // CAS-1412: a brand-new mood starts with Include watched on; editing keeps the mood's own stored value.
+    watched: mood ? !!mood.watched : true,
     stylesAll: mood ? !(mood.styles && mood.styles.length) : true,
     styles: new Set(mood && mood.styles ? mood.styles : []),
     // CAS-1400: genre | keyword — which way this mood finds films. Nothing stored before Save.
@@ -20878,7 +20879,7 @@ window.openOamMoodSheetForNew=()=>{
 function oamFindPrefillFields(search, svc){
   const people=(search||"").trim();
   const name = people ? people.slice(0,24) : (svc ? oamSvcChipLabel(svc) : "");
-  return {people, svc: svc||null, name, watched:false};
+  return {people, svc: svc||null, name, watched:true};   // CAS-1412: new moods start with Include watched on
 }
 // CAS-1395: Find's own "Save as mood" button — a v2 account, an applied search or service (not
 // unsubmitted typing), no Series filter and the mood row not already full.
