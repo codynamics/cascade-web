@@ -10696,12 +10696,16 @@ function renderWatchTop(){
   // to be captured before it's thrown away and reapplied (or adjusted) on the new one below.
   const prevRow=el.querySelector(".moodrow");
   const prevScrollLeft=prevRow ? prevRow.scrollLeft : 0;
-  el.innerHTML = `<div class="moodrow" role="group" aria-label="Mood">${moodHTML}${addHTML}</div>${stageHTML}`;
+  // CAS-1413: a re-render that keeps the same selected mood (focus/visibility reconcile, prefs poll) must not
+  // move the row — only a changed selection brings the selected chip into view.
+  const prevSel=prevRow ? prevRow.dataset.sel : null;
+  el.innerHTML = `<div class="moodrow" role="group" aria-label="Mood" data-sel="${escA(watchMoodSel)}">${moodHTML}${addHTML}</div>${stageHTML}`;
   // Keeps #wtMini's own text honest immediately after a stage/mood change, independent of the next scroll
   // event — the collapse listener itself (defined later in this script) only ever touches it on scroll.
   if(typeof wtRefreshMini==="function") wtRefreshMini();
   const newRow=el.querySelector(".moodrow");
-  moodRowShowSelected(newRow, prevScrollLeft);
+  if(prevRow && prevSel===watchMoodSel) newRow.scrollLeft=prevScrollLeft;
+  else moodRowShowSelected(newRow, prevScrollLeft);
   wireMoodRowDrag(newRow);
 }
 // CAS-1300: sets .moodrow's own scrollLeft so the selected chip is fully visible, without ever touching the

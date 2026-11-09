@@ -2269,6 +2269,27 @@ test(`CAS-1296 AC3: "+ Mood" opens with From = My agents and every agent chip on
   await page.evaluate(() => window.closeWatchSheet());
 });
 
+// CAS-1413: a re-render that keeps the same selected mood must keep the mood row's own scroll position.
+test("CAS-1413 AC2: re-render with an unchanged mood selection keeps the mood row's scrollLeft", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  const before = await page.evaluate(() => {
+    const row = document.querySelector(".moodrow");
+    row.scrollLeft = row.scrollWidth;
+    return { left: row.scrollLeft, sel: row.dataset.sel };
+  });
+  await page.evaluate(() => window.render());
+  const after = await page.evaluate(() => {
+    const row = document.querySelector(".moodrow");
+    return { left: row.scrollLeft, sel: row.dataset.sel };
+  });
+  expect(after.sel).toBe(before.sel);
+  expect(Math.abs(after.left - before.left)).toBeLessThanOrEqual(1);
+});
+
 // CAS-1296 Change 4: Releases (the flow view) is pinned leftmost in the mood row, outside the draggable
 // set, with a divider after it — a drag among the rest can rearrange them, but never puts anything before
 // Releases, and Releases itself never lifts.
