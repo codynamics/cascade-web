@@ -3936,6 +3936,9 @@
   .brand-ident .updated-row{gap:0}
   .navmenu-wrap{order:9}
   .navmenu{left:auto;right:0}
+  /* Lee, 2026-11-09: every menu label stays on one line — the menu widens to its longest
+     ("Streaming service analysis") rather than wrapping it. */
+  .navmenu .navitem{white-space:nowrap}
   #navMenuBtn{background:var(--panel);border:1px solid var(--line);border-radius:10px}
   .hdr-actions{flex:1 1 auto;margin-left:0;display:flex!important;gap:5px;min-width:0}
   .hdr-actions .modechip{flex:1 1 0;min-width:0;width:auto;padding:0 2px;gap:3px;flex-direction:column;
@@ -4388,7 +4391,7 @@
         <div class="navmenu" id="navMenu" role="menu" aria-label="Menu">
           <!-- Lee, 2026-11-09: Service analysis leads the menu, with My streaming services (moved up out of
                Settings) directly below it; Watch Invites (renamed from Invites) opens the day-to-day group. -->
-          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('svcAnalysis')">Service analysis</button>
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('svcAnalysis')">Streaming service analysis</button>
           <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('services')">My streaming services</button>
           <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('invites')">Watch Invites
             <span class="navitem-badge" id="invitesNavBadge" style="display:none">0</span></button>
@@ -24212,7 +24215,7 @@ const TOUR_STEPS = [
     before(){ closeSettings(); openFindScreen(); }, after(){ showAgentsHome(); }, sel:["#findSearchInput"]},
   {text:"Agents are fully adjustable. Each one starts with sensible settings. As you rate films it learns your taste and suggests changes to its own settings, so it finds more of what you'll love.",
     before(){ closeSettings(); openAgentsScreen(); }, after(){ showAgentsHome(); }, sel:["#agList .agrow"]},
-  {text:"Change your streaming services any time from this menu, under My streaming services — and see which services suit you best in Service analysis.",
+  {text:"Change your streaming services any time from this menu, under My streaming services — and see which services suit you best in Streaming service analysis.",
     before(){ closeSettings(); showAgentsHome(); }, sel:["#navMenuBtn"]},
   {text:"You're all set. Your agents report every day at 5pm.",
     before(){ closeSettings(); showAgentsHome(); }, center:true},
