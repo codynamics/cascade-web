@@ -4392,14 +4392,15 @@
           <span class="navcountbadge" id="navMenuDot" style="display:none" aria-hidden="true"></span>
         </div>
         <div class="navmenu" id="navMenu" role="menu" aria-label="Menu">
-          <!-- CAS-886: Invites leads the day-to-day group — the top-of-list slot Notifications held before
-               CAS-636 folded that surface into Moving, and the position the design image gives Invites now. -->
-          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('invites')">Invites
+          <!-- Lee, 2026-11-09: Service analysis leads the menu, with My streaming services (moved up out of
+               Settings) directly below it; Watch Invites (renamed from Invites) opens the day-to-day group. -->
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('svcAnalysis')">Service analysis</button>
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('services')">My streaming services</button>
+          <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('invites')">Watch Invites
             <span class="navitem-badge" id="invitesNavBadge" style="display:none">0</span></button>
-          <!-- CAS-928: Friends sits directly below Invites, the slot the design image gives it. -->
+          <!-- CAS-928: Friends sits directly below Watch Invites. -->
           <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('friends')">Friends</button>
           <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('recommend')">Recommend Cascade</button>
-          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('svcAnalysis')">Service analysis</button>
           <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('settings')">Settings</button>
           <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('help')">Help</button>
           <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('about')">About</button>
@@ -4992,7 +4993,7 @@
 </div>
 
 <!-- SETTINGS (CAS-1126) — the middle menu group: the screens that shape how Cascade behaves (Where & when
-     you'll watch, How you're told, My services, Languages, Occasions), split out of the old flat menu and
+     you'll watch → Status tracking, Notification Settings, Languages), split out of the old flat menu and
      out of Account. Body rendered by renderSettings(). Each row opens the existing screen it always did;
      closing that screen now returns here instead of just closing (see screenResume). -->
 <div class="uscreen" id="settingsScreen" role="dialog" aria-modal="true" aria-label="Settings">
@@ -5001,7 +5002,7 @@
 
 <!-- INVITES (CAS-886) — the sender's own list of who they've invited to watch something, and who's
      replied. Body rendered by renderInvitesScreen(). Reached from the top menu, its own top entry. -->
-<div class="uscreen" id="invitesScreen" role="dialog" aria-modal="true" aria-label="Invites">
+<div class="uscreen" id="invitesScreen" role="dialog" aria-modal="true" aria-label="Watch Invites">
   <div class="uwrap" id="invitesBody"></div>
 </div>
 
@@ -5037,14 +5038,14 @@
      Preferences page. Retires the old Taste Baseline concept (Genre/How far back/Age rating dropped
      entirely; new agents use fixed system defaults). Body rendered by renderWhereWhen(). Reached from the
      top menu's Settings screen (CAS-1126). -->
-<div class="uscreen" id="wwScreen" role="dialog" aria-modal="true" aria-label="Service tracking">
+<div class="uscreen" id="wwScreen" role="dialog" aria-modal="true" aria-label="Status tracking">
   <div class="uwrap" id="wwBody"></div>
 </div>
 
 <!-- HOW YOU'RE TOLD (CAS-1176) — Settings' own copy of the notify controls, a plain back-arrow-and-title
      screen like #wwScreen above rather than the onboarding step frame. Body rendered by renderNotifyScreen().
      Reached from the top menu's Settings screen. -->
-<div class="uscreen" id="notifyScreen" role="dialog" aria-modal="true" aria-label="How you're told">
+<div class="uscreen" id="notifyScreen" role="dialog" aria-modal="true" aria-label="Notification Settings">
   <div class="uwrap" id="notifyBody"></div>
 </div>
 
@@ -8392,12 +8393,12 @@ function inviteSentLineFor(sent){
   const names=joinNames(sent.map(s=>s.friend.name));
   const plural=sent.length!==1, verb=plural?"have":"has", noun=plural?"answers":"answer";
   const allEmail=sent.every(s=>s.channel==="email");
-  if(allEmail) return `${names} ${verb} been emailed. You will be notified when they respond, and you can see all invites and responses from the Invites menu option.`;
+  if(allEmail) return `${names} ${verb} been emailed. You will be notified when they respond, and you can see all invites and responses from the Watch Invites menu option.`;
   const anyEmail=sent.some(s=>s.channel==="email");
   if(anyEmail) return `${names} ${verb} been invited — some by email, some in your messaging app. `+
-    `You will be notified when they respond, and you can see all invites and responses from the Invites menu option.`;
+    `You will be notified when they respond, and you can see all invites and responses from the Watch Invites menu option.`;
   return `${names} ${verb} been invited — finish sending in your messaging app. `+
-    `You will be notified when they respond, and you can see all invites and responses from the Invites menu option.`;
+    `You will be notified when they respond, and you can see all invites and responses from the Watch Invites menu option.`;
 }
 function filmInviteSentHTML(info){
   return `<div class="filminvsent">
@@ -8948,7 +8949,7 @@ function renderInvitesScreen(){
     ? `<div class="invempty">No invites yet — expand a film card to see the invite button. Their reply will show up here.</div>`
     : sections.map(s=>`<div class="flabel">${s.label}</div>${s.rows.map(inv=>inviteRowHTML(inv, s.key)).join("")}`).join("");
   el.innerHTML=`
-    <div class="ostop"><h2 class="osh">Invites</h2>
+    <div class="ostop"><h2 class="osh">Watch Invites</h2>
       <button class="donebtn" type="button" onclick="closeInvitesScreen()">Close</button></div>
     ${body}`;
 }
@@ -15206,7 +15207,7 @@ function renderWhereWhen(){
   prefsWatchMode=true;   // retargets winFlags/agentWindows/wwToggleWin/wwChanged at watchPrefs
   $("wwBody").innerHTML=`
     <div class="ostop"><button class="osback" type="button" onclick="closeWhereWhen()" aria-label="Back">←</button>
-      <h2 class="osh">Service tracking</h2></div>
+      <h2 class="osh">Status tracking</h2></div>
     <p class="ossub">Turn on the windows you watch in. Your agents follow each film into them and tell you
       when it arrives in the one it's set to Watch On.</p>
     <div id="wwLanes"></div>`;
@@ -15235,7 +15236,7 @@ window.closeWhereWhen=()=>{
 function renderNotifyScreen(){
   $("notifyBody").innerHTML=`
     <div class="ostop"><button class="osback" type="button" onclick="closeNotifyScreen()" aria-label="Back">←</button>
-      <h2 class="osh">How you're told</h2></div>
+      <h2 class="osh">Notification Settings</h2></div>
     <p class="ossub">As new movies come along that meet your brief, this agent will ping you. How would you like to be notified?</p>
     ${notifyControlsHTML()}`;
   wireNotifyControls();
@@ -15366,7 +15367,7 @@ const HELP_ARTICLES = [
      + BADGE_FILTER_OPTS.map(opt=>`${TENT_BADGE[opt.key].ico} ${TENT_BADGE[opt.key].label} — ${opt.descriptor()}`).join("\n\n")},
   {slug:"setting-the-bar", title:"Setting the bar",
    summary:"Markers per window, the single admission floor, and that moving a marker re-places films immediately.",
-   body:"Each window an agent tracks — Cinema, Premium, Rent, Stream — can carry its own marker: a minimum score for a film to be listed once it reaches that window. But your agent doesn't re-test a film against a fresh marker every time it moves on — it's admitted the moment it clears the lowest marker among every window you're tracking, and stays admitted from there. Markers still decide where a film is placed: the earliest window you've given a marker is where an agent judges a film in, while a later window you're tracking but haven't marked just carries it forward once it's already admitted.\n\nYou can set a window's marker to Off, which lists everything that reaches that window regardless of score. Turning a window off entirely, so it's never tracked at all, isn't something an agent decides for itself — that's set account-wide, in Service tracking.\n\nDrag a marker and Cascade re-checks every film your agent has already found against the new bar straight away — no refresh needed. A film that no longer clears it drops from the agent's list; one that now does appears. (A film you've set Watch On for yourself by hand is protected from this — see “Watch On and overrides”.)"},
+   body:"Each window an agent tracks — Cinema, Premium, Rent, Stream — can carry its own marker: a minimum score for a film to be listed once it reaches that window. But your agent doesn't re-test a film against a fresh marker every time it moves on — it's admitted the moment it clears the lowest marker among every window you're tracking, and stays admitted from there. Markers still decide where a film is placed: the earliest window you've given a marker is where an agent judges a film in, while a later window you're tracking but haven't marked just carries it forward once it's already admitted.\n\nYou can set a window's marker to Off, which lists everything that reaches that window regardless of score. Turning a window off entirely, so it's never tracked at all, isn't something an agent decides for itself — that's set account-wide, in Status tracking.\n\nDrag a marker and Cascade re-checks every film your agent has already found against the new bar straight away — no refresh needed. A film that no longer clears it drops from the agent's list; one that now does appears. (A film you've set Watch On for yourself by hand is protected from this — see “Watch On and overrides”.)"},
   {slug:"the-cascade", title:"The cascade",
    summary:"Cinema to rent to stream, the start window, and that the entry bar is the lowest marker you've set.",
    body:"A film moves through the same four windows in order: Cinema, Premium, Rent, then Stream. That order is the whole idea behind the name — a film cascades down through them over time, and Cascade watches for it at whichever window you've chosen to track.\n\nThe earliest window you've armed with a marker is your agent's start window. Every window you're tracking after it is always followed, marker or not — a later window's chip reads “follows Rent” instead of showing a score of its own, because it doesn't need one. Your agent's entry bar itself is simply the lowest marker among every window you've set one on — not necessarily the start window's — so once a film clears it, the film doesn't need to clear a fresh bar just because it's moved further down the cascade."},
@@ -15384,7 +15385,7 @@ const HELP_ARTICLES = [
    body:"Alerts is where Cascade tells you what's happened lately, split into two kinds of row. New is a film's first appearance for a given agent — something it's never found before. Changed is everything else: a film the agent already had, that's now moved to a different window. A film is never counted as both at once.\n\nYou choose how far back to look — Today, Week, 2 weeks or Month — and Alerts shows only what falls inside that window, measured back from right now. Every row names the agent that actually owns the film today, so nothing is shown under an agent that no longer has it."},
   {slug:"notifications", title:"Notifications",
    summary:"Exactly what will reach you, by which channel, and when the daily report runs.",
-   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Service tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for every agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
+   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Status tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for every agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
   {slug:"your-account-and-data", title:"Your account and data",
    summary:"What is stored, where, and how to delete it.",
    body:`Signed out, everything Cascade knows about you — your agents, what you've watched, your preferences — is stored only on this device, in this browser or app install. Nothing about it reaches anywhere else.\n\nSigned in, that same information is mirrored to your account so it's there again on another device you sign into. Signing out doesn't erase it — it's still on your account, waiting for you to sign back in.\n\nDeleting your account is on the Account screen itself: type DELETE to confirm, and it permanently removes your agents, everything they've found for you, what you've marked watched, your invites and friends, your notification history and your sign-in — there's nothing left to undo.${MEMBERSHIP_ENABLED ? " It doesn't cancel an active App Store subscription, which you'll need to manage separately." : ""}`},
@@ -15491,7 +15492,6 @@ window.navMenuGo=key=>{
   else if(key==="svcAnalysis") openSvcAnalysis();
   else if(key==="languages") openLanguages();
   else if(key==="whereWhen") openWhereWhen();
-  else if(key==="occasions") openManageOccasionsScreen();
   else if(key==="recommend") openRecommend();
   else if(key==="help") openHelp();
   else if(key==="about") openAbout();
@@ -18771,7 +18771,7 @@ const SHARP_STEPS = {
   // The count moves live as lanes are ticked, because ticking a lane really does widen or narrow what the
   // agent watches — a screen whose controls didn't move the number would be a form, not a choice.
   watching: {
-    title: "Service tracking",
+    title: "Status tracking",
     progress: 70,
     noAgent: true,
     noSkip: true,       // inside the hub's door — Done confirms it, Back leaves it alone
@@ -18960,7 +18960,7 @@ const SHARP_STEPS = {
     // CAS-475/CAS-911: reached only via the top-menu's own bare spoke (openMenuServices sets
     // menuStepOn) — the account-level "My services" screen, shared with (but no longer briefed by)
     // onboarding.
-    title(){ return menuStepOn ? "My services" : ""; },
+    title(){ return menuStepOn ? "My streaming services" : ""; },
     progress: 95,
     noAgent: true,
     // CAS-381: what the agent WATCHES stays unfiltered (matchesTaste drops myServices — CAS-132: an agent
@@ -23470,12 +23470,10 @@ function renderSettings(){
     <p class="ossub">How Cascade works for you.</p>
 
     <div class="ucard">
-      ${acctRow("🕒","Service tracking", null, "settingsOpenWhereWhen()")}
-      ${acctRow("🔔","How you're told", esc(notif) + (notifyPrefs.emailOn && notifyPrefs.email
+      ${acctRow("🕒","Status tracking", null, "settingsOpenWhereWhen()")}
+      ${acctRow("🔔","Notification Settings", esc(notif) + (notifyPrefs.emailOn && notifyPrefs.email
                 ? ` · ${esc(notifyPrefs.email)}` : ""), "settingsOpenNotify()")}
-      ${acctRow("📺","My services", null, "settingsOpenServices()")}
       ${acctRow("🌐","Languages", null, "settingsOpenLanguages()")}
-      ${acctRow("🎉","Occasions", null, "settingsOpenOccasions()")}
     </div>`;
 }
 window.openSettings=()=>{
@@ -23488,9 +23486,7 @@ window.openSettings=()=>{
 window.closeSettings=()=>{ $("settingsScreen").classList.remove("open"); lockBodyScroll(false); syncWatchChip(); };
 window.settingsOpenWhereWhen=()=>{ screenResume="settings"; closeSettings(); openWhereWhen(); };
 window.settingsOpenNotify=()=>{ screenResume="settings"; closeSettings(); openNotifyScreen(); };
-window.settingsOpenServices=()=>{ screenResume="settings"; closeSettings(); openMenuServices(); };
 window.settingsOpenLanguages=()=>{ screenResume="settings"; closeSettings(); openLanguages(); };
-window.settingsOpenOccasions=()=>{ screenResume="settings"; closeSettings(); openManageOccasionsScreen(); };
 window.openAccount=()=>{
   renderAccount();
   $("accountScreen").scrollTop=0;
@@ -24581,9 +24577,8 @@ const TOUR_STEPS = [
     before(){ closeSettings(); openFindScreen(); }, after(){ showAgentsHome(); }, sel:["#findSearchInput"]},
   {text:"Agents are fully adjustable. Each one starts with sensible settings. As you rate films it learns your taste and suggests changes to its own settings, so it finds more of what you'll love.",
     before(){ closeSettings(); openAgentsScreen(); }, after(){ showAgentsHome(); }, sel:["#agList .agrow"]},
-  {text:"Change your streaming services here any time, and see which services suit you best.",
-    before(){ showAgentsHome(); navMenuGo("settings"); }, after(){ closeSettings(); },
-    sel:['#settingsBody .urow[onclick="settingsOpenServices()"]']},
+  {text:"Change your streaming services any time from this menu, under My streaming services — and see which services suit you best in Service analysis.",
+    before(){ closeSettings(); showAgentsHome(); }, sel:["#navMenuBtn"]},
   {text:"You're all set. Your agents report every day at 5pm.",
     before(){ closeSettings(); showAgentsHome(); }, center:true},
 ];
