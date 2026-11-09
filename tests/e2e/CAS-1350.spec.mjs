@@ -87,7 +87,7 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
   await expect(page.locator("#oafInner .ossub").first()).toHaveText("Name: Ruby");
   // CAS-1368: the moods table — Releases, Best of the best, Me, Date night, Family, Starred (partner+kids both yes).
   const moodChips = page.locator("#oafInner .svcsec", { hasText: "Your moods" }).locator(".chip");
-  await expect(moodChips).toHaveText(["Releases", "Best of the best", "Me", "Date night", "Family", "Starred"]);
+  await expect(moodChips).toHaveText(["All Latest", "Best of the best", "Me", "Date night", "Family", "Starred"]);
   await expect(page.locator("#oafCta")).toHaveText("Start watching");
   await page.locator("#oafCta").click();
 
