@@ -4476,14 +4476,14 @@
              agent/tab/service/watched/style/Picked-by narrowing of any kind. Same modechip construction as
              Moving; the magnifying-glass icon is the Watch search box's own glyph (CAS-150), drawn in the
              same stroke style as the other chip icons. -->
-        <div class="modechip fd" id="findBtn" title="Find" role="button" tabindex="0"
-             aria-pressed="false" aria-label="Find" onclick="openFindScreen()">
+        <div class="modechip fd" id="findBtn" title="Database" role="button" tabindex="0"
+             aria-pressed="false" aria-label="Database" onclick="openFindScreen()">
           <svg class="mcicon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <circle class="s" cx="11" cy="11" r="6.4" stroke-width="2" fill="none"/>
             <path class="s" d="M15.8 15.8 20 20" stroke-width="2" stroke-linecap="round" fill="none"/>
           </svg>
-          <span class="mclabel mclabel-full">Find</span>
-          <span class="mclabel mclabel-short">Find</span>
+          <span class="mclabel mclabel-full">Database</span>
+          <span class="mclabel mclabel-short">Database</span>
         </div>
         <!-- Agents is a main nav destination again, the fourth item (Lee, 2026-10-10). -->
         <div class="modechip ag" id="agentsBtn" title="Agents" role="button" tabindex="0"
@@ -4990,7 +4990,7 @@
      so it sits BELOW the header (top:var(--hdrh), z-index:29) rather than covering it at top:0. Body
      rendered by renderFindScreen(); the list itself is paged in by findRenderMore() as the user scrolls
      near the bottom — the whole catalogue (~5,800 films) is never rendered at once. -->
-<div class="uscreen" id="findScreen" role="dialog" aria-modal="true" aria-label="Find">
+<div class="uscreen" id="findScreen" role="dialog" aria-modal="true" aria-label="Database">
   <div class="uwrap" id="findBody"></div>
 </div>
 
@@ -22962,7 +22962,7 @@ function findSvcFiltHTML(){
 }
 function renderFindScreen(){
   $("findBody").innerHTML = `
-    <h2 class="osh">Find</h2>
+    <h2 class="osh">Database</h2>
     <div class="watchsearchwrap" id="findSearchWrap">
       <input id="findSearchInput" class="search" type="text" inputmode="search" autocomplete="off"
              enterkeyhint="search"
