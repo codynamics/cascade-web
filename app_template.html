@@ -20654,7 +20654,7 @@ function oamFilmMeetsMoodRules(m, mood, c){
     if(c.excludeBlocked!==false && blocked.has(m.tmdb_id)) return false;
     if(admitC.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
     const ps=primaryStatus(m);
-    if(c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)) return false;
+    if(!mood.anySvc && c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)) return false;
     if(!filmMatchesSearch(m, mood.people)) return false;
     const age=oamFilmAge(m);
     if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
@@ -20662,7 +20662,7 @@ function oamFilmMeetsMoodRules(m, mood, c){
     if(mood.years && !releasedSince(m, yearsCutoff(mood.years))) return false;
     return true;
   }
-  if(!matchesCriteriaOneAgent(m, admitC, false)) return false;
+  if(!matchesCriteriaOneAgent(m, mood.anySvc ? {...admitC, myServices:false} : admitC, false)) return false;
   const {main}=mainOtherCombos(m);
   if(main===undefined) return false;
   if(!oamMoodStyles(mood, c).includes(main)) return false;
@@ -20837,6 +20837,9 @@ function oamMoodDraftFrom(mood){
     // CAS-1384: the sheet always shows the EFFECTIVE service (null if the stored one was dropped from
     // prefs.sub) — reading it here never rewrites the stored mood; only a Save does that.
     svc: mood ? oamMoodEffectiveSvc(mood) : null,
+    // Lee, 2026-11-09: "Any service" — this mood also lists films on services you don't subscribe to,
+    // even while the account's "Only show films on my services" switch is on. Never set alongside svc.
+    anySvc: mood ? (!!mood.anySvc && !oamMoodEffectiveSvc(mood)) : false,
     // CAS-1390: title/actor/director text filter, same comma-AND matcher as Find (filmMatchesSearch).
     people: mood ? (mood.people||"") : "",
   };
@@ -20947,7 +20950,8 @@ window.toggleOamDraftAge=a=>{ if(!oamDraft) return; oamDraft.ages.has(a)?oamDraf
 window.setOamDraftAwards=v=>{ if(!oamDraft) return; oamDraft.awards=v; renderOamMoodSheetBody(); };
 window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMoodSheetBody(); };
 window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMoodSheetBody(); };
-window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; renderOamMoodSheetBody(); };
+window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; oamDraft.anySvc=false; renderOamMoodSheetBody(); };
+window.setOamDraftAnySvc=()=>{ if(!oamDraft) return; oamDraft.svc=null; oamDraft.anySvc=true; renderOamMoodSheetBody(); };
 window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
 window.setOamDraftPeople=v=>{ if(oamDraft) oamDraft.people=v; };
 // CAS-1400: tapping a tab sets the draft's mode and slides the track WITHOUT re-rendering the sheet.
@@ -21212,11 +21216,13 @@ function renderOamMoodSheetBody(){
     ${(!d.handOnly && prefs.sub.size) ? `<div class="wsheetsec mainsec">
       <div class="wsheethd"><span>STREAMING ON</span></div>
       <div class="chips">
-        <button type="button" class="chip${d.svc?"":" on"}" aria-pressed="${!d.svc}" onclick="setOamDraftSvc(null)">All services</button>
+        ${prefs.on ? `<button type="button" class="chip${(d.svc||d.anySvc)?"":" on"}" aria-pressed="${!d.svc&&!d.anySvc}" onclick="setOamDraftSvc(null)">My services</button>
+        <button type="button" class="chip${d.anySvc?" on":""}" aria-pressed="${!!d.anySvc}" onclick="setOamDraftAnySvc()">Any service</button>`
+        : `<button type="button" class="chip${d.svc?"":" on"}" aria-pressed="${!d.svc}" onclick="setOamDraftSvc(null)">All services</button>`}
         ${SUB_SERVICES.filter(s=>prefs.sub.has(s)).map(s=>{ const on=d.svc===s; return `<button type="button" class="chip${on?" on":""}"
           aria-pressed="${on}" onclick="setOamDraftSvc('${escA(s)}')">${esc(oamSvcChipLabel(s))}</button>`; }).join("")}
       </div>
-      <p class="oamgenreintro">Pick one service to see only what's included on it. Cinema and Rental stay empty while a service is picked.</p>
+      <p class="oamgenreintro">${prefs.on ? "Any service also lists films on services you don't have. " : ""}Pick one service to see only what's included on it. Cinema and Rental stay empty while a service is picked.</p>
     </div>` : ""}
     <div class="wsheetsec mainsec">
       <div class="wsheethd"><span>HOW MANY, AND IN WHAT ORDER</span></div>
@@ -21295,6 +21301,7 @@ function oamMoodFromDraft(d){
     years: d.years,
     in: [...d.in], out: [...d.out],
     svc: d.svc || null,
+    anySvc: !!d.anySvc && !d.svc,
     people: (d.people||"").trim(),
     mode: d.mode==="keyword" ? "keyword" : "genre",   // CAS-1400
   };

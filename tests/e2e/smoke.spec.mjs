@@ -2845,3 +2845,47 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
   expect(after.mode).toBe("keyword");
   await page.evaluate(() => window.closeWatchSheet());
 });
+
+// CAS-1403: with the account switch "Only show films on my services" on, a mood can opt into "Any service"
+// and so list films on services the user doesn't subscribe to. Picking a single service clears it again.
+test("CAS-1403: Any service chip lists films beyond my services and clears when a single service is picked", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  await page.evaluate(() => {
+    cascades.length = 0;
+    cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
+    saveCascades();
+    setActive(cascades[0].id);
+    prefs.sub = new Set([SUB_SERVICES[0]]);
+    prefs.on = true;
+    watchMoods = [];
+    watchMoodSel = "best";
+    render();
+    window.openOamMoodSheetFor("best");
+  });
+  await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+
+  const myBtn = page.locator('#watchSheetBody .chip:text-is("My services")');
+  const anyBtn = page.locator('#watchSheetBody .chip:text-is("Any service")');
+  await expect(myBtn).toHaveAttribute("aria-pressed", "true");
+  await expect(anyBtn).toHaveAttribute("aria-pressed", "false");
+
+  const countPool = () => page.evaluate(() => {
+    const mood = currentOamMood();
+    return oamStagePool().filter(m => filmInOneAgentMood(m, mood, oneAgentCriteria())).length;
+  });
+  const before = await countPool();
+
+  await anyBtn.click();
+  await page.locator('#watchSheetBody button:text-is("Save")').click();
+  expect(await page.evaluate(() => currentOamMood().anySvc)).toBe(true);
+  const after = await countPool();
+  expect(after).toBeGreaterThan(before);
+
+  await page.evaluate(() => window.openOamMoodSheetFor("best"));
+  await page.locator("#watchSheetBody .chip[onclick^=\"setOamDraftSvc('\"]").first().click();
+  expect(await page.evaluate(() => oamDraft.anySvc)).toBe(false);
+  expect(await page.evaluate(() => !!oamDraft.svc)).toBe(true);
+});
