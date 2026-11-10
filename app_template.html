@@ -4405,9 +4405,10 @@
         <div class="navmenu" id="navMenu" role="menu" aria-label="Menu">
           <!-- Lee, 2026-11-09: Service analysis leads the menu, with My streaming services (moved up out of
                Settings) directly below it; Watch Invites (renamed from Invites) opens the day-to-day group. -->
-          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('svcAnalysis')">Streaming service analysis</button>
-          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('services')">My streaming services</button>
-          <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('invites')">Watch Invites
+          <!-- Lee, 2026-11-11: every menu item in Title Case; Streaming Analysis and Movie Invites renamed. -->
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('svcAnalysis')">Streaming Analysis</button>
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('services')">My Streaming Services</button>
+          <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('invites')">Movie Invites
             <span class="navitem-badge" id="invitesNavBadge" style="display:none">0</span></button>
           <!-- CAS-928: Friends sits directly below Watch Invites. -->
           <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('friends')">Friends</button>
@@ -4670,7 +4671,7 @@
 
 <!-- PREFERENCES modal -->
 <div class="modal" id="prefs">
-  <div class="modalhead"><h3>My streaming services</h3><button class="donebtn" id="prefsDone">Done</button></div>
+  <div class="modalhead"><h3>My Streaming Services</h3><button class="donebtn" id="prefsDone">Done</button></div>
   <div class="setup" id="prefSetup"></div>
   <div class="switch" id="prefSwitch"><span>Only show what I can watch</span><span class="knob"></span></div>
   <div class="pnote">Tell Cascade what you're paying for and it only shows you films you can actually watch on it —
@@ -5013,7 +5014,7 @@
 
 <!-- INVITES (CAS-886) — the sender's own list of who they've invited to watch something, and who's
      replied. Body rendered by renderInvitesScreen(). Reached from the top menu, its own top entry. -->
-<div class="uscreen" id="invitesScreen" role="dialog" aria-modal="true" aria-label="Watch Invites">
+<div class="uscreen" id="invitesScreen" role="dialog" aria-modal="true" aria-label="Movie Invites">
   <div class="uwrap" id="invitesBody"></div>
 </div>
 
@@ -5026,7 +5027,7 @@
 <!-- SERVICE ANALYSIS (CAS-344) — the "which service covers what your agents found" view, given its own
      page instead of living inside Preferences. Body rendered by renderSvcAnalysis(). Reached from the top
      menu (CAS-345), its permanent entry point. -->
-<div class="uscreen" id="svcAnalysis" role="dialog" aria-modal="true" aria-label="Streaming service analysis">
+<div class="uscreen" id="svcAnalysis" role="dialog" aria-modal="true" aria-label="Streaming Analysis">
   <div class="uwrap" id="svcAnalysisBody"></div>
 </div>
 
@@ -8292,12 +8293,12 @@ function inviteSentLineFor(sent){
   const names=joinNames(sent.map(s=>s.friend.name));
   const plural=sent.length!==1, verb=plural?"have":"has", noun=plural?"answers":"answer";
   const allEmail=sent.every(s=>s.channel==="email");
-  if(allEmail) return `${names} ${verb} been emailed. You will be notified when they respond, and you can see all invites and responses from the Watch Invites menu option.`;
+  if(allEmail) return `${names} ${verb} been emailed. You will be notified when they respond, and you can see all invites and responses from the Movie Invites menu option.`;
   const anyEmail=sent.some(s=>s.channel==="email");
   if(anyEmail) return `${names} ${verb} been invited — some by email, some in your messaging app. `+
-    `You will be notified when they respond, and you can see all invites and responses from the Watch Invites menu option.`;
+    `You will be notified when they respond, and you can see all invites and responses from the Movie Invites menu option.`;
   return `${names} ${verb} been invited — finish sending in your messaging app. `+
-    `You will be notified when they respond, and you can see all invites and responses from the Watch Invites menu option.`;
+    `You will be notified when they respond, and you can see all invites and responses from the Movie Invites menu option.`;
 }
 function filmInviteSentHTML(info){
   return `<div class="filminvsent">
@@ -8844,7 +8845,7 @@ function renderInvitesScreen(){
     ? `<div class="invempty">No invites yet — expand a film card to see the invite button. Their reply will show up here.</div>`
     : sections.map(s=>`<div class="flabel">${s.label}</div>${s.rows.map(inv=>inviteRowHTML(inv, s.key)).join("")}`).join("");
   el.innerHTML=`
-    <div class="ostop"><h2 class="osh">Watch Invites</h2>
+    <div class="ostop"><h2 class="osh">Movie Invites</h2>
       <button class="donebtn" type="button" onclick="closeInvitesScreen()">Close</button></div>
     ${body}`;
 }
@@ -14897,7 +14898,7 @@ function renderSvcAnalysis(){
     // Biggest loss first, so the bottom of the list is always the cheapest service to drop.
     const mineRows=[...a.mine].sort((x,y)=> (y.onlyHere-x.onlyHere) || (y.total-x.total) || x.svc.localeCompare(y.svc));
     const mineBody = !a.mine.length
-      ? `<div class="pnote">You haven't told Cascade which services you have yet — add them in My streaming services.</div>`
+      ? `<div class="pnote">You haven't told Cascade which services you have yet — add them in My Streaming Services.</div>`
       : mineRows.map(svcRowHTML).join("");
     const worthBody = !a.worth.length
       ? `<div class="pnote">No other service would add a film your moods list that you can't already watch.</div>`
@@ -14923,7 +14924,7 @@ function renderSvcAnalysis(){
   }
   el.innerHTML=`
     <div class="ostop"><button class="osback" type="button" onclick="closeSvcAnalysis()" aria-label="Back">←</button>
-      <h2 class="osh">Streaming service analysis</h2></div>
+      <h2 class="osh">Streaming Analysis</h2></div>
     <p class="ossub">How many of the films your moods list you'd lose by dropping a service, or gain by adding one.</p>
     ${body}`;
 }
@@ -18781,7 +18782,7 @@ const SHARP_STEPS = {
     // CAS-475/CAS-911: reached only via the top-menu's own bare spoke (openMenuServices sets
     // menuStepOn) — the account-level "My services" screen, shared with (but no longer briefed by)
     // onboarding.
-    title(){ return menuStepOn ? "My streaming services" : ""; },
+    title(){ return menuStepOn ? "My Streaming Services" : ""; },
     progress: 95,
     noAgent: true,
     // CAS-381: what the agent WATCHES stays unfiltered (matchesTaste drops myServices — CAS-132: an agent
@@ -24309,7 +24310,7 @@ const TOUR_STEPS = [
     before(){ closeSettings(); openFindScreen(); }, after(){ showAgentsHome(); }, sel:["#findSearchInput"]},
   {text:"Agents are fully adjustable. Each one starts with sensible settings. As you rate films it learns your taste and suggests changes to its own settings, so it finds more of what you'll love.",
     before(){ closeSettings(); openAgentsScreen(); }, after(){ showAgentsHome(); }, sel:["#agList .agrow"]},
-  {text:"Change your streaming services any time from this menu, under My streaming services — and see which services suit you best in Streaming service analysis.",
+  {text:"Change your streaming services any time from this menu, under My Streaming Services — and see which services suit you best in Streaming Analysis.",
     before(){ closeSettings(); showAgentsHome(); }, sel:["#navMenuBtn"]},
   {text:"You're all set. Your agents report every day at 5pm.",
     before(){ closeSettings(); showAgentsHome(); }, center:true},
