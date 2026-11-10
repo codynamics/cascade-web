@@ -3418,19 +3418,29 @@
      children cards (shared .obopt/.obradio skin, unchanged) and the tick grids Date night/Family genres use.
      Replaces the CAS-1346/1347 scores+alerts wizard and the "Who do you watch with?" step entirely. */
   .favlegend{display:flex;flex-wrap:wrap;gap:10px 18px;margin:2px 0 14px;font-size:11.5px;font-weight:700}
-  .favleg.fav{color:#e0567a}
-  .favleg.incl{color:var(--accent)}
+  .favleg.fav{color:#5fb985}
+  .favleg.incl{color:#27b3a2}
   .favgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .favcell{display:flex;align-items:center;justify-content:space-between;gap:6px;height:38px;
-    padding:0 6px 0 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2)}
-  .favcell.fav{border-color:#e0567a;background:color-mix(in srgb, #e0567a 12%, transparent)}
-  .favcell.incl{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent)}
+  .favcell{display:flex;align-items:center;gap:6px;height:38px;padding:0 8px 0 0;border-radius:10px;
+    border:1px dashed var(--line);background:transparent}
+  .favcell:not(.on) .favname{color:var(--faint);font-weight:600}
+  .favcell.incl{border:1px solid #138c7d;background:color-mix(in srgb, #138c7d 12%, transparent)}
+  .favcell.fav{border:1px solid #3f8f62;background:color-mix(in srgb, #3f8f62 14%, transparent)}
+  .favtoggle{flex:1;min-width:0;height:100%;display:flex;align-items:center;padding:0 0 0 12px;border:0;
+    background:none;font:inherit;color:inherit;cursor:pointer;text-align:left}
+  .favtoggle:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px;border-radius:10px}
+  .favscale{position:relative;display:flex;gap:3px;flex:0 0 auto;margin-left:6px}
+  .favseg{width:28px;height:22px;border-radius:4px;padding:0;display:grid;place-items:center;cursor:pointer;
+    font-size:11px;line-height:1;color:var(--faint);background:transparent;border:1px solid var(--bc)}
+  .favseg.check{--bc:#138c7d}
+  .favseg.heart{--bc:#3f8f62}
+  .favseg.on{background:var(--bc);color:#fff}
+  .favthumb{position:absolute;top:-1px;width:8px;height:24px;border-radius:4px;background:#fff;
+    box-shadow:0 1px 4px rgba(0,0,0,.5);pointer-events:none;transform:translateX(-50%);transition:left .15s}
+  .favcell.lvl0 .favthumb{left:0}
+  .favcell.lvl1 .favthumb{left:29.5px}
+  .favcell.lvl2 .favthumb{left:100%}
   .favname{font-size:13px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .favbtns{display:flex;gap:4px;flex:0 0 auto}
-  .favbtn{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--panel);
-    color:var(--faint);font-size:13px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0}
-  .favbtn.heart.on{border-color:#e0567a;background:#e0567a;color:#fff}
-  .favbtn.check.on{border-color:var(--accent);background:var(--accent);color:#fff}
   .tickgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .tickcell{display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border-radius:10px;
     border:1px solid var(--line);background:var(--panel2);color:var(--dim);font-size:13px;font-weight:700;
@@ -21955,6 +21965,8 @@ const ONE_AGENT_FLOW_WHERE = [
   ["stream", "On my streaming services", "Netflix, Disney+, Stan and the like"],
 ];
 const ONE_AGENT_FAMILY_DEFAULT = ["Family","Animation","Adventure","Comedy"];
+// Lee, 11 Nov: Date night starts with exactly these on, whatever the person's own genre picks.
+const ONE_AGENT_TOGETHER_DEFAULT = ["Comedy","Documentary","Romance","Mystery","Drama"];
 function oafHasServicesStep(){ return oafState.where.has("rent") || oafState.where.has("stream"); }
 function oafHasChildrenStep(){ return oafState.age==="18plus"; }
 // Only the windows picked on the where step ever carry an alert — a window not picked is never set on, in
@@ -22156,21 +22168,28 @@ function oafFavCount(){ return ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]
 function oafFavCellHTML(style){
   const pick = oafState.favs[style] || null;
   const name = oneAgentShortName(style);
-  return `<div class="favcell${pick?" "+pick:""}" data-style="${escA(style)}">
-      <span class="favname">${esc(name)}</span>
-      <span class="favbtns">
-        <button type="button" class="favbtn heart${pick==="fav"?" on":""}" data-pick="fav"
-            aria-pressed="${pick==="fav"}" aria-label="${escA(name)} favourite">♥</button>
-        <button type="button" class="favbtn check${pick==="incl"?" on":""}" data-pick="incl"
+  // Lee, 11 Nov: a three-way toggle (off / ✓ include / ♥ favourite) drawn like the agent's share scale —
+  // two boxes filling from the left in the scale's own first two colours, a white thumb at the fill edge.
+  // Tapping the name switches the genre on (include) or off; tapping a box sets that level; tapping the
+  // lit top box steps down one level.
+  const lvl = pick==="fav" ? 2 : pick==="incl" ? 1 : 0;
+  return `<div class="favcell lvl${lvl}${pick?" on "+pick:""}" data-style="${escA(style)}">
+      <button type="button" class="favtoggle" data-pick="toggle" aria-pressed="${!!pick}"
+          aria-label="${escA(name)} on or off"><span class="favname">${esc(name)}</span></button>
+      <span class="favscale">
+        <button type="button" class="favseg favbtn check${lvl>=1?" on":""}" data-pick="incl"
             aria-pressed="${pick==="incl"}" aria-label="${escA(name)} include">✓</button>
+        <button type="button" class="favseg favbtn heart${lvl>=2?" on":""}" data-pick="fav"
+            aria-pressed="${pick==="fav"}" aria-label="${escA(name)} favourite">♥</button>
+        <i class="favthumb" aria-hidden="true"></i>
       </span>
     </div>`;
 }
 function oafFavouritesHTML(){
   const n = oafFavCount();
   return `<h2 class="osh">Your favourite genres</h2>
-    <p class="ossub">Tap ♥ for your absolute favourites (two or three is ideal) and ✓ for others you'd watch if they're really good. Leave the rest.</p>
-    <div class="favlegend"><span class="favleg fav">♥ Favourite · plenty of choice</span><span class="favleg incl">✓ Include · only the best</span></div>
+    <p class="ossub">Tap a genre to switch it on ✓ if you'd watch it when it's really good. Slide it to ♥ for your absolute favourites (two or three is ideal). Leave the rest off.</p>
+    <div class="favlegend"><span class="favleg incl">✓ Include · only the best</span><span class="favleg fav">♥ Favourite · plenty of choice</span></div>
     <div class="favgrid" id="oafFavGrid">${ONE_AGENT_SETUP_STYLES.map(oafFavCellHTML).join("")}</div>
     <p class="ossub" style="margin-top:10px">${n} favourite${n===1?"":"s"}${n>3?" · fewer gives sharper lists":""}</p>`;
 }
@@ -22178,10 +22197,13 @@ function oafWireFavourites(){
   const grid=$("oafFavGrid"); if(!grid) return;
   grid.querySelectorAll(".favcell[data-style]").forEach(cell=>{
     const style=cell.dataset.style;
-    cell.querySelectorAll(".favbtn[data-pick]").forEach(btn=>{
+    cell.querySelectorAll("[data-pick]").forEach(btn=>{
       btn.onclick=()=>{
-        const pick=btn.dataset.pick;
-        oafState.favs[style] = oafState.favs[style]===pick ? null : pick;
+        const pick=btn.dataset.pick, cur=oafState.favs[style]||null;
+        oafState.favs[style] =
+            pick==="toggle" ? (cur ? null : "incl")
+          : pick==="incl"   ? (cur==="incl" ? null : "incl")
+          :                   (cur==="fav" ? "incl" : "fav");
         oafPaint();
       };
     });
@@ -22308,10 +22330,10 @@ function oafPaint(){
   else if(oafStep==="age") wireObOpt($("oafAgeOpts"), val=>{ oafState.age=val; oafPaint(); });
   else if(oafStep==="partner") wireObOpt($("oafPartnerOpts"), val=>{
       oafState.partner=val;
-      // Pre-tick Date night with the person's own ♥/✓ genres the first time Yes is picked — never again, so
+      // Pre-tick Date night with ONE_AGENT_TOGETHER_DEFAULT the first time Yes is picked — never again, so
       // a later edit to the grid survives tapping Yes/No/Yes.
       if(val==="yes" && !oafState.togetherInit){
-        oafState.together=new Set(ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]));
+        oafState.together=new Set(ONE_AGENT_TOGETHER_DEFAULT);
         oafState.togetherInit=true;
       }
       oafPaint();

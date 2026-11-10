@@ -58,8 +58,10 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
   await expect(page.locator("#oafInner .osh")).toHaveText("What do you watch together?");
   await expectHeadingBelowHeader(page);
   // Pre-ticked with the favourites step's own picks (Action/Drama).
-  await expect(page.locator('.tickcell[data-style="Action"]')).toHaveClass(/on/);
-  await expect(page.locator('.tickcell[data-style="Drama"]')).toHaveClass(/on/);
+  // Lee, 11 Nov: Date night pre-ticks a fixed five (ONE_AGENT_TOGETHER_DEFAULT), not the person's own picks.
+  for(const s of ["Comedy","Documentary","Romance","Mystery","Drama"])
+    await expect(page.locator(`.tickcell[data-style="${s}"]`)).toHaveClass(/on/);
+  await expect(page.locator('.tickcell[data-style="Action"]')).not.toHaveClass(/on/);
   await page.locator("#oafCta").click();   // together -> children (18 or over)
 
   await expect(page.locator("#oafInner .osh")).toHaveText("Do you watch with children?");
