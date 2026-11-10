@@ -9,7 +9,7 @@
 // recommendations render, a film's Watched control works, and the my-services filter actually filters.
 import { test, expect } from "@playwright/test";
 import {
-  freshApp, gotoFresh, toShortlist, shortlistCards, finishFlow, toListing, settleListing, ctaLocator, sectionCounts,
+  freshApp, gotoFresh, toShortlist, walkToServices, shortlistCards, finishFlow, toListing, settleListing, ctaLocator, sectionCounts,
   openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen, openNotifyScreen,
   dumpSignedInDiagnostics, openAgentsScreenFromNav,
 } from "./helpers.mjs";
@@ -56,10 +56,9 @@ test("the app loads and onboarding renders", async ({ page }) => {
   // gotoStep moves onto the incoming pane the instant it's created) is what makes this locator
   // resolve to exactly one element even mid-slide, instead of racing the 460ms slide against the
   // fixed 120ms wait below.
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");   // v2_intro (CAS-1312)
+  await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");   // CAS-1344: one-agent welcome
+  await page.locator("#oafCta").click();
+  await expect(page.locator("#oafInner .osh")).toContainText("Where do you watch movies?");
 });
 
 // CAS-911: onboarding generates its roster from the v2 sequence's own four-agent generator
@@ -1153,11 +1152,9 @@ test("CAS-740 AC4: a signed-in user whose account already holds agents is never 
 
   await expect(page.locator("#splashCta")).toBeVisible();
   await page.locator("#splashCta").click();
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
-  expect(await page.evaluate(() => flowOn)).toBe(true);   // genuinely inside the wizard before the race resolves
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");   // v2_intro (CAS-1312) — proves the wizard actually opened
+  await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");   // CAS-1344: one-agent welcome
+  await page.locator("#oafCta").click();
+  await expect(page.locator("#oafInner .osh")).toContainText("Where do you watch movies?");   // proves the wizard actually opened
 
   // Now let the session restore resolve to an account that already holds an agent.
   await page.evaluate(() => window.__cas740ResolveSession());
@@ -1167,9 +1164,13 @@ test("CAS-740 AC4: a signed-in user whose account already holds agents is never 
   // suite's standard headroom instead.
   await page.waitForFunction(() => window.CascadeAuth.status === "signed-in", null, { timeout: 15_000 });
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+  // CAS-1344: a new account's first run is closed once the account is known; the account's one old agent has
+  // no v2 agent, so it is switched on next — the migration screen, not a second roster built by the wizard.
+  await expect(page.locator("#oafScreen")).toHaveClass(/open/);
+  await expect(page.locator("#oafInner .osh")).toContainText("We've simplified your agents");
   const state = await page.evaluate(() => ({ flowOn, names: cascades.map(c => c.name) }));
-  expect(state.flowOn, "the wizard must be exited once the account is known to already have agents").toBe(false);
-  expect(state.names, "the account's own roster must be shown, not a second one built by the wizard")
+  expect(state.flowOn, "the old wizard must not be running").toBe(false);
+  expect(state.names, "the account's own roster must be kept, not a second one built by the wizard")
     .toEqual(["Existing agent"]);
 });
 
@@ -1322,39 +1323,9 @@ async function cas913GotoConfigured(page){
 async function cas913WalkToShortlist(page){
   await expect(page.locator("#splashCta")).toBeVisible();
   await page.locator("#splashCta").click();
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");            // v2_intro (CAS-1312)
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#obCinemaOpts")).toBeVisible();                      // v2_cinema
-  await page.locator('#obCinemaOpts .obopt[data-val="yes"]').click();
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#obCinemaAgesChips")).toBeVisible();                 // v2_cinema_ages (CAS-1270)
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#obRentOpts")).toBeVisible();                        // v2_rent
-  await page.locator('#obRentOpts .obopt[data-val="yes"]').click();
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  for(const marker of ["v2_massive", "v2_handoff", "v2_styles", "v2_ages", "v2_favs"]){
-    await ctaLocator(page).click();
-    await page.waitForTimeout(120);
-  }
-  await expect(page.locator("#obPartnerOpts")).toBeVisible();                     // v2_partner
-  await page.locator('#obPartnerOpts .obopt[data-val="no"]').click();
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#obKidsOpts")).toBeVisible();                        // v2_kids — v2_date skipped
-  await page.locator('#obKidsOpts .obopt[data-val="no"]').click();
-  await page.evaluate(() => { prefs.touched = true; prefs.on = false; });         // CAS-1167 AC4: must arm anyway
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);                                                 // v2_family skipped
-  await expect(page.locator("#obSvcStores")).toBeVisible();                       // v2_services
-  await expect(page.locator("#obSvcOnly")).toHaveCount(0);                        // CAS-1167: toggle removed
-  for(const boxId of ["obSvcStores", "obSvcSubs"]){
+  await walkToServices(page, "cinema");   // CAS-1344: welcome, where, services of the one-agent flow
+  for(const boxId of ["oafSvcStores", "oafSvcSubs"]){
+    if(await page.locator("#" + boxId).count() === 0) continue;
     const { chipWidth, boxWidth } = await page.evaluate(id => {
       const box = document.getElementById(id);
       const chip = box.querySelector(".chip.svcmore");
@@ -1362,7 +1333,6 @@ async function cas913WalkToShortlist(page){
     }, boxId);
     expect(Math.abs(chipWidth - boxWidth)).toBeLessThanOrEqual(2);
   }
-  expect(await page.evaluate(() => prefs.on)).toBe(true);                         // CAS-1167: armed regardless of touched
 }
 
 test("CAS-913: signing out from the Account screen returns to the splash and survives a reload", async ({ page }) => {

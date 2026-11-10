@@ -3451,9 +3451,6 @@
   .tickcell.on .tickbox{border-color:var(--accent);background:var(--accent)}
   /* .onbdot: still used by the Done screen's per-window alert rows (oafAlertRowsHTML). */
   .onbdot{width:7px;height:7px;border-radius:50%;background:var(--wc);display:inline-block}
-  /* .oaspreview: the Agent screen's "Preview setup ›" link (oasOpenPreview), until CAS-1344 retires it. */
-  .oaspreview{background:none;border:0;color:var(--accent);font-size:12.5px;font-weight:800;cursor:pointer;
-    padding:0;margin-left:6px}
   #oafNameChips{margin-top:12px}
 
   /* ---- CAS-1341: moods as lists — the v2 mood sheet and the card's list sheet. Reuses CAS-1339's .oarowstrip/
@@ -4975,7 +4972,7 @@
      (together) → (children) → (family) → name → done. Own stephdr/sharpstep/stepnav markup — same CSS
      classes the v2_about FLOWS/gotoStep engine's #stepHdr/#onbStep/#stepNav use, but entirely separate
      elements/ids/state, so this flow can never entangle with (or be entangled by) that untouched engine.
-     Body rendered by oafRender(); opened by oafOpen() — see ?oneagent=setup and oasOpenPreview(). -->
+     Body rendered by oafRender(); opened by oafOpen() — see flowStart() and afterSignIn(). -->
 <div class="stephdr" id="oafHdr" hidden>
   <div class="steprow">
     <button class="osback" type="button" id="oafBack" onclick="oafGoBack()" aria-label="Back" hidden>←</button>
@@ -19578,9 +19575,17 @@ function flowStart(startKey){
   // person, and never walks the v2_* sequence at all (it jumps straight to the Briefing) — excluded so its
   // saved answers, which other spokes (My services, Ages) still read, survive.
   if(startKey!=="pickagent") onbAnswersV2Save(onbAnswersV2Default());
-  $("onbStep").classList.add("open"); lockBodyScroll(true);
   logEvent("flow_start");
-  gotoStep(startKey||"v2_about","none");   // CAS-953: the first-run entry is v2_about, ahead of v2_intro
+  // CAS-1344: every first run (splash, empty signed-in account) is the CAS-1347 one-agent flow now; the old
+  // v2_about … v2_done FLOWS sequence is no longer reachable from here. "+ New Cascade" (startKey
+  // "pickagent") is a different path and still opens its own pickagent step below.
+  if(startKey!=="pickagent"){
+    flowOn=false;   // the wizard that flag names is not what is on screen — afterSignIn closes the new one itself
+    oafOpen({mode:"new"});
+    return;
+  }
+  $("onbStep").classList.add("open"); lockBodyScroll(true);
+  gotoStep(startKey,"none");
 }
 function flowStop(){
   flowOn=false; flowNewAgent=false; briefOn=false; menuStepOn=false;
@@ -20226,7 +20231,7 @@ function renderOneAgentScreen(c){
   const title = (c.name||"").trim() || "Your agent";   // CAS-1352: unnamed agents keep the generic title
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
-    <p class="ossub">${n} verdict${n===1?"":"s"} learned<button type="button" class="oaspreview" onclick="oasOpenPreview()">Preview setup ›</button></p>
+    <p class="ossub">${n} verdict${n===1?"":"s"} learned</p>
     <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
 }
@@ -21958,7 +21963,10 @@ const ONE_AGENT_SETUP_STYLES = Object.keys(TASTE_SHORT);   // the exact 19, in T
 
 let oafState = null;   // see oafOpen below for the full shape — null when closed
 let oafStep = "welcome";
-let oasSetupQueryConsumed = false;   // the ?oneagent=setup gate fires at most once per page load (afterSignIn)
+// CAS-1344: "new" = a brand-new account's first run (signed out until membership); "migrate" = a signed-in
+// account with no v2 agent, switched on once at next open (cannot be skipped).
+let oafMode = "new";
+let oafPendingDraft = null;   // a signed-out first run's draft, held until the account exists (membStartWork)
 const ONE_AGENT_FLOW_WHERE = [
   ["cinema", "At the cinema", "Often enough to plan around it"],
   ["rent", "Renting or buying", "Apple, Prime Video, Google and the like"],
@@ -21967,7 +21975,11 @@ const ONE_AGENT_FLOW_WHERE = [
 const ONE_AGENT_FAMILY_DEFAULT = ["Family","Animation","Adventure","Comedy"];
 // Lee, 11 Nov: Date night starts with exactly these on, whatever the person's own genre picks.
 const ONE_AGENT_TOGETHER_DEFAULT = ["Comedy","Documentary","Romance","Mystery","Drama"];
-function oafHasServicesStep(){ return oafState.where.has("rent") || oafState.where.has("stream"); }
+// CAS-1344: a migrating account that already has any service set is not asked again.
+function oafHasServicesStep(){
+  if(oafMode==="migrate" && (prefs.store.size || prefs.sub.size)) return false;
+  return oafState.where.has("rent") || oafState.where.has("stream");
+}
 function oafHasChildrenStep(){ return oafState.age==="18plus"; }
 // Only the windows picked on the where step ever carry an alert — a window not picked is never set on, in
 // the done screen's own alert rows and in oneAgentBuildDraft's styles[s].al, whatever oafState itself holds.
@@ -22103,6 +22115,8 @@ function oneAgentCommit(draft){
 // oafState with the rest of the flow above; today's old first run (v2_about … v2_done) is not touched by
 // this ticket and must never be able to see this flow running. ===========================================
 function oafWelcomeHTML(){
+  if(oafMode==="migrate") return `<h2 class="osh">We've simplified your agents</h2>
+    <p class="obintrotext">Cascade now has one agent that learns your taste, and moods for the lists you like to browse. A few quick questions and you're set.</p>`;
   return `<h2 class="osh">Let's get you set up.</h2>
     <p class="obintrotext">Your Cascade agent hunts thousands of new and catalogue movies for you.</p>
     <p class="obintrotext">A few quick questions and it goes to work.</p>`;
@@ -22316,7 +22330,7 @@ function oafPaint(){
     family:oafFamilyHTML, nameAgent:oafNameAgentHTML, done:oafDoneHTML};
   const inner=$("oafInner"); if(!inner) return;
   inner.innerHTML = fns[oafStep]();
-  $("oafBack").hidden = oafStep==="welcome";
+  $("oafBack").hidden = oafStep==="welcome" && oafMode==="migrate";   // CAS-1344: a migration cannot be skipped
   $("oafFill").style.width = oafProgressPct(oafStep)+"%";
   const cta=$("oafCta");
   cta.textContent = oafStep==="done" ? "Start watching" : "Continue";
@@ -22368,7 +22382,21 @@ window.oafGoContinue=()=>{
   if(oafStep==="family") return oafShow("nameAgent");
   if(oafStep==="nameAgent") return oafShow("done");
 };
+// Closes the overlay chrome without touching oafState/draft (shared by Start watching, Back-to-splash and the
+// hand-off to membership).
+function oafHide(){
+  $("oafScreen").classList.remove("open");
+  $("oafHdr").hidden=true; $("oafNav").hidden=true;   // Lee, 1 Nov: these stayed over Watch after Start watching
+  lockBodyScroll(false);
+}
+const oafIsOpen = () => !!$("oafScreen") && $("oafScreen").classList.contains("open");
 window.oafGoBack=()=>{
+  if(oafStep==="welcome"){
+    // Off the front of a new account's first run: out to the splash, the draft abandoned (CAS-1099 rule).
+    if(oafMode==="migrate") return;
+    oafHide(); oafState=null; onbDraftModeOn=false;
+    return showSplash();
+  }
   if(oafStep==="where") return oafShow("welcome");
   if(oafStep==="services") return oafShow("where");
   if(oafStep==="favourites") return oafShow(oafHasServicesStep() ? "services" : "where");
@@ -22385,25 +22413,18 @@ window.oafGoBack=()=>{
   }
   if(oafStep==="done") return oafShow("nameAgent");
 };
-// Entry point — a signed-in account's ?oneagent=setup, or the Agent screen's "Preview setup ›" link
-// (pre-filled from the current agent — see oasOpenPreview below). A prefilled re-run can only recover the
-// genre fav/incl split (c.styles[s].fav, written by oneAgentBuildDraft above); age/partner/children were
-// never saved on the agent itself, so a re-run always asks them fresh.
+// Entry point — flowStart() opens it for a brand-new account ({mode:"new"}); afterSignIn() opens it for a
+// signed-in account with no v2 agent ({mode:"migrate"}). CAS-1344 retired the ?oneagent=setup entry and the
+// Agent screen's "Preview setup ›" link that used to be the only ways in.
 window.oafOpen=(opts)=>{
   opts=opts||{};
-  const prefillAgent = opts.prefillAgent || null;
+  oafMode = opts.mode==="migrate" ? "migrate" : "new";
+  oafPendingDraft=null;
   oafState = {
     where: new Set(), favs: {}, age: null, partner: null, children: null,
     together: new Set(), togetherInit: false, family: new Set(), familyInit: false,
-    name: (prefillAgent && prefillAgent.name) || "",
-    prefillAgent,
+    name: "",
   };
-  if(prefillAgent){
-    ONE_AGENT_SETUP_STYLES.forEach(s=>{
-      const st=(prefillAgent.styles||{})[s];
-      if(st && st.bar!=null) oafState.favs[s] = st.fav ? "fav" : "incl";
-    });
-  }
   oafStep="welcome";
   $("oafHdr").hidden=false; $("oafNav").hidden=false;
   $("oafScreen").scrollTop=0;
@@ -22411,29 +22432,42 @@ window.oafOpen=(opts)=>{
   lockBodyScroll(true);
   oafPaint();
 };
-// The Agent screen's own "Preview setup ›" link (until CAS-1344) — re-runs the whole flow, with favourites
-// pre-filled from the account's current v2 agent.
-window.oasOpenPreview=()=>{
-  const c=oneAgentCriteria(); if(!c) return;
-  oafOpen({prefillAgent:c});
-};
-// The done screen's "Start watching" — builds the draft, commits it (oneAgentCommit), then closes everything
-// and lands on Watch, same tail as the wizard always had.
+// The done screen's "Start watching". A migrating account commits straight away (oneAgentCommit) and lands on
+// Watch. A new account commits the draft in memory (nothing reaches the server while onbDraftModeOn), then
+// hands over to the existing membership step; membStartWork writes the moods once the account exists.
 window.oafStartWatching=()=>{
   if(!oafState) return;
   const draft = oneAgentBuildDraft();
   oneAgentCommit(draft);
-  $("oafScreen").classList.remove("open");
-  $("oafHdr").hidden=true; $("oafNav").hidden=true;   // Lee, 1 Nov: these stayed over Watch after Start watching
-  lockBodyScroll(false);
+  if(oafMode==="new"){
+    try{ localStorage.setItem("cascade_onboarded","1"); }catch(e){}
+    oafPendingDraft = draft;
+    oafHide();   // oafState stays: membership's Back reopens the flow on its done screen
+    onbFlow.workingAgents = cascades.slice(); onbFlow.reportStats = null;
+    logEvent("agent_created",{count:cascades.length, sharpened:true});
+    openOnbMembership();
+    return;
+  }
+  oafHide();
   oafState=null;
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
   if(typeof render==="function") render();
+  applyDeepLink();
+  applyPendingPushAlert();
   // CAS-1349: the v2 guided tour's one automatic trigger point for a brand-new v2 account — straight after
   // this screen's own render() has painted Watch, same "first listing paint" rule CAS-976 used for the
   // non-v2 tour from membStartWork.
   maybeStartTutorial();
 };
+// Membership's Back: undo the in-memory commit and reopen the flow on its done screen, answers intact.
+function oafReopenFromMembership(){
+  closeMembership();
+  cascades.length=0; oafPendingDraft=null; onbFlow.workingAgents=null;
+  $("oafHdr").hidden=false; $("oafNav").hidden=false;
+  $("oafScreen").classList.add("open");
+  lockBodyScroll(true);
+  oafShow("done");
+}
 
 // ================= CAS-636: Moving — the alert feed made visible =================
 // CAS-848: the screen's own subtitle, shared by the loading state and the real one so they never say two
@@ -23961,6 +23995,7 @@ function openOnbMembership(){
 // like any other flowBack() hop; notifyPrefs (and so the email field) is untouched by any of this, so
 // it comes back populated (AC7).
 window.onbMembBack=()=>{
+  if(oafState) return oafReopenFromMembership();   // CAS-1344
   closeMembership();
   flowOn=true;
   gotoStep("v2_done","back");
@@ -24172,6 +24207,7 @@ function discardOnbDraft(){
   notifyPrefs=notifyPrefsDefault();
   watchPrefs=watchPrefsDefaults();   // CAS-1157: the draft's cinema/rent-derived windows go with it
   onbFlow.workingAgents=null;
+  oafPendingDraft=null; oafState=null;   // CAS-1344
 }
 // The membership screen's own "Sign in" button, shown only alongside membAcctExistsShow's message —
 // abandons the draft exactly as any other "back to splash" exit would (CAS-1099 change 4: the draft was
@@ -24634,6 +24670,16 @@ async function membStartWork(viaNewSignup){
     // verified), same "allow retry" rule the ticket's own change 3 describes.
     const outcome = await membCompleteNewMembership();
     if(outcome==="error") return;
+    // CAS-1344: the account exists now — write the one-agent draft's moods (the agent itself went up with
+    // complete_membership). An account that already existed is never merged with a draft.
+    if(oafPendingDraft && outcome==="created"){
+      const d=oafPendingDraft;
+      watchMoods = d.moods.map(m=>({...m}));
+      pushViewField("moods", watchMoods.map(m=>({...m})));
+      watchMoodSel = "releases";
+      pushViewField("mood", watchMoodSel);
+    }
+    oafPendingDraft=null; oafState=null;
   } else if(!cascades.length){
     const s=STARTERS.find(x=>x.key==="streaming");   // CAS-143: the R5 presets replaced watch_tonight
     if(s){ draft=normCascade(draftFromTemplate({key:s.key, icon:s.icon, name:s.name, crit:s.crit})); commitDraft(); }
@@ -25892,16 +25938,11 @@ function afterSignIn(){
   // the same flowStop() either way, just no longer conditioned on which of the two happened to be showing.
   if(splashUp || flowOn) flowStop();
   lockBodyScroll(false);
-  // CAS-1342/CAS-1347: a signed-in account opening ?oneagent=setup gets the six-screen first run on top of
-  // its normal landing — gated until CAS-1344 replaces first-run onboarding outright. Guarded so a second
-  // afterSignIn() this session (e.g. a token refresh re-firing the account fan-out) never reopens it under
-  // the person's hands.
-  if(URLQ.get("oneagent")==="setup" && !oasSetupQueryConsumed){
-    oasSetupQueryConsumed=true;
-    if(cascades.length){ activeId=null; openCascade(cascades[0].id, false); }
-    else { showFoundList(); render(); }
-    oafOpen();
-    return;
+  // CAS-1344: a signed-in arrival closes a new account's first run still open underneath (the account is the
+  // authority — see above), and never reopens a migration already on screen (a token refresh re-firing this).
+  if(oafIsOpen()){
+    if(oafMode==="migrate") return;
+    oafHide(); oafState=null; oafPendingDraft=null; onbDraftModeOn=false;
   }
   if(cascades.length){
     // CAS-420/CAS-409/CAS-566: arrival at an account with agents already made is arrival at the FIRST one.
@@ -25918,6 +25959,9 @@ function afterSignIn(){
     activeId=null;
     openCascade(cascades[0].id, false);
     logEvent("signin_returning",{cascades:cascades.length});
+    // CAS-1344: an account with no v2 agent is switched on once, and cannot skip it. The deep link and any held
+    // push tap wait for oafStartWatching, which applies them.
+    if(!oneAgentCriteria()){ oafOpen({mode:"migrate"}); return; }
     applyDeepLink();   // CAS-962: arrival, same as the boot path's "onboarding already seen" branch
     applyPendingPushAlert();   // CAS-1206: same arrival moment, for a held push tap
     return;
