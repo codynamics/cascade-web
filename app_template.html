@@ -19579,7 +19579,7 @@ function flowStart(startKey){
   // CAS-1344: every first run (splash, empty signed-in account) is the CAS-1347 one-agent flow now; the old
   // v2_about … v2_done FLOWS sequence is no longer reachable from here. "+ New Cascade" (startKey
   // "pickagent") is a different path and still opens its own pickagent step below.
-  if(startKey!=="pickagent"){
+  if(!startKey){
     flowOn=false;   // the wizard that flag names is not what is on screen — afterSignIn closes the new one itself
     oafOpen({mode:"new"});
     return;

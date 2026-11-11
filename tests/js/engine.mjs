@@ -914,8 +914,8 @@ export function loadEngine({ htmlPath = path.join(ROOT, "index.html"), localStor
 /** A fresh flow, seeded exactly the way a person walking the app seeds it. */
 export function pickInLane(E, kind, presetKey){
   // CAS-1344: flowStart() with no key opens the one-agent first run now, which never seeds the old flow's state;
-  // "pickagent" (the + New Cascade entry) still does, and that is all this helper needs.
-  E.flowStart("pickagent");
+  // an explicit key ("v2_about" here, as the old first run opened on) still does, and that is all this helper needs.
+  E.flowStart("v2_about");
   E.setFlowKind(kind);
   E.pickStarter(presetKey);
   return E;
