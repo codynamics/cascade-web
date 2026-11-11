@@ -15175,7 +15175,7 @@ window.closeAbout=()=>{ $("aboutScreen").classList.remove("open"); lockBodyScrol
 const PRIVACY_LEDE = "How Cascade, made by CoDynamics Pty Ltd, handles your information. Last updated 25 September 2026.";
 const PRIVACY_SECTIONS = [
   {heading:"Who we are",
-   paras:["Cascade (cascademovies.com and the Cascade iPhone app) is operated by CoDynamics Pty Ltd, ABN 28 135 826 809, Gordon NSW 2072, Australia. Questions about privacy go to lee@codynamics.com.au."]},
+   paras:["Cascade (cascademovies.com and the Cascade iPhone app) is operated by CoDynamics Pty Ltd, ABN 28 135 826 809, Australia. Questions about privacy go to hello@codynamics.com.au."]},
   {heading:"What we collect",
    paras:[
     "Your account. Cascade needs an account. We collect your email address to create it and to send you a one-time sign-in code. We record app activity (for example, which screens are opened and which features are used) so we can see what works and fix what doesn't, and we strip anything that looks like an email address out of it before it is stored. We store your agents, the films you pin, rate or mark, your streaming services and viewing preferences, and your notification settings, so they follow you between devices.",
@@ -15188,7 +15188,7 @@ const PRIVACY_SECTIONS = [
   {heading:"Who helps us run it",
    paras:["We use a small number of service providers, who process information only to provide their service to us: Supabase (accounts and database), Resend and Amazon SES (sending email), Apple (push notifications on iPhone), Cloudflare and GitHub (hosting and scheduled jobs). Their servers may be outside Australia. Film information comes from The Movie Database (TMDB), Watchmode and other film data sources; we do not send them your personal information."]},
   {heading:"Your choices",
-   paras:["You can turn alerts off at any time in the app. You can delete your account in the app (Menu → Account → Delete account); this deletes your account and the information stored with it. You can also ask us for a copy of your information, to correct it, or to delete it, by emailing lee@codynamics.com.au."]},
+   paras:["You can turn alerts off at any time in the app. You can delete your account in the app (Menu → Account → Delete account); this deletes your account and the information stored with it. You can also ask us for a copy of your information, to correct it, or to delete it, by emailing hello@codynamics.com.au."]},
   {heading:"Children",
    paras:["Cascade is not directed at children under 13, and we do not knowingly collect their personal information."]},
   {heading:"Changes",
@@ -15199,8 +15199,8 @@ const PRIVACY_BOLD_LEADS = ["Your account.", "Alerts.", "Friends and invites.", 
 function privacyParaHTML(text){
   const lead = PRIVACY_BOLD_LEADS.find(l=>text.startsWith(l));
   const rest = lead ? text.slice(lead.length) : text;
-  const linked = esc(rest).replace(/lee@codynamics\.com\.au/g,
-    `<a href="mailto:lee@codynamics.com.au" style="color:var(--accenttext)">lee@codynamics.com.au</a>`);
+  const linked = esc(rest).replace(/hello@codynamics\.com\.au/g,
+    `<a href="mailto:hello@codynamics.com.au" style="color:var(--accenttext)">hello@codynamics.com.au</a>`);
   return `<p class="ossub" style="margin-bottom:12px">${lead?`<b style="color:var(--ink)">${esc(lead)}</b>`:""}${linked}</p>`;
 }
 function renderPrivacy(){
