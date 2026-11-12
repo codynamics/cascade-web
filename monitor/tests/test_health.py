@@ -165,6 +165,68 @@ class WatchmodeFetch(unittest.TestCase):
         self.assertIsNone(c["ok"])
 
 
+class Cas1424FreePlanSizing(unittest.TestCase):
+    """CAS-1424: watchmode_fetch / watchmode_freshness sized by the live quota and cycle shape in
+    state/api_budget.json (wm_cycle), never a plan name."""
+
+    TODAY = datetime.date(2026, 11, 2)   # reset 2026-11-12 -> 10 days; 2026-11-08 -> 4 days
+
+    @staticmethod
+    def _cycle(quota, cycle_end="2026-11-12"):
+        return {"cycle_end": cycle_end, "quota": quota, "quota_live": True}
+
+    def _fetch(self, remaining, today, quota=2500, cycle_end="2026-11-12"):
+        return health.check_watchmode_fetch(
+            {"calls": 40, "errors": 0, "quota": quota, "remaining_monthly_credits": remaining},
+            run_max_credits_raw="500", wm_cycle=self._cycle(quota, cycle_end), today=today)
+
+    def test_low_credits_early_in_cycle_fail(self):
+        self.assertFalse(self._fetch(329, self.TODAY)["ok"])
+
+    def test_low_credits_in_the_last_7_days_pass_with_detail(self):
+        c = self._fetch(329, datetime.date(2026, 11, 8))
+        self.assertTrue(c["ok"])
+        self.assertIn("resets in 4 day", c["detail"])
+
+    def test_zero_credits_early_fail(self):
+        self.assertFalse(self._fetch(0, datetime.date(2026, 11, 8))["ok"])
+
+    def test_zero_credits_in_the_last_2_days_pass(self):
+        self.assertTrue(self._fetch(0, datetime.date(2026, 11, 11))["ok"])
+
+    @staticmethod
+    def _freshness_catalogue(today, weekly_stale=False, year_stale=False):
+        movies = [{"tmdb_id": i, "status": [], "wm_fields_fetched_at": today.isoformat(),
+                   "cinema_date": (today - datetime.timedelta(days=200)).isoformat()}
+                  for i in range(100)]
+        movies += [{"tmdb_id": 500 + i, "status": ["in_cinema"],
+                    "cinema_date": (today - datetime.timedelta(days=5)).isoformat(),
+                    "wm_fields_fetched_at": today.isoformat()} for i in range(100)]
+        if year_stale:
+            for m in movies[:50]:
+                m["wm_fields_fetched_at"] = (today - datetime.timedelta(days=60)).isoformat()
+        if weekly_stale:
+            for m in movies[100:150]:
+                m["wm_fields_fetched_at"] = (today - datetime.timedelta(days=20)).isoformat()
+        return movies
+
+    def test_year_cohort_stale_on_2500_quota_passes_with_detail(self):
+        movies = self._freshness_catalogue(self.TODAY, year_stale=True)
+        c = health.check_watchmode_freshness(movies, self.TODAY, self._cycle(2500))
+        self.assertTrue(c["ok"])
+        self.assertIn("report-only", c["detail"])
+
+    def test_year_cohort_stale_on_40000_quota_fails(self):
+        movies = self._freshness_catalogue(self.TODAY, year_stale=True)
+        self.assertFalse(health.check_watchmode_freshness(movies, self.TODAY, self._cycle(40000))["ok"])
+
+    def test_weekly_cohort_stale_fails_on_any_quota(self):
+        movies = self._freshness_catalogue(self.TODAY, weekly_stale=True)
+        for quota in (2500, 40000):
+            self.assertFalse(
+                health.check_watchmode_freshness(movies, self.TODAY, self._cycle(quota))["ok"])
+
+
 class WatchmodeFetchUnsetVsExplicitZero(unittest.TestCase):
     """CAS-1003 AC1-AC4: distinguish "the WM_RUN_MAX_CREDITS repo variable was never set" (None,
     or "" — the literal string GitHub Actions leaves an unset `vars.X` reference as) from

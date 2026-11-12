@@ -84,6 +84,12 @@ TMDB_NOT_FOUND_MAX_PCT = 0.02
 # CAS-988: the floor is 15% of the REAL quota (state/api_budget.json, CAS-987's cycle shape),
 # never a hard-coded plan size — the account has moved plans before (see CAS-987) and will again.
 WATCHMODE_FLOOR_PCT = 0.15
+# CAS-1424: low credits only fail with more than this many days to the quota reset; zero credits
+# still fail with more than the second figure.
+WATCHMODE_LOW_CREDITS_GRACE_DAYS = 7
+WATCHMODE_ZERO_CREDITS_FAIL_DAYS = 2
+# CAS-1424: at or below this live quota (the free plan) the within-a-year cohort is report-only.
+WM_FRESHNESS_YEAR_REPORT_ONLY_QUOTA = 2500
 WATCHMODE_PACE_LOOKBACK_DAYS = 7
 WATCHMODE_PACE_MIN_DAYS = 3
 # CAS-985: shared precondition for all three usage_events checks below — fewer app_open rows than this
@@ -235,8 +241,20 @@ def check_oscarbase_fetch(stats: dict | None) -> dict:
     return _check_fetch("oscarbase_fetch", stats)
 
 
+def _wm_days_to_reset(wm_cycle: dict | None, today: _dt.date | None) -> int | None:
+    """CAS-1424: whole days from `today` to state/api_budget.json's cycle_end, or None when the
+    cycle shape or today's date is unavailable (callers then keep the strict, un-relaxed rule)."""
+    if not wm_cycle or today is None or not wm_cycle.get("cycle_end"):
+        return None
+    try:
+        return max(0, (_dt.date.fromisoformat(wm_cycle["cycle_end"]) - today).days)
+    except ValueError:
+        return None
+
+
 def check_watchmode_fetch(stats: dict | None, run_max_credits_raw: str | None = None,
-                          unfilled_count: int = 0) -> dict:
+                          unfilled_count: int = 0, wm_cycle: dict | None = None,
+                          today: _dt.date | None = None) -> dict:
     """CAS-988: the floor is 15% of the quota. CAS-1138: that quota is read from `stats['quota']`
     — this run's own live Watchmode /status figure (poc_pipeline.wm_run_allowance via
     state/run_stats.json), never a passed-in cycle number or a hard-coded plan size, so a plan
@@ -276,10 +294,19 @@ def check_watchmode_fetch(stats: dict | None, run_max_credits_raw: str | None = 
         return _check("watchmode_fetch", None, base["value"], None,
                       "calls/errors OK but the live Watchmode quota is unavailable this run.")
     floor = round(quota * WATCHMODE_FLOOR_PCT)
+    # CAS-1424: the pipeline is designed to spend most of each cycle's pot, so a low balance is
+    # the expected steady state close to the reset. Only fail with more than
+    # WATCHMODE_LOW_CREDITS_GRACE_DAYS to go (or none left with more than WATCHMODE_ZERO_..._DAYS).
+    days_to_reset = _wm_days_to_reset(wm_cycle, today)
     if remaining < floor:
-        return _check("watchmode_fetch", False, remaining, floor,
-                      f"only {remaining} of {quota} Watchmode credit(s) remaining this month "
-                      f"(floor {floor}, 15% of quota).")
+        low = (f"only {remaining} of {quota} Watchmode credit(s) remaining this month "
+               f"(floor {floor}, 15% of quota)")
+        if days_to_reset is not None and days_to_reset <= WATCHMODE_LOW_CREDITS_GRACE_DAYS \
+                and not (remaining <= 0 and days_to_reset > WATCHMODE_ZERO_CREDITS_FAIL_DAYS):
+            return _check("watchmode_fetch", True, remaining, floor,
+                          f"{low}, but the quota resets in {days_to_reset} day(s) — low credits "
+                          f"this close to the reset are expected, not a fault.")
+        return _check("watchmode_fetch", False, remaining, floor, f"{low}.")
     return _check("watchmode_fetch", True, base["value"], floor,
                   f"{base['value']} call(s), 0 errors, {remaining} of {quota} credit(s) "
                   f"remaining this month (floor {floor}).")
@@ -717,7 +744,7 @@ def _wm_fields_age_days(movie: dict, today: _dt.date) -> int | None:
         return None
 
 
-def check_watchmode_freshness(movies: list, today: _dt.date) -> dict:
+def check_watchmode_freshness(movies: list, today: _dt.date, wm_cycle: dict | None = None) -> dict:
     """CAS-1139: the nightly fields pass and the scoreability probe now spend the free plan's
     small Watchmode pot on the titles whose ratings still move — this is the check that would
     catch that ordering silently failing (e.g. the repair/never-fetched tiers starving tier 2/3
@@ -750,7 +777,14 @@ def check_watchmode_freshness(movies: list, today: _dt.date) -> dict:
              f"{WM_FRESHNESS_WEEKLY_MAX_AGE_DAYS}d, {year_pct:.1%} of film(s) released within "
              f"{pp.WM_RECENT_YEAR_DAYS}d stale past {WM_FRESHNESS_YEAR_MAX_AGE_DAYS}d, oldest "
              f"stamp in the catalogue is {oldest if oldest is not None else 'unknown'} day(s) old.")
-    ok = weekly_pct <= WM_FRESHNESS_MAX_PCT and year_pct <= WM_FRESHNESS_MAX_PCT
+    # CAS-1424: on the free plan the within-a-year cohort can't be refreshed every 45 days, so it is
+    # report-only while the live quota is small; read from state/api_budget.json, never a plan name.
+    quota = wm_cycle.get("quota") if wm_cycle and wm_cycle.get("quota_live") else None
+    year_report_only = quota is not None and quota <= WM_FRESHNESS_YEAR_REPORT_ONLY_QUOTA
+    if year_report_only:
+        detail += (f" Within-a-year cohort is report-only on the live quota of {quota} "
+                   f"credit(s) (limit applies above {WM_FRESHNESS_YEAR_REPORT_ONLY_QUOTA}).")
+    ok = weekly_pct <= WM_FRESHNESS_MAX_PCT and (year_report_only or year_pct <= WM_FRESHNESS_MAX_PCT)
     return _check("watchmode_freshness", ok, round(max(weekly_pct, year_pct) * 100, 1),
                  round(WM_FRESHNESS_MAX_PCT * 100, 1), detail)
 
@@ -806,7 +840,8 @@ def run_checks(*, today_movies=None, prev_movies=None, stats=None, usage_probe=N
         "watchmode_fetch": lambda: check_watchmode_fetch(
             stats.get("watchmode"),
             run_max_credits_raw=os.environ.get("WM_RUN_MAX_CREDITS"),
-            unfilled_count=sum(1 for m in today_movies if not m.get("wm_fields_fetched_at"))),
+            unfilled_count=sum(1 for m in today_movies if not m.get("wm_fields_fetched_at")),
+            wm_cycle=wm_cycle, today=today),
         "watchmode_pace": lambda: check_watchmode_pace(wm_cycle, today),
         "oscarbase_fetch": lambda: check_oscarbase_fetch(stats.get("oscarbase")),
         "score_coverage": lambda: check_score_coverage(today_movies, prev_movies),
@@ -822,7 +857,7 @@ def run_checks(*, today_movies=None, prev_movies=None, stats=None, usage_probe=N
             (today_movies or []) + (candidates or []), tv_tmdb_ids, remap_backlog_prev),
         "released_scored_without_rating": lambda: check_released_scored_without_rating(candidates or []),
         "landmark_films": lambda: check_landmark_films(today_movies or []),
-        "watchmode_freshness": lambda: check_watchmode_freshness(today_movies or [], today),
+        "watchmode_freshness": lambda: check_watchmode_freshness(today_movies or [], today, wm_cycle),
     }
     return [thunks[n]() for n in CHECK_NAMES if n in names]
 
