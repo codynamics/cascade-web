@@ -60,11 +60,11 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
   // Pre-ticked with the favourites step's own picks (Action/Drama).
   // Lee, 11 Nov: Date night pre-ticks a fixed five (ONE_AGENT_TOGETHER_DEFAULT), not the person's own picks.
   for(const s of ["Comedy","Documentary","Romance","Mystery","Drama"])
-    await expect(page.locator(`.tickcell[data-style="${s}"]`)).toHaveClass(/on/);
-  await expect(page.locator('.tickcell[data-style="Action"]')).not.toHaveClass(/on/);
+    await expect(page.locator(`.favcell[data-style="${s}"]`)).toHaveClass(/ on incl/);   // Lee, 13 Nov: middle setting
+  await expect(page.locator('.favcell[data-style="Action"]')).not.toHaveClass(/on/);
   await page.locator("#oafCta").click();   // together -> children (18 or over)
 
-  await expect(page.locator("#oafInner .osh")).toHaveText("Do you watch with children?");
+  await expect(page.locator("#oafInner .osh")).toHaveText("Do you watch with a young family?");
   await expectHeadingBelowHeader(page);
   await page.locator('#oafChildrenOpts .obopt[data-val="yes"]').click();
   await page.locator("#oafCta").click();   // children (yes) -> family
@@ -72,24 +72,24 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
   await expect(page.locator("#oafInner .osh")).toHaveText("What do you watch as a family?");
   await expectHeadingBelowHeader(page);
   // Pre-ticked with the usual family genres (ticket's own default list).
-  await expect(page.locator('.tickcell[data-style="Family"]')).toHaveClass(/on/);
-  await expect(page.locator('.tickcell[data-style="Animation"]')).toHaveClass(/on/);
+  await expect(page.locator('.favcell[data-style="Family"]')).toHaveClass(/on/);
+  await expect(page.locator('.favcell[data-style="Animation"]')).toHaveClass(/on/);
   await page.locator("#oafCta").click();   // family -> name your agent
 
   await expect(page.locator("#oafInner .osh")).toHaveText("Name your agent");
   await expectHeadingBelowHeader(page);
   await expect(page.locator("#oafCta")).toBeDisabled();
-  await page.locator('#oafNameChips .chip[data-name="Ruby"]').click();
-  await expect(page.locator("#oafNameInput")).toHaveValue("Ruby");
+  await page.locator('#oafNameChips .chip[data-name="Nova"]').click();
+  await expect(page.locator("#oafNameInput")).toHaveValue("Nova");
   await expect(page.locator("#oafCta")).toBeEnabled();
   await page.locator("#oafCta").click();   // name your agent -> done
 
-  await expect(page.locator("#oafInner .osh")).toHaveText("Your agent is set up.");
+  await expect(page.locator("#oafInner .osh")).toHaveText("Your Cascade account is set up.");
   await expectHeadingBelowHeader(page);
-  await expect(page.locator("#oafInner .ossub").first()).toHaveText("Name: Ruby");
+  await expect(page.locator("#oafInner .obintrotext").first()).toContainText("Your agent Nova is now watching");
   // CAS-1368: the moods table — Releases, Best of the best, Me, Date night, Family, Starred (partner+kids both yes).
   const moodChips = page.locator("#oafInner .svcsec", { hasText: "Your moods" }).locator(".chip");
-  await expect(moodChips).toHaveText(["All Latest", "Best of the best", "Me", "Date night", "Family", "Starred"]);
+  await expect(moodChips).toHaveText(["All Latest", "Best of the best", "Me", "Partner", "Family", "Starred"]);
   await expect(page.locator("#oafCta")).toHaveText("Start watching");
   await page.locator("#oafCta").click();
 
