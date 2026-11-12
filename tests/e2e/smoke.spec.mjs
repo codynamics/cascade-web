@@ -1573,7 +1573,10 @@ test("CAS-1169 AC5: an invalid email's error clears on correction without pressi
 // come back by flipping it. Checks both screens the production QA run found still carrying it: Account
 // (the Plan row and the "Manage or cancel" row) and the keepfinding onboarding step (?step=keepfinding
 // preview, CAS-226's own $4.99/cancel-any-time copy).
-const CAS1076_BANNED_PHRASES = ["$4.99", "free month", "manage or cancel", "cancel any time"];
+// CAS-971 superseded the free-launch premise: membership is real again (MEMBERSHIP_ENABLED on, A$3.99 from
+// StoreKit), so the Account Plan/Manage rows and "cancel any time" copy are now intended. Only the old
+// hard-coded $4.99 price must never reappear.
+const CAS1076_BANNED_PHRASES = ["$4.99"];
 function expectNoCas1076MembershipCopy(text){
   const lower = (text || "").toLowerCase();
   for(const phrase of CAS1076_BANNED_PHRASES) expect(lower, text).not.toContain(phrase);
