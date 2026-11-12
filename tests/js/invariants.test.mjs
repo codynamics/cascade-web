@@ -2203,6 +2203,10 @@ function fakeCas726Supabase(seed){
   }
   const client = {
     from(table){
+      // Sign-in now reads more tables than this fake seeds (CAS-1344 one-agent, CAS-971 membership). On a slow
+      // runner those reads land after the test ended, and rows.map(undefined) threw an unhandledRejection that
+      // failed the whole file. Any table the fake was not seeded with reads as empty.
+      if(!state[table]) state[table] = [];
       return {
         select(){ return selectBuilder(state[table]); },
         upsert(rows){
@@ -2210,7 +2214,8 @@ function fakeCas726Supabase(seed){
           // array — alongside agent_films' own array-based chunked upsert, which still calls this the old way.
           const list = Array.isArray(rows) ? rows : [rows];
           list.forEach(row => {
-            const i = state[table].findIndex(x => keyOf[table](x) === keyOf[table](row));
+            const k = keyOf[table] || (r => r.id ?? r.user_id);
+            const i = state[table].findIndex(x => k(x) === k(row));
             if(i >= 0) state[table][i] = { ...state[table][i], ...row }; else state[table].push({ ...row });
           });
           return Promise.resolve({ error: null });
@@ -2823,6 +2828,10 @@ function fakeCas739Supabase(seed){
   }
   const client = {
     from(table){
+      // Sign-in now reads more tables than this fake seeds (CAS-1344 one-agent, CAS-971 membership). On a slow
+      // runner those reads land after the test ended, and rows.map(undefined) threw an unhandledRejection that
+      // failed the whole file. Any table the fake was not seeded with reads as empty.
+      if(!state[table]) state[table] = [];
       return {
         select(){ return selectBuilder(state[table]); },
         upsert(rows){
@@ -2830,7 +2839,8 @@ function fakeCas739Supabase(seed){
           // array.
           const list = Array.isArray(rows) ? rows : [rows];
           list.forEach(row => {
-            const i = state[table].findIndex(x => keyOf[table](x) === keyOf[table](row));
+            const k = keyOf[table] || (r => r.id ?? r.user_id);
+            const i = state[table].findIndex(x => k(x) === k(row));
             if(i >= 0) state[table][i] = { ...state[table][i], ...row }; else state[table].push({ ...row });
           });
           return Promise.resolve({ error: null });
