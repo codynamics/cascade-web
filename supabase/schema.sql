@@ -1574,7 +1574,7 @@ as $$
 $$;
 
 revoke all on function public.admin_member_emails_list() from public, anon;
-grant execute on function public.admin_member_emails_list() to authenticated;
+grant execute on function public.admin_member_emails_list() to authenticated, service_role;
 
 create or replace view public.admin_member_emails
 with (security_invoker = true) as
@@ -1597,7 +1597,7 @@ revoke all on public.admin_cascades         from anon, public;
 grant select on public.admin_members          to authenticated;
 grant select on public.admin_member_activity  to authenticated;
 grant select on public.admin_member_onboarding to authenticated;
-grant select on public.admin_member_emails    to authenticated;
+grant select on public.admin_member_emails    to authenticated, service_role;
 grant select on public.admin_cascades         to authenticated;
 
 -- CAS-1227: these views only ever needed SELECT — drop the INSERT/UPDATE/DELETE/TRUNCATE/
