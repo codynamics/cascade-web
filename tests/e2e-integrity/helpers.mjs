@@ -48,7 +48,16 @@ export async function createTestUser(email){
 /** CAS-1423: since the CAS-1344 one-agent cutover, signing in to an account with no v2 agent opens the
  * un-skippable migration wizard. The first seeded row therefore carries a minimal v2 agent's criteria (the
  * same shape oneAgentCommit builds), so sign-in lands on the listing; later rows keep their {} criteria. */
-const V2_AGENT_CRITERIA = () => ({ v: 2, styles: [], combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
+/** CAS-1425: a v2 agent with no styles admits nothing, so the default seed is genuinely wide open — every style
+ * in the app's TASTE_SHORT (ONE_AGENT_SETUP_STYLES), bar 0, all three alert windows on. */
+const V2_STYLES = ["Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Family",
+  "Fantasy", "History", "Horror", "Music", "Mystery", "Romance", "Science Fiction", "Thriller", "War", "Western",
+  "TV Movie"];
+const V2_AGENT_CRITERIA = () => ({
+  v: 2,
+  styles: Object.fromEntries(V2_STYLES.map(s => [s, { bar: 0, al: { cinema: true, rent: true, stream: true } }])),
+  combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [],
+});
 
 /** Seed cascades rows straight into the account, bypassing onboarding entirely — S1 (onboarding
  * committing its own roster through complete_membership) is out of scope until CAS-1098/CAS-1099 land. */
@@ -68,6 +77,13 @@ export async function liveCascades(userId){
     .is("deleted_at", null);
   if(error) throw new Error(`liveCascades failed: ${error.message}`);
   return data;
+}
+
+/** CAS-1425: one cascades row's criteria jsonb as the server holds it (null if the row is missing). */
+export async function liveCascadeCriteria(id){
+  const { data, error } = await admin.from("cascades").select("criteria").eq("id", id).maybeSingle();
+  if(error) throw new Error(`liveCascadeCriteria failed: ${error.message}`);
+  return data ? data.criteria : null;
 }
 
 /** The notify_prefs row currently on the server for this account, or null if none exists yet. */

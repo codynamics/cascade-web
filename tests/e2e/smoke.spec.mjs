@@ -186,6 +186,19 @@ test.fixme("opening Notify, Tags or Watched leaves the card rendered and scroll 
   }
 });
 
+// CAS-1425: the one v2 agent made wide open — every style in TASTE_SHORT, bar 0, all three windows on — so
+// a test that needs a long listing gets one now that the CAS-1344 cutover removed the multi-agent presets.
+async function makeAgentWideOpen(page){
+  await page.evaluate(() => {
+    const styles = {};
+    Object.keys(TASTE_SHORT).forEach(g => { styles[g] = { bar: 0, al: { cinema: true, rent: true, stream: true } }; });
+    cascades[0].styles = styles;
+    saveCascades();
+    invalidateComputeCaches();
+    render();
+  });
+}
+
 // CAS-1036: scrolling a long Watch list down was smooth, but scrolling back up became jumpy at an
 // unpredictable point. content-visibility:auto's contain-intrinsic-size is only ever a GUESS for an
 // off-screen row until it's actually laid out for real (CAS-129/CAS-897) — if the guess is wrong, the
@@ -219,22 +232,11 @@ test("Watch listing scroll position survives a long scroll to the bottom and bac
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
-  // A freshly onboarded roster only matches a handful of films — not long enough to scroll meaningfully.
-  // Broadening with a few more real presets, the same "+ Add" flow a person uses from the Agents screen,
-  // gives an actually-scrollable list.
-  for(const name of ["Date Night", "Family Movies", "Totally Custom"]){
-    await openAgentsScreenFromNav(page);
-    await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
-    await page.locator(".ag-add").click();
-    await expect(page.locator(".scard").first()).toBeVisible();
-    await page.locator(".scard", { has: page.locator(".sc-name", { hasText: name }) }).first().click();
-    await expect(page.locator("#onbStepInner .osback")).toBeVisible();
-    await page.locator("#onbStepInner .osback").click();
-    await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
-  }
-  // The loop above leaves #agentsScreen open (the real "+ Add" flow returns there so a person can add
-  // another preset) — it covers the mood chip below, so close it before interacting with Watch top.
-  await page.evaluate(() => window.closeAgentsScreen());
+  // A freshly onboarded one-agent account only matches a handful of films — not long enough to scroll
+  // meaningfully. CAS-1425: the CAS-1344 cutover removed the Agents-screen "+ Add" presets this used to
+  // broaden the roster with, so the same condition is set up directly: the one v2 agent is made wide open
+  // (every style, bar 0, all three windows on), as the integrity suite's seeded agent is.
+  await makeAgentWideOpen(page);
   // CAS-1247: the default mood (Top scores) now caps each stage at its best 10 — too short to scroll
   // meaningfully regardless of roster size. Releases carries no such cap, so select it for this scroll test.
   await page.locator('.moodchip[data-mood="releases"]').click();
@@ -2061,7 +2063,7 @@ test("CAS-1264: the Order popover lists You score only when signed in, and picki
 
 // CAS-1296 Change 1/2: the Order row is gone — a manual order no longer makes sense now that Show top
 // picks the films. Name leads the sheet; Order is derived (moodOrder), never a control a person taps.
-test("CAS-1296 AC1: the mood sheet's first section is Name, and the Order row is gone", async ({ page }) => {
+test("CAS-1296 AC1: the mood sheet's first section is Name, and there is no manual Order row", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
@@ -2070,11 +2072,13 @@ test("CAS-1296 AC1: the mood sheet's first section is Name, and the Order row is
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
-  // .wsheethd's first span is CSS text-transform:uppercase (rendered, so innerText reflects it on
-  // WebKit) — textContent reads the source text, which is what "the first section is Name" means.
-  const firstHeading = await page.locator("#watchSheetBody .wsheetsec").first().locator(".wsheethd").textContent();
-  expect(firstHeading.trim()).toBe("Name");
-  await expect(page.locator('.mfseg[aria-label="Order"]')).toHaveCount(0);
+  // CAS-1425: the v2 (CAS-1341) mood sheet leads with the name input in its .oamhead block; Order is the
+  // derived Score / Release date / A-Z choice, never a manual ordering control.
+  const firstIsName = await page.locator("#watchSheetBody").evaluate(
+    body => body.firstElementChild?.querySelector("#oamMoodName") != null);
+  expect(firstIsName).toBe(true);
+  const orderLabels = await page.locator('.mfseg[aria-label="Order"] button').evaluateAll(els => els.map(el => el.textContent.trim()));
+  expect(orderLabels).toEqual(["Score", "Release date", "A–Z"]);
   await page.evaluate(() => window.closeWatchSheet());
 });
 
@@ -2085,6 +2089,7 @@ test("CAS-1296 AC2: a mood with Show top You set sorts the listing by You, desce
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
+  await makeAgentWideOpen(page);   // CAS-1425: plenty of same-section cards to compare
 
   // toShortlist() boots via freshAppSignedIn() (CAS-1110) — a real signed-in session, so accountActive()
   // is already true and the Show top You segment is live.
@@ -2122,9 +2127,11 @@ test("CAS-1296 AC2: a mood with Show top You set sorts the listing by You, desce
   expect(seeded.ok, seeded.reason).toBe(true);
 
   const moodId = await page.evaluate(() => watchMoodSel);
+  // CAS-1425: Show top You is gone with the old sheet; a signed-in mood sorted by Score is what derives
+  // filt.sort === "you" now (applyMoodToState), so pick that and Save.
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
-  await page.locator('.mfseg[aria-label="Show top You"] button[data-top="20"]').click();
-  await page.locator("#moodSaveBtn").click();
+  await page.locator('.mfseg[aria-label="Order"] button', { hasText: "Score" }).click();
+  await page.locator("#watchSheetBody .oamhead .donebtn").click();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
 
   expect(await page.evaluate(() => filt.sort)).toBe("you");
@@ -2151,18 +2158,20 @@ test("CAS-1303: a new mood's Sort defaults to Score; picking Release date explic
   await finishFlow(page);
   await toListing(page);
 
+  // CAS-1425: on a v2 account "+ Mood" opens the OAM sheet (CAS-1341): the name input and Save live in its
+  // .oamhead, and Sort is its "Order" segment.
   await page.evaluate(() => window.openMoodSheetForNew());
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
-  await expect(page.locator('.mfseg[aria-label="Sort"] button[data-sort="score"]')).toHaveClass(/on/);
-  await page.locator("#moodName").fill("Both off");
-  await page.locator("#moodSaveBtn").click();
+  await expect(page.locator('.mfseg[aria-label="Order"] button', { hasText: "Score" })).toHaveClass(/on/);
+  await page.locator("#oamMoodName").fill("Both off");
+  await page.locator("#watchSheetBody .oamhead .donebtn").click();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
   expect(await page.evaluate(() => filt.sort)).toBe("you");
 
   const moodId = await page.evaluate(() => watchMoodSel);
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
-  await page.locator('.mfseg[aria-label="Sort"] button[data-sort="release"]').click();
-  await page.locator("#moodSaveBtn").click();
+  await page.locator('.mfseg[aria-label="Order"] button', { hasText: "Release date" }).click();
+  await page.locator("#watchSheetBody .oamhead .donebtn").click();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
   expect(await page.evaluate(() => filt.sort)).toBe("cinema");
 });
@@ -2170,7 +2179,7 @@ test("CAS-1303: a new mood's Sort defaults to Score; picking Release date explic
 // CAS-1303 AC1: the mood sheet's last section is "Sort", with exactly three options in order Score,
 // Release date, A-Z, and the saved value is the one pressed. The default mood (Top scores) carries its own
 // explicit sort:"score" (MOOD_DEFAULTS), so its Score button starts pressed.
-test("CAS-1303 AC1: the mood sheet's last section is Sort, three options in order, saved value pressed", async ({ page }) => {
+test("CAS-1303 AC1: the mood sheet's Order options are Score, Release date, A-Z in order, saved value pressed", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
@@ -2179,13 +2188,16 @@ test("CAS-1303 AC1: the mood sheet's last section is Sort, three options in orde
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
-  const lastSec = page.locator("#watchSheetBody .wsheetsec").last();
-  await expect(lastSec.locator(".wsheethd")).toHaveText("Sort");
-  const sortBtns = lastSec.locator(".mfseg button");
+  // CAS-1425: the v2 sheet's last section is "HOW MANY, AND IN WHAT ORDER" (Show, then Order); More filters
+  // sits below it, collapsed. Order is still the three options in the same order, the draft's saved value on.
+  await expect(page.locator("#watchSheetBody .wsheetsec").last().locator(".wsheethd")).toHaveText("HOW MANY, AND IN WHAT ORDER");
+  const sortBtns = page.locator('.mfseg[aria-label="Order"] button');
   await expect(sortBtns).toHaveCount(3);
   const labels = await sortBtns.evaluateAll(els => els.map(el => el.textContent.trim()));
   expect(labels).toEqual(["Score", "Release date", "A–Z"]);
-  await expect(sortBtns.nth(0)).toHaveClass(/on/);
+  const savedIdx = await page.evaluate(() => ["score", "release", "title"].indexOf(oamDraft.sort));
+  expect(savedIdx).toBeGreaterThanOrEqual(0);
+  await expect(sortBtns.nth(savedIdx)).toHaveClass(/on/);
   await page.evaluate(() => window.closeWatchSheet());
 });
 
@@ -2198,8 +2210,8 @@ test("CAS-1303 AC2: Sort A-Z orders titles ascending; Sort Release date uses the
 
   const moodId = await page.evaluate(() => watchMoodSel);
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
-  await page.locator('.mfseg[aria-label="Sort"] button[data-sort="title"]').click();
-  await page.locator("#moodSaveBtn").click();
+  await page.locator('.mfseg[aria-label="Order"] button', { hasText: "A–Z" }).click();
+  await page.locator("#watchSheetBody .oamhead .donebtn").click();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
   expect(await page.evaluate(() => filt.sort)).toBe("title");
 
@@ -2217,14 +2229,17 @@ test("CAS-1303 AC2: Sort A-Z orders titles ascending; Sort Release date uses the
   expect(titles).toEqual([...titles].sort((a, b) => a.localeCompare(b)));
 
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
-  await page.locator('.mfseg[aria-label="Sort"] button[data-sort="release"]').click();
-  await page.locator("#moodSaveBtn").click();
+  await page.locator('.mfseg[aria-label="Order"] button', { hasText: "Release date" }).click();
+  await page.locator("#watchSheetBody .oamhead .donebtn").click();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
   expect(await page.evaluate(() => filt.sort)).toBe("cinema");
 });
 
-// CAS-1296 Change 3: a new mood ("+ Mood") defaults to From: My agents, every agent on.
-test(`CAS-1296 AC3: "+ Mood" opens with From = My agents and every agent chip on`, async ({ page }) => {
+// CAS-1296 Change 3: a new mood ("+ Mood") defaults to drawing from the agent, every style on.
+// CAS-1425: the From (My agents / Everything) switch and per-agent chips went with the multi-agent sheet; with
+// one agent the same default is the OAM draft's stylesAll (every style the agent lists, nothing excluded),
+// on the Genre tab, with Include watched on (CAS-1412).
+test(`CAS-1296 AC3: "+ Mood" opens on the agent's genres with every style included`, async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
@@ -2232,11 +2247,10 @@ test(`CAS-1296 AC3: "+ Mood" opens with From = My agents and every agent chip on
   await page.evaluate(() => window.openMoodSheetForNew());
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
-  await expect(page.locator('.mfseg[aria-label="From"] button[data-source="agents"]')).toHaveClass(/on/);
-  const agentStates = await page.locator("#watchSheetBody .chips button[data-agent]")
-    .evaluateAll(els => els.map(el => el.classList.contains("on")));
-  expect(agentStates.length).toBeGreaterThan(0);
-  expect(agentStates.every(Boolean)).toBe(true);
+  await expect(page.locator('.mtabs [data-mode="genre"]')).toHaveClass(/on/);
+  const draft = await page.evaluate(() => ({ stylesAll: oamDraft.stylesAll, mode: oamDraft.mode, watched: oamDraft.watched }));
+  expect(draft).toEqual({ stylesAll: true, mode: "genre", watched: true });
+  await expect(page.locator("#watchSheetBody .oalist .oamexpand")).toHaveCount(0);   // nothing sits under "Not in this mood"
   await page.evaluate(() => window.closeWatchSheet());
 });
 
@@ -2547,35 +2561,46 @@ test("CAS-1063 AC2: the saving indicator never moves the listing, before, during
 
 // CAS-1266: the Your taste card's icon is a fixed picture (TASTE_ICON_PATTERN/TASTE_ICON_FILL), not drawn
 // live from the account's own data, so this checks the fixed grid rendered, not any particular account's taste.
+// CAS-1425: the card sat on the multi-agent Agents screen, which CAS-1339 replaced with the one-agent "Your
+// agent" screen for a v2 account, so the card is no longer on any screen; tasteCardHTML() itself is unchanged,
+// so the icon is checked by rendering that markup directly.
 test("CAS-1266: the Your taste card icon is a fixed 16-cell grid", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
 
-  await openAgentsScreenFromNav(page);
-  await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
-  const cells = page.locator(".tastecard .tcmini i");
+  await page.evaluate(() => {
+    const host = document.createElement("div");
+    host.id = "cas1266Host";
+    host.innerHTML = tasteCardHTML();
+    document.body.appendChild(host);
+  });
+  const cells = page.locator("#cas1266Host .tastecard .tcmini i");
   await expect(cells).toHaveCount(16);
   await expect(cells.nth(0)).toHaveCSS("background-color", "rgb(45, 212, 191)");
   await expect(cells.nth(7)).toHaveCSS("background-color", "rgba(240, 136, 58, 0.7)");
 });
 
-// CAS-1274: Edit Agent opens on Basic — Styles, Cascade score and Age rating, plus any Advanced setting
-// already set — with everything else behind a Basic|Advanced switch (replacing CAS-1267's single
-// collapsible Advanced section), so the screen a non-technical person opens reads as a handful of
-// settings, not nine at once.
-test("CAS-1274: Edit Agent opens on Basic, Advanced reveals the rest, and the switch resets to Basic on reopen", async ({ page }) => {
+// CAS-1274: Edit Agent opens on Basic — Styles, Cascade score and Age rating, with everything else behind a
+// Basic|Advanced switch, so the screen a non-technical person opens reads as a handful of settings, not nine
+// at once.
+// CAS-1425: the Edit Agent hub and its switch were replaced by CAS-1339's "Your agent" screen for a v2 account.
+// The same intent holds there: it opens as a plain list of genre rows with nothing expanded, and each row's
+// detail (minimum score, film alerts, score adjustments) is behind one tap on that row. The removed
+// Occasions screen must still leave nothing behind (CAS-1402).
+test("CAS-1274: the agent screen opens as plain genre rows, and a row's details open on demand", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
-  await openFirstAgentMission(page);
+  await makeAgentWideOpen(page);
+  await openAgentsScreenFromNav(page);
+  await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
 
-  // AC2: Basic is visible, Advanced's own controls are not.
-  await expect(page.locator("#stylesListCard")).toBeVisible();
-  await expect(page.locator(".msntrackwrap")).toBeVisible();
-  await expect(page.locator("#ageRatingCard")).toBeVisible();
-  await expect(page.locator("#briefTabBasic")).toHaveClass(/on/);
-  await expect(page.locator("#onbAlertsOn")).toBeHidden();
+  // Collapsed: genre rows are listed, none of the per-genre controls are rendered.
+  expect(await page.locator("#oaList .oarow").count()).toBeGreaterThan(0);
+  await expect(page.locator(".oaopen")).toHaveCount(0);
+  await expect(page.locator(".oachip")).toHaveCount(0);
+
   // CAS-1402: the removed feature leaves nothing behind in the built page (names split so the
   // feature's name appears nowhere in tests/).
   const gone = await page.evaluate(() => {
@@ -2584,38 +2609,17 @@ test("CAS-1274: Edit Agent opens on Basic, Advanced reveals the rest, and the sw
   });
   expect(gone.el).toBeNull();
   expect(gone.fn).toBe("undefined");
-  // The first agent (onb_massive) is built with yearsBack 3 and cinemaReleaseOnly on, so CAS-1274 rule 3
-  // shows exactly those two under SET IN ADVANCED on Basic; Budget and Awards are at their defaults, so not.
-  await expect(page.locator("#onbStepInner .usec", { hasText: "SET IN ADVANCED" })).toBeVisible();
-  await expect(page.locator("#onbCinemaRelease")).toBeVisible();
-  await expect(page.locator(".reqcard", { hasText: "How far back" })).toBeVisible();
-  for(const label of ["Movie Budget", "Awards"])
-    await expect(page.locator(".reqcard", { hasText: label })).toBeHidden();
 
-  // AC3: tapping Advanced reveals all six, plus the Styles card's own More button.
-  await page.locator("#briefTabAdvanced").click();
-  await expect(page.locator("#briefTabAdvanced")).toHaveClass(/on/);
-  await expect(page.locator("#onbAlertsOn")).toBeVisible();
-  await expect(page.locator("#onbCinemaRelease")).toBeVisible();
-  await expect(page.locator(".slmore")).toBeVisible();
-  for(const label of ["Movie Budget", "Awards", "How far back"])
-    await expect(page.locator(".reqcard", { hasText: label })).toBeVisible();
+  // One tap on a row opens its details: the minimum score, the three alert windows, the adjustments.
+  await page.locator('.oarow[data-style="Drama"] .oarowhead').click();
+  await expect(page.locator(".oaopen")).toHaveCount(1);
+  await expect(page.locator(".oaopen .oasechdr", { hasText: "MOVIE MINIMUM SCORE" })).toBeVisible();
+  await expect(page.locator(".oaopen .oasechdr", { hasText: "FILM ALERTS" })).toBeVisible();
+  await expect(page.locator(".oaopen .oachip")).toHaveCount(3);
 
-  // The first agent (onb_massive) starts with alerts ON (normCascade), so read the state rather than assume it.
-  const alertsWasOn = await page.locator("#onbAlertsOn").evaluate(el => el.classList.contains("on"));
-  await page.locator("#onbAlertsOn").click();
-  await expect(page.locator("#onbAlertsOn")).toHaveAttribute("aria-checked", String(!alertsWasOn));
-
-  // Scoped to #onbStepInner: gotoStep's dual-pane slide leaves the outgoing step's .osback in the DOM too.
-  await expect(page.locator("#onbStepInner .osback")).toBeVisible();
-  await page.locator("#onbStepInner .osback").click();
-  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
-
-  await openFirstAgentMission(page);
-  await expect(page.locator("#briefTabBasic")).toHaveClass(/on/);   // always reopens on Basic
-  await expect(page.locator("#onbAlertsOn")).toBeHidden();          // not rendered at all on Basic
-  await page.locator("#briefTabAdvanced").click();
-  await expect(page.locator("#onbAlertsOn")).toHaveAttribute("aria-checked", String(!alertsWasOn));   // the value set before Back was kept
+  // Tapping the same row again folds it back to the plain list.
+  await page.locator('.oarow[data-style="Drama"] .oarowhead').click();
+  await expect(page.locator(".oaopen")).toHaveCount(0);
 });
 
 // ---- CAS-1269: the Style screen becomes the taste-map grid ----------------------------------------------
@@ -2646,37 +2650,37 @@ async function openStyleGrid(page){
   await expect(page.locator(".tmap")).toBeVisible();
 }
 
-test("CAS-1269 AC1: the Styles card and suggestions panel flag a taste disagreement, and Skip clears it", async ({ page }) => {
+test("CAS-1269 AC1: the agent flags a taste disagreement on a genre, and Keep clears it", async ({ page }) => {
+  // CAS-1425: the Styles card / suggestions panel went with the Edit Agent hub. On a v2 account the same
+  // "your verdicts disagree with this setting" flag is the genre row's AGENT SUGGESTION (barAdvice), and
+  // dismissing it (Keep) is what clears it. barAdvice's evidence maths is covered by the engine tests; this
+  // drives the screen's flag -> Keep path, so the advice is stubbed to fire until its own dismissed marker
+  // ("bar:<style>", the check barAdvice itself makes) is set.
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
-  await openFirstAgentMission(page);
-  await page.evaluate(() => { onbFlow.draft.genre = []; onbFlow.draft.exclude = []; onbFlow.draft.pairs = {}; });
-  // Only the PAIR may be strong: 6 Wow on each style alone and 5 Never on the pair give each style
-  // lean (9-5)/(11+4) = 0.27 (under the 0.3 bar, so neither style flags) and the pair
-  // lean (-5 + 4*0.27)/(5+4) = -0.44 (strong, and listed via genre:[] above) -> exactly one flag.
-  await pushTasteFixture(page, 11, ["Science Fiction"], "wow", 6);
-  await pushTasteFixture(page, 12, ["Animation"], "wow", 6);
-  await pushTasteFixture(page, 1, ["Science Fiction", "Animation"], "notfor", 5);
-  await page.evaluate(() => renderOnbStep("briefing"));
+  await makeAgentWideOpen(page);
+  await page.evaluate(() => {
+    cascades[0].styles.Drama.bar = 70;
+    window.barAdvice = style => {
+      const c = oneAgentCriteria();
+      if(style !== "Drama" || !c || (c.dismissed || []).includes("bar:" + style)) return null;
+      return { dir: "up", from: 70, to: 80, lo: [], hi: [] };
+    };
+  });
+  await openAgentsScreenFromNav(page);
+  await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
+  await page.locator('.oarow[data-style="Drama"] .oarowhead').click();
 
-  // CAS-1274: the Styles card's own flag line now reads "suggested updates", and the card itself is no
-  // longer a single button through to the grid — Review (Basic) switches to Advanced, whose Styles card
-  // carries the More button that actually opens it.
-  await expect(page.locator("#stylesListCard")).toContainText("! 1 suggested updates from your taste");
+  await expect(page.locator(".oasuggest")).toHaveCount(1);
+  await page.locator(".oasuglbl").click();
+  await expect(page.locator(".oasugtext")).toContainText("Your verdicts suggest");
+  await expect(page.locator(".oasugchange")).toContainText("Change to Top");
+  await expect(page.locator(".oasugkeep")).toContainText("Keep Top");
 
-  await page.locator("#stylesListCard .sllink").click();
-  await expect(page.locator("#briefTabAdvanced")).toHaveClass(/on/);
-  await page.locator(".slmore").click();
-  await expect(page.locator(".tsugg")).toContainText("! Your verdicts suggest 1 update to this agent");   // CAS-1276 wording
-  await expect(page.locator(".tsuggrow")).toContainText("Animation + Science Fiction: listed");
-  await expect(page.locator(".tsuggrow")).toContainText("Suggested: skip.");   // CAS-1306
-  await expect(page.locator(".tsuggbtn")).toHaveText("Apply");
-  await expect(page.locator(".tsuggall")).toHaveCount(0);   // CAS-1306 AC3: a single flag shows no Apply all
-
-  await page.locator(".tsuggbtn").click();
-  expect(await page.evaluate(() => onbFlow.draft.pairs["Animation|Science Fiction"])).toBe("-");
-  await expect(page.locator(".tsugg")).toHaveCount(0);
+  await page.locator(".oasugkeep").click();
+  expect(await page.evaluate(() => oneAgentCriteria().dismissed.includes("bar:Drama"))).toBe(true);
+  await expect(page.locator(".oasuggest")).toHaveCount(0);
 });
 
 test("CAS-1306: suggestion rows read Apply with Suggested: skip., and Apply all clears every flag", async ({ page }) => {
