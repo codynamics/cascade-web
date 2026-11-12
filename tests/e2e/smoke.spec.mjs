@@ -1514,7 +1514,8 @@ test("CAS-919: the score row reads Watchmode fields as People/Critics, a missing
   // marker and make filmInWatchRows silently drop the patch (CAS-750/CAS-823's "film left the list"
   // no-op). Force every window's marker to Off first so the floor can never react to the scores this
   // test is about to set.
-  await page.evaluate(() => { WATCH_LEVEL_KEYS.forEach(k => { cascades[0].watchMarkers[k] = 0; }); });
+  // CAS-1425: a v2 agent has no watchMarkers — open its floor the v2 way (every genre's bar at 0).
+  await makeAgentWideOpen(page);
   // CAS-1247: the default mood caps each stage at its best 10 — nulling this card's critic score below
   // can drop its cascadeScore far enough to fall out of that cap, silently no-oping the second
   // fastPatchFindRow (same "film left the list" shape as the marker case above). Releases carries no
@@ -1569,7 +1570,8 @@ test("CAS-919: a collapsed card's score row has no Cascade cell and no Pop cell,
   // CAS-1191: see the sibling People/Critics test above — blending ratings into an upcoming film's score
   // means the patch below can itself push this card across the onboarded agent's marker, so force every
   // window's marker to Off first.
-  await page.evaluate(() => { WATCH_LEVEL_KEYS.forEach(k => { cascades[0].watchMarkers[k] = 0; }); });
+  // CAS-1425: a v2 agent has no watchMarkers — open its floor the v2 way (every genre's bar at 0).
+  await makeAgentWideOpen(page);
   // CAS-1247: zeroing every marker above (so the floor can never react to the low scores this test sets)
   // also lifts the agent's own score gate, which widens Upcoming's scope from a handful of high-buzz films
   // to nearly all of them. The default mood (Top scores) caps each stage at its best 10 — against this
@@ -1625,7 +1627,8 @@ test("CAS-1261: the closed card hides People/Critics and shows the synopsis; the
   // CAS-1191: see the sibling "no Cascade cell and no Pop cell" test above — force every window's
   // marker to Off so blending ratings into an upcoming film's score can't itself move this card across
   // the onboarded agent's own marker.
-  await page.evaluate(() => { WATCH_LEVEL_KEYS.forEach(k => { cascades[0].watchMarkers[k] = 0; }); });
+  // CAS-1425: a v2 agent has no watchMarkers — open its floor the v2 way (every genre's bar at 0).
+  await makeAgentWideOpen(page);
   // CAS-1247: see the sibling "no Cascade cell and no Pop cell" test above — zeroing every marker widens
   // Upcoming's scope enough that patching this card's score down to 4.0/40 can drop it out of the default
   // mood's top-10-per-stage cap, silently no-oping fastPatchFindRow. Releases carries no cap.
