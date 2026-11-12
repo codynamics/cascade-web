@@ -132,6 +132,8 @@ if(typeof window.CascadeAuth === "undefined"){
   window.CascadeAuth = { enabled:false, client:null, user:null, session:null, status:"guest" };
 }
 ;globalThis.__ENGINE__ = {
+  membClassifyPurchase, membBuy, membRestore, membRowActive, membLoadEntitlement, membEnsureMember, membPriceLine, membFineText, membCtaLabel,
+  get membEnt(){ return membEnt; }, get membLastMessage(){ return membLastMessage; },
   MOVIES, CASCADE, STATUS_LABEL, SHOWABLE_N,
   // CAS-1327: TRACK_MIN is the agent score track's own floor — exported so scripts/scoreable_shim.mjs
   // can hand poc_pipeline.py the catalogue's publication floor straight from the shipped engine instead
@@ -913,7 +915,9 @@ export function loadEngine({ htmlPath = path.join(ROOT, "index.html"), localStor
 
 /** A fresh flow, seeded exactly the way a person walking the app seeds it. */
 export function pickInLane(E, kind, presetKey){
-  E.flowStart();
+  // CAS-1344: flowStart() with no key opens the one-agent first run now, which never seeds the old flow's state;
+  // an explicit key ("v2_about" here, as the old first run opened on) still does, and that is all this helper needs.
+  E.flowStart("v2_about");
   E.setFlowKind(kind);
   E.pickStarter(presetKey);
   return E;

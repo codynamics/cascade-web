@@ -122,6 +122,7 @@ SAMPLE_FILE   = os.path.join(os.path.dirname(__file__), "sample_data.json")
 TEMPLATE_FILE = os.path.join(os.path.dirname(__file__), "app_template.html")
 APP_FILE      = os.path.join(os.path.dirname(__file__), "index.html")
 VERSION_FILE  = os.path.join(os.path.dirname(__file__), "VERSION")        # hand-bumped SemVer (CAS-124)
+PRIVACY_FILE  = os.path.join(os.path.dirname(__file__), "privacy.html")   # CAS-1426 public privacy page
 VERSION_JSON  = os.path.join(os.path.dirname(__file__), "version.json")   # machine-readable build stamp
 BUILD_INFO_JS = os.path.join(os.path.dirname(__file__), "build-info.js")  # CAS-947: runtime-loadable twin of VERSION_JSON
 HEADERS_FILE  = os.path.join(os.path.dirname(__file__), "_headers")       # Cloudflare Pages response headers (CAS-946)
@@ -134,6 +135,7 @@ IOS_WWW_ASSETS = ("index.html", "config.js", "favicon.svg", "favicon.png",
                    "capacitor-core.js", "capacitor-push-notifications.js",  # CAS-463
                    "capacitor-app.js",  # CAS-524
                    "capacitor-in-app-review.js",  # CAS-969
+                   "capacitor-native-purchases.js",  # CAS-971
                    "capacitor-contact-picker.js",  # CAS-932
                    "build-info.js")  # CAS-947
 
@@ -3987,7 +3989,72 @@ def build_html(records: list[dict] | None = None, provider_status: dict | None =
     print(f"stamped v{info['version']} · build {info['build']} · {info['commit']}")
     write_catalogue(records, catalogue_date, generated_at)
     write_csp_headers()
+    build_privacy_page()
     _sync_ios_www()
+
+
+def _extract_privacy_source(template: str) -> tuple[str, list[dict], list[str]]:
+    """Pull PRIVACY_LEDE / PRIVACY_SECTIONS / PRIVACY_BOLD_LEADS out of app_template.html (CAS-1426).
+    They are plain JS literals; quote the two bare object keys and drop trailing commas to read as JSON."""
+    lede = json.loads(re.search(r"^const PRIVACY_LEDE = (\".*\");\s*$", template, re.M).group(1))
+    sec_src = re.search(r"^const PRIVACY_SECTIONS = (\[.*?^\]);", template, re.M | re.S).group(1)
+    sec_src = re.sub(r"\b(heading|paras):", r'"\1":', sec_src)
+    sec_src = re.sub(r",(\s*[\]}])", r"\1", sec_src)
+    leads = json.loads(re.search(r"^const PRIVACY_BOLD_LEADS = (\[.*\]);\s*$", template, re.M).group(1))
+    return lede, json.loads(sec_src), leads
+
+
+def render_privacy_page(lede: str, sections: list[dict], leads: list[str]) -> str:
+    """Static, script-free public privacy page (CAS-1426), mirroring the in-app renderPrivacy()."""
+    esc = html.escape
+    mail = "hello@codynamics.com.au"
+
+    def para(text: str) -> str:
+        lead = next((l for l in leads if text.startswith(l)), "")
+        body = esc(text[len(lead):], quote=False).replace(mail, f'<a href="mailto:{mail}">{mail}</a>')
+        b = f"<b>{esc(lead, quote=False)}</b>" if lead else ""
+        return f"<p>{b}{body}</p>"
+
+    nl = "\n"
+    body = nl.join(
+        f"<h2>{esc(s['heading'], quote=False)}</h2>{nl}" + nl.join(para(t) for t in s["paras"])
+        for s in sections)
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cascade — Privacy policy</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+body{{margin:0;background:#0A0E1A;color:#e8ecf2;font:16px/1.6 "Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}}
+main{{max-width:640px;margin:0 auto;padding:24px 20px 56px}}
+h1,h2{{font-family:"Poppins","Inter",-apple-system,"Segoe UI",Roboto,sans-serif}}
+h1{{font-size:26px;margin:16px 0 8px}}
+h2{{font-size:13px;letter-spacing:.04em;text-transform:uppercase;margin:28px 0 8px}}
+p{{color:#aab4c4;font-size:15px;margin:0 0 12px}}
+b{{color:#e8ecf2}}
+a{{color:#b3a4ff}}
+.back{{font-size:14px}}
+</style>
+</head>
+<body>
+<main>
+<a class="back" href="https://cascademovies.com">← cascademovies.com</a>
+<h1>Privacy policy</h1>
+<p>{esc(lede, quote=False)}</p>
+{body}
+</main>
+</body>
+</html>
+"""
+
+
+def build_privacy_page() -> None:
+    """Generate privacy.html from the app's own PRIVACY_* source so the public page cannot drift (CAS-1426)."""
+    template = open(TEMPLATE_FILE, encoding="utf-8").read()
+    with open(PRIVACY_FILE, "w", encoding="utf-8", newline="\n") as f:
+        f.write(render_privacy_page(*_extract_privacy_source(template)))
 
 
 def build_csp() -> str:

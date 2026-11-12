@@ -1,68 +1,50 @@
 {
-  "checked_at": "2026-11-10T21:06:09.838637+00:00",
+  "checked_at": "2026-11-12T06:02:00.203263+00:00",
   "checks": [
-    {
-      "name": "email_send",
-      "ok": null,
-      "value": 0,
-      "threshold": 0,
-      "detail": "no email attempted this run \u2014 unavailable.",
-      "status": "unknown",
-      "checked_at": "2026-11-10T06:01:24.616653+00:00"
-    },
-    {
-      "name": "push_send",
-      "ok": null,
-      "value": 0,
-      "threshold": 0,
-      "detail": "APNs configured but no push attempted this run \u2014 unavailable.",
-      "status": "unknown",
-      "checked_at": "2026-11-10T06:01:24.616653+00:00"
-    },
     {
       "name": "catalogue_size",
       "ok": true,
-      "value": 6249,
+      "value": 6252,
       "threshold": 5500,
-      "detail": "6249 record(s).",
+      "detail": "6252 record(s).",
       "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "catalogue_integrity",
       "ok": true,
-      "value": 6249,
+      "value": 6252,
       "threshold": 0,
       "detail": "every record parses, carries tmdb_id + title + release info, no duplicates.",
       "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "tmdb_fetch",
       "ok": true,
-      "value": 10057,
+      "value": 10062,
       "threshold": 0,
-      "detail": "10057 call(s), 0 error(s), 0 not-found (0.0%).",
+      "detail": "10062 call(s), 0 error(s), 0 not-found (0.0%).",
       "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "watchmode_fetch",
-      "ok": true,
-      "value": 75,
+      "ok": false,
+      "value": 329,
       "threshold": 375,
-      "detail": "75 call(s), 0 errors, 404 of 2500 credit(s) remaining this month (floor 375).",
-      "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "detail": "only 329 of 2500 Watchmode credit(s) remaining this month (floor 375, 15% of quota).",
+      "status": "fail",
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "watchmode_pace",
       "ok": true,
-      "value": 2303,
+      "value": 2307,
       "threshold": 2500,
-      "detail": "73 credit(s)/day average, projecting 2303 of 2500 by the 2026-11-12 reset.",
+      "detail": "74 credit(s)/day average, projecting 2307 of 2500 by the 2026-11-12 reset.",
       "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "oscarbase_fetch",
@@ -71,16 +53,16 @@
       "threshold": 0,
       "detail": "750 call(s), 0 errors.",
       "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "score_coverage",
       "ok": true,
-      "value": 6169,
-      "threshold": 5550,
-      "detail": "6169 scored film(s) vs 6167 last refresh (90% floor).",
+      "value": 6172,
+      "threshold": 5552,
+      "detail": "6172 scored film(s) vs 6169 last refresh (90% floor).",
       "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "usage_events_insert",
@@ -89,7 +71,7 @@
       "threshold": 1,
       "detail": "HTTP 201",
       "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "auth_signin",
@@ -98,34 +80,34 @@
       "threshold": 1,
       "detail": "session returned.",
       "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "client_error_rate",
       "ok": null,
-      "value": 9,
+      "value": 1,
       "threshold": 50,
-      "detail": "only 9 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
+      "detail": "only 1 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
       "status": "unknown",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "empty_account_rate",
       "ok": null,
-      "value": 9,
+      "value": 1,
       "threshold": 50,
-      "detail": "only 9 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
+      "detail": "only 1 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
       "status": "unknown",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "activity_floor",
       "ok": null,
-      "value": 9,
+      "value": 1,
       "threshold": 50,
-      "detail": "only 9 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
+      "detail": "only 1 app_open row(s) in the last 24h (floor 50) \u2014 a quiet window, or CAS-942's live select grant for this account isn't applied yet.",
       "status": "unknown",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "watchmode_identity",
@@ -134,7 +116,7 @@
       "threshold": 0,
       "detail": "0 identity mismatch(es) this run. 26 quarantined.",
       "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "watchmode_remap_backlog",
@@ -143,7 +125,7 @@
       "threshold": 0,
       "detail": "0 record(s) awaiting repair.",
       "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "released_scored_without_rating",
@@ -152,7 +134,7 @@
       "threshold": 0,
       "detail": "every 'scored' candidate outside the ladder cohort carries a real rating.",
       "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "landmark_films",
@@ -161,16 +143,34 @@
       "threshold": 7,
       "detail": "all 7 landmark film(s) published and scoreable.",
       "status": "ok",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
     },
     {
       "name": "watchmode_freshness",
       "ok": false,
-      "value": 58.6,
+      "value": 59.0,
       "threshold": 5.0,
-      "detail": "4.4% of weekly-TTL film(s) stale past 14d, 58.6% of film(s) released within 365d stale past 45d, oldest stamp in the catalogue is 61 day(s) old.",
+      "detail": "4.4% of weekly-TTL film(s) stale past 14d, 59.0% of film(s) released within 365d stale past 45d, oldest stamp in the catalogue is 62 day(s) old.",
       "status": "fail",
-      "checked_at": "2026-11-10T21:06:09.838637+00:00"
+      "checked_at": "2026-11-11T21:23:32.706212+00:00"
+    },
+    {
+      "name": "email_send",
+      "ok": null,
+      "value": 0,
+      "threshold": 0,
+      "detail": "no email attempted this run \u2014 unavailable.",
+      "status": "unknown",
+      "checked_at": "2026-11-12T06:02:00.203263+00:00"
+    },
+    {
+      "name": "push_send",
+      "ok": null,
+      "value": 0,
+      "threshold": 0,
+      "detail": "APNs configured but no push attempted this run \u2014 unavailable.",
+      "status": "unknown",
+      "checked_at": "2026-11-12T06:02:00.203263+00:00"
     }
   ],
   "ok": false

@@ -15,15 +15,10 @@ const count = (needleOrRe) =>
     ? html.split(needleOrRe).length - 1
     : (html.match(needleOrRe) || []).length;
 
-test("CAS-1168 AC1: the restored price paragraph appears on both #membScreen paths", () => {
-  assert.equal(
-    count("Free for your first month · then <b>$4.99/month</b> · cancel any time. No card needed"),
-    2,
-  );
-});
-
-test("CAS-1168 AC2: the .membcta button reads 'Start my free month' on both paths", () => {
-  assert.equal(count(">Start my free month</button>"), 2);
+test("CAS-1168 AC1/AC2 (superseded by CAS-971): the price and CTA come from the membFineText()/membCtaLabel() helpers, not hard-coded text", () => {
+  assert.equal(count('<p class="memfine" id="membFine">${esc(membFineText())}</p>'), 2);
+  assert.equal(count("${esc(membCtaLabel())}</button>"), 2);
+  assert.equal(count("$4.99/month"), 0);
 });
 
 test("CAS-1168 AC3: the retired 'Save my agents' copy is gone", () => {
@@ -32,5 +27,5 @@ test("CAS-1168 AC3: the retired 'Save my agents' copy is gone", () => {
 
 test("CAS-1168 AC4: no 'Prototype' line, and MEMBERSHIP_ENABLED stays false", () => {
   assert.equal(count(/membproto/gi), 0);
-  assert.equal(count("const MEMBERSHIP_ENABLED = false;"), 1);
+  assert.equal(count(/const MEMBERSHIP_ENABLED = true;/g), 1);
 });

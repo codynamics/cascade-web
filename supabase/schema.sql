@@ -1499,7 +1499,16 @@ grant select on public.analytics_feature_usage     to authenticated;
 -- directly, which the same cascades_owner RLS also limits to the caller's own rows — an admin view
 -- is added here rather than loosening cascades' RLS (out of scope, and would expose ordinary users'
 -- own cascades to each other via the app itself, not just the Admin site).
-create or replace view public.admin_members
+-- CAS-1427: the four views below no longer live in public. Supabase flags a security-definer view
+-- in an exposed schema (security_definer_view ERROR), so each body now lives in the unexposed
+-- admin_priv schema (no privileges for public/anon/authenticated), is read through a
+-- public.<name>_list() SECURITY DEFINER function that carries the analytics_admins guard, and
+-- public.<name> is a security_invoker = true wrapper over that function — the admin_member_emails
+-- pattern from CAS-1227/CAS-1422. The guard inside each admin_priv view body stays: do not drop it.
+create schema if not exists admin_priv;
+revoke all on schema admin_priv from public, anon, authenticated;
+
+create or replace view admin_priv.admin_members
 with (security_invoker = false) as
 with ev as (
   select
@@ -1533,7 +1542,7 @@ from ev
 full join ag on ag.user_id = ev.user_id
 where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid());
 
-create or replace view public.admin_member_activity
+create or replace view admin_priv.admin_member_activity
 with (security_invoker = false) as
 select user_id, type as feature, count(*) as events, min(created_at) as first_at, max(created_at) as last_at
 from public.usage_events
@@ -1541,7 +1550,7 @@ where user_id is not null
   and exists (select 1 from public.analytics_admins a where a.user_id = auth.uid())
 group by user_id, type;
 
-create or replace view public.admin_member_onboarding
+create or replace view admin_priv.admin_member_onboarding
 with (security_invoker = false) as
 select
   user_id,
@@ -1574,38 +1583,122 @@ as $$
 $$;
 
 revoke all on function public.admin_member_emails_list() from public, anon;
-grant execute on function public.admin_member_emails_list() to authenticated;
+grant execute on function public.admin_member_emails_list() to authenticated, service_role;
 
 create or replace view public.admin_member_emails
 with (security_invoker = true) as
 select user_id, email from public.admin_member_emails_list();
 
 -- CAS-1092: cascades can now carry a soft delete (deleted_at); exclude those rows here too.
-create or replace view public.admin_cascades
+create or replace view admin_priv.admin_cascades
 with (security_invoker = false) as
 select id, user_id, name, criteria, alert_moments, active, created_at, updated_at
 from public.cascades
 where deleted_at is null
   and exists (select 1 from public.analytics_admins a where a.user_id = auth.uid());
 
-revoke all on public.admin_members          from anon, public;
-revoke all on public.admin_member_activity  from anon, public;
-revoke all on public.admin_member_onboarding from anon, public;
-revoke all on public.admin_member_emails    from anon, public, authenticated;
-revoke all on public.admin_cascades         from anon, public;
+revoke all on admin_priv.admin_members           from public, anon, authenticated;
+revoke all on admin_priv.admin_member_activity   from public, anon, authenticated;
+revoke all on admin_priv.admin_member_onboarding from public, anon, authenticated;
+revoke all on admin_priv.admin_cascades          from public, anon, authenticated;
 
-grant select on public.admin_members          to authenticated;
-grant select on public.admin_member_activity  to authenticated;
-grant select on public.admin_member_onboarding to authenticated;
-grant select on public.admin_member_emails    to authenticated;
-grant select on public.admin_cascades         to authenticated;
+create or replace function public.admin_members_list()
+returns setof admin_priv.admin_members
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select * from admin_priv.admin_members
+  where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid())
+$$;
 
--- CAS-1227: these views only ever needed SELECT — drop the INSERT/UPDATE/DELETE/TRUNCATE/
--- REFERENCES/TRIGGER grants Supabase adds to every view by default.
-revoke insert, update, delete, truncate, references, trigger on public.admin_members from authenticated;
-revoke insert, update, delete, truncate, references, trigger on public.admin_member_activity from authenticated;
-revoke insert, update, delete, truncate, references, trigger on public.admin_member_onboarding from authenticated;
-revoke insert, update, delete, truncate, references, trigger on public.admin_cascades from authenticated;
+create or replace function public.admin_member_activity_list()
+returns setof admin_priv.admin_member_activity
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select * from admin_priv.admin_member_activity
+  where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid())
+$$;
+
+create or replace function public.admin_member_onboarding_list()
+returns setof admin_priv.admin_member_onboarding
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select * from admin_priv.admin_member_onboarding
+  where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid())
+$$;
+
+create or replace function public.admin_cascades_list()
+returns setof admin_priv.admin_cascades
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select * from admin_priv.admin_cascades
+  where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid())
+$$;
+
+revoke all on function public.admin_members_list()           from public, anon;
+revoke all on function public.admin_member_activity_list()   from public, anon;
+revoke all on function public.admin_member_onboarding_list() from public, anon;
+revoke all on function public.admin_cascades_list()          from public, anon;
+grant execute on function public.admin_members_list()           to authenticated, service_role;
+grant execute on function public.admin_member_activity_list()   to authenticated, service_role;
+grant execute on function public.admin_member_onboarding_list() to authenticated, service_role;
+grant execute on function public.admin_cascades_list()          to authenticated, service_role;
+
+create or replace view public.admin_members
+with (security_invoker = true) as
+select * from public.admin_members_list();
+
+create or replace view public.admin_member_activity
+with (security_invoker = true) as
+select * from public.admin_member_activity_list();
+
+create or replace view public.admin_member_onboarding
+with (security_invoker = true) as
+select * from public.admin_member_onboarding_list();
+
+create or replace view public.admin_cascades
+with (security_invoker = true) as
+select * from public.admin_cascades_list();
+
+revoke all on public.admin_members           from public, anon, authenticated;
+revoke all on public.admin_member_activity   from public, anon, authenticated;
+revoke all on public.admin_member_onboarding from public, anon, authenticated;
+revoke all on public.admin_member_emails     from public, anon, authenticated;
+revoke all on public.admin_cascades          from public, anon, authenticated;
+
+grant select on public.admin_members           to authenticated, service_role;
+grant select on public.admin_member_activity   to authenticated, service_role;
+grant select on public.admin_member_onboarding to authenticated, service_role;
+grant select on public.admin_member_emails     to authenticated, service_role;
+grant select on public.admin_cascades          to authenticated, service_role;
+
+-- CAS-1427: trigger functions are never meant to be called over the API — take EXECUTE away from
+-- the API roles (the triggers still fire). rls_auto_enable() is a Supabase-side event-trigger
+-- function that may not exist on a fresh project, hence the guard. set_updated_at() gets a pinned
+-- empty search_path.
+revoke execute on function public.archive_deleted_row() from public, anon, authenticated;
+revoke execute on function public.contact_messages_rate_limit() from public, anon, authenticated;
+revoke execute on function public.recommendations_rate_limit() from public, anon, authenticated;
+revoke execute on function public.usage_events_rate_limit() from public, anon, authenticated;
+do $$
+begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+  end if;
+end
+$$;
+alter function public.set_updated_at() set search_path = '';
 
 -- ---------------------------------------------------------------------------
 -- delete_my_account — self-service account deletion (CAS-980)
@@ -1655,7 +1748,7 @@ begin
 end;
 $$;
 
-revoke all on function public.delete_my_account() from public;
+revoke all on function public.delete_my_account() from public, anon;
 grant execute on function public.delete_my_account() to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -1786,3 +1879,51 @@ $$;
 
 revoke all on function public.email_has_account(text) from public;
 grant execute on function public.email_has_account(text) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- memberships — one row per user: the server-side entitlement (CAS-971)
+-- ---------------------------------------------------------------------------
+-- Cascade is an iOS-only paid app (Apple in-app purchase). Nothing about membership lives only on the
+-- device: the app reads this row to decide whether the account may use the app. Rows are written ONLY by
+-- the membership-verify and membership-notifications Edge Functions (service_role bypasses RLS) and by
+-- Lee, for comps — so there is deliberately no insert/update/delete policy for any client role.
+--   status  : 'active' | 'expired' | 'revoked' | 'grace' | 'billing_retry'
+--   source  : 'apple' (a verified App Store transaction) | 'comp' (granted by hand — see below)
+-- A comp is a row with source = 'comp' and a far-future expires_at, e.g. run as postgres/service_role:
+--   insert into public.memberships (user_id, product_id, status, expires_at, source)
+--   values ('<auth.users id>', 'comp', 'active', '2099-12-31', 'comp')
+--   on conflict (user_id) do update set status='active', expires_at='2099-12-31', source='comp', updated_at=now();
+create table if not exists public.memberships (
+  user_id                 uuid primary key references auth.users(id) on delete cascade,
+  original_transaction_id text unique,
+  product_id              text not null,
+  status                  text not null default 'active',
+  expires_at              timestamptz not null,
+  is_trial                boolean not null default false,
+  source                  text not null default 'apple',
+  updated_at              timestamptz not null default now()
+);
+alter table public.memberships enable row level security;
+
+drop policy if exists memberships_select_own on public.memberships;
+create policy memberships_select_own on public.memberships
+  for select to authenticated using (auth.uid() = user_id);
+
+-- The one definition of "active member" the client and any future server check share: a row that has not
+-- expired and has not been revoked/refunded. Grace and billing-retry still count (Apple is still trying).
+create or replace function public.is_active_member(p_user uuid default auth.uid())
+returns boolean
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.memberships m
+    where m.user_id = p_user
+      and m.status in ('active','grace','billing_retry')
+      and m.expires_at > now()
+  );
+$$;
+revoke all on function public.is_active_member(uuid) from public;
+grant execute on function public.is_active_member(uuid) to authenticated;

@@ -24,7 +24,7 @@
 // as B on the same context — nothing of A visible, A's server rows unchanged) are new, and must pass.
 import { test, expect } from "@playwright/test";
 import {
-  admin, createTestUser, seedCascades, liveCascades, liveNotifyPrefs, testEmail,
+  admin, createTestUser, seedCascades, liveCascades, liveCascadeCriteria, liveNotifyPrefs, testEmail,
   gotoIntegrityFresh, signInFromSplash, signOutFromAccount, signInDirect, fetchOtp, emailHasAccount,
 } from "./helpers.mjs";
 import { settleListing, finishFlow, walkToServices, openAgentsScreenFromNav } from "../e2e/helpers.mjs";
@@ -130,7 +130,6 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
   const email = testEmail("s4");
   const user = await createTestUser(email);
   const [seededAgent] = await seedCascades(user.id, [{ name: "Blockbusters" }]);
-  const newName = "Blockbusters (edited)";
 
   const ctxA = await browser.newContext();
   const ctxB = await browser.newContext();
@@ -152,35 +151,28 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
     await signInFromSplash(pageB, email);
     await settleListing(pageB);
 
-    // Rename through the real Agents-screen edit flow (Edit → the hub's rename pencil → the name step),
-    // then back out twice — closing the hub is what commits (briefClose → briefCommit → commitDraft →
-    // saveCascades()), there is no separate Save button (CAS-934).
+    // CAS-1425: the CAS-1344 one-agent cutover removed the rename flow (Agents-screen Edit -> hub pencil). The
+    // edit is now made on the Agent screen: switching the Drama genre off with its row tick (oaToggleStyleOn
+    // -> saveCascades()), which must reach the server and then context B.
     await openAgentsScreenFromNav(pageA);
     await expect(pageA.locator("#agentsScreen")).toHaveClass(/open/);
-    await pageA.locator(`.agrow[data-id="${seededAgent.id}"] .ag-edit`).click();
-    await pageA.locator(".eapenc").click();
-    await pageA.locator("#onbStepName").fill(newName);
-    await pageA.locator("#onbStepInner .osback").click();
-    await pageA.locator("#onbStepInner .osback").click();
+    await pageA.locator('.oarow[data-style="Drama"] .oarowtick').click();
 
-    // CAS-1132: bisect "the UI never committed the rename locally" from "the commit landed but the push to
-    // the server failed/never fired" — the two candidate causes the ticket itself names — before ever
-    // asking the (real) network. If this reads newName, the bug is sync-side; if it still reads the old
-    // name, the bug is in the briefClose/briefCommit/commitDraft chain above, never reaching the account at all.
+    // CAS-1132: bisect "the UI never committed the edit locally" from "the commit landed but the push to
+    // the server failed/never fired" before ever asking the (real) network.
     await expect.poll(
-      () => pageA.evaluate((id) => { const c = cascades.find(x => x.id === id); return c && c.name; }, seededAgent.id),
+      () => pageA.evaluate((id) => { const c = cascades.find(x => x.id === id); return c && c.styles.Drama && c.styles.Drama.bar; }, seededAgent.id),
       { timeout: 5_000 },
-    ).toBe(newName);
+    ).toBeNull();
 
     // CAS-1109: saveCascades() pushes through acctOp immediately now, no debounce to wait out — this just
     // makes sure the queue is drained rather than racing the network.
     await pageA.evaluate(() => window.CascadePersistence.syncNow());
 
     await expect.poll(async () => {
-      const rows = await liveCascades(user.id);
-      const row = rows.find(r => r.id === seededAgent.id);
-      return row && row.name;
-    }, { timeout: 15_000 }).toBe(newName);
+      const criteria = await liveCascadeCriteria(seededAgent.id);
+      return criteria && criteria.styles && criteria.styles.Drama ? criteria.styles.Drama.bar : "missing";
+    }, { timeout: 15_000 }).toBeNull();
 
     await pageB.reload();
     await pageB.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
@@ -192,10 +184,10 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
     await expect.poll(
       () => pageB.evaluate((agentId) => {
         const c = cascades.find(x => x.id === agentId);
-        return c && c.name;
+        return c && c.styles.Drama ? c.styles.Drama.bar : "missing";
       }, seededAgent.id),
       { timeout: 15_000 },
-    ).toBe(newName);
+    ).toBeNull();
   } finally {
     await ctxA.close();
     await ctxB.close();

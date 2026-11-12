@@ -44,6 +44,7 @@
 <script src="capacitor-push-notifications.js"></script>
 <script src="capacitor-app.js"></script>
 <script src="capacitor-in-app-review.js"></script>
+<script src="capacitor-native-purchases.js"></script>
 <script src="capacitor-contact-picker.js"></script>
 <!-- CAS-947: the build stamp lives in its own generated file, not inlined into the classic script
      block below, because its `builtAt` timestamp changes on every build — inlining it would make the
@@ -3442,18 +3443,17 @@
   .favcell.lvl2 .favthumb{left:100%}
   .favname{font-size:13px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tickgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .tickcell{display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border-radius:10px;
-    border:1px solid var(--line);background:var(--panel2);color:var(--dim);font-size:13px;font-weight:700;
-    cursor:pointer;text-align:left}
-  .tickcell.on{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, transparent);color:var(--ink)}
-  .tickbox{width:16px;height:16px;border-radius:4px;border:1px solid var(--line);flex:0 0 auto;
-    display:grid;place-items:center;font-size:11px;line-height:1;color:#fff}
-  .tickcell.on .tickbox{border-color:var(--accent);background:var(--accent)}
+  /* Lee, 12 Nov: Date night / Family use the favourites grid's lozenge language, two-state — off is a dashed
+     lozenge with a dimmed name, on is the teal Include colour, the box sits right like the ✓ box there. */
+  .tickcell{display:flex;align-items:center;justify-content:space-between;gap:8px;height:38px;padding:0 8px 0 12px;
+    border-radius:10px;border:1px dashed var(--line);background:transparent;color:var(--faint);font:inherit;
+    font-size:13px;font-weight:600;cursor:pointer;text-align:left}
+  .tickcell.on{border:1px solid #138c7d;background:color-mix(in srgb, #138c7d 12%, transparent);color:var(--ink);font-weight:700}
+  .tickbox{width:28px;height:22px;border-radius:4px;border:1px solid #138c7d;flex:0 0 auto;
+    display:grid;place-items:center;font-size:11px;line-height:1;color:var(--faint)}
+  .tickcell.on .tickbox{background:#138c7d;color:#fff}
   /* .onbdot: still used by the Done screen's per-window alert rows (oafAlertRowsHTML). */
   .onbdot{width:7px;height:7px;border-radius:50%;background:var(--wc);display:inline-block}
-  /* .oaspreview: the Agent screen's "Preview setup ›" link (oasOpenPreview), until CAS-1344 retires it. */
-  .oaspreview{background:none;border:0;color:var(--accent);font-size:12.5px;font-weight:800;cursor:pointer;
-    padding:0;margin-left:6px}
   #oafNameChips{margin-top:12px}
 
   /* ---- CAS-1341: moods as lists — the v2 mood sheet and the card's list sheet. Reuses CAS-1339's .oarowstrip/
@@ -4908,7 +4908,7 @@
       <div class="splashword">CASCADE</div>
       <!-- CAS-257: the tagline. Directly under the wordmark, so the first thing after the name says what
            the thing IS — the bullets below say what it does. -->
-      <div class="splashtag">Movies</div>
+      <div class="splashtag">Your movie-watching engine</div>
       <!-- CAS-258: all five windows Cascade follows, not four — Purchase was missing, which made the strip
            quietly untrue about what the app tracks. Split 2 / 3: before it is home, then home. -->
       <div class="splashloz">
@@ -4923,9 +4923,9 @@
         </div>
       </div>
       <div class="splashbullets">
-        <div class="splashb"><svg class="splashtick" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#22D3EE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>find movies you'll love</span></div>
-        <div class="splashb"><svg class="splashtick" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#22D3EE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>always know what to watch on cinema, rental and streaming</span></div>
-        <div class="splashb"><svg class="splashtick" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#22D3EE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>always have the viewing inside track</span></div>
+        <div class="splashb"><svg class="splashtick" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#22D3EE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Never miss a must-see, in cinemas, to rent or streaming</span></div>
+        <div class="splashb"><svg class="splashtick" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#22D3EE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Always know what to watch next</span></div>
+        <div class="splashb"><svg class="splashtick" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" stroke="#22D3EE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>An agent that learns your taste</span></div>
       </div>
     </div>
     <!-- CAS-186: two doors, not one. New here → the setup flow. Been here → straight to your own
@@ -4975,7 +4975,7 @@
      (together) → (children) → (family) → name → done. Own stephdr/sharpstep/stepnav markup — same CSS
      classes the v2_about FLOWS/gotoStep engine's #stepHdr/#onbStep/#stepNav use, but entirely separate
      elements/ids/state, so this flow can never entangle with (or be entangled by) that untouched engine.
-     Body rendered by oafRender(); opened by oafOpen() — see ?oneagent=setup and oasOpenPreview(). -->
+     Body rendered by oafRender(); opened by oafOpen() — see flowStart() and afterSignIn(). -->
 <div class="stephdr" id="oafHdr" hidden>
   <div class="steprow">
     <button class="osback" type="button" id="oafBack" onclick="oafGoBack()" aria-label="Back" hidden>←</button>
@@ -15176,7 +15176,7 @@ window.closeAbout=()=>{ $("aboutScreen").classList.remove("open"); lockBodyScrol
 const PRIVACY_LEDE = "How Cascade, made by CoDynamics Pty Ltd, handles your information. Last updated 25 September 2026.";
 const PRIVACY_SECTIONS = [
   {heading:"Who we are",
-   paras:["Cascade (cascademovies.com and the Cascade iPhone app) is operated by CoDynamics Pty Ltd, ABN 28 135 826 809, Gordon NSW 2072, Australia. Questions about privacy go to lee@codynamics.com.au."]},
+   paras:["Cascade (cascademovies.com and the Cascade iPhone app) is operated by CoDynamics Pty Ltd, ABN 28 135 826 809, Australia. Questions about privacy go to hello@codynamics.com.au."]},
   {heading:"What we collect",
    paras:[
     "Your account. Cascade needs an account. We collect your email address to create it and to send you a one-time sign-in code. We record app activity (for example, which screens are opened and which features are used) so we can see what works and fix what doesn't, and we strip anything that looks like an email address out of it before it is stored. We store your agents, the films you pin, rate or mark, your streaming services and viewing preferences, and your notification settings, so they follow you between devices.",
@@ -15189,7 +15189,7 @@ const PRIVACY_SECTIONS = [
   {heading:"Who helps us run it",
    paras:["We use a small number of service providers, who process information only to provide their service to us: Supabase (accounts and database), Resend and Amazon SES (sending email), Apple (push notifications on iPhone), Cloudflare and GitHub (hosting and scheduled jobs). Their servers may be outside Australia. Film information comes from The Movie Database (TMDB), Watchmode and other film data sources; we do not send them your personal information."]},
   {heading:"Your choices",
-   paras:["You can turn alerts off at any time in the app. You can delete your account in the app (Menu → Account → Delete account); this deletes your account and the information stored with it. You can also ask us for a copy of your information, to correct it, or to delete it, by emailing lee@codynamics.com.au."]},
+   paras:["You can turn alerts off at any time in the app. You can delete your account in the app (Menu → Account → Delete account); this deletes your account and the information stored with it. You can also ask us for a copy of your information, to correct it, or to delete it, by emailing hello@codynamics.com.au."]},
   {heading:"Children",
    paras:["Cascade is not directed at children under 13, and we do not knowingly collect their personal information."]},
   {heading:"Changes",
@@ -15200,8 +15200,8 @@ const PRIVACY_BOLD_LEADS = ["Your account.", "Alerts.", "Friends and invites.", 
 function privacyParaHTML(text){
   const lead = PRIVACY_BOLD_LEADS.find(l=>text.startsWith(l));
   const rest = lead ? text.slice(lead.length) : text;
-  const linked = esc(rest).replace(/lee@codynamics\.com\.au/g,
-    `<a href="mailto:lee@codynamics.com.au" style="color:var(--accenttext)">lee@codynamics.com.au</a>`);
+  const linked = esc(rest).replace(/hello@codynamics\.com\.au/g,
+    `<a href="mailto:hello@codynamics.com.au" style="color:var(--accenttext)">hello@codynamics.com.au</a>`);
   return `<p class="ossub" style="margin-bottom:12px">${lead?`<b style="color:var(--ink)">${esc(lead)}</b>`:""}${linked}</p>`;
 }
 function renderPrivacy(){
@@ -15226,7 +15226,7 @@ document.addEventListener("keydown", e=>{ if(e.key==="Escape" && $("privacyScree
 // flag so it returns by flipping it, rather than being re-authored from scratch. Declared here (ahead of its
 // first use in HELP_ARTICLES below) because that array is built eagerly at load, not lazily inside a
 // function, so a later declaration would throw on the temporal dead zone.
-const MEMBERSHIP_ENABLED = false;
+const MEMBERSHIP_ENABLED = true;   // CAS-971: the membership is real now — iOS in-app purchase, server entitlement
 // ================= Help (CAS-977) =================
 // Not an external wiki, not a hosted site — a static array shipped with the build, so it works offline and
 // in the iOS app with no second source of truth to keep in sync. Each body is written from the behaviour in
@@ -18933,8 +18933,8 @@ const SHARP_STEPS = {
              string for each, so both are quotable and each is still written on one source line here. Note the
              price now reads "$4.99 / month" with spaces, as the ticket writes it. -->
         <div class="kfprice">
-          <div class="big">Cascade Membership is free for your first month</div>
-          <div class="sub">then <b>$4.99 / month</b> · cancel any time</div>
+          <div class="big">Cascade Membership</div>
+          <div class="sub">Billed monthly through your Apple ID · cancel any time</div>
         </div>` : ""}`;
     },
   },
@@ -19578,9 +19578,17 @@ function flowStart(startKey){
   // person, and never walks the v2_* sequence at all (it jumps straight to the Briefing) — excluded so its
   // saved answers, which other spokes (My services, Ages) still read, survive.
   if(startKey!=="pickagent") onbAnswersV2Save(onbAnswersV2Default());
-  $("onbStep").classList.add("open"); lockBodyScroll(true);
   logEvent("flow_start");
-  gotoStep(startKey||"v2_about","none");   // CAS-953: the first-run entry is v2_about, ahead of v2_intro
+  // CAS-1344: every first run (splash, empty signed-in account) is the CAS-1347 one-agent flow now; the old
+  // v2_about … v2_done FLOWS sequence is no longer reachable from here. "+ New Cascade" (startKey
+  // "pickagent") is a different path and still opens its own pickagent step below.
+  if(!startKey){
+    flowOn=false;   // the wizard that flag names is not what is on screen — afterSignIn closes the new one itself
+    oafOpen({mode:"new"});
+    return;
+  }
+  $("onbStep").classList.add("open"); lockBodyScroll(true);
+  gotoStep(startKey,"none");
 }
 function flowStop(){
   flowOn=false; flowNewAgent=false; briefOn=false; menuStepOn=false;
@@ -20226,7 +20234,7 @@ function renderOneAgentScreen(c){
   const title = (c.name||"").trim() || "Your agent";   // CAS-1352: unnamed agents keep the generic title
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
-    <p class="ossub">${n} verdict${n===1?"":"s"} learned<button type="button" class="oaspreview" onclick="oasOpenPreview()">Preview setup ›</button></p>
+    <p class="ossub">${n} verdict${n===1?"":"s"} learned</p>
     <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
 }
@@ -21377,7 +21385,9 @@ window.oamSaveMoodFromSheet=()=>{
   if(mood.id==="starred") mood.starredOnly=true;
   // CAS-1366: a save always stamps Releases' own repair marker, whichever sort was actually picked, so the
   // one-time load repair below (loadUserPrefs) never reverts a deliberate choice of Score back to release.
-  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=3; }
+  // 13 Nov: moodSort() only honours Releases' saved sort once sortChosen is stamped — the v1 sheet's
+  // save did that (CAS-1331/1333), this v2 save never did, so Score / A–Z on Releases silently reverted.
+  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=3; mood.sortChosen=true; }
   const list=oamMoodsListReal();
   const idx=list.findIndex(m=>m.id===mood.id);
   watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
@@ -21958,7 +21968,10 @@ const ONE_AGENT_SETUP_STYLES = Object.keys(TASTE_SHORT);   // the exact 19, in T
 
 let oafState = null;   // see oafOpen below for the full shape — null when closed
 let oafStep = "welcome";
-let oasSetupQueryConsumed = false;   // the ?oneagent=setup gate fires at most once per page load (afterSignIn)
+// CAS-1344: "new" = a brand-new account's first run (signed out until membership); "migrate" = a signed-in
+// account with no v2 agent, switched on once at next open (cannot be skipped).
+let oafMode = "new";
+let oafPendingDraft = null;   // a signed-out first run's draft, held until the account exists (membStartWork)
 const ONE_AGENT_FLOW_WHERE = [
   ["cinema", "At the cinema", "Often enough to plan around it"],
   ["rent", "Renting or buying", "Apple, Prime Video, Google and the like"],
@@ -21967,7 +21980,11 @@ const ONE_AGENT_FLOW_WHERE = [
 const ONE_AGENT_FAMILY_DEFAULT = ["Family","Animation","Adventure","Comedy"];
 // Lee, 11 Nov: Date night starts with exactly these on, whatever the person's own genre picks.
 const ONE_AGENT_TOGETHER_DEFAULT = ["Comedy","Documentary","Romance","Mystery","Drama"];
-function oafHasServicesStep(){ return oafState.where.has("rent") || oafState.where.has("stream"); }
+// CAS-1344: a migrating account that already has any service set is not asked again.
+function oafHasServicesStep(){
+  if(oafMode==="migrate" && (prefs.store.size || prefs.sub.size)) return false;
+  return oafState.where.has("rent") || oafState.where.has("stream");
+}
 function oafHasChildrenStep(){ return oafState.age==="18plus"; }
 // Only the windows picked on the where step ever carry an alert — a window not picked is never set on, in
 // the done screen's own alert rows and in oneAgentBuildDraft's styles[s].al, whatever oafState itself holds.
@@ -22013,8 +22030,8 @@ function oafTickCellHTML(style, set){
   const on=set.has(style);
   return `<button type="button" class="tickcell${on?" on":""}" role="checkbox" aria-checked="${on}"
       data-style="${escA(style)}">
-    <span class="tickbox" aria-hidden="true">${on?"✓":""}</span>
     <span>${esc(oneAgentShortName(style))}</span>
+    <span class="tickbox" aria-hidden="true">✓</span>
   </button>`;
 }
 function oafTickGridHTML(set){
@@ -22103,9 +22120,12 @@ function oneAgentCommit(draft){
 // oafState with the rest of the flow above; today's old first run (v2_about … v2_done) is not touched by
 // this ticket and must never be able to see this flow running. ===========================================
 function oafWelcomeHTML(){
+  if(oafMode==="migrate") return `<h2 class="osh">We've simplified your agents</h2>
+    <p class="obintrotext">Cascade now has one agent that learns your taste, and moods for the lists you like to browse. A few quick questions and you're set.</p>`;
   return `<h2 class="osh">Let's get you set up.</h2>
-    <p class="obintrotext">Your Cascade agent hunts thousands of new and catalogue movies for you.</p>
-    <p class="obintrotext">A few quick questions and it goes to work.</p>`;
+    <p class="obintrotext">Cascade is your movie-watching engine. It tracks the films you mustn't miss as they move from cinema to rental to streaming.</p>
+    <p class="obintrotext">Members always know what to watch next, with personalised alerts and moods by genre, actor or director. Every film you rate teaches your agent your taste, and it sharpens what it finds for you.</p>
+    <p class="obintrotext">Answer a few quick questions to set up your membership. That's how we brief your agent.</p>`;
 }
 function oafWhereHTML(){
   return `<h2 class="osh">Where do you watch movies?</h2>
@@ -22316,7 +22336,7 @@ function oafPaint(){
     family:oafFamilyHTML, nameAgent:oafNameAgentHTML, done:oafDoneHTML};
   const inner=$("oafInner"); if(!inner) return;
   inner.innerHTML = fns[oafStep]();
-  $("oafBack").hidden = oafStep==="welcome";
+  $("oafBack").hidden = oafStep==="welcome" && oafMode==="migrate";   // CAS-1344: a migration cannot be skipped
   $("oafFill").style.width = oafProgressPct(oafStep)+"%";
   const cta=$("oafCta");
   cta.textContent = oafStep==="done" ? "Start watching" : "Continue";
@@ -22368,7 +22388,21 @@ window.oafGoContinue=()=>{
   if(oafStep==="family") return oafShow("nameAgent");
   if(oafStep==="nameAgent") return oafShow("done");
 };
+// Closes the overlay chrome without touching oafState/draft (shared by Start watching, Back-to-splash and the
+// hand-off to membership).
+function oafHide(){
+  $("oafScreen").classList.remove("open");
+  $("oafHdr").hidden=true; $("oafNav").hidden=true;   // Lee, 1 Nov: these stayed over Watch after Start watching
+  lockBodyScroll(false);
+}
+const oafIsOpen = () => !!$("oafScreen") && $("oafScreen").classList.contains("open");
 window.oafGoBack=()=>{
+  if(oafStep==="welcome"){
+    // Off the front of a new account's first run: out to the splash, the draft abandoned (CAS-1099 rule).
+    if(oafMode==="migrate") return;
+    oafHide(); oafState=null; onbDraftModeOn=false;
+    return showSplash();
+  }
   if(oafStep==="where") return oafShow("welcome");
   if(oafStep==="services") return oafShow("where");
   if(oafStep==="favourites") return oafShow(oafHasServicesStep() ? "services" : "where");
@@ -22385,25 +22419,18 @@ window.oafGoBack=()=>{
   }
   if(oafStep==="done") return oafShow("nameAgent");
 };
-// Entry point — a signed-in account's ?oneagent=setup, or the Agent screen's "Preview setup ›" link
-// (pre-filled from the current agent — see oasOpenPreview below). A prefilled re-run can only recover the
-// genre fav/incl split (c.styles[s].fav, written by oneAgentBuildDraft above); age/partner/children were
-// never saved on the agent itself, so a re-run always asks them fresh.
+// Entry point — flowStart() opens it for a brand-new account ({mode:"new"}); afterSignIn() opens it for a
+// signed-in account with no v2 agent ({mode:"migrate"}). CAS-1344 retired the ?oneagent=setup entry and the
+// Agent screen's "Preview setup ›" link that used to be the only ways in.
 window.oafOpen=(opts)=>{
   opts=opts||{};
-  const prefillAgent = opts.prefillAgent || null;
+  oafMode = opts.mode==="migrate" ? "migrate" : "new";
+  oafPendingDraft=null;
   oafState = {
     where: new Set(), favs: {}, age: null, partner: null, children: null,
     together: new Set(), togetherInit: false, family: new Set(), familyInit: false,
-    name: (prefillAgent && prefillAgent.name) || "",
-    prefillAgent,
+    name: "",
   };
-  if(prefillAgent){
-    ONE_AGENT_SETUP_STYLES.forEach(s=>{
-      const st=(prefillAgent.styles||{})[s];
-      if(st && st.bar!=null) oafState.favs[s] = st.fav ? "fav" : "incl";
-    });
-  }
   oafStep="welcome";
   $("oafHdr").hidden=false; $("oafNav").hidden=false;
   $("oafScreen").scrollTop=0;
@@ -22411,29 +22438,42 @@ window.oafOpen=(opts)=>{
   lockBodyScroll(true);
   oafPaint();
 };
-// The Agent screen's own "Preview setup ›" link (until CAS-1344) — re-runs the whole flow, with favourites
-// pre-filled from the account's current v2 agent.
-window.oasOpenPreview=()=>{
-  const c=oneAgentCriteria(); if(!c) return;
-  oafOpen({prefillAgent:c});
-};
-// The done screen's "Start watching" — builds the draft, commits it (oneAgentCommit), then closes everything
-// and lands on Watch, same tail as the wizard always had.
+// The done screen's "Start watching". A migrating account commits straight away (oneAgentCommit) and lands on
+// Watch. A new account commits the draft in memory (nothing reaches the server while onbDraftModeOn), then
+// hands over to the existing membership step; membStartWork writes the moods once the account exists.
 window.oafStartWatching=()=>{
   if(!oafState) return;
   const draft = oneAgentBuildDraft();
   oneAgentCommit(draft);
-  $("oafScreen").classList.remove("open");
-  $("oafHdr").hidden=true; $("oafNav").hidden=true;   // Lee, 1 Nov: these stayed over Watch after Start watching
-  lockBodyScroll(false);
+  if(oafMode==="new"){
+    try{ localStorage.setItem("cascade_onboarded","1"); }catch(e){}
+    oafPendingDraft = draft;
+    oafHide();   // oafState stays: membership's Back reopens the flow on its done screen
+    onbFlow.workingAgents = cascades.slice(); onbFlow.reportStats = null;
+    logEvent("agent_created",{count:cascades.length, sharpened:true});
+    openOnbMembership();
+    return;
+  }
+  oafHide();
   oafState=null;
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
   if(typeof render==="function") render();
+  applyDeepLink();
+  applyPendingPushAlert();
   // CAS-1349: the v2 guided tour's one automatic trigger point for a brand-new v2 account — straight after
   // this screen's own render() has painted Watch, same "first listing paint" rule CAS-976 used for the
   // non-v2 tour from membStartWork.
   maybeStartTutorial();
 };
+// Membership's Back: undo the in-memory commit and reopen the flow on its done screen, answers intact.
+function oafReopenFromMembership(){
+  closeMembership();
+  cascades.length=0; oafPendingDraft=null; onbFlow.workingAgents=null;
+  $("oafHdr").hidden=false; $("oafNav").hidden=false;
+  $("oafScreen").classList.add("open");
+  lockBodyScroll(true);
+  oafShow("done");
+}
 
 // ================= CAS-636: Moving — the alert feed made visible =================
 // CAS-848: the screen's own subtitle, shared by the loading state and the real one so they never say two
@@ -23205,13 +23245,14 @@ function renderAccount(){
     <div class="ucard">
       ${who.in ? acctRow("👤","Signed in", esc(who.email), "openAccountAuth()")
                : acctRow("👤","Not signed in", "Sign in to sync across devices", "openAccountAuth()")}
-      ${MEMBERSHIP_ENABLED ? acctRow("💳","Plan", "Free for your first month · then $4.99/month · cancel any time", null, false) : ""}
+      ${MEMBERSHIP_ENABLED ? acctRow("💳","Membership", membAccountPlanText(), null, false) : ""}
+      ${MEMBERSHIP_ENABLED && membIsNativeApp() ? acctRow("↩️","Restore Purchases", "Already a member on this Apple ID? Bring it back.", "openMembershipRestore()") : ""}
       ${MEMBERSHIP_ENABLED ? ((typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform())
           ? acctRow("⚙️","Manage or cancel", "A subscription bought in the app is cancelled in the App Store.", "openManageSubscription()")
           : acctLink("⚙️","Manage or cancel", "A subscription bought in the app is cancelled in the App Store.", MANAGE_SUB_URL)) : ""}
       ${who.in ? acctRow("🗑️","Delete account", "This can't be undone.", "openDeleteAccount()") : acctSoon("🗑️","Delete account")}
     </div>
-    ${MEMBERSHIP_ENABLED ? `<p class="unone" style="margin:10px 2px 0">Prototype — no card is held and nothing is ever charged.</p>` : ""}`;
+    `;
 }
 // CAS-1126: the Settings screen — the three defaults screens (Where & when, My services, Languages) plus
 // the notification defaults, gathered in the menu's new middle group. Each row opens the
@@ -23840,7 +23881,7 @@ function openMembership(agentKey, nameOverride, cascade){
     <span class="cascpill" id="membPill">CASCADE</span>
     <h2 class="membh" id="membHead">Cascade Membership</h2>
     ${haul}
-    <p class="memfine">Free for your first month · then <b>$4.99/month</b> · cancel any time. No card needed — we'll always ask before anything is ever charged.</p>
+    <p class="memfine" id="membFine">${esc(membFineText())}</p>
     <div class="membenefits">
       ${MEMB_BENEFITS.map(b=>`<div class="mbrow"><span class="mbic">${b.ic}</span>
         <span class="mbtx"><span class="mbt">${esc(b.name)}</span><span class="mbd">${esc(b.sub)}</span></span>
@@ -23868,9 +23909,12 @@ function openMembership(agentKey, nameOverride, cascade){
     </div>
     <p class="pnote">By continuing you agree to our
       <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button>.</p>` : ""}
-    <button class="membcta" type="button" onclick="membStart()">Start my free month</button>
+    <p class="fielderr" id="membPurchaseMsg" hidden></p>
+    <button class="membcta" type="button" onclick="membStart()">${esc(membCtaLabel())}</button>
+    ${membIsNativeApp() ? `<button type="button" class="linkbtn" id="membRestoreBtn" onclick="membRestoreTap()">Restore Purchases</button>` : ""}
     ${posters?`<div class="rvgrid membgrid" id="membPosterGrid">${posters}</div>`:""}`;
   membResetCodeState();   // B10: always opens in State A
+  membLoadProduct();      // CAS-971: StoreKit's localized price/trial text, native only
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
   logEvent("membership_shown",{agent:agentKey||null, haul:n});
@@ -23926,7 +23970,7 @@ function openOnbMembership(){
       ${OB_MEMB_BENEFITS.map(b=>`<div class="mbrow"><span class="mbic">✓</span>
         <span class="mbtx"><span class="mbt">${esc(b)}</span></span></div>`).join("")}
     </div>
-    <p class="memfine">Free for your first month · then <b>$4.99/month</b> · cancel any time. No card needed — we'll always ask before anything is ever charged.</p>
+    <p class="memfine" id="membFine">${esc(membFineText())}</p>
     ${needsEmail ? `
     <div id="membEmailField">
       <div class="flabel">Email</div>
@@ -23949,9 +23993,12 @@ function openOnbMembership(){
     </div>
     <p class="pnote">By continuing you agree to our
       <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button>.</p>` : ""}
-    <button class="membcta" type="button" onclick="membStart()">Start my free month</button>
+    <p class="fielderr" id="membPurchaseMsg" hidden></p>
+    <button class="membcta" type="button" onclick="membStart()">${esc(membCtaLabel())}</button>
+    ${membIsNativeApp() ? `<button type="button" class="linkbtn" id="membRestoreBtn" onclick="membRestoreTap()">Restore Purchases</button>` : ""}
     ${posters?`<div class="rvgrid membgrid" id="membPosterGrid">${posters}</div>`:""}`;
   membResetCodeState();   // B10: always opens in State A
+  membLoadProduct();      // CAS-971: StoreKit's localized price/trial text, native only
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
   logEvent("membership_shown",{onboarding:true, agents:n});
@@ -23961,6 +24008,7 @@ function openOnbMembership(){
 // like any other flowBack() hop; notifyPrefs (and so the email field) is untouched by any of this, so
 // it comes back populated (AC7).
 window.onbMembBack=()=>{
+  if(oafState) return oafReopenFromMembership();   // CAS-1344
   closeMembership();
   flowOn=true;
   gotoStep("v2_done","back");
@@ -23968,7 +24016,7 @@ window.onbMembBack=()=>{
 };
 // Starting the free month goes straight to the #12 listing with the finish-setup bar (CAS-121) — no invite,
 // no learn step. In the real flow the sharpened agent is already committed; on the ?step=membership preview we
-// seed one so the listing has cards. Prototype — no real charge is ever made.
+// seed one so the listing has cards.
 // CAS-167: the tap used to do all of this inline, and the whole listing is built synchronously — ~160 cards
 // and 18k DOM nodes, 23ms of blocked main thread on a desktop and several seconds of it on Lee's phone. The
 // button had no state of its own, so for that whole stretch the screen was frozen on an un-pressed button:
@@ -24137,7 +24185,7 @@ function membSubmitCode(){
     membStarting=false;
     if($("membScreen").classList.contains("open") && btn){
       btn.disabled=false; btn.classList.remove("busy"); btn.removeAttribute("aria-busy");
-      btn.textContent="Start my free month";
+      btn.textContent=membCtaLabel();
     }
   };
   if(btn){
@@ -24150,7 +24198,7 @@ function membSubmitCode(){
       // Exactly what the #authVerify step's onVerified callback used to do — proceed(true), the
       // brand-new-signup path through membStartWork/membCompleteNewMembership, unchanged.
       requestAnimationFrame(()=>requestAnimationFrame(()=>{
-        membStartWork(true).finally(idle);
+        membEnsureMember(()=>membStartWork(true)).finally(idle);
       }));
     } else {
       // Not cleared here: onbMembershipInFlight stays true across a wrong-code retry (only Change email
@@ -24172,6 +24220,7 @@ function discardOnbDraft(){
   notifyPrefs=notifyPrefsDefault();
   watchPrefs=watchPrefsDefaults();   // CAS-1157: the draft's cinema/rent-derived windows go with it
   onbFlow.workingAgents=null;
+  oafPendingDraft=null; oafState=null;   // CAS-1344
 }
 // The membership screen's own "Sign in" button, shown only alongside membAcctExistsShow's message —
 // abandons the draft exactly as any other "back to splash" exit would (CAS-1099 change 4: the draft was
@@ -24207,12 +24256,12 @@ window.membStart=()=>{
     // than leaving a spinner that can never resolve.
     if($("membScreen").classList.contains("open") && btn){
       btn.disabled=false; btn.classList.remove("busy"); btn.removeAttribute("aria-busy");
-      btn.textContent="Start my free month";
+      btn.textContent=membCtaLabel();
     }
   };
   if(btn){
     btn.disabled=true; btn.classList.add("busy"); btn.setAttribute("aria-busy","true");
-    btn.innerHTML=`<span class="btnspin"></span>${needsEmail?"Sending your code…":"Starting your free month…"}`;
+    btn.innerHTML=`<span class="btnspin"></span>${needsEmail?"Sending your code…":"Starting your membership…"}`;
   }
   logEvent("membership_start");
   // The membership screen stays up until the listing is ready, so the spinner is what the user watches
@@ -24220,7 +24269,7 @@ window.membStart=()=>{
   // CAS-1099: viaNewSignup tells membStartWork() whether this run is a genuinely new, signed-out signup
   // (drive complete_membership) or an already-signed-in return (the old direct-commit body, unchanged).
   const proceed=(viaNewSignup)=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    membStartWork(viaNewSignup).finally(idle);
+    membEnsureMember(()=>membStartWork(viaNewSignup)).finally(idle);
   }));
   if(needsEmail){
     // CAS-1099: set before any network call below — the SIGNED_IN event a confirmed code produces can
@@ -24248,6 +24297,173 @@ window.membStart=()=>{
     });
   } else proceed(false);
 };
+// ---- CAS-971: the membership is real — Apple in-app purchase, entitlement read from the server -----------
+// Cascade is an iOS-only paid app. The purchase happens only in the native app (StoreKit 2 via the vendored
+// @capgo/native-purchases plugin); cascademovies.com never sells it. Whether an account is a member is a
+// SERVER fact (public.memberships, written only by the membership-verify / membership-notifications Edge
+// Functions, or by Lee for a comp) — membEnt below is just this page's in-memory copy of the last read,
+// never persisted, so clearing localStorage cannot change it. "unknown" (not loaded yet, or the table is
+// not reachable) fails OPEN: an outage or a not-yet-applied migration must never lock a member out.
+const MEMB_PRODUCT_ID="au.com.codynamics.cascade.membership.monthly";
+let membEnt={state:"unknown", row:null};   // state: "unknown" | "active" | "none"
+let membProduct=null;                      // StoreKit's localized product info, native only
+let membBusy=false;
+let membLastMessage="";                    // what membMessage() last painted ("" = nothing shown)
+function membIsNativeApp(){ return !!(typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform()); }
+function membPlugin(){ return (typeof Capacitor!=="undefined" && Capacitor.Plugins && Capacitor.Plugins.NativePurchases) || null; }
+// Mirrors public.is_active_member(): not expired, and not revoked/expired by Apple. Grace and billing-retry
+// still count — Apple is still trying to collect.
+function membRowActive(row, nowMs){
+  if(!row) return false;
+  if(!["active","grace","billing_retry"].includes(row.status)) return false;
+  const exp=Date.parse(row.expires_at);
+  return Number.isFinite(exp) && exp>(nowMs==null?Date.now():nowMs);
+}
+async function membLoadEntitlement(){
+  const a=window.CascadeAuth;
+  if(!a || a.status!=="signed-in" || !a.client || !a.user){ membEnt={state:"unknown", row:null}; return membEnt; }
+  try{
+    const {data, error}=await a.client.from("memberships").select("status,expires_at,is_trial,source").eq("user_id", a.user.id).maybeSingle();
+    if(error){ console.warn("Cascade: memberships read failed", error); membEnt={state:"unknown", row:null}; return membEnt; }
+    membEnt={state: membRowActive(data) ? "active" : "none", row:data||null};
+  }catch(e){ console.warn("Cascade: memberships read failed", e); membEnt={state:"unknown", row:null}; }
+  return membEnt;
+}
+// A purchase has exactly four outcomes. The plugin rejects for all three non-success ones, so the message
+// is the only discriminator ("User cancelled" / "Transaction pending" in its Swift source).
+function membClassifyPurchase(err){
+  const msg=String((err && (err.message||err.errorMessage)) || err || "");
+  if(/cancel/i.test(msg)) return "cancelled";
+  if(/pending/i.test(msg)) return "pending";
+  return "failed";
+}
+// "1 month free, then A$3.99/month" — every figure comes from StoreKit's localized product info.
+function membPriceLine(p){
+  if(!p || !p.priceString) return "";
+  const intro=p.introductoryPrice;
+  const per="/month";
+  if(intro && Number(intro.price)===0 && intro.subscriptionPeriod){
+    const n=(intro.subscriptionPeriod.numberOfUnits||intro.numberOfPeriods||1);
+    const unit=({0:"day",1:"week",2:"month",3:"year"})[intro.subscriptionPeriod.unit]||"month";
+    return `${n} ${unit}${n===1?"":"s"} free, then ${p.priceString}${per} · cancel any time.`;
+  }
+  return `${p.priceString}${per} · cancel any time.`;
+}
+function membAccountPlanText(){
+  const r=membEnt.row;
+  if(membEnt.state==="active" && r){
+    const d=new Date(r.expires_at).toLocaleDateString(undefined,{day:"numeric",month:"long",year:"numeric"});
+    if(r.source==="comp") return "Complimentary membership";
+    return (r.is_trial ? "Free trial until " : "Active · renews ") + d;
+  }
+  return membEnt.state==="none" ? "No active membership" : "Membership is started in the Cascade iPhone app.";
+}
+function membHasFreeTrial(p){ return !!(p && p.introductoryPrice && Number(p.introductoryPrice.price)===0); }
+function membCtaLabel(){
+  if(!membIsNativeApp()) return "Continue";
+  return (membProduct && !membHasFreeTrial(membProduct)) ? "Subscribe" : "Start free trial";
+}
+function membFineText(){
+  if(!membIsNativeApp()) return "Membership is started in the Cascade iPhone app.";
+  const line=membPriceLine(membProduct);
+  return line || "Billed monthly through your Apple ID · cancel any time.";
+}
+async function membLoadProduct(){
+  const pl=membPlugin(); if(!membIsNativeApp() || !pl || membProduct) return membProduct;
+  try{ const r=await pl.getProduct({productIdentifier:MEMB_PRODUCT_ID, productType:"subs"}); membProduct=r && r.product || null; }
+  catch(e){ console.warn("Cascade: product lookup failed", e); }
+  const fine=$("membFine"); if(fine) fine.textContent=membFineText();
+  const btn=document.querySelector(".membcta"); if(btn && !btn.disabled) btn.textContent=membCtaLabel();
+  return membProduct;
+}
+// Hands Apple's signed transaction to the verify function, which checks it against Apple's chain and writes
+// the member row; then re-reads the server's answer.
+async function membSyncTransaction(jws){
+  const a=window.CascadeAuth;
+  if(!jws) throw new Error("no signed transaction");
+  const {error}=await a.client.functions.invoke("membership-verify", {body:{signedTransaction:jws}});
+  if(error) throw error;
+  return membLoadEntitlement();
+}
+function membMessage(kind, text){
+  membLastMessage=text||"";
+  const el=$("membPurchaseMsg"); if(!el) return;
+  el.hidden=!text; el.textContent=text||""; el.dataset.kind=kind||"";
+  el.setAttribute("role", kind==="failed" ? "alert" : "status");
+}
+// Returns {outcome:"success"|"cancelled"|"pending"|"failed"}; paints the matching message. A cancel shows
+// nothing at all — the person chose it, it is not an error.
+async function membBuy(){
+  const pl=membPlugin(), a=window.CascadeAuth;
+  if(!pl){ membMessage("failed","Purchases aren't available on this device."); return {outcome:"failed"}; }
+  membMessage("", "");
+  try{
+    const tx=await pl.purchaseProduct({productIdentifier:MEMB_PRODUCT_ID, productType:"subs", appAccountToken:a && a.user ? a.user.id : undefined});
+    try{ await membSyncTransaction(tx && tx.jwsRepresentation); }
+    catch(e){ console.warn("Cascade: membership verify failed", e); membMessage("failed","Your purchase went through but we couldn't confirm it yet. Tap Restore Purchases to try again."); return {outcome:"failed"}; }
+    return {outcome:"success"};
+  }catch(e){
+    const outcome=membClassifyPurchase(e);
+    if(outcome==="pending") membMessage("pending","Your purchase is waiting for approval. It'll unlock here as soon as it's approved.");
+    else if(outcome==="failed") membMessage("failed","The purchase didn't go through. Nothing was charged — please try again.");
+    return {outcome};
+  }
+}
+async function membRestore(){
+  const pl=membPlugin();
+  if(!pl){ membMessage("failed","Purchases aren't available on this device."); return {outcome:"failed"}; }
+  membMessage("", "");
+  try{
+    await pl.restorePurchases();
+    const r=await pl.getPurchases({productType:"subs"});
+    const mine=((r && r.purchases)||[]).filter(t=>t.productIdentifier===MEMB_PRODUCT_ID && t.jwsRepresentation);
+    if(!mine.length){ membMessage("failed","We couldn't find a Cascade membership on this Apple ID."); return {outcome:"failed"}; }
+    await membSyncTransaction(mine[mine.length-1].jwsRepresentation);
+    if(membEnt.state!=="active"){ membMessage("failed","That membership has expired. Start a new one to continue."); return {outcome:"failed"}; }
+    return {outcome:"success"};
+  }catch(e){
+    membMessage("failed","We couldn't restore your purchases. Please try again.");
+    return {outcome:"failed"};
+  }
+}
+// Runs `go` once the person is a member: a native, signed-in non-member buys first; anything else (web,
+// guest build, already a member, unknown) passes straight through.
+async function membEnsureMember(go){
+  if(!membIsNativeApp() || !window.CascadeAuth || window.CascadeAuth.status!=="signed-in") return go();
+  await membLoadEntitlement();
+  if(membEnt.state!=="none") return go();
+  const r=await membBuy();
+  if(r.outcome==="success") return go();
+}
+window.membRestoreTap=async()=>{
+  if(membBusy) return; membBusy=true;
+  const r=await membRestore(); membBusy=false;
+  if(r.outcome==="success"){ closeMembership(); membGateDone(); }
+};
+window.openMembershipRestore=async()=>{      // the Account screen's row
+  const r=await membRestore();
+  if(typeof window.toast==="function") window.toast(r.outcome==="success" ? "Membership restored." : "No membership found to restore.");
+};
+// The gate. After sign-in, a signed-in account with a definite "no active membership" answer is held on the
+// membership screen (native: Start free trial / Subscribe + Restore; web: the short iPhone-app message). A
+// lapsed member keeps their account and data — nothing is deleted, resubscribing just reopens the door.
+let membGated=false;
+function membGateDone(){ membGated=false; }
+async function membGateCheck(){
+  if(onbMembershipInFlight || flowOn || (typeof oafIsOpen==="function" && oafIsOpen())) return;
+  await membLoadEntitlement();
+  if(membEnt.state!=="none") { if(membGated){ closeMembership(); membGated=false; } return; }
+  membGated=true;
+  openMembership(null, null, null);
+  const head=$("membHead"); if(head) head.textContent="Cascade Membership";
+  if(!membIsNativeApp()){
+    const btn=document.querySelector(".membcta"); if(btn) btn.remove();
+    const f=$("membFine"); if(f) f.textContent="Membership is started in the Cascade iPhone app. Once you're a member, sign in here with the same account and everything is waiting for you.";
+  } else {
+    membLoadProduct();
+  }
+}
+window.membGateCheck=membGateCheck;
 // ---- GUIDED TOUR (CAS-1317, replaces CAS-976's five coach marks) ----------------------------------------
 // Shown once per account the first time the listing paints after onboarding. Where CAS-976 pointed at four
 // small controls in place, this tour shows the whole interface first and drills into detail after: it
@@ -24634,6 +24850,16 @@ async function membStartWork(viaNewSignup){
     // verified), same "allow retry" rule the ticket's own change 3 describes.
     const outcome = await membCompleteNewMembership();
     if(outcome==="error") return;
+    // CAS-1344: the account exists now — write the one-agent draft's moods (the agent itself went up with
+    // complete_membership). An account that already existed is never merged with a draft.
+    if(oafPendingDraft && outcome==="created"){
+      const d=oafPendingDraft;
+      watchMoods = d.moods.map(m=>({...m}));
+      pushViewField("moods", watchMoods.map(m=>({...m})));
+      watchMoodSel = "releases";
+      pushViewField("mood", watchMoodSel);
+    }
+    oafPendingDraft=null; oafState=null;
   } else if(!cascades.length){
     const s=STARTERS.find(x=>x.key==="streaming");   // CAS-143: the R5 presets replaced watch_tonight
     if(s){ draft=normCascade(draftFromTemplate({key:s.key, icon:s.icon, name:s.name, crit:s.crit})); commitDraft(); }
@@ -24780,19 +25006,14 @@ function renderInvite(){
       <div class="invh">Turn your search into an agent.</div>
       <p class="invp">Right now it's watching for you. Keep it on and it never stops — it finds new films the
         moment they match, in every window, every day, so you don't have to look.</p>
-      ${MEMBERSHIP_ENABLED ? `<div class="invprice">
-        <span class="free">Free for a month</span><span class="then">then $3/month</span>
-        <span class="anchor">≈ less than half a rental</span>
-      </div>` : ""}
-      <p class="invnote">A preview — no card needed, and we'd always ask before anything is ever charged.</p>
+      <p class="invnote">Turn these on to hear about films the moment they match.</p>
       <div class="invrow"><div class="ir-main"><div class="ir-name">🔔 App alerts</div>
         <div class="ir-sub">A nudge here when one of your films moves.</div></div>${tglHTML("alerts","App alerts")}</div>
       <div class="invrow"><div class="ir-main"><div class="ir-name">✉️ Email</div>
         <div class="ir-sub">The same alerts, in your inbox.</div></div>${tglHTML("email","Email")}</div>
       <button class="invnext" type="button" onclick="inviteGo(1)">Continue</button>
       <button class="invskip" type="button" onclick="inviteFinish()">Not now — keep it as it is</button>
-      <p class="invnote" style="margin-top:12px;text-align:center">Prototype — these switches are for the demo only:
-        no account, no payment, no real notifications.</p>`;
+      `;
   } else if(inviteStep===1){
     b.innerHTML=`
       <div class="invh">Tune it to your taste.</div>
@@ -24820,7 +25041,6 @@ function renderInvite(){
       <div class="invstatus">
         ${row("🔔 Alerts", agentState.alerts)}
         ${row("🎯 Learning", agentState.learning)}
-        ${MEMBERSHIP_ENABLED ? row("🎁 Free month", true) : ""}
       </div>
       <button class="invnext" type="button" onclick="inviteFinish()">See what it found</button>`;
   }
@@ -25880,6 +26100,7 @@ function openSharedFromURL(){
 // top of the listing this function is about to show.
 function afterSignIn(){
   screenResume=null;
+  membGateCheck();   // CAS-971: a signed-in account with no active membership is held on the membership screen
   const splashUp=$("splash").classList.contains("open");
   closeModal($("authModal"));
   try{ localStorage.setItem("cascade_onboarded","1"); }catch(e){}
@@ -25892,16 +26113,11 @@ function afterSignIn(){
   // the same flowStop() either way, just no longer conditioned on which of the two happened to be showing.
   if(splashUp || flowOn) flowStop();
   lockBodyScroll(false);
-  // CAS-1342/CAS-1347: a signed-in account opening ?oneagent=setup gets the six-screen first run on top of
-  // its normal landing — gated until CAS-1344 replaces first-run onboarding outright. Guarded so a second
-  // afterSignIn() this session (e.g. a token refresh re-firing the account fan-out) never reopens it under
-  // the person's hands.
-  if(URLQ.get("oneagent")==="setup" && !oasSetupQueryConsumed){
-    oasSetupQueryConsumed=true;
-    if(cascades.length){ activeId=null; openCascade(cascades[0].id, false); }
-    else { showFoundList(); render(); }
-    oafOpen();
-    return;
+  // CAS-1344: a signed-in arrival closes a new account's first run still open underneath (the account is the
+  // authority — see above), and never reopens a migration already on screen (a token refresh re-firing this).
+  if(oafIsOpen()){
+    if(oafMode==="migrate") return;
+    oafHide(); oafState=null; oafPendingDraft=null; onbDraftModeOn=false;
   }
   if(cascades.length){
     // CAS-420/CAS-409/CAS-566: arrival at an account with agents already made is arrival at the FIRST one.
@@ -25918,6 +26134,9 @@ function afterSignIn(){
     activeId=null;
     openCascade(cascades[0].id, false);
     logEvent("signin_returning",{cascades:cascades.length});
+    // CAS-1344: an account with no v2 agent is switched on once, and cannot skip it. The deep link and any held
+    // push tap wait for oafStartWatching, which applies them.
+    if(!oneAgentCriteria()){ oafOpen({mode:"migrate"}); return; }
     applyDeepLink();   // CAS-962: arrival, same as the boot path's "onboarding already seen" branch
     applyPendingPushAlert();   // CAS-1206: same arrival moment, for a held push tap
     return;

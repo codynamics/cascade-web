@@ -153,8 +153,14 @@ export async function freshAppSignedIn(page){
   const { url, anonKey, serviceRoleKey } = signedInEnv();
   const admin = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
   const email = e2eTestEmail();
-  const { error: createErr } = await admin.auth.admin.createUser({ email, email_confirm: true });
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({ email, email_confirm: true });
   if(createErr) throw new Error(`createUser(${email}) failed: ${createErr.message}`);
+  // CAS-971: the app holds a signed-in account with no active membership on the membership screen (which has
+  // no purchase button on web). QA accounts are comped server-side, the documented mechanism.
+  const { error: compErr } = await admin.from("memberships").upsert(
+    { user_id: created.user.id, product_id: "comp", status: "active", expires_at: "2099-12-31", source: "comp" },
+    { onConflict: "user_id" });
+  if(compErr) throw new Error(`comp membership(${email}) failed: ${compErr.message}`);
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({ type: "magiclink", email });
   if(linkErr) throw new Error(`generateLink(${email}) failed: ${linkErr.message}`);
   const code = linkData && linkData.properties && linkData.properties.email_otp;
@@ -203,10 +209,12 @@ export const numberIn = s => {
  * actually happens instead of assuming the splash wins. */
 export async function toShortlist(page, kind){
   await freshAppSignedIn(page);
-  await page.waitForFunction(() => flowOn === true || document.querySelector("#splashCta"));
-  if(!(await page.evaluate(() => flowOn === true))){
+  // CAS-1344: the first run is the one-agent flow (#oafScreen), not the old flowOn wizard.
+  const oafUp = () => page.evaluate(() => !!document.querySelector("#oafScreen.open"));
+  await page.waitForFunction(() => document.querySelector("#oafScreen.open") || document.querySelector("#splashCta"));
+  if(!(await oafUp())){
     try{ await page.locator("#splashCta").click({ timeout: 5000 }); }
-    catch(e){ if(!(await page.evaluate(() => flowOn === true))) throw e; }
+    catch(e){ if(!(await oafUp())) throw e; }
   }
   await walkToServices(page, kind);
 }
@@ -217,43 +225,16 @@ export async function toShortlist(page, kind){
  * answer the flow's two gated opening questions (cinema, rent) instead of finishFlow()'s blind Continue loop
  * hanging on them for 90s (CAS-1099 requeue: that is exactly what S1/S6/S10 did before this split existed). */
 export async function walkToServices(page, kind){
-  // CAS-1018: scoped to #onbStepInner, not a bare ".obhd" — gotoStep's dual-pane slide leaves the
-  // outgoing step's .obhd in the DOM alongside the incoming one for the length of the transition
-  // (intentional, see gotoStep's own comment), and #onbStepInner is the id it moves onto the
-  // incoming pane immediately, so this always resolves to exactly one element.
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");   // v2_intro (CAS-1312)
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);              // the flow slides between steps
-  await expect(page.locator("#obCinemaOpts")).toBeVisible();             // v2_cinema
-  await page.locator(`#obCinemaOpts .obopt[data-val="${kind === "stream" ? "no" : "yes"}"]`).click();
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  // CAS-1270: only walked when cinema was answered Yes — skipped straight past for a stream-kind run.
-  if(kind !== "stream"){
-    await expect(page.locator("#obCinemaAgesChips")).toBeVisible();      // v2_cinema_ages
-    await ctaLocator(page).click();
-    await page.waitForTimeout(120);
-  }
-  await expect(page.locator("#obRentOpts")).toBeVisible();               // v2_rent
-  await page.locator('#obRentOpts .obopt[data-val="yes"]').click();
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  for(const marker of ["v2_massive", "v2_handoff", "v2_styles", "v2_ages", "v2_favs"]){
-    await ctaLocator(page).click();
-    await page.waitForTimeout(120);
-  }
-  await expect(page.locator("#obPartnerOpts")).toBeVisible();            // v2_partner
-  await page.locator('#obPartnerOpts .obopt[data-val="no"]').click();
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#obKidsOpts")).toBeVisible();               // v2_kids — v2_date skipped
-  await page.locator('#obKidsOpts .obopt[data-val="no"]').click();
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);                                       // v2_family skipped
-  await expect(page.locator("#obSvcStores")).toBeVisible();              // v2_services
+  // CAS-1344: the CAS-1347 one-agent flow — welcome, where, services. `kind` "stream" answers Renting only
+  // (no cinema), anything else answers cinema + renting, the same two answers the old walk gave.
+  const cta = page.locator("#oafCta");
+  await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");   // welcome
+  await cta.click();
+  await expect(page.locator("#oafWhereOpts")).toBeVisible();             // where
+  if(kind !== "stream") await page.locator('#oafWhereOpts .obopt[data-val="cinema"]').click();
+  await page.locator('#oafWhereOpts .obopt[data-val="rent"]').click();
+  await cta.click();
+  await expect(page.locator("#oafSvcStores")).toBeVisible();             // services
 }
 
 /** Every card on the shortlist, as {name, countText, count}. */
@@ -285,11 +266,26 @@ export const ctaCount = page => ctaLocator(page).textContent().then(numberIn);
  * needs to be known here. Returns the membership recap's own "worth your time" count (`.membhaul .cnt`),
  * a roster-wide figure read off onbFlow.workingAgents, whichever generator committed it. */
 export async function finishFlow(page){
-  for(let i = 0; i < 15; i++){
-    const stillInFlow = await page.evaluate(() => flowOn === true);
-    if(!stillInFlow) break;
-    await ctaLocator(page).click();
-    await page.waitForTimeout(120);          // the flow slides between steps
+  // CAS-1344: from the services step (or wherever the caller left the one-agent flow) to membership:
+  // services -> favourites (one genre on) -> age -> partner (No) -> children (No) -> name -> done -> Start watching.
+  const cta = page.locator("#oafCta");
+  const step = () => page.evaluate(() => oafStep);
+  for(let i = 0; i < 20; i++){
+    const st = await step().catch(() => null);
+    if(!(await page.evaluate(() => !!document.querySelector("#oafScreen.open")))) break;
+    if(st === "favourites" && await page.evaluate(() => oafFavCount() === 0)){
+      await page.locator("#oafFavGrid .favcell .favtoggle").first().click();
+    } else if(st === "age"){
+      await page.locator('#oafAgeOpts .obopt[data-val="18plus"]').click();
+    } else if(st === "partner"){
+      await page.locator('#oafPartnerOpts .obopt[data-val="no"]').click();
+    } else if(st === "children"){
+      await page.locator('#oafChildrenOpts .obopt[data-val="no"]').click();
+    } else if(st === "nameAgent"){
+      await page.locator("#oafNameInput").fill("Archie");
+    }
+    await cta.click();
+    await page.waitForTimeout(120);
   }
   await expect(page.locator("#membScreen.open")).toBeVisible();
   const reveal = numberIn(await page.locator(".membhaul .cnt").textContent());
@@ -399,13 +395,14 @@ export async function bootAlreadySignedIn(page, { supabaseScript, resolveFnName,
   // splashGo() always starts the wizard (flowStart()) before the (deferred, async) auth module has had any
   // chance to answer whether this device is signed in — mirrors CAS-740 AC4's own first assertion after
   // this same click (smoke.spec.mjs).
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about (CAS-953)
+  await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");   // CAS-1344: one-agent welcome
   await page.evaluate(name => window[name](), resolveFnName);
   // CAS-1159 requeue: 5000ms here (and below) was tight enough that e2e-full's heavier parallel-shard load
   // occasionally lost the race even though the mechanism itself is correct (CAS-886.spec.mjs:88 saw this) —
   // every sibling wait in this file for an account-sync/signed-in condition already uses 30_000ms.
   await page.waitForFunction(() => window.CascadeAuth.status === "signed-in", null, { timeout: 30_000 });
   await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
+  await expect(page.locator("#oafScreen")).not.toHaveClass(/open/);
   if(readyFlagExpr) await page.waitForFunction(readyFlagExpr, null, { timeout: 30_000 });
 }
 

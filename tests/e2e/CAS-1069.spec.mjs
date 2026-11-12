@@ -8,18 +8,20 @@ import { toShortlist, finishFlow, toListing } from "./helpers.mjs";
 /** The screen's own rendered text carries the restored price copy and never the "Prototype" disclaimer. */
 async function expectPriceCopy(page){
   const text = (await page.locator("#membBody").textContent()) || "";
-  expect(text).toContain("Free for your first month");
-  expect(text).toContain("$4.99/month");
+  // CAS-971: the membership is bought only in the iOS app, so the web screen carries no price and no
+  // purchase wording; the fine print points at the iPhone app instead.
+  expect(text).toContain("Membership is started in the Cascade iPhone app.");
+  expect(text).not.toContain("$4.99");
   expect(text.toLowerCase()).not.toContain("prototype");
 }
 
-test("onboarding recap (openOnbMembership): price copy, 'Start my free month' CTA, and membStart() still lands on the listing (CAS-1168)", async ({ page }) => {
+test("onboarding recap (openOnbMembership): price copy, 'Continue' CTA, and membStart() still lands on the listing (CAS-1168)", async ({ page }) => {
   await toShortlist(page, "cinema");
   await finishFlow(page);   // lands on #membScreen.open — the onboarding recap
 
   await expect(page.locator("#membScreen.open")).toBeVisible();
   await expectPriceCopy(page);
-  await expect(page.locator(".membcta")).toHaveText("Start my free month");
+  await expect(page.locator(".membcta")).toHaveText("Continue");
 
   // membStart() behaviour is unchanged: guest mode (config.js 404'd by freshApp) needs no email and
   // proceeds straight through to the listing.
@@ -27,12 +29,12 @@ test("onboarding recap (openOnbMembership): price copy, 'Start my free month' CT
   await expect(page.locator("#groups")).toBeVisible();
 });
 
-test("standalone preview (openMembership via ?step=membership): price copy and 'Start my free month' CTA (CAS-1168)", async ({ page }) => {
+test("standalone preview (openMembership via ?step=membership): price copy and 'Continue' CTA (CAS-1168)", async ({ page }) => {
   await page.route("**/config.js", route => route.fulfill({ status: 404, body: "" }));
   await page.goto("/index.html?step=membership");
   await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
 
   await expect(page.locator("#membScreen.open")).toBeVisible();
   await expectPriceCopy(page);
-  await expect(page.locator(".membcta")).toHaveText("Start my free month");
+  await expect(page.locator(".membcta")).toHaveText("Continue");
 });

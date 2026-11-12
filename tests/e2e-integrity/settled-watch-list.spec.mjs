@@ -119,8 +119,11 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
   // (CAS-129) abandons it outright. No extra render() call needed or safe to add.
   await page.evaluate(() => {
     setWatchTab("stream");
-    const uncappedMood = { ...moodDefaultFieldsNow(), id: "t-cas1236-ac3-uncapped", name: "Test",
-      sort: "score", topYou: null, topPublic: null };
+    // CAS-1425: a v2 account lists only v2 moods (oamMoodsListReal), so a v1-shaped mood here was ignored and
+    // the list fell back to All Latest (cinema release in the last year) — which the cloned film below
+    // (cinema_date null) can never satisfy. Push an uncapped v2 mood instead: every on genre, no cinema filter.
+    const uncappedMood = { ...oamMoodDefaultFields(), id: "t-cas1236-ac3-uncapped", name: "Test",
+      sort: "score", show: "all", watched: true, topShare: 100 };
     watchMoods.push(uncappedMood);
     window.setWatchMood(uncappedMood.id);
   });
@@ -152,9 +155,12 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
     // Cloning a film the list is already showing guarantees it does.
     const donor = MOVIES.find(m => m.tmdb_id === donorId);
     const id = -1236100001;
-    MOVIES.push({ ...donor, tmdb_id: id, status: ["included_streaming"], cinema_date: null });
+    // CAS-1425: keep the donor's own cinema_date (a null can fail the v2 agent's how-far-back window).
+    MOVIES.push({ ...donor, tmdb_id: id, status: ["included_streaming"] });
     notify[id] = { source: "auto", cascadeIds: [cascadeId], pinnedTo: [cascadeId], notIn: [],
       wins: { in_cinema: false, premium: false, rent: false, stream: true }, winsSource: { stream: "manual" } };
+    // CAS-1425: found is rebuilt only by recomputeFound(); a real catalogue update runs it, so stand in for that.
+    recomputeFound();
     render();
     return id;
   }, { cascadeId: agent.id, donorId: Number(before.ids[0]) });
