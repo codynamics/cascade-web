@@ -1838,7 +1838,7 @@ test("CAS-1296 AC2: a mood with Show top You set sorts the listing by You, desce
       .find(g => g.querySelectorAll(".card:not(.expanded)").length >= 2);
     if(!group) return [null, null];
     return [...group.querySelectorAll(".card:not(.expanded)")]
-      .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null);
+      .slice(0, 2).map(c => c.querySelector(".qone .qpub b")).map(el => el ? Number(el.textContent) : null);
   });
   expect(values[0], `first two You values (one section): ${JSON.stringify(values)}`).not.toBeNull();
   expect(values[1], `first two You values (one section): ${JSON.stringify(values)}`).not.toBeNull();
