@@ -135,6 +135,7 @@ IOS_WWW_ASSETS = ("index.html", "config.js", "favicon.svg", "favicon.png",
                    "capacitor-core.js", "capacitor-push-notifications.js",  # CAS-463
                    "capacitor-app.js",  # CAS-524
                    "capacitor-in-app-review.js",  # CAS-969
+                   "capacitor-native-purchases.js",  # CAS-971
                    "capacitor-contact-picker.js",  # CAS-932
                    "build-info.js")  # CAS-947
 
