@@ -58,9 +58,9 @@ class AdminEmailsFunctionMigration(unittest.TestCase):
 
     def test_schema_sql_makes_the_other_four_views_read_only(self):
         for view in ("admin_members", "admin_member_activity", "admin_member_onboarding", "admin_cascades"):
-            self.assertIn(
-                f"revoke insert, update, delete, truncate, references, trigger on public.{view} from authenticated;",
-                self.schema_src)
+            # CAS-1427: schema.sql revokes everything from authenticated, then grants SELECT only.
+            self.assertIn(f"revoke all on public.{view}", self.schema_src)
+            self.assertRegex(self.schema_src, rf"grant select on public\.{view}\s+to authenticated, service_role;")
 
 
 if __name__ == "__main__":

@@ -163,13 +163,15 @@ class SchemaAndMigrationBothCarryTheChange(unittest.TestCase):
     def test_admin_views_filter_deleted_at_is_null(self):
         for name, src in self.sources.items():
             with self.subTest(file=name):
+                # CAS-1427: schema.sql keeps the view bodies in admin_priv (public.<name> is a thin wrapper)
+                schema = "admin_priv" if name == "schema.sql" else "public"
                 cascades_view = re.search(
-                    r"create or replace view public\.admin_cascades.*?;", src, re.S)
+                    rf"create or replace view {schema}\.admin_cascades.*?;", src, re.S)
                 self.assertIsNotNone(cascades_view)
                 self.assertIn("where deleted_at is null", cascades_view.group(0))
 
                 members_view = re.search(
-                    r"create or replace view public\.admin_members.*?\nag as \((.*?)\)\n", src, re.S)
+                    rf"create or replace view {schema}\.admin_members.*?\nag as \((.*?)\)\n", src, re.S)
                 self.assertIsNotNone(members_view, "admin_members' ag CTE not found")
                 self.assertIn("where cascades.deleted_at is null", members_view.group(1))
 
