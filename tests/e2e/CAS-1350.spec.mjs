@@ -86,9 +86,9 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
 
   await expect(page.locator("#oafInner .osh")).toHaveText("Your Cascade account is set up.");
   await expectHeadingBelowHeader(page);
-  await expect(page.locator("#oafInner .obintrotext").first()).toContainText("Your agent Nova is now watching");
+  await expect(page.locator("#oafInner .oafdsec.agent")).toContainText("Agent · Nova");   // Lee, 13 Nov: sectioned by main nav
   // CAS-1368: the moods table — Releases, Best of the best, Me, Date night, Family, Starred (partner+kids both yes).
-  const moodChips = page.locator("#oafInner .svcsec", { hasText: "Your moods" }).locator(".chip");
+  const moodChips = page.locator("#oafInner .oafdsec.watch .chip");
   await expect(moodChips).toHaveText(["All Latest", "Best of the best", "Me", "Partner", "Family", "Starred"]);
   await expect(page.locator("#oafCta")).toHaveText("Start watching");
   await page.locator("#oafCta").click();
