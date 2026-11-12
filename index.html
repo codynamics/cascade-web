@@ -21385,7 +21385,9 @@ window.oamSaveMoodFromSheet=()=>{
   if(mood.id==="starred") mood.starredOnly=true;
   // CAS-1366: a save always stamps Releases' own repair marker, whichever sort was actually picked, so the
   // one-time load repair below (loadUserPrefs) never reverts a deliberate choice of Score back to release.
-  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=3; }
+  // 13 Nov: moodSort() only honours Releases' saved sort once sortChosen is stamped — the v1 sheet's
+  // save did that (CAS-1331/1333), this v2 save never did, so Score / A–Z on Releases silently reverted.
+  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=3; mood.sortChosen=true; }
   const list=oamMoodsListReal();
   const idx=list.findIndex(m=>m.id===mood.id);
   watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
