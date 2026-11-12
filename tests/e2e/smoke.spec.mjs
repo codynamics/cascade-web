@@ -1690,10 +1690,10 @@ test("CAS-1264: the Order popover lists You score only when signed in, and picki
   // direction, rather than relying on a "signed out by default" assumption that no longer holds.
   await page.evaluate(() => { window.CascadePersistence.accountActive = () => false; });
   await page.evaluate(() => window.togglePickerFor("sort", document.getElementById("sortCtl")));
-  // CAS-1425: on a v2 account the popover drops Public score outright and relabels You score as "Score"
-  // (PICKER_KINDS.sort.items, CAS-1338 §8); signed out, neither the You nor the Score entry is offered.
+  // CAS-1425: signed out, PICKER_KINDS.sort.items only drops the You entry, so Public score stays and no
+  // bare "Score" entry is offered (the v2 Score collapse, CAS-1338 §8, applies to signed-in accounts only).
   await expect(page.locator(".cpop.pickpop .popt", { hasText: "You score" })).toHaveCount(0);
-  await expect(page.locator(".cpop.pickpop .popt", { hasText: "Public score" })).toHaveCount(0);
+  await expect(page.locator(".cpop.pickpop .popt", { hasText: "Public score" })).toHaveCount(1);
   await expect(page.locator(".cpop.pickpop .popt", { hasText: /^\s*Score\s*$/ })).toHaveCount(0);
   await page.evaluate(() => closePickerPop());
 
