@@ -153,8 +153,14 @@ export async function freshAppSignedIn(page){
   const { url, anonKey, serviceRoleKey } = signedInEnv();
   const admin = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
   const email = e2eTestEmail();
-  const { error: createErr } = await admin.auth.admin.createUser({ email, email_confirm: true });
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({ email, email_confirm: true });
   if(createErr) throw new Error(`createUser(${email}) failed: ${createErr.message}`);
+  // CAS-971: the app holds a signed-in account with no active membership on the membership screen (which has
+  // no purchase button on web). QA accounts are comped server-side, the documented mechanism.
+  const { error: compErr } = await admin.from("memberships").upsert(
+    { user_id: created.user.id, product_id: "comp", status: "active", expires_at: "2099-12-31", source: "comp" },
+    { onConflict: "user_id" });
+  if(compErr) throw new Error(`comp membership(${email}) failed: ${compErr.message}`);
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({ type: "magiclink", email });
   if(linkErr) throw new Error(`generateLink(${email}) failed: ${linkErr.message}`);
   const code = linkData && linkData.properties && linkData.properties.email_otp;

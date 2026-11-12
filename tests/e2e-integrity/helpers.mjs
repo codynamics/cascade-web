@@ -42,6 +42,11 @@ export function testRefCode(tag){
 export async function createTestUser(email){
   const { data, error } = await admin.auth.admin.createUser({ email, email_confirm: true });
   if(error) throw new Error(`createTestUser(${email}) failed: ${error.message}`);
+  // CAS-971: comp the account so the membership gate lets it in (a QA account needs no purchase).
+  const { error: compErr } = await admin.from("memberships").upsert(
+    { user_id: data.user.id, product_id: "comp", status: "active", expires_at: "2099-12-31", source: "comp" },
+    { onConflict: "user_id" });
+  if(compErr) throw new Error(`comp membership(${email}) failed: ${compErr.message}`);
   return data.user;
 }
 
