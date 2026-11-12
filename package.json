@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
-    "@capacitor/cli": "^8.5.0",
+    "@capacitor/cli": "^8.5.2",
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "1.60.0",
     "supabase": "2.118.0"
