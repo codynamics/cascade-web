@@ -45,11 +45,16 @@ export async function createTestUser(email){
   return data.user;
 }
 
+/** CAS-1423: since the CAS-1344 one-agent cutover, signing in to an account with no v2 agent opens the
+ * un-skippable migration wizard. The first seeded row therefore carries a minimal v2 agent's criteria (the
+ * same shape oneAgentCommit builds), so sign-in lands on the listing; later rows keep their {} criteria. */
+const V2_AGENT_CRITERIA = () => ({ v: 2, styles: [], combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
+
 /** Seed cascades rows straight into the account, bypassing onboarding entirely — S1 (onboarding
  * committing its own roster through complete_membership) is out of scope until CAS-1098/CAS-1099 land. */
 export async function seedCascades(userId, rows){
   const { data, error } = await admin.from("cascades").insert(
-    rows.map(r => ({ user_id: userId, name: r.name, criteria: r.criteria || {}, active: true }))
+    rows.map((r, i) => ({ user_id: userId, name: r.name, criteria: r.criteria || (i === 0 ? V2_AGENT_CRITERIA() : {}), active: true }))
   ).select();
   if(error) throw new Error(`seedCascades failed: ${error.message}`);
   return data;

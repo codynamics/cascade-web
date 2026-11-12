@@ -69,11 +69,12 @@ test("onboarding commits a real, de-duplicated agent roster", async ({ page }) =
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
-  const roster = await page.evaluate(() => cascades.map(c => ({ id: c.id, name: c.name, sort: c.sort })));
+  const roster = await page.evaluate(() => cascades.map(c => ({ id: c.id, name: c.name, v: c.v })));
   expect(roster.length).toBeGreaterThan(0);
   expect(new Set(roster.map(c => c.id)).size).toBe(roster.length);
-  expect(roster.every(c => c.sort === "cascade")).toBe(true);
-  expect(roster.map(c => c.name)).toEqual(["Cinema Releases", "Personal Favs"]);   // CAS-1312: name is fixed now
+  // CAS-1423: the CAS-1344 one-agent first run commits exactly one v2 agent, named as finishFlow names it.
+  expect(roster.filter(c => c.v === 2).length).toBe(1);
+  expect(roster.map(c => c.name)).toEqual(["Archie"]);
 });
 
 test("recommendations render as a results list with items", async ({ page }) => {
