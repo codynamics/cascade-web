@@ -1601,8 +1601,9 @@ test("CAS-919: a collapsed card's score row has no Cascade cell and no Pop cell,
   await expect(card2).not.toHaveClass(/expanded/);
 
   // CAS-1261: the closed card carries the Public lozenge and no People/Critics cells; the open card shows them.
-  await expect(card2.locator(".title .qpub.intitle")).toBeVisible();
-  await expect(card2.locator(".title .qpub.intitle")).toContainText("Public");
+  // CAS-1425: a v2 account shows ONE score box (.qone, CAS-1338) in the title in place of the You + Public pair.
+  await expect(card2.locator(".title .qone .qpub")).toBeVisible();
+  await expect(card2.locator(".title .qpub.intitle")).toHaveCount(0);
   await expect(card2.locator(".mrow.r-scores .m", { hasText: "People" })).toBeHidden();
   await page.evaluate((filmId) => toggleExpand(filmId), id);
   await expect(card2).toHaveClass(/expanded/);
@@ -1614,7 +1615,9 @@ test("CAS-919: a collapsed card's score row has no Cascade cell and no Pop cell,
   await expect(scoresRow.locator(".m", { hasText: "Pop" })).toHaveCount(0);
   await expect(scoresRow.locator(".m", { hasText: "People" })).toBeVisible();
   await expect(scoresRow.locator(".m", { hasText: "Critics" })).toBeVisible();
-  await expect(scoresRow.locator(".qpub.inrow")).toBeVisible();
+  // CAS-1425: the open card's score companion is the .qonetext sentence, not a Public lozenge.
+  await expect(scoresRow.locator(".qonetext")).toBeVisible();
+  await expect(scoresRow.locator(".qpub.inrow")).toHaveCount(0);
 });
 
 // CAS-1261 (replaces CAS-900's 12px/11px collapsed-row check): signed in, the closed card no longer shows
@@ -1687,8 +1690,11 @@ test("CAS-1264: the Order popover lists You score only when signed in, and picki
   // direction, rather than relying on a "signed out by default" assumption that no longer holds.
   await page.evaluate(() => { window.CascadePersistence.accountActive = () => false; });
   await page.evaluate(() => window.togglePickerFor("sort", document.getElementById("sortCtl")));
+  // CAS-1425: on a v2 account the popover drops Public score outright and relabels You score as "Score"
+  // (PICKER_KINDS.sort.items, CAS-1338 §8); signed out, neither the You nor the Score entry is offered.
   await expect(page.locator(".cpop.pickpop .popt", { hasText: "You score" })).toHaveCount(0);
-  await expect(page.locator(".cpop.pickpop .popt", { hasText: "Public score" })).toBeVisible();
+  await expect(page.locator(".cpop.pickpop .popt", { hasText: "Public score" })).toHaveCount(0);
+  await expect(page.locator(".cpop.pickpop .popt", { hasText: /^\s*Score\s*$/ })).toHaveCount(0);
   await page.evaluate(() => closePickerPop());
 
   // CAS-1261's own placeholder test (above in this file) stubs the account this same shallow way.
@@ -1733,7 +1739,7 @@ test("CAS-1264: the Order popover lists You score only when signed in, and picki
   expect(seeded.ok, seeded.reason).toBe(true);
 
   await page.evaluate(() => window.togglePickerFor("sort", document.getElementById("sortCtl")));
-  const youOpt = page.locator(".cpop.pickpop .popt", { hasText: "You score" });
+  const youOpt = page.locator(".cpop.pickpop .popt", { hasText: /^\s*Score\s*$/ });
   await expect(youOpt).toBeVisible();
   await youOpt.click();
 
@@ -1744,7 +1750,7 @@ test("CAS-1264: the Order popover lists You score only when signed in, and picki
       .find(g => g.querySelectorAll(".card:not(.expanded)").length >= 2);
     if(!group) return [null, null];
     return [...group.querySelectorAll(".card:not(.expanded)")]
-      .slice(0, 2).map(c => c.querySelector(".qyou b")).map(el => el ? Number(el.textContent) : null);
+      .slice(0, 2).map(c => c.querySelector(".qone .qpub b")).map(el => el ? Number(el.textContent) : null);
   });
   expect(values[0], `first two You values (one section): ${JSON.stringify(values)}`).not.toBeNull();
   expect(values[1], `first two You values (one section): ${JSON.stringify(values)}`).not.toBeNull();
@@ -1940,7 +1946,14 @@ test(`CAS-1296 AC3: "+ Mood" opens on the agent's genres with every style includ
   await expect(page.locator('.mtabs [data-mode="genre"]')).toHaveClass(/on/);
   const draft = await page.evaluate(() => ({ stylesAll: oamDraft.stylesAll, mode: oamDraft.mode, watched: oamDraft.watched }));
   expect(draft).toEqual({ stylesAll: true, mode: "genre", watched: true });
-  await expect(page.locator("#watchSheetBody .oalist .oamexpand")).toHaveCount(0);   // nothing sits under "Not in this mood"
+  // Nothing the agent has ON sits under "Not in this mood" — only genres the agent has off (oaBar null) do,
+  // so the expander appears only when the agent has some off.
+  const notIn = await page.evaluate(() => {
+    const c = oneAgentCriteria();
+    return { names: oamDraft.rowOrder.notInMood, allOff: oamDraft.rowOrder.notInMood.every(g => oaBar(c, g) == null) };
+  });
+  expect(notIn.allOff, `genres under "Not in this mood": ${notIn.names}`).toBe(true);
+  await expect(page.locator("#watchSheetBody .oalist .oamexpand")).toHaveCount(notIn.names.length ? 1 : 0);
   await page.evaluate(() => window.closeWatchSheet());
 });
 

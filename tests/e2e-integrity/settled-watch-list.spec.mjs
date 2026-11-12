@@ -119,8 +119,11 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
   // (CAS-129) abandons it outright. No extra render() call needed or safe to add.
   await page.evaluate(() => {
     setWatchTab("stream");
-    const uncappedMood = { ...moodDefaultFieldsNow(), id: "t-cas1236-ac3-uncapped", name: "Test",
-      sort: "score", topYou: null, topPublic: null };
+    // CAS-1425: a v2 account lists only v2 moods (oamMoodsListReal), so a v1-shaped mood here was ignored and
+    // the list fell back to All Latest (cinema release in the last year) — which the cloned film below
+    // (cinema_date null) can never satisfy. Push an uncapped v2 mood instead: every on genre, no cinema filter.
+    const uncappedMood = { ...oamMoodDefaultFields(), id: "t-cas1236-ac3-uncapped", name: "Test",
+      sort: "score", show: "all", watched: true, topShare: 100 };
     watchMoods.push(uncappedMood);
     window.setWatchMood(uncappedMood.id);
   });
