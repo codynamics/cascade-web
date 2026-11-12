@@ -3023,6 +3023,27 @@
   /* The two statement-only screens (v2_intro/v2_handoff) — a headline with one highlighted phrase, same
      copy weight as .obhd, plus a longer explanatory paragraph .obsub is too small a font for. */
   .obintrotext{font-size:14px;line-height:1.55;color:#d6dce6;margin:10px 0 0}
+  /* Lee, 13 Nov: every one-agent first-run step reads 1.5pt larger than the old flow — body copy, sub copy,
+     selection boxes, genre grids, chips, section heads and the name field. Headings (.osh) are unchanged. */
+  #oafBack[hidden]{display:none}   /* .osback's own display beats the hidden attribute otherwise */
+  #oafScreen .obintrotext{font-size:15.5px}
+  #oafScreen .ossub{font-size:14.5px}
+  #oafScreen .obopttitle{font-size:16.5px}
+  #oafScreen .oboptsub{font-size:13.5px}
+  #oafScreen .favname,#oafScreen .tickcell{font-size:14.5px}
+  #oafScreen .favgrid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  #oafScreen .favgrid{gap:8px 6px}
+  #oafScreen .favcell{min-width:0;padding-right:6px;gap:0}
+  #oafScreen .favtoggle{padding-left:9px}
+  #oafScreen .favscale{margin-left:2px}
+  #oafScreen .favname{font-size:14px;letter-spacing:-.1px;font-weight:650}
+  #oafScreen .favseg{width:20px}
+  #oafScreen .favcell.lvl1 .favthumb{left:21.5px}
+  #oafScreen .favlegend{font-size:13px}
+  #oafScreen .chip{font-size:13.5px}
+  #oafScreen .svcsech{font-size:12.5px}
+  /* 16px+ on the text input stops iOS Safari zooming the page when it is focused (it then stays zoomed). */
+  #oafScreen .osfield{font-size:16.5px}
   .obhi{color:var(--brand-blue)} /* a11y-contrast-ignore: LARGE-TEXT — inline span inside .obhd (22px/800), inherits that size; clears 3:1 large-text AA on every surface */
   /* ==== CAS-629 Onboarding S5/S6: the roster commits (S5) and reports back (S6) — both are read-only
      rows/cards inside the shared .obwrap skin above, nothing here is a control. */
@@ -4979,11 +5000,11 @@
 <div class="stephdr" id="oafHdr" hidden>
   <div class="steprow">
     <button class="osback" type="button" id="oafBack" onclick="oafGoBack()" aria-label="Back" hidden>←</button>
-    <span class="osh" id="oafTitle">Set up your agent</span>
+    <span class="osh" id="oafTitle">Account setup</span>
   </div>
   <div class="stepprog" role="progressbar" aria-label="Setup progress" id="oafProg"><i id="oafFill"></i></div>
 </div>
-<div class="sharpstep chromed" id="oafScreen" role="dialog" aria-modal="true" aria-label="Set up your agent">
+<div class="sharpstep chromed" id="oafScreen" role="dialog" aria-modal="true" aria-label="Account setup">
   <div class="osstage"><div class="osinner" id="oafInner"></div></div>
 </div>
 <div class="stepnav" id="oafNav" hidden>
@@ -22053,7 +22074,7 @@ function oneAgentStarterMoods(who, ages){
   const pick = id => ({...oamMoodDefaultFields(), ...ONE_AGENT_MOOD_BUILTINS.find(b=>b.id===id), ages, watched:true});
   const list = [pick("releases"), pick("best"),
     {...oamMoodDefaultFields(), id:"me", name:"Me", show:"40", ages, watched:true}];
-  if(who.partner) list.push({...oamMoodDefaultFields(), id:"date", name:"Date night",
+  if(who.partner) list.push({...oamMoodDefaultFields(), id:"date", name:"Partner",
     styles:[...(who.dateStyles||[])], show:"40", ages, watched:true});
   if(who.kids) list.push({...oamMoodDefaultFields(), id:"family", name:"Family",
     styles:[...(who.familyStyles||[])], show:"40", ages:["G","PG","M"], watched:true});
@@ -22073,21 +22094,25 @@ function oneAgentBuildDraft(){
     ONE_AGENT_WINDOWS.forEach(w=>{ al[w.key] = windows.some(x=>x.key===w.key) && pick==="fav"; });
     styles[s] = pick==="fav" ? {bar:60, al, fav:true} : {bar:80, al};
   });
-  // CAS-1368: a genre ticked for Date night/Family that isn't already on turns on at bar 80, no alerts —
-  // never overrides a genre already marked ♥/✓ above.
-  const turnOn = style => {
-    if(styles[style]) return;
+  // CAS-1368: a genre switched on for Date night/Family that isn't already on turns on, no alerts — ✓ at
+  // bar 80, ♥ at bar 60 (Lee, 13 Nov: the same two levels as the favourites screen) — and never overrides a
+  // genre already marked ♥/✓ above. Where Date night and Family disagree, ♥ wins.
+  const turnOn = (style, pick) => {
+    const bar = pick==="fav" ? 60 : 80;
+    if(styles[style] && !styles[style].fromWho) return;
+    if(styles[style] && styles[style].bar<=bar) return;
     const al={}; ONE_AGENT_WINDOWS.forEach(w=>{ al[w.key]=false; });
-    styles[style] = {bar:80, al};
+    styles[style] = {bar, al, fromWho:true};
   };
-  if(oafState.partner==="yes") oafState.together.forEach(turnOn);
-  if(oafState.children==="yes") oafState.family.forEach(turnOn);
+  if(oafState.partner==="yes") Object.entries(oafState.together).forEach(([g,p])=>turnOn(g,p));
+  if(oafState.children==="yes") Object.entries(oafState.family).forEach(([g,p])=>turnOn(g,p));
+  Object.values(styles).forEach(v=>{ delete v.fromWho; });
   const ages = oafState.age==="under18" ? ["PG","M","MA 15+"] : ["M","MA 15+","R 18+"];
   const who = {
     partner: oafState.partner==="yes",
     kids: oafHasChildrenStep() && oafState.children==="yes",
-    dateStyles: oafState.partner==="yes" ? [...oafState.together] : [],
-    familyStyles: oafState.children==="yes" ? [...oafState.family] : [],
+    dateStyles: oafState.partner==="yes" ? Object.keys(oafState.together) : [],
+    familyStyles: oafState.children==="yes" ? Object.keys(oafState.family) : [],
   };
   const moods = oneAgentStarterMoods(who, ages);
   const name = (oafState.name||"").trim();
@@ -22185,8 +22210,8 @@ function oafWireServices(){
 // Favourites — tapping ♥ or ✓ sets that genre's one pick; tapping the same button again clears it. A genre's
 // pick is only ever "fav", "incl" or absent, never both, so picking one always replaces the other.
 function oafFavCount(){ return ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]).length; }
-function oafFavCellHTML(style){
-  const pick = oafState.favs[style] || null;
+function oafFavCellHTML(style, picks){
+  const pick = (picks || oafState.favs)[style] || null;
   const name = oneAgentShortName(style);
   // Lee, 11 Nov: a three-way toggle (off / ✓ include / ♥ favourite) drawn like the agent's share scale —
   // two boxes filling from the left in the scale's own first two colours, a white thumb at the fill edge.
@@ -22210,25 +22235,29 @@ function oafFavouritesHTML(){
   return `<h2 class="osh">Your favourite genres</h2>
     <p class="ossub">Tap a genre to switch it on ✓ if you'd watch it when it's really good. Slide it to ♥ for your absolute favourites (two or three is ideal). Leave the rest off.</p>
     <div class="favlegend"><span class="favleg incl">✓ Include · only the best</span><span class="favleg fav">♥ Favourite · plenty of choice</span></div>
-    <div class="favgrid" id="oafFavGrid">${ONE_AGENT_SETUP_STYLES.map(oafFavCellHTML).join("")}</div>
+    <div class="favgrid" id="oafFavGrid">${oafFavGridCellsHTML(oafState.favs)}</div>
     <p class="ossub" style="margin-top:10px">${n} favourite${n===1?"":"s"}${n>3?" · fewer gives sharper lists":""}</p>`;
 }
-function oafWireFavourites(){
-  const grid=$("oafFavGrid"); if(!grid) return;
+// Lee, 13 Nov: Date night and Family use exactly this control too — one renderer and one wiring for all three grids.
+function oafFavGridCellsHTML(picks){ return ONE_AGENT_SETUP_STYLES.map(st=>oafFavCellHTML(st, picks)).join(""); }
+function oafWireFavGrid(gridId, picks){
+  const grid=$(gridId); if(!grid) return;
   grid.querySelectorAll(".favcell[data-style]").forEach(cell=>{
     const style=cell.dataset.style;
     cell.querySelectorAll("[data-pick]").forEach(btn=>{
       btn.onclick=()=>{
-        const pick=btn.dataset.pick, cur=oafState.favs[style]||null;
-        oafState.favs[style] =
+        const pick=btn.dataset.pick, cur=picks[style]||null;
+        const next =
             pick==="toggle" ? (cur ? null : "incl")
           : pick==="incl"   ? (cur==="incl" ? null : "incl")
           :                   (cur==="fav" ? "incl" : "fav");
+        if(next) picks[style]=next; else delete picks[style];
         oafPaint();
       };
     });
   });
 }
+function oafWireFavourites(){ oafWireFavGrid("oafFavGrid", oafState.favs); }
 function oafAgeHTML(){
   return `<h2 class="osh">How old are you?</h2>
     <p class="ossub">So we show the right age ratings. You can change them on any mood.</p>
@@ -22239,28 +22268,30 @@ function oafAgeHTML(){
 }
 function oafPartnerHTML(){
   return `<h2 class="osh">Do you watch with a partner?</h2>
-    <p class="ossub">If you do, we'll make a <b>Date night</b> mood.</p>
+    <p class="ossub">If you do, we'll make a <b>Partner</b> mood: a list of films for the two of you.</p>
     <div class="obopts" id="oafPartnerOpts">${obOptHTML([["yes","Yes"],["no","No"]], oafState.partner)}</div>`;
 }
 function oafTogetherHTML(){
   return `<h2 class="osh">What do you watch together?</h2>
-    <p class="ossub">Tick the genres for <b>Date night</b>.</p>
-    <div id="oafTogetherGrid">${oafTickGridHTML(oafState.together)}</div>`;
+    <p class="ossub">Switch on the genres for your <b>Partner</b> mood, and ♥ the ones you watch together most.</p>
+    <div class="favgrid" id="oafTogetherGrid">${oafFavGridCellsHTML(oafState.together)}</div>`;
 }
 function oafChildrenHTML(){
-  return `<h2 class="osh">Do you watch with children?</h2>
-    <p class="ossub">If you do, we'll make a <b>Family</b> mood, rated G, PG and M.</p>
+  return `<h2 class="osh">Do you watch with a young family?</h2>
+    <p class="ossub">If you do, we'll make a <b>Family</b> mood: films rated G, PG and M.</p>
     <div class="obopts" id="oafChildrenOpts">${obOptHTML([["yes","Yes"],["no","No"]], oafState.children)}</div>`;
 }
 function oafFamilyHTML(){
   return `<h2 class="osh">What do you watch as a family?</h2>
-    <p class="ossub">We've ticked the usual ones. Change them as you like.</p>
-    <div id="oafFamilyGrid">${oafTickGridHTML(oafState.family)}</div>`;
+    <p class="ossub">We've switched on the usual ones. Change them as you like, and ♥ the family favourites.</p>
+    <div class="favgrid" id="oafFamilyGrid">${oafFavGridCellsHTML(oafState.family)}</div>`;
 }
 // New screen (CAS-1352): between family/partner and done. Continue stays disabled until a trimmed name exists (oafBlocked).
 // Typing and chip-picking both write oafState.name directly and patch just the CTA/chip DOM (deleteAcctGate's
 // pattern) rather than a full oafPaint() repaint, so the input never loses focus/cursor mid-keystroke.
-const ONE_AGENT_NAME_CHIPS = ["Archie","Rocco","Felix","Ruby","Luna","Coco"];
+// Lee, 13 Nov: a robot that works for you — friendly robot / character names, invented or generic words only
+// (no film, TV or toy character names). Three lean masculine, three feminine, as CAS-1352 set.
+const ONE_AGENT_NAME_CHIPS = ["Sprocket","Rivet","Cosmo","Pixel","Nova","Juno"];
 const ONE_AGENT_NAME_MAXLEN = 24;
 function oafNameAgentHTML(){
   const name = oafState.name || "";
@@ -22301,7 +22332,7 @@ function oafWireNameAgent(){
 // get an alert — see oneAgentBuildDraft).
 function oafAlertRowsHTML(){
   const favs = ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]==="fav");
-  if(!favs.length) return `<p class="ossub">No favourites, so no alerts yet.</p>`;
+  if(!favs.length) return `<p class="ossub">Heart a genre on your agent any time and it will alert you when its films arrive.</p>`;
   return oafActiveWindows().map(w=>
     `<p class="ossub" style="display:flex;align-items:center;gap:6px;margin:0 0 6px">
        <i class="onbdot" style="background:${w.color}"></i><b style="color:${w.color}">${esc(w.label)}</b>
@@ -22310,13 +22341,17 @@ function oafAlertRowsHTML(){
   ).join("");
 }
 function oafDoneHTML(){
-  const n = oafFavCount();
   const draft = oneAgentBuildDraft();
-  return `<h2 class="osh">Your agent is set up.</h2>
-    <p class="ossub">Name: ${esc(draft.name)}</p>
-    <p class="obintrotext">It's watching <b>${n} genre${n===1?"":"s"}</b> across the whole catalogue, every day.</p>
-    <div class="svcsec"><div class="svcsech">Alerts for your favourites</div>${oafAlertRowsHTML()}</div>
+  const n = Object.keys(draft.styles).length;   // every genre the agent will watch, Partner/Family ones included
+  const favs = ONE_AGENT_SETUP_STYLES.filter(st=>oafState.favs[st]==="fav");
+  // Lee, 13 Nov: what's been set up is the Cascade account (agent, moods, services), not just the agent.
+  return `<h2 class="osh">Your Cascade account is set up.</h2>
+    <p class="obintrotext">Your agent <b>${esc(draft.name)}</b> is now watching <b>${n} genre${n===1?"":"s"}</b> across the whole catalogue, every day.</p>
+    <div class="svcsec"><div class="svcsech">Alerts</div>
+      ${favs.length?`<p class="ossub">${esc(draft.name)} alerts you when a film in one of your ♥ favourite genres arrives:</p>`:""}
+      ${oafAlertRowsHTML()}</div>
     <div class="svcsec"><div class="svcsech">Your moods</div>
+      <p class="ossub">Moods are ready-made lists of what your agent finds. Switch between them at the top of Watch.</p>
       <div class="chips">${draft.moods.map(m=>`<span class="chip gen on">${esc(m.name)}</span>`).join("")}</div></div>`;
 }
 function oafBlocked(){
@@ -22336,7 +22371,8 @@ function oafPaint(){
     family:oafFamilyHTML, nameAgent:oafNameAgentHTML, done:oafDoneHTML};
   const inner=$("oafInner"); if(!inner) return;
   inner.innerHTML = fns[oafStep]();
-  $("oafBack").hidden = oafStep==="welcome" && oafMode==="migrate";   // CAS-1344: a migration cannot be skipped
+  // CAS-1344: a migration cannot be skipped. Lee, 13 Nov: done is a finished state — no way back from it.
+  $("oafBack").hidden = (oafStep==="welcome" && oafMode==="migrate") || oafStep==="done";
   $("oafFill").style.width = oafProgressPct(oafStep)+"%";
   const cta=$("oafCta");
   cta.textContent = oafStep==="done" ? "Start watching" : "Continue";
@@ -22353,21 +22389,21 @@ function oafPaint(){
       // Pre-tick Date night with ONE_AGENT_TOGETHER_DEFAULT the first time Yes is picked — never again, so
       // a later edit to the grid survives tapping Yes/No/Yes.
       if(val==="yes" && !oafState.togetherInit){
-        oafState.together=new Set(ONE_AGENT_TOGETHER_DEFAULT);
+        oafState.together=Object.fromEntries(ONE_AGENT_TOGETHER_DEFAULT.map(g=>[g,"incl"]));   // the middle setting
         oafState.togetherInit=true;
       }
       oafPaint();
     });
-  else if(oafStep==="together") oafWireTickGrid("oafTogetherGrid", oafState.together);
+  else if(oafStep==="together") oafWireFavGrid("oafTogetherGrid", oafState.together);
   else if(oafStep==="children") wireObOpt($("oafChildrenOpts"), val=>{
       oafState.children=val;
       if(val==="yes" && !oafState.familyInit){
-        oafState.family=new Set(ONE_AGENT_FAMILY_DEFAULT);
+        oafState.family=Object.fromEntries(ONE_AGENT_FAMILY_DEFAULT.map(g=>[g,"incl"]));
         oafState.familyInit=true;
       }
       oafPaint();
     });
-  else if(oafStep==="family") oafWireTickGrid("oafFamilyGrid", oafState.family);
+  else if(oafStep==="family") oafWireFavGrid("oafFamilyGrid", oafState.family);
   else if(oafStep==="nameAgent") oafWireNameAgent();
 }
 function oafShow(key){
@@ -22428,7 +22464,7 @@ window.oafOpen=(opts)=>{
   oafPendingDraft=null;
   oafState = {
     where: new Set(), favs: {}, age: null, partner: null, children: null,
-    together: new Set(), togetherInit: false, family: new Set(), familyInit: false,
+    together: {}, togetherInit: false, family: {}, familyInit: false,
     name: "",
   };
   oafStep="welcome";
