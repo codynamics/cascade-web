@@ -3542,7 +3542,9 @@
   .favseg{height:30px;border-radius:7px;padding:0;display:grid;place-items:center;cursor:pointer;
     font-size:13px;line-height:1;color:var(--faint);background:transparent;border:0;font-weight:700}
   .favseg + .favseg{box-shadow:-2px 0 0 -1px rgba(255,255,255,.12)}   /* a hairline divider, nothing to grab */
-  .favseg.off.on{background:#2a3242;color:var(--ink)}
+  /* Lee, 13 Nov: Off carries the same weight as ✓ and ♥ — a glyph, not a word, and a quiet fill when chosen. */
+  .favseg.off{font-size:12px}
+  .favseg.off.on{background:rgba(255,255,255,.07);color:var(--ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)}
   .favseg.check.on{background:#138c7d;color:#fff}
   .favseg.heart.on{background:#2fbf71;color:#fff;box-shadow:0 0 10px rgba(95,220,149,.7)}
   .tickgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -22318,7 +22320,7 @@ function oafFavCellHTML(style, picks){
           aria-label="${escA(name)} on or off"><span class="favname">${esc(name)}</span>${own?
         `<span class="favalert" aria-hidden="${pick!=="fav"}">${OAF_DONE_ICONS.alerts}Alerts on</span>`:""}</button>
       <span class="favscale" role="group" aria-label="${escA(name)}">
-        ${seg("off","off","off","Off")}${seg("incl","check","include","✓")}${seg("fav","heart","favourite","♥")}
+        ${seg("off","off","off","✕")}${seg("incl","check","include","✓")}${seg("fav","heart","favourite","♥")}
       </span>
     </div>`;
 }
