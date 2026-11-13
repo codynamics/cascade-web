@@ -2193,6 +2193,12 @@
   .membhaul{font-size:13.5px;line-height:1.5;color:var(--dim);margin:0 0 10px}
   .membhaul b{color:var(--ink)} .membhaul .cnt{color:var(--green);font-weight:800}
   .memfine{font-size:12.5px;line-height:1.55;color:var(--dim);margin:0 0 16px}
+  .memboffer{display:flex;flex-direction:column;align-items:center;gap:2px;margin:4px 0 12px;padding:14px 16px;
+    border-radius:16px;text-align:center;border:1px solid rgba(139,124,255,.55);
+    background:linear-gradient(135deg,rgba(124,92,255,.22),rgba(34,211,238,.14));
+    box-shadow:0 0 22px rgba(124,92,255,.25)}
+  .memboffer .mofree{font-family:Poppins,system-ui,sans-serif;font-weight:700;font-size:24px;line-height:1.2;color:#fff}
+  .memboffer .mothen{font-size:13.5px;font-weight:600;color:#cfd6e6}
   .memfine b{color:var(--accenttext)}
   .membenefits{display:flex;flex-direction:column;gap:15px;margin:0 0 20px}
   .mbrow{display:flex;align-items:center;gap:13px}
@@ -3026,33 +3032,86 @@
   /* Lee, 13 Nov: every one-agent first-run step reads 1.5pt larger than the old flow — body copy, sub copy,
      selection boxes, genre grids, chips, section heads and the name field. Headings (.osh) are unchanged. */
   #oafBack[hidden]{display:none}
-  /* Done screen sections (Lee, 13 Nov) — each headed by its main-nav icon in that item's colour. */
-  #oafScreen .oafdsec{margin:12px 0 0;padding:10px 14px 2px;border-radius:14px;border:1px solid var(--line);
-    background:var(--panel2)}
-  #oafScreen .oafdh{display:flex;align-items:center;gap:10px;margin:0 0 8px}
-  #oafScreen .oafdico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;
-    color:var(--dc);background:color-mix(in srgb, var(--dc) 16%, transparent)}
-  #oafScreen .oafdico svg{width:18px;height:18px}
-  #oafScreen .oafdt{font-family:Poppins,system-ui,sans-serif;font-weight:700;font-size:16px;color:var(--ink)}
-  #oafScreen .oafdsec.agent{--dc:#a78bfa}
-  #oafScreen .oafdsec.alerts{--dc:#ffd54a}
-  #oafScreen .oafdsec.watch{--dc:var(--brand-blue)}
-  #oafScreen .oafdsec .ossub{margin:0 0 10px}
-  #oafScreen .oafdsec .chips{margin:0 0 10px}   /* .osback's own display beats the hidden attribute otherwise */
+  /* Welcome screen (Lee, 13 Nov pm): three illustrated beats rising in turn. */
+  #oafScreen .oafwlede{font-family:Poppins,system-ui,sans-serif;font-weight:700;font-size:18px;line-height:1.35;
+    margin:8px 0 4px;background:linear-gradient(90deg,#a78bfa,#38bdf8);-webkit-background-clip:text;background-clip:text;color:transparent}
+  #oafScreen .oafwbeat{display:flex;gap:14px;align-items:flex-start;margin:16px 0 0;
+    opacity:0;transform:translateY(10px);animation:oafwIn .6s ease forwards;animation-delay:var(--d)}
+  #oafScreen .oafwclose{opacity:0;animation:oafwIn .6s ease forwards;animation-delay:var(--d);margin-top:20px}
+  #oafScreen .oafwbeat .obintrotext{margin:0}
+  #oafScreen .oafwbeat b.wc{color:var(--amber)} #oafScreen .oafwbeat b.wr{color:var(--blue)} #oafScreen .oafwbeat b.ws{color:var(--green)}
+  @keyframes oafwIn{to{opacity:1;transform:none}}
+  #oafScreen .oafwart{flex:none;width:52px;height:44px;border-radius:12px;display:grid;place-items:center;
+    background:rgba(255,255,255,.05);border:1px solid var(--line)}
+  #oafScreen .oafwico{color:var(--dc)}
+  #oafScreen .oafwico svg{width:24px;height:24px}
+  #oafScreen .oafwico.alerts{--dc:#ffd54a;animation:oafwPulse 2.4s ease-in-out 1.4s infinite}
+  #oafScreen .oafwico.agent{--dc:#a78bfa}
+  #oafScreen .oafwico.agent svg circle{animation:oafwBlink 3s ease-in-out 2s infinite;transform-origin:12px 3.6px}
+  @keyframes oafwPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 14px rgba(255,213,74,.35)}}
+  @keyframes oafwBlink{0%,90%,100%{opacity:1}95%{opacity:.2}}
+  /* the cascade: three stage dots joined by lines, a film travelling along them */
+  #oafScreen .oafwflow{position:relative;display:flex;align-items:center;justify-content:center;gap:0;padding:0 6px}
+  #oafScreen .oafwflow i{width:8px;height:8px;border-radius:50%;flex:none}
+  #oafScreen .oafwflow i.c{background:var(--amber)} #oafScreen .oafwflow i.r{background:var(--blue)} #oafScreen .oafwflow i.s{background:var(--green)}
+  #oafScreen .oafwflow b{width:9px;height:2px;background:var(--line);flex:none}
+  #oafScreen .oafwfilm{position:absolute;top:50%;left:8px;width:10px;height:10px;margin-top:-5px;border-radius:3px;
+    background:#fff;box-shadow:0 0 8px #fff;animation:oafwTravel 3s ease-in-out .8s infinite}
+  @keyframes oafwTravel{0%{left:8px;background:var(--amber);box-shadow:0 0 8px var(--amber)}
+    45%{left:21px;background:var(--blue);box-shadow:0 0 8px var(--blue)}
+    90%,100%{left:34px;background:var(--green);box-shadow:0 0 8px var(--green)}}
+  @media (prefers-reduced-motion:reduce){
+    #oafScreen .oafwbeat,#oafScreen .oafwclose{animation:none;opacity:1;transform:none}
+    #oafScreen .oafwfilm,#oafScreen .oafwico.alerts,#oafScreen .oafwico.agent svg circle{animation:none}
+  }
+  /* Done screen (Lee, 13 Nov pm): the agent comes alive, counts what it has found, plays back the answers. */
+  #oafScreen .oafdhero{display:flex;flex-direction:column;align-items:center;text-align:center;margin:6px 0 4px}
+  #oafScreen .oafdbot{position:relative;width:76px;height:76px;border-radius:22px;display:grid;place-items:center;
+    color:#fff;background:linear-gradient(135deg,#8b5cf6,#38bdf8);box-shadow:0 0 28px rgba(139,92,246,.55);
+    animation:oafdPop .6s cubic-bezier(.2,1.4,.4,1) both}
+  #oafScreen .oafdbot svg{width:40px;height:40px;position:relative}
+  #oafScreen .oafdbot .ring{position:absolute;inset:-6px;border-radius:26px;border:2px solid rgba(139,92,246,.6);
+    animation:oafdRing 2.4s ease-out .4s infinite}
+  #oafScreen .oafdbot .ring.r2{animation-delay:1.6s}
+  #oafScreen .oafdbot svg circle{animation:oafwBlink 3s ease-in-out 1s infinite}
+  #oafScreen .oafdtitle{margin:16px 0 2px;text-align:center}
+  #oafScreen .oafdsub{margin:0;color:var(--dim);font-size:14px}
+  #oafScreen .oafdcount{display:flex;flex-direction:column;align-items:center;margin:18px 0 10px;
+    animation:oafwIn .6s ease .3s both}
+  #oafScreen .oafdcount b{font-family:Poppins,system-ui,sans-serif;font-size:44px;line-height:1;font-weight:700;
+    background:linear-gradient(90deg,#a78bfa,#38bdf8);-webkit-background-clip:text;background-clip:text;color:transparent;
+    font-variant-numeric:tabular-nums}
+  #oafScreen .oafdcount span{font-size:14.5px;color:#d6dce6;margin-top:4px}
+  #oafScreen .oafdposters{display:flex;justify-content:center;align-items:center;margin:4px 0 16px;height:96px}
+  #oafScreen .oafdposter{width:62px;height:93px;border-radius:8px;background:#1b2130 center/cover;flex:none;
+    margin-left:-14px;box-shadow:0 6px 18px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.12);
+    transform:rotate(var(--r)) translateY(var(--y));
+    opacity:0;animation:oafdDeal .5s ease forwards;animation-delay:calc(.9s + var(--i) * .12s)}
+  #oafScreen .oafdposter:first-child{margin-left:0}
+  #oafScreen .oafdposter:nth-child(1){--r:-10deg;--y:8px} #oafScreen .oafdposter:nth-child(2){--r:-5deg;--y:2px}
+  #oafScreen .oafdposter:nth-child(3){--r:0deg;--y:0px;z-index:1} #oafScreen .oafdposter:nth-child(4){--r:5deg;--y:2px}
+  #oafScreen .oafdposter:nth-child(5){--r:10deg;--y:8px}
+  #oafScreen .oafdmore{margin-left:10px;font-size:12px;font-weight:700;color:var(--dim);opacity:0;
+    animation:oafwIn .5s ease 1.6s forwards}
+  #oafScreen .oafdtold{padding:12px 14px 8px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);
+    animation:oafwIn .6s ease 1.2s both}
+  #oafScreen .oafdtoldh{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);margin:0 0 8px}
+  #oafScreen .oafdtag{display:inline-flex;align-items:center;gap:5px;margin:0 6px 6px 0;padding:5px 10px;border-radius:999px;
+    font-size:13px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid var(--line)}
+  #oafScreen .oafdtag.fav{color:#5fdc95;border-color:rgba(95,220,149,.5);background:rgba(47,191,113,.12)}
+  #oafScreen .oafdtag i{width:7px;height:7px;border-radius:50%;background:var(--tc)}
+  @keyframes oafdPop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+  @keyframes oafdRing{from{transform:scale(1);opacity:.8}to{transform:scale(1.35);opacity:0}}
+  @keyframes oafdDeal{from{opacity:0;transform:translateY(20px) rotate(0)}to{opacity:1}}
+  @media (prefers-reduced-motion:reduce){
+    #oafScreen .oafdbot,#oafScreen .oafdbot .ring,#oafScreen .oafdcount,#oafScreen .oafdposter,#oafScreen .oafdmore,
+    #oafScreen .oafdtold{animation:none;opacity:1}
+  }
   #oafScreen .obintrotext{font-size:15.5px}
   #oafScreen .ossub{font-size:14.5px}
   #oafScreen .obopttitle{font-size:16.5px}
   #oafScreen .oboptsub{font-size:13.5px}
   #oafScreen .favname,#oafScreen .tickcell{font-size:14.5px}
-  #oafScreen .favgrid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-  #oafScreen .favgrid{gap:8px 6px}
-  #oafScreen .favcell{min-width:0;padding-right:6px;gap:0}
-  #oafScreen .favtoggle{padding-left:9px}
-  #oafScreen .favscale{margin-left:2px}
-  #oafScreen .favname{font-size:14px;letter-spacing:-.1px;font-weight:650}
-  #oafScreen .favseg{width:20px}
-  #oafScreen .favcell.lvl1 .favthumb{left:21.5px}
-  #oafScreen .favlegend{font-size:13px}
   #oafScreen .chip{font-size:13.5px}
   #oafScreen .svcsech{font-size:12.5px}
   /* 16px+ on the text input stops iOS Safari zooming the page when it is focused (it then stays zoomed). */
@@ -3452,30 +3511,40 @@
   /* ---- CAS-1368: first run — favourite genres (two-column ♥/✓ grid), then single-select age/partner/
      children cards (shared .obopt/.obradio skin, unchanged) and the tick grids Date night/Family genres use.
      Replaces the CAS-1346/1347 scores+alerts wizard and the "Who do you watch with?" step entirely. */
-  .favlegend{display:flex;flex-wrap:wrap;gap:10px 18px;margin:2px 0 14px;font-size:11.5px;font-weight:700}
-  .favleg.fav{color:#5fb985}
+  /* Lee, 13 Nov (pm): one genre per row; a three-segment lozenge Off | ✓ Include | ♥ Favourite — tap a segment
+     to set it (no draggable thumb). Everything starts on ✓. ♥ lights the row neon; on the favourites screen a
+     ♥ row also fades in "Alerts on". The legend sits over the segments, in the same order. */
+  .favlegend{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,48px);gap:0 3px;margin:4px 0 6px;padding-right:9px;
+    font-size:11.5px;font-weight:700;text-align:center}
+  .favlegend span:first-child{text-align:left}
+  .favleg.off{color:var(--dim)}
   .favleg.incl{color:#27b3a2}
-  .favgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .favcell{display:flex;align-items:center;gap:6px;height:38px;padding:0 8px 0 0;border-radius:10px;
-    border:1px dashed var(--line);background:transparent}
+  .favleg.fav{color:#5fdc95}
+  .favgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
+  .favcell{min-width:0}
+  .favcell{display:flex;align-items:center;gap:8px;height:44px;padding:0 5px 0 0;border-radius:12px;
+    border:1px dashed var(--line);background:transparent;transition:border-color .2s,box-shadow .2s,background .2s}
   .favcell:not(.on) .favname{color:var(--faint);font-weight:600}
-  .favcell.incl{border:1px solid #138c7d;background:color-mix(in srgb, #138c7d 12%, transparent)}
-  .favcell.fav{border:1px solid #3f8f62;background:color-mix(in srgb, #3f8f62 14%, transparent)}
-  .favtoggle{flex:1;min-width:0;height:100%;display:flex;align-items:center;padding:0 0 0 12px;border:0;
+  .favcell.incl{border:1px solid #138c7d;background:color-mix(in srgb, #138c7d 10%, transparent)}
+  .favcell.fav{border:1px solid #5fdc95;background:color-mix(in srgb, #2fbf71 16%, transparent);
+    box-shadow:0 0 0 1px #5fdc95 inset,0 0 14px rgba(95,220,149,.45)}
+  .favtoggle{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:0;padding:0 0 0 14px;border:0;
     background:none;font:inherit;color:inherit;cursor:pointer;text-align:left}
-  .favtoggle:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px;border-radius:10px}
-  .favscale{position:relative;display:flex;gap:3px;flex:0 0 auto;margin-left:6px}
-  .favseg{width:28px;height:22px;border-radius:4px;padding:0;display:grid;place-items:center;cursor:pointer;
-    font-size:11px;line-height:1;color:var(--faint);background:transparent;border:1px solid var(--bc)}
-  .favseg.check{--bc:#138c7d}
-  .favseg.heart{--bc:#3f8f62}
-  .favseg.on{background:var(--bc);color:#fff}
-  .favthumb{position:absolute;top:-1px;width:8px;height:24px;border-radius:4px;background:#fff;
-    box-shadow:0 1px 4px rgba(0,0,0,.5);pointer-events:none;transform:translateX(-50%);transition:left .15s}
-  .favcell.lvl0 .favthumb{left:0}
-  .favcell.lvl1 .favthumb{left:29.5px}
-  .favcell.lvl2 .favthumb{left:100%}
-  .favname{font-size:13px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .favtoggle:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px;border-radius:12px}
+  .favname{font-size:14.5px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .favname{max-width:100%}
+  .favalert{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#ffd54a;
+    white-space:nowrap;max-height:0;overflow:hidden;opacity:0;transition:opacity .5s ease,max-height .3s ease}
+  .favalert svg{width:13px;height:13px}
+  .favcell.fav .favalert{opacity:1;max-height:15px}
+  .favscale{display:grid;grid-template-columns:repeat(3,48px);gap:3px;flex:0 0 auto;padding:3px;border-radius:9px;
+    background:rgba(255,255,255,.04)}
+  .favseg{height:30px;border-radius:7px;padding:0;display:grid;place-items:center;cursor:pointer;
+    font-size:13px;line-height:1;color:var(--faint);background:transparent;border:0;font-weight:700}
+  .favseg + .favseg{box-shadow:-2px 0 0 -1px rgba(255,255,255,.12)}   /* a hairline divider, nothing to grab */
+  .favseg.off.on{background:#2a3242;color:var(--ink)}
+  .favseg.check.on{background:#138c7d;color:#fff}
+  .favseg.heart.on{background:#2fbf71;color:#fff;box-shadow:0 0 10px rgba(95,220,149,.7)}
   .tickgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   /* Lee, 12 Nov: Date night / Family use the favourites grid's lozenge language, two-state — off is a dashed
      lozenge with a dimmed name, on is the teal Include colour, the box sits right like the ✓ box there. */
@@ -22008,8 +22077,8 @@ let oafMode = "new";
 let oafPendingDraft = null;   // a signed-out first run's draft, held until the account exists (membStartWork)
 const ONE_AGENT_FLOW_WHERE = [
   ["cinema", "At the cinema", "Often enough to plan around it"],
-  ["rent", "Renting or buying", "Apple, Prime Video, Google and the like"],
-  ["stream", "On my streaming services", "Netflix, Disney+, Stan and the like"],
+  ["rent", "I rent them", "Apple, Prime Video, Google and the like"],
+  ["stream", "I watch on streaming", "Netflix, Disney+, Stan and the like"],
 ];
 const ONE_AGENT_FAMILY_DEFAULT = ["Family","Animation","Adventure","Comedy"];
 // Lee, 11 Nov: Date night starts with exactly these on, whatever the person's own genre picks.
@@ -22160,10 +22229,23 @@ function oneAgentCommit(draft){
 function oafWelcomeHTML(){
   if(oafMode==="migrate") return `<h2 class="osh">We've simplified your agents</h2>
     <p class="obintrotext">Cascade now has one agent that learns your taste, and moods for the lists you like to browse. A few quick questions and you're set.</p>`;
+  // Lee, 13 Nov (pm): the same message, broken into three illustrated beats that rise in one after another —
+  // a film travelling the cascade (cinema → rent → stream), your alerts and moods, and the agent that learns.
   return `<h2 class="osh">Let's get you set up.</h2>
-    <p class="obintrotext">Cascade is your movie-watching engine. It tracks the films you mustn't miss as they move from cinema to rental to streaming.</p>
-    <p class="obintrotext">Members always know what to watch next, with personalised alerts and moods by genre, actor or director. Every film you rate teaches your agent your taste, and it sharpens what it finds for you.</p>
-    <p class="obintrotext">Answer a few quick questions to set up your membership. That's how we brief your agent.</p>`;
+    <p class="oafwlede">Cascade is your movie-watching engine.</p>
+    <div class="oafwbeat" style="--d:.15s">
+      <div class="oafwart oafwflow" aria-hidden="true"><i class="c"></i><b></b><i class="r"></i><b></b><i class="s"></i><span class="oafwfilm"></span></div>
+      <p class="obintrotext">It tracks the films you mustn't miss as they move from <b class="wc">cinema</b> to <b class="wr">rental</b> to <b class="ws">streaming</b>.</p>
+    </div>
+    <div class="oafwbeat" style="--d:.55s">
+      <div class="oafwart oafwico alerts" aria-hidden="true">${OAF_DONE_ICONS.alerts}</div>
+      <p class="obintrotext">Members always know what to watch next, with personalised <b>alerts</b> and <b>moods</b> by genre, actor or director.</p>
+    </div>
+    <div class="oafwbeat" style="--d:.95s">
+      <div class="oafwart oafwico agent" aria-hidden="true">${OAF_DONE_ICONS.agent}</div>
+      <p class="obintrotext">Every film you rate teaches your <b>agent</b> your taste, and it sharpens what it finds for you.</p>
+    </div>
+    <p class="obintrotext oafwclose" style="--d:1.35s">Answer a few quick questions to set up your membership. That's how we brief your agent.</p>`;
 }
 function oafWhereHTML(){
   return `<h2 class="osh">Where do you watch movies?</h2>
@@ -22224,32 +22306,34 @@ function oafWireServices(){
 // pick is only ever "fav", "incl" or absent, never both, so picking one always replaces the other.
 function oafFavCount(){ return ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]).length; }
 function oafFavCellHTML(style, picks){
+  const own = !picks || picks===oafState.favs;   // only the person's own ♥ genres carry alerts
   const pick = (picks || oafState.favs)[style] || null;
   const name = oneAgentShortName(style);
-  // Lee, 11 Nov: a three-way toggle (off / ✓ include / ♥ favourite) drawn like the agent's share scale —
-  // two boxes filling from the left in the scale's own first two colours, a white thumb at the fill edge.
-  // Tapping the name switches the genre on (include) or off; tapping a box sets that level; tapping the
-  // lit top box steps down one level.
-  const lvl = pick==="fav" ? 2 : pick==="incl" ? 1 : 0;
-  return `<div class="favcell lvl${lvl}${pick?" on "+pick:""}" data-style="${escA(style)}">
+  // Lee, 13 Nov (pm): one row per genre; Off | ✓ | ♥ segments you tap (no draggable thumb). Tapping the name
+  // still switches the genre on (✓) or off.
+  const seg = (k, cls, label, glyph) => `<button type="button" class="favseg favbtn ${cls}${(pick||"off")===k?" on":""}"
+      data-pick="${k}" aria-pressed="${(pick||"off")===k}" aria-label="${escA(name)} ${label}">${glyph}</button>`;
+  return `<div class="favcell${pick?" on "+pick:""}" data-style="${escA(style)}">
       <button type="button" class="favtoggle" data-pick="toggle" aria-pressed="${!!pick}"
-          aria-label="${escA(name)} on or off"><span class="favname">${esc(name)}</span></button>
-      <span class="favscale">
-        <button type="button" class="favseg favbtn check${lvl>=1?" on":""}" data-pick="incl"
-            aria-pressed="${pick==="incl"}" aria-label="${escA(name)} include">✓</button>
-        <button type="button" class="favseg favbtn heart${lvl>=2?" on":""}" data-pick="fav"
-            aria-pressed="${pick==="fav"}" aria-label="${escA(name)} favourite">♥</button>
-        <i class="favthumb" aria-hidden="true"></i>
+          aria-label="${escA(name)} on or off"><span class="favname">${esc(name)}</span>${own?
+        `<span class="favalert" aria-hidden="${pick!=="fav"}">${OAF_DONE_ICONS.alerts}Alerts on</span>`:""}</button>
+      <span class="favscale" role="group" aria-label="${escA(name)}">
+        ${seg("off","off","off","Off")}${seg("incl","check","include","✓")}${seg("fav","heart","favourite","♥")}
       </span>
     </div>`;
 }
 function oafFavouritesHTML(){
-  const n = oafFavCount();
+  const n = ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]==="fav").length;
   return `<h2 class="osh">Your favourite genres</h2>
-    <p class="ossub">Tap a genre to switch it on ✓ if you'd watch it when it's really good. Slide it to ♥ for your absolute favourites (two or three is ideal). Leave the rest off.</p>
-    <div class="favlegend"><span class="favleg incl">✓ Include · only the best</span><span class="favleg fav">♥ Favourite · plenty of choice</span></div>
+    <p class="ossub">Every genre starts on ✓: your agent shows only the best of it. Tap ♥ for your absolute favourites (two or three is ideal) to get plenty of choice and alerts. Tap Off for genres you never watch.</p>
+    ${oafFavLegendHTML()}
     <div class="favgrid" id="oafFavGrid">${oafFavGridCellsHTML(oafState.favs)}</div>
     <p class="ossub" style="margin-top:10px">${n} favourite${n===1?"":"s"}${n>3?" · fewer gives sharper lists":""}</p>`;
+}
+// The legend is laid out over the three segments, in their order (Lee, 13 Nov pm).
+function oafFavLegendHTML(){
+  return `<div class="favlegend" aria-hidden="true"><span></span><span class="favleg off">Off</span>
+    <span class="favleg incl">Include</span><span class="favleg fav">Favourite</span></div>`;
 }
 // Lee, 13 Nov: Date night and Family use exactly this control too — one renderer and one wiring for all three grids.
 function oafFavGridCellsHTML(picks){ return ONE_AGENT_SETUP_STYLES.map(st=>oafFavCellHTML(st, picks)).join(""); }
@@ -22260,10 +22344,8 @@ function oafWireFavGrid(gridId, picks){
     cell.querySelectorAll("[data-pick]").forEach(btn=>{
       btn.onclick=()=>{
         const pick=btn.dataset.pick, cur=picks[style]||null;
-        const next =
-            pick==="toggle" ? (cur ? null : "incl")
-          : pick==="incl"   ? (cur==="incl" ? null : "incl")
-          :                   (cur==="fav" ? "incl" : "fav");
+        // A segment sets its own level; the name toggles on (✓) / off.
+        const next = pick==="toggle" ? (cur ? null : "incl") : pick==="off" ? null : pick;
         if(next) picks[style]=next; else delete picks[style];
         oafPaint();
       };
@@ -22287,6 +22369,7 @@ function oafPartnerHTML(){
 function oafTogetherHTML(){
   return `<h2 class="osh">What do you watch together?</h2>
     <p class="ossub">Switch on the genres for your <b>Partner</b> mood, and ♥ the ones you watch together most.</p>
+    ${oafFavLegendHTML()}
     <div class="favgrid" id="oafTogetherGrid">${oafFavGridCellsHTML(oafState.together)}</div>`;
 }
 function oafChildrenHTML(){
@@ -22297,6 +22380,7 @@ function oafChildrenHTML(){
 function oafFamilyHTML(){
   return `<h2 class="osh">What do you watch as a family?</h2>
     <p class="ossub">We've switched on the usual ones. Change them as you like, and ♥ the family favourites.</p>
+    ${oafFavLegendHTML()}
     <div class="favgrid" id="oafFamilyGrid">${oafFavGridCellsHTML(oafState.family)}</div>`;
 }
 // New screen (CAS-1352): between family/partner and done. Continue stays disabled until a trimmed name exists (oafBlocked).
@@ -22365,23 +22449,53 @@ function oafDoneSecHTML(kind, title, body){
   return `<section class="oafdsec ${kind}"><div class="oafdh"><span class="oafdico">${OAF_DONE_ICONS[kind]}</span>
     <span class="oafdt">${title}</span></div>${body}</section>`;
 }
+// Lee, 13 Nov (pm): the done screen is not an explainer. Its one job is to make the person want what's on
+// the other side of sign-up: their agent comes alive, counts up what it has already found for them, plays
+// back what they told it (the time they've put in), and teases the first posters — then "See what X found".
+function oafDraftMatches(draft){
+  const c = {v:2, styles:draft.styles, combo:{}, myServices:false, excludeWatched:false};
+  try{
+    return MOVIES.filter(m => { try{ return matchesCriteriaOneAgent(m, c, true); }catch(e){ return false; } })
+      .map(m => ({m, sc: (()=>{ try{ return oneScoreFor(m, c); }catch(e){ return 0; } })()}))
+      .sort((a,b) => b.sc - a.sc).map(x => x.m);
+  }catch(e){ return []; }
+}
 function oafDoneHTML(){
   const draft = oneAgentBuildDraft();
-  const n = Object.keys(draft.styles).length;   // every genre the agent will watch, Partner/Family ones included
-  const favs = ONE_AGENT_SETUP_STYLES.filter(st=>oafState.favs[st]==="fav");
   const name = esc(draft.name);
-  // Lee, 13 Nov: what's been set up is the Cascade account (agent, moods, services), not just the agent.
-  return `<h2 class="osh">Your Cascade account is set up.</h2>
-    ${oafDoneSecHTML("agent", `Agent · ${name}`,
-      `<p class="ossub">${name} searches the whole catalogue every day for films in your <b>${n} genre${n===1?"":"s"}</b>,
-        and learns from every film you rate.</p>`)}
-    ${oafDoneSecHTML("alerts", "Alerts",
-      favs.length
-        ? `<p class="ossub">${name} tells you when a film in a ♥ favourite genre arrives:</p>${oafAlertRowsHTML()}`
-        : oafAlertRowsHTML())}
-    ${oafDoneSecHTML("watch", "Watch",
-      `<p class="ossub">What ${name} finds is listed here, in moods: ready-made lists you switch between at the top.</p>
-       <div class="chips">${draft.moods.map(m=>`<span class="chip gen on">${esc(m.name)}</span>`).join("")}</div>`)}`;
+  const found = oafDraftMatches(draft);
+  oafDoneFound = found.length;
+  const favs = ONE_AGENT_SETUP_STYLES.filter(st=>oafState.favs[st]==="fav").map(oneAgentShortName);
+  const nGenres = Object.keys(draft.styles).length;
+  const svcs = [...(prefs.sub||[])].slice(0,3).map(k=>{ try{ return svcName(k); }catch(e){ return k; } });
+  const told = [
+    ...favs.map(g=>`<span class="oafdtag fav">♥ ${esc(g)}</span>`),
+    `<span class="oafdtag">${nGenres} genre${nGenres===1?"":"s"}</span>`,
+    ...oafActiveWindows().map(w=>`<span class="oafdtag" style="--tc:${w.color}"><i></i>${esc(w.label)}</span>`),
+    ...svcs.map(n=>`<span class="oafdtag">${esc(n)}</span>`),
+    ...(oafState.partner==="yes" ? [`<span class="oafdtag">Partner</span>`] : []),
+    ...(oafState.children==="yes" ? [`<span class="oafdtag">Family</span>`] : []),
+  ].join("");
+  const posters = found.filter(m=>m.poster).slice(0,5)
+    .map((m,i)=>`<div class="oafdposter" style="--i:${i};background-image:url(https://image.tmdb.org/t/p/w185${m.poster})"></div>`).join("");
+  return `<div class="oafdhero">
+      <div class="oafdbot" aria-hidden="true"><span class="ring"></span><span class="ring r2"></span>${OAF_DONE_ICONS.agent}</div>
+      <h2 class="osh oafdtitle">${name} is ready.</h2>
+      <p class="oafdsub">Your Cascade account is set up.</p>
+    </div>
+    <div class="oafdcount"><b id="oafDoneCount">0</b><span>films already found for you</span></div>
+    ${posters ? `<div class="oafdposters" aria-hidden="true">${posters}<span class="oafdmore">+ more</span></div>` : ""}
+    <div class="oafdtold"><div class="oafdtoldh">${name} is working from what you told it</div>${told}</div>`;
+}
+let oafDoneFound = 0;
+function oafAnimateDone(){
+  const el=$("oafDoneCount"); if(!el) return;
+  const target=oafDoneFound, reduce=window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if(reduce || !target){ el.textContent=target.toLocaleString(); return; }
+  const t0=performance.now(), dur=1600;
+  const step=t=>{ const k=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-k,3);
+    el.textContent=Math.round(target*e).toLocaleString(); if(k<1 && document.body.contains(el)) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
 }
 function oafBlocked(){
   if(oafStep==="where") return oafState.where.size===0;
@@ -22404,7 +22518,10 @@ function oafPaint(){
   $("oafBack").hidden = (oafStep==="welcome" && oafMode==="migrate") || oafStep==="done";
   $("oafFill").style.width = oafProgressPct(oafStep)+"%";
   const cta=$("oafCta");
-  cta.textContent = oafStep==="done" ? "Start watching" : "Continue";
+  // Lee, 13 Nov (pm): the new-account done screen's CTA promises the payoff on the far side of sign-up.
+  const agentName = ((oafState && oafState.name) || "").trim();
+  cta.textContent = oafStep!=="done" ? "Continue"
+    : (oafMode==="new" && agentName) ? `See what ${agentName} found` : "Start watching";
   cta.onclick = oafStep==="done" ? oafStartWatching : oafGoContinue;
   const blocked = oafBlocked();
   cta.disabled = blocked;
@@ -22434,6 +22551,7 @@ function oafPaint(){
     });
   else if(oafStep==="family") oafWireFavGrid("oafFamilyGrid", oafState.family);
   else if(oafStep==="nameAgent") oafWireNameAgent();
+  else if(oafStep==="done") oafAnimateDone();
 }
 function oafShow(key){
   oafStep=key;
@@ -22492,7 +22610,8 @@ window.oafOpen=(opts)=>{
   oafMode = opts.mode==="migrate" ? "migrate" : "new";
   oafPendingDraft=null;
   oafState = {
-    where: new Set(), favs: {}, age: null, partner: null, children: null,
+    // Lee, 13 Nov (pm): every genre starts on ✓ (the middle setting).
+    where: new Set(), favs: Object.fromEntries(ONE_AGENT_SETUP_STYLES.map(g=>[g,"incl"])), age: null, partner: null, children: null,
     together: {}, togetherInit: false, family: {}, familyInit: false,
     name: "",
   };
@@ -23946,6 +24065,7 @@ function openMembership(agentKey, nameOverride, cascade){
     <span class="cascpill" id="membPill">CASCADE</span>
     <h2 class="membh" id="membHead">Cascade Membership</h2>
     ${haul}
+    ${membOfferHTML()}
     <p class="memfine" id="membFine">${esc(membFineText())}</p>
     <div class="membenefits">
       ${MEMB_BENEFITS.map(b=>`<div class="mbrow"><span class="mbic">${b.ic}</span>
@@ -24035,6 +24155,7 @@ function openOnbMembership(){
       ${OB_MEMB_BENEFITS.map(b=>`<div class="mbrow"><span class="mbic">✓</span>
         <span class="mbtx"><span class="mbt">${esc(b)}</span></span></div>`).join("")}
     </div>
+    ${membOfferHTML()}
     <p class="memfine" id="membFine">${esc(membFineText())}</p>
     ${needsEmail ? `
     <div id="membEmailField">
@@ -24423,6 +24544,26 @@ function membAccountPlanText(){
   }
   return membEnt.state==="none" ? "No active membership" : "Membership is started in the Cascade iPhone app.";
 }
+// Lee, 13 Nov: the sign-up screens show the offer as a presentational box again (it was a fine-print line
+// before CAS-971). Figures come from StoreKit in the app; the web (no StoreKit) shows the configured offer.
+const MEMB_OFFER_FALLBACK = {free:"First month free", then:"then A$3.99/month · cancel any time"};
+function membOfferParts(){
+  const p=membProduct;
+  if(p && p.priceString){
+    const intro=p.introductoryPrice;
+    if(intro && Number(intro.price)===0 && intro.subscriptionPeriod){
+      const n=(intro.subscriptionPeriod.numberOfUnits||intro.numberOfPeriods||1);
+      const unit=({0:"day",1:"week",2:"month",3:"year"})[intro.subscriptionPeriod.unit]||"month";
+      return {free: n===1 ? `First ${unit} free` : `First ${n} ${unit}s free`, then:`then ${p.priceString}/month · cancel any time`};
+    }
+    return {free:`${p.priceString}/month`, then:"cancel any time"};
+  }
+  return MEMB_OFFER_FALLBACK;
+}
+function membOfferHTML(){
+  const o=membOfferParts();
+  return `<div class="memboffer" id="membOffer"><span class="mofree">${esc(o.free)}</span><span class="mothen">${esc(o.then)}</span></div>`;
+}
 function membHasFreeTrial(p){ return !!(p && p.introductoryPrice && Number(p.introductoryPrice.price)===0); }
 function membCtaLabel(){
   if(!membIsNativeApp()) return "Continue";
@@ -24438,6 +24579,7 @@ async function membLoadProduct(){
   try{ const r=await pl.getProduct({productIdentifier:MEMB_PRODUCT_ID, productType:"subs"}); membProduct=r && r.product || null; }
   catch(e){ console.warn("Cascade: product lookup failed", e); }
   const fine=$("membFine"); if(fine) fine.textContent=membFineText();
+  const offer=$("membOffer"); if(offer) offer.outerHTML=membOfferHTML();
   const btn=document.querySelector(".membcta"); if(btn && !btn.disabled) btn.textContent=membCtaLabel();
   return membProduct;
 }
