@@ -3025,7 +3025,20 @@
   .obintrotext{font-size:14px;line-height:1.55;color:#d6dce6;margin:10px 0 0}
   /* Lee, 13 Nov: every one-agent first-run step reads 1.5pt larger than the old flow — body copy, sub copy,
      selection boxes, genre grids, chips, section heads and the name field. Headings (.osh) are unchanged. */
-  #oafBack[hidden]{display:none}   /* .osback's own display beats the hidden attribute otherwise */
+  #oafBack[hidden]{display:none}
+  /* Done screen sections (Lee, 13 Nov) — each headed by its main-nav icon in that item's colour. */
+  #oafScreen .oafdsec{margin:12px 0 0;padding:10px 14px 2px;border-radius:14px;border:1px solid var(--line);
+    background:var(--panel2)}
+  #oafScreen .oafdh{display:flex;align-items:center;gap:10px;margin:0 0 8px}
+  #oafScreen .oafdico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none;
+    color:var(--dc);background:color-mix(in srgb, var(--dc) 16%, transparent)}
+  #oafScreen .oafdico svg{width:18px;height:18px}
+  #oafScreen .oafdt{font-family:Poppins,system-ui,sans-serif;font-weight:700;font-size:16px;color:var(--ink)}
+  #oafScreen .oafdsec.agent{--dc:#a78bfa}
+  #oafScreen .oafdsec.alerts{--dc:#ffd54a}
+  #oafScreen .oafdsec.watch{--dc:var(--brand-blue)}
+  #oafScreen .oafdsec .ossub{margin:0 0 10px}
+  #oafScreen .oafdsec .chips{margin:0 0 10px}   /* .osback's own display beats the hidden attribute otherwise */
   #oafScreen .obintrotext{font-size:15.5px}
   #oafScreen .ossub{font-size:14.5px}
   #oafScreen .obopttitle{font-size:16.5px}
@@ -22340,19 +22353,35 @@ function oafAlertRowsHTML(){
      </p>`
   ).join("");
 }
+// Lee, 13 Nov: the done screen is sectioned by the three main-nav destinations it set up, each headed by that
+// nav item's own icon and colour — Agent (what it watches), Alerts (what it will tell you) and Watch (the moods
+// you browse) — so the screen reads as a map of the app the person is about to land in.
+const OAF_DONE_ICONS = {
+  agent:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4.5" y="8" width="15" height="11" rx="3"/><path d="M12 4.5V8"/><circle cx="12" cy="3.6" r="1.1"/><path d="M9.3 13.2v1.6M14.7 13.2v1.6"/></svg>`,
+  alerts:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15.5 10 9.5 14 13.5 20 5.5"/><path d="M14 5.5h6v6"/></svg>`,
+  watch:`<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 3.6h12a1 1 0 0 1 1 1V20.8l-7-3.95-7 3.95V4.6a1 1 0 0 1 1-1Z" mask="url(#mcWatchMask)"/></svg>`,
+};
+function oafDoneSecHTML(kind, title, body){
+  return `<section class="oafdsec ${kind}"><div class="oafdh"><span class="oafdico">${OAF_DONE_ICONS[kind]}</span>
+    <span class="oafdt">${title}</span></div>${body}</section>`;
+}
 function oafDoneHTML(){
   const draft = oneAgentBuildDraft();
   const n = Object.keys(draft.styles).length;   // every genre the agent will watch, Partner/Family ones included
   const favs = ONE_AGENT_SETUP_STYLES.filter(st=>oafState.favs[st]==="fav");
+  const name = esc(draft.name);
   // Lee, 13 Nov: what's been set up is the Cascade account (agent, moods, services), not just the agent.
   return `<h2 class="osh">Your Cascade account is set up.</h2>
-    <p class="obintrotext">Your agent <b>${esc(draft.name)}</b> is now watching <b>${n} genre${n===1?"":"s"}</b> across the whole catalogue, every day.</p>
-    <div class="svcsec"><div class="svcsech">Alerts</div>
-      ${favs.length?`<p class="ossub">${esc(draft.name)} alerts you when a film in one of your ♥ favourite genres arrives:</p>`:""}
-      ${oafAlertRowsHTML()}</div>
-    <div class="svcsec"><div class="svcsech">Your moods</div>
-      <p class="ossub">Moods are ready-made lists of what your agent finds. Switch between them at the top of Watch.</p>
-      <div class="chips">${draft.moods.map(m=>`<span class="chip gen on">${esc(m.name)}</span>`).join("")}</div></div>`;
+    ${oafDoneSecHTML("agent", `Agent · ${name}`,
+      `<p class="ossub">${name} searches the whole catalogue every day for films in your <b>${n} genre${n===1?"":"s"}</b>,
+        and learns from every film you rate.</p>`)}
+    ${oafDoneSecHTML("alerts", "Alerts",
+      favs.length
+        ? `<p class="ossub">${name} tells you when a film in a ♥ favourite genre arrives:</p>${oafAlertRowsHTML()}`
+        : oafAlertRowsHTML())}
+    ${oafDoneSecHTML("watch", "Watch",
+      `<p class="ossub">What ${name} finds is listed here, in moods: ready-made lists you switch between at the top.</p>
+       <div class="chips">${draft.moods.map(m=>`<span class="chip gen on">${esc(m.name)}</span>`).join("")}</div>`)}`;
 }
 function oafBlocked(){
   if(oafStep==="where") return oafState.where.size===0;

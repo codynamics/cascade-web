@@ -62,7 +62,10 @@ test("CAS-1205: tapping a Watch On segment calls toggleFilmOpt, Never calls pick
 test("CAS-1205: a Watch On tick lights its own segment, through the real toggleFilmOpt", () => {
   const E = loadEngine();
   signIn(E);
-  const m = E.MOVIES[3];
+  // Not a fixed index: the daily refresh moves films on, and a film already streaming has Rent spent, so
+  // toggleFilmOpt correctly refuses it. Pick the first film whose Rent level can still be ticked.
+  const m = E.MOVIES.find(f => { const r = E.watchLevelsFor(f.tmdb_id).find(l => l.key === "rent"); return r && !r.spent; });
+  assert.ok(m, "the catalogue must hold at least one film whose Rent level is still open");
   E.toggleFilmOpt(m.tmdb_id, "rent");
   const html = E.filmPageHTML(m);
   assert.ok(html.includes('class="cseg on" data-key="rent"'), "the Rent segment must be lit");

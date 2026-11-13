@@ -1,63 +1,228 @@
 [
   {
-    "tmdb_id": 1400837,
-    "title": "Other Mommy",
+    "tmdb_id": 1234139,
+    "title": "Jailer 2",
     "kind": "arrived",
-    "new_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "services": [
-      "Apple TV Store",
-      "Amazon Video"
-    ],
-    "detected": "2026-11-11"
-  },
-  {
-    "tmdb_id": 1101383,
-    "title": "The End of Oak Street",
-    "kind": "left",
-    "lost_window": "included_streaming",
+    "new_window": "included_streaming",
     "label": "Included Streaming",
-    "detected": "2026-11-11"
+    "services": [
+      "Amazon Prime Video",
+      "Amazon Prime Video with Ads"
+    ],
+    "detected": "2026-11-12"
   },
   {
-    "tmdb_id": 1300968,
-    "title": "The Hunger Games: Sunrise on the Reaping",
+    "tmdb_id": 1234139,
+    "title": "Jailer 2",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1765072,
+    "title": "You Can See Everything",
     "kind": "arrived",
     "new_window": "in_cinema",
     "label": "In Cinema",
     "services": [],
-    "detected": "2026-11-11"
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1765072,
+    "title": "You Can See Everything",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-11-12"
   },
   {
     "tmdb_id": 1300968,
     "title": "The Hunger Games: Sunrise on the Reaping",
     "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1437696,
+    "title": "Fatherland",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1437696,
+    "title": "Fatherland",
+    "kind": "left",
     "lost_window": "upcoming",
     "label": "Upcoming",
-    "detected": "2026-11-11"
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1567605,
+    "title": "Ebenezer",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-11-12"
   },
   {
     "tmdb_id": 1567605,
     "title": "Ebenezer",
     "kind": "left",
-    "lost_window": "in_cinema",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1437511,
+    "title": "How to Rob a Bank",
+    "kind": "arrived",
+    "new_window": "in_cinema",
     "label": "In Cinema",
-    "detected": "2026-11-11"
+    "services": [],
+    "detected": "2026-11-12"
   },
   {
     "tmdb_id": 1437511,
     "title": "How to Rob a Bank",
     "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-11-11"
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-11-12"
   },
   {
-    "tmdb_id": 1058615,
-    "title": "The Accidental Getaway Driver",
+    "tmdb_id": 1294698,
+    "title": "Case 137",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1633056,
+    "title": "All Wishes Come True!",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 374461,
+    "title": "Mr. Church",
     "kind": "left",
     "lost_window": "included_streaming",
     "label": "Included Streaming",
-    "detected": "2026-11-11"
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1227877,
+    "title": "I Love Boosters",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1227877,
+    "title": "I Love Boosters",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 530079,
+    "title": "Ride Your Wave",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Crunchyroll Amazon Channel"
+    ],
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 530079,
+    "title": "Ride Your Wave",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1168719,
+    "title": "Silent Friend",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1168719,
+    "title": "Silent Friend",
+    "kind": "left",
+    "lost_window": "released",
+    "label": "Released (no AU offer)",
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1458300,
+    "title": "The Mosquito Bowl",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1458300,
+    "title": "The Mosquito Bowl",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1030588,
+    "title": "Ghost Cat Anzu",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Binge Amazon Channel"
+    ],
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1030588,
+    "title": "Ghost Cat Anzu",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1638741,
+    "title": "Man of Valor",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 1638741,
+    "title": "Man of Valor",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-11-12"
   }
 ]
