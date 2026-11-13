@@ -3034,6 +3034,9 @@
   .obintrotext{font-size:14px;line-height:1.55;color:#d6dce6;margin:10px 0 0}
   /* Lee, 13 Nov: every one-agent first-run step reads 1.5pt larger than the old flow — body copy, sub copy,
      selection boxes, genre grids, chips, section heads and the name field. Headings (.osh) are unchanged. */
+  /* Lee, 13 Nov: quick taps on Back (or a lozenge) let iOS Safari treat them as a double-tap and zoom the page,
+     which then stayed zoomed. manipulation keeps scroll and pinch but drops double-tap-to-zoom. */
+  #oafScreen,#oafScreen *,#membScreen,#membScreen *{touch-action:manipulation}
   #oafBack[hidden]{display:none}
   /* Welcome screen (Lee, 13 Nov pm): three illustrated beats rising in turn. */
   #oafScreen .oafwlede{font-family:Poppins,system-ui,sans-serif;font-weight:700;font-size:18px;line-height:1.35;
@@ -3546,10 +3549,10 @@
     font-size:13px;line-height:1;color:var(--faint);background:transparent;border:0;font-weight:700}
   .favseg + .favseg{box-shadow:-2px 0 0 -1px rgba(255,255,255,.12)}   /* a hairline divider, nothing to grab */
   /* Lee, 13 Nov: Off carries the same weight as ✓ and ♥ — a glyph, not a word, and a quiet fill when chosen. */
-  .favseg.off{font-size:12px}
   .favseg.off.on{background:rgba(255,255,255,.07);color:var(--ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)}
   .favseg.check.on{background:#138c7d;color:#fff}
-  .favseg.heart.on{background:#2fbf71;color:#fff;box-shadow:0 0 10px rgba(95,220,149,.7)}
+  .favseg.heart.on{background:#2fbf71;color:#fff}   /* the row carries the glow; the segment stays crisp */
+  .favseg svg{display:block}
   .tickgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   /* Lee, 12 Nov: Date night / Family use the favourites grid's lozenge language, two-state — off is a dashed
      lozenge with a dimmed name, on is the teal Include colour, the box sits right like the ✓ box there. */
@@ -22310,6 +22313,12 @@ function oafWireServices(){
 // Favourites — tapping ♥ or ✓ sets that genre's one pick; tapping the same button again clears it. A genre's
 // pick is only ever "fav", "incl" or absent, never both, so picking one always replaces the other.
 function oafFavCount(){ return ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]).length; }
+// Lee, 13 Nov: the font glyphs (✕ ✓ ♥) rendered soft on the phone — crisp stroked/filled SVGs instead.
+const OAF_SEG_ICONS = {
+  off:`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17"/></svg>`,
+  incl:`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
+  fav:`<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 20.3 4.6 13.1a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9a4.6 4.6 0 0 1 6.5 6.5Z"/></svg>`,
+};
 function oafFavCellHTML(style, picks){
   const own = !picks || picks===oafState.favs;   // only the person's own ♥ genres carry alerts
   const pick = (picks || oafState.favs)[style] || null;
@@ -22323,7 +22332,7 @@ function oafFavCellHTML(style, picks){
           aria-label="${escA(name)} on or off"><span class="favname">${esc(name)}</span>${own?
         `<span class="favalert" aria-hidden="${pick!=="fav"}">${OAF_DONE_ICONS.alerts}Alerts on</span>`:""}</button>
       <span class="favscale" role="group" aria-label="${escA(name)}">
-        ${seg("off","off","off","✕")}${seg("incl","check","include","✓")}${seg("fav","heart","favourite","♥")}
+        ${seg("off","off","off",OAF_SEG_ICONS.off)}${seg("incl","check","include",OAF_SEG_ICONS.incl)}${seg("fav","heart","favourite",OAF_SEG_ICONS.fav)}
       </span>
     </div>`;
 }
