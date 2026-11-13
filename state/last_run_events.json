@@ -1,7 +1,15 @@
 [
   {
-    "tmdb_id": 1234139,
-    "title": "Jailer 2",
+    "tmdb_id": 270303,
+    "title": "It Follows",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 523536,
+    "title": "Checkered Ninja",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
@@ -9,220 +17,89 @@
       "Amazon Prime Video",
       "Amazon Prime Video with Ads"
     ],
-    "detected": "2026-11-12"
+    "detected": "2026-11-13"
   },
   {
-    "tmdb_id": 1234139,
-    "title": "Jailer 2",
-    "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1765072,
-    "title": "You Can See Everything",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1765072,
-    "title": "You Can See Everything",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1300968,
-    "title": "The Hunger Games: Sunrise on the Reaping",
-    "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1437696,
-    "title": "Fatherland",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1437696,
-    "title": "Fatherland",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1567605,
-    "title": "Ebenezer",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1567605,
-    "title": "Ebenezer",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1437511,
-    "title": "How to Rob a Bank",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1437511,
-    "title": "How to Rob a Bank",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1294698,
-    "title": "Case 137",
-    "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1633056,
-    "title": "All Wishes Come True!",
-    "kind": "left",
-    "lost_window": "in_cinema",
-    "label": "In Cinema",
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 374461,
-    "title": "Mr. Church",
-    "kind": "left",
-    "lost_window": "included_streaming",
-    "label": "Included Streaming",
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1227877,
-    "title": "I Love Boosters",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1227877,
-    "title": "I Love Boosters",
-    "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 530079,
-    "title": "Ride Your Wave",
-    "kind": "arrived",
-    "new_window": "included_streaming",
-    "label": "Included Streaming",
-    "services": [
-      "Crunchyroll Amazon Channel"
-    ],
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 530079,
-    "title": "Ride Your Wave",
-    "kind": "left",
-    "lost_window": "rental",
-    "label": "Standard Rental (~$7)",
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1168719,
-    "title": "Silent Friend",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1168719,
-    "title": "Silent Friend",
+    "tmdb_id": 523536,
+    "title": "Checkered Ninja",
     "kind": "left",
     "lost_window": "released",
     "label": "Released (no AU offer)",
-    "detected": "2026-11-12"
+    "detected": "2026-11-13"
   },
   {
-    "tmdb_id": 1458300,
-    "title": "The Mosquito Bowl",
-    "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-11-12"
-  },
-  {
-    "tmdb_id": 1458300,
-    "title": "The Mosquito Bowl",
+    "tmdb_id": 333596,
+    "title": "Woodlawn",
     "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-11-12"
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-13"
   },
   {
-    "tmdb_id": 1030588,
-    "title": "Ghost Cat Anzu",
+    "tmdb_id": 1221061,
+    "title": "Sound of Falling",
     "kind": "arrived",
     "new_window": "included_streaming",
     "label": "Included Streaming",
     "services": [
-      "Binge Amazon Channel"
+      "MUBI Amazon Channel"
     ],
-    "detected": "2026-11-12"
+    "detected": "2026-11-13"
   },
   {
-    "tmdb_id": 1030588,
-    "title": "Ghost Cat Anzu",
+    "tmdb_id": 1221061,
+    "title": "Sound of Falling",
     "kind": "left",
     "lost_window": "rental",
     "label": "Standard Rental (~$7)",
-    "detected": "2026-11-12"
+    "detected": "2026-11-13"
   },
   {
-    "tmdb_id": 1638741,
-    "title": "Man of Valor",
+    "tmdb_id": 1472844,
+    "title": "Everyone Is Lying to You for Money",
     "kind": "arrived",
-    "new_window": "in_cinema",
-    "label": "In Cinema",
-    "services": [],
-    "detected": "2026-11-12"
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Amazon Prime Video",
+      "Amazon Prime Video with Ads"
+    ],
+    "detected": "2026-11-13"
   },
   {
-    "tmdb_id": 1638741,
-    "title": "Man of Valor",
+    "tmdb_id": 1472844,
+    "title": "Everyone Is Lying to You for Money",
     "kind": "left",
-    "lost_window": "upcoming",
-    "label": "Upcoming",
-    "detected": "2026-11-12"
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 626820,
+    "title": "The Art Of Waiting",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Amazon Prime Video",
+      "Amazon Prime Video with Ads"
+    ],
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 626820,
+    "title": "The Art Of Waiting",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 1375331,
+    "title": "Adrienne Iapalucci: The Dark Queen",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-13"
   }
 ]

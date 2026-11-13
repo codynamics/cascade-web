@@ -24253,5 +24253,108 @@
     "lost_window": "upcoming",
     "label": "Upcoming",
     "detected": "2026-11-12"
+  },
+  {
+    "tmdb_id": 270303,
+    "title": "It Follows",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 523536,
+    "title": "Checkered Ninja",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Amazon Prime Video",
+      "Amazon Prime Video with Ads"
+    ],
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 523536,
+    "title": "Checkered Ninja",
+    "kind": "left",
+    "lost_window": "released",
+    "label": "Released (no AU offer)",
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 333596,
+    "title": "Woodlawn",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 1221061,
+    "title": "Sound of Falling",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "MUBI Amazon Channel"
+    ],
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 1221061,
+    "title": "Sound of Falling",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 1472844,
+    "title": "Everyone Is Lying to You for Money",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Amazon Prime Video",
+      "Amazon Prime Video with Ads"
+    ],
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 1472844,
+    "title": "Everyone Is Lying to You for Money",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 626820,
+    "title": "The Art Of Waiting",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Amazon Prime Video",
+      "Amazon Prime Video with Ads"
+    ],
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 626820,
+    "title": "The Art Of Waiting",
+    "kind": "left",
+    "lost_window": "rental",
+    "label": "Standard Rental (~$7)",
+    "detected": "2026-11-13"
+  },
+  {
+    "tmdb_id": 1375331,
+    "title": "Adrienne Iapalucci: The Dark Queen",
+    "kind": "left",
+    "lost_window": "included_streaming",
+    "label": "Included Streaming",
+    "detected": "2026-11-13"
   }
 ]
