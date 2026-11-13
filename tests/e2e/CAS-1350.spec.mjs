@@ -33,9 +33,13 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
   await page.locator('#oafWhereOpts .obopt[data-val="cinema"]').click();
   await page.locator("#oafCta").click();   // where -> favourites (no services step, cinema only)
 
-  // CAS-1368: the favourites screen — Continue stays disabled until at least one genre is marked.
+  // Lee, 13 Nov (pm): every genre starts on ✓, so Continue is ready at once; switching every genre Off
+  // disables it again (CAS-1368's "at least one genre" rule still holds).
   await expect(page.locator("#oafInner .osh")).toHaveText("Your favourite genres");
   await expectHeadingBelowHeader(page);
+  await expect(page.locator('.favcell[data-style="Comedy"]')).toHaveClass(/ on incl/);
+  await expect(page.locator("#oafCta")).toBeEnabled();
+  await page.evaluate(() => document.querySelectorAll("#oafFavGrid .favbtn.off").forEach(b => b.click()));
   await expect(page.locator("#oafCta")).toBeDisabled();
   await page.locator('.favcell[data-style="Action"] .favbtn.heart').click();
   await page.locator('.favcell[data-style="Drama"] .favbtn.check').click();
@@ -84,13 +88,15 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
   await expect(page.locator("#oafCta")).toBeEnabled();
   await page.locator("#oafCta").click();   // name your agent -> done
 
-  await expect(page.locator("#oafInner .osh")).toHaveText("Your Cascade account is set up.");
+  // Lee, 13 Nov (pm): the done screen is the payoff — the named agent, a count of what it found, the answers played back.
+  await expect(page.locator("#oafInner .osh")).toHaveText("Nova is ready.");
   await expectHeadingBelowHeader(page);
-  await expect(page.locator("#oafInner .oafdsec.agent")).toContainText("Agent · Nova");   // Lee, 13 Nov: sectioned by main nav
-  // CAS-1368: the moods table — Releases, Best of the best, Me, Date night, Family, Starred (partner+kids both yes).
-  const moodChips = page.locator("#oafInner .oafdsec.watch .chip");
-  await expect(moodChips).toHaveText(["All Latest", "Best of the best", "Me", "Partner", "Family", "Starred"]);
-  await expect(page.locator("#oafCta")).toHaveText("Start watching");
+  await expect(page.locator("#oafInner .oafdtold")).toContainText("Partner");
+  await expect(page.locator("#oafDoneCount")).not.toHaveText("0", { timeout: 4000 });
+  await expect(page.locator("#oafCta")).toHaveText("See what Nova found");
+  // CAS-1368: the moods table still follows the answers (partner+kids both yes), though the screen no longer lists it.
+  expect(await page.evaluate(() => oneAgentBuildDraft().moods.map(m => m.name)))
+    .toEqual(["All Latest", "Best of the best", "Me", "Partner", "Family", "Starred"]);
   await page.locator("#oafCta").click();
 
   // CAS-1361 part 1: after Start watching, the setup header/nav must not float over Watch underneath.
