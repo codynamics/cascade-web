@@ -3099,8 +3099,14 @@
   #oafScreen .oafdposter:nth-child(5){--r:10deg;--y:8px}
   #oafScreen .oafdmore{margin-left:10px;font-size:12px;font-weight:700;color:var(--dim);opacity:0;
     animation:oafwIn .5s ease 1.6s forwards}
+  /* Lee, 13 Nov: the moods the answers created, dealt in after the posters. */
+  #oafScreen .oafdmoods{text-align:center;margin:0 0 14px}
+  #oafScreen .oafdmoods .oafdtoldh{text-align:center}
+  #oafScreen .oafdmood{display:inline-flex;margin:0 4px 6px;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:700;
+    color:#fff;background:linear-gradient(135deg,rgba(124,92,255,.85),rgba(56,189,248,.75));
+    opacity:0;animation:oafwIn .45s ease forwards;animation-delay:calc(1.6s + var(--i) * .1s)}
   #oafScreen .oafdtold{padding:12px 14px 8px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);
-    animation:oafwIn .6s ease 1.2s both}
+    animation:oafwIn .6s ease 2.2s both}
   #oafScreen .oafdtoldh{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);margin:0 0 8px}
   #oafScreen .oafdtag{display:inline-flex;align-items:center;gap:5px;margin:0 6px 6px 0;padding:5px 10px;border-radius:999px;
     font-size:13px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid var(--line)}
@@ -3111,7 +3117,7 @@
   @keyframes oafdDeal{from{opacity:0;transform:translateY(20px) rotate(0)}to{opacity:1}}
   @media (prefers-reduced-motion:reduce){
     #oafScreen .oafdbot,#oafScreen .oafdbot .ring,#oafScreen .oafdcount,#oafScreen .oafdposter,#oafScreen .oafdmore,
-    #oafScreen .oafdtold{animation:none;opacity:1}
+    #oafScreen .oafdtold,#oafScreen .oafdmood{animation:none;opacity:1}
   }
   #oafScreen .obintrotext{font-size:15.5px}
   #oafScreen .ossub{font-size:14.5px}
@@ -22499,6 +22505,8 @@ function oafDoneHTML(){
     </div>
     <div class="oafdcount"><b id="oafDoneCount">0</b><span>films already found for you</span></div>
     ${posters ? `<div class="oafdposters" aria-hidden="true">${posters}<span class="oafdmore">+ more</span></div>` : ""}
+    <div class="oafdmoods"><div class="oafdtoldh">Sorted into your moods</div>
+      ${draft.moods.map((m,i)=>`<span class="oafdmood" style="--i:${i}">${esc(m.name)}</span>`).join("")}</div>
     <div class="oafdtold"><div class="oafdtoldh">${name} is working from what you told it</div>${told}</div>`;
 }
 let oafDoneFound = 0;
