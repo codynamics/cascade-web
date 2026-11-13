@@ -94,9 +94,9 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
   await expect(page.locator("#oafInner .oafdtold")).toContainText("Partner");
   await expect(page.locator("#oafDoneCount")).not.toHaveText("0", { timeout: 4000 });
   await expect(page.locator("#oafCta")).toHaveText("See what Nova found");
-  // CAS-1368: the moods table still follows the answers (partner+kids both yes), though the screen no longer lists it.
-  expect(await page.evaluate(() => oneAgentBuildDraft().moods.map(m => m.name)))
-    .toEqual(["All Latest", "Best of the best", "Me", "Partner", "Family", "Starred"]);
+  // CAS-1368: the moods table follows the answers (partner+kids both yes) — and the done screen shows it (Lee, 13 Nov).
+  await expect(page.locator("#oafInner .oafdmood"))
+    .toHaveText(["All Latest", "Best of the best", "Me", "Partner", "Family", "Starred"]);
   await page.locator("#oafCta").click();
 
   // CAS-1361 part 1: after Start watching, the setup header/nav must not float over Watch underneath.
