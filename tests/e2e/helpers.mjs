@@ -263,7 +263,7 @@ export const ctaCount = page => ctaLocator(page).textContent().then(numberIn);
 
 /** Press Continue until the flow ends, landing on the membership page. CAS-911: this now walks
  * v2_services → v2_done (the roster commits here) → membership — generic enough that no step name
- * needs to be known here. Returns the membership recap's own "worth your time" count (`.membhaul .cnt`),
+ * needs to be known here. Returns the done screen's "films already found" count (oafDoneFound),
  * a roster-wide figure read off onbFlow.workingAgents, whichever generator committed it. */
 export async function finishFlow(page){
   // CAS-1344: from the services step (or wherever the caller left the one-agent flow) to membership:
@@ -288,8 +288,8 @@ export async function finishFlow(page){
     await page.waitForTimeout(120);
   }
   await expect(page.locator("#membScreen.open")).toBeVisible();
-  const reveal = numberIn(await page.locator(".membhaul .cnt").textContent());
-  return reveal;
+  // Lee, 14 Nov: the membership screen no longer prints a film count — return the done screen's own count.
+  return await page.evaluate(() => oafDoneFound);
 }
 
 /** Close the membership page and land on the new agent's listing, fully streamed in.

@@ -91,12 +91,12 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
   // Lee, 13 Nov (pm): the done screen is the payoff — the named agent, a count of what it found, the answers played back.
   await expect(page.locator("#oafInner .osh")).toHaveText("Nova is ready.");
   await expectHeadingBelowHeader(page);
-  await expect(page.locator("#oafInner .oafdtold")).toContainText("Partner");
+  await expect(page.locator("#oafInner .oafdtold .oafdtoldh")).toHaveText("Nova is working for you");
   await expect(page.locator("#oafDoneCount")).not.toHaveText("0", { timeout: 4000 });
-  await expect(page.locator("#oafCta")).toHaveText("See what Nova found");
+  await expect(page.locator("#oafCta")).toHaveText("Proceed");
   // CAS-1368: the moods table follows the answers (partner+kids both yes) — and the done screen shows it (Lee, 13 Nov).
   await expect(page.locator("#oafInner .oafdmood"))
-    .toHaveText(["All Latest", "Best of the best", "Me", "Partner", "Family", "Starred"]);
+    .toHaveText(["All Latest", "Best of the best", "Me", "Partner", "Family"]);   // no Starred (Lee, 14 Nov)
   await page.locator("#oafCta").click();
 
   // CAS-1361 part 1: after Start watching, the setup header/nav must not float over Watch underneath.

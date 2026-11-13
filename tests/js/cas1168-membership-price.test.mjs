@@ -16,7 +16,7 @@ const count = (needleOrRe) =>
     : (html.match(needleOrRe) || []).length;
 
 test("CAS-1168 AC1/AC2 (superseded by CAS-971): the price and CTA come from the membFineText()/membCtaLabel() helpers, not hard-coded text", () => {
-  assert.equal(count('<p class="memfine" id="membFine">${esc(membFineText())}</p>'), 2);
+  assert.equal(count('<p class="memfine" id="membFine"${membFineText()?"":" hidden"}>${esc(membFineText())}</p>'), 2);
   assert.equal(count("${esc(membCtaLabel())}</button>"), 2);
   assert.equal(count("$4.99/month"), 0);
 });

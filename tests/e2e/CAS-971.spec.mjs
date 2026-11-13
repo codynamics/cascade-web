@@ -12,7 +12,8 @@ test("web membership screen: no purchase button, the iPhone-app message, and no 
 
   await expect(page.locator("#membScreen.open")).toBeVisible();
   const body = (await page.locator("#membBody").textContent()) || "";
-  expect(body).toContain("Membership is started in the Cascade iPhone app.");
+  expect(body).not.toContain("Membership is started in the Cascade iPhone app.");   // Lee, 14 Nov: the web line is gone; the offer box carries the terms
+  expect(body).toContain("First month free");
   for (const word of ["Start free trial", "Subscribe", "Restore Purchases", "Start my free month"]) {
     expect(body).not.toContain(word);
   }
