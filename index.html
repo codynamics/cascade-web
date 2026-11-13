@@ -2430,7 +2430,10 @@
   .oscta:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
   /* CAS-253: a blocked Continue looks blocked. It stays visible and keeps its label, because a button that
      vanishes leaves nothing to explain why you cannot go on. */
-  .oscta.blocked,.oscta:disabled{opacity:.45;cursor:not-allowed}
+  /* Lee, 13 Nov: opacity let the list scrolling behind the button bleed through it — a blocked Continue is now
+     an opaque, muted fill instead. */
+  .oscta.blocked,.oscta:disabled{cursor:not-allowed;color:rgba(255,255,255,.5);box-shadow:none;
+    background:linear-gradient(135deg,#2f2a63 0%,#1c3d5c 100%)}
   .fielderr{margin:7px 2px 0;color:#ffb4ae;font-size:12px;line-height:1.45}
   .osfield.bad{border-color:var(--open)}
   .osskip{display:block;width:100%;text-align:center;margin-top:12px;color:var(--dim);font-size:12.5px;
