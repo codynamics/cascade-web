@@ -3665,18 +3665,14 @@
   .oamstylerow .oamalso{white-space:nowrap}
   .oamalso{display:block;font-size:10.5px;color:var(--faint);margin-top:1px;overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
-  /* Lee, 2026-11-14: one toggle per mood. In = lit (accent fill, white name, green switch); out = dark. */
-  .oamlistpanel{padding:6px;min-width:220px;max-width:280px}
-  .oamlistrows{display:flex;flex-direction:column;gap:4px}
-  .oamtog{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:8px 10px;
-    border-radius:9px;border:1.5px solid var(--line);background:transparent;color:var(--faint);
-    font:700 13px/1.2 var(--font-body);text-align:left;cursor:pointer}
-  .oamtog.on{background:rgba(124,92,255,.24);border-color:var(--accent);color:var(--ink)}
-  .oamtogname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .oamsw{flex:none;position:relative;width:34px;height:20px;border-radius:10px;background:#3a4150;transition:background .15s}
-  .oamsw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#9aa3b2;transition:left .15s}
-  .oamtog.on .oamsw{background:#22c55e}
-  .oamtog.on .oamsw::after{left:16px;background:#fff}
+  /* Lee, 2026-11-14 (later): one on/off BUTTON per mood, not a switch, wrapped to save height. On = filled
+     accent with a tick and white text; off = outlined and faint. Capped at the action row's width. */
+  .cpop.oamlpop{width:max-content;max-width:100%}
+  .oamlistpanel{padding:8px}
+  .oamlistrows{display:flex;flex-wrap:wrap;gap:6px}
+  .oamtog{padding:8px 12px;border-radius:999px;border:1.5px solid var(--line);background:transparent;
+    color:var(--faint);font:700 13px/1.2 var(--font-body);cursor:pointer;white-space:nowrap}
+  .oamtog.on{background:var(--accent);border-color:var(--accent);color:#fff}
   .oamlistrow{display:flex;align-items:center;justify-content:space-between;gap:8px;
     padding:7px 0;border-bottom:1px solid var(--line)}
   .oamlistrow:last-child{border-bottom:0}
@@ -21643,8 +21639,9 @@ function oamListPanelRowsHTML(id){
   const c=oneAgentCriteria(); if(!c) return "";
   const rows=oamMoodsListReal().map(mood=>{
     const on=oamFilmInMoodNow(m, mood, c);
-    return `<button type="button" class="oamtog${on?" on":""}" role="switch" aria-checked="${on}"
-      onclick="oamToggleMood(${id},'${escA(mood.id)}')"><span class="oamtogname">${esc(moodDisplayName(mood))}</span><span class="oamsw"></span></button>`;
+    // Lee, 2026-11-14 (later): a plain on/off button per mood, not a switch.
+    return `<button type="button" class="oamtog${on?" on":""}" aria-pressed="${on}"
+      onclick="oamToggleMood(${id},'${escA(mood.id)}')">${on?"&check; ":""}${esc(moodDisplayName(mood))}</button>`;
   }).join("");
   return `<div class="oamlistpanel"><div class="oamlistrows">${rows}</div></div>`;
 }
