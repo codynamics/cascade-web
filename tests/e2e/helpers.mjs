@@ -341,6 +341,8 @@ export async function toListing(page, opts = {}){
     }
     if(await tour.count() > 0){
       await page.locator("#tutSkipBtn").click();
+      // Lee, 14 Nov: skipping the Watch tutorial shows its closing box first; Done there ends it.
+      if(await page.locator("#tutScrim.open").count() > 0) await page.locator("#tutNextBtn").click();
       await expect(page.locator("#tutScrim")).not.toHaveClass(/open/);
     }
   }

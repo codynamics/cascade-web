@@ -4003,25 +4003,88 @@
      carries no background — it exists only to catch pointer events everywhere outside the card and
      buttons, same as .overlay above. CAS-1317: the dim is lighter than CAS-976's (.55 vs .78) so the
      interface stays readable around the spotlight, per the ticket's own principle 2. */
+  /* Lee, 14 Nov: tour v3. Everything the step is NOT about is shaded almost to nothing (.tutshade, one SVG
+     path with an even-odd hole per lit element). Two kinds of lit element: the TRAIL (where you are — the
+     section's nav chip, the mood, the viewing status; a thin lilac outline, .tuttrail) and the TARGET (what
+     this step is about; a pulsing ring, #tutHole). The card is light so it can never be mistaken for app
+     content, points at its target with .tutarrow, and docks on whichever side of the target is clear. */
   .tutscrim{position:fixed;inset:0;z-index:120;display:none}
   .tutscrim.open{display:block}
-  .tuthole{position:fixed;pointer-events:none;border-radius:12px;box-shadow:0 0 0 9999px rgba(6,8,14,.55)}
-  .tutcard{position:fixed;z-index:2;width:260px;background:var(--panel2);border:1px solid var(--line);
-    border-radius:14px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
-  /* CAS-1317: the small friendly banner every step carries ("Cascade tour" + "n of N"). */
-  .tutbanner{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 10px;
-    font-size:11.5px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.3px}
-  .tutprog{font-weight:600;color:var(--faint);text-transform:none;letter-spacing:0}
-  .tuttext{margin:0 0 14px;font-size:14.5px;line-height:1.5;color:var(--ink)}
+  .tutshade{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+  .tutshade .tutshadefill{fill:rgba(4,5,10,.88)}
+  .tuthole{position:fixed;pointer-events:none;border-radius:12px;border:2px solid #22D3EE;
+    box-shadow:0 0 0 4px rgba(34,211,238,.25),0 0 18px rgba(34,211,238,.55);animation:tutpulse 1.6s ease-in-out infinite;
+    transition:left .35s ease,top .35s ease,width .35s ease,height .35s ease}
+  .tuthole.none{border:none;box-shadow:none;animation:none}
+  .tuthole.multi{border:none;box-shadow:none;animation:none}
+  @keyframes tutpulse{0%,100%{box-shadow:0 0 0 3px rgba(34,211,238,.22),0 0 14px rgba(34,211,238,.45)}
+    50%{box-shadow:0 0 0 7px rgba(34,211,238,.10),0 0 26px rgba(34,211,238,.7)}}
+  .tutshade rect.shut,#tutMaskHoles rect.shut{fill:#fff}
+  #tutMaskHoles rect{fill:#000;transition:fill .7s ease}
+  .tutring.shut{animation:tutringout .7s ease forwards}
+  @keyframes tutringout{to{opacity:0;transform:scale(.92)}}
+  .tutring{position:fixed;pointer-events:none;border-radius:12px;border:2px solid #22D3EE;
+    box-shadow:0 0 0 4px rgba(34,211,238,.25),0 0 18px rgba(34,211,238,.55);animation:tutpulse 1.6s ease-in-out infinite}
+  .tuttrail{position:fixed;pointer-events:none;border-radius:11px;border:1.5px solid rgba(167,139,250,.85);
+    box-shadow:0 0 12px rgba(124,92,255,.45)}
+  .tuttap{position:fixed;pointer-events:none;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
+    background:rgba(255,255,255,.55);animation:tuttap 1.8s ease-out infinite}
+  @keyframes tuttap{0%{transform:scale(.35);opacity:0}15%{transform:scale(.5);opacity:.95}
+    45%{transform:scale(1.5);opacity:0}100%{transform:scale(1.5);opacity:0}}
+  .tutcard{position:fixed;z-index:2;width:330px;box-sizing:border-box;background:#f4f2ff;color:#17152b;
+    border:none;border-radius:16px;padding:16px 16px 14px;box-shadow:0 14px 40px rgba(0,0,0,.6),0 0 0 1px rgba(124,92,255,.5);
+    transition:top .35s ease,left .35s ease;animation:tutin .3s ease}
+  @keyframes tutin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .tutarrow{position:absolute;width:16px;height:16px;background:#f4f2ff;transform:rotate(45deg);display:none}
+  .tutarrow.up{display:block;top:-7px}
+  .tutarrow.down{display:block;bottom:-7px}
+  .tutbanner{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin:0 0 8px;
+    font-size:11.5px;font-weight:800;color:#6d4cf0;text-transform:uppercase;letter-spacing:.4px}
+  .tutprog{font-weight:700;color:#8a86a6;text-transform:none;letter-spacing:0}
+  .tuttext{margin:0 0 14px;font-size:15px;line-height:1.5;color:#17152b}
+  .tuttext b{color:#4c2fd6}
+  .tuttext .tutico{display:inline-flex;vertical-align:-5px;width:22px;height:22px;border-radius:50%;background:#2a2550;color:#fff;
+    align-items:center;justify-content:center;margin:0 2px}
+  .tuttext .tutico svg{width:13px;height:13px}
+  .tutbody{display:flex;flex-direction:row-reverse;gap:12px;align-items:flex-start}
+  .tutbody .tuttext{flex:1;min-width:0}
+  .tutdemo{flex:none;width:84px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;
+    padding:12px 6px;border-radius:12px;background:#121524;align-self:stretch;max-height:150px}
+  .tutdemo:empty{display:none}
+  .tutdemo .qone{position:relative;top:auto;right:auto;display:block;animation:none}
+  .tutdemo .qone .qpub{animation:tutbob 4s ease-in-out infinite;transition:none}
+  @keyframes tutbob{0%,12%{top:8px;border-color:rgba(255,255,255,.3)}25%,45%{top:0;border-color:#5eead4}
+    58%,62%{top:8px;border-color:rgba(255,255,255,.3)}75%,95%{top:16px;border-color:#f0a060}100%{top:8px;border-color:rgba(255,255,255,.3)}}
+  .tutdemo .tutlbl{position:relative;width:76px;height:30px;font:700 11.5px/1.25 var(--font-body);text-align:center}
+  .tutdemo .tutlbl span{position:absolute;inset:0;opacity:0}
+  .tutdemo .tutlbl .u{color:#5eead4;animation:tutlu 4s infinite}
+  .tutdemo .tutlbl .d{color:#f0a060;animation:tutld 4s infinite}
+  @keyframes tutlu{0%,18%{opacity:0}25%,45%{opacity:1}52%,100%{opacity:0}}
+  @keyframes tutld{0%,68%{opacity:0}75%,95%{opacity:1}100%{opacity:0}}
+  .tutdemo .tutstar{position:relative;width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.55);display:grid;place-items:center;
+    font-size:22px;color:#fff;animation:tutstar 3s infinite}
+  .tutdemo .tutstar::after{content:"";position:absolute;inset:0;border-radius:50%;background:rgba(255,255,255,.5);opacity:0;animation:tuttapin 3s infinite}
+  @keyframes tutstar{0%,35%{color:#fff}42%,90%{color:#f5c542;text-shadow:0 0 10px rgba(245,197,66,.7)}100%{color:#fff}}
+  @keyframes tuttapin{0%,25%{opacity:0;transform:scale(.4)}32%{opacity:.9;transform:scale(.7)}45%{opacity:0;transform:scale(1.5)}100%{opacity:0}}
   .tutbtns{display:flex;justify-content:space-between;align-items:center;gap:10px}
-  .tutskip{background:transparent;border:none;color:var(--dim);font-size:13px;font-weight:600;cursor:pointer;padding:8px 4px}
-  .tutskip:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .tutskip{background:transparent;border:none;color:#6b6788;font-size:13.5px;font-weight:600;cursor:pointer;padding:8px 4px}
+  .tutskip:focus-visible{outline:2px solid #6d4cf0;outline-offset:2px}
   .tutnav{display:flex;align-items:center;gap:8px}
-  .tutback{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:10px;
-    padding:9px 14px;font-weight:600;font-size:14px;cursor:pointer}
-  .tutback:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-  .tutnext{background:var(--accentdeep);color:#fff;border:none;border-radius:10px;padding:9px 18px;font-weight:700;font-size:14px;cursor:pointer}
-  .tutnext:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .tutback{background:transparent;border:1.5px solid #cfc8f5;color:#2a2550;border-radius:10px;
+    padding:9px 14px;font-weight:700;font-size:14px;cursor:pointer}
+  .tutback:focus-visible{outline:2px solid #6d4cf0;outline-offset:2px}
+  .tutnext{background:#6d4cf0;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-weight:800;font-size:14px;cursor:pointer}
+  .tutnext:focus-visible{outline:2px solid #22D3EE;outline-offset:2px}
+  @media (prefers-reduced-motion: reduce){ .tuthole,.tutring,.tuttap,.tutcard,.tutdemo *{animation:none!important;transition:none!important} }
+  /* Tutorials screen (Menu → Tutorials). */
+  .tutlist .tutrow{display:flex;align-items:center;gap:12px;width:100%;padding:14px;background:transparent;border:none;
+    border-bottom:1px solid var(--line);color:var(--ink);text-align:left;cursor:pointer;font:inherit}
+  .tutlist .tutrow:last-child{border-bottom:none}
+  .tutlist .tutrow .ic{width:34px;height:34px;flex:none;border-radius:10px;display:grid;place-items:center;background:var(--panel2)}
+  .tutlist .tutrow .ic svg{width:18px;height:18px}
+  .tutlist .tutrow b{display:block;font-size:15px}
+  .tutlist .tutrow small{display:block;color:var(--dim);font-size:12.5px;margin-top:2px}
+  .tutlist .tutrow .chev{margin-left:auto;color:var(--faint)}
   /* ---- Minimum client build gate (CAS-1108) ---- .tutscrim above tops out at 120; this has to sit above
      literally everything (it is the one state nothing — not onboarding, not a sheet, not the tutorial — may
      be interacted through), hence 200. */
@@ -4554,7 +4617,9 @@
           <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('friends')">Friends</button>
           <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('recommend')">Recommend Cascade</button>
           <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('settings')">Settings</button>
-          <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('help')">Help</button>
+          <!-- Lee, 14 Nov: Tutorials — the Watch tour and each section's own tour, replayable any time. -->
+          <button class="navitem navsep" type="button" role="menuitem" onclick="navMenuGo('tutorials')">Tutorials</button>
+          <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('help')">Help</button>
           <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('about')">About</button>
           <button class="navitem" type="button" role="menuitem" onclick="navMenuGo('account')">Account</button>
         </div>
@@ -5222,6 +5287,11 @@
 <div class="uscreen" id="helpScreen" role="dialog" aria-modal="true" aria-label="Help">
   <div class="uwrap" id="helpBody"></div>
 </div>
+<!-- Lee, 14 Nov: Menu → Tutorials. One row per tour (TOURS in the script); a row closes this screen and
+     plays that tour over the real app. -->
+<div class="uscreen" id="tutorialsScreen" role="dialog" aria-modal="true" aria-label="Tutorials">
+  <div class="uwrap" id="tutorialsBody"></div>
+</div>
 
 
 <!-- ON-DEVICE DIAGNOSTICS (CAS-553) — opened by 5 taps on the About screen's build line (#aboutBuild),
@@ -5263,12 +5333,18 @@
      "n of N" are painted by showTutorialCard() and the spotlight geometry by tutorialReposition(), both
      further down in this script. -->
 <div class="tutscrim" id="tutScrim" role="dialog" aria-modal="true" aria-label="Tour">
+  <svg class="tutshade" id="tutShade" aria-hidden="true"><defs><mask id="tutMask" maskUnits="userSpaceOnUse">
+    <rect x="0" y="0" width="10000" height="10000" fill="#fff"/><g id="tutMaskHoles"></g></mask></defs>
+    <rect class="tutshadefill" x="0" y="0" width="10000" height="10000" mask="url(#tutMask)"/></svg>
+  <div id="tutMarks" aria-hidden="true"></div>
   <div class="tuthole" id="tutHole"></div>
   <div class="tutcard" id="tutCard">
-    <div class="tutbanner"><span>Cascade tour</span><span class="tutprog" id="tutProg"></span></div>
-    <p class="tuttext" id="tutText"></p>
+    <span class="tutarrow" id="tutArrow" aria-hidden="true"></span>
+    <div class="tutbanner"><span id="tutTitle">Cascade tour</span><span class="tutprog" id="tutProg"></span></div>
+    <div class="tutbody"><div class="tutdemo" id="tutDemo" aria-hidden="true"></div>
+    <p class="tuttext" id="tutText"></p></div>
     <div class="tutbtns">
-      <button type="button" class="tutskip" id="tutSkipBtn" onclick="tutorialSkip()">Skip tour</button>
+      <button type="button" class="tutskip" id="tutSkipBtn" onclick="tutorialSkip()">Skip tutorial</button>
       <span class="tutnav">
         <button type="button" class="tutback" id="tutBackBtn" onclick="tutorialBack()">Back</button>
         <button type="button" class="tutnext" id="tutNextBtn" onclick="tutorialNext()">Next</button>
@@ -15435,7 +15511,7 @@ function helpIndexBody(){
     <div class="ucard" id="helpList">${helpListHTML()}</div>
     <div class="usec">Still stuck?</div>
     <div class="ucard">${acctRow("✉️","Send feedback", null, "openFeedback('help')")}
-      ${acctRow("🔁","Replay the tour", null, "replayTutorial()")}</div>`;
+      ${acctRow("🔁","Replay the Watch tutorial", null, "replayTutorial()")}</div>`;
 }
 function helpArticleBody(a){
   const paras=a.body.split("\n\n").map(p=>`<p class="ossub" style="margin-bottom:12px">${esc(p)}</p>`).join("");
@@ -15505,6 +15581,7 @@ window.navMenuGo=key=>{
   else if(key==="whereWhen") openWhereWhen();
   else if(key==="recommend") openRecommend();
   else if(key==="help") openHelp();
+  else if(key==="tutorials") openTutorials();
   else if(key==="about") openAbout();
 };
 document.addEventListener("click", e=>{
@@ -24857,14 +24934,17 @@ function v2CardHTML(raw){
 // that only ever reads/writes the shared tourCardEl/tourCardId pair.
 function v2CaptureCard(){
   tourCardEl=null; tourCardId=null;
-  let fallback=null;
+  let fallback=null, scoreCard=null;
   for(const el of document.querySelectorAll("#groups .card")){
     const r=el.getBoundingClientRect();
     if(r.width<=0 || r.height<=0) continue;
     if(!fallback) fallback=el;
     if(el.querySelector(".qone.up")){ tourCardEl=el; break; }
+    // Lee, 14 Nov: the score step needs the full score box (with its dotted outline) — a condensed
+    // cinema-info card hides it, so prefer the first card that shows one.
+    if(!scoreCard && !el.classList.contains("cinfo") && tutFirstVisible(el, ".qone")) scoreCard=el;
   }
-  if(!tourCardEl) tourCardEl=fallback;
+  if(!tourCardEl) tourCardEl=scoreCard||fallback;
   if(tourCardEl){ const m=/card-(\d+)/.exec(tourCardEl.id); tourCardId = m ? Number(m[1]) : null; }
 }
 // Step 16: opens the first ON style (oaComputeOrder's own on-styles-first order; "on" = oaBar non-null),
@@ -24880,93 +24960,128 @@ function v2OpenFirstOnStyle(){
   oaShowAllAdj=false; oaComboFilmsOpen.clear(); oaSuggestionOpen=false;
   renderAgentsScreen();
 }
-// Lee's revisions of 1 Nov 2026 (CAS-1353), on top of the 31 Oct script (CAS-1349). Steps 8-17 (0-based
-// 7-16) drive the same tour card tutCaptureCard/tutExpandCard already use for the non-v2 script above.
-// Step 8's invite button needs a signed-in account (inviteFilmHTML renders nothing signed out) and is the
-// one step this script ever skips — see v2InviteSkipped/V2_INVITE_STEP_IDX below.
-const V2_TOUR_STEPS = [
-  {html:v2CardHTML("You're all set. Here's a one-minute tour of how Cascade works."), center:true},
-  {html:v2CardHTML("Cascade has four places. Here's what each one does."), sel:[".hdr-actions"]},
-  {html:v2CardHTML("Watch: every film your agent has found for you."), sel:["#moviesBtn"]},
-  {html:v2CardHTML("Moods are filtered collections of movies. A number have been created for you, which you can change, and you can create your own. ¶ All Latest is special: it gives you every cinema release, upcoming, current and recent — as far back as its How far back filter, one year to start. Starred holds every movie you star. ¶ Tap a mood to change it, or + Mood to make your own."),
-    sel:[".moodrow"]},
-  {html:v2CardHTML("Each mood lets you see its movies by viewing status."), sel:[".stgroups"]},
-  {html:v2CardHTML("This is a film card. Tap it to expand and see details such as director, cast and awards, and to watch trailers."),
-    before(){ setWatchMood("releases"); showAgentsHome(); v2CaptureCard(); }, wholeCard:true},
-  {html:v2CardHTML("Tap ☆ to star a movie. Starred movies go into your Starred mood, so you can find them again."),
-    scope:"card", sel:[".starbtn"]},
-  {html:v2CardHTML("Watching with someone? Invite a friend to watch this. They get a link with the film and a simple Yes / No, no app needed, so you can see who's in."),
-    before(){ tutExpandCard(true); }, after(){ tutExpandCard(false); }, scope:"card", sel:[".exsharebtn"]},
-  {html:v2CardHTML("The Cascade score is built from public and critics' opinion. Once you start telling Cascade which movies you like, scores are adjusted up or down to give you much more personal recommendations. Above a dotted outline: raised for you. Below: lowered."),
-    before(){ tutExpandCard(false); }, scope:"card", sel:[".qone"]},
-  {html:v2CardHTML("Watch On: your agent suggests where to watch each movie, but you can set it yourself for any movie you like."),
-    scope:"card", sel:[".ctl.notify"]},
-  {html:v2CardHTML("Add to mood: put any film in a mood by hand, or take it out."), scope:"card", sel:[".ctl.oamlist"]},
-  {html:v2CardHTML("Seen it? Say what you thought. Every verdict teaches your agent your taste."), scope:"card", sel:[".ctl.watch"]},
-  {html:v2CardHTML("Alerts: films arriving where you watch, in the genres you asked to hear about, plus anything you added by hand. We email them to you too."),
-    before(){ closeSettings(); openMovingScreen(); }, after(){ showAgentsHome(); }, sel:["#movingBtn"]},
-  {html:v2CardHTML("Find any film in Cascade, whether your agent picked it or not."),
-    before(){ closeSettings(); openFindScreen(); }, after(){ showAgentsHome(); }, sel:["#findSearchInput"]},
-  {html:v2CardHTML("Your agent. Each genre shows how much of the catalogue you want, and the bells show which availability statuses alert you. Tap a genre to change it."),
-    before(){ closeSettings(); oaOpenStyle=null; oaOrderSnapshot=null; openAgentsScreen(); },
-    after(){ oaOpenStyle=null; oaOrderSnapshot=null; showAgentsHome(); }, sel:["#oaList .oarow"]},
-  {html:v2CardHTML("Most movies have a main genre, listed first, and sub-genres after it: a Sci-fi that is also a Thriller, a Comedy that is also a Romance. ¶ Your Cascade agent studies those combinations in what you watch and rate, and works out which ones you're most and least likely to enjoy."),
-    center:true},
-  {html:v2CardHTML("So your agent tracks each genre together with its sub-genres. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here, and you can override any of them."),
-    before(){ v2OpenFirstOnStyle(); }, sel:["#oaAdjustSection"]},
-  {html:v2CardHTML("That's it. Your agent checks the whole catalogue every day and reports at 5pm."),
-    before(){ oaOpenStyle=null; oaOrderSnapshot=null; closeSettings(); showAgentsHome(); }, center:true},
-];
-let tutSteps=TOUR_STEPS, tutV2Active=false, tutIdx=-1, tutCurrent=null;
-// Set once, when the v2 tour starts (startTutorialV2) — the invite step (index 7, CAS-1353's new star
-// step at index 6 shifted it from CAS-1349's index 6) is the only step this script ever skips, so "n of N"
-// never counts it once it's known to be unreachable, instead of the raw index silently jumping forward the
-// way a non-v2 skip would (CAS-1349 AC: "n of N must not count it").
-let v2InviteSkipped=false;
-const V2_INVITE_STEP_IDX=7;
-function tutDisplayN(){
-  if(!tutV2Active || !v2InviteSkipped || tutIdx<=V2_INVITE_STEP_IDX) return tutIdx+1;
-  return tutIdx;
+// ---- TOUR v3 (Lee, 14 Nov 2026) -------------------------------------------------------------------------
+// One engine, several short tours (Menu → Tutorials). The Watch tour is the one that starts by itself after
+// setup; Alerts, Database and Agent are their own tours. Each step names:
+//   sel      — its TARGET(s): what the step is about (pulsing ring). Several = several rings.
+//   trail    — where you are: the section's nav chip, the mood, the viewing status (lit, thin outline).
+//   trailCard— the tour's film card stays lit as part of the trail (every card step).
+//   demo     — a small animation inside the tour card ("score" | "star").
+//   tap      — a tap ripple over the target.
+//   needsAccount — dropped from the run when there's no signed-in account (the invite button needs one).
+// Everything that is neither target nor trail is shaded almost to nothing.
+const TUT_P = (...paras) => paras.join("<br><br>");
+const TUT_W = ["#moviesBtn"], TUT_WM = ["#moviesBtn", ".moodrow .moodchip.on"],
+      TUT_WMS = ["#moviesBtn", ".moodrow .moodchip.on", ".stgroups .stagestop.on"];
+const TOURS = {
+  watch:{ title:"Watch tutorial", steps:[
+    {html:TUT_P("You're all set. Here's a quick tour of <b>Watch</b>, the main area in Cascade, where your films live."), center:true},
+    // All four sections light, then Agent, Database and Alerts fade out one by one, leaving Watch.
+    {html:TUT_P("<b>Watch</b>: every film that Cascade has found for you."),
+      sel:["#moviesBtn","#movingBtn","#findBtn","#agentsBtn"], narrow:["#agentsBtn","#findBtn","#movingBtn"],
+      before(){ showAgentsHome(); }},
+    {html:TUT_P("Your Watch area is organised into <b>moods</b>.", "Moods are filtered collections of movies.",
+      "<b>All Latest</b> is a special mood designed to give you a forward view of all upcoming and cinema releases.",
+      `To change a mood, tap its <span class="tutico">${MOOD_EDIT_SVG}</span> filter icon.`),
+      before(){ setWatchMood("releases"); }, sel:[".moodrow"], trail:TUT_W},
+    {html:TUT_P("Each mood lets you see its movies by viewing status."), sel:[".stgroups"], trail:TUT_WM},
+    {html:TUT_P("This is a film card."),
+      before(){ tutExpandCard(false); setWatchMood("releases"); v2CaptureCard(); }, wholeCard:true, trail:TUT_WMS},
+    {html:TUT_P("The Cascade score blends public and critics' opinion.",
+      "As Cascade learns what you like, it adjusts scores up or down for the genres and sub-genres you enjoy most and least."),
+      before(){ tutExpandCard(false); }, scope:"card", sel:[".qone",".title .qscore"], trail:TUT_WMS, trailCard:true, demo:"score"},
+    {html:TUT_P("Tap ☆ to star a movie. Starred movies appear at the top of your mood lists.",
+      "You can also make a mood of just your starred movies."),
+      before(){ tutExpandCard(false); }, scope:"card", sel:[".starbtn"], trail:TUT_WMS, trailCard:true, demo:"star", tap:true},
+    {html:TUT_P("Expanded, a film card shows its trailers. Tap one to watch it."),
+      before(){ tutExpandCard(true); }, scope:"card", sel:[".trailers",".notrailer"], trail:TUT_WMS, trailCard:true},
+    {html:TUT_P("Watching with someone? Invite a friend to watch this. They get a link with the film and a simple Yes / No, no app needed, so you can see who's in."),
+      before(){ tutExpandCard(true); }, scope:"card", sel:[".exsharebtn"], trail:TUT_WMS, trailCard:true, needsAccount:true},
+    {html:TUT_P("For your favourite genres, your agent automatically sets alerts so you never miss the most important movies when they arrive at the cinema, on rental and on streaming.",
+      "You can also set an alert yourself on any individual movie."),
+      before(){ tutExpandCard(false); }, scope:"card", sel:[".ctl.notify"], trail:TUT_WMS, trailCard:true},
+    {html:TUT_P("This shows which moods a movie appears in.",
+      "You can add a movie to a mood, or take it out, by hand. For example, if a movie is in <b>Me</b> but you want to watch it with your partner, set it to appear only in <b>Partner</b>."),
+      before(){ tutExpandCard(false); }, scope:"card", sel:[".ctl.oamlist"], trail:TUT_WMS, trailCard:true},
+    {html:TUT_P("Seen it? Say what you thought. Every verdict teaches your agent your taste.",
+      "The more films you rate, the better your agent gets at picking films you'll love."),
+      before(){ tutExpandCard(false); }, scope:"card", sel:[".ctl.watch"], trail:TUT_WMS, trailCard:true},
+    {get html(){ return tutWatchFinaleHTML(true); }, before(){ tutExpandCard(false); }, sel:["#navMenuBtn"]},
+  ]},
+  alerts:{ title:"Alerts tutorial", steps:[
+    {html:TUT_P("<b>Alerts</b>: films arriving where you watch, in the genres you asked to hear about, plus anything you added by hand. We email them to you too."),
+      before(){ closeSettings(); openMovingScreen(); }, after(){ showAgentsHome(); }, sel:["#movingBtn"]},
+  ]},
+  database:{ title:"Database tutorial", steps:[
+    {html:TUT_P("<b>Database</b>: find any film in Cascade, whether your agent picked it or not."),
+      before(){ closeSettings(); openFindScreen(); }, after(){ showAgentsHome(); }, sel:["#findSearchInput"], trail:["#findBtn"]},
+  ]},
+  agent:{ title:"Agent tutorial", steps:[
+    {html:TUT_P("Your <b>agent</b>. Each genre shows how much of the catalogue you want, and the bells show which availability statuses alert you. Tap a genre to change it."),
+      before(){ closeSettings(); oaOpenStyle=null; oaOrderSnapshot=null; openAgentsScreen(); },
+      after(){ oaOpenStyle=null; oaOrderSnapshot=null; showAgentsHome(); }, sel:["#oaList .oarow"], trail:["#agentsBtn"]},
+    {html:TUT_P("Most movies have a main genre, listed first, and sub-genres after it: a Sci-fi that is also a Thriller, a Comedy that is also a Romance.",
+      "Your Cascade agent studies those combinations in what you watch and rate, and works out which ones you're most and least likely to enjoy."),
+      center:true},
+    {html:TUT_P("So your agent tracks each genre together with its sub-genres. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here, and you can override any of them."),
+      before(){ v2OpenFirstOnStyle(); }, sel:["#oaAdjustSection"], trail:["#agentsBtn"]},
+    {html:TUT_P("That's it. Your agent checks the whole catalogue every day and reports at 5pm."),
+      before(){ oaOpenStyle=null; oaOrderSnapshot=null; closeSettings(); showAgentsHome(); }, center:true},
+  ]},
+};
+// The Watch tutorial's closing words: its last step (finished=true) and the box "Skip tutorial" shows
+// (finished=false — no "That's Watch", no step count). The moods line appears once a "moods" tutorial
+// exists (Lee, 14 Nov), so it is never pointing at something that isn't there.
+function tutWatchFinaleHTML(finished){
+  return TUT_P((finished ? "That's Watch. " : "") + "You can replay this tutorial any time.",
+    ...(TOURS.moods ? ["There's also a tutorial on the powerful filters available in <b>moods</b>."] : []),
+    "There are tutorials for <b>Alerts</b>, <b>Database</b> and your <b>Agent</b> too, under <b>Tutorials</b> in the menu.");
 }
-function tutDisplayTotal(){
-  return tutV2Active ? (tutSteps.length - (v2InviteSkipped?1:0)) : tutSteps.length;
+// Kept for anything that still reads the v2 script by name — it is the Watch tour.
+const V2_TOUR_STEPS = TOURS.watch.steps;
+let tutSteps=TOUR_STEPS, tutV2Active=false, tutIdx=-1, tutCurrent=null, tutTitle="Cascade tour", tutKey=null;
+function tutDisplayN(){ return tutIdx+1; }
+function tutDisplayTotal(){ return tutSteps.length; }
+function tutFirstVisible(root, sel){
+  for(const el of root.querySelectorAll(sel)){
+    const r=el.getBoundingClientRect();
+    if(r.width>0 && r.height>0) return el;
+  }
+  return null;
 }
 // Resolves one step's anchor(s) against the live DOM — never cached across steps, since most of the script
 // only exists once its own before() has opened the screen it lives on. A condensed ("cinfo") card hides its
-// own .r-scores via display:none rather than removing it (same trap CAS-976's tutorialResolveAnchor noted),
-// so every match is checked for a real, non-zero rect before counting as "present".
+// own .r-scores via display:none rather than removing it, so every match is checked for a real rect.
 function tutResolveEls(step){
   const root = step.scope==="card" ? tourCardEl : document;
   if(!root) return [];
   const out=[];
-  (step.sel||[]).forEach(sel=>{
-    for(const el of root.querySelectorAll(sel)){
-      const r=el.getBoundingClientRect();
-      if(r.width>0 && r.height>0){ out.push(el); return; }
-    }
-  });
+  (step.sel||[]).forEach(sel=>{ const el=tutFirstVisible(root, sel); if(el) out.push(el); });
+  return out;
+}
+function tutResolveTrail(step){
+  const out=[];
+  (step.trail||[]).forEach(sel=>{ const el=tutFirstVisible(document, sel); if(el) out.push(el); });
+  if((step.trailCard) && tourCardEl && tourCardEl.getBoundingClientRect().width>0) out.push(tourCardEl);
   return out;
 }
 function tutResolveStep(step){
-  if(step.center) return {center:true};
-  if(step.wholeCard){
-    return (tourCardEl && tourCardEl.getBoundingClientRect().width>0) ? {els:[tourCardEl]} : null;
-  }
-  const els=tutResolveEls(step);
-  return els.length ? {els} : null;
+  if(step.center) return {center:true, els:[], trail:[]};
+  let els;
+  if(step.wholeCard) els = (tourCardEl && tourCardEl.getBoundingClientRect().width>0) ? [tourCardEl] : [];
+  else els=tutResolveEls(step);
+  // A step with several selectors (the four nav chips) needs them all; one with alternatives (trailers or
+  // "no trailer yet") needs any one.
+  if(!els.length) return null;
+  return {els, trail:tutResolveTrail(step)};
 }
 // The one gate for the automatic (non-replay) trigger: onboarding done, at least one agent, not already
 // seen or skipped, and nothing else already on screen (a deep link opening straight into another screen
 // right after onboarding, per CAS-962, must win over the tour starting underneath it).
-// CAS-1119: a #/film/ route counts as "the film page" even in the instant before openFilmPage() has run
-// and actually added .filmpage.open — the invite page is a share-link recipient's whole reason for being
-// here, and the tour must never show on top of it.
+// CAS-1119: a #/film/ route counts as "the film page" even in the instant before openFilmPage() has run.
 function maybeStartTutorial(){
   if(!onboardingSeen() || !cascades.length) return;
   if(filmRouteId()!=null || document.querySelector(".uscreen.open,.modal.open,.wsheetscrim.open,.filmpage.open")) return;
-  // CAS-1349: a v2 account (oneAgentCriteria() non-null) gets the v2 script, gated on tourV2Seen instead of
-  // tutorialSeen — a non-v2 account on the same device keeps the CAS-1317 script and its own seen-flag,
-  // untouched.
   if(oneAgentCriteria()){
     if(tourV2Seen()) return;
     requestAnimationFrame(()=>requestAnimationFrame(startTutorialV2));
@@ -24975,39 +25090,32 @@ function maybeStartTutorial(){
     requestAnimationFrame(()=>requestAnimationFrame(startTutorial));
   }
 }
-// Resolution happens here, not at the gate above, so it always runs one full layout past whatever just
-// painted the listing — same double-rAF reasoning as membStart's own proceed() a few lines up.
-function startTutorial(){
-  // CAS-1119: maybeStartTutorial's gate only reflects the instant it ran — a film page that opens in the
-  // two rAFs between then and now (the boot path's own #/film/<id> handling runs after maybeStartTutorial,
-  // see CAS-437) must still win, so the one check that matters here runs again right before the tour
-  // actually shows.
-  if(filmRouteId()!=null || document.querySelector(".filmpage.open")) return;
-  tutSteps=TOUR_STEPS; tutV2Active=false; v2InviteSkipped=false;
-  tutIdx=-1; tutCurrent=null;
-  window.addEventListener("resize", tutorialReposition);
-  window.addEventListener("scroll", tutorialReposition, true);
-  $("tutScrim").classList.add("open");
-  if(!tutorialAdvance(1)) endTutorial(false);   // step 1 is always centred/anchorless, so this never misses
-}
-// CAS-1349: the v2 script's own entry point — same shape as startTutorial above, plus the one-time invite-
-// step skip check so tutDisplayN/tutDisplayTotal know, for this whole run, whether step 7 will ever resolve.
-function startTutorialV2(){
-  if(filmRouteId()!=null || document.querySelector(".filmpage.open")) return;
-  tutSteps=V2_TOUR_STEPS; tutV2Active=true;
-  v2InviteSkipped = !(window.CascadePersistence && window.CascadePersistence.accountActive());
-  tutIdx=-1; tutCurrent=null;
+function tutOpen(){
+  tutIdx=-1; tutCurrent=null; tutFinale=false;
   window.addEventListener("resize", tutorialReposition);
   window.addEventListener("scroll", tutorialReposition, true);
   $("tutScrim").classList.add("open");
   if(!tutorialAdvance(1)) endTutorial(false);
 }
+function startTutorial(){
+  if(filmRouteId()!=null || document.querySelector(".filmpage.open")) return;
+  tutSteps=TOUR_STEPS; tutV2Active=false; tutTitle="Cascade tour"; tutKey=null;
+  tutOpen();
+}
+// Starts one of TOURS by key. The Watch tour is the v2 account's automatic first-run tour (its finish/skip
+// marks tourV2Seen); the others are only ever started from Menu → Tutorials.
+function startTour(key){
+  if(filmRouteId()!=null || document.querySelector(".filmpage.open")) return;
+  const t=TOURS[key]; if(!t) return;
+  const a=window.CascadeAuth;   // same test inviteFilmHTML uses to draw the invite button at all
+  const signedIn = !!(a && a.enabled && a.status==="signed-in");
+  tutSteps = t.steps.filter(st => !st.needsAccount || signedIn);
+  tutV2Active = key==="watch"; tutTitle=t.title; tutKey=key;
+  tutOpen();
+}
+function startTutorialV2(){ startTour("watch"); }
 // Runs the next (dir>0) or previous (dir<0) step's before(), skipping any step whose anchor doesn't resolve
-// once before() has run — CAS-976's "skip a card whose anchor isn't there" rule, extended to a tour that
-// now opens and closes screens rather than just pointing at fixed controls. Every screen a before() opens
-// is already mutually exclusive with the others it might have left behind (openMovingScreen/openFindScreen/
-// openAgentsScreen each close one another; closeSettings() above guards the one case none of them do), so
-// skipping forward or jumping back mid-script never needs its own clean-up pass here.
+// once before() has run (CAS-976's rule).
 function tutorialAdvance(dir){
   let idx=tutIdx+dir;
   while(idx>=0 && idx<tutSteps.length){
@@ -25019,22 +25127,81 @@ function tutorialAdvance(dir){
   }
   return false;
 }
+function tutDemoHTML(kind){
+  if(kind==="score") return `<span class="qone"><span class="qghost"></span><span class="qpub"><b>79</b><small>SCORE</small></span></span>
+    <span class="tutlbl"><span class="u">Raised<br>for you</span><span class="d">Lowered<br>for you</span></span>`;
+  if(kind==="star") return `<span class="tutstar">★</span>`;
+  return "";
+}
+// The top of the clear area under the sticky Watch header (nav + moods + statuses): a card step scrolls its
+// film card to sit just below it, so the header trail and the card are both on screen together.
+function tutStickyBottom(){
+  const st=tutFirstVisible(document, ".stgroups");
+  const bar = st && st.closest(".cascbar");
+  if(bar){
+    const r=bar.getBoundingClientRect();
+    // + the section heading ("Next week") that sticks directly under the bar.
+    const gh=tutFirstVisible(document, "#groups .grouphead");
+    if(r.bottom>0 && r.bottom<innerHeight*0.6) return r.bottom + (gh ? gh.getBoundingClientRect().height : 0);
+  }
+  const nav=$("moviesBtn"); return nav ? Math.max(0, nav.getBoundingClientRect().bottom) : 0;
+}
+function tutScrollIntoPlace(step){
+  const els=tutCurrent && tutCurrent.els ? tutCurrent.els : [];
+  if(!els.length) return;
+  const inCard = step.wholeCard || step.scope==="card";
+  if(!inCard){ els[0].scrollIntoView({block:"center", inline:"center"}); return; }
+  const z=tutZoomFactor(), top=tutStickyBottom()+10;
+  const card=tourCardEl, cr=card.getBoundingClientRect(), tr=els[0].getBoundingClientRect();
+  // Lee, 14 Nov: the tour card never sits on the film card. It docks under the whole film card, so the film
+  // card goes just under the header when both fit; when they don't, the film card is pushed up only as far
+  // as needed (its top may slip under the header) — unless the target itself would then be hidden, in which
+  // case the target goes to the top of the clear area and the card docks under the target.
+  const tourH=($("tutCard").offsetHeight||300)*z, gap=20;
+  let anchor=card, margin=top;
+  const room = innerHeight - tourH - gap - 8;           // where the film card's bottom must end
+  if(top + cr.height > room){
+    margin = room - cr.height;                          // card bottom lands on `room`
+    // Only give up on docking under the whole card if the target itself would be mostly hidden.
+    if(margin + (tr.top+tr.height*0.6-cr.top) < top){ anchor=els[0]; margin=top; }
+  }
+  // Scrolled directly (not scrollIntoView + scroll-margin), since the margin can be negative.
+  window.scrollBy(0, anchor.getBoundingClientRect().top - margin);
+}
+let tutNarrowTimers=[], tutShut=new Set(), tutShutDrawn=new Set();
+function tutClearNarrow(){ tutNarrowTimers.forEach(clearTimeout); tutNarrowTimers=[]; tutShut=new Set(); tutShutDrawn=new Set(); }
+// step.narrow: selectors (of the step's own targets) that fade out one by one, ~0.9s apart, after a beat.
+function tutRunNarrow(step){
+  (step.narrow||[]).forEach((sel,i)=>{
+    tutNarrowTimers.push(setTimeout(()=>{
+      const el=tutFirstVisible(document, sel);
+      if(el){ tutShut.add(el); tutorialReposition(); }
+    }, 1400+i*900));
+  });
+}
 function showTutorialCard(){
   const step=tutSteps[tutIdx];
+  tutClearNarrow();
   if(step.html) $("tutText").innerHTML=step.html; else $("tutText").textContent=step.text;
-  $("tutProg").textContent=`${tutDisplayN()} of ${tutDisplayTotal()}`;
+  $("tutTitle").textContent=tutTitle;
+  $("tutDemo").innerHTML=tutDemoHTML(step.demo);
+  $("tutProg").textContent = tutFinale ? "" : `${tutDisplayN()} of ${tutDisplayTotal()}`;
   $("tutNextBtn").textContent = (tutIdx===tutSteps.length-1) ? "Done" : "Next";
   $("tutBackBtn").style.display = tutIdx===0 ? "none" : "";
-  const el = tutCurrent && tutCurrent.els ? tutCurrent.els[0] : null;
-  if(el) el.scrollIntoView({block:"center", inline:"center"});
+  $("tutSkipBtn").style.visibility = (tutIdx===tutSteps.length-1) ? "hidden" : "";
+  const card=$("tutCard"); card.style.animation="none"; void card.offsetWidth; card.style.animation="";
+  tutScrollIntoPlace(step);
   requestAnimationFrame(()=>requestAnimationFrame(tutorialReposition));
+  // A card that has just expanded or collapsed is still settling — place it again once it has.
+  if(step.scope==="card" || step.wholeCard){
+    const idx=tutIdx;
+    tutNarrowTimers.push(setTimeout(()=>{ if(tutIdx===idx){ tutScrollIntoPlace(step); tutorialReposition(); } }, 380));
+  }
+  tutRunNarrow(step);
 }
 // CAS-1152: `zoom:var(--ui-scale)` (CAS-157) makes a position:fixed element's *written* style length
-// land pre-zoom while every *read-back* geometry query (getBoundingClientRect, offsetWidth/Height,
-// innerWidth/innerHeight) reports the post-zoom visual pixel it actually painted at — so a value copied
-// straight from a read into a write is off by the zoom factor. WebKit does not split the two this way,
-// which is why only Chromium shows the drift. Measured per call via a probe (not hard-coded 1.12) so it
-// tracks whatever --ui-scale is and keeps working if an engine changes how it reports either side.
+// land pre-zoom while every *read-back* geometry query reports the post-zoom visual pixel — so a value
+// copied straight from a read into a write is off by the zoom factor. Measured per call via a probe.
 function tutZoomFactor(){
   const probe=document.createElement("div");
   probe.style.cssText="position:fixed;left:0;top:0;width:100px;height:100px;visibility:hidden;pointer-events:none";
@@ -25043,8 +25210,6 @@ function tutZoomFactor(){
   probe.remove();
   return w>0 ? w/100 : 1;
 }
-// The union of every element a multi-anchor step (e.g. the whole nav row, or a card's three action
-// buttons) spotlights together, as one rect — a single-element step is just that element's own rect.
 function tutUnionRect(els){
   let left=Infinity, top=Infinity, right=-Infinity, bottom=-Infinity;
   els.forEach(el=>{
@@ -25054,52 +25219,106 @@ function tutUnionRect(els){
   });
   return {left, top, right, bottom, width:right-left, height:bottom-top};
 }
-// Re-measures the current step's anchor(s) and repositions the spotlight + card. Bound to resize/scroll
-// while the tour is open (AC: the cut-out stays correct after either), and called once per step on top of
-// that. A centred step carries no anchor: collapsing the hole to a zero-size box at the viewport centre
-// (see the .tuthole comment in <style>) dims the whole screen evenly instead of needing a second layout
-// branch for "no spotlight". r, vw and vh are all read-back (post-zoom, visual) units; offsetWidth/
-// offsetHeight are not — they report the card's pre-zoom authored size (CAS-1152: proven by measurement,
-// not assumed — a 260px-wide .tutcard's own offsetWidth stays 260 while its getBoundingClientRect() comes
-// back ~291px under a 1.12 --ui-scale), so cardW/cardH are converted to visual units with the same probed
-// factor before mixing them into arithmetic with r/vw/vh. Only the final top/left written to .style are
-// divided back down by z, since a style write is interpreted pre-zoom — see tutZoomFactor above.
-// CAS-1317: the card docks to whichever side of the spotlight has MORE room (not "below unless it doesn't
-// fit"), so it never overlaps a spotlight that is itself nearly full-height — principle 3's "whichever is
-// clear".
+// Re-measures the current step and repaints: the shade's holes (targets + trail), the rings, the tap
+// ripple, and the card, which docks below the target if it fits there, else above, else on whichever side
+// has more room — and points at the target's centre with its arrow. All read-back geometry is visual
+// (post-zoom) px; every write is divided by z (CAS-1152).
 function tutorialReposition(){
   const scrim=$("tutScrim");
   if(!scrim || !scrim.classList.contains("open")) return;
-  const hole=$("tutHole"), card=$("tutCard"), pad=8, vw=innerWidth, vh=innerHeight;
+  const step=tutSteps[tutIdx]||{};
+  const hole=$("tutHole"), card=$("tutCard"), arrow=$("tutArrow"), pad=6, vw=innerWidth, vh=innerHeight;
   const z=tutZoomFactor();
-  const els = tutCurrent && tutCurrent.els ? tutCurrent.els : [];
+  const allEls = tutCurrent && tutCurrent.els ? tutCurrent.els : [];
+  const els = allEls.filter(el=>!tutShut.has(el));
+  const trail = tutCurrent && tutCurrent.trail ? tutCurrent.trail : [];
+  const box = r => ({x:r.left-pad, y:r.top-pad, w:r.width+pad*2, h:r.height+pad*2});
+  const inCard = step.wholeCard || step.scope==="card";
+  const clipTop = inCard ? tutStickyBottom() : -Infinity;
+  const clip = b => { if(b.y>=clipTop) return b; const y=clipTop; return {...b, y, h:Math.max(0, b.y+b.h-y)}; };
+  const trailBox = el => el===tourCardEl ? clip(box(el.getBoundingClientRect())) : box(el.getBoundingClientRect());
+  const holes=[...trail.map(el=>({b:trailBox(el)})), ...allEls.map(el=>({b:box(el.getBoundingClientRect()), shut:tutShut.has(el)}))];
+  // Holes are kept (not re-created) so a target fading out animates its hole closed (fill → white).
+  const g=$("tutMaskHoles");
+  while(g.childNodes.length>holes.length) g.lastChild.remove();
+  holes.forEach((h,i)=>{
+    let rc=g.childNodes[i];
+    if(!rc){ rc=document.createElementNS("http://www.w3.org/2000/svg","rect"); g.appendChild(rc); }
+    rc.setAttribute("x",h.b.x/z); rc.setAttribute("y",h.b.y/z); rc.setAttribute("width",h.b.w/z);
+    rc.setAttribute("height",h.b.h/z); rc.setAttribute("rx",12/z);
+    rc.setAttribute("class", h.shut ? "shut" : "");
+  });
+  const pos = b => `left:${b.x/z}px;top:${b.y/z}px;width:${b.w/z}px;height:${b.h/z}px`;
+  let marks = trail.map(el=>`<div class="tuttrail" style="${pos(trailBox(el))}"></div>`).join("");
+  // A ring that has already faded out isn't redrawn (a redraw would replay its fade on every scroll).
+  if(allEls.length>1) marks += allEls.filter(el=>!tutShutDrawn.has(el)).map(el=>{
+    const shut=tutShut.has(el); if(shut) tutShutDrawn.add(el);
+    return `<div class="tutring${shut?" shut":""}" style="${pos(box(el.getBoundingClientRect()))}"></div>`;
+  }).join("");
   let r;
   if(els.length){
     r=tutUnionRect(els);
+    hole.className = "tuthole"+(allEls.length>1?" multi":"");
     hole.style.left=(r.left-pad)/z+"px"; hole.style.top=(r.top-pad)/z+"px";
     hole.style.width=(r.width+pad*2)/z+"px"; hole.style.height=(r.height+pad*2)/z+"px";
+    if(step.tap){
+      const t = step.wholeCard ? {x:r.left+r.width*0.62, y:r.top+r.height*0.3} : {x:r.left+r.width/2, y:r.top+r.height/2};
+      marks += `<div class="tuttap" style="left:${t.x/z}px;top:${t.y/z}px"></div>`;
+    }
   } else {
-    r={left:vw/2, top:vh/2, bottom:vh/2, width:0, height:0};
+    r={left:vw/2, top:vh/2, bottom:vh/2, right:vw/2, width:0, height:0};
+    hole.className="tuthole none";
     hole.style.left=r.left/z+"px"; hole.style.top=r.top/z+"px";
     hole.style.width="0px"; hole.style.height="0px";
   }
-  const cardH=(card.offsetHeight||140)*z, cardW=(card.offsetWidth||260)*z;
-  let top, left;
+  $("tutMarks").innerHTML=marks;
+  // Width is set here, not in CSS: under --ui-scale a vw-based width would be scaled past the screen edge.
+  card.style.width=Math.min(vw-24, 366)/z+"px";
+  const cardH=(card.offsetHeight||160)*z, cardW=(card.offsetWidth||340)*z, gap=pad+14;
+  let top, left, dir="";
+  // Card steps dock clear of the whole film card, not just the button being explained.
+  let avoid=r;
+  if(els.length && step.scope==="card" && tourCardEl){
+    const fr=tourCardEl.getBoundingClientRect();
+    if(fr.bottom + 14 + cardH + 8 <= vh) avoid={...r, top:Math.min(r.top, fr.top), bottom:Math.max(r.bottom, fr.bottom)};
+  }
   if(!els.length){
     top=(vh-cardH)/2; left=(vw-cardW)/2;
   } else {
-    const spaceBelow=vh-r.bottom-pad*2, spaceAbove=r.top-pad*2;
-    top = spaceBelow>=spaceAbove ? Math.min(r.bottom+pad*2+12, vh-cardH-12) : Math.max(12, r.top-pad*2-12-cardH);
+    const below=vh-avoid.bottom-gap-12, above=avoid.top-gap-12;
+    if(below>=cardH){ top=avoid.bottom+gap; dir="up"; }
+    else if(above>=cardH){ top=avoid.top-gap-cardH; dir="down"; }
+    else if(below>=above){ top=Math.min(avoid.bottom+gap, vh-cardH-12); dir="up"; }
+    else { top=Math.max(12, avoid.top-gap-cardH); dir="down"; }
     top=Math.max(12, top);
-    left = Math.min(Math.max(12, r.left), vw-cardW-12);
+    const cx=r.left+r.width/2;
+    left=Math.min(Math.max(12, cx-cardW/2), vw-cardW-12);
+    const ax=Math.min(Math.max(18, cx-left-8), cardW-34);
+    arrow.style.left=ax/z+"px";
   }
+  arrow.className="tutarrow"+(dir?" "+dir:"");
   card.style.top=top/z+"px"; card.style.left=left/z+"px";
 }
 function tutorialNext(){ if(!tutorialAdvance(1)) endTutorial(true); }
 function tutorialBack(){ tutorialAdvance(-1); }
-function tutorialSkip(){ endTutorial(true); }
+// Lee, 14 Nov: skipping the Watch tutorial before its last step shows its closing box (pointing at the
+// menu) instead of vanishing; Done there ends it. Other tutorials, and the finale itself, just end.
+let tutFinale=false;
+function tutorialSkip(){
+  if(tutKey==="watch" && !tutFinale && tutIdx<tutSteps.length-1){
+    // Undo whatever earlier steps opened before showing the box over the plain listing.
+    tutSteps.forEach(st=>{ if(st.after) st.after(); });
+    tutExpandCard(false);
+    tutFinale=true;
+    tutSteps=[{html:tutWatchFinaleHTML(false), sel:["#navMenuBtn"]}];
+    tutIdx=-1;
+    if(tutorialAdvance(1)) return;
+  }
+  endTutorial(true);
+}
 function endTutorial(markSeen){
   $("tutScrim").classList.remove("open");
+  $("tutMarks").innerHTML=""; $("tutMaskHoles").innerHTML=""; tutClearNarrow(); tutFinale=false;
   window.removeEventListener("resize", tutorialReposition);
   window.removeEventListener("scroll", tutorialReposition, true);
   // CAS-1317 rule 5: "everything it opened is put back on exit" — run every step's own after(), not just
@@ -25108,8 +25327,8 @@ function endTutorial(markSeen){
   // so after() is written to be a safe no-op when there's nothing left for it to undo; running them all
   // unconditionally is simpler than tracking exactly which one is still "outstanding".
   tutSteps.forEach(step=>{ if(step.after) step.after(); });
-  if(markSeen){ if(tutV2Active) markTourV2Seen(); else markTutorialSeen(); }
-  tutIdx=-1; tutCurrent=null; tourCardEl=null; tourCardId=null;
+  if(markSeen){ if(tutKey==="watch") markTourV2Seen(); else if(!tutKey) markTutorialSeen(); }
+  tutIdx=-1; tutCurrent=null; tourCardEl=null; tourCardId=null; tutKey=null;
 }
 // Replay (from the Help screen's "Still stuck?" row — CAS-1126 moved it here from Account's old Help &
 // feedback card, the only place it now lives). Help is a .uscreen sitting over whatever was already there,
@@ -25119,10 +25338,39 @@ function endTutorial(markSeen){
 // Moving/Agents if either is open, then Help's own close reveals the listing underneath both.
 // Bypasses tutorialSeen()/tourV2Seen() on purpose, same as any other explicit "show me that again" control.
 // CAS-1349: plays the v2 script on a v2 account, the CAS-1317 script on every other account.
+const TUTORIAL_ROWS = [
+  {key:"watch", icon:"watch", name:"Watch", sub:"Moods, viewing status and the film card."},
+  {key:"alerts", icon:"alerts", name:"Alerts", sub:"What your agent tells you about, and when."},
+  {key:"database", icon:"find", name:"Database", sub:"Finding any film in Cascade."},
+  {key:"agent", icon:"agent", name:"Agent", sub:"How your agent learns your taste."},
+];
+const TUT_FIND_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>`;
+function tutorialsBodyHTML(){
+  const ic = k => k==="find" ? TUT_FIND_SVG : OAF_DONE_ICONS[k];
+  return `<div class="ostop menutop"><button class="osback" type="button" onclick="closeTutorials()" aria-label="Back">←</button>
+      <h2 class="osh">Tutorials</h2></div>
+    <p class="ossub">Short guided tours over your own Cascade. Play any of them as often as you like.</p>
+    <div class="ucard tutlist">${TUTORIAL_ROWS.map(t=>`<button type="button" class="tutrow" onclick="playTutorial('${t.key}')">
+      <span class="ic" aria-hidden="true">${ic(t.icon)}</span><span><b>${esc(t.name)}</b><small>${esc(t.sub)}</small></span>
+      <span class="chev" aria-hidden="true">›</span></button>`).join("")}</div>`;
+}
+window.openTutorials=()=>{
+  $("tutorialsBody").innerHTML=tutorialsBodyHTML();
+  $("tutorialsScreen").scrollTop=0;
+  $("tutorialsScreen").classList.add("open"); lockBodyScroll(true);
+  logEvent("tutorials_opened");
+};
+window.closeTutorials=()=>{ $("tutorialsScreen").classList.remove("open"); lockBodyScroll(false); syncWatchChip(); };
+window.playTutorial=key=>{
+  closeTutorials();
+  showAgentsHome();
+  logEvent("tutorial_played",{key});
+  requestAnimationFrame(()=>requestAnimationFrame(()=>startTour(key)));
+};
 function replayTutorial(){
   closeHelp();
   showAgentsHome();
-  const startFn = oneAgentCriteria() ? startTutorialV2 : startTutorial;
+  const startFn = oneAgentCriteria() ? ()=>startTour("watch") : startTutorial;
   requestAnimationFrame(()=>requestAnimationFrame(startFn));
 }
 async function membStartWork(viaNewSignup){
