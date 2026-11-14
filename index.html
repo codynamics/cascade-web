@@ -4076,6 +4076,10 @@
   .tutnext{background:#6d4cf0;color:#fff;border:none;border-radius:10px;padding:9px 18px;font-weight:800;font-size:14px;cursor:pointer}
   .tutnext:focus-visible{outline:2px solid #22D3EE;outline-offset:2px}
   @media (prefers-reduced-motion: reduce){ .tuthole,.tutring,.tuttap,.tutcard,.tutdemo *{animation:none!important;transition:none!important} }
+  /* First run: favourite actor-or-director field (Lee, 14 Nov). */
+  .oafpfield{display:block;margin:0 0 16px}
+  .oafpcount{display:block;min-height:18px;margin-top:6px;font-size:12.5px;color:#5eead4}
+  .oafpcount.none{color:#f0a060}
   /* Tutorials screen (Menu → Tutorials). */
   .tutlist .tutrow{display:flex;align-items:center;gap:12px;width:100%;padding:14px;background:transparent;border:none;
     border-bottom:1px solid var(--line);color:var(--ink);text-align:left;cursor:pointer;font:inherit}
@@ -22208,6 +22212,15 @@ function oafHasServicesStep(){
   return oafState.where.has("rent") || oafState.where.has("stream");
 }
 function oafHasChildrenStep(){ return oafState.age==="18plus"; }
+// Lee, 14 Nov: "which streaming service do you use most?" — only when there's a choice (2+ picked). With one,
+// that one is the answer; with none, there's no service mood.
+function oafHasTopSvcStep(){ return oafHasServicesStep() && oafState.where.has("stream") && prefs.sub.size>=2; }
+function oafTopSvc(){
+  if(!oafState || !oafState.where.has("stream")) return null;
+  if(prefs.sub.size===1) return [...prefs.sub][0];
+  return oafState.topSvc && prefs.sub.has(oafState.topSvc) ? oafState.topSvc : null;
+}
+function oafPerson(){ return oafState ? (oafState.person||"").trim() : ""; }
 // Only the windows picked on the where step ever carry an alert — a window not picked is never set on, in
 // the done screen's own alert rows and in oneAgentBuildDraft's styles[s].al, whatever oafState itself holds.
 function oafActiveWindows(){
@@ -22219,7 +22232,8 @@ function oafActiveWindows(){
 function oafCountedKeys(){
   const keys=["welcome","where"];
   if(oafHasServicesStep()) keys.push("services");
-  keys.push("favourites","age","partner");
+  if(oafHasTopSvcStep()) keys.push("topSvc");
+  keys.push("favourites","people","age","partner");
   if(oafState.partner==="yes") keys.push("together");
   if(oafHasChildrenStep()) keys.push("children");
   if(oafState.children==="yes") keys.push("family");
@@ -22279,6 +22293,13 @@ function oneAgentStarterMoods(who, ages){
     styles:[...(who.dateStyles||[])], show:"40", ages, watched:true});
   if(who.kids) list.push({...oamMoodDefaultFields(), id:"family", name:"Family",
     styles:[...(who.familyStyles||[])], show:"40", ages:["G","PG","M"], watched:true});
+  // Lee, 14 Nov: a mood for the streaming service they use most (named after it, default agent settings), and
+  // one for each favourite actor/director (a keyword mood on their name). Ids are fixed so the Watch tutorial
+  // can point at them.
+  if(who.topSvc) list.push({...oamMoodDefaultFields(), id:"topsvc", name:oafSvcTagName(who.topSvc).slice(0,24),
+    svc:who.topSvc, show:"40", ages, watched:true});
+  if(who.person) list.push({...oamMoodDefaultFields(), id:"fav-person", name:who.person.slice(0,24), people:who.person,
+    show:"all", ages, watched:true});
   // Lee, 14 Nov: no Starred mood for new accounts (starring films and the "only starred" mood filter remain;
   // existing accounts keep a Starred mood they already have).
   return list;
@@ -22315,6 +22336,8 @@ function oneAgentBuildDraft(){
     kids: oafHasChildrenStep() && oafState.children==="yes",
     dateStyles: oafState.partner==="yes" ? Object.keys(oafState.together) : [],
     familyStyles: oafState.children==="yes" ? Object.keys(oafState.family) : [],
+    topSvc: oafTopSvc(),
+    person: oafPerson(),
   };
   const moods = oneAgentStarterMoods(who, ages);
   const name = (oafState.name||"").trim();
@@ -22479,6 +22502,44 @@ function oafWireFavGrid(gridId, picks){
   });
 }
 function oafWireFavourites(){ oafWireFavGrid("oafFavGrid", oafState.favs); }
+// Lee, 14 Nov (pm): styled like the services step before it — the same service chips, one pickable.
+function oafTopSvcHTML(){
+  const subs=[...prefs.sub].sort((a,b)=>svcName(a).localeCompare(svcName(b)));
+  return `<h2 class="osh">Which streaming service do you use most?</h2>
+    <p class="ossub">We'll set up a mood of the best films on it for you.</p>
+    <div class="svcsec"><div class="svcsech">My Streaming Services</div>
+      <div class="chips" id="oafTopSvcOpts" role="radiogroup">${subs.map(k=>`<button type="button" class="chip svc${oafState.topSvc===k?" on":""}"
+        role="radio" aria-checked="${oafState.topSvc===k}" data-val="${escA(k)}">${esc(svcName(k))}</button>`).join("")}</div></div>`;
+}
+// Lee, 14 Nov (pm): one box — a favourite actor or director — which becomes a mood of its own. Optional; it
+// says how many films in Cascade match as you type, so a misspelling shows up before it becomes an empty mood.
+function oafPeopleHTML(){
+  return `<h2 class="osh">A favourite actor or director?</h2>
+    <p class="ossub">We'll make them a mood, so you never miss their films. Or skip this.</p>
+    <label class="oafpfield"><input type="text" class="osfield" id="oafP_person" placeholder="e.g. Cate Blanchett" maxlength="40"
+      autocomplete="off" value="${escA(oafState.person||"")}" aria-label="Favourite actor or director">
+    <span class="oafpcount" id="oafPC_person" aria-live="polite"></span></label>`;
+}
+function oafPeopleCount(q){
+  q=(q||"").trim(); if(q.length<3) return null;
+  return (typeof MOVIES!=="undefined" ? MOVIES : []).filter(m=>{
+    const n=normSearchText(q);
+    return (m.director && normSearchText(m.director).includes(n)) || (m.cast||[]).some(c=>normSearchText(c).includes(n));
+  }).length;
+}
+function oafWirePeople(){
+  ["person"].forEach(key=>{
+    const input=$("oafP_"+key), out=$("oafPC_"+key); if(!input) return;
+    const sync=()=>{
+      const n=oafPeopleCount(input.value);
+      out.textContent = n==null ? "" : n ? `${n} film${n===1?"":"s"} in Cascade` : "No films in Cascade yet — check the spelling";
+      out.classList.toggle("none", n===0);
+      $("oafCta").textContent = oafPerson() ? "Continue" : "Skip";
+    };
+    input.oninput=()=>{ oafState[key]=input.value; sync(); };
+    sync();
+  });
+}
 function oafAgeHTML(){
   return `<h2 class="osh">How old are you?</h2>
     <p class="ossub">So we show the right age ratings. You can change them on any mood.</p>
@@ -22657,13 +22718,14 @@ function oafBlocked(){
   if(oafStep==="partner") return !oafState.partner;
   if(oafStep==="children") return !oafState.children;
   if(oafStep==="nameAgent") return !(oafState.name||"").trim();
+  if(oafStep==="topSvc") return !oafState.topSvc;
   return false;
 }
 // Paints the current step into #oafInner plus the shared header/footer chrome — never touches scroll
 // position, so a chip toggle's own repaint (oafWireMultiOpt) doesn't jump the screen back to the top.
 function oafPaint(){
   const fns = {welcome:oafWelcomeHTML, where:oafWhereHTML, services:oafServicesHTML, favourites:oafFavouritesHTML,
-    age:oafAgeHTML, partner:oafPartnerHTML, together:oafTogetherHTML, children:oafChildrenHTML,
+    topSvc:oafTopSvcHTML, people:oafPeopleHTML, age:oafAgeHTML, partner:oafPartnerHTML, together:oafTogetherHTML, children:oafChildrenHTML,
     family:oafFamilyHTML, nameAgent:oafNameAgentHTML, done:oafDoneHTML};
   const inner=$("oafInner"); if(!inner) return;
   inner.innerHTML = fns[oafStep]();
@@ -22682,6 +22744,10 @@ function oafPaint(){
   if(oafStep==="where") oafWireMultiOpt("oafWhereOpts", oafState.where);
   else if(oafStep==="services") oafWireServices();
   else if(oafStep==="favourites") oafWireFavourites();
+  else if(oafStep==="topSvc") $("oafTopSvcOpts").querySelectorAll(".chip[data-val]").forEach(c=>{
+      c.onclick=()=>{ oafState.topSvc=c.dataset.val; oafPaint(); };
+    });
+  else if(oafStep==="people") oafWirePeople();
   else if(oafStep==="age") wireObOpt($("oafAgeOpts"), val=>{ oafState.age=val; oafPaint(); });
   else if(oafStep==="partner") wireObOpt($("oafPartnerOpts"), val=>{
       oafState.partner=val;
@@ -22715,8 +22781,10 @@ window.oafGoContinue=()=>{
   if(oafBlocked()) return;
   if(oafStep==="welcome") return oafShow("where");
   if(oafStep==="where") return oafShow(oafHasServicesStep() ? "services" : "favourites");
-  if(oafStep==="services") return oafShow("favourites");
-  if(oafStep==="favourites") return oafShow("age");
+  if(oafStep==="services") return oafShow(oafHasTopSvcStep() ? "topSvc" : "favourites");
+  if(oafStep==="topSvc") return oafShow("favourites");
+  if(oafStep==="favourites") return oafShow("people");
+  if(oafStep==="people") return oafShow("age");
   if(oafStep==="age") return oafShow("partner");
   if(oafStep==="partner") return oafShow(oafState.partner==="yes" ? "together" : (oafHasChildrenStep() ? "children" : "nameAgent"));
   if(oafStep==="together") return oafShow(oafHasChildrenStep() ? "children" : "nameAgent");
@@ -22741,8 +22809,10 @@ window.oafGoBack=()=>{
   }
   if(oafStep==="where") return oafShow("welcome");
   if(oafStep==="services") return oafShow("where");
-  if(oafStep==="favourites") return oafShow(oafHasServicesStep() ? "services" : "where");
-  if(oafStep==="age") return oafShow("favourites");
+  if(oafStep==="topSvc") return oafShow("services");
+  if(oafStep==="favourites") return oafShow(oafHasTopSvcStep() ? "topSvc" : oafHasServicesStep() ? "services" : "where");
+  if(oafStep==="people") return oafShow("favourites");
+  if(oafStep==="age") return oafShow("people");
   if(oafStep==="partner") return oafShow("age");
   if(oafStep==="together") return oafShow("partner");
   if(oafStep==="children") return oafShow(oafState.partner==="yes" ? "together" : "partner");
@@ -22766,7 +22836,7 @@ window.oafOpen=(opts)=>{
     // Lee, 13 Nov (pm): every genre starts on ✓ (the middle setting).
     where: new Set(), favs: Object.fromEntries(ONE_AGENT_SETUP_STYLES.map(g=>[g,"incl"])), age: null, partner: null, children: null,
     together: {}, togetherInit: false, family: {}, familyInit: false,
-    name: "",
+    name: "", topSvc: null, person: "",
   };
   oafStep="welcome";
   $("oafHdr").hidden=false; $("oafNav").hidden=false;
@@ -24984,7 +25054,11 @@ const TOURS = {
       "<b>All Latest</b> is a special mood designed to give you a forward view of all upcoming and cinema releases.",
       `To change a mood, tap its <span class="tutico">${MOOD_EDIT_SVG}</span> filter icon.`),
       before(){ setWatchMood("releases"); }, sel:[".moodrow"], trail:TUT_W},
-    {html:TUT_P("Each mood lets you see its movies by viewing status."), sel:[".stgroups"], trail:TUT_WM},
+    // Lee, 14 Nov: point at the moods setup made from the first-run answers. Skipped (CAS-976 rule) when the
+    // account has neither.
+    {get html(){ return tutMadeMoodsHTML(); }, sel:[`.moodrow .moodchip[data-mood="topsvc"]`,`.moodrow .moodchip[data-mood="fav-person"]`],
+      before(){ tutRevealMadeMoods(); }, trail:TUT_W},
+    {html:TUT_P("Each mood lets you see its movies by viewing status."), before(){ setWatchMood("releases"); }, sel:[".stgroups"], trail:TUT_WM},
     {html:TUT_P("This is a film card."),
       before(){ tutExpandCard(false); setWatchMood("releases"); v2CaptureCard(); }, wholeCard:true, trail:TUT_WMS},
     {html:TUT_P("The Cascade score blends public and critics' opinion.",
@@ -25036,6 +25110,20 @@ function tutWatchFinaleHTML(finished){
   return TUT_P((finished ? "That's Watch. " : "") + "You can replay this tutorial any time.",
     ...(TOURS.moods ? ["There's also a tutorial on the powerful filters available in <b>moods</b>."] : []),
     "There are tutorials for <b>Alerts</b>, <b>Database</b> and your <b>Agent</b> too, under <b>Tutorials</b> in the menu.");
+}
+function tutMadeMoodsHTML(){
+  const get=id=>watchMoods.find(m=>m.id===id), b=m=>`<b>${esc(m.name)}</b>`;
+  const svc=get("topsvc"), per=get("fav-person");
+  const bits=[];
+  if(svc) bits.push(`${b(svc)}, for the streaming service you use most`);
+  if(per) bits.push(`${b(per)}, for your favourite actor or director`);
+  return TUT_P(`We've also set up ${bits.length>1?"these moods":"this mood"} for you: ${bits.join("; and ")}.`,
+    `You can change or remove ${bits.length>1?"them":"it"} any time.`);
+}
+// The made moods sit at the end of the mood row — scroll it so they're on screen for the step.
+function tutRevealMadeMoods(){
+  const chip=document.querySelector(`.moodrow .moodchip[data-mood="topsvc"],.moodrow .moodchip[data-mood="fav-person"]`);
+  if(chip) chip.scrollIntoView({block:"nearest", inline:"center"});
 }
 // Kept for anything that still reads the v2 script by name — it is the Watch tour.
 const V2_TOUR_STEPS = TOURS.watch.steps;

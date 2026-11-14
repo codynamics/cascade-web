@@ -275,6 +275,9 @@ export async function finishFlow(page){
     if(!(await page.evaluate(() => !!document.querySelector("#oafScreen.open")))) break;
     if(st === "favourites" && await page.evaluate(() => oafFavCount() === 0)){
       await page.locator("#oafFavGrid .favcell .favtoggle").first().click();
+    } else if(st === "topSvc"){
+      // Lee, 14 Nov: "which streaming service do you use most?" — pick the first.
+      await page.locator("#oafTopSvcOpts .chip").first().click();
     } else if(st === "age"){
       await page.locator('#oafAgeOpts .obopt[data-val="18plus"]').click();
     } else if(st === "partner"){

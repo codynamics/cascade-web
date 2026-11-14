@@ -46,7 +46,13 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
   await expect(page.locator('.favcell[data-style="Action"]')).toHaveClass(/fav/);
   await expect(page.locator('.favcell[data-style="Drama"]')).toHaveClass(/incl/);
   await expect(page.locator("#oafCta")).toBeEnabled();
-  await page.locator("#oafCta").click();   // favourites -> age
+  await page.locator("#oafCta").click();   // favourites -> people
+
+  // Lee, 14 Nov: an optional favourite actor or director (one box); empty, the CTA reads Skip.
+  await expect(page.locator("#oafInner .osh")).toHaveText("A favourite actor or director?");
+  await expectHeadingBelowHeader(page);
+  await expect(page.locator("#oafCta")).toHaveText("Skip");
+  await page.locator("#oafCta").click();   // people -> age
 
   await expect(page.locator("#oafInner .osh")).toHaveText("How old are you?");
   await expectHeadingBelowHeader(page);
@@ -112,7 +118,8 @@ test("CAS-1368 AC1: under 18 skips children and family, and 'No' to partner skip
   await page.locator('#oafWhereOpts .obopt[data-val="cinema"]').click();
   await page.locator("#oafCta").click();   // where -> favourites
   await page.locator('.favcell[data-style="Comedy"] .favbtn.check').click();
-  await page.locator("#oafCta").click();   // favourites -> age
+  await page.locator("#oafCta").click();   // favourites -> people
+  await page.locator("#oafCta").click();   // people (Skip) -> age
 
   await page.locator('#oafAgeOpts .obopt[data-val="under18"]').click();
   await page.locator("#oafCta").click();   // age -> partner
