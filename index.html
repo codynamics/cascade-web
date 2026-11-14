@@ -23120,6 +23120,11 @@ function movingAgeText(dateStr){
 // get their own chip wording instead of borrowing CHANGED's. Same .mvchip class (and so colour) as the
 // tag it stands in for; only the word shown is different.
 const MOVING_REMINDER_CHIP = {opens_soon:"SOON", past_opening_weekend:"REMINDER"};
+// CAS-1447: an agent heading's label. One-agent (v2) agents carry no icon, so `${c.icon} ${name}` printed the
+// literal word "undefined" before the name — icon only when there is one, the name alone otherwise.
+function agentHeadingHTML(c){
+  return (c.icon ? `${esc(c.icon)} ` : "") + esc(c.name);
+}
 function movingChipLabel(row){
   return MOVING_REMINDER_CHIP[row.moment] || (row.tag==="new" ? "NEW" : "CHANGED");
 }
@@ -23214,7 +23219,7 @@ function renderMovingScreen(markSeen){
     const total=lanes.reduce((n,l)=>n+l.rows.length,0);
     const lanesHTML=lanes.map(lane=>{
       const tint=cascadeRankTint(lane.cascade);
-      const name=`${lane.cascade.icon} ${esc(lane.cascade.name)}`;
+      const name=agentHeadingHTML(lane.cascade);
       // CAS-636: tapping the lane heading lands on Watch with that agent selected — the same destination the
       // old per-row "via <agent>" chip opened (openMovingAgent), just moved onto the heading that now names it.
       const clickable = ` role="button" tabindex="0" data-cid="${escA(lane.cascade.id)}" onclick="openMovingAgentEl(this)" style="cursor:pointer"`;
@@ -26068,7 +26073,7 @@ function render(){
     // The row is now unconditional — a section that names its agent every time can be read without
     // inferring anything from the row's absence.
     blocks.forEach(block=>{
-      const name=block.cascade ? `${block.cascade.icon} ${esc(block.cascade.name)}` : "Other";
+      const name=block.cascade ? agentHeadingHTML(block.cascade) : "Other";
       const tint=cascadeRankTint(block.cascade);   // CAS-760: null keeps the untinted "Other" appearance
       // CAS-763: heading + list share one wrapper so the rank tint can paint a continuous lane behind the
       // whole block instead of just the heading row — the rank class moves here, .grouphead.sub itself no
