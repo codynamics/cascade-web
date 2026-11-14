@@ -1,22 +1,22 @@
 {
-  "date": "2026-11-13",
+  "date": "2026-11-14",
   "tmdb": {
-    "calls": 10076,
+    "calls": 10075,
     "errors": 0,
     "not_found": 0,
     "status_counts": {}
   },
   "watchmode": {
     "quota": 2500,
-    "quota_used": 373,
-    "remaining_monthly_credits": 2127,
+    "quota_used": 435,
+    "remaining_monthly_credits": 2065,
     "calls": 62,
     "errors": 0,
     "mismatch": 1,
     "mismatch_ids": [
-      1798383
+      1780407
     ],
-    "quarantined": 27
+    "quarantined": 29
   },
   "oscarbase": {
     "calls": 750,
@@ -25,8 +25,8 @@
   "cinema_chains": {
     "chains": {
       "hoyts": {
-        "fetched": 46,
-        "matched": 27,
+        "fetched": 47,
+        "matched": 28,
         "unmatched": 19,
         "unmatched_titles": [
           "OM - Chapter 1: Udhiram - The Blood Wood (Tamil, Eng Sub)",
@@ -35,19 +35,19 @@
           "The Songs of John Farnham: Celebration Concert Encore",
           "Hadoota (Arabic, Eng Sub)",
           "Traces Of Justice (Mandarin, Eng Sub)",
-          "Parkway Drive: Home",
-          "Scene (Tamil, Eng Sub)",
           "Remember (Tagalog, Eng Sub)",
+          "Scene (Tamil, Eng Sub)",
+          "Parkway Drive: Home",
           "Aakasamlo Oka Tara (Telugu, Eng Sub)",
           "OM - Chapter 1: Udhiram - The Blood Wood (Telugu, Eng Sub)",
           "Aadarsha Kutumbam House No: 47 #AK47 (Telugu, Eng Sub)",
           "Kabaddi 5 (Nepali, Eng Sub)",
           "Matloob Aelian (Arabic, Eng Sub)",
           "Drishyam: The Conclusion",
+          "Hadestown: The Musical",
           "Udta Teer (Hindi, Eng Sub)",
           "Karaoke Murder (Vietnamese, Eng Sub)",
-          "Aakasamlo Oka Tara (Malayalam, Eng Sub)",
-          "Hadestown: The Musical"
+          "Aakasamlo Oka Tara (Malayalam, Eng Sub)"
         ],
         "ignored": false
       },
@@ -59,9 +59,9 @@
           "Festive Fun With Peppa",
           "George Michael - The Faith Tour",
           "Parkway Drive: Home",
-          "Scene (Tamil)",
           "Traces of Justice",
           "Mookuthi Amman 2",
+          "Scene (Tamil)",
           "Remember",
           "Donga Naa Koduku",
           "Hadestown: The Musical",
@@ -73,8 +73,8 @@
           "Arthur Christmas",
           "Home Alone 2 - Lost In New York",
           "The Holiday",
-          "Scene (Telugu)",
           "Shrek (25th Anniversary)",
+          "Scene (Telugu)",
           "The Rosie Awards - Rosemeadow Public School",
           "3D Under the Sea",
           "3D Born To Be Wild",
