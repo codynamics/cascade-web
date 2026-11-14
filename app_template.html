@@ -24529,7 +24529,9 @@ function membSetStateAVisible(visible){
   const d = visible ? "" : "none";
   // Lee, 14 Nov: the privacy consent line shows once, with the email it applies to, not again on the code step.
   [$("membPill"), body.querySelector(".membhaul"), body.querySelector(".membenefits"),
-   body.querySelector(".memfine"), $("membEmailField"), $("membPosterGrid"), body.querySelector(".pnote")]
+   body.querySelector(".memfine"), $("membEmailField"), $("membPosterGrid"),
+   // The privacy line specifically — the first .pnote is #membCodeMsg, which holds Change email (CAS-1445).
+   body.querySelector('.pnote button[onclick^="openPrivacy"]')?.closest(".pnote")]
     .forEach(el=>{ if(el) el.style.display=d; });
 }
 // B1-B6: moves the screen from the email step to the code step, in place — no separate sheet.
