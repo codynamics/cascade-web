@@ -2563,6 +2563,8 @@ test("CAS-1442: mood panel toggles stay open; only the chip closes it", async ({
     watchMoods = [];
     render();
   });
+  // CAS-1449: a v2 agent with styles {} admits no films, so no card renders — open its floor the CAS-1425 way.
+  await makeAgentWideOpen(page);
 
   const chip = page.locator(".card .ctl.oamlist").first();
   await expect(chip).toBeVisible();
