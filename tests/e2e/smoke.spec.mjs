@@ -2029,7 +2029,9 @@ test("CAS-1356 AC1/AC4: a v2 account's mood row can be reordered, and the order 
     cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
     saveCascades();
     setActive(cascades[0].id);
-    watchMoods = [];   // never provisioned — oamMoodsListReal() must fall back to the in-memory builtins
+    // CAS-1440 dropped Starred from the built-in moods, leaving only All Latest and Best of the best; a third
+    // (custom) mood gives the reorder a neighbour to move past.
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), { ...oamMoodDefaultFields(), id: "extra", name: "Extra" }];
     watchMoodSel = "releases";
     render();
   });
@@ -2125,7 +2127,9 @@ test("CAS-1371 AC3: Move left / Move right in the mood sheet reorders", async ({
     cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
     saveCascades();
     setActive(cascades[0].id);
-    watchMoods = [];
+    // CAS-1440 dropped Starred from the built-in moods, leaving only All Latest and Best of the best; a third
+    // (custom) mood gives the reorder a neighbour to move past.
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), { ...oamMoodDefaultFields(), id: "extra", name: "Extra" }];
     watchMoodSel = "best";
     render();
     window.openOamMoodSheetFor("best");
@@ -2166,7 +2170,9 @@ test("CAS-1371 AC2: a still touch hold lifts a mood chip and dragging it reorder
     cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
     saveCascades();
     setActive(cascades[0].id);
-    watchMoods = [];
+    // CAS-1440 dropped Starred from the built-in moods, leaving only All Latest and Best of the best; a third
+    // (custom) mood gives the reorder a neighbour to move past.
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), { ...oamMoodDefaultFields(), id: "extra", name: "Extra" }];
     watchMoodSel = "releases";
     render();
   });
