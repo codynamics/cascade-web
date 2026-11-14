@@ -4474,6 +4474,11 @@
      both the collapsed and expanded card, so the box needs no card-state rule of its own — it just stays
      visible always. oneScoreTextHTML(m)'s (.qonetext) expanded-card companion is unchanged. */
   .qone{position:absolute;top:2px;right:0;width:44px;height:50px}
+  /* Lee, 2026-11-14: on the closed card the score box drops below the title line, so the title and its
+     rating own the whole first line. The box (up/down shifts included) sits beside the genres and synopsis,
+     which keep their padding-right. The open card is unchanged. */
+  .card:not(.expanded) .ctop.one .title{padding-right:0}
+  .card:not(.expanded) .ctop.one .title .qone{top:calc(100% + 4px)}
   .qone .qpub{position:absolute;left:0;top:8px;z-index:1;background:var(--panel);border:1.5px solid rgba(255,255,255,.3)}
   .qone.up .qpub{top:0;border-color:#5eead4} .qone.down .qpub{top:16px;border-color:#f0a060}
   .qone .qghost{position:absolute;left:0;top:8px;width:44px;height:34px;border-radius:8px;border:1.5px dashed rgba(255,255,255,.6);box-sizing:border-box}
@@ -9212,7 +9217,7 @@ function cardTopHTML(m, inWatch=false){
   // CAS-1370: an unrated film still shows something where the certificate normally sits, in the same
   // small style, so people can judge for themselves rather than have the film silently vanish.
   const cert = m.age_rating ? `<span class="cert ${MATURE.has(m.age_rating)?'mature':''}">${m.age_rating}</span>`
-    : `<span class="cert unrated">Not rated</span>`;
+    : `<span class="cert" title="Not rated">?</span>`;   // Lee, 2026-11-14: same lozenge as a rated film, "?" inside
   // CAS-486: a fixture film from the notify-test harness's ?fixtures=1 merge stays visually marked
   // wherever it renders — this badge, plus the "TEST FIXTURE" director credit in About & credits.
   const fixtureBadge = m._fixture ? `<span class="fixturebadge" title="${escA(FIXTURE_MARKER)}">TEST</span>` : "";
@@ -9244,7 +9249,7 @@ function cardTopHTML(m, inWatch=false){
   const rowScore = oneAgentC ? oneScoreTextHTML(m) : signedIn ? publicLozengeHTML(m, "inrow") : "";
   // CAS-179: one grid, one order — title · genres·language · synopsis · money · scores · awards, with
   // the poster spanning down to the scores row and the scale badge tucked under it beside the awards.
-  return `<div class="ctop${signedIn?" hasmatch":""}${signedIn && !oneAgentC && !matchBadge?" nomatch":""}">
+  return `<div class="ctop${signedIn?" hasmatch":""}${signedIn && !oneAgentC && !matchBadge?" nomatch":""}${oneAgentC?" one":""}">
       <!-- CAS-276: the tombstone is the POSTER, and nothing else. -->
       <div class="ptomb">
         <div class="poster"${posterAttr}>${play}</div>
