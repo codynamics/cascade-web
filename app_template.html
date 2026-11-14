@@ -3665,10 +3665,18 @@
   .oamstylerow .oamalso{white-space:nowrap}
   .oamalso{display:block;font-size:10.5px;color:var(--faint);margin-top:1px;overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
-  .oamlistpanel{padding:10px 14px;max-width:280px}
-  .oamlisttitle{font-size:14px;font-weight:800;color:var(--ink)}
-  .oamlistagent,.oamlistscore{font-size:11.5px;color:var(--dim);line-height:1.4;margin-top:4px}
-  .oamlistrows{margin-top:10px;display:flex;flex-direction:column}
+  /* Lee, 2026-11-14: one toggle per mood. In = lit (accent fill, white name, green switch); out = dark. */
+  .oamlistpanel{padding:6px;min-width:220px;max-width:280px}
+  .oamlistrows{display:flex;flex-direction:column;gap:4px}
+  .oamtog{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;padding:8px 10px;
+    border-radius:9px;border:1.5px solid var(--line);background:transparent;color:var(--faint);
+    font:700 13px/1.2 var(--font-body);text-align:left;cursor:pointer}
+  .oamtog.on{background:rgba(124,92,255,.24);border-color:var(--accent);color:var(--ink)}
+  .oamtogname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .oamsw{flex:none;position:relative;width:34px;height:20px;border-radius:10px;background:#3a4150;transition:background .15s}
+  .oamsw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#9aa3b2;transition:left .15s}
+  .oamtog.on .oamsw{background:#22c55e}
+  .oamtog.on .oamsw::after{left:16px;background:#fff}
   .oamlistrow{display:flex;align-items:center;justify-content:space-between;gap:8px;
     padding:7px 0;border-bottom:1px solid var(--line)}
   .oamlistrow:last-child{border-bottom:0}
@@ -10026,6 +10034,8 @@ function positionPanel(pop, anchorBtn){
   }
 }
 // One panel at a time, anchored in the .actions row (which is position:relative for exactly this).
+// Lee, 2026-11-14: set by oamToggleMood — the film whose card repaints once the mood panel closes.
+let oamListDirty=null;
 function closeWatchPanel(){
   // CAS-374: the chip that opened a panel carries its own open/closed state now (.open, aria-expanded) —
   // clear it here, the one place every panel close already runs through, so no caller has to remember to.
@@ -10039,6 +10049,11 @@ function closeWatchPanel(){
   document.querySelectorAll(".card.popopen").forEach(c=>c.classList.remove("popopen"));   // CAS-684
   document.removeEventListener("keydown", watchPanelKey, true);
   document.removeEventListener("pointerdown", watchPanelOutsideClose, true);   // CAS-751
+  if(oamListDirty!=null){
+    const d=oamListDirty; oamListDirty=null;
+    keepRowInPlace(d, ()=>repaintAfterOpinion(d));
+    renderWatchTop();
+  }
 }
 function watchPanelKey(e){ if(e.key==="Escape"){ e.stopPropagation(); closeWatchPanel(); } }
 // CAS-751: a press outside the open panel AND outside the chip that owns it closes the panel, same as
@@ -21614,33 +21629,43 @@ function oneAgentAdmitReason(m){
   if(score<style.bar) return {ok:false, text:`${name} lists ${style.bar}+, this scores ${score}`};
   return {ok:true, text:`${name} lists ${style.bar}+ &middot; this scores ${score}`};
 }
+// Lee, 2026-11-14: the mood panel is one toggle per mood — lit when the film is in that mood, dark when it is
+// out — with no header or footer text. A toggle writes the same in/out lists oamAddIn/oamTakeOut/oamPutBack do:
+// in by its own rules -> off writes `out`; out of its rules -> on writes `in`; a hand entry is simply cleared.
+function oamFilmInMoodNow(m, mood, c){
+  const id=m.tmdb_id;
+  if((mood.in||[]).includes(id)) return true;
+  if((mood.out||[]).includes(id)) return false;
+  return filmInOneAgentMood(m, {...mood, in:[], out:[]}, c);
+}
 function oamListPanelRowsHTML(id){
   const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return "";
   const c=oneAgentCriteria(); if(!c) return "";
-  const reason=oneAgentAdmitReason(m);
   const rows=oamMoodsListReal().map(mood=>{
-    const inHand=(mood.in||[]).includes(id);
-    const outHand=(mood.out||[]).includes(id);
-    const byRules = !outHand && !inHand && filmInOneAgentMood(m, {...mood, in:[], out:[]}, c);
-    let state, btnLabel, action;
-    if(inHand){ state="In &middot; added by you"; btnLabel="Take out"; action=`oamTakeOut(${id},'${escA(mood.id)}')`; }
-    else if(outHand){ state="Out &middot; taken out by you"; btnLabel="Put back"; action=`oamPutBack(${id},'${escA(mood.id)}')`; }
-    else if(byRules){ state="In &middot; by its rules"; btnLabel="Take out"; action=`oamTakeOut(${id},'${escA(mood.id)}')`; }
-    else { state="Not in"; btnLabel="Add"; action=`oamAddIn(${id},'${escA(mood.id)}')`; }
-    return `<div class="oamlistrow">
-      <span class="oamlistname">${esc(moodDisplayName(mood))}</span>
-      <span class="oamliststate">${state}</span>
-      <button type="button" class="ebtn ghost oamlistbtn" onclick="${action}">${esc(btnLabel)}</button>
-    </div>`;
+    const on=oamFilmInMoodNow(m, mood, c);
+    return `<button type="button" class="oamtog${on?" on":""}" role="switch" aria-checked="${on}"
+      onclick="oamToggleMood(${id},'${escA(mood.id)}')"><span class="oamtogname">${esc(moodDisplayName(mood))}</span><span class="oamsw"></span></button>`;
   }).join("");
-  return `<div class="oamlistpanel">
-    <div class="oamlisttitle">${esc(m.title)}</div>
-    <div class="oamlistagent">Your agent: ${reason.ok?"&check;":"&cross;"} ${esc(reason.text)}</div>
-    <div class="oamlistscore">${oneScoreTextHTML(m)}</div>
-    <div class="oamlistrows">${rows}</div>
-    <div class="oamlistnote">Adding keeps a film in a mood whatever its score, and it will alert you when it lands somewhere you watch. Taking it out keeps it out.</div>
-  </div>`;
+  return `<div class="oamlistpanel"><div class="oamlistrows">${rows}</div></div>`;
 }
+// The card behind the panel repaints only when the panel closes (oamListDirty, read in closeWatchPanel), so
+// the panel stays put while moods are toggled — even when the film leaves the mood on screen.
+window.oamToggleMood=(id, moodId)=>{
+  const m=MOVIES.find(x=>x.tmdb_id===id); const c=oneAgentCriteria(); if(!m || !c) return;
+  const mood=oamMoodsListReal().find(x=>x.id===moodId); if(!mood) return;
+  const byRules=filmInOneAgentMood(m, {...mood, in:[], out:[]}, c);
+  const wasIn=oamFilmInMoodNow(m, mood, c);
+  oamMutateMood(moodId, md=>{
+    md.in=md.in.filter(x=>x!==id); md.out=md.out.filter(x=>x!==id);
+    if(wasIn && byRules) md.out.push(id);
+    if(!wasIn && !byRules) md.in.push(id);
+  });
+  logEvent("watch_mood", {action: wasIn ? "hand_out" : "hand_add"});
+  oamListDirty=id;
+  const pop=document.querySelector(".cpop.oamlpop"); if(pop) pop.innerHTML=oamListPanelRowsHTML(id);
+};
+// Lee, 2026-11-14: only the mood chip itself closes this panel — no outside-tap or Escape close, and a toggle
+// inside it never closes it.
 window.openOamListPanel=(id, btn)=>{
   const open=btn.closest(".actions").querySelector(".cpop");
   const mine=open && open.classList.contains("oamlpop");
@@ -21653,8 +21678,6 @@ window.openOamListPanel=(id, btn)=>{
   pop.innerHTML=oamListPanelRowsHTML(id);
   btn.closest(".actions").appendChild(pop);
   positionPanel(pop, btn);
-  document.addEventListener("keydown", watchPanelKey, true);
-  document.addEventListener("pointerdown", watchPanelOutsideClose, true);
   btn.classList.add("open"); btn.setAttribute("aria-expanded","true");
   snapToWatchPanelAnchor();
 };

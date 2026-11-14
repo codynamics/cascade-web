@@ -2541,3 +2541,42 @@ test("CAS-1414: a starred film leads the mood list and survives a Best 20 cut", 
   // Best 20 only has something to cut when more than 20 films are admitted; either way the starred film stays.
   expect(r.cappedHasLowest).toBe(true);
 });
+
+// CAS-1442: the mood panel on a Watch card is one on/off toggle per mood, and only its own chip closes it —
+// a toggle inside it, or a tap outside it, leaves it open.
+test("CAS-1442: mood panel toggles stay open; only the chip closes it", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  await page.evaluate(() => {
+    cascades.length = 0;
+    cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
+    saveCascades();
+    setActive(cascades[0].id);
+    watchMoods = [];
+    render();
+  });
+
+  const chip = page.locator(".card .ctl.oamlist").first();
+  await expect(chip).toBeVisible();
+  await chip.click();
+
+  const panel = page.locator(".cpop.oamlpop");
+  await expect(panel).toBeVisible();
+  const rows = panel.locator(".oamtog");
+  expect(await rows.count()).toBeGreaterThan(0);
+  expect(await panel.locator(".oamtog.on").count()).toBeGreaterThan(0);
+
+  const first = rows.first();
+  const wasOn = await first.evaluate(el => el.classList.contains("on"));
+  await first.click();
+  await expect(panel).toBeVisible();
+  expect(await panel.locator(".oamtog").first().evaluate(el => el.classList.contains("on"))).toBe(!wasOn);
+
+  await page.mouse.click(2, 2);
+  await expect(panel).toBeVisible();
+
+  await chip.click();
+  await expect(page.locator(".cpop.oamlpop")).toHaveCount(0);
+});
