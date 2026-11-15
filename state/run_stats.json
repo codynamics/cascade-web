@@ -1,22 +1,22 @@
 {
-  "date": "2026-11-14",
+  "date": "2026-11-15",
   "tmdb": {
-    "calls": 10075,
+    "calls": 10077,
     "errors": 0,
     "not_found": 0,
     "status_counts": {}
   },
   "watchmode": {
     "quota": 2500,
-    "quota_used": 435,
-    "remaining_monthly_credits": 2065,
+    "quota_used": 497,
+    "remaining_monthly_credits": 2003,
     "calls": 62,
     "errors": 0,
     "mismatch": 1,
     "mismatch_ids": [
-      1780407
+      1559984
     ],
-    "quarantined": 29
+    "quarantined": 31
   },
   "oscarbase": {
     "calls": 750,
@@ -25,9 +25,9 @@
   "cinema_chains": {
     "chains": {
       "hoyts": {
-        "fetched": 47,
+        "fetched": 49,
         "matched": 28,
-        "unmatched": 19,
+        "unmatched": 21,
         "unmatched_titles": [
           "OM - Chapter 1: Udhiram - The Blood Wood (Tamil, Eng Sub)",
           "Festive Fun with Peppa Cinema Experience",
@@ -37,34 +37,35 @@
           "Traces Of Justice (Mandarin, Eng Sub)",
           "Remember (Tagalog, Eng Sub)",
           "Scene (Tamil, Eng Sub)",
-          "Parkway Drive: Home",
           "Aakasamlo Oka Tara (Telugu, Eng Sub)",
+          "BTS WORLD TOUR ARIRANG IN KAOHSIUNG LIVE VIEWING",
           "OM - Chapter 1: Udhiram - The Blood Wood (Telugu, Eng Sub)",
+          "Parkway Drive: Home",
+          "JEONGHAN X JOSHUA JOURNEY INTO - DREAMING",
+          "Hadestown: The Musical",
+          "Drishyam: The Conclusion",
+          "Aakasamlo Oka Tara (Malayalam, Eng Sub)",
           "Aadarsha Kutumbam House No: 47 #AK47 (Telugu, Eng Sub)",
           "Kabaddi 5 (Nepali, Eng Sub)",
           "Matloob Aelian (Arabic, Eng Sub)",
-          "Drishyam: The Conclusion",
-          "Hadestown: The Musical",
-          "Udta Teer (Hindi, Eng Sub)",
           "Karaoke Murder (Vietnamese, Eng Sub)",
-          "Aakasamlo Oka Tara (Malayalam, Eng Sub)"
+          "Udta Teer (Hindi, Eng Sub)"
         ],
         "ignored": false
       },
       "event": {
-        "fetched": 55,
-        "matched": 31,
-        "unmatched": 24,
+        "fetched": 52,
+        "matched": 29,
+        "unmatched": 23,
         "unmatched_titles": [
           "Festive Fun With Peppa",
           "George Michael - The Faith Tour",
-          "Parkway Drive: Home",
           "Traces of Justice",
           "Mookuthi Amman 2",
           "Scene (Tamil)",
+          "Parkway Drive: Home",
           "Remember",
           "Donga Naa Koduku",
-          "Hadestown: The Musical",
           "Love Actually",
           "Home Alone",
           "Elf",
@@ -75,8 +76,8 @@
           "The Holiday",
           "Shrek (25th Anniversary)",
           "Scene (Telugu)",
-          "The Rosie Awards - Rosemeadow Public School",
           "3D Under the Sea",
+          "The Rosie Awards - Rosemeadow Public School",
           "3D Born To Be Wild",
           "3D Deep Sea",
           "How The Grinch Stole Christmas"
