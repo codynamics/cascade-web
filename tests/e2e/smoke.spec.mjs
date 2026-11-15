@@ -2029,7 +2029,9 @@ test("CAS-1356 AC1/AC4: a v2 account's mood row can be reordered, and the order 
     cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
     saveCascades();
     setActive(cascades[0].id);
-    watchMoods = [];   // never provisioned — oamMoodsListReal() must fall back to the in-memory builtins
+    // CAS-1440 dropped Starred from the built-in moods, leaving only All Latest and Best of the best; a third
+    // (custom) mood gives the reorder a neighbour to move past.
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), { ...oamMoodDefaultFields(), id: "extra", name: "Extra" }];
     watchMoodSel = "releases";
     render();
   });
@@ -2125,7 +2127,9 @@ test("CAS-1371 AC3: Move left / Move right in the mood sheet reorders", async ({
     cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
     saveCascades();
     setActive(cascades[0].id);
-    watchMoods = [];
+    // CAS-1440 dropped Starred from the built-in moods, leaving only All Latest and Best of the best; a third
+    // (custom) mood gives the reorder a neighbour to move past.
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), { ...oamMoodDefaultFields(), id: "extra", name: "Extra" }];
     watchMoodSel = "best";
     render();
     window.openOamMoodSheetFor("best");
@@ -2166,7 +2170,9 @@ test("CAS-1371 AC2: a still touch hold lifts a mood chip and dragging it reorder
     cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
     saveCascades();
     setActive(cascades[0].id);
-    watchMoods = [];
+    // CAS-1440 dropped Starred from the built-in moods, leaving only All Latest and Best of the best; a third
+    // (custom) mood gives the reorder a neighbour to move past.
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), { ...oamMoodDefaultFields(), id: "extra", name: "Extra" }];
     watchMoodSel = "releases";
     render();
   });
@@ -2540,4 +2546,45 @@ test("CAS-1414: a starred film leads the mood list and survives a Best 20 cut", 
   expect(r.firstId).toBe("card-" + r.lowest);
   // Best 20 only has something to cut when more than 20 films are admitted; either way the starred film stays.
   expect(r.cappedHasLowest).toBe(true);
+});
+
+// CAS-1442: the mood panel on a Watch card is one on/off toggle per mood, and only its own chip closes it —
+// a toggle inside it, or a tap outside it, leaves it open.
+test("CAS-1442: mood panel toggles stay open; only the chip closes it", async ({ page }) => {
+  await toShortlist(page, "cinema");
+  await finishFlow(page);
+  await toListing(page);
+
+  await page.evaluate(() => {
+    cascades.length = 0;
+    cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
+    saveCascades();
+    setActive(cascades[0].id);
+    watchMoods = [];
+    render();
+  });
+  // CAS-1449: a v2 agent with styles {} admits no films, so no card renders — open its floor the CAS-1425 way.
+  await makeAgentWideOpen(page);
+
+  const chip = page.locator(".card .ctl.oamlist").first();
+  await expect(chip).toBeVisible();
+  await chip.click();
+
+  const panel = page.locator(".cpop.oamlpop");
+  await expect(panel).toBeVisible();
+  const rows = panel.locator(".oamtog");
+  expect(await rows.count()).toBeGreaterThan(0);
+  expect(await panel.locator(".oamtog.on").count()).toBeGreaterThan(0);
+
+  const first = rows.first();
+  const wasOn = await first.evaluate(el => el.classList.contains("on"));
+  await first.click();
+  await expect(panel).toBeVisible();
+  expect(await panel.locator(".oamtog").first().evaluate(el => el.classList.contains("on"))).toBe(!wasOn);
+
+  await page.mouse.click(2, 2);
+  await expect(panel).toBeVisible();
+
+  await chip.click();
+  await expect(page.locator(".cpop.oamlpop")).toHaveCount(0);
 });

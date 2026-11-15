@@ -31,7 +31,7 @@ test("CAS-1079: replaying the tour from Moving (via Help) uncovers the listing f
   await expect(page.locator("#helpScreen")).toHaveClass(/open/);
   await expect(page.locator("#movingScreen")).toHaveClass(/open/);   // still nested underneath
 
-  await page.locator("#helpScreen .urow", { hasText: "Replay the tour" }).click();
+  await page.locator("#helpScreen .urow", { hasText: "Replay the Watch tutorial" }).click();
 
   // Both screens it was nested under are gone — "no scrim may be left on screen" — and the tour is the only
   // thing showing.

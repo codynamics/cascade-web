@@ -54,9 +54,10 @@ test("CAS-1370 AC1: Releases' own ages gate admits an unrated film too (the actu
     "sanity: a real, non-matching rating is still excluded by this same gate");
 });
 
-test("CAS-1370 AC2: the card shows \"Not rated\" instead of silently dropping the certificate", () => {
+test("CAS-1370 AC2: the card shows \"?\" in the certificate lozenge instead of silently dropping it", () => {
+  // Lee, 2026-11-14: an unrated film gets the same lozenge as a rated one, with "?" in it.
   const unrated = E.cardTopHTML(filmWith({ age_rating:null }));
-  assert.match(unrated, /<span class="cert unrated">Not rated<\/span>/);
+  assert.match(unrated, /<span class="cert" title="Not rated">\?<\/span>/);
   const rated = E.cardTopHTML(filmWith({ age_rating:"M" }));
   assert.match(rated, /<span class="cert ">M<\/span>/);
 });

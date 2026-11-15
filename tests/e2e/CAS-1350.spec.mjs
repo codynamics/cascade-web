@@ -46,7 +46,13 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
   await expect(page.locator('.favcell[data-style="Action"]')).toHaveClass(/fav/);
   await expect(page.locator('.favcell[data-style="Drama"]')).toHaveClass(/incl/);
   await expect(page.locator("#oafCta")).toBeEnabled();
-  await page.locator("#oafCta").click();   // favourites -> age
+  await page.locator("#oafCta").click();   // favourites -> people
+
+  // Lee, 14 Nov: an optional favourite actor or director (one box); empty, the CTA reads Skip.
+  await expect(page.locator("#oafInner .osh")).toHaveText("A favourite actor or director?");
+  await expectHeadingBelowHeader(page);
+  await expect(page.locator("#oafCta")).toHaveText("Skip");
+  await page.locator("#oafCta").click();   // people -> age
 
   await expect(page.locator("#oafInner .osh")).toHaveText("How old are you?");
   await expectHeadingBelowHeader(page);
@@ -91,12 +97,12 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
   // Lee, 13 Nov (pm): the done screen is the payoff — the named agent, a count of what it found, the answers played back.
   await expect(page.locator("#oafInner .osh")).toHaveText("Nova is ready.");
   await expectHeadingBelowHeader(page);
-  await expect(page.locator("#oafInner .oafdtold")).toContainText("Partner");
+  await expect(page.locator("#oafInner .oafdtold .oafdtoldh")).toHaveText("Nova is working for you");
   await expect(page.locator("#oafDoneCount")).not.toHaveText("0", { timeout: 4000 });
-  await expect(page.locator("#oafCta")).toHaveText("See what Nova found");
+  await expect(page.locator("#oafCta")).toHaveText("Proceed");
   // CAS-1368: the moods table follows the answers (partner+kids both yes) — and the done screen shows it (Lee, 13 Nov).
   await expect(page.locator("#oafInner .oafdmood"))
-    .toHaveText(["All Latest", "Best of the best", "Me", "Partner", "Family", "Starred"]);
+    .toHaveText(["All Latest", "Best of the best", "Me", "Partner", "Family"]);   // no Starred (Lee, 14 Nov)
   await page.locator("#oafCta").click();
 
   // CAS-1361 part 1: after Start watching, the setup header/nav must not float over Watch underneath.
@@ -112,7 +118,8 @@ test("CAS-1368 AC1: under 18 skips children and family, and 'No' to partner skip
   await page.locator('#oafWhereOpts .obopt[data-val="cinema"]').click();
   await page.locator("#oafCta").click();   // where -> favourites
   await page.locator('.favcell[data-style="Comedy"] .favbtn.check').click();
-  await page.locator("#oafCta").click();   // favourites -> age
+  await page.locator("#oafCta").click();   // favourites -> people
+  await page.locator("#oafCta").click();   // people (Skip) -> age
 
   await page.locator('#oafAgeOpts .obopt[data-val="under18"]').click();
   await page.locator("#oafCta").click();   // age -> partner

@@ -123,8 +123,8 @@ test("CAS-971: price and trial text come from StoreKit's product info", () => {
   assert.equal(E.membPriceLine(null), "");
 });
 
-test("CAS-971: on the web there is no purchase action — the fine print points at the iPhone app", () => {
+test("CAS-971: on the web there is no purchase action — and no fine-print line (Lee, 14 Nov: the offer box carries the terms)", () => {
   const E = loadEngine();
   assert.equal(E.membCtaLabel(), "Continue");
-  assert.match(E.membFineText(), /Cascade iPhone app/);
+  assert.equal(E.membFineText(), "");
 });
