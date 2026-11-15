@@ -20426,9 +20426,9 @@ function oaRowHTML(c, style, filmCount){
   const tick=`<label class="oarowtick">
       <input type="checkbox" ${on?"checked":""} onchange="oaToggleStyleOn('${escA(style)}')" aria-label="Turn ${escA(name)} on or off">
     </label>`;
-  // CAS-1369: the ♥ toggle only ever appears on an ON row — turning it on sets fav without touching the bar.
-  const favBtn = on ? `<button type="button" class="oarowfav${oaFav(c,style)?" on":""}"
-      onclick="oaToggleFav('${escA(style)}')" aria-pressed="${oaFav(c,style)}" aria-label="${escA(name)} favourite">♥</button>` : "";
+  // Lee, 2026-11-15: the ♥ toggle is gone from the agent's rows — after setup it did nothing but a hidden sort
+  // lift, and that is retired (OAM_FAV_LIFT 0). The slider sets each genre's level.
+  const favBtn = "";
   const head=`
     <div class="oarowwrap">
       ${tick}
@@ -20996,7 +20996,9 @@ function filmInOneAgentMood(m, mood, c){
 // the agent (oaFav) ranks as if its score were OAM_FAV_LIFT higher. Ordering and the Best-N cut ONLY: the
 // score box, "score N+" text, membership and alerts all read oneScoreFor/oneScore untouched — nothing here
 // ever writes back through those.
-const OAM_FAV_LIFT = 5;
+// Lee, 2026-11-15: "Surely it's all done through the slider" — a genre's score level is set by its slider, so
+// the ♥ no longer lifts a film's place in a score-sorted mood. Every mood now sorts by the score the card shows.
+const OAM_FAV_LIFT = 0;
 function oamOrderScore(m, c){
   const score=oneScoreFor(m, c);
   if(score===-1) return score;

@@ -80,18 +80,18 @@ function withMoviesAndMoods(c, movies, moods, fn){
 
 // ---- 1. oamOrderScore: the lift, and only the lift ------------------------------------------------------
 
-test("CAS-1369: OAM_FAV_LIFT is 5", () => {
-  assert.equal(E.OAM_FAV_LIFT, 5);
+// Lee, 2026-11-15: the ♥ ordering lift is retired — a score-sorted mood follows the score the card shows.
+test("CAS-1369 (retired 2026-11-15): OAM_FAV_LIFT is 0", () => {
+  assert.equal(E.OAM_FAV_LIFT, 0);
 });
 
-test("CAS-1369 AC1: oamOrderScore adds the lift only for a ♥ main genre; the real score is untouched", () => {
+test("oamOrderScore is the shown score, ♥ or not", () => {
   const c = oneAgent({ styles: { Action: styleOn(1, { fav:true }), Drama: styleOn(1, { fav:false }) } });
   const favFilm = scoredFilm(["Action"], 70);
   const plainFilm = scoredFilm(["Drama"], 70);
-  assert.equal(E.oneScore(favFilm, c), 70, "the real score the card shows never moves");
-  assert.equal(E.oneScore(plainFilm, c), 70);
-  assert.equal(E.oamOrderScore(favFilm, c), 75, "ordering sees the lifted score");
-  assert.equal(E.oamOrderScore(plainFilm, c), 70, "no lift without the ♥");
+  assert.equal(E.oneScore(favFilm, c), 70);
+  assert.equal(E.oamOrderScore(favFilm, c), 70, "no lift for a ♥ main genre");
+  assert.equal(E.oamOrderScore(plainFilm, c), 70);
 });
 
 test("CAS-1369 AC1: a film with no score (-1) gets no lift either way", () => {
@@ -102,33 +102,28 @@ test("CAS-1369 AC1: a film with no score (-1) gets no lift either way", () => {
   assert.equal(E.oamOrderScore(noScore, c), -1);
 });
 
-test("CAS-1369 AC1: a ♥ favourite outranks a non-favourite scoring up to 4 points higher, but not 6", () => {
+test("a ♥ favourite no longer outranks a higher-scoring non-favourite (Poor Things 88 vs Call Me by Your Name 92)", () => {
   const c = oneAgent({ styles: { Action: styleOn(1, { fav:true }), Drama: styleOn(1, { fav:false }) } });
-  const action = scoredFilm(["Action"], 70);
-  const dramaClose = scoredFilm(["Drama"], 74);   // 4 points higher — inside the +5 lift
-  const dramaFar = scoredFilm(["Drama"], 76);     // 6 points higher — outside it
-  assert.ok(E.oamOrderScore(action, c) > E.oamOrderScore(dramaClose, c),
-    "the lift puts Action ahead of a Drama film that only out-scores it by 4");
-  assert.ok(E.oamOrderScore(action, c) < E.oamOrderScore(dramaFar, c),
-    "a 6-point gap is too wide for the lift to close");
+  const action = scoredFilm(["Action"], 88);
+  const drama = scoredFilm(["Drama"], 92);
+  assert.ok(E.oamOrderScore(action, c) < E.oamOrderScore(drama, c), "the higher shown score ranks first");
 });
 
 // ---- 2. oamApplyShowCap: the Best-N cut itself uses the lifted order -------------------------------------
 
-test("CAS-1369 AC1: the Best-N cut uses oamOrderScore, not the raw score", () => {
+test("the Best-N cut is by the shown score: a ♥ film below every decoy is cut", () => {
   const c = oneAgent({ styles: { Action: styleOn(1, { fav:true }), Drama: styleOn(1, { fav:false }) } });
   const mood = moodWith({ show:"40" });
   // 40 Drama decoys, scores 90,88,...,12 (step 2) — a clean Best-40 pool on raw score alone.
   const decoys = Array.from({ length:40 }, (_, i) => scoredFilm(["Drama"], 90 - i*2));
   const weakest = decoys[decoys.length-1];   // scores 12, the last to survive on raw score
-  // The ♥ Action target scores 10 — below every decoy on raw score, so it would be cut outright — but its
-  // lift (+5, to 15) slots it between the decoys scoring 16 and 14, bumping the weakest (12) out instead.
+  // The ♥ Action target scores 10 — below every decoy — and with no lift it is cut; the weakest decoy stays.
   const target = scoredFilm(["Action"], 10);
   const kept = E.oamApplyShowCap([...decoys, target], mood, c, new Set());
   const keptIds = new Set(kept.map(m => m.tmdb_id));
   assert.equal(kept.length, 40);
-  assert.ok(keptIds.has(target.tmdb_id), "the favourite's lift should have won it a slot");
-  assert.ok(!keptIds.has(weakest.tmdb_id), "the weakest decoy should have been bumped out, not the favourite");
+  assert.ok(!keptIds.has(target.tmdb_id), "no lift: the ♥ film below every decoy is cut");
+  assert.ok(keptIds.has(weakest.tmdb_id), "the weakest decoy keeps its slot");
 });
 
 // ---- 3. Watched films don't spend a Best-N slot ----------------------------------------------------------
@@ -202,10 +197,10 @@ test("CAS-1369 AC3: oaToggleFav flips fav without touching the bar", () => {
   });
 });
 
-test("CAS-1369 AC3: the ♥ toggle only renders on an ON row", () => {
+test("the agent's genre rows carry no ♥ toggle any more (Lee, 2026-11-15)", () => {
   const c = oneAgent({ styles: { War: styleOn(65, { fav:true }) } });
   const onHTML = E.oaRowHTML(c, "War", 3);
-  assert.ok(onHTML.includes('class="oarowfav on"'), "an on, favourited row shows the filled ♥");
+  assert.ok(!onHTML.includes("oarowfav"), "even an on, favourited row shows no ♥");
   const offHTML = E.oaRowHTML(oneAgent({ styles: {} }), "War", 0);
   assert.ok(!offHTML.includes("oarowfav"), "an off row carries no ♥ toggle at all");
 });
