@@ -298,6 +298,9 @@ def main(argv=None) -> int:
     if auto_watch_rows:
         print(f"[monitor] auto placement (CAS-1097): {len(auto_watch_rows)} admitted film(s) placed "
               "from agent_films with no film_watch row of their own.")
+    # CAS-1466: match_film_watches() ("Your picks") must see ONLY real film_watch rows — a synthesized
+    # auto placement is an agent's own, not a per-film "Watch it" tick, and must never alert as one.
+    real_watches = watches
     watches = watches + auto_watch_rows
 
     # CAS-601: an agent's own Alert toggles are the control again (Lee's decision of 2026-08-24,
@@ -361,7 +364,7 @@ def main(argv=None) -> int:
     watch_already = _store_call(store, "fetch_watch_notification_keys", set())
     agent_seen = {(str(uid), h.transition.movie_id, h.transition.moment)
                   for uid, hits in agent_hits.items() for h in hits}
-    watch_hits = match_film_watches(watches, transitions, already=watch_already,
+    watch_hits = match_film_watches(real_watches, transitions, already=watch_already,
                                     cascade_hits=agent_seen, excluded=muted, suppressed=suppressed)
     by_user: dict = {u: list(hits) for u, hits in agent_hits.items()}
     for user_id, hits in watch_hits.items():

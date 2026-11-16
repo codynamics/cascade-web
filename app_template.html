@@ -3382,10 +3382,12 @@
   .oacolhdr span:last-child{grid-column:2 / span 3;text-align:right}
   .oalist{display:flex;flex-direction:column}
   .oarow{border-bottom:1px solid var(--line)}
-  .oarow.oa-changed{background:rgba(255,213,74,.09);box-shadow:inset 3px 0 0 var(--gold)}
-  .oarow.oa-open{background:rgba(124,92,255,.08);border:1px solid rgba(124,92,255,.45);border-radius:12px;margin:10px 0;padding:0 6px}
-  .oarow.oa-open .oarowhead{border-bottom:1px solid rgba(124,92,255,.3)}
-  .oarow.oa-open .oastyname{font-size:17px}
+  .oarow.oa-changed:not(.oa-open){background:rgba(255,213,74,.09);box-shadow:inset 3px 0 0 var(--gold)}
+  .oarow.oa-open.oa-changed .oarowwrap,.oarow.oa-open.oa-changed .oatop{background:rgba(255,213,74,.11)}
+  .oarow.oa-open{background:rgba(124,92,255,.08);border:0;border-radius:12px;margin:0;padding:0;box-shadow:inset 0 0 0 1px rgba(124,92,255,.45)}
+  .oarow.oa-open .oarowwrap{border-radius:11px 11px 0 0}
+  .oarow.oa-open .oarowhead{border-bottom:0}
+  .oatop{margin:0 -10px;padding:2px 10px 12px;border-bottom:1px solid rgba(124,92,255,.3)}
   /* CAS-1367: the tick sits outside the row's own <button> (a checkbox can't legally nest inside one) in a
      thin flex wrapper, so the button keeps native keyboard/activation behaviour for the rest of the row. */
   .oarowwrap{display:flex;align-items:center}
@@ -3425,7 +3427,7 @@
   .oastripfull .oabox{height:22px;border-radius:4px}
   .oalbl{position:relative;z-index:2;display:block;margin:4px 0 0 4px;font-size:9px;font-weight:700;
     color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
-  .oaopen{padding:2px 4px 16px}
+  .oaopen{padding:2px 10px 16px}
   .oasechdr{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;
     color:var(--faint);margin:14px 0 8px}
   .oaopen>.oasechdr:first-child{margin-top:4px}
@@ -3474,7 +3476,8 @@
      Teal/orange reuse the exact literals .qone.up/.qone.down already mark a positive/negative adjustment
      with (#5eead4/#f0a060) — there is no --teal custom property in this file, so this follows that existing
      precedent rather than inventing a new token for the same two colours. */
-  .oaintro{font-size:13.5px;line-height:1.5;color:var(--ink);opacity:.85;margin:10px 0 14px}
+  .oaintro{font-size:13.5px;line-height:1.45;color:var(--ink);opacity:.85;margin:8px 0 12px}
+  .oaintro p{margin:0 0 6px}
   .oaintro b{color:var(--gold)}
   .oaalertnote{font-size:12.5px;line-height:1.45;opacity:.8;margin:8px 0 4px}
   .oalog{border:1px solid rgba(255,213,74,.2);background:rgba(255,213,74,.03);border-radius:10px;margin:0 0 14px;padding:0}
@@ -3625,6 +3628,22 @@
   .mfbox.off .oaslidewrap{opacity:.35;filter:grayscale(1)}
   .mfbox.off .oarange{pointer-events:none}
   .mfbox{margin:6px 0 0;padding:12px 4px 6px;border-top:1px solid var(--line)}
+  /* Lee, 2026-11-17: the Agent settings / Agent override switch sits where "% of Catalog" was; when override is
+     on, the one-level slider box slots in under it, above the genres. */
+  .gcolhd.agovhd{align-items:center;margin:4px 0 2px}
+  .agovseg{grid-column:2/span 2;display:flex;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px}
+  .agovseg button{flex:1;border:0;background:transparent;border-radius:999px;padding:5px 0;font:700 10.5px/1.1 var(--font-body);
+    color:var(--faint);cursor:pointer;white-space:nowrap}
+  .agovseg button.on{background:var(--accent);color:#fff}
+  .agovhd + .mfbox{margin:4px 0 8px;border-top:0;border-bottom:1px solid var(--line);padding:4px 4px 10px}
+  /* Simple (default): one genre per row with a tick and its "also in" line — no levels, strips or scores. */
+  .mgenre.simple .agovhd,.mgenre.simple .mfbox,.mgenre.simple .oaslidewrap,.mgenre.simple .oarowval{display:none}
+  .mgenre.simple .oamstylerow{grid-template-columns:1fr}
+  .oamadvbtn{display:flex;align-items:center;justify-content:space-between;width:100%;margin:10px 0 2px;padding:11px 12px;
+    border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--dim);font:700 13px var(--font-body);cursor:pointer}
+  .oamadvbtn i{font-style:normal;font-weight:600;color:var(--faint)}
+  .oamadvbtn .chev{transition:transform .15s}
+  .oamadvbtn.open .chev{transform:rotate(90deg)}
   .mfrowgrid{align-items:center}
   .mfrowgrid .mflbl{font-size:12px;color:var(--dim);line-height:1.35}
   .mfrowgrid .mflbl b{color:var(--ink);font-size:12.5px}
@@ -20430,9 +20449,9 @@ function oaOpenBodyHTML(c, style){
           <p class="oaslidedesc" id="oaSliderDesc">${esc(name)} films scoring ${bar} or more are listed: the top ${top}% of ${esc(name)}.</p>`;
       })();
   return `<div class="oaopen">
-      <div class="oasechdr">MOVIE MINIMUM SCORE</div>
+      <div class="oatop"><div class="oasechdr">MOVIE MINIMUM SCORE</div>
       ${sectionHTML}
-      ${oaSuggestionHTML(style)}
+      ${oaSuggestionHTML(style)}</div>
       <div class="oasechdr">FILM ALERTS</div>
       ${oaAlertsHTML(c, style)}
       ${oaAlertNoteHTML(c, style)}
@@ -20476,28 +20495,87 @@ function renderOneAgentScreen(c){
   const counts=oaFilmCounts(c);
   const order=oaOrder(c);
   const n=tasteProfile().n;
-  const changedMain=oaChangedGenres(c, oaVisitCutoffFor(c));
+  const changedMain=oaRecentVerdictGenres();
   const rows=order.map(style=>oaRowHTML(c, style, counts[style]||0, changedMain.has(style))).join("");
   const title = (c.name||"").trim() || "Your agent";   // CAS-1352: unnamed agents keep the generic title
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">${n} verdict${n===1?"":"s"} learned</p>
-    <p class="oaintro">Your agent learns from your verdicts and works on two levels. For each genre it may suggest raising or lowering the minimum score. Within each genre it adjusts sub-genres up or down as you watch, so you're shown more of what you enjoy and less of what you don't. <b>Gold rows</b> have changed since your last visit. Tap a genre to open it and see its sub-genres.</p>
+    <div class="oaintro"><p>Your agent learns from your verdicts.</p><p>It can suggest a new minimum score for a genre, and it nudges sub-genres up or down so you see more of what you enjoy.</p><p><b>Gold rows</b> are the genres you've watched most recently. Tap a genre to open it.</p></div>
     <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
+}
+// CAS-1461: open/close morph. The open genre's .oastripfull animates from/to the closed row's own bar
+// (Web Animations API, 800ms); the rest of the panel fades. All skipped under prefers-reduced-motion.
+const OA_DUR=800, OA_EASE="cubic-bezier(.4,0,.2,1)";
+let oaPendingClose=null;   // {timer, fin} while a close animation is in flight
+function oaReducedMotion(){ return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }
+function oaRowEl(style){ return [...document.querySelectorAll("#oaList .oarow")].find(r=>r.dataset.style===style)||null; }
+function oaFinishPendingClose(){ if(oaPendingClose){ const p=oaPendingClose; oaPendingClose=null; clearTimeout(p.timer); p.fin(); } }
+function oaResetOpenState(){
+  // CAS-1340: section 3's own "Show all"/open-film-chips state is per open style, not per account — start
+  // fresh every time a style opens (or closes), the same way oaOrderSnapshot does.
+  oaShowAllAdj=false; oaComboFilmsOpen.clear(); oaLogShown=5; oaLogOpen=false;
+  oaSuggestionOpen=false;   // CAS-1345 Part 5: the suggestion callout starts collapsed every time, too.
+}
+function oaOpenAnim(row, src){
+  const full=row.querySelector(".oastripfull"); if(!full||!src) return;
+  const tgt=full.getBoundingClientRect(), z=(tgt.width/full.offsetWidth)||1;
+  const tbox=full.querySelector(".oabox"), tbh=tbox?tbox.getBoundingClientRect().height:0;
+  if(!tgt.width||!tbh||!src.w||!src.bh) return;
+  const sx=src.w/tgt.width, sy=src.bh/tbh;
+  const dx=(src.left-tgt.left)/z, dy=(src.top-tgt.top)/z;
+  const o={duration:OA_DUR,easing:OA_EASE};
+  full.style.transformOrigin="0 0";
+  full.animate([{transform:`translate(${dx}px,${dy}px) scale(${sx},${sy})`},{transform:"none"}],o);
+  const fade=[{opacity:0},{opacity:1,offset:.7},{opacity:1}];
+  const lateSet=new Set([...row.querySelectorAll(".oalbl,input.oarange")]);
+  const others=[...row.querySelectorAll(".oaopen > *:not(.oatop), .oatop > *:not(.oaslider), .oaslideval")];
+  others.forEach(el=>el.animate(fade,o));
+  lateSet.forEach(el=>el.animate([{opacity:0},{opacity:0,offset:.75},{opacity:1}],o));
+}
+function oaCloseAnim(row){
+  const full=row.querySelector(".oastripfull"), hs=row.querySelector(".oarowhead .oarowstrip");
+  if(!full||!hs) return false;
+  const cur=full.getBoundingClientRect(), z=(cur.width/full.offsetWidth)||1;
+  const hr=hs.getBoundingClientRect(), tbox=full.querySelector(".oabox");
+  const tbh=tbox?tbox.getBoundingClientRect().height:0; if(!cur.width||!tbh) return false;
+  const CLOSED_BOX_H=18;
+  const sx=hr.width/cur.width, sy=CLOSED_BOX_H/tbh;
+  const dx=(hr.left-cur.left)/z, dy=((hr.top+hr.height/2-CLOSED_BOX_H/2)-cur.top)/z;
+  full.style.transformOrigin="0 0";
+  full.animate([{transform:"none"},{transform:`translate(${dx}px,${dy}px) scale(${sx},${sy})`}],{duration:OA_DUR,easing:OA_EASE,fill:"forwards"});
+  const late=new Set([...row.querySelectorAll(".oalbl,input.oarange")]);
+  late.forEach(el=>el.animate([{opacity:1},{opacity:0}],{duration:OA_DUR*.2,fill:"forwards"}));
+  [...row.querySelectorAll(".oaopen > *:not(.oatop), .oatop > *:not(.oaslider), .oaslideval")]
+    .forEach(el=>el.animate([{opacity:1},{opacity:0}],{duration:OA_DUR*.6,fill:"forwards"}));
+  return true;
 }
 // Opening a style freezes the row order NOW (as if nothing were open), so switching straight from one open
 // style to another never shows an intermediate resort — only closing (oaOpenStyle back to null) lets the
 // next render recompute a fresh order.
 window.oaToggleStyle=(style)=>{
   const c=oneAgentCriteria(); if(!c) return;
-  if(oaOpenStyle===style){ oaOpenStyle=null; oaOrderSnapshot=null; }
-  else { oaOrderSnapshot=oaComputeOrder(c); oaOpenStyle=style; }
-  // CAS-1340: section 3's own "Show all"/open-film-chips state is per open style, not per account — start
-  // fresh every time a style opens (or closes), the same way oaOrderSnapshot does above.
-  oaShowAllAdj=false; oaComboFilmsOpen.clear(); oaLogShown=5; oaLogOpen=false;
-  oaSuggestionOpen=false;   // CAS-1345 Part 5: the suggestion callout starts collapsed every time, too.
+  oaFinishPendingClose();
+  const reduced=oaReducedMotion();
+  if(oaOpenStyle===style){
+    const row=reduced?null:oaRowEl(style);
+    const fin=()=>{ oaOpenStyle=null; oaOrderSnapshot=null; oaResetOpenState(); renderAgentsScreen(); };
+    if(row && oaCloseAnim(row)){ oaPendingClose={fin, timer:setTimeout(()=>{ oaPendingClose=null; fin(); }, OA_DUR)}; return; }
+    fin(); return;
+  }
+  if(oaOpenStyle!=null){ oaOpenStyle=null; oaResetOpenState(); renderAgentsScreen(); }   // old genre closes without animation
+  else oaOrderSnapshot=oaComputeOrder(c);
+  let src=null;
+  if(!reduced){
+    const row=oaRowEl(style), st=row&&row.querySelector(".oarowstrip"), bx=st&&st.querySelector(".oabox");
+    if(st&&bx){ const r=st.getBoundingClientRect(); src={left:r.left,top:r.top,w:r.width,bh:bx.getBoundingClientRect().height}; }
+  }
+  oaOrderSnapshot=oaOrderSnapshot||oaComputeOrder(c);
+  oaOpenStyle=style;
+  oaResetOpenState();
   renderAgentsScreen();
+  if(src){ const row=oaRowEl(style); if(row) oaOpenAnim(row, src); }
 };
 // Live drag feedback (oninput) — redraws the slider's own boxes/value/description text in place, without a
 // full re-render, so neither the drag gesture nor the frozen row order is disturbed mid-drag.
@@ -20771,7 +20849,20 @@ function oaChangedGenres(c, cutoff){
 // "Since your last visit" cut-off for this visit: set once when the Agent screen opens (the previous
 // agentSeenAt), so the rows stay gold for the whole visit. Falls back to the stored value before any open.
 let oaVisitCutoff = null;
-function oaVisitCutoffFor(c){ return oaVisitCutoff==null ? ((c && c.agentSeenAt)||0) : oaVisitCutoff; }
+// CAS-1461: gold rows are the genres (main style) of the account's 10 most recent verdicts, newest first by
+// verdictAt. A verdict with no timestamp is ignored.
+function oaRecentVerdictGenres(){
+  const ids = new Set(watched); blocked.forEach(id=>ids.add(id));
+  const rec = [];
+  ids.forEach(id=>{
+    if(!opinionOf(id)) return;
+    const at = verdictAt.get(id)||0; if(!at) return;
+    const m = MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
+    rec.push({at, main: mainOtherCombos(m).main});
+  });
+  rec.sort((a,b)=>b.at-a.at);
+  return new Set(rec.slice(0,10).map(r=>r.main));
+}
 let oaLogShown = 5;      // changes listed in the open genre's recent-changes log (+10 per "Show more")
 let oaLogOpen = false;   // the log's <details> open state, kept across re-renders
 function oaChangeLogHTML(c, style){
@@ -21361,9 +21452,7 @@ function oamOverrideValHTML(share, on){
   return share>=100 ? `All<i>every genre</i>` : `Top ${share}%<i>every genre</i>`;
 }
 function oamOverrideFilterDesc(share, on){
-  return on
-    ? `Every ticked genre shows its ${share>=100?"whole catalog":`top ${share}%`} in this mood, whatever your agent's own setting. Greyed is what this takes away; striped is what it adds.`
-    : `Off: each genre uses your agent's own setting. Switch on to set every genre in this mood to the same top %, higher or lower.`;
+  return `Every ticked genre shows its ${share>=100?"whole catalog":`top ${share}%`} here, instead of your agent's level.`;
 }
 function oamOverrideFilterHTML(d){
   const on = d.topShare!=null;
@@ -21371,9 +21460,7 @@ function oamOverrideFilterHTML(d){
   return `<div class="mfbox${on?"":" off"}">
       <div class="mfscale"><span>${ONE_AGENT_SHARE_BRACKETS.map(b=>`<i>${esc(oaShareLabel(b.pct))}</i>`).join("")}</span></div>
       <div class="mfrowgrid">
-        <div class="mflbl"><b>Mood Override</b>
-          <span class="mftogrow"><button type="button" class="mftog${on?" on":""}" role="switch" aria-checked="${on}"
-            aria-label="Mood Override" onclick="toggleOamOverride()"><i></i></button><span class="mfsub">${on?"On":"Off"}</span></span></div>
+        <div class="mflbl"><b>Every genre</b><span class="mfsub">same level</span></div>
         <div class="oaslidewrap">
           <div class="oastrip oastripfull">${oamFilterBoxesHTML(share)}</div>
           <input type="range" class="oarange" min="1" max="100" step="1" value="${share}" ${on?"":"disabled"}
@@ -21387,8 +21474,21 @@ function oamOverrideFilterHTML(d){
 window.toggleOamOverride=()=>{
   const d=oamDraft; if(!d) return;
   if(d.topShare!=null){ d.lastTopShare=d.topShare; d.topShare=null; }
-  else d.topShare=d.lastTopShare || 40;
+  else d.topShare=d.lastTopShare || 60;
   renderOamMoodSheetBody();
+};
+// Lee, 2026-11-17: Agent settings (off) / Agent override (on, starting at 60% the first time).
+// Lee, 2026-11-17: the genre list is just ticks until "Advanced settings" brings in the agent's levels and the
+// Agent settings / Agent override switch. A mood that already overrides opens with Advanced showing.
+function oamAdvancedOn(d){
+  if(d.advanced===undefined) d.advanced = d.topShare!=null;
+  return !!d.advanced;
+}
+window.toggleOamAdvanced=()=>{ const d=oamDraft; if(!d) return; d.advanced=!oamAdvancedOn(d); renderOamMoodSheetBody(); };
+window.setOamAgentOverride=(on)=>{
+  const d=oamDraft; if(!d) return;
+  if(!!on === (d.topShare!=null)) return;
+  window.toggleOamOverride();
 };
 // The box-geometry rule the ticket gives verbatim: share p falls in box floor(p/20) at fraction (p mod 20)/20
 // of that box's own rendered width, and 100 is the right edge of the last box — reading real DOM geometry
@@ -21516,9 +21616,16 @@ function renderOamMoodSheetBody(){
     </div>
     <div class="mpanel">
       <div class="mtrack${kwMode?" kw":""}">
-        <section class="mgenre" aria-hidden="${kwMode}">
-          <p class="oamgenreintro">Tick the genres this mood lists. Each genre's score is set in your agent.</p>
-          <div class="gcolhd"><b>Include in mood</b><b>% of Catalog<i>(agent setting)</i></b></div>
+        <section class="mgenre${oamAdvancedOn(d)?"":" simple"}" aria-hidden="${kwMode}">
+          <p class="oamgenreintro">${!oamAdvancedOn(d) ? "Tick the genres for this mood." : `Tick the genres this mood lists. ${d.topShare==null ? "Each genre's level comes from your agent." : "Every genre uses the level set below."}`}</p>
+          <!-- Lee, 2026-11-17: the genre levels come from the agent by default; "Agent override" reveals one
+               level slider for every genre in this mood, pushed in above the list. -->
+          <div class="gcolhd agovhd"><b>Include in mood</b>
+            <span class="agovseg" role="radiogroup" aria-label="Genre levels">
+              <button type="button" role="radio" class="${d.topShare==null?"on":""}" aria-checked="${d.topShare==null}" onclick="setOamAgentOverride(false)">Agent settings</button>
+              <button type="button" role="radio" class="${d.topShare!=null?"on":""}" aria-checked="${d.topShare!=null}" onclick="setOamAgentOverride(true)">Agent override</button>
+            </span></div>
+          ${d.topShare!=null ? oamOverrideFilterHTML(d) : ""}
           <div class="oalist">
             ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
             ${order.notInMood.length ? `
@@ -21528,7 +21635,9 @@ function renderOamMoodSheetBody(){
               ${oamNotInMoodOpen ? order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("") : ""}
             ` : ""}
           </div>
-          ${oamOverrideFilterHTML(d)}
+          <button type="button" class="oamadvbtn${oamAdvancedOn(d)?" open":""}" onclick="toggleOamAdvanced()" aria-expanded="${oamAdvancedOn(d)}">
+            <span>${oamAdvancedOn(d) ? "Hide advanced settings" : "Advanced settings"}${!oamAdvancedOn(d) && d.topShare!=null ? ` <i>· Agent override on</i>` : ""}</span><span class="chev" aria-hidden="true">&rsaquo;</span>
+          </button>
         </section>
         <section class="mkeyword" aria-hidden="${!kwMode}">
           <input class="search" type="text" enterkeyhint="done" placeholder="e.g. Tom Cruise, Russo"
@@ -22953,6 +23062,9 @@ const MOVING_EMPTY_COPY = {
 // "nothing moved" and should not be said as if it were.
 const MOVING_EMPTY_NO_OWNER_COPY = "Something moved, but no agent currently owns it, so there's nothing to show.";
 let movingWindow="today";
+// CAS-1465: the period the user last picked this session (null = none yet). In memory only — never saved
+// anywhere; a reload or a sign-out (signOutReset) puts it back to null so the next open lands on Today.
+let movingWindowChosen=null;
 // CAS-668: whether the screen is actually open right now — the badge mirrors movingWindow
 // while it is, and predicts the window openMovingScreen would pick while it isn't. See movingBadgeWindow.
 let movingIsOpen=false;
@@ -23072,9 +23184,10 @@ function movingEmptyCopy(win){
 }
 // CAS-668: while Moving is open, the badge must track whatever window is actually on screen (movingWindow),
 // including a tap via setMovingWindow. While it's closed, there is no "on screen" window yet, so the badge
-// predicts the window Moving now always opens on (CAS-1197: pinned to Today, no longer auto-picked).
+// predicts the window Moving will open on (CAS-1465: Today until the user picks a period this session, then
+// that period; CAS-1197 pinned the first open to Today, no longer auto-picked).
 function movingBadgeWindow(){
-  return movingIsOpen ? movingWindow : "today";
+  return movingIsOpen ? movingWindow : (movingWindowChosen||"today");
 }
 function movingUnseenCount(){
   const win=movingBadgeWindow();
@@ -23284,7 +23397,9 @@ function renderMovingScreen(markSeen){
 }
 // CAS-650: switching the window re-renders in place.
 window.setMovingWindow=(key)=>{
-  if(!MOVING_WINDOWS.some(w=>w.key===key) || movingWindow===key) return;
+  if(!MOVING_WINDOWS.some(w=>w.key===key)) return;
+  movingWindowChosen=key;   // CAS-1465: remembered for later opens this session (memory only)
+  if(movingWindow===key) return;
   movingWindow=key;
   renderMovingScreen(true);
 };
@@ -23313,13 +23428,15 @@ window.closeAgentsScreen=()=>{
 // CAS-636: Moving — the alert feed made visible. Same open/close shape as Agents (mutually exclusive with
 // Agents), plus its own render + seen-state pass (renderMovingScreen marks every row it shows
 // as seen and refreshes the badge, per cascade_moving_seen — see that function for the mechanism).
-// CAS-1197: which window the visit OPENS on is always Today now (CAS-848's pin to 2 weeks is gone).
-// Never persisted; the user's own tap (setMovingWindow) always overrides it.
+// CAS-1465 (builds on CAS-1197): the FIRST open in an app session lands on Today (CAS-848's pin to 2 weeks
+// is gone). Once the user picks a period with setMovingWindow, every later open in the same session lands on
+// that period until they pick another. Session = this page load, held in memory only (movingWindowChosen) —
+// never persisted; a reload or sign-out (signOutReset) returns the next open to Today.
 window.openMovingScreen=()=>{
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
   if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186: mutually exclusive with Find too
   movingIsOpen=true;
-  movingWindow="today";   // CAS-1197: always opens pinned to Today; a tap (setMovingWindow) still overrides it
+  movingWindow=movingWindowChosen||"today";   // CAS-1465: Today until the user picks a period this session
   renderMovingScreen(true);
   $("movingScreen").scrollTop=0;
   $("movingScreen").classList.add("open"); lockBodyScroll(true);
@@ -27621,6 +27738,7 @@ function acctFetchKeepalive(init){
     watchPrefs = watchPrefsDefaults();
     notifyPrefs = notifyPrefsDefault();
     Object.keys(movingSeen).forEach(k=>delete movingSeen[k]);
+    movingWindowChosen=null;   // CAS-1465: the next account's first Alerts open is Today again
     realAlerts=[]; updateMovingBadge();
     invites=[]; invitesReady=true; updateInvitesBadge();   // CAS-886: same reasoning — nothing left to wait on
     agentFilms={}; agentFilmsReady=true;   // CAS-736: nothing left to wait on

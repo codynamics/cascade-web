@@ -1652,6 +1652,64 @@ class HandPickedAlertTests(unittest.TestCase):
         self.assertEqual(hits.get("u1", []), [])
 
 
+class V2CurrentWindowAlertGateTests(unittest.TestCase):
+    """CAS-1466: for a v2 agent, newly_qualifies / new_to_agent pass only when the film's main style
+    has the alert switch ON for the window of its CURRENT status."""
+
+    PREV_RUN_START = _dt.datetime(2026, 11, 16, 0, 0, tzinfo=_dt.timezone.utc)
+
+    def _movie(self, genre, status, imdb):
+        return {"tmdb_id": 9801, "title": "Gate Fixture", "genres": [genre], "status": [status],
+                "cinema_date": "2026-01-01", "language": "en", "offers": [], "wm_user_rating": imdb}
+
+    def _cascade(self, al_by_genre, v2=True):
+        criteria = {"v": 2, "styles": {g: {"bar": 1, "al": al} for g, al in al_by_genre.items()}} if v2 else {}
+        return [{"id": "c1", "user_id": "u1", "name": "Pixel", "active": True,
+                 "alert_moments": ["hits_cinema", "hits_rent", "hits_stream"], "criteria": criteria,
+                 "updated_at": "2026-11-01T00:00:00+00:00"}]
+
+    ADMIT = {"c1": {"today": {"9801"}, "yesterday": set()}}
+
+    def _both(self, cascades, genre, status):
+        prev, today = [self._movie(genre, status, 6.0)], [self._movie(genre, status, 8.0)]
+        nq = match_newly_qualified(cascades, prev, today, admission=self.ADMIT)
+        na = match_new_to_agent(cascades, prev, today, self.PREV_RUN_START, admission=self.ADMIT)
+        return len(nq.get("u1", [])), len(na.get("u1", []))
+
+    def test_a_documentary_all_off_is_silent(self):
+        off = {"cinema": False, "rent": False, "stream": False}
+        self.assertEqual(self._both(self._cascade({"Documentary": off}), "Documentary",
+                                    "included_streaming"), (0, 0))
+
+    def test_b_action_stream_on_fires(self):
+        al = {"cinema": False, "rent": False, "stream": True}
+        self.assertEqual(self._both(self._cascade({"Action": al}), "Action", "included_streaming"), (1, 1))
+
+    def test_c_action_rent_off_is_silent_for_a_rental_film(self):
+        al = {"cinema": False, "rent": False, "stream": True}
+        self.assertEqual(self._both(self._cascade({"Action": al}), "Action", "rental"), (0, 0))
+
+    def test_unmapped_status_is_silent(self):
+        al = {"cinema": True, "rent": True, "stream": True}
+        self.assertEqual(self._both(self._cascade({"Action": al}), "Action", "mystery"), (0, 0))
+
+    def test_g_non_v2_agent_unchanged(self):
+        self.assertEqual(self._both(self._cascade({}, v2=False), "Documentary", "included_streaming"),
+                         (1, 1))
+
+    def test_e_unplaced_non_hand_picked_film_has_no_window_arrival_moment(self):
+        prev = [{"tmdb_id": 9801, "title": "Gate Fixture", "status": [], "cinema_date": "2026-01-01",
+                 "offers": []}]
+        today = [self._movie("Action", "included_streaming", 8.0)]
+        t = next(t for t in compute_transitions(prev, today, RUN_DATE) if t.moment == "hits_stream")
+        al = {"cinema": True, "rent": True, "stream": True}
+        counts = {}
+        hits = match(self._cascade({"Action": al}), [t], admission=self.ADMIT, film_watches=[],
+                     hand_picked=set(), placement_counts=counts)
+        self.assertEqual(hits.get("u1", []), [])
+        self.assertEqual(counts.get("no_placement"), 1)
+
+
 class HandPickedPairsTests(unittest.TestCase):
     """CAS-1343: hand_picked_pairs() itself — the pure function that turns `user_prefs.view.moods`
     into the (user_id, movie_id) set match() reads, including AC3's watched/blocked exclusion."""

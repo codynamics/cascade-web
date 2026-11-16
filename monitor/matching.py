@@ -217,6 +217,24 @@ def one_agent_alerts(movie: dict, criteria: dict, window: str) -> bool:
     return bool((style.get("al") or {}).get(window))
 
 
+# CAS-1466: a film's CURRENT window-derived moment (``_current_moment``) -> the v2 `al` window key
+# for newly_qualifies / new_to_agent, which have no window moment of their own. upcoming (announced)
+# and in_cinema -> cinema; pvod/rental -> rent; included_streaming -> stream; anything else -> None.
+_CURRENT_MOMENT_TO_AL_WINDOW = {
+    "announced": "cinema", "hits_cinema": "cinema",
+    "hits_pvod": "rent", "hits_rent": "rent", "hits_stream": "stream",
+}
+
+
+def _v2_current_window_alerts(criteria: dict, record: dict, current_moment: Optional[str]) -> bool:
+    """CAS-1466: for a v2 agent, does the film's main style have the alert switch ON for the window
+    of its CURRENT status? False when the current status maps to no window. Non-v2 -> always True."""
+    if criteria.get("v") != 2:
+        return True
+    window = _CURRENT_MOMENT_TO_AL_WINDOW.get(current_moment)
+    return window is not None and one_agent_alerts(record, criteria, window)
+
+
 # The account's own "Where & when you'll watch" defaults (app_template.html's watchPrefsDefaults())
 # for the four windows WINDOW_TO_MOMENT names — in_cinema/rent/stream default on, premium (PVOD)
 # defaults off (CAS-243, "the one window nobody should be opted into by default").
@@ -840,6 +858,8 @@ def match_newly_qualified(cascades: list, prev_movies: list, today_movies: list,
             moment = _current_moment(today_record)
             if moment is None or moment not in moments:
                 continue
+            if not _v2_current_window_alerts(criteria, today_record, moment):
+                continue                       # CAS-1466: the film's own style/window switch is off
             if not _own_watch_on_ok(placements, c["user_id"], mid, moment):
                 if placement_counts is not None:
                     placement_counts["own_watch_on"] = placement_counts.get("own_watch_on", 0) + 1
@@ -964,6 +984,10 @@ def match_new_to_agent(cascades: list, prev_movies: list, today_movies: list, pr
                 continue                   # already matched yesterday -> not a first appearance
             if not matches_criteria(mid, c["id"], "today", admission):
                 continue                   # still doesn't match today
+            # CAS-1466: v2 agents' per-style alert switch for the film's CURRENT window.
+            if not _v2_current_window_alerts(c.get("criteria") or {}, today_record,
+                                             _current_moment(today_record)):
+                continue
             # CAS-1307: gate on the film's own CURRENT window-derived moment, not the "new_to_agent"
             # moment this Hit will actually carry — the same question CAS-841/CAS-1237 ask of a real
             # window transition for this film, asked here of a first-appearance one instead.
