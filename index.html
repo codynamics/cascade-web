@@ -24931,12 +24931,43 @@ window.openMembershipRestore=async()=>{      // the Account screen's row
 // lapsed member keeps their account and data — nothing is deleted, resubscribing just reopens the door.
 let membGated=false;
 function membGateDone(){ membGated=false; }
+// CAS-1458: TEMPORARY testing bypass. public.app_config 'membership_bypass' (jsonb true) lets a held account
+// tap "Continue without membership (testing)" for the rest of this app session. In memory only — never
+// localStorage, never written to the server; keyed to the user id so a different sign-in is held again.
+// A failed read or a missing row = false (no button, gate exactly as CAS-971).
+let membBypassUid=null, membBypassShown=false;
+async function membBypassEnabled(){
+  const a=window.CascadeAuth;
+  if(!a || !a.client) return false;
+  try{
+    const {data, error}=await a.client.from("app_config").select("value").eq("key","membership_bypass").maybeSingle();
+    return !error && !!data && data.value===true;
+  }catch(e){ return false; }
+}
+window.membBypassTap=()=>{
+  const a=window.CascadeAuth;
+  membBypassUid=(a && a.user && a.user.id) || "anon";
+  membGated=false; membBypassShown=false;
+  closeMembership();
+};
 async function membGateCheck(){
   if(onbMembershipInFlight || flowOn || (typeof oafIsOpen==="function" && oafIsOpen())) return;
   await membLoadEntitlement();
   if(membEnt.state!=="none") { if(membGated){ closeMembership(); membGated=false; } return; }
+  const a=window.CascadeAuth;
+  if(membBypassUid && a && a.user && a.user.id===membBypassUid) return;
+  const bypass=await membBypassEnabled();
   membGated=true;
+  membBypassShown=false;
   openMembership(null, null, null);
+  if(bypass && $("membBody")){
+    membBypassShown=true;
+    const b=document.createElement("button");
+    b.type="button"; b.className="linkbtn"; b.id="membBypassBtn";
+    b.textContent="Continue without membership (testing)";
+    b.onclick=()=>window.membBypassTap();
+    $("membBody").appendChild(b);
+  }
   const head=$("membHead"); if(head) head.textContent="Cascade Membership";
   if(!membIsNativeApp()){
     const btn=document.querySelector(".membcta"); if(btn) btn.remove();

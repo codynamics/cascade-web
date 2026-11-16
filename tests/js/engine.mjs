@@ -47,14 +47,17 @@ function makeContext(localStorageStore){
   // test implicitly ran under) rather than falling through to the permissive node() stub below — the prefs
   // poll's own gate reads it directly, so a test needs to flip it to "hidden" and back for real.
   let docVisibilityState = "visible";
+  let docGetElementById = null;
   const doc = new Proxy({}, {
     get(t, k){
       if(k === "querySelectorAll" || k === "getElementsByClassName" || k === "getElementsByTagName") return () => [];
       if(k === "visibilityState") return docVisibilityState;
+      if(k === "getElementById" && docGetElementById) return docGetElementById;   // CAS-1458: a test may override
       return node();
     },
     set(t, k, v){
       if(k === "visibilityState"){ docVisibilityState = v; return true; }
+      if(k === "getElementById"){ docGetElementById = v; return true; }
       return true;
     },
   });
@@ -132,8 +135,8 @@ if(typeof window.CascadeAuth === "undefined"){
   window.CascadeAuth = { enabled:false, client:null, user:null, session:null, status:"guest" };
 }
 ;globalThis.__ENGINE__ = {
-  membClassifyPurchase, membBuy, membRestore, membRowActive, membLoadEntitlement, membEnsureMember, membPriceLine, membFineText, membCtaLabel,
-  get membEnt(){ return membEnt; }, get membLastMessage(){ return membLastMessage; },
+  membClassifyPurchase, membBuy, membRestore, membRowActive, membLoadEntitlement, membGateCheck, membEnsureMember, membPriceLine, membFineText, membCtaLabel,
+  get membEnt(){ return membEnt; }, get membGated(){ return membGated; }, get membBypassShown(){ return membBypassShown; }, get membLastMessage(){ return membLastMessage; },
   MOVIES, CASCADE, STATUS_LABEL, SHOWABLE_N,
   // CAS-1327: TRACK_MIN is the agent score track's own floor — exported so scripts/scoreable_shim.mjs
   // can hand poc_pipeline.py the catalogue's publication floor straight from the shipped engine instead
