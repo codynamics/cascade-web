@@ -4055,6 +4055,13 @@
   .tutdemo .qone .qpub{animation:tutbob 4s ease-in-out infinite;transition:none}
   @keyframes tutbob{0%,12%{top:8px;border-color:rgba(255,255,255,.3)}25%,45%{top:0;border-color:#5eead4}
     58%,62%{top:8px;border-color:rgba(255,255,255,.3)}75%,95%{top:16px;border-color:#f0a060}100%{top:8px;border-color:rgba(255,255,255,.3)}}
+  /* Lee, 16 Nov: the number changes as the badge moves — 79 at rest, 86 raised, 71 lowered. */
+  .tutdemo .tutnum{position:relative;display:inline-block;width:2.1ch;height:1.15em}
+  .tutdemo .tutnum i{position:absolute;inset:0;font-style:normal;text-align:center;opacity:0}
+  .tutdemo .tutnum .n0{animation:tutn0 4s infinite}
+  .tutdemo .tutnum .n1{animation:tutlu 4s infinite}
+  .tutdemo .tutnum .n2{animation:tutld 4s infinite}
+  @keyframes tutn0{0%,15%{opacity:1}22%,55%{opacity:0}60%,65%{opacity:1}72%,97%{opacity:0}100%{opacity:1}}
   .tutdemo .tutlbl{position:relative;width:76px;height:30px;font:700 11.5px/1.25 var(--font-body);text-align:center}
   .tutdemo .tutlbl span{position:absolute;inset:0;opacity:0}
   .tutdemo .tutlbl .u{color:#5eead4;animation:tutlu 4s infinite}
@@ -4078,8 +4085,6 @@
   @media (prefers-reduced-motion: reduce){ .tuthole,.tutring,.tuttap,.tutcard,.tutdemo *{animation:none!important;transition:none!important} }
   /* First run: favourite actor-or-director field (Lee, 14 Nov). */
   .oafpfield{display:block;margin:0 0 16px}
-  .oafpcount{display:block;min-height:18px;margin-top:6px;font-size:12.5px;color:#5eead4}
-  .oafpcount.none{color:#f0a060}
   /* Tutorials screen (Menu → Tutorials). */
   .tutlist .tutrow{display:flex;align-items:center;gap:12px;width:100%;padding:14px;background:transparent;border:none;
     border-bottom:1px solid var(--line);color:var(--ink);text-align:left;cursor:pointer;font:inherit}
@@ -22192,7 +22197,10 @@ function onbRevealGridHTML(c){
 // done. Nothing here runs unless the wizard is actually open (oafOpen), so an account that never runs setup
 // is never touched (AC5). The actual account change is ONE atomic commit (oneAgentCommit below, fired by the
 // done screen's "Start watching") — every screen before that only ever edits the in-memory draft (oafState).
-const ONE_AGENT_SETUP_STYLES = Object.keys(TASTE_SHORT);   // the exact 19, in TASTE_SHORT's own order
+// Lee, 16 Nov: TV Movie is left out of every setup genre screen (Me, Partner, Family) — so it's never given
+// an entry and stays off for a new agent. The agent screen still lists it, where it can be switched on.
+const ONE_AGENT_SETUP_HIDDEN = new Set(["TV Movie"]);
+const ONE_AGENT_SETUP_STYLES = Object.keys(TASTE_SHORT).filter(s=>!ONE_AGENT_SETUP_HIDDEN.has(s));   // 18, in TASTE_SHORT's order
 
 let oafState = null;   // see oafOpen below for the full shape — null when closed
 let oafStep = "welcome";
@@ -22476,7 +22484,7 @@ function oafFavCellHTML(style, picks){
 function oafFavouritesHTML(){
   const n = ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]==="fav").length;
   return `<h2 class="osh">Your favourite genres</h2>
-    <p class="ossub">Every genre starts on ✓: your agent shows only the best of it. Tap ♥ for your absolute favourites (two or three is ideal) to get plenty of choice and alerts. Tap Off for genres you never watch.</p>
+    <p class="ossub">If you don't like it, switch it off. If you love it, make it a favourite.</p>
     ${oafFavLegendHTML()}
     <div class="favgrid" id="oafFavGrid">${oafFavGridCellsHTML(oafState.favs)}</div>
     <p class="ossub" style="margin-top:10px">${n} favourite${n===1?"":"s"}${n>3?" · fewer gives sharper lists":""}</p>`;
@@ -22514,28 +22522,19 @@ function oafTopSvcHTML(){
         role="radio" aria-checked="${oafState.topSvc===k}" data-val="${escA(k)}">${esc(svcName(k))}</button>`).join("")}</div></div>`;
 }
 // Lee, 14 Nov (pm): one box — a favourite actor or director — which becomes a mood of its own. Optional; it
-// says how many films in Cascade match as you type, so a misspelling shows up before it becomes an empty mood.
+// (Lee, 16 Nov: no film count under it.)
 function oafPeopleHTML(){
   return `<h2 class="osh">A favourite actor or director?</h2>
     <p class="ossub">We'll make them a mood, so you never miss their films. Or skip this.</p>
     <label class="oafpfield"><input type="text" class="osfield" id="oafP_person" placeholder="e.g. Cate Blanchett" maxlength="40"
       autocomplete="off" value="${escA(oafState.person||"")}" aria-label="Favourite actor or director">
-    <span class="oafpcount" id="oafPC_person" aria-live="polite"></span></label>`;
-}
-function oafPeopleCount(q){
-  q=(q||"").trim(); if(q.length<3) return null;
-  return (typeof MOVIES!=="undefined" ? MOVIES : []).filter(m=>{
-    const n=normSearchText(q);
-    return (m.director && normSearchText(m.director).includes(n)) || (m.cast||[]).some(c=>normSearchText(c).includes(n));
-  }).length;
+</label>`;
 }
 function oafWirePeople(){
   ["person"].forEach(key=>{
-    const input=$("oafP_"+key), out=$("oafPC_"+key); if(!input) return;
+    // Lee, 16 Nov: no film count under the box.
+    const input=$("oafP_"+key); if(!input) return;
     const sync=()=>{
-      const n=oafPeopleCount(input.value);
-      out.textContent = n==null ? "" : n ? `${n} film${n===1?"":"s"} in Cascade` : "No films in Cascade yet — check the spelling";
-      out.classList.toggle("none", n===0);
       $("oafCta").textContent = oafPerson() ? "Continue" : "Skip";
     };
     input.oninput=()=>{ oafState[key]=input.value; sync(); };
@@ -24530,7 +24529,8 @@ function membSetStateAVisible(visible){
   const body=$("membBody"); if(!body) return;
   const d = visible ? "" : "none";
   // Lee, 14 Nov: the privacy consent line shows once, with the email it applies to, not again on the code step.
-  [$("membPill"), body.querySelector(".membhaul"), body.querySelector(".membenefits"),
+  // Lee, 16 Nov: the First month free box is the email step's only; the code step just asks for the code.
+  [$("membPill"), $("membOffer"), body.querySelector(".membhaul"), body.querySelector(".membenefits"),
    body.querySelector(".memfine"), $("membEmailField"), $("membPosterGrid"),
    // The privacy line specifically — the first .pnote is #membCodeMsg, which holds Change email (CAS-1445).
    body.querySelector('.pnote button[onclick^="openPrivacy"]')?.closest(".pnote")]
@@ -24812,7 +24812,7 @@ async function membLoadProduct(){
   try{ const r=await pl.getProduct({productIdentifier:MEMB_PRODUCT_ID, productType:"subs"}); membProduct=r && r.product || null; }
   catch(e){ console.warn("Cascade: product lookup failed", e); }
   const fine=$("membFine"); if(fine) fine.textContent=membFineText();
-  const offer=$("membOffer"); if(offer) offer.outerHTML=membOfferHTML();
+  const offer=$("membOffer"); if(offer){ offer.outerHTML=membOfferHTML(); if(membInCodeState) $("membOffer").style.display="none"; }
   const btn=document.querySelector(".membcta"); if(btn && !btn.disabled) btn.textContent=membCtaLabel();
   return membProduct;
 }
@@ -25059,14 +25059,23 @@ const TOURS = {
     {html:TUT_P("<b>Watch</b>: every film that Cascade has found for you."),
       sel:["#moviesBtn","#movingBtn","#findBtn","#agentsBtn"], narrow:["#agentsBtn","#findBtn","#movingBtn"],
       before(){ showAgentsHome(); }},
-    {html:TUT_P("Your Watch area is organised into <b>moods</b>.", "Moods are filtered collections of movies.",
-      "<b>All Latest</b> is a special mood designed to give you a forward view of all upcoming and cinema releases.",
-      `To change a mood, tap its <span class="tutico">${MOOD_EDIT_SVG}</span> filter icon.`),
-      before(){ setWatchMood("releases"); }, sel:[".moodrow"], trail:TUT_W},
+    // Lee, 16 Nov: the moods run is split so each step points at what it talks about — the row, All Latest,
+    // the moods made from the setup answers, then how to edit and add moods.
+    {html:TUT_P("Your Watch area is organised into <b>moods</b>.", "Moods are filtered collections of movies."),
+      before(){ setWatchMood("releases"); tutMoodRowTo(null); }, sel:[".moodrow"], trail:TUT_W},
+    {html:TUT_P("<b>All Latest</b> is a special mood designed to give you a forward view of all upcoming and cinema releases."),
+      before(){ tutMoodRowTo(null); }, sel:[`.moodrow .moodchip[data-mood="releases"]`], trail:TUT_W},
+    {html:TUT_P("Some moods have been created from the questions you answered."),
+      before(){ tutMoodRowTo(`.moodrow .moodchip[data-mood="me"]`); },
+      sel:[`.moodrow .moodchip[data-mood="me"]`,`.moodrow .moodchip[data-mood="date"]`,`.moodrow .moodchip[data-mood="family"]`], trail:TUT_W},
     // Lee, 14 Nov: point at the moods setup made from the first-run answers. Skipped (CAS-976 rule) when the
     // account has neither.
     {get html(){ return tutMadeMoodsHTML(); }, sel:[`.moodrow .moodchip[data-mood="topsvc"]`,`.moodrow .moodchip[data-mood="fav-person"]`],
       before(){ tutRevealMadeMoods(); }, trail:TUT_W},
+    {get html(){ return TUT_P(`You can edit any mood: tap its <span class="tutico">${MOOD_EDIT_SVG}</span> filter icon.` +
+        (TOURS.moods ? " There's a detailed tutorial on moods in the main menu." : ""),
+      "You can also create your own moods with <b>+ Mood</b>."); },
+      before(){ tutMoodRowTo("#moodAddBtn"); }, sel:["#moodAddBtn"], trail:TUT_W},
     {html:TUT_P("Each mood lets you see its movies by viewing status."), before(){ setWatchMood("releases"); }, sel:[".stgroups"], trail:TUT_WM},
     {html:TUT_P("This is a film card."),
       before(){ tutExpandCard(false); setWatchMood("releases"); v2CaptureCard(); }, wholeCard:true, trail:TUT_WMS},
@@ -25116,9 +25125,11 @@ const TOURS = {
 // (finished=false — no "That's Watch", no step count). The moods line appears once a "moods" tutorial
 // exists (Lee, 14 Nov), so it is never pointing at something that isn't there.
 function tutWatchFinaleHTML(finished){
+  // Lee, 16 Nov: one list — "There are tutorials for Moods, Alerts, Database and your Agent too". Moods is
+  // named only once that tutorial exists.
+  const names=[...(TOURS.moods ? ["<b>Moods</b>"] : []), "<b>Alerts</b>", "<b>Database</b>", "your <b>Agent</b>"];
   return TUT_P((finished ? "That's Watch. " : "") + "You can replay this tutorial any time.",
-    ...(TOURS.moods ? ["There's also a tutorial on the powerful filters available in <b>moods</b>."] : []),
-    "There are tutorials for <b>Alerts</b>, <b>Database</b> and your <b>Agent</b> too, under <b>Tutorials</b> in the menu.");
+    `There are tutorials for ${names.slice(0,-1).join(", ")} and ${names[names.length-1]} too, under <b>Tutorials</b> in the menu.`);
 }
 function tutMadeMoodsHTML(){
   const get=id=>watchMoods.find(m=>m.id===id), b=m=>`<b>${esc(m.name)}</b>`;
@@ -25128,6 +25139,15 @@ function tutMadeMoodsHTML(){
   if(per) bits.push(`${b(per)}, for your favourite actor or director`);
   return TUT_P(`We've also set up ${bits.length>1?"these moods":"this mood"} for you: ${bits.join("; and ")}.`,
     `You can change or remove ${bits.length>1?"them":"it"} any time.`);
+}
+// Scrolls the mood row (horizontally only) so `sel` is in view, or back to its start when sel is null.
+function tutMoodRowTo(sel){
+  const row=document.querySelector(".moodrow"); if(!row) return;
+  const scroller = row.scrollWidth>row.clientWidth ? row : (row.querySelector(".moodscroll")||row);
+  if(!sel){ scroller.scrollLeft=0; return; }
+  const el=row.querySelector(sel)||document.querySelector(sel); if(!el) return;
+  const rr=scroller.getBoundingClientRect(), er=el.getBoundingClientRect();
+  scroller.scrollLeft += (er.left+er.width/2) - (rr.left+rr.width/2);
 }
 // The made moods sit at the end of the mood row — scroll it so they're on screen for the step.
 function tutRevealMadeMoods(){
@@ -25225,7 +25245,7 @@ function tutorialAdvance(dir){
   return false;
 }
 function tutDemoHTML(kind){
-  if(kind==="score") return `<span class="qone"><span class="qghost"></span><span class="qpub"><b>79</b><small>SCORE</small></span></span>
+  if(kind==="score") return `<span class="qone"><span class="qghost"></span><span class="qpub"><b class="tutnum"><i class="n0">79</i><i class="n1">86</i><i class="n2">71</i></b><small>SCORE</small></span></span>
     <span class="tutlbl"><span class="u">Raised<br>for you</span><span class="d">Lowered<br>for you</span></span>`;
   if(kind==="star") return `<span class="tutstar">★</span>`;
   return "";
@@ -25324,7 +25344,9 @@ function tutorialReposition(){
   const scrim=$("tutScrim");
   if(!scrim || !scrim.classList.contains("open")) return;
   const step=tutSteps[tutIdx]||{};
-  const hole=$("tutHole"), card=$("tutCard"), arrow=$("tutArrow"), pad=6, vw=innerWidth, vh=innerHeight;
+  const hole=$("tutHole"), card=$("tutCard"), arrow=$("tutArrow"), vw=innerWidth, vh=innerHeight;
+  // Lee, 16 Nov: several targets side by side (the four nav chips) get a hairline pad, so their rings don't overlap.
+  const pad = tutCurrent && tutCurrent.els && tutCurrent.els.length>1 ? 1 : 6;
   const z=tutZoomFactor();
   const allEls = tutCurrent && tutCurrent.els ? tutCurrent.els : [];
   const els = allEls.filter(el=>!tutShut.has(el));
