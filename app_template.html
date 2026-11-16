@@ -4055,6 +4055,13 @@
   .tutdemo .qone .qpub{animation:tutbob 4s ease-in-out infinite;transition:none}
   @keyframes tutbob{0%,12%{top:8px;border-color:rgba(255,255,255,.3)}25%,45%{top:0;border-color:#5eead4}
     58%,62%{top:8px;border-color:rgba(255,255,255,.3)}75%,95%{top:16px;border-color:#f0a060}100%{top:8px;border-color:rgba(255,255,255,.3)}}
+  /* Lee, 16 Nov: the number changes as the badge moves — 79 at rest, 86 raised, 71 lowered. */
+  .tutdemo .tutnum{position:relative;display:inline-block;width:2.1ch;height:1.15em}
+  .tutdemo .tutnum i{position:absolute;inset:0;font-style:normal;text-align:center;opacity:0}
+  .tutdemo .tutnum .n0{animation:tutn0 4s infinite}
+  .tutdemo .tutnum .n1{animation:tutlu 4s infinite}
+  .tutdemo .tutnum .n2{animation:tutld 4s infinite}
+  @keyframes tutn0{0%,15%{opacity:1}22%,55%{opacity:0}60%,65%{opacity:1}72%,97%{opacity:0}100%{opacity:1}}
   .tutdemo .tutlbl{position:relative;width:76px;height:30px;font:700 11.5px/1.25 var(--font-body);text-align:center}
   .tutdemo .tutlbl span{position:absolute;inset:0;opacity:0}
   .tutdemo .tutlbl .u{color:#5eead4;animation:tutlu 4s infinite}
@@ -25052,14 +25059,23 @@ const TOURS = {
     {html:TUT_P("<b>Watch</b>: every film that Cascade has found for you."),
       sel:["#moviesBtn","#movingBtn","#findBtn","#agentsBtn"], narrow:["#agentsBtn","#findBtn","#movingBtn"],
       before(){ showAgentsHome(); }},
-    {html:TUT_P("Your Watch area is organised into <b>moods</b>.", "Moods are filtered collections of movies.",
-      "<b>All Latest</b> is a special mood designed to give you a forward view of all upcoming and cinema releases.",
-      `To change a mood, tap its <span class="tutico">${MOOD_EDIT_SVG}</span> filter icon.`),
-      before(){ setWatchMood("releases"); }, sel:[".moodrow"], trail:TUT_W},
+    // Lee, 16 Nov: the moods run is split so each step points at what it talks about — the row, All Latest,
+    // the moods made from the setup answers, then how to edit and add moods.
+    {html:TUT_P("Your Watch area is organised into <b>moods</b>.", "Moods are filtered collections of movies."),
+      before(){ setWatchMood("releases"); tutMoodRowTo(null); }, sel:[".moodrow"], trail:TUT_W},
+    {html:TUT_P("<b>All Latest</b> is a special mood designed to give you a forward view of all upcoming and cinema releases."),
+      before(){ tutMoodRowTo(null); }, sel:[`.moodrow .moodchip[data-mood="releases"]`], trail:TUT_W},
+    {html:TUT_P("Some moods have been created from the questions you answered."),
+      before(){ tutMoodRowTo(`.moodrow .moodchip[data-mood="me"]`); },
+      sel:[`.moodrow .moodchip[data-mood="me"]`,`.moodrow .moodchip[data-mood="date"]`,`.moodrow .moodchip[data-mood="family"]`], trail:TUT_W},
     // Lee, 14 Nov: point at the moods setup made from the first-run answers. Skipped (CAS-976 rule) when the
     // account has neither.
     {get html(){ return tutMadeMoodsHTML(); }, sel:[`.moodrow .moodchip[data-mood="topsvc"]`,`.moodrow .moodchip[data-mood="fav-person"]`],
       before(){ tutRevealMadeMoods(); }, trail:TUT_W},
+    {get html(){ return TUT_P(`You can edit any mood: tap its <span class="tutico">${MOOD_EDIT_SVG}</span> filter icon.` +
+        (TOURS.moods ? " There's a detailed tutorial on moods in the main menu." : ""),
+      "You can also create your own moods with <b>+ Mood</b>."); },
+      before(){ tutMoodRowTo("#moodAddBtn"); }, sel:["#moodAddBtn"], trail:TUT_W},
     {html:TUT_P("Each mood lets you see its movies by viewing status."), before(){ setWatchMood("releases"); }, sel:[".stgroups"], trail:TUT_WM},
     {html:TUT_P("This is a film card."),
       before(){ tutExpandCard(false); setWatchMood("releases"); v2CaptureCard(); }, wholeCard:true, trail:TUT_WMS},
@@ -25109,9 +25125,11 @@ const TOURS = {
 // (finished=false — no "That's Watch", no step count). The moods line appears once a "moods" tutorial
 // exists (Lee, 14 Nov), so it is never pointing at something that isn't there.
 function tutWatchFinaleHTML(finished){
+  // Lee, 16 Nov: one list — "There are tutorials for Moods, Alerts, Database and your Agent too". Moods is
+  // named only once that tutorial exists.
+  const names=[...(TOURS.moods ? ["<b>Moods</b>"] : []), "<b>Alerts</b>", "<b>Database</b>", "your <b>Agent</b>"];
   return TUT_P((finished ? "That's Watch. " : "") + "You can replay this tutorial any time.",
-    ...(TOURS.moods ? ["There's also a tutorial on the powerful filters available in <b>moods</b>."] : []),
-    "There are tutorials for <b>Alerts</b>, <b>Database</b> and your <b>Agent</b> too, under <b>Tutorials</b> in the menu.");
+    `There are tutorials for ${names.slice(0,-1).join(", ")} and ${names[names.length-1]} too, under <b>Tutorials</b> in the menu.`);
 }
 function tutMadeMoodsHTML(){
   const get=id=>watchMoods.find(m=>m.id===id), b=m=>`<b>${esc(m.name)}</b>`;
@@ -25121,6 +25139,15 @@ function tutMadeMoodsHTML(){
   if(per) bits.push(`${b(per)}, for your favourite actor or director`);
   return TUT_P(`We've also set up ${bits.length>1?"these moods":"this mood"} for you: ${bits.join("; and ")}.`,
     `You can change or remove ${bits.length>1?"them":"it"} any time.`);
+}
+// Scrolls the mood row (horizontally only) so `sel` is in view, or back to its start when sel is null.
+function tutMoodRowTo(sel){
+  const row=document.querySelector(".moodrow"); if(!row) return;
+  const scroller = row.scrollWidth>row.clientWidth ? row : (row.querySelector(".moodscroll")||row);
+  if(!sel){ scroller.scrollLeft=0; return; }
+  const el=row.querySelector(sel)||document.querySelector(sel); if(!el) return;
+  const rr=scroller.getBoundingClientRect(), er=el.getBoundingClientRect();
+  scroller.scrollLeft += (er.left+er.width/2) - (rr.left+rr.width/2);
 }
 // The made moods sit at the end of the mood row — scroll it so they're on screen for the step.
 function tutRevealMadeMoods(){
@@ -25218,7 +25245,7 @@ function tutorialAdvance(dir){
   return false;
 }
 function tutDemoHTML(kind){
-  if(kind==="score") return `<span class="qone"><span class="qghost"></span><span class="qpub"><b>79</b><small>SCORE</small></span></span>
+  if(kind==="score") return `<span class="qone"><span class="qghost"></span><span class="qpub"><b class="tutnum"><i class="n0">79</i><i class="n1">86</i><i class="n2">71</i></b><small>SCORE</small></span></span>
     <span class="tutlbl"><span class="u">Raised<br>for you</span><span class="d">Lowered<br>for you</span></span>`;
   if(kind==="star") return `<span class="tutstar">★</span>`;
   return "";
