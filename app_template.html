@@ -2201,8 +2201,8 @@
     border-radius:16px;text-align:center;border:1px solid rgba(139,124,255,.55);
     background:linear-gradient(135deg,rgba(124,92,255,.22),rgba(34,211,238,.14));
     box-shadow:0 0 22px rgba(124,92,255,.25)}
-  .memboffer .mofree{font-family:Poppins,system-ui,sans-serif;font-weight:700;font-size:24px;line-height:1.2;color:#fff}
-  .memboffer .mothen{font-size:13.5px;font-weight:600;color:#cfd6e6}
+  .memboffer .moprice{font-family:Poppins,system-ui,sans-serif;font-weight:700;font-size:24px;line-height:1.2;color:#fff}
+  .memboffer .moterms{font-size:13px;font-weight:500;line-height:1.45;color:#cfd6e6;max-width:300px}
   .memfine b{color:var(--accenttext)}
   .membenefits{display:flex;flex-direction:column;gap:15px;margin:0 0 20px}
   .mbrow{display:flex;align-items:center;gap:13px}
@@ -24364,7 +24364,8 @@ function openMembership(agentKey, nameOverride, cascade){
                 style="vertical-align:baseline">Resend code</button></p>
     </div>
     <p class="pnote">By continuing you agree to our
-      <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button>.</p>` : ""}
+      <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button> and the
+      <a class="linkbtn" href="${MEMB_TERMS_URL}" target="_blank" rel="noopener">Terms of Use</a>.</p>` : ""}
     <p class="fielderr" id="membPurchaseMsg" hidden></p>
     <button class="membcta" type="button" onclick="membStart()">${esc(membCtaLabel())}</button>
     ${membIsNativeApp() ? `<button type="button" class="linkbtn" id="membRestoreBtn" onclick="membRestoreTap()">Restore Purchases</button>` : ""}
@@ -24448,7 +24449,8 @@ function openOnbMembership(){
                 style="vertical-align:baseline">Resend code</button></p>
     </div>
     <p class="pnote">By continuing you agree to our
-      <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button>.</p>` : ""}
+      <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button> and the
+      <a class="linkbtn" href="${MEMB_TERMS_URL}" target="_blank" rel="noopener">Terms of Use</a>.</p>` : ""}
     <p class="fielderr" id="membPurchaseMsg" hidden></p>
     <button class="membcta" type="button" onclick="membStart()">${esc(membCtaLabel())}</button>
     ${membIsNativeApp() ? `<button type="button" class="linkbtn" id="membRestoreBtn" onclick="membRestoreTap()">Restore Purchases</button>` : ""}
@@ -24820,7 +24822,17 @@ function membAccountPlanText(){
 }
 // Lee, 13 Nov: the sign-up screens show the offer as a presentational box again (it was a fine-print line
 // before CAS-971). Figures come from StoreKit in the app; the web (no StoreKit) shows the configured offer.
-const MEMB_OFFER_FALLBACK = {free:"First month free", then:"then A$3.99/month · cancel any time"};
+// Lee, 16 Nov (App Store 3.1.2(c)): the billed amount is the most prominent pricing element; the free period,
+// the renewal and how to cancel are said plainly underneath, never larger than the price.
+// Apple requires a Terms of Use link in the purchase flow (Schedule 2, 3.8(b)); Cascade uses Apple's standard EULA.
+const MEMB_TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
+const MEMB_CANCEL_LINE = "Cancel any time in Settings › Subscriptions.";
+function membOfferText(price, freeLabel){
+  return freeLabel
+    ? `Your first ${freeLabel} is free. After that it renews at ${price} a month until you cancel. ${MEMB_CANCEL_LINE}`
+    : `Renews at ${price} a month until you cancel. ${MEMB_CANCEL_LINE}`;
+}
+const MEMB_OFFER_FALLBACK = {price:"A$3.99 a month", terms:membOfferText("A$3.99", "month")};
 function membOfferParts(){
   const p=membProduct;
   if(p && p.priceString){
@@ -24828,15 +24840,15 @@ function membOfferParts(){
     if(intro && Number(intro.price)===0 && intro.subscriptionPeriod){
       const n=(intro.subscriptionPeriod.numberOfUnits||intro.numberOfPeriods||1);
       const unit=({0:"day",1:"week",2:"month",3:"year"})[intro.subscriptionPeriod.unit]||"month";
-      return {free: n===1 ? `First ${unit} free` : `First ${n} ${unit}s free`, then:`then ${p.priceString}/month · cancel any time`};
+      return {price:`${p.priceString} a month`, terms:membOfferText(p.priceString, n===1 ? unit : `${n} ${unit}s`)};
     }
-    return {free:`${p.priceString}/month`, then:"cancel any time"};
+    return {price:`${p.priceString} a month`, terms:membOfferText(p.priceString, null)};
   }
   return MEMB_OFFER_FALLBACK;
 }
 function membOfferHTML(){
   const o=membOfferParts();
-  return `<div class="memboffer" id="membOffer"><span class="mofree">${esc(o.free)}</span><span class="mothen">${esc(o.then)}</span></div>`;
+  return `<div class="memboffer" id="membOffer"><span class="moprice">${esc(o.price)}</span><span class="moterms">${esc(o.terms)}</span></div>`;
 }
 function membHasFreeTrial(p){ return !!(p && p.introductoryPrice && Number(p.introductoryPrice.price)===0); }
 function membCtaLabel(){
@@ -24846,8 +24858,8 @@ function membCtaLabel(){
 function membFineText(){
   // Lee, 14 Nov: no web line — the offer box says it all, and membership is an iPhone-app thing anyway.
   if(!membIsNativeApp()) return "";
-  const line=membPriceLine(membProduct);
-  return line || "Billed monthly through your Apple ID · cancel any time.";
+  // Lee, 16 Nov: the offer box now carries the price, free period, renewal and cancelling.
+  return "Billed monthly through your Apple ID.";
 }
 async function membLoadProduct(){
   const pl=membPlugin(); if(!membIsNativeApp() || !pl || membProduct) return membProduct;

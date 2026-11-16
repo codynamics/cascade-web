@@ -11,7 +11,7 @@ async function expectPriceCopy(page){
   // CAS-971: the membership is bought only in the iOS app, so the web screen carries no price and no
   // purchase wording; the fine print points at the iPhone app instead.
   expect(text).not.toContain("Membership is started in the Cascade iPhone app.");   // Lee, 14 Nov: the web line is gone; the offer box carries the terms
-  expect(text).toContain("First month free");
+  expect(text).toContain("Your first month is free.");
   expect(text).not.toContain("$4.99");
   expect(text.toLowerCase()).not.toContain("prototype");
 }
