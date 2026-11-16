@@ -112,7 +112,7 @@ test("CAS-1340 AC1: an override >=5 from learned shows '±0' underlined and 'you
 
 test("CAS-1340 AC1b: an override within 5 of learned shows 'let the agent decide' instead", () => {
   const r = { key:"Drama|Comedy", other:"Comedy", learned:10, override:8, overridden:true, never:false,
-    points:8, n:3, filmCount:3, adjusted:false, seen:0 };
+    points:8, n:3, filmCount:3 };
   const leftHTML = E.oaOverrideLeftHTML(r);
   assert.ok(leftHTML.includes("Set by you") && leftHTML.includes("let the agent decide"), leftHTML);
   assert.ok(!leftHTML.includes("your verdicts say"), "the close-override branch skips the learned comparison clause");
@@ -140,33 +140,39 @@ test("CAS-1351 AC2b: releasing above 0 writes a numeric combo[k] = bar - oneBarF
   });
 });
 
-// ---- AC3: a verdict moving a combo by >=2 flags it adjusted; Mark as seen clears it --------------------------
+// ---- AC3 (CAS-1457): the change log replaces ADJUSTED tags / Mark as seen ------------------------------------
 
-test("CAS-1340 AC3: |learned - seenAdj| >= 2 with no override flags the row adjusted, tags, badges and lights the nav dot; Mark as seen clears all three", () => {
-  const evidence = [scoredFilm(["Science Fiction","Comedy"], 50), scoredFilm(["Science Fiction","Comedy"], 50)];
+test("CAS-1457: a timestamped verdict that moves a pair >=1 point is a change; the log, gold-row and badge questions derive from it", () => {
+  const evidence = [scoredFilm(["Science Fiction","Comedy"], 50, "Dud One"), scoredFilm(["Science Fiction","Comedy"], 50, "Dud Two")];
   withTasteFixture(evidence.map(m => [m, "disliked"]), () => {
-    const key = "Science Fiction|Comedy";
-    const learned = E.oneComboAdj(key);
-    withCascades([oneAgent({ seenAdj: { [key]: learned + 5 } })], () => {   // stale "was" value, |diff|=5 >= 2, direction down
+    evidence.forEach((m, i) => E.verdictAt.set(m.tmdb_id, 1000 + i));
+    withCascades([oneAgent()], () => {
       const c = E.cascades[0];
-      const rows = E.oaComboStats(c, "Science Fiction");
-      const row = rows.find(r => r.key === key);
-      assert.equal(row.adjusted, true);
-      assert.equal(E.oaComboDirection(row), "down");
-      const rowHTML = E.oaComboRowHTML(c, "Science Fiction", row);
-      assert.ok(rowHTML.includes("▼ ADJUSTED"), rowHTML);
-      assert.ok(rowHTML.includes(`${E.oaFmtPoints(learned + 5)} → ${E.oaFmtPoints(learned)}`), rowHTML);
-      const badge = E.oaAdjustedBadgeHTML(c, "Science Fiction");
-      assert.ok(badge.includes("▼1"), badge);
-      assert.equal(E.oaAnyAdjusted(c), true, "the nav dot's own condition");
-
-      E.oaMarkSeenAdjusted("Science Fiction");
-      assert.equal(c.seenAdj[key], learned, "seenAdj[k] = comboAdj(k)");
-      assert.equal(typeof c.seenAdjAt[key], "number", "a companion write-timestamp is recorded");
-      const after = E.oaComboStats(c, "Science Fiction").find(r => r.key === key);
-      assert.equal(after.adjusted, false, "marking seen clears the adjusted flag (tag/was-line/badge/dot all derive from it)");
-      assert.equal(E.oaAnyAdjusted(c), false);
+      const H = E.oaChangeHistory();
+      const ch = H["Science Fiction"];
+      assert.ok(ch && ch.length >= 1, "changes recorded for the film's main genre");
+      assert.equal(ch[0].title, "Dud Two", "newest first");
+      const mv = ch[0].moves.find(m => m.other === "Comedy");
+      assert.equal(mv.to, E.oneComboAdj("Science Fiction|Comedy"), "replay ends on oneComboAdj");
+      assert.equal(E.oaChangedGenres(c, 0).has("Science Fiction"), true);
+      assert.equal(E.oaChangedGenres(c, 5000).has("Science Fiction"), false, "nothing newer than the cut-off");
+      const html = E.oaChangeLogHTML(c, "Science Fiction");
+      assert.ok(html.includes('<details class="oalog"') && html.includes("RECENT CHANGES IN"), html);
+      assert.ok(html.includes("after Dud Two"), html);
+      const rowHTML = E.oaComboRowHTML(c, "Science Fiction", E.oaComboStats(c, "Science Fiction")[0]);
+      assert.ok(!rowHTML.includes("ADJUSTED") && !rowHTML.includes("Mark as seen"), "old tags are gone");
+      assert.equal(E.oaChangeLogHTML(c, "Western"), "", "no changes -> no box");
     });
+  });
+});
+
+test("CAS-1457: alerts explainer names the windows that are on", () => {
+  withCascades([oneAgent()], () => {
+    const c = E.cascades[0];
+    c.styles = { "Adventure": { bar:60, al:{cinema:true,rent:true,stream:true} } };
+    assert.ok(E.oaAlertNoteHTML(c, "Adventure").includes("reach cinemas, become available to rent or arrive on streaming"));
+    c.styles["Adventure"].al = {cinema:false,rent:false,stream:false};
+    assert.ok(E.oaAlertNoteHTML(c, "Adventure").includes("Alerts are off for"));
   });
 });
 
@@ -206,7 +212,6 @@ test("CAS-1340: a combo with no verdicts shows 'no verdicts yet' and an empty ba
     assert.ok(rows.length > 0, "the real catalogue still supplies candidate (style, other) combos");
     const row = rows[0];
     assert.equal(row.n, 0);
-    assert.equal(row.adjusted, false);
     const html = E.oaComboRowHTML(c, "Western", row);
     assert.ok(html.includes("no verdicts yet"), html);
     assert.ok(html.includes("oacrow-empty"), html);
@@ -215,13 +220,12 @@ test("CAS-1340: a combo with no verdicts shows 'no verdicts yet' and an empty ba
 
 // ---- Order: adjusted first, then |points| desc, then film count desc ----------------------------------------
 
-test("CAS-1340: oaComboSort puts adjusted rows first, then sorts by |points| desc, 'never' sorting as the smallest magnitude", () => {
-  const adjusted = { key:"a", adjusted:true, never:false, points:1, filmCount:1 };
-  const big = { key:"b", adjusted:false, never:false, points:-20, filmCount:5 };
-  const small = { key:"c", adjusted:false, never:false, points:3, filmCount:2 };
-  const never = { key:"d", adjusted:false, never:true, points:0, filmCount:9 };
-  const sorted = [small, never, big, adjusted].sort(E.oaComboSort);
-  assert.deepEqual(sorted.map(r=>r.key), ["a","b","c","d"]);
+test("CAS-1340: oaComboSort sorts by |points| desc, 'never' sorting as the smallest magnitude", () => {
+  const big = { key:"b", never:false, points:-20, filmCount:5 };
+  const small = { key:"c", never:false, points:3, filmCount:2 };
+  const never = { key:"d", never:true, points:0, filmCount:9 };
+  const sorted = [small, never, big].sort(E.oaComboSort);
+  assert.deepEqual(sorted.map(r=>r.key), ["b","c","d"]);
 });
 
 // ---- Geometry: every mark this section draws shares section 1's own value->position formula -----------------

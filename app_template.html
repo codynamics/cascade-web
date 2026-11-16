@@ -292,8 +292,12 @@
     min-width:16px;height:16px;border-radius:9px;display:grid;place-items:center;padding:0 4px;line-height:1}
   /* CAS-1340: the Agent nav chip's own gold dot — lit while any style has a combo adjusted since the
      account's v2 agent last had its Score adjustments section marked seen (updateAgentNavDot). */
-  .modechip.oa-adjusted::after{content:"";position:absolute;top:-2px;right:-2px;width:8px;height:8px;
-    border-radius:50%;background:var(--gold);box-shadow:0 0 0 2px var(--panel2,#0b1020)}
+  .oabadge{position:absolute;top:-7px;right:-6px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;
+    background:var(--gold);color:#161000;font-size:11px;font-weight:900;display:grid;place-items:center;line-height:1;
+    box-shadow:0 0 0 2px var(--panel2,#0b1020);animation:oabadgepulse 2s ease-out infinite}
+  @keyframes oabadgepulse{0%{box-shadow:0 0 0 2px var(--panel2,#0b1020),0 0 0 2px rgba(255,213,74,.6)}
+    100%{box-shadow:0 0 0 2px var(--panel2,#0b1020),0 0 0 10px rgba(255,213,74,0)}}
+  @media (prefers-reduced-motion:reduce){.oabadge{animation:none}}
   /* CAS-538: two label strings per chip, one shown at a time — .mclabel-short only appears below the
      460px breakpoint above, where "Find"/"Watch" fit but "Agents"/"Your Movies" don't. */
   .mclabel-short{display:none}
@@ -2197,8 +2201,8 @@
     border-radius:16px;text-align:center;border:1px solid rgba(139,124,255,.55);
     background:linear-gradient(135deg,rgba(124,92,255,.22),rgba(34,211,238,.14));
     box-shadow:0 0 22px rgba(124,92,255,.25)}
-  .memboffer .mofree{font-family:Poppins,system-ui,sans-serif;font-weight:700;font-size:24px;line-height:1.2;color:#fff}
-  .memboffer .mothen{font-size:13.5px;font-weight:600;color:#cfd6e6}
+  .memboffer .moprice{font-family:Poppins,system-ui,sans-serif;font-weight:700;font-size:24px;line-height:1.2;color:#fff}
+  .memboffer .moterms{font-size:13px;font-weight:500;line-height:1.45;color:#cfd6e6;max-width:300px}
   .memfine b{color:var(--accenttext)}
   .membenefits{display:flex;flex-direction:column;gap:15px;margin:0 0 20px}
   .mbrow{display:flex;align-items:center;gap:13px}
@@ -3378,6 +3382,10 @@
   .oacolhdr span:last-child{grid-column:2 / span 3;text-align:right}
   .oalist{display:flex;flex-direction:column}
   .oarow{border-bottom:1px solid var(--line)}
+  .oarow.oa-changed{background:rgba(255,213,74,.09);box-shadow:inset 3px 0 0 var(--gold)}
+  .oarow.oa-open{background:rgba(124,92,255,.08);border:1px solid rgba(124,92,255,.45);border-radius:12px;margin:10px 0;padding:0 6px}
+  .oarow.oa-open .oarowhead{border-bottom:1px solid rgba(124,92,255,.3)}
+  .oarow.oa-open .oastyname{font-size:17px}
   /* CAS-1367: the tick sits outside the row's own <button> (a checkbox can't legally nest inside one) in a
      thin flex wrapper, so the button keeps native keyboard/activation behaviour for the rest of the row. */
   .oarowwrap{display:flex;align-items:center}
@@ -3389,7 +3397,7 @@
     padding:0;margin-right:2px;border:0;background:none;font-size:15px;line-height:1;color:var(--faint);cursor:pointer}
   .oarowfav.on{color:#e0567a}
   .oarow.off .oarowhead{opacity:.55}
-  .oarowhead{display:grid;grid-template-columns:104px 1fr 52px 28px;align-items:center;gap:8px;
+  .oarowhead{display:grid;grid-template-columns:104px 1fr 64px 28px;align-items:center;gap:8px;
     padding:11px 4px;cursor:pointer;background:none;border:0;flex:1;min-width:0;text-align:left;font:inherit;color:inherit}
   .oarowhead:hover,.oarowhead:focus-visible{background:rgba(255,255,255,.03)}
   .oarowhead:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
@@ -3402,7 +3410,10 @@
   .oarowstrip{display:flex;gap:3px}
   .oarowval{font-size:12.5px;font-weight:800;text-align:right;color:var(--ink);white-space:nowrap}
   .oarowval i{display:block;font-style:normal;font-weight:600;font-size:10px;color:var(--faint);margin-top:1px}
-  .oachev{text-align:center;color:var(--faint);font-size:11px}
+  .oachev{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.07);display:grid;place-items:center;font-size:0}
+  .oachev::before{content:"";display:inline-block;width:6px;height:6px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:translateY(0) rotate(45deg);transition:transform .15s}
+  .oarow.oa-open .oachev{background:rgba(124,92,255,.35)}
+  .oarow.oa-open .oachev::before{transform:translateY(2px) rotate(-135deg)}
   /* The score strip — collapsed row (small, no decade labels) and the open style's full-width slider
      (.oastripfull: taller, with decade labels) share the same box/fill markup. */
   .oabox{position:relative;flex:1;height:16px;border-radius:3px;overflow:hidden;
@@ -3434,7 +3445,7 @@
   .oarange:focus-visible{outline:none}
   .oarange:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
   .oarange:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
-  .oaslideval{flex:0 0 52px;width:52px;text-align:right;font-size:13px;font-weight:800;color:var(--ink)}
+  .oaslideval{flex:0 0 64px;width:64px;text-align:right;font-size:13px;font-weight:800;color:var(--ink);white-space:nowrap}
   .oaslideval i{display:block;font-style:normal;font-size:10.5px;font-weight:600;color:var(--faint);margin-top:1px}
   .oaslidedesc{font-size:12px;color:var(--dim);line-height:1.5;margin:8px 0 0}
   /* Agent suggestion — a gold-bordered callout, same gold token the rest of the app marks a suggestion with.
@@ -3463,21 +3474,28 @@
      Teal/orange reuse the exact literals .qone.up/.qone.down already mark a positive/negative adjustment
      with (#5eead4/#f0a060) — there is no --teal custom property in this file, so this follows that existing
      precedent rather than inventing a new token for the same two colours. */
-  .oacintro{font-size:12.5px;color:var(--dim);line-height:1.5;margin:6px 0 10px}
-  .oacseen{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;
-    padding:10px 12px;border-radius:10px;border:1px solid var(--gold);background:rgba(245,214,117,.08);
-    font-size:12.5px;color:var(--ink)}
-  .oacseen b{color:var(--gold)}
-  .oacseenbtn{flex:0 0 auto;background:none;border:0;color:var(--gold);font-weight:800;font-size:12.5px;
-    cursor:pointer;white-space:nowrap;padding:0}
+  .oaintro{font-size:13.5px;line-height:1.5;color:var(--ink);opacity:.85;margin:10px 0 14px}
+  .oaintro b{color:var(--gold)}
+  .oaalertnote{font-size:12.5px;line-height:1.45;opacity:.8;margin:8px 0 4px}
+  .oalog{border:1px solid rgba(255,213,74,.2);background:rgba(255,213,74,.03);border-radius:10px;margin:0 0 14px;padding:0}
+  .oalog > summary{list-style:none;cursor:pointer;padding:9px 12px;display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--gold)}
+  .oalog > summary::-webkit-details-marker{display:none}
+  .oalog > summary::after{content:"";margin-left:auto;width:6px;height:6px;border-right:2px solid var(--gold);border-bottom:2px solid var(--gold);transform:rotate(45deg) translateY(-2px)}
+  .oalog[open] > summary::after{transform:rotate(-135deg)}
+  .oalogn{font-weight:700;opacity:.7;letter-spacing:0}
+  .oalogbody{padding:0 12px 10px}
+  .oalogch{padding:6px 0;border-top:1px solid rgba(255,255,255,.06);font-size:13px}
+  .oalogch .s{font-weight:700}
+  .oalogch.up .s,.oalogch.up .v{color:#2dd4bf}
+  .oalogch.down .s,.oalogch.down .v{color:#f0883a}
+  .oalogch .v{font-weight:800;margin-left:4px}
+  .oalogch .w{display:block;font-size:11.5px;color:var(--ink);opacity:.65;padding-left:14px}
+  .oalogmore{font-size:12px;color:var(--cyan,#22d3ee);margin-top:4px;background:none;border:0;padding:0;cursor:pointer}
   .oaclist{display:flex;flex-direction:column}
   .oacrow{padding:10px 0;border-bottom:1px solid var(--line)}
   .oacrow:last-child{border-bottom:0}
   .oacrow-empty .oacright{opacity:.45}
   .oactitle{font-size:14px;font-weight:800;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .oactag{font-size:10px;font-weight:800;letter-spacing:.3px;padding:2px 8px;border-radius:10px;text-transform:uppercase}
-  .oactag.up{background:rgba(94,234,212,.18);color:#5eead4}
-  .oactag.down{background:rgba(240,160,96,.18);color:#f0a060}
   .oacline2{display:flex;align-items:center;gap:8px;margin-top:3px}
   .oactitle .oacleft{flex:0 0 auto;margin-left:auto;white-space:nowrap}
   .oacleft{flex:0 0 104px;font-size:12px;line-height:1.4;background:none;border:0;text-align:left;padding:0;
@@ -3506,12 +3524,9 @@
   .oacrange:focus-visible{outline:none}
   .oacrange:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
   .oacrange:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
-  .oacval{flex:0 0 52px;width:52px;font-size:12.5px;font-weight:800;color:var(--ink);text-align:right}
+  .oacval{flex:0 0 64px;width:64px;font-size:12.5px;font-weight:800;color:var(--ink);text-align:right}
   .oacval-empty{color:var(--faint);font-weight:600}
   .oacval.up{color:#5eead4} .oacval.down{color:#f0a060} .oacval-over{color:var(--gold);text-decoration:underline}
-  .oacwas{font-size:11.5px;margin:4px 0 0;line-height:1.4}
-  .oacwas.up{color:#5eead4}
-  .oacwas.down{color:#f0a060}
   .oacchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
   .oacchip{font-size:11px;font-weight:700;padding:4px 9px;border-radius:12px;background:var(--panel2);
     border:1px solid var(--line)}
@@ -3520,9 +3535,6 @@
   .oacshowall{display:block;margin:8px 0 0;background:none;border:0;color:var(--accent);font-size:12.5px;
     font-weight:800;cursor:pointer;padding:0}
   .oacfoot{font-size:11px;color:var(--faint);line-height:1.5;margin:12px 0 0}
-  .oaadjup,.oaadjdown{font-style:normal;font-weight:800;font-size:11px;margin-left:6px}
-  .oaadjup{color:#5eead4}
-  .oaadjdown{color:#f0a060}
 
   /* ---- CAS-1368: first run — favourite genres (two-column ♥/✓ grid), then single-select age/partner/
      children cards (shared .obopt/.obradio skin, unchanged) and the tick grids Date night/Family genres use.
@@ -20385,6 +20397,16 @@ function oaAlertsHTML(c, style){
       </button>`;
   }).join("")}</div>`;
 }
+// CAS-1457: one line under the alert chips saying what the current chips mean (re-rendered on every toggle).
+function oaAlertNoteHTML(c, style){
+  const name=oneAgentShortName(style);
+  const al=((c.styles||{})[style]||{}).al||{};
+  const phr={cinema:"reach cinemas", rent:"become available to rent", stream:"arrive on streaming"};
+  const on=["cinema","rent","stream"].filter(k=>al[k]).map(k=>phr[k]);
+  if(!on.length) return `<p class="oaalertnote">Alerts are off for ${esc(name)}. Tap Cinema, Rent or Stream to be told when its films become available that way.</p>`;
+  const list = on.length===1 ? on[0] : on.slice(0,-1).join(", ")+" or "+on[on.length-1];
+  return `<p class="oaalertnote">You'll be alerted when ${esc(name)} films ${list}.</p>`;
+}
 // Section 1 (MOVIE MINIMUM SCORE) + section 2 (FILM ALERTS) for the one open style, then CAS-1340's own
 // section 3 (SCORE ADJUSTMENTS, oaAdjustSectionHTML further down this file).
 // CAS-1367: a style with no bar is off (the row's own tick is the only way there, not this slider), so this
@@ -20403,7 +20425,7 @@ function oaOpenBodyHTML(c, style){
                 data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
                 aria-label="${escA(name)} minimum score">
             </div>
-            <span class="oaslideval" id="oaSliderVal">Top ${top}%<i>score ${bar}+</i></span>
+            <span class="oaslideval" id="oaSliderVal">Score ${bar}+<i>top ${top}%</i></span>
           </div>
           <p class="oaslidedesc" id="oaSliderDesc">${esc(name)} films scoring ${bar} or more are listed: the top ${top}% of ${esc(name)}.</p>`;
       })();
@@ -20413,12 +20435,13 @@ function oaOpenBodyHTML(c, style){
       ${oaSuggestionHTML(style)}
       <div class="oasechdr">FILM ALERTS</div>
       ${oaAlertsHTML(c, style)}
+      ${oaAlertNoteHTML(c, style)}
       ${oaAdjustSectionHTML(c, style)}
     </div>`;
 }
 // CAS-1367: the tick before the name is the row's own on/off switch — a genre with bar null is off, and the
 // tick is now the only way there (the open slider below runs Top 20%..All only, never down to off).
-function oaRowHTML(c, style, filmCount){
+function oaRowHTML(c, style, filmCount, changed){
   const open = oaOpenStyle===style;
   const bar=oaBar(c, style);
   const on = bar!=null;
@@ -20427,7 +20450,7 @@ function oaRowHTML(c, style, filmCount){
   const rowTop = on ? oneTopPct(style,bar) : 0;
   const strip = open ? `<span class="oarowstrip"></span><span class="oarowval"></span>`
     : `<span class="oarowstrip">${oaShareBoxesHTML(style, bar)}</span>
-       <span class="oarowval">${on?`Top ${rowTop}%<i>score ${bar}+</i>`:"Off"}</span>`;
+       <span class="oarowval">${on?`Score ${bar}+<i>top ${rowTop}%</i>`:"Off"}</span>`;
   const tick=`<label class="oarowtick">
       <input type="checkbox" ${on?"checked":""} onchange="oaToggleStyleOn('${escA(style)}')" aria-label="Turn ${escA(name)} on or off">
     </label>`;
@@ -20441,23 +20464,25 @@ function oaRowHTML(c, style, filmCount){
       <button type="button" class="oarowhead" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
         <span class="oarowleft">
           <span class="oastyname">${esc(name)}${oaAlertDotsHTML(c, style)}</span>
-          <span class="oarowfilms">${filmsLine}${oaAdjustedBadgeHTML(c, style)}</span>
+          <span class="oarowfilms">${filmsLine}</span>
         </span>
         ${strip}
-        <span class="oachev" aria-hidden="true">${open?"▴":"▾"}</span>
+        <span class="oachev" aria-hidden="true"></span>
       </button>
     </div>`;
-  return `<div class="oarow${on?"":" off"}" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
+  return `<div class="oarow${on?"":" off"}${changed?" oa-changed":""}${open?" oa-open":""}" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
 }
 function renderOneAgentScreen(c){
   const counts=oaFilmCounts(c);
   const order=oaOrder(c);
   const n=tasteProfile().n;
-  const rows=order.map(style=>oaRowHTML(c, style, counts[style]||0)).join("");
+  const changedMain=oaChangedGenres(c, oaVisitCutoffFor(c));
+  const rows=order.map(style=>oaRowHTML(c, style, counts[style]||0, changedMain.has(style))).join("");
   const title = (c.name||"").trim() || "Your agent";   // CAS-1352: unnamed agents keep the generic title
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">${n} verdict${n===1?"":"s"} learned</p>
+    <p class="oaintro">Your agent learns from your verdicts and works on two levels. For each genre it may suggest raising or lowering the minimum score. Within each genre it adjusts sub-genres up or down as you watch, so you're shown more of what you enjoy and less of what you don't. <b>Gold rows</b> have changed since your last visit. Tap a genre to open it and see its sub-genres.</p>
     <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
 }
@@ -20470,7 +20495,7 @@ window.oaToggleStyle=(style)=>{
   else { oaOrderSnapshot=oaComputeOrder(c); oaOpenStyle=style; }
   // CAS-1340: section 3's own "Show all"/open-film-chips state is per open style, not per account — start
   // fresh every time a style opens (or closes), the same way oaOrderSnapshot does above.
-  oaShowAllAdj=false; oaComboFilmsOpen.clear();
+  oaShowAllAdj=false; oaComboFilmsOpen.clear(); oaLogShown=5; oaLogOpen=false;
   oaSuggestionOpen=false;   // CAS-1345 Part 5: the suggestion callout starts collapsed every time, too.
   renderAgentsScreen();
 };
@@ -20491,7 +20516,7 @@ window.oaOnDrag=(input)=>{
   const bar = oneBarForTopPct(style, share);
   const name=oneAgentShortName(style);
   const valEl=$("oaSliderVal");
-  if(valEl) valEl.innerHTML = `Top ${share}%<i>score ${bar}+</i>`;
+  if(valEl) valEl.innerHTML = `Score ${bar}+<i>top ${share}%</i>`;
   const descEl=$("oaSliderDesc");
   if(descEl) descEl.textContent = `${name} films scoring ${bar} or more are listed: the top ${share}% of ${name}.`;
 };
@@ -20599,7 +20624,6 @@ function oaComboMarkShare(style, bar, points){ return oneTopPct(style, bar-point
 function oaComboStats(c, style){
   const P = oneAgentProfile();
   const combo = (c && c.combo) || {};
-  const seenAdj = (c && c.seenAdj) || {};
   const filmCounts = {};
   MOVIES.forEach(m=>{
     const {main, keys} = mainOtherCombos(m);
@@ -20615,26 +20639,18 @@ function oaComboStats(c, style){
     const never = ov==="never";
     const overridden = typeof ov==="number";
     const points = overridden ? ov : learned;
-    const seen = typeof seenAdj[key]==="number" ? seenAdj[key] : 0;
-    const adjusted = !overridden && !never && Math.abs(learned-seen)>=2;
-    return {key, other, n, filmCount:filmCounts[key], learned, override:ov, overridden, never, points, adjusted, seen};
+    return {key, other, n, filmCount:filmCounts[key], learned, override:ov, overridden, never, points};
   });
 }
-// Order: combos adjusted since last looked first, then by |points| descending, then by film count — a
+// Order: by |points| descending, then by film count — a
 // "never" row's magnitude is treated as -1 (below every real |points|, including 0) so it still sorts
 // ahead of nothing at all.
 function oaComboMag(r){ return r.never ? -1 : Math.abs(r.points); }
 function oaComboSort(a,b){
-  if(a.adjusted!==b.adjusted) return a.adjusted ? -1 : 1;
   const am=oaComboMag(a), bm=oaComboMag(b);
   if(am!==bm) return bm-am;
   return b.filmCount-a.filmCount;
 }
-function oaComboDirection(r){ return (r.learned-r.seen)>=0 ? "up" : "down"; }
-// Any style with an adjusted combo, account-wide — the Agent nav dot's one question. Deliberately NOT
-// memoised against renderOneAgentScreen's own pass: this is also called off the Watch screen (every verdict,
-// via repaintAfterOpinion), where no Agent-screen render has run yet to prime a cache.
-function oaAnyAdjusted(c){ return ALL_GENRES.some(style => oaComboStats(c, style).some(r=>r.adjusted)); }
 // The films behind one combo — every film you've judged (watched or blocked, same `ids` oneAgentProfile
 // itself builds from) whose mainOtherCombos keys include this exact key.
 function oaComboFilms(key){
@@ -20647,15 +20663,6 @@ function oaComboFilms(key){
     out.push({id, title:m.title, kind, good: TASTE_WEIGHTS[kind]>0, at: verdictAt.get(id)||0});
   });
   return out;
-}
-// Titles for the "<was> -> <now> after your verdict(s) on <titles>" line: this combo's judged films whose
-// verdictAt is newer than the v2 agent's own seenAdjAt for this key (c.seenAdjAt, written alongside
-// c.seenAdj by oaMarkSeenAdjusted below) — the ticket's own fallback wording ("verdicts newer than the last
-// seenAdj write") for "whose verdicts were saved after seenAdj was last written". A film whose verdictAt was
-// never captured (see the verdictAt comment, above the Set it backs) simply never qualifies.
-function oaComboAdjustTitles(c, key){
-  const seenAt = ((c && c.seenAdjAt) || {})[key] || 0;
-  return oaComboFilms(key).filter(f=>f.at>seenAt).sort((a,b)=>b.at-a.at).map(f=>f.title);
 }
 // The bar: five faint outline boxes (same brackets/colours as oaBoxesHTML, so the row lines up with section
 // 1's own strip), the style's own bar as a white 2px line, a fill from that line to bar+points (teal right /
@@ -20675,7 +20682,6 @@ function oaComboBarHTML(c, style, r){
     : `<i class="oacfill ${r.points>=0?"up":"down"}" style="left:${lo}%;width:${hi-lo}%"></i>`;
   let marks = `<i class="oacbarline" style="left:${barPct}%"></i>`;
   if(r.overridden || r.never) marks += `<i class="oacdash" style="left:${oaTrackPct(oaComboMarkShare(style, bar, r.learned))}%"></i>`;
-  else if(r.adjusted) marks += `<i class="oacdash" style="left:${oaTrackPct(oaComboMarkShare(style, bar, r.seen))}%"></i>`;
   const inputVal = r.never ? 0 : Math.max(0, Math.min(100, Math.round(oaComboMarkShare(style, bar, r.points))));
   const rangeHTML = `<input type="range" class="oacrange" min="0" max="100" step="1" value="${inputVal}"
       data-style="${escA(style)}" data-key="${escA(r.key)}"
@@ -20700,73 +20706,119 @@ function oaOverrideLeftHTML(r){
   }
   return `<span class="oacleft oacset">Set by you · <button type="button" class="oaclink oacuse" onclick="oaUseLearned('${escA(r.key)}')">let the agent decide</button></span>`;
 }
-function oaComboWasLineHTML(c, r){
-  const titles = oaComboAdjustTitles(c, r.key);
-  const titleTxt = titles.length ? ` after your verdict${titles.length===1?"":"s"} on ${titles.map(esc).join(", ")}` : "";
-  return `<p class="oacwas ${oaComboDirection(r)}">${oaFmtPoints(r.seen)} → ${oaFmtPoints(r.learned)}${titleTxt}</p>`;
-}
 function oaComboRowHTML(c, style, r){
-  const tagHTML = r.adjusted
-    ? `<span class="oactag ${oaComboDirection(r)}">${oaComboDirection(r)==="up"?"▲":"▼"} ADJUSTED</span>` : "";
   const films = (r.n>0 || r.overridden || r.never) ? oaComboFilms(r.key) : [];
   const liked = films.filter(f=>f.good).length, notN = films.length-liked;
   const leftHTML = (r.overridden || r.never) ? oaOverrideLeftHTML(r)
     : (r.n===0 ? `<span class="oacleft oacnoverdict">no verdicts yet</span>`
        : `<button type="button" class="oacleft oaclink" onclick="oaToggleComboFilms('${escA(r.key)}')">${liked} liked · ${notN} not <span aria-hidden="true">›</span></button>`);
   const rowEmpty = r.n===0 && !r.overridden && !r.never;
-  const wasLine = r.adjusted ? oaComboWasLineHTML(c, r) : "";
   const chipsOpen = oaComboFilmsOpen.has(r.key);
   const chipsHTML = chipsOpen ? `<div class="oacchips">${films.map(f=>
       `<span class="oacchip ${f.good?"up":"down"}">${esc(f.title)} · ${esc((OPINIONS.find(o=>o.key===f.kind)||{}).lbl||f.kind)}</span>`).join("")}</div>` : "";
   return `<div class="oacrow${rowEmpty?" oacrow-empty":""}" data-key="${escA(r.key)}">
-      <div class="oactitle">${esc(style)} with ${esc(r.other)}${tagHTML}${leftHTML}</div>
+      <div class="oactitle">${esc(style)} with ${esc(r.other)}${leftHTML}</div>
       <div class="oacline2">
         <span class="oacright">${oaComboBarHTML(c, style, r)}${oaComboValueHTML(r)}</span>
       </div>
-      ${wasLine}
       ${chipsHTML}
     </div>`;
 }
-// The collapsed row's own "<n> films ▲<up> ▼<down>" badge — counts THIS style's adjusted combos, whether or
-// not the style is currently open.
-function oaAdjustedBadgeHTML(c, style){
-  const rows = oaComboStats(c, style).filter(r=>r.adjusted);
-  if(!rows.length) return "";
-  const up = rows.filter(r=>oaComboDirection(r)==="up").length, down = rows.length-up;
-  return (up?`<i class="oaadjup">▲${up}</i>`:"") + (down?`<i class="oaadjdown">▼${down}</i>`:"");
+// CAS-1457: the account's change history. A change is one verdict that moved one or more sub-genre
+// adjustments by at least 1 point. Replays every timestamped verdict in time order, adding TASTE_WEIGHTS[kind]
+// to each film's main x other pair and recomputing that pair's adjustment (youScore with the profile's CURRENT
+// baseline for every step — a deliberate simplification). Films with no timestamp are not changes, but their
+// weight is seeded first so the replay ends on oneComboAdj. Returns {main: [change newest-first]}.
+function oaChangeHistory(){
+  const P = oneAgentProfile();
+  const ids = new Set(watched); blocked.forEach(id=>ids.add(id));
+  const byId = new Map(); MOVIES.forEach(m=>{ if(ids.has(m.tmdb_id)) byId.set(m.tmdb_id, m); });
+  const st = {};
+  const adjOf = pr => Math.round(youScore({pub:0, pairs:[{sum:pr.sum, n:pr.n}], b:P.baseline}).adj);
+  const judged = [];
+  ids.forEach(id=>{
+    const kind = opinionOf(id), m = byId.get(id); if(!kind || !m) return;
+    const at = verdictAt.get(id)||0;
+    if(!at){
+      mainOtherCombos(m).keys.forEach(({key})=>{ const pr=st[key]||(st[key]={sum:0,n:0}); pr.sum+=TASTE_WEIGHTS[kind]; pr.n+=1; });
+      return;
+    }
+    judged.push({id, kind, m, at});
+  });
+  judged.sort((a,b)=>a.at-b.at);
+  const out = {};
+  judged.forEach(({kind, m, at})=>{
+    const {main, keys} = mainOtherCombos(m);
+    const moves = [];
+    keys.forEach(({other, key})=>{
+      const pr = st[key]||(st[key]={sum:0,n:0});
+      const from = adjOf(pr);
+      pr.sum += TASTE_WEIGHTS[kind]; pr.n += 1;
+      const to = adjOf(pr);
+      if(Math.abs(to-from)>=1) moves.push({other, from, to});
+    });
+    if(moves.length) (out[main]||(out[main]=[])).push({title:m.title, kind, at, main, moves});
+  });
+  Object.keys(out).forEach(k=>out[k].reverse());
+  return out;
 }
+// Genres with at least one change newer than `cutoff` (ms).
+function oaChangedGenres(c, cutoff){
+  const H = oaChangeHistory(), set = new Set();
+  Object.keys(H).forEach(g=>{ if(H[g].some(ch=>ch.at>cutoff)) set.add(g); });
+  return set;
+}
+// "Since your last visit" cut-off for this visit: set once when the Agent screen opens (the previous
+// agentSeenAt), so the rows stay gold for the whole visit. Falls back to the stored value before any open.
+let oaVisitCutoff = null;
+function oaVisitCutoffFor(c){ return oaVisitCutoff==null ? ((c && c.agentSeenAt)||0) : oaVisitCutoff; }
+let oaLogShown = 5;      // changes listed in the open genre's recent-changes log (+10 per "Show more")
+let oaLogOpen = false;   // the log's <details> open state, kept across re-renders
+function oaChangeLogHTML(c, style){
+  const all = oaChangeHistory()[style] || [];
+  if(!all.length) return "";
+  const shown = all.slice(0, oaLogShown);
+  const lines = shown.map(ch=>{
+    const lbl = (OPINIONS.find(o=>o.key===ch.kind)||{}).lbl || ch.kind;
+    const d = new Date(ch.at).toLocaleDateString("en-AU",{day:"numeric",month:"short"});
+    return ch.moves.map(mv=>`<div class="oalogch ${mv.to>mv.from?"up":"down"}"><span class="s">${mv.to>mv.from?"▲":"▼"} ${esc(mv.other)}</span><span class="v">${oaFmtPoints(mv.from)} → ${oaFmtPoints(mv.to)}</span><span class="w">after ${esc(ch.title)} · ${esc(lbl)} · ${esc(d)}</span></div>`);
+  }).flat();
+  const more = all.length>shown.length ? `<button type="button" class="oalogmore" onclick="oaLogMore()">Show more ›</button>` : "";
+  return `<details class="oalog"${oaLogOpen?" open":""} ontoggle="oaLogToggled(this)"><summary>RECENT CHANGES IN ${esc(oneAgentShortName(style).toUpperCase())} <span class="oalogn">${lines.length}</span></summary><div class="oalogbody">${lines.join("")}${more}</div></details>`;
+}
+window.oaLogToggled=(el)=>{ oaLogOpen=el.open; };
+window.oaLogMore=()=>{ oaLogShown+=10; oaLogOpen=true; renderAgentsScreen(); };
 function oaAdjustSectionHTML(c, style){
   const name = oneAgentShortName(style);
   const bar = oaBar(c, style);
   if(bar==null){
     return `<div class="oaadjust" id="oaAdjustSection"><div class="oasechdr">SCORE ADJUSTMENTS</div>
-      <p class="oacintro">Turn ${esc(name)} on (set a minimum score, above) to see its score adjustments.</p></div>`;
+      <p class="oaslidedesc">Turn ${esc(name)} on (set a minimum score, above) to see its score adjustments.</p></div>`;
   }
   const rows = oaComboStats(c, style).sort(oaComboSort);
-  const adjustedN = rows.filter(r=>r.adjusted).length;
   const shown = oaShowAllAdj ? rows : rows.slice(0,8);
-  const seenBox = adjustedN ? `<div class="oacseen">
-      <span><b>${adjustedN}</b> score${adjustedN===1?"":"s"} adjusted since you last looked</span>
-      <button type="button" class="oacseenbtn" onclick="oaMarkSeenAdjusted('${escA(style)}')">Mark as seen</button>
-    </div>` : "";
   const showAllHTML = (!oaShowAllAdj && rows.length>8)
     ? `<button type="button" class="oacshowall" onclick="oaToggleShowAllAdj()">Show all ${rows.length}</button>` : "";
   // CAS-1349: wrapped in one #oaAdjustSection container (heading through rows) so the v2 guided tour can
   // spotlight the whole section as a single anchor, same as tutUnionRect does for a multi-element step.
   return `<div class="oaadjust" id="oaAdjustSection"><div class="oasechdr">SCORE ADJUSTMENTS</div>
-    <p class="oacintro">Your agent adjusts the scores of ${esc(name)} films up or down by their sub-genres, based on your verdicts on films you've watched. The adjusted score is the one you see in Watch. Tap a row to see the films behind it. Sub-genres with no verdicts yet count as neutral, so they soften the others.</p>
-    ${seenBox}
+    ${oaChangeLogHTML(c, style)}
     <div class="oaclist">${shown.map(r=>oaComboRowHTML(c, style, r)).join("")}</div>
     ${showAllHTML}
     <p class="oacfoot">The white line is ${esc(name)}'s ${bar}+. Drag a row to set it yourself; all the way left means never list it. Your agent keeps learning underneath and tells you if your verdicts start to disagree.</p></div>`;
 }
-// Gold dot on the Agent nav chip — pure DOM sync, called from both the full render() and the lean verdict-
-// repaint path (repaintAfterOpinion's fastPatchFindRow branch skips a full render()).
+// CAS-1457: the Agent nav chip's gold count badge — pure DOM sync, called from both the full render() and
+// the lean verdict-repaint path (repaintAfterOpinion's fastPatchFindRow branch skips a full render()).
 function updateAgentNavDot(){
   const btn = typeof $==="function" ? $("agentsBtn") : null;
   if(!btn || !btn.classList) return;
   const c = oneAgentCriteria();
-  btn.classList.toggle("oa-adjusted", !!(c && oaAnyAdjusted(c)));
+  const n = c ? oaChangedGenres(c, c.agentSeenAt||0).size : 0;
+  let badge = btn.querySelector(".oabadge");
+  if(n>0){
+    if(!badge){ badge=document.createElement("span"); badge.className="oabadge"; btn.appendChild(badge); }
+    badge.textContent=String(n);
+  } else if(badge) badge.remove();
   // CAS-1345 Part 3: a v2 account has one agent, so the nav label reads "Agent" (singular); every other
   // account keeps "Agents".
   const label = c ? "Agent" : "Agents";
@@ -20782,18 +20834,6 @@ window.oaToggleShowAllAdj=()=>{ oaShowAllAdj=true; renderAgentsScreen(); };
 window.oaUseLearned=(key)=>{
   const c=oneAgentCriteria(); if(!c) return;
   if(c.combo) delete c.combo[key];
-  saveCascades();
-  if(typeof render==="function") render();
-  renderAgentsScreen();
-};
-// "Mark as seen" — writes c.seenAdj[k] = comboAdj(k) (the ticket's own wording) for every combo of this
-// style, plus c.seenAdjAt[k] (this ticket's own companion timestamp, see oaComboAdjustTitles above) so a
-// later adjustment's "after your verdict(s) on <titles>" line only names films newer than THIS write.
-window.oaMarkSeenAdjusted=(style)=>{
-  const c=oneAgentCriteria(); if(!c) return;
-  c.seenAdj=c.seenAdj||{}; c.seenAdjAt=c.seenAdjAt||{};
-  const now=Date.now();
-  oaComboStats(c, style).forEach(r=>{ c.seenAdj[r.key]=r.learned; c.seenAdjAt[r.key]=now; });
   saveCascades();
   if(typeof render==="function") render();
   renderAgentsScreen();
@@ -23253,6 +23293,11 @@ window.openAgentsScreen=()=>{
   // way #movingBtn lights for Alerts.
   if($("movingScreen").classList.contains("open")) closeMovingScreen();
   if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186: mutually exclusive with Find too
+  { const oc=oneAgentCriteria();
+    if(oc){ oaVisitCutoff=oc.agentSeenAt||0;
+      // CAS-1218 server-first: only stamp agentSeenAt when there is something new to clear — opening Agent with
+      // nothing changed must write nothing.
+      if(oaChangedGenres(oc, oaVisitCutoff).size){ oc.agentSeenAt=Date.now(); saveCascades(); updateAgentNavDot(); } } }
   renderAgentsScreen();
   $("agentsScreen").scrollTop=0;
   $("agentsScreen").classList.add("open"); lockBodyScroll(true);
@@ -24322,7 +24367,8 @@ function openMembership(agentKey, nameOverride, cascade){
                 style="vertical-align:baseline">Resend code</button></p>
     </div>
     <p class="pnote">By continuing you agree to our
-      <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button>.</p>` : ""}
+      <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button> and the
+      <a class="linkbtn" href="${MEMB_TERMS_URL}" target="_blank" rel="noopener">Terms of Use</a>.</p>` : ""}
     <p class="fielderr" id="membPurchaseMsg" hidden></p>
     <button class="membcta" type="button" onclick="membStart()">${esc(membCtaLabel())}</button>
     ${membIsNativeApp() ? `<button type="button" class="linkbtn" id="membRestoreBtn" onclick="membRestoreTap()">Restore Purchases</button>` : ""}
@@ -24406,7 +24452,8 @@ function openOnbMembership(){
                 style="vertical-align:baseline">Resend code</button></p>
     </div>
     <p class="pnote">By continuing you agree to our
-      <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button>.</p>` : ""}
+      <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button> and the
+      <a class="linkbtn" href="${MEMB_TERMS_URL}" target="_blank" rel="noopener">Terms of Use</a>.</p>` : ""}
     <p class="fielderr" id="membPurchaseMsg" hidden></p>
     <button class="membcta" type="button" onclick="membStart()">${esc(membCtaLabel())}</button>
     ${membIsNativeApp() ? `<button type="button" class="linkbtn" id="membRestoreBtn" onclick="membRestoreTap()">Restore Purchases</button>` : ""}
@@ -24778,7 +24825,17 @@ function membAccountPlanText(){
 }
 // Lee, 13 Nov: the sign-up screens show the offer as a presentational box again (it was a fine-print line
 // before CAS-971). Figures come from StoreKit in the app; the web (no StoreKit) shows the configured offer.
-const MEMB_OFFER_FALLBACK = {free:"First month free", then:"then A$3.99/month · cancel any time"};
+// Lee, 16 Nov (App Store 3.1.2(c)): the billed amount is the most prominent pricing element; the free period,
+// the renewal and how to cancel are said plainly underneath, never larger than the price.
+// Apple requires a Terms of Use link in the purchase flow (Schedule 2, 3.8(b)); Cascade uses Apple's standard EULA.
+const MEMB_TERMS_URL = "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/";
+const MEMB_CANCEL_LINE = "Cancel any time in Settings › Subscriptions.";
+function membOfferText(price, freeLabel){
+  return freeLabel
+    ? `Your first ${freeLabel} is free. After that it renews at ${price} a month until you cancel. ${MEMB_CANCEL_LINE}`
+    : `Renews at ${price} a month until you cancel. ${MEMB_CANCEL_LINE}`;
+}
+const MEMB_OFFER_FALLBACK = {price:"A$3.99 a month", terms:membOfferText("A$3.99", "month")};
 function membOfferParts(){
   const p=membProduct;
   if(p && p.priceString){
@@ -24786,15 +24843,15 @@ function membOfferParts(){
     if(intro && Number(intro.price)===0 && intro.subscriptionPeriod){
       const n=(intro.subscriptionPeriod.numberOfUnits||intro.numberOfPeriods||1);
       const unit=({0:"day",1:"week",2:"month",3:"year"})[intro.subscriptionPeriod.unit]||"month";
-      return {free: n===1 ? `First ${unit} free` : `First ${n} ${unit}s free`, then:`then ${p.priceString}/month · cancel any time`};
+      return {price:`${p.priceString} a month`, terms:membOfferText(p.priceString, n===1 ? unit : `${n} ${unit}s`)};
     }
-    return {free:`${p.priceString}/month`, then:"cancel any time"};
+    return {price:`${p.priceString} a month`, terms:membOfferText(p.priceString, null)};
   }
   return MEMB_OFFER_FALLBACK;
 }
 function membOfferHTML(){
   const o=membOfferParts();
-  return `<div class="memboffer" id="membOffer"><span class="mofree">${esc(o.free)}</span><span class="mothen">${esc(o.then)}</span></div>`;
+  return `<div class="memboffer" id="membOffer"><span class="moprice">${esc(o.price)}</span><span class="moterms">${esc(o.terms)}</span></div>`;
 }
 function membHasFreeTrial(p){ return !!(p && p.introductoryPrice && Number(p.introductoryPrice.price)===0); }
 function membCtaLabel(){
@@ -24804,8 +24861,8 @@ function membCtaLabel(){
 function membFineText(){
   // Lee, 14 Nov: no web line — the offer box says it all, and membership is an iPhone-app thing anyway.
   if(!membIsNativeApp()) return "";
-  const line=membPriceLine(membProduct);
-  return line || "Billed monthly through your Apple ID · cancel any time.";
+  // Lee, 16 Nov: the offer box now carries the price, free period, renewal and cancelling.
+  return "Billed monthly through your Apple ID.";
 }
 async function membLoadProduct(){
   const pl=membPlugin(); if(!membIsNativeApp() || !pl || membProduct) return membProduct;
@@ -24889,12 +24946,43 @@ window.openMembershipRestore=async()=>{      // the Account screen's row
 // lapsed member keeps their account and data — nothing is deleted, resubscribing just reopens the door.
 let membGated=false;
 function membGateDone(){ membGated=false; }
+// CAS-1458: TEMPORARY testing bypass. public.app_config 'membership_bypass' (jsonb true) lets a held account
+// tap "Continue without membership (testing)" for the rest of this app session. In memory only — never
+// localStorage, never written to the server; keyed to the user id so a different sign-in is held again.
+// A failed read or a missing row = false (no button, gate exactly as CAS-971).
+let membBypassUid=null, membBypassShown=false;
+async function membBypassEnabled(){
+  const a=window.CascadeAuth;
+  if(!a || !a.client) return false;
+  try{
+    const {data, error}=await a.client.from("app_config").select("value").eq("key","membership_bypass").maybeSingle();
+    return !error && !!data && data.value===true;
+  }catch(e){ return false; }
+}
+window.membBypassTap=()=>{
+  const a=window.CascadeAuth;
+  membBypassUid=(a && a.user && a.user.id) || "anon";
+  membGated=false; membBypassShown=false;
+  closeMembership();
+};
 async function membGateCheck(){
   if(onbMembershipInFlight || flowOn || (typeof oafIsOpen==="function" && oafIsOpen())) return;
   await membLoadEntitlement();
   if(membEnt.state!=="none") { if(membGated){ closeMembership(); membGated=false; } return; }
+  const a=window.CascadeAuth;
+  if(membBypassUid && a && a.user && a.user.id===membBypassUid) return;
+  const bypass=await membBypassEnabled();
   membGated=true;
+  membBypassShown=false;
   openMembership(null, null, null);
+  if(bypass && $("membBody")){
+    membBypassShown=true;
+    const b=document.createElement("button");
+    b.type="button"; b.className="linkbtn"; b.id="membBypassBtn";
+    b.textContent="Continue without membership (testing)";
+    b.onclick=()=>window.membBypassTap();
+    $("membBody").appendChild(b);
+  }
   const head=$("membHead"); if(head) head.textContent="Cascade Membership";
   if(!membIsNativeApp()){
     const btn=document.querySelector(".membcta"); if(btn) btn.remove();
