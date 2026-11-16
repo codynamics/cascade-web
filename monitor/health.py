@@ -649,7 +649,13 @@ def check_activity_floor(window: dict | None) -> dict:
 # — CAS-1135: none of CAS-974's original fourteen checks measure identity (only volume/coverage),
 # so CAS-1134's movie/TV id-map collision tripped none of them. See each check's own docstring.
 # ---------------------------------------------------------------------------
-def check_watchmode_identity(stats: dict | None) -> dict:
+WATCHMODE_MISMATCH_RUN_MAX = 5          # CAS-1451: more than this in one run = systemic
+WATCHMODE_QUARANTINE_GROWTH_MAX = 10    # CAS-1451: new quarantine entries allowed per 7 days
+
+
+def check_watchmode_identity(stats: dict | None, quarantine: dict | None = None,
+                             today_movies: list | None = None,
+                             today: _dt.date | None = None) -> dict:
     """CAS-1134's details-response identity guard (poc_pipeline.enrich_watchmode_fields) returns
     'mismatch' — writing nothing — whenever a Watchmode id it was about to trust turns out to
     identify a different tmdb_id or a non-movie type. Zero NEW mismatches is the only acceptable
@@ -670,12 +676,46 @@ def check_watchmode_identity(stats: dict | None) -> dict:
     if not mismatches:
         return _check("watchmode_identity", True, 0, 0,
                       f"0 identity mismatch(es) this run.{quarantined_suffix}")
-    names = ", ".join(str(i) for i in (stats.get("mismatch_ids") or [])[:5])
+    ids = [str(i) for i in (stats.get("mismatch_ids") or [])[:5]]
     detail = f"{mismatches} identity mismatch(es) this run."
-    if names:
-        detail += f" TMDB id(s): {names}."
+    if ids:
+        detail += f" TMDB id(s): {', '.join(ids)}."
     detail += quarantined_suffix
-    return _check("watchmode_identity", False, mismatches, 0, detail)
+
+    # CAS-1451: without the quarantine store the old strict behaviour stands (can't verify).
+    if quarantine is None:
+        return _check("watchmode_identity", False, mismatches, 0, detail)
+
+    problems = []
+    if mismatches > WATCHMODE_MISMATCH_RUN_MAX:
+        problems.append(f"more than {WATCHMODE_MISMATCH_RUN_MAX} mismatches in one run "
+                        f"(systemic mapping fault)")
+    unquarantined = [i for i in ids if i not in quarantine]
+    if unquarantined or (not ids):
+        problems.append("not quarantined: " + (", ".join(unquarantined) or "unknown id(s)"))
+    by_id = {str(m.get("tmdb_id")): m for m in (today_movies or [])}
+    published = [i for i in ids if i in quarantine and i in by_id
+                 and by_id[i].get("wm_id") is not None
+                 and str(by_id[i].get("wm_id")) == str(quarantine[i].get("wm_id"))]
+    if published:
+        problems.append("published with the mismatched Watchmode id: " + ", ".join(published))
+    if today is not None:
+        cutoff = today - _dt.timedelta(days=7)
+        recent = 0
+        for entry in quarantine.values():
+            try:
+                if _dt.date.fromisoformat(entry.get("first_seen", "")) > cutoff:
+                    recent += 1
+            except (ValueError, TypeError, AttributeError):
+                continue
+        if recent > WATCHMODE_QUARANTINE_GROWTH_MAX:
+            problems.append(f"quarantine grew by {recent} in 7 days "
+                            f"(limit {WATCHMODE_QUARANTINE_GROWTH_MAX})")
+    if problems:
+        return _check("watchmode_identity", False, mismatches, 0,
+                      detail + " " + "; ".join(problems) + ".")
+    return _check("watchmode_identity", True, mismatches, 0,
+                  detail + " Quarantined, not published.")
 
 
 def _load_watchmode_tv_tmdb_ids(today: _dt.date):
@@ -852,7 +892,9 @@ def run_checks(*, today_movies=None, prev_movies=None, stats=None, usage_probe=N
         "client_error_rate": lambda: check_client_error_rate(usage_window),
         "empty_account_rate": lambda: check_empty_account_rate(usage_window),
         "activity_floor": lambda: check_activity_floor(usage_window),
-        "watchmode_identity": lambda: check_watchmode_identity(stats.get("watchmode")),
+        "watchmode_identity": lambda: check_watchmode_identity(
+            stats.get("watchmode"), quarantine=pp.load_watchmode_mismatch_quarantine(),
+            today_movies=today_movies, today=today),
         "watchmode_remap_backlog": lambda: check_watchmode_remap_backlog(
             (today_movies or []) + (candidates or []), tv_tmdb_ids, remap_backlog_prev),
         "released_scored_without_rating": lambda: check_released_scored_without_rating(candidates or []),
