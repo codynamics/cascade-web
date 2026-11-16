@@ -36,7 +36,7 @@ jobs:
     timeout-minutes: 360         # covers the longest possible wait (a run starting just after 17:17 the PREVIOUS cycle boundary) plus the monitor itself
     steps:
       - name: Check out repo (carries yesterday's state for change-detection)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: staging           # the repo's default branch is main; alerts must land on staging, never main
           fetch-depth: 0         # full history: the monitor anchors "yesterday" to the last refresh on an EARLIER day, not HEAD~1
