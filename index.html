@@ -23294,7 +23294,10 @@ window.openAgentsScreen=()=>{
   if($("movingScreen").classList.contains("open")) closeMovingScreen();
   if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186: mutually exclusive with Find too
   { const oc=oneAgentCriteria();
-    if(oc){ oaVisitCutoff=oc.agentSeenAt||0; oc.agentSeenAt=Date.now(); saveCascades(); updateAgentNavDot(); } }
+    if(oc){ oaVisitCutoff=oc.agentSeenAt||0;
+      // CAS-1218 server-first: only stamp agentSeenAt when there is something new to clear — opening Agent with
+      // nothing changed must write nothing.
+      if(oaChangedGenres(oc, oaVisitCutoff).size){ oc.agentSeenAt=Date.now(); saveCascades(); updateAgentNavDot(); } } }
   renderAgentsScreen();
   $("agentsScreen").scrollTop=0;
   $("agentsScreen").classList.add("open"); lockBodyScroll(true);
