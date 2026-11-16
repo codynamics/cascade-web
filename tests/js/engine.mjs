@@ -358,9 +358,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // conventions CAS-1339's own exports just above use. verdictAt is exposed by reference (same convention
   // the watched Set uses) so a fixture can seed deterministic "verdict newer than seenAdjAt" timestamps
   // without waiting on real wall-clock gaps between two Date.now() calls.
-  oaComboStats, oaComboSort, oaComboDirection, oaComboMag, oaAnyAdjusted, oaComboFilms, oaComboAdjustTitles,
-  oaFmtPoints, oaTrackPct, oaComboMarkShare, oaComboBarHTML, oaComboValueHTML, oaOverrideLeftHTML, oaComboWasLineHTML,
-  oaComboRowHTML, oaAdjustedBadgeHTML, oaAdjustSectionHTML, updateAgentNavDot,
+  oaComboStats, oaComboSort, oaComboMag, oaComboFilms, oaChangeHistory, oaChangedGenres, oaChangeLogHTML, oaAlertNoteHTML,
+  oaFmtPoints, oaTrackPct, oaComboMarkShare, oaComboBarHTML, oaComboValueHTML, oaOverrideLeftHTML,
+  oaComboRowHTML, oaAdjustSectionHTML, updateAgentNavDot,
   verdictAt,
   get oaShowAllAdj(){ return oaShowAllAdj; },
   get oaComboFilmsOpen(){ return oaComboFilmsOpen; },
