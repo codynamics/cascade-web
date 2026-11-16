@@ -253,4 +253,5 @@ jobs:
     uses: ./.github/workflows/alert.yml
     with:
       workflow_name: "daily"
+      consecutive_failures: 2
     secrets: inherit

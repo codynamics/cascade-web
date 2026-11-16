@@ -39,6 +39,8 @@ jobs:
     uses: ./.github/workflows/alert.yml
     with:
       workflow_name: "rls"
+      consecutive_failures: 3
+      min_red_hours: 6
     secrets:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       CASCADE_EMAIL_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}

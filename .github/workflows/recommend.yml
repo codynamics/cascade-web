@@ -102,6 +102,7 @@ jobs:
     uses: ./.github/workflows/alert.yml
     with:
       workflow_name: "recommend"
+      consecutive_failures: 2
     secrets:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       CASCADE_EMAIL_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}

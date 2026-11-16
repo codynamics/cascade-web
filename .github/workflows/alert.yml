@@ -30,6 +30,16 @@ on:
         description: "Human name of the calling workflow, for the alert subject/body."
         required: true
         type: string
+      consecutive_failures:
+        description: "CAS-1460: alert only once this many consecutive runs of the calling workflow (same branch) have failed. 1 = always alert."
+        required: false
+        type: number
+        default: 2
+      min_red_hours:
+        description: "CAS-1460: and only once the streak's first failure is at least this many hours old. 0 = no time condition."
+        required: false
+        type: number
+        default: 0
     secrets:
       RESEND_API_KEY:
         required: false
@@ -65,6 +75,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           WORKFLOW_NAME: ${{ inputs.workflow_name }}
+          CONSECUTIVE_FAILURES: ${{ inputs.consecutive_failures }}
+          MIN_RED_HOURS: ${{ inputs.min_red_hours }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           CASCADE_EMAIL_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}
           CASCADE_ALERT_TO: ${{ secrets.CASCADE_ALERT_TO }}

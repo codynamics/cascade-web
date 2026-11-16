@@ -165,6 +165,7 @@ jobs:
     uses: ./.github/workflows/alert.yml
     with:
       workflow_name: "ios-testflight"
+      consecutive_failures: 1
     secrets:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       CASCADE_EMAIL_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}
