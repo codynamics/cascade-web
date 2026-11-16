@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from datetime import datetime
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -39,6 +40,17 @@ LOG_TAIL_LINES = 40
 PUSH_TITLE = "Cascade Alert"
 GOTRUE_ADMIN_USERS_PAGE_SIZE = 200
 GOTRUE_ADMIN_USERS_MAX_PAGES = 25
+
+# CAS-1460: an alert must be an actionable item. Only these conclusions of a *previous* run
+# count as red; "cancelled" and "skipped" say nothing about health and are stepped over rather
+# than ending (or extending) a streak. "success" ends the streak.
+RED_CONCLUSIONS = {"failure", "timed_out", "startup_failure"}
+HISTORY_PER_PAGE = 50
+DEFAULT_ACTION = "Open the Cascade Admin chat and say: check {workflow} run {run_url}."
+ACTION_BY_WORKFLOW = {
+    "ios-testflight": ("Check the run; if it failed at build_app the provisioning profile needs "
+                       "regenerating in the Apple Developer Portal."),
+}
 
 
 def _api_get(url: str, token: str, parse_json: bool = True):
@@ -80,9 +92,96 @@ def find_failure(repo: str, run_id: str, token: str):
     return failed_job, failed_step, log_tail
 
 
-def build_message(workflow_name: str, run_url: str, failed_job: str, failed_step: str, log_tail: str):
+def _parse_ts(value: str):
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _env_number(name: str, default, cast):
+    raw = os.environ.get(name, "")
+    try:
+        return cast(raw) if raw.strip() else default
+    except ValueError:
+        return default
+
+
+def threshold_met(count: int, first_at, at, consecutive_failures: int, min_red_hours: float) -> bool:
+    """True when `count` consecutive red runs, the first at `first_at`, have - as of `at` -
+    reached the caller's threshold on BOTH axes (run count and hours red)."""
+    if count < consecutive_failures:
+        return False
+    return (at - first_at).total_seconds() / 3600.0 >= min_red_hours
+
+
+def streak_decision(prior_runs: list, current_started, consecutive_failures: int, min_red_hours: float):
+    """CAS-1460: decide whether the current (red) run should alert.
+
+    `prior_runs` are this workflow's earlier *completed* runs on the same branch, newest first,
+    each {"conclusion", "created_at"}. The current run is red by definition (the alert job only
+    runs `if: failure()`). Returns (send, count, first_at, reason):
+      - count/first_at describe the streak ending with the current run;
+      - a green (success) prior run resets the streak; cancelled/skipped runs are stepped over;
+      - one alert per streak: if the previous run's own streak had already met the threshold it
+        alerted, so this one stays quiet until a green run resets things. A threshold of 1 means
+        "always alert" (e.g. ios-testflight, which Lee dispatched by hand), so it is exempt.
+    """
+    streak = []  # red prior runs, newest first
+    for run in prior_runs:
+        conclusion = run.get("conclusion")
+        if conclusion in RED_CONCLUSIONS:
+            streak.append(run)
+        elif conclusion == "success":
+            break
+    count = len(streak) + 1
+    first_at = _parse_ts(streak[-1]["created_at"]) if streak else current_started
+    if not threshold_met(count, first_at, current_started, consecutive_failures, min_red_hours):
+        return False, count, first_at, (
+            f"suppressed: {count} consecutive failure(s), first at {first_at.isoformat()}, "
+            f"threshold {consecutive_failures} failure(s) and {min_red_hours:g}h red")
+    if consecutive_failures > 1 and streak:
+        prev_at = _parse_ts(streak[0]["created_at"])
+        if threshold_met(len(streak), first_at, prev_at, consecutive_failures, min_red_hours):
+            return False, count, first_at, (
+                f"suppressed: already alerted for this red streak ({count} consecutive failure(s), "
+                f"first at {first_at.isoformat()}); waiting for a green run to reset it")
+    return True, count, first_at, "threshold met"
+
+
+def fetch_streak(repo: str, run_id: str, token: str, consecutive_failures: int, min_red_hours: float):
+    """(send, count, first_at_iso, reason) using the Actions API. Fails OPEN - if the history
+    can't be read the alert is sent (count/first unknown), because a false alert is cheaper than
+    a silent real failure."""
+    try:
+        run = _api_get(f"{GITHUB_API}/repos/{repo}/actions/runs/{run_id}", token)
+        started = _parse_ts(run.get("run_started_at") or run["created_at"])
+        workflow_id = run["workflow_id"]
+        query = {"status": "completed", "per_page": HISTORY_PER_PAGE}
+        if run.get("head_branch"):
+            query["branch"] = run["head_branch"]
+        data = _api_get(
+            f"{GITHUB_API}/repos/{repo}/actions/workflows/{workflow_id}/runs?{urllib.parse.urlencode(query)}",
+            token)
+        prior = [r for r in data.get("workflow_runs", [])
+                 if str(r.get("id")) != str(run_id) and r.get("created_at")
+                 and _parse_ts(r["created_at"]) < started]
+        prior.sort(key=lambda r: r["created_at"], reverse=True)
+        send, count, first_at, reason = streak_decision(prior, started, consecutive_failures, min_red_hours)
+        return send, count, first_at.isoformat(), reason
+    except (urllib.error.URLError, urllib.error.HTTPError, KeyError, ValueError) as err:
+        return True, 0, "", f"could not read run history ({err}); sending to be safe"
+
+
+def action_line(workflow_name: str, run_url: str) -> str:
+    return "Action: " + ACTION_BY_WORKFLOW.get(
+        workflow_name, DEFAULT_ACTION.format(workflow=workflow_name, run_url=run_url))
+
+
+def build_message(workflow_name: str, run_url: str, failed_job: str, failed_step: str, log_tail: str,
+                  count: int = 0, first_at: str = ""):
     subject = f"[Cascade ALERT] {workflow_name} failed"
-    lines = [
+    lines = [action_line(workflow_name, run_url), ""]
+    if count:
+        lines.append(f"Consecutive failures: {count}" + (f" (since {first_at})" if first_at else ""))
+    lines += [
         f"Workflow: {workflow_name}",
         f"Run: {run_url}",
         f"Failing job: {failed_job or '(unknown)'}",
@@ -171,7 +270,8 @@ def send_email_alert(to_addr: str, subject: str, text: str) -> bool:
     return True
 
 
-def send_push_alert(workflow_name: str, failed_job: str, failed_step: str, to_addr: str) -> bool:
+def send_push_alert(workflow_name: str, failed_job: str, failed_step: str, to_addr: str,
+                    action: str = "") -> bool:
     """True unless push was configured and a real attempt at it failed outright (the token
     lookup itself errored). No SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY, or no push tokens
     registered for `to_addr`, are tolerated skips — same convention as email above — because a
@@ -191,6 +291,8 @@ def send_push_alert(workflow_name: str, failed_job: str, failed_step: str, to_ad
         print(f"No push tokens registered for {to_addr} — skipping push.")
         return True
     body = f"Cascade alert: {workflow_name} failed at {failed_step or failed_job or '(unknown step)'}"
+    if action:
+        body += f". {action}"
     delivered = sum(1 for tok in tokens if pusher.send_via_apns(tok, PUSH_TITLE, body))
     print(f"Push sent to {delivered}/{len(tokens)} device(s).")
     return True
@@ -210,14 +312,24 @@ def main() -> int:
     run_url = f"{server_url}/{repo}/actions/runs/{run_id}" if repo and run_id else "(unknown run)"
     token = os.environ.get("GITHUB_TOKEN", "")
 
+    consecutive_failures = _env_number("CONSECUTIVE_FAILURES", 2, int)
+    min_red_hours = _env_number("MIN_RED_HOURS", 0.0, float)
+    count, first_at = 0, ""
+    if repo and run_id and token:
+        send, count, first_at, reason = fetch_streak(repo, run_id, token, consecutive_failures, min_red_hours)
+        print(reason)
+        if not send:
+            return 0
+
     failed_job = failed_step = log_tail = ""
     if repo and run_id and token:
         failed_job, failed_step, log_tail = find_failure(repo, run_id, token)
 
-    subject, text = build_message(workflow_name, run_url, failed_job, failed_step, log_tail)
+    subject, text = build_message(workflow_name, run_url, failed_job, failed_step, log_tail, count, first_at)
 
     email_ok = send_email_alert(to_addr, subject, text)
-    push_ok = send_push_alert(workflow_name, failed_job, failed_step, to_addr)
+    push_ok = send_push_alert(workflow_name, failed_job, failed_step, to_addr,
+                              action_line(workflow_name, run_url))
 
     return 0 if (email_ok and push_ok) else 1
 

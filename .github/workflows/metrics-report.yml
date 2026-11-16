@@ -49,4 +49,5 @@ jobs:
     uses: ./.github/workflows/alert.yml
     with:
       workflow_name: "metrics-report"
+      consecutive_failures: 2
     secrets: inherit

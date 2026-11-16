@@ -140,4 +140,5 @@ jobs:
     uses: ./.github/workflows/alert.yml
     with:
       workflow_name: "alerts"
+      consecutive_failures: 2
     secrets: inherit

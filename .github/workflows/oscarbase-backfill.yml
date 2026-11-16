@@ -60,4 +60,5 @@ jobs:
     uses: ./.github/workflows/alert.yml
     with:
       workflow_name: "oscarbase-backfill"
+      consecutive_failures: 2
     secrets: inherit
