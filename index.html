@@ -4078,8 +4078,6 @@
   @media (prefers-reduced-motion: reduce){ .tuthole,.tutring,.tuttap,.tutcard,.tutdemo *{animation:none!important;transition:none!important} }
   /* First run: favourite actor-or-director field (Lee, 14 Nov). */
   .oafpfield{display:block;margin:0 0 16px}
-  .oafpcount{display:block;min-height:18px;margin-top:6px;font-size:12.5px;color:#5eead4}
-  .oafpcount.none{color:#f0a060}
   /* Tutorials screen (Menu → Tutorials). */
   .tutlist .tutrow{display:flex;align-items:center;gap:12px;width:100%;padding:14px;background:transparent;border:none;
     border-bottom:1px solid var(--line);color:var(--ink);text-align:left;cursor:pointer;font:inherit}
@@ -22192,7 +22190,10 @@ function onbRevealGridHTML(c){
 // done. Nothing here runs unless the wizard is actually open (oafOpen), so an account that never runs setup
 // is never touched (AC5). The actual account change is ONE atomic commit (oneAgentCommit below, fired by the
 // done screen's "Start watching") — every screen before that only ever edits the in-memory draft (oafState).
-const ONE_AGENT_SETUP_STYLES = Object.keys(TASTE_SHORT);   // the exact 19, in TASTE_SHORT's own order
+// Lee, 16 Nov: TV Movie is left out of every setup genre screen (Me, Partner, Family) — so it's never given
+// an entry and stays off for a new agent. The agent screen still lists it, where it can be switched on.
+const ONE_AGENT_SETUP_HIDDEN = new Set(["TV Movie"]);
+const ONE_AGENT_SETUP_STYLES = Object.keys(TASTE_SHORT).filter(s=>!ONE_AGENT_SETUP_HIDDEN.has(s));   // 18, in TASTE_SHORT's order
 
 let oafState = null;   // see oafOpen below for the full shape — null when closed
 let oafStep = "welcome";
@@ -22476,7 +22477,7 @@ function oafFavCellHTML(style, picks){
 function oafFavouritesHTML(){
   const n = ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]==="fav").length;
   return `<h2 class="osh">Your favourite genres</h2>
-    <p class="ossub">Every genre starts on ✓: your agent shows only the best of it. Tap ♥ for your absolute favourites (two or three is ideal) to get plenty of choice and alerts. Tap Off for genres you never watch.</p>
+    <p class="ossub">If you don't like it, switch it off. If you love it, make it a favourite.</p>
     ${oafFavLegendHTML()}
     <div class="favgrid" id="oafFavGrid">${oafFavGridCellsHTML(oafState.favs)}</div>
     <p class="ossub" style="margin-top:10px">${n} favourite${n===1?"":"s"}${n>3?" · fewer gives sharper lists":""}</p>`;
@@ -22514,28 +22515,19 @@ function oafTopSvcHTML(){
         role="radio" aria-checked="${oafState.topSvc===k}" data-val="${escA(k)}">${esc(svcName(k))}</button>`).join("")}</div></div>`;
 }
 // Lee, 14 Nov (pm): one box — a favourite actor or director — which becomes a mood of its own. Optional; it
-// says how many films in Cascade match as you type, so a misspelling shows up before it becomes an empty mood.
+// (Lee, 16 Nov: no film count under it.)
 function oafPeopleHTML(){
   return `<h2 class="osh">A favourite actor or director?</h2>
     <p class="ossub">We'll make them a mood, so you never miss their films. Or skip this.</p>
     <label class="oafpfield"><input type="text" class="osfield" id="oafP_person" placeholder="e.g. Cate Blanchett" maxlength="40"
       autocomplete="off" value="${escA(oafState.person||"")}" aria-label="Favourite actor or director">
-    <span class="oafpcount" id="oafPC_person" aria-live="polite"></span></label>`;
-}
-function oafPeopleCount(q){
-  q=(q||"").trim(); if(q.length<3) return null;
-  return (typeof MOVIES!=="undefined" ? MOVIES : []).filter(m=>{
-    const n=normSearchText(q);
-    return (m.director && normSearchText(m.director).includes(n)) || (m.cast||[]).some(c=>normSearchText(c).includes(n));
-  }).length;
+</label>`;
 }
 function oafWirePeople(){
   ["person"].forEach(key=>{
-    const input=$("oafP_"+key), out=$("oafPC_"+key); if(!input) return;
+    // Lee, 16 Nov: no film count under the box.
+    const input=$("oafP_"+key); if(!input) return;
     const sync=()=>{
-      const n=oafPeopleCount(input.value);
-      out.textContent = n==null ? "" : n ? `${n} film${n===1?"":"s"} in Cascade` : "No films in Cascade yet — check the spelling";
-      out.classList.toggle("none", n===0);
       $("oafCta").textContent = oafPerson() ? "Continue" : "Skip";
     };
     input.oninput=()=>{ oafState[key]=input.value; sync(); };
@@ -24530,7 +24522,8 @@ function membSetStateAVisible(visible){
   const body=$("membBody"); if(!body) return;
   const d = visible ? "" : "none";
   // Lee, 14 Nov: the privacy consent line shows once, with the email it applies to, not again on the code step.
-  [$("membPill"), body.querySelector(".membhaul"), body.querySelector(".membenefits"),
+  // Lee, 16 Nov: the First month free box is the email step's only; the code step just asks for the code.
+  [$("membPill"), $("membOffer"), body.querySelector(".membhaul"), body.querySelector(".membenefits"),
    body.querySelector(".memfine"), $("membEmailField"), $("membPosterGrid"),
    // The privacy line specifically — the first .pnote is #membCodeMsg, which holds Change email (CAS-1445).
    body.querySelector('.pnote button[onclick^="openPrivacy"]')?.closest(".pnote")]
@@ -24812,7 +24805,7 @@ async function membLoadProduct(){
   try{ const r=await pl.getProduct({productIdentifier:MEMB_PRODUCT_ID, productType:"subs"}); membProduct=r && r.product || null; }
   catch(e){ console.warn("Cascade: product lookup failed", e); }
   const fine=$("membFine"); if(fine) fine.textContent=membFineText();
-  const offer=$("membOffer"); if(offer) offer.outerHTML=membOfferHTML();
+  const offer=$("membOffer"); if(offer){ offer.outerHTML=membOfferHTML(); if(membInCodeState) $("membOffer").style.display="none"; }
   const btn=document.querySelector(".membcta"); if(btn && !btn.disabled) btn.textContent=membCtaLabel();
   return membProduct;
 }
@@ -25324,7 +25317,9 @@ function tutorialReposition(){
   const scrim=$("tutScrim");
   if(!scrim || !scrim.classList.contains("open")) return;
   const step=tutSteps[tutIdx]||{};
-  const hole=$("tutHole"), card=$("tutCard"), arrow=$("tutArrow"), pad=6, vw=innerWidth, vh=innerHeight;
+  const hole=$("tutHole"), card=$("tutCard"), arrow=$("tutArrow"), vw=innerWidth, vh=innerHeight;
+  // Lee, 16 Nov: several targets side by side (the four nav chips) get a hairline pad, so their rings don't overlap.
+  const pad = tutCurrent && tutCurrent.els && tutCurrent.els.length>1 ? 1 : 6;
   const z=tutZoomFactor();
   const allEls = tutCurrent && tutCurrent.els ? tutCurrent.els : [];
   const els = allEls.filter(el=>!tutShut.has(el));
