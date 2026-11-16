@@ -23062,6 +23062,9 @@ const MOVING_EMPTY_COPY = {
 // "nothing moved" and should not be said as if it were.
 const MOVING_EMPTY_NO_OWNER_COPY = "Something moved, but no agent currently owns it, so there's nothing to show.";
 let movingWindow="today";
+// CAS-1465: the period the user last picked this session (null = none yet). In memory only — never saved
+// anywhere; a reload or a sign-out (signOutReset) puts it back to null so the next open lands on Today.
+let movingWindowChosen=null;
 // CAS-668: whether the screen is actually open right now — the badge mirrors movingWindow
 // while it is, and predicts the window openMovingScreen would pick while it isn't. See movingBadgeWindow.
 let movingIsOpen=false;
@@ -23181,9 +23184,10 @@ function movingEmptyCopy(win){
 }
 // CAS-668: while Moving is open, the badge must track whatever window is actually on screen (movingWindow),
 // including a tap via setMovingWindow. While it's closed, there is no "on screen" window yet, so the badge
-// predicts the window Moving now always opens on (CAS-1197: pinned to Today, no longer auto-picked).
+// predicts the window Moving will open on (CAS-1465: Today until the user picks a period this session, then
+// that period; CAS-1197 pinned the first open to Today, no longer auto-picked).
 function movingBadgeWindow(){
-  return movingIsOpen ? movingWindow : "today";
+  return movingIsOpen ? movingWindow : (movingWindowChosen||"today");
 }
 function movingUnseenCount(){
   const win=movingBadgeWindow();
@@ -23393,7 +23397,9 @@ function renderMovingScreen(markSeen){
 }
 // CAS-650: switching the window re-renders in place.
 window.setMovingWindow=(key)=>{
-  if(!MOVING_WINDOWS.some(w=>w.key===key) || movingWindow===key) return;
+  if(!MOVING_WINDOWS.some(w=>w.key===key)) return;
+  movingWindowChosen=key;   // CAS-1465: remembered for later opens this session (memory only)
+  if(movingWindow===key) return;
   movingWindow=key;
   renderMovingScreen(true);
 };
@@ -23422,13 +23428,15 @@ window.closeAgentsScreen=()=>{
 // CAS-636: Moving — the alert feed made visible. Same open/close shape as Agents (mutually exclusive with
 // Agents), plus its own render + seen-state pass (renderMovingScreen marks every row it shows
 // as seen and refreshes the badge, per cascade_moving_seen — see that function for the mechanism).
-// CAS-1197: which window the visit OPENS on is always Today now (CAS-848's pin to 2 weeks is gone).
-// Never persisted; the user's own tap (setMovingWindow) always overrides it.
+// CAS-1465 (builds on CAS-1197): the FIRST open in an app session lands on Today (CAS-848's pin to 2 weeks
+// is gone). Once the user picks a period with setMovingWindow, every later open in the same session lands on
+// that period until they pick another. Session = this page load, held in memory only (movingWindowChosen) —
+// never persisted; a reload or sign-out (signOutReset) returns the next open to Today.
 window.openMovingScreen=()=>{
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
   if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186: mutually exclusive with Find too
   movingIsOpen=true;
-  movingWindow="today";   // CAS-1197: always opens pinned to Today; a tap (setMovingWindow) still overrides it
+  movingWindow=movingWindowChosen||"today";   // CAS-1465: Today until the user picks a period this session
   renderMovingScreen(true);
   $("movingScreen").scrollTop=0;
   $("movingScreen").classList.add("open"); lockBodyScroll(true);
@@ -27730,6 +27738,7 @@ function acctFetchKeepalive(init){
     watchPrefs = watchPrefsDefaults();
     notifyPrefs = notifyPrefsDefault();
     Object.keys(movingSeen).forEach(k=>delete movingSeen[k]);
+    movingWindowChosen=null;   // CAS-1465: the next account's first Alerts open is Today again
     realAlerts=[]; updateMovingBadge();
     invites=[]; invitesReady=true; updateInvitesBadge();   // CAS-886: same reasoning — nothing left to wait on
     agentFilms={}; agentFilmsReady=true;   // CAS-736: nothing left to wait on
