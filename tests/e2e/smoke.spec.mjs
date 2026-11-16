@@ -2415,6 +2415,8 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
+  // Lee, 2026-11-17: the levels, strips and the Agent override slider live under "Advanced settings".
+  await page.evaluate(() => { if (!oamAdvancedOn(oamDraft)) window.toggleOamAdvanced(); window.setOamAgentOverride(true); });
   const m = await page.evaluate(() => {
     const rows = [...document.querySelectorAll("#watchSheetBody .oamstylerow")];
     const hd = document.querySelector("#watchSheetBody .gcolhd");
@@ -2435,7 +2437,7 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
   });
   expect(m.rowCount).toBeGreaterThan(0);
   m.rowHeights.forEach(h => expect(h).toBeLessThan(52));
-  expect(m.hdHeight).toBeLessThan(16);
+  expect(m.hdHeight).toBeLessThan(36);   // the header now carries the Agent settings / Agent override switch
   expect(m.hdVsTick).toBeLessThanOrEqual(5);
   expect(m.stripLeftDiff).toBeLessThanOrEqual(1);
   expect(m.stripWidthDiff).toBeLessThanOrEqual(1);

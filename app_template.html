@@ -3628,6 +3628,22 @@
   .mfbox.off .oaslidewrap{opacity:.35;filter:grayscale(1)}
   .mfbox.off .oarange{pointer-events:none}
   .mfbox{margin:6px 0 0;padding:12px 4px 6px;border-top:1px solid var(--line)}
+  /* Lee, 2026-11-17: the Agent settings / Agent override switch sits where "% of Catalog" was; when override is
+     on, the one-level slider box slots in under it, above the genres. */
+  .gcolhd.agovhd{align-items:center;margin:4px 0 2px}
+  .agovseg{grid-column:2/span 2;display:flex;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px}
+  .agovseg button{flex:1;border:0;background:transparent;border-radius:999px;padding:5px 0;font:700 10.5px/1.1 var(--font-body);
+    color:var(--faint);cursor:pointer;white-space:nowrap}
+  .agovseg button.on{background:var(--accent);color:#fff}
+  .agovhd + .mfbox{margin:4px 0 8px;border-top:0;border-bottom:1px solid var(--line);padding:4px 4px 10px}
+  /* Simple (default): one genre per row with a tick and its "also in" line — no levels, strips or scores. */
+  .mgenre.simple .agovhd,.mgenre.simple .mfbox,.mgenre.simple .oaslidewrap,.mgenre.simple .oarowval{display:none}
+  .mgenre.simple .oamstylerow{grid-template-columns:1fr}
+  .oamadvbtn{display:flex;align-items:center;justify-content:space-between;width:100%;margin:10px 0 2px;padding:11px 12px;
+    border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--dim);font:700 13px var(--font-body);cursor:pointer}
+  .oamadvbtn i{font-style:normal;font-weight:600;color:var(--faint)}
+  .oamadvbtn .chev{transition:transform .15s}
+  .oamadvbtn.open .chev{transform:rotate(90deg)}
   .mfrowgrid{align-items:center}
   .mfrowgrid .mflbl{font-size:12px;color:var(--dim);line-height:1.35}
   .mfrowgrid .mflbl b{color:var(--ink);font-size:12.5px}
@@ -21436,9 +21452,7 @@ function oamOverrideValHTML(share, on){
   return share>=100 ? `All<i>every genre</i>` : `Top ${share}%<i>every genre</i>`;
 }
 function oamOverrideFilterDesc(share, on){
-  return on
-    ? `Every ticked genre shows its ${share>=100?"whole catalog":`top ${share}%`} in this mood, whatever your agent's own setting. Greyed is what this takes away; striped is what it adds.`
-    : `Off: each genre uses your agent's own setting. Switch on to set every genre in this mood to the same top %, higher or lower.`;
+  return `Every ticked genre shows its ${share>=100?"whole catalog":`top ${share}%`} here, instead of your agent's level.`;
 }
 function oamOverrideFilterHTML(d){
   const on = d.topShare!=null;
@@ -21446,9 +21460,7 @@ function oamOverrideFilterHTML(d){
   return `<div class="mfbox${on?"":" off"}">
       <div class="mfscale"><span>${ONE_AGENT_SHARE_BRACKETS.map(b=>`<i>${esc(oaShareLabel(b.pct))}</i>`).join("")}</span></div>
       <div class="mfrowgrid">
-        <div class="mflbl"><b>Mood Override</b>
-          <span class="mftogrow"><button type="button" class="mftog${on?" on":""}" role="switch" aria-checked="${on}"
-            aria-label="Mood Override" onclick="toggleOamOverride()"><i></i></button><span class="mfsub">${on?"On":"Off"}</span></span></div>
+        <div class="mflbl"><b>Every genre</b><span class="mfsub">same level</span></div>
         <div class="oaslidewrap">
           <div class="oastrip oastripfull">${oamFilterBoxesHTML(share)}</div>
           <input type="range" class="oarange" min="1" max="100" step="1" value="${share}" ${on?"":"disabled"}
@@ -21462,8 +21474,21 @@ function oamOverrideFilterHTML(d){
 window.toggleOamOverride=()=>{
   const d=oamDraft; if(!d) return;
   if(d.topShare!=null){ d.lastTopShare=d.topShare; d.topShare=null; }
-  else d.topShare=d.lastTopShare || 40;
+  else d.topShare=d.lastTopShare || 60;
   renderOamMoodSheetBody();
+};
+// Lee, 2026-11-17: Agent settings (off) / Agent override (on, starting at 60% the first time).
+// Lee, 2026-11-17: the genre list is just ticks until "Advanced settings" brings in the agent's levels and the
+// Agent settings / Agent override switch. A mood that already overrides opens with Advanced showing.
+function oamAdvancedOn(d){
+  if(d.advanced===undefined) d.advanced = d.topShare!=null;
+  return !!d.advanced;
+}
+window.toggleOamAdvanced=()=>{ const d=oamDraft; if(!d) return; d.advanced=!oamAdvancedOn(d); renderOamMoodSheetBody(); };
+window.setOamAgentOverride=(on)=>{
+  const d=oamDraft; if(!d) return;
+  if(!!on === (d.topShare!=null)) return;
+  window.toggleOamOverride();
 };
 // The box-geometry rule the ticket gives verbatim: share p falls in box floor(p/20) at fraction (p mod 20)/20
 // of that box's own rendered width, and 100 is the right edge of the last box — reading real DOM geometry
@@ -21591,9 +21616,16 @@ function renderOamMoodSheetBody(){
     </div>
     <div class="mpanel">
       <div class="mtrack${kwMode?" kw":""}">
-        <section class="mgenre" aria-hidden="${kwMode}">
-          <p class="oamgenreintro">Tick the genres this mood lists. Each genre's score is set in your agent.</p>
-          <div class="gcolhd"><b>Include in mood</b><b>% of Catalog<i>(agent setting)</i></b></div>
+        <section class="mgenre${oamAdvancedOn(d)?"":" simple"}" aria-hidden="${kwMode}">
+          <p class="oamgenreintro">${!oamAdvancedOn(d) ? "Tick the genres for this mood." : `Tick the genres this mood lists. ${d.topShare==null ? "Each genre's level comes from your agent." : "Every genre uses the level set below."}`}</p>
+          <!-- Lee, 2026-11-17: the genre levels come from the agent by default; "Agent override" reveals one
+               level slider for every genre in this mood, pushed in above the list. -->
+          <div class="gcolhd agovhd"><b>Include in mood</b>
+            <span class="agovseg" role="radiogroup" aria-label="Genre levels">
+              <button type="button" role="radio" class="${d.topShare==null?"on":""}" aria-checked="${d.topShare==null}" onclick="setOamAgentOverride(false)">Agent settings</button>
+              <button type="button" role="radio" class="${d.topShare!=null?"on":""}" aria-checked="${d.topShare!=null}" onclick="setOamAgentOverride(true)">Agent override</button>
+            </span></div>
+          ${d.topShare!=null ? oamOverrideFilterHTML(d) : ""}
           <div class="oalist">
             ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
             ${order.notInMood.length ? `
@@ -21603,7 +21635,9 @@ function renderOamMoodSheetBody(){
               ${oamNotInMoodOpen ? order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("") : ""}
             ` : ""}
           </div>
-          ${oamOverrideFilterHTML(d)}
+          <button type="button" class="oamadvbtn${oamAdvancedOn(d)?" open":""}" onclick="toggleOamAdvanced()" aria-expanded="${oamAdvancedOn(d)}">
+            <span>${oamAdvancedOn(d) ? "Hide advanced settings" : "Advanced settings"}${!oamAdvancedOn(d) && d.topShare!=null ? ` <i>· Agent override on</i>` : ""}</span><span class="chev" aria-hidden="true">&rsaquo;</span>
+          </button>
         </section>
         <section class="mkeyword" aria-hidden="${!kwMode}">
           <input class="search" type="text" enterkeyhint="done" placeholder="e.g. Tom Cruise, Russo"
