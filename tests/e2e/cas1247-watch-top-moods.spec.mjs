@@ -115,11 +115,11 @@ test("CAS-1283 AC1/AC2: the bar stays open while scrolling, and collapses/reopen
   await expect(page.locator(".stagestop").first()).toBeVisible();
   await page.evaluate(() => window.scrollTo(0, 0));
 
-  // AC2: tapping the handle collapses to #wtMini; tapping #wtMini reopens it; the first visible card's
-  // own screen position doesn't move either way.
+  // AC2: tapping the handle collapses to #wtMini; tapping #wtMini reopens it. Lee, 2026-11-17: the list moves
+  // up into the space the bar gives back, so the first card keeps its distance below the sticky bar's bottom.
   const firstCardTop = async () => page.evaluate(() => {
     const el = document.querySelector("#groups .card, #groups .stub");
-    return el ? el.getBoundingClientRect().top : null;
+    return el ? el.getBoundingClientRect().top - document.getElementById("cascbar").getBoundingClientRect().bottom : null;
   });
   await page.evaluate(() => window.scrollTo(0, 300));
   await page.waitForTimeout(50);
@@ -129,7 +129,7 @@ test("CAS-1283 AC1/AC2: the bar stays open while scrolling, and collapses/reopen
   await expect(page.locator("#cascbar")).toHaveClass(/wtcollapsed/);
   await expect(page.locator("#watchTop")).not.toBeVisible();
   await expect(page.locator("#wtMini")).toBeVisible();
-  await expect(page.locator("#wtMini")).toContainText("Change");
+  await expect(page.locator("#wtMini .wtchev")).toBeVisible();
   expect(Math.abs((await firstCardTop()) - beforeCollapse)).toBeLessThanOrEqual(2);
 
   const beforeExpand = await firstCardTop();

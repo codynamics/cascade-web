@@ -4279,10 +4279,16 @@
   #wtMini .gdot{width:7px;height:7px;border-radius:50%;flex:none}
   #wtMini .wtsep{color:var(--faint)}
   #wtMini .wtmood{color:var(--dim)}
-  #wtMini .wtchev{margin-left:auto;color:var(--faint);font-size:11px}
-  /* CAS-1283: the collapse handle — the open bar's own last row, a full-width tap target */
-  #wtHandle{display:flex;align-items:center;justify-content:center;height:22px;color:var(--faint);
-    font-size:12px;cursor:pointer}
+  /* Lee, 2026-11-17: open/close uses the Agent screen's chevron (.oachev) — a round chip with a drawn chevron,
+     bigger here (24px). Down + plain on the collapsed row; up + violet on the open bar's handle. No "Change" word. */
+  .wtchev{flex:none;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.07);display:grid;place-items:center;font-size:0}
+  .wtchev::before{content:"";display:inline-block;width:7px;height:7px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:translateY(-2px) rotate(45deg)}
+  #wtMini .wtchev{margin-left:auto}
+  #wtHandle .wtchev{background:rgba(124,92,255,.35)}
+  #wtHandle .wtchev::before{transform:translateY(2px) rotate(-135deg)}
+  /* CAS-1283: the collapse handle — the open bar's own last row, a full-width tap target. Lee, 2026-11-17:
+     tucked up under the stage groups (negative top margin) so the list starts higher. */
+  #wtHandle{display:flex;align-items:center;justify-content:center;height:28px;margin:-4px 0 -8px;cursor:pointer}
   #cascbar.wtcollapsed #wtHandle{display:none}
   /* the mood sheet's own fields, above the sections the Filters sheet already has */
   .mfinput{width:100%;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);
@@ -4789,7 +4795,7 @@
          state (the toggle itself lives near the bottom of this script). -->
     <div id="wtMini" role="button" tabindex="0" aria-label="Show stages and moods"></div>
     <div class="watchtop" id="watchTop"></div>
-    <div id="wtHandle" role="button" tabindex="0" aria-label="Hide stages and moods">▴</div>
+    <div id="wtHandle" role="button" tabindex="0" aria-label="Hide stages and moods"><span class="wtchev" aria-hidden="true"></span></div>
     <!-- CAS-1223: the standalone sort button is gone from Watch — kept only as inert state (hidden, never
          focused) so syncSortCtl's own #sort option lookup is untouched. -->
     <button type="button" class="sortctl ca-btn x" id="sortCtl" aria-haspopup="listbox" aria-expanded="false"
@@ -26667,7 +26673,7 @@ function wtRefreshMini(){
   const stop = watchStageStopsNow().find(s=>s.key===curKey);
   const stageName = stop ? (stop.key==="in_cinema" ? "Now showing" : stop.label) : "";
   mini.innerHTML = `<span class="wtmood">${esc(moodDisplayName(currentMood()))}</span><span class="wtsep">·</span>`
-    + `<span class="gdot ${stop?stop.dot:""}" aria-hidden="true"></span><span>${esc(stageName)}</span><span class="wtchev">Change ▾</span>`;
+    + `<span class="gdot ${stop?stop.dot:""}" aria-hidden="true"></span><span>${esc(stageName)}</span><span class="wtchev" aria-hidden="true"></span>`;
 }
 // Measuring shortH forces a layout flush while the bar is shrunk but not yet margin-compensated — if the
 // page is scrolled to (or past) what is, for that one instant, a shorter document, the browser clamps
@@ -26681,12 +26687,12 @@ function wtPreservingScrollY(fn){
 }
 function wtEnterCollapsed(bar){
   wtPreservingScrollY(() => {
-    const fullH=bar.offsetHeight;
     bar.classList.add("wtcollapsed");
     wtRefreshMini();
-    const shortH=bar.offsetHeight;
-    wtCollapseMarginPx = Math.max(0, fullH-shortH);
-    bar.style.marginBottom = wtCollapseMarginPx+"px";
+    // Lee, 2026-11-17: no compensating margin any more — the list moves up into the space the bar gave back.
+    // #cascbar is sticky, so a film on screen keeps its distance below the bar's bottom edge.
+    wtCollapseMarginPx = 0;
+    bar.style.marginBottom = "";
   });
   syncHeaderHeight();
 }
