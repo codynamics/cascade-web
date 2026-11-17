@@ -2415,20 +2415,17 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
-  // Lee, 2026-11-17: the levels, strips and the Agent override slider live under "Advanced settings".
+  // CAS-1467: the levels always show; the Agent override switch sits under the genre rows.
   await page.evaluate(() => { if (!oamAdvancedOn(oamDraft)) window.toggleOamAdvanced(); window.setOamAgentOverride(true); });
   const m = await page.evaluate(() => {
     const rows = [...document.querySelectorAll("#watchSheetBody .oamstylerow")];
-    const hd = document.querySelector("#watchSheetBody .gcolhd");
-    const hdFirst = hd.querySelector("b").getBoundingClientRect();
-    const tick = rows[0].querySelector("input[type=checkbox]").getBoundingClientRect();
+    const hd = document.querySelector("#watchSheetBody .oamlvlhd");
     const rowStrip = rows[0].querySelector(".oastrip").getBoundingClientRect();
     const fStrip = document.querySelector("#watchSheetBody .mfrowgrid .oastrip").getBoundingClientRect();
     return {
       rowCount: rows.length,
       rowHeights: rows.map(r => r.getBoundingClientRect().height),
       hdHeight: hd.getBoundingClientRect().height,
-      hdVsTick: Math.abs(hdFirst.left - tick.left),
       stripLeftDiff: Math.abs(rowStrip.left - fStrip.left),
       stripWidthDiff: Math.abs(rowStrip.width - fStrip.width),
       rangeInRow: document.querySelectorAll("#watchSheetBody .oamstylerow input[type=range]").length,
@@ -2437,8 +2434,7 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
   });
   expect(m.rowCount).toBeGreaterThan(0);
   m.rowHeights.forEach(h => expect(h).toBeLessThan(52));
-  expect(m.hdHeight).toBeLessThan(36);   // the header now carries the Agent settings / Agent override switch
-  expect(m.hdVsTick).toBeLessThanOrEqual(5);
+  expect(m.hdHeight).toBeLessThan(36);   // CAS-1467: the "Genre levels" heading sits under the rows (the old .gcolhd header is gone)
   expect(m.stripLeftDiff).toBeLessThanOrEqual(1);
   expect(m.stripWidthDiff).toBeLessThanOrEqual(1);
   expect(m.rangeInRow).toBe(0);
