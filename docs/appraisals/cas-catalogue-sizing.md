@@ -1,10 +1,10 @@
 # Catalogue sizing — TMDB discover total_results (CAS-354, CAS-522)
 
-Measured 2026-11-16 by `scripts/catalogue_sizing.py`, run in CI (`.github/workflows/daily.yml`) where the TMDB key exists.
+Measured 2026-11-17 by `scripts/catalogue_sizing.py`, run in CI (`.github/workflows/daily.yml`) where the TMDB key exists.
 
-## Current scope (pipeline-identical: with_release_type=2|3, region=AU, 2023-11-17..2026-11-16, sort_by=popularity.desc)
+## Current scope (pipeline-identical: with_release_type=2|3, region=AU, 2023-11-18..2026-11-17, sort_by=popularity.desc)
 
-- total_results: 1973
+- total_results: 1972
 - total_pages: 99
 
 ## Widened scope, unbounded (everything watchable in AU across all of film history: watch_region=AU, with_watch_monetization_types=flatrate|free|ads|rent|buy, no release_type restriction, no date bound)
@@ -12,17 +12,17 @@ Measured 2026-11-16 by `scripts/catalogue_sizing.py`, run in CI (`.github/workfl
 - total_results: 20001
 - total_pages: 1001
 
-## Widened scope, 3yr-bounded (same AU-watchable query as above, but bounded to the same 2023-11-17..2026-11-16 window as current-scope — extra non-cinema-release titles within the 3 years we already cover)
+## Widened scope, 3yr-bounded (same AU-watchable query as above, but bounded to the same 2023-11-18..2026-11-17 window as current-scope — extra non-cinema-release titles within the 3 years we already cover)
 
-- total_results: 17161
-- total_pages: 859
+- total_results: 17146
+- total_pages: 858
 
 ## Quality-gated pool (AU-watchable, watch_region=AU, with_watch_monetization_types=flatrate|free|ads|rent|buy, sort_by=popularity.desc — CAS-548)
 
 | # | Window | vote_average.gte | vote_count.gte | total_results | total_pages |
 | --- | --- | --- | --- | --- | --- |
-| 1 | in-window (2023-11-17..2026-11-16) | 5.9 | 0 | 9219 | 461 |
-| 2 | in-window (2023-11-17..2026-11-16) | 5.9 | 50 | 5110 | 256 |
-| 3 | in-window (2023-11-17..2026-11-16) | 5.9 | 250 | 3462 | 174 |
-| 4 | pre-window (release_date.lte=2023-11-16, no lower bound) | 5.9 | 50 | 14976 | 749 |
+| 1 | in-window (2023-11-18..2026-11-17) | 5.9 | 0 | 9210 | 461 |
+| 2 | in-window (2023-11-18..2026-11-17) | 5.9 | 50 | 5109 | 256 |
+| 3 | in-window (2023-11-18..2026-11-17) | 5.9 | 250 | 3466 | 174 |
+| 4 | pre-window (release_date.lte=2023-11-17, no lower bound) | 5.9 | 50 | 14979 | 749 |
 
