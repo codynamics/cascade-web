@@ -1041,6 +1041,11 @@
   .cmini .ctog svg{width:12px;height:12px;display:block;transition:transform .15s;transform:rotate(180deg)}
   .ctl.open .cmini .ctog svg{transform:rotate(0deg)}
   .ctl:hover .cmini{border-color:#3a4150}
+  /* Lee, 2026-11-17: a selected (open) Alert / mood / Watched button is lit — lighter fill, white outline,
+     white icon — so it is clear which panel is showing. Overrides the gold/blue provenance line only while open. */
+  .ctl.open .cmini,.ctl.open:hover .cmini,.card .actions .ctl.open .cmini{background:#323b4e;border-color:var(--ink);
+    box-shadow:inset 0 0 0 1px var(--ink)}
+  .ctl.open .cmini .cic,.ctl.open .cmini .ctog,.card .actions .ctl.open .cmini .clab,.card:not(.expanded) .actions .ctl.open .cmini .clab.dim{color:var(--ink);font-weight:700}
   .ctl:focus-visible .cmini{outline:2px solid var(--cyan);outline-offset:2px}
   /* CAS-348 (0.8.5 staging review): three equal columns leave too little room on a phone for the icon AND
      the full label — the label lost, ellipsising to a single letter. Full legibility wins: the icon goes,
@@ -3636,14 +3641,13 @@
     color:var(--faint);cursor:pointer;white-space:nowrap}
   .agovseg button.on{background:var(--accent);color:#fff}
   .agovhd + .mfbox{margin:4px 0 8px;border-top:0;border-bottom:1px solid var(--line);padding:4px 4px 10px}
-  /* Simple (default): one genre per row with a tick and its "also in" line — no levels, strips or scores. */
-  .mgenre.simple .agovhd,.mgenre.simple .mfbox,.mgenre.simple .oaslidewrap,.mgenre.simple .oarowval{display:none}
-  .mgenre.simple .oamstylerow{grid-template-columns:1fr}
-  .oamadvbtn{display:flex;align-items:center;justify-content:space-between;width:100%;margin:10px 0 2px;padding:11px 12px;
-    border:1px solid var(--line);border-radius:10px;background:transparent;color:var(--dim);font:700 13px var(--font-body);cursor:pointer}
-  .oamadvbtn i{font-style:normal;font-weight:600;color:var(--faint)}
-  .oamadvbtn .chev{transition:transform .15s}
-  .oamadvbtn.open .chev{transform:rotate(90deg)}
+  /* Lee, 2026-11-17: the level switch sits under the genre rows, full width. */
+  .oamlvl{margin:10px 0 4px;padding-top:10px;border-top:1px solid var(--line)}
+  .oamlvlhd{font:800 11px/1 var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin:0 2px 8px}
+  .agovseg.lvl2{grid-column:auto;width:100%}
+  .agovseg.lvl2 button{padding:8px 0;font-size:12.5px}
+  .oamlvlnote{margin:8px 2px 0}
+  .oamlvl .mfbox{margin:8px 0 0;border-top:0;padding:4px 4px 0}
   .mfrowgrid{align-items:center}
   .mfrowgrid .mflbl{font-size:12px;color:var(--dim);line-height:1.35}
   .mfrowgrid .mflbl b{color:var(--ink);font-size:12.5px}
@@ -3696,14 +3700,19 @@
   .oamstylerow .oamalso{white-space:nowrap}
   .oamalso{display:block;font-size:10.5px;color:var(--faint);margin-top:1px;overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
-  /* Lee, 2026-11-14 (later): one on/off BUTTON per mood, not a switch, wrapped to save height. On = filled
-     accent with a tick and white text; off = outlined and faint. Capped at the action row's width. */
-  .cpop.oamlpop{width:max-content;max-width:100%}
-  .oamlistpanel{padding:8px}
-  .oamlistrows{display:flex;flex-wrap:wrap;gap:6px}
-  .oamtog{padding:8px 12px;border-radius:999px;border:1.5px solid var(--line);background:transparent;
-    color:var(--faint);font:700 13px/1.2 var(--font-body);cursor:pointer;white-space:nowrap}
-  .oamtog.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  /* Lee, 2026-11-17: a plain vertical menu — one mood per row, each row a button styled exactly like the mood
+     chips in the Watch row: in this mood = the selected chip (like "Me"), not in it = a plain chip (like
+     "Partner"). A tick marks the in rows too. No switches. */
+  .cpop.oamlpop{width:max-content;min-width:200px;max-width:100%}
+  .oamlistpanel{padding:6px}
+  .oamlistrows{display:flex;flex-direction:column;gap:6px}
+  .oamtog{display:flex;align-items:center;justify-content:space-between;gap:14px;width:100%;height:34px;padding:0 13px;
+    border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--dim);
+    font:600 13.5px/1.2 var(--font-body);text-align:left;cursor:pointer}
+  /* In = the mood row's own selected chip (.moodchip.on): --sel-bg fill, --sel-bd outline, white bold. */
+  .oamtog.on{background:var(--sel-bg);border-color:var(--sel-bd);color:#fff;font-weight:700}
+  .oamtogname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .oamtick{flex:none;width:14px;text-align:right;font-weight:800}
   .oamlistrow{display:flex;align-items:center;justify-content:space-between;gap:8px;
     padding:7px 0;border-bottom:1px solid var(--line)}
   .oamlistrow:last-child{border-bottom:0}
@@ -21478,13 +21487,10 @@ window.toggleOamOverride=()=>{
   renderOamMoodSheetBody();
 };
 // Lee, 2026-11-17: Agent settings (off) / Agent override (on, starting at 60% the first time).
-// Lee, 2026-11-17: the genre list is just ticks until "Advanced settings" brings in the agent's levels and the
-// Agent settings / Agent override switch. A mood that already overrides opens with Advanced showing.
-function oamAdvancedOn(d){
-  if(d.advanced===undefined) d.advanced = d.topShare!=null;
-  return !!d.advanced;
-}
-window.toggleOamAdvanced=()=>{ const d=oamDraft; if(!d) return; d.advanced=!oamAdvancedOn(d); renderOamMoodSheetBody(); };
+// Lee, 2026-11-17 (later): no hidden/simple view — the agent's levels always show, so nothing filters out of sight.
+// Kept as always-on so existing callers (tutorial, e2e) still work.
+function oamAdvancedOn(d){ return true; }
+window.toggleOamAdvanced=()=>{};
 window.setOamAgentOverride=(on)=>{
   const d=oamDraft; if(!d) return;
   if(!!on === (d.topShare!=null)) return;
@@ -21616,28 +21622,28 @@ function renderOamMoodSheetBody(){
     </div>
     <div class="mpanel">
       <div class="mtrack${kwMode?" kw":""}">
-        <section class="mgenre${oamAdvancedOn(d)?"":" simple"}" aria-hidden="${kwMode}">
-          <p class="oamgenreintro">${!oamAdvancedOn(d) ? "Tick the genres for this mood." : `Tick the genres this mood lists. ${d.topShare==null ? "Each genre's level comes from your agent." : "Every genre uses the level set below."}`}</p>
-          <!-- Lee, 2026-11-17: the genre levels come from the agent by default; "Agent override" reveals one
-               level slider for every genre in this mood, pushed in above the list. -->
-          <div class="gcolhd agovhd"><b>Include in mood</b>
-            <span class="agovseg" role="radiogroup" aria-label="Genre levels">
-              <button type="button" role="radio" class="${d.topShare==null?"on":""}" aria-checked="${d.topShare==null}" onclick="setOamAgentOverride(false)">Agent settings</button>
-              <button type="button" role="radio" class="${d.topShare!=null?"on":""}" aria-checked="${d.topShare!=null}" onclick="setOamAgentOverride(true)">Agent override</button>
-            </span></div>
-          ${d.topShare!=null ? oamOverrideFilterHTML(d) : ""}
+        <section class="mgenre" aria-hidden="${kwMode}">
+          <!-- Lee, 2026-11-17: the agent's levels always show, and the genre rows never move — the Agent settings /
+               Agent override switch and the override slider sit UNDER the rows, so switching never pushes them. -->
+          <p class="oamgenreintro">Tick the genres for this mood.</p>
           <div class="oalist">
             ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
-            ${order.notInMood.length ? `
+          </div>
+          <div class="oamlvl">
+            <div class="oamlvlhd">Genre levels</div>
+            <div class="agovseg lvl2" role="radiogroup" aria-label="Genre levels">
+              <button type="button" role="radio" class="${d.topShare==null?"on":""}" aria-checked="${d.topShare==null}" onclick="setOamAgentOverride(false)">Agent settings</button>
+              <button type="button" role="radio" class="${d.topShare!=null?"on":""}" aria-checked="${d.topShare!=null}" onclick="setOamAgentOverride(true)">Agent override</button>
+            </div>
+            <p class="oamgenreintro oamlvlnote">${d.topShare==null ? "Each genre uses the level set for it in your agent." : "Every genre in this mood uses the level below."}</p>
+            ${d.topShare!=null ? oamOverrideFilterHTML(d) : ""}
+          </div>
+          ${order.notInMood.length ? `<div class="oalist">
               <button type="button" class="oamexpand${oamNotInMoodOpen?" open":""}" onclick="toggleOamNotInMood()" aria-expanded="${oamNotInMoodOpen}">
                 <span>Not in this mood <b>${order.notInMood.length}</b></span><span class="chev" aria-hidden="true">&rsaquo;</span>
               </button>
               ${oamNotInMoodOpen ? order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("") : ""}
-            ` : ""}
-          </div>
-          <button type="button" class="oamadvbtn${oamAdvancedOn(d)?" open":""}" onclick="toggleOamAdvanced()" aria-expanded="${oamAdvancedOn(d)}">
-            <span>${oamAdvancedOn(d) ? "Hide advanced settings" : "Advanced settings"}${!oamAdvancedOn(d) && d.topShare!=null ? ` <i>· Agent override on</i>` : ""}</span><span class="chev" aria-hidden="true">&rsaquo;</span>
-          </button>
+            </div>` : ""}
         </section>
         <section class="mkeyword" aria-hidden="${!kwMode}">
           <input class="search" type="text" enterkeyhint="done" placeholder="e.g. Tom Cruise, Russo"
@@ -21876,9 +21882,9 @@ function oamListPanelRowsHTML(id){
   const c=oneAgentCriteria(); if(!c) return "";
   const rows=oamMoodsListReal().map(mood=>{
     const on=oamFilmInMoodNow(m, mood, c);
-    // Lee, 2026-11-14 (later): a plain on/off button per mood, not a switch.
+    // Lee, 2026-11-17: one mood per row, each row a plain button — pressed (lit, ✓) when the film is in that mood.
     return `<button type="button" class="oamtog${on?" on":""}" aria-pressed="${on}"
-      onclick="oamToggleMood(${id},'${escA(mood.id)}')">${on?"&check; ":""}${esc(moodDisplayName(mood))}</button>`;
+      onclick="oamToggleMood(${id},'${escA(mood.id)}')"><span class="oamtogname">${esc(moodDisplayName(mood))}</span><span class="oamtick" aria-hidden="true">${on?"&check;":""}</span></button>`;
   }).join("");
   return `<div class="oamlistpanel"><div class="oamlistrows">${rows}</div></div>`;
 }
@@ -25317,9 +25323,9 @@ const TOURS = {
     {html:TUT_P("A mood starts with your agent's genre preferences, so you get the films that matter most to you.",
       "Switch genres on or off to make a special mood. For example, to create a mood with only drama movies, switch everything else off."),
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .mgenre .oalist"]},
-    // CAS-1462 moved the levels under "Advanced settings", with an Agent settings / Agent override switch.
+    // Lee, 2026-11-17: the Agent settings / Agent override switch sits under the genre rows.
     {html:TUT_P("Sometimes you want just the best of the best.",
-      "Open <b>Advanced settings</b> and choose <b>Agent override</b> to set one level for every genre in this mood, in place of your agent's settings."),
+      "Under the genres, choose <b>Agent override</b> to set one level for every genre in this mood, in place of your agent's settings."),
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .agovseg"]},
     // The "during account setup" lines only appear when that setup mood exists (Lee, 16 Nov).
     {get html(){ return TUT_P("Instead of building a mood around genres, you can use a keyword search around an actor, director or title.",
