@@ -103,61 +103,23 @@ test("AC7/AC8: creating and deleting a mood", async ({ page }) => {
   await expect(page.locator(".moodchip")).toHaveCount(2);
 });
 
-test("CAS-1283 AC1/AC2: the bar stays open while scrolling, and collapses/reopens only on a tap", async ({ page }) => {
+// Lee, 2026-11-17: the collapse control (CAS-1283 AC2/AC3) is removed — the bar is always open.
+test("CAS-1283 AC1 (kept): the bar stays open while scrolling, and there is no collapse control", async ({ page }) => {
   await toWatchScreen(page);
-  const cardCount = await page.locator("#groups .card, #groups .stub").count();
-  test.skip(cardCount < 4, "not enough cards on this catalogue build to scroll meaningfully");
-
-  // AC1: scrolling alone never collapses the bar.
+  await expect(page.locator("#wtHandle")).toHaveCount(0);
   await page.evaluate(() => window.scrollTo(0, 1500));
   await page.waitForTimeout(50);
   await expect(page.locator("#cascbar")).not.toHaveClass(/wtcollapsed/);
   await expect(page.locator(".stagestop").first()).toBeVisible();
-  await page.evaluate(() => window.scrollTo(0, 0));
-
-  // AC2: tapping the handle collapses to #wtMini; tapping #wtMini reopens it. Lee, 2026-11-17: the list moves
-  // up into the space the bar gives back, so the first card keeps its distance below the sticky bar's bottom.
-  const firstCardTop = async () => page.evaluate(() => {
-    const el = document.querySelector("#groups .card, #groups .stub");
-    return el ? el.getBoundingClientRect().top - document.getElementById("cascbar").getBoundingClientRect().bottom : null;
-  });
-  await page.evaluate(() => window.scrollTo(0, 300));
-  await page.waitForTimeout(50);
-  const beforeCollapse = await firstCardTop();
-
-  await page.locator("#wtHandle").click();
-  await expect(page.locator("#cascbar")).toHaveClass(/wtcollapsed/);
-  await expect(page.locator("#watchTop")).not.toBeVisible();
-  await expect(page.locator("#wtMini")).toBeVisible();
-  await expect(page.locator("#wtMini .wtchev")).toBeVisible();
-  expect(Math.abs((await firstCardTop()) - beforeCollapse)).toBeLessThanOrEqual(2);
-
-  const beforeExpand = await firstCardTop();
-  await page.locator("#wtMini").click();
-  await expect(page.locator("#cascbar")).not.toHaveClass(/wtcollapsed/);
-  await expect(page.locator("#watchTop")).toBeVisible();
-  expect(Math.abs((await firstCardTop()) - beforeExpand)).toBeLessThanOrEqual(2);
-
-  // Scrolling again still never touches the bar's state.
-  await page.evaluate(() => window.scrollTo(0, 1500));
-  await page.waitForTimeout(50);
-  await expect(page.locator("#cascbar")).not.toHaveClass(/wtcollapsed/);
 });
 
-test("CAS-1283 AC3: the collapsed/open choice survives a reload", async ({ page }) => {
+test("a device that had saved the bar collapsed still boots open", async ({ page }) => {
   await toWatchScreen(page);
-
-  await page.locator("#wtHandle").click();
-  await expect(page.locator("#cascbar")).toHaveClass(/wtcollapsed/);
-  await page.reload();
-  await settleListing(page);
-  await expect(page.locator("#cascbar")).toHaveClass(/wtcollapsed/);
-
-  await page.locator("#wtMini").click();
-  await expect(page.locator("#cascbar")).not.toHaveClass(/wtcollapsed/);
+  await page.evaluate(() => localStorage.setItem("cascade_wt_collapsed", "1"));
   await page.reload();
   await settleListing(page);
   await expect(page.locator("#cascbar")).not.toHaveClass(/wtcollapsed/);
+  await expect(page.locator(".stagestop").first()).toBeVisible();
 });
 
 test("AC12: watchNavKey() differs between two moods that differ only in top", async ({ page }) => {

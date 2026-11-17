@@ -4279,17 +4279,8 @@
   #wtMini .gdot{width:7px;height:7px;border-radius:50%;flex:none}
   #wtMini .wtsep{color:var(--faint)}
   #wtMini .wtmood{color:var(--dim)}
-  /* Lee, 2026-11-17: open/close uses the Agent screen's chevron (.oachev) — a round chip with a drawn chevron,
-     bigger here (24px). Down + plain on the collapsed row; up + violet on the open bar's handle. No "Change" word. */
-  .wtchev{flex:none;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.07);display:grid;place-items:center;font-size:0}
-  .wtchev::before{content:"";display:inline-block;width:7px;height:7px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:translateY(-2px) rotate(45deg)}
-  #wtMini .wtchev{margin-left:auto}
-  #wtHandle .wtchev{background:rgba(124,92,255,.35)}
-  #wtHandle .wtchev::before{transform:translateY(2px) rotate(-135deg)}
-  /* CAS-1283: the collapse handle — the open bar's own last row, a full-width tap target. Lee, 2026-11-17:
-     tucked up under the stage groups (negative top margin) so the list starts higher. */
-  #wtHandle{display:flex;align-items:center;justify-content:center;height:28px;margin:-4px 0 -8px;cursor:pointer}
-  #cascbar.wtcollapsed #wtHandle{display:none}
+  /* Lee, 2026-11-17: the collapse control is gone (handle and chevrons) — the bar is always open and the
+     film list starts straight under it. #wtMini stays in the DOM, never shown. */
   /* the mood sheet's own fields, above the sections the Filters sheet already has */
   .mfinput{width:100%;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);
     color:var(--ink);font:600 15px var(--font-body);padding:0 12px;box-sizing:border-box}
@@ -4795,7 +4786,6 @@
          state (the toggle itself lives near the bottom of this script). -->
     <div id="wtMini" role="button" tabindex="0" aria-label="Show stages and moods"></div>
     <div class="watchtop" id="watchTop"></div>
-    <div id="wtHandle" role="button" tabindex="0" aria-label="Hide stages and moods"><span class="wtchev" aria-hidden="true"></span></div>
     <!-- CAS-1223: the standalone sort button is gone from Watch — kept only as inert state (hidden, never
          focused) so syncSortCtl's own #sort option lookup is untouched. -->
     <button type="button" class="sortctl ca-btn x" id="sortCtl" aria-haspopup="listbox" aria-expanded="false"
@@ -10926,6 +10916,17 @@ function oamEnsureStageNotDimmedForMood(mood){
   watchTab=next.tabKey;
   if(next.tabKey==="in_cinema") watchCinemaStage=next.key;
 }
+// Lee, 2026-11-17: visiting a mood never lands on an empty stage. If the current stage has no films, move to
+// the first stage that has any, in order Upcoming, Now showing, Rental, Streaming. A mood with none anywhere stays put.
+function watchEnsureStageNonEmpty(){
+  const stops=watchStageStopsNow(); if(!stops.length) return;
+  const curKey=watchTab==="in_cinema" ? watchCinemaStage : watchTab;
+  const cur=stops.find(s=>s.key===curKey);
+  if(cur && watchStageCountFor(cur)>0) return;
+  const next=stops.find(s=>watchStageCountFor(s)>0); if(!next) return;
+  watchTab=next.tabKey;
+  if(next.tabKey==="in_cinema") watchCinemaStage=next.key;
+}
 function renderWatchTop(){
   const el=$("watchTop"); if(!el) return;
   const stops=watchStageStopsNow();
@@ -11564,6 +11565,7 @@ window.setWatchMood = id => {
   watchMoodSel=id;
   applyMoodToState(mood);
   oamEnsureStageNotDimmedForMood(mood);   // CAS-1384
+  watchEnsureStageNonEmpty();   // Lee, 2026-11-17
   pushViewField("mood", id);   // C4: selecting a different mood
   logEvent("watch_mood", {action:"select"});
   render();
@@ -23545,6 +23547,15 @@ function findRenderMore(){
   observeLazyPosters(listEl);
   findShown=end;
 }
+// Lee, 2026-11-17: the last search actually run (Search / Enter, or cleared with ×) is remembered for the
+// login in user_prefs.view.findQ until the next one overwrites it, and Database reopens with it. Text typed
+// but never run is not saved. Signed out, pushViewField is a no-op and nothing is remembered.
+let findSearchSaved="";
+function findRememberSearch(raw){
+  if(raw===findSearchSaved) return;
+  findSearchSaved=raw;
+  pushViewField("findQ", raw);
+}
 window.setFindSearch=raw=>{
   findCollectionFilter=null;   // CAS-1382: typing clears an active Series filter before searching
   findSearchRaw=raw;
@@ -23559,6 +23570,7 @@ window.onFindSearchInput=val=>{
 window.runFindSearch=()=>{
   const input=$("findSearchInput"); if(!input) return;
   setFindSearch(input.value);
+  findRememberSearch(input.value.trim());
   input.blur();   // closes the on-device keyboard so the results are visible
 };
 window.onFindSearchKeydown=e=>{
@@ -23576,6 +23588,7 @@ window.setFindSvc=svc=>{
 window.clearFindSearch=()=>{
   $("findSearchInput").value="";
   findSearchRaw=""; findSearch="";
+  findRememberSearch("");
   findRenderList();
   $("findSearchInput").focus();
 };
@@ -23636,10 +23649,12 @@ function renderFindScreen(){
 window.openFindScreen=()=>{
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
   if($("movingScreen").classList.contains("open")) closeMovingScreen();
-  findSearchRaw=""; findSearch="";   // AC9: always reopens with an empty box and the list at the top
+  // Lee, 2026-11-17 (replaces AC9's empty box): reopens with the login's remembered search, list at the top.
+  findSearchRaw=findSearchSaved; findSearch=findSearchSaved.toLowerCase();
   findCollectionFilter=null;   // CAS-1382: opening Find any other way starts with no collection filter
   findSvc=null;   // CAS-1384: Find's own service chip always resets to All on open
   renderFindScreen();
+  { const inp=$("findSearchInput"); if(inp && findSearchSaved){ inp.value=findSearchSaved; onFindSearchInput(findSearchSaved); } }
   $("findScreen").scrollTop=0;
   $("findScreen").classList.add("open"); lockBodyScroll(true);
   $("findBtn").classList.add("active"); $("findBtn").setAttribute("aria-pressed","true");
@@ -26698,7 +26713,7 @@ function wtRefreshMini(){
   const stop = watchStageStopsNow().find(s=>s.key===curKey);
   const stageName = stop ? (stop.key==="in_cinema" ? "Now showing" : stop.label) : "";
   mini.innerHTML = `<span class="wtmood">${esc(moodDisplayName(currentMood()))}</span><span class="wtsep">·</span>`
-    + `<span class="gdot ${stop?stop.dot:""}" aria-hidden="true"></span><span>${esc(stageName)}</span><span class="wtchev" aria-hidden="true"></span>`;
+    + `<span class="gdot ${stop?stop.dot:""}" aria-hidden="true"></span><span>${esc(stageName)}</span>`;
 }
 // Measuring shortH forces a layout flush while the bar is shrunk but not yet margin-compensated — if the
 // page is scrolled to (or past) what is, for that one instant, a shorter document, the browser clamps
@@ -26734,17 +26749,8 @@ window.toggleWatchTopMini = () => {
   if(collapsed) wtLeaveCollapsed(bar); else wtEnterCollapsed(bar);
   wtStoreCollapsed(!collapsed);
 };
-{
-  const mini=$("wtMini"), handle=$("wtHandle"), bar=$("cascbar");
-  const wireTap = el => {
-    if(!el) return;
-    el.addEventListener("click", toggleWatchTopMini);
-    el.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleWatchTopMini(); } });
-  };
-  wireTap(mini);
-  wireTap(handle);
-  if(bar && wtStoredCollapsed()) bar.classList.add("wtcollapsed");
-}
+// Lee, 2026-11-17: the collapse control is gone — nothing is wired to toggleWatchTopMini and the bar never boots
+// collapsed, even on a device that had saved "collapsed" (cascade_wt_collapsed is no longer read at boot).
 // Repaint, and leave the film's row exactly where it was on screen — then animate it between the height it
 // had and the height it now has, so the change reads as a shrink (or an unfold) rather than a swap. Under
 // prefers-reduced-motion it lands at its new height instantly, still without moving.
@@ -29021,6 +29027,7 @@ function acctFetchKeepalive(init){
         starredIds.clear();
         v.starred.filter(id=>typeof id==="number").forEach(id=>starredIds.add(id));
       }
+      findSearchSaved = typeof v.findQ==="string" ? v.findQ : "";   // Lee, 2026-11-17: Database search, per login
       watchMoodSel = (typeof v.mood==="string" && watchMoods.some(m=>m.id===v.mood)) ? v.mood : watchMoods[0].id;
       applyMoodToState(currentMood());
       if(typeof v.tutorialSeen==="boolean") tutorialSeenFlag = v.tutorialSeen;

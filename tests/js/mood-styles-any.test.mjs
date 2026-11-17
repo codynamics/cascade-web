@@ -93,6 +93,9 @@ test("CAS-1334 AC2: on the Streaming stage, only Action on shows a film whose MA
   // CAS-753's mine-only default hides any film the guest harness has no configured service for — both
   // seeded films carry a streaming offer, so this is CAS-1222/CAS-1234's own established way to reach
   // past it, not something this ticket's own behaviour touches.
+  // Lee, 2026-11-17: selecting a mood moves off an empty stage (Streaming is empty in this harness while
+  // mine-only is on), so return to Streaming before mine-only is read and switched off.
+  E.setWatchTab("stream");
   const savedMineOnly = E.watchMineOnlyOn();
   if(savedMineOnly) E.window.toggleWatchMineOnly();
   try{
