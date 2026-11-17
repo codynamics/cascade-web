@@ -21646,7 +21646,7 @@ function renderOamMoodSheetBody(){
         </section>
       </div>
     </div>
-    ${(!d.handOnly && prefs.sub.size) ? `<div class="wsheetsec mainsec">
+    ${(!d.handOnly && prefs.sub.size) ? `<div class="wsheetsec mainsec" id="oamSvcSec">
       <div class="wsheethd"><span>STREAMING ON</span></div>
       <div class="chips">
         ${prefs.on ? `<button type="button" class="chip${(d.svc||d.anySvc)?"":" on"}" aria-pressed="${!d.svc&&!d.anySvc}" onclick="setOamDraftSvc(null)">My services</button>
@@ -21657,7 +21657,7 @@ function renderOamMoodSheetBody(){
       </div>
       <p class="oamgenreintro">${prefs.on ? "Any service also lists films on services you don't have. " : ""}Pick one service to see only what's included on it. Cinema and Rental stay empty while a service is picked.</p>
     </div>` : ""}
-    <div class="wsheetsec mainsec">
+    <div class="wsheetsec mainsec" id="oamHowSec">
       <div class="wsheethd"><span>HOW MANY, AND IN WHAT ORDER</span></div>
       <div class="subhd">SHOW</div>
       ${seg(OAM_SHOW_OPTS, d.show, "setOamDraftShow", "Show")}
@@ -25305,6 +25305,36 @@ const TOURS = {
       before(){ tutExpandCard(false); }, scope:"card", sel:[".ctl.watch"], trail:TUT_WMS, trailCard:true},
     {get html(){ return tutWatchFinaleHTML(true); }, before(){ tutExpandCard(false); }, sel:["#navMenuBtn"]},
   ]},
+  // Lee, 16 Nov: the Moods tutorial — run on the Me mood's filter sheet (or the first mood that isn't All
+  // Latest), closing it unsaved at the end.
+  moods:{ title:"Moods tutorial", steps:[
+    {html:TUT_P("Every mood has its own filters.", `Tap a mood's <span class="tutico">${MOOD_EDIT_SVG}</span> filter icon to change what it shows.`),
+      // The filter icon only shows on the selected mood, so select it first.
+      before(){ closeWatchSheetQuiet(); showAgentsHome(); const id=tutMoodsTourMoodId(); setWatchMood(id); tutMoodRowTo(`.moodrow .moodchip[data-mood="${id}"]`); },
+      get sel(){ return [`.moodrow .moodchip[data-mood="${tutMoodsTourMoodId()}"] .moodedit`]; }, trail:TUT_WM, tap:true},
+    {html:TUT_P("Give the mood a name. It's the label on the mood row."),
+      before(){ tutOpenMoodsTourSheet(); }, after(){ closeWatchSheetQuiet(); }, sel:["#oamMoodName"]},
+    {html:TUT_P("A mood starts with your agent's genre preferences, so you get the films that matter most to you.",
+      "Switch genres on or off to make a special mood. For example, to create a mood with only drama movies, switch everything else off."),
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .mgenre .oalist"]},
+    // CAS-1462 moved the levels under "Advanced settings", with an Agent settings / Agent override switch.
+    {html:TUT_P("Sometimes you want just the best of the best.",
+      "Open <b>Advanced settings</b> and choose <b>Agent override</b> to set one level for every genre in this mood, in place of your agent's settings."),
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .agovseg"]},
+    // The "during account setup" lines only appear when that setup mood exists (Lee, 16 Nov).
+    {get html(){ return TUT_P("Instead of building a mood around genres, you can use a keyword search around an actor, director or title.",
+      ...(watchMoods.some(m=>m.id==="fav-person") ? ["During account setup, we set up a mood with your favourite actor or director to show you how this is done."] : [])); },
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:[`#watchSheet .mtabs button[data-mode="keyword"]`], tap:true},
+    {get html(){ return TUT_P("Show only films included on one of your services, so the whole mood is ready to watch tonight.",
+      ...(watchMoods.some(m=>m.id==="topsvc") ? ["During account setup, we created a mood with your most-used streaming service to show you how this is done."] : [])); },
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); }, sel:["#oamSvcSec"]},
+    {html:TUT_P("Choose how many films the mood shows, and in what order."),
+      before(){ tutOpenMoodsTourSheet(); }, sel:["#oamHowSec"]},
+    {html:TUT_P("<b>More filters</b> narrow it further: age ratings, awards, how far back, films you've seen, and more."),
+      before(){ tutOpenMoodsTourSheet(); }, sel:["#watchSheet .morebtn"]},
+    {html:TUT_P("To make a new mood, tap <b>+ Mood</b>. You can have up to 10."),
+      before(){ closeWatchSheetQuiet(); showAgentsHome(); tutMoodRowTo("#moodAddBtn"); }, sel:["#moodAddBtn"], trail:TUT_W},
+  ]},
   alerts:{ title:"Alerts tutorial", steps:[
     {html:TUT_P("<b>Alerts</b>: films arriving where you watch, in the genres you asked to hear about, plus anything you added by hand. We email them to you too."),
       before(){ closeSettings(); openMovingScreen(); }, after(){ showAgentsHome(); }, sel:["#movingBtn"]},
@@ -25344,6 +25374,28 @@ function tutMadeMoodsHTML(){
   if(per) bits.push(`${b(per)}, for your favourite actor or director`);
   return TUT_P(`We've also set up ${bits.length>1?"these moods":"this mood"} for you: ${bits.join("; and ")}.`,
     `You can change or remove ${bits.length>1?"them":"it"} any time.`);
+}
+// Moods tutorial helpers. The tour edits nothing: the sheet is opened on a fresh draft and closed unsaved.
+function tutMoodsTourMoodId(){
+  const ms=watchMoodsList();
+  return (ms.find(m=>m.id==="me") || ms.find(m=>m.id!=="releases") || ms[0] || {}).id;
+}
+function tutOpenMoodsTourSheet(){
+  if(document.getElementById("watchSheet").classList.contains("open")) return;
+  openOamMoodSheetFor(tutMoodsTourMoodId());
+}
+function tutSheetMode(mode){
+  const b=document.querySelector(`#watchSheet .mtabs button[data-mode="${mode}"]`);
+  if(b && !b.classList.contains("on")) setOamDraftMode(mode);
+}
+// Shows or hides the sheet's Advanced settings on the unsaved draft (CAS-1462), so the tour can point at them.
+function tutSheetAdvanced(on){
+  if(typeof oamDraft==="undefined" || !oamDraft) return;
+  if(oamAdvancedOn(oamDraft)!==on) toggleOamAdvanced();
+}
+function closeWatchSheetQuiet(){
+  const sh=document.getElementById("watchSheet");
+  if(sh && sh.classList.contains("open")) closeWatchSheet();
 }
 // Scrolls the mood row (horizontally only) so `sel` is in view, or back to its start when sel is null.
 function tutMoodRowTo(sel){
@@ -25664,6 +25716,7 @@ function endTutorial(markSeen){
 // CAS-1349: plays the v2 script on a v2 account, the CAS-1317 script on every other account.
 const TUTORIAL_ROWS = [
   {key:"watch", icon:"watch", name:"Watch", sub:"Moods, viewing status and the film card."},
+  {key:"moods", icon:"watch", name:"Moods", sub:"The powerful filters behind every mood."},
   {key:"alerts", icon:"alerts", name:"Alerts", sub:"What your agent tells you about, and when."},
   {key:"database", icon:"find", name:"Database", sub:"Finding any film in Cascade."},
   {key:"agent", icon:"agent", name:"Agent", sub:"How your agent learns your taste."},
