@@ -4618,6 +4618,9 @@
   .card:not(.expanded) .ctl .cmini .clab.dim{color:var(--dim);font-weight:500}
   .card:not(.expanded) .ctl.notify.wsrc-manual .cmini,.card:not(.expanded) .ctl.casc.csrc-manual .cmini,
   .card:not(.expanded) .ctl.watch:has(.clab:not(.dim)) .cmini{border-color:#ffd54a}
+  /* Lee, 2026-11-17: the lit "open" look must also beat the collapsed-card Watched rules above (CAS-1467 missed them). */
+  .card:not(.expanded) .actions .ctl.open .cmini,.card:not(.expanded) .actions .ctl.watch.open .cmini,
+  .card:not(.expanded) .actions .ctl.watch.open:has(.clab:not(.dim)) .cmini{background:#323b4e;border-color:var(--ink)}
 </style>
 </head>
 <body>
