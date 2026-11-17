@@ -25354,9 +25354,21 @@ const TOURS = {
     {html:TUT_P("<b>Alerts</b>: films arriving where you watch, in the genres you asked to hear about, plus anything you added by hand. We email them to you too."),
       before(){ closeSettings(); openMovingScreen(); }, after(){ showAgentsHome(); }, sel:["#movingBtn"]},
   ]},
+  // Lee, 17 Nov: the Database tutorial — searches "Nolan" on the real Database screen (session-only search,
+  // nothing saved), then points at the service chips, a result's "Where it lists" panel and Save as mood.
   database:{ title:"Database tutorial", steps:[
-    {html:TUT_P("<b>Database</b>: find any film in Cascade, whether your agent picked it or not."),
-      before(){ closeSettings(); openFindScreen(); }, after(){ showAgentsHome(); }, sel:["#findSearchInput"], trail:["#findBtn"]},
+    {html:TUT_P("<b>Database</b>: every film in Cascade, whether your agent picked it or not."),
+      before(){ closeSettings(); openFindScreen(); tutFindSearch(""); }, after(){ tutFindSearch(""); setFindSvc(null); showAgentsHome(); },
+      sel:["#moviesBtn","#movingBtn","#findBtn","#agentsBtn"], narrow:["#agentsBtn","#movingBtn","#moviesBtn"]},
+    {html:TUT_P("Search by title, actor or director.", "Separate words with commas to combine them, like \"Nolan, Caine\"."),
+      before(){ tutFindSearch("Nolan", true); }, sel:["#findSearchInput"], trail:["#findBtn"]},
+    {html:TUT_P("Searched for something? Narrow the results to one of your streaming services."),
+      before(){ tutFindSearch("Nolan"); }, sel:["#findSvcFilt"], trail:["#findBtn"]},
+    {html:TUT_P("This shows which of your moods the film is in. Tap <b>Show in Watch</b> to jump to it.",
+      "If it isn't in a mood you'd expect, tap <b>Add it to…</b> to put it there."),
+      before(){ tutFindSearch("Nolan"); }, sel:["#findListWrap .wilpanel"], trail:["#findBtn"]},
+    {html:TUT_P("Like a search? Tap <b>Save as mood</b> to turn it into a mood, so its films are always one tap away in Watch."),
+      before(){ tutFindSearch("Nolan"); }, sel:["#findSaveAsMoodBtn"], trail:["#findBtn"]},
   ]},
   agent:{ title:"Agent tutorial", steps:[
     {html:TUT_P("Your <b>agent</b>. Each genre shows how much of the catalogue you want, and the bells show which availability statuses alert you. Tap a genre to change it."),
@@ -25402,6 +25414,19 @@ function tutOpenMoodsTourSheet(){
 function tutSheetMode(mode){
   const b=document.querySelector(`#watchSheet .mtabs button[data-mode="${mode}"]`);
   if(b && !b.classList.contains("on")) setOamDraftMode(mode);
+}
+// Database tutorial: puts `q` in the search box and runs it. With `typed`, the letters appear one by one first.
+let tutTypeTimer=null;
+function tutFindSearch(q, typed){
+  const input=$("findSearchInput"); if(!input) return;
+  clearInterval(tutTypeTimer);
+  if((input.value||"")===q && !typed) return;
+  if(!typed || !q){ input.value=q; setFindSearch(q); return; }
+  input.value=""; let i=0;
+  tutTypeTimer=setInterval(()=>{
+    input.value=q.slice(0, ++i);
+    if(i>=q.length){ clearInterval(tutTypeTimer); setFindSearch(q); requestAnimationFrame(tutorialReposition); }
+  }, 140);
 }
 // Shows or hides the sheet's Advanced settings on the unsaved draft (CAS-1462), so the tour can point at them.
 function tutSheetAdvanced(on){
