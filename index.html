@@ -23053,7 +23053,9 @@ function oafReopenFromMembership(){
 // ================= CAS-636: Moving — the alert feed made visible =================
 // CAS-848: the screen's own subtitle, shared by the loading state and the real one so they never say two
 // different things about what this screen covers.
-const MOVING_SUBTITLE = "What your agents found and what moved.";
+// CAS-1475: singular for an account with exactly one active (non-paused) agent — a v2 account has one.
+function movingAgentsWord(){ return cascades.filter(c=>!c.paused).length===1 ? "agent" : "agents"; }
+function movingSubtitle(){ return `What your ${movingAgentsWord()} found and what moved.`; }
 // CAS-848: the shared classification rule (also used by monitor/emailer.py's daily digest) — New = the
 // film's first appearance for this agent; Changed = anything else (a window move on a film the agent
 // already had). Nothing is both.
@@ -23181,7 +23183,7 @@ function movingData(){
       if(!m) return;
       const owner=filmOwnerCascade(m);
       if(!owner){ dropped.push({date:firstFound[fid]}); return; }
-      rows.push({filmId:fid, m, tag:"new", reason:"New to your agents",
+      rows.push({filmId:fid, m, tag:"new", reason:"New to your "+movingAgentsWord(),
         agentId:owner.id, date:firstFound[fid]});
     });
   }else{
@@ -23369,13 +23371,19 @@ function renderMovingScreen(markSeen){
   // paint — say so explicitly instead of falling through to the "nothing has moved" empty state, which
   // would read as a real (and wrong) answer rather than "still loading".
   const guest=movingIsGuestDevice();
+  const mvScreen=$("movingScreen");
   if(!guest && !movingLoadsReady()){
-    $("movingBody").innerHTML = `<h2 class="osh">Alerts</h2><p class="ossub">${MOVING_SUBTITLE}</p>
+    // CAS-1475: a list already on screen stays put while a reload is in flight — never swap it for the
+    // loading state.
+    if($("movingGroups")){ updateMovingBadge(); return; }
+    $("movingBody").innerHTML = `<h2 class="osh">Alerts</h2><p class="ossub">${movingSubtitle()}</p>
       <div class="mvempty"><p class="mvemptymain">Loading what's moved…</p></div>`;
     updateMovingBadge();
     return;
   }
   const {shownRows}=movingWindowRows(movingWindow);
+  const keepTop=mvScreen?mvScreen.scrollTop:0;   // CAS-1475: an in-place re-render keeps the reader's place
+  const wasPopulated=!!$("movingGroups");
   if(markSeen){
     shownRows.forEach(r=>{ movingSeen[r.filmId]=r.tag; });
     saveMovingSeen();
@@ -23396,7 +23404,7 @@ function renderMovingScreen(markSeen){
   // .mvhead's own comment for why the lane heading below it (.grouphead.sub) was floating with nothing to
   // release against otherwise. CAS-869: the truncation notice that used to sit here is gone — the status
   // nav below takes its place; the 200-row ledger fetch cap itself (movingLedgerTruncated) is unchanged.
-  const head=`<div class="mvhead" id="movingHead"><h2 class="osh">Alerts</h2><p class="ossub">${MOVING_SUBTITLE}</p>
+  const head=`<div class="mvhead" id="movingHead"><h2 class="osh">Alerts</h2><p class="ossub">${movingSubtitle()}</p>
     <div class="mvwindows">${pillHTML}</div></div>`;
   // CAS-886: the reply alert is IN THE FLOW, not sticky with #movingHead and not a floating toast — it
   // scrolls away with the rest of the content, the same as everything else here.
@@ -23404,7 +23412,7 @@ function renderMovingScreen(markSeen){
   if(!shownRows.length){
     $("movingBody").innerHTML = `${head}${alertHTML}<div class="mvempty">
       <p class="mvemptymain">${esc(movingEmptyCopy(movingWindow))}</p>
-      <p class="mvemptysub">Your agents are still watching. You'll see it here first.</p>
+      <p class="mvemptysub">Your ${movingAgentsWord()} ${movingAgentsWord()==="agent"?"is":"are"} still watching. You'll see it here first.</p>
     </div>`;
     syncHeaderHeight();
     return;
@@ -23434,6 +23442,7 @@ function renderMovingScreen(markSeen){
   // see those functions' own comments for how they were generalised to take a container.
   const jumpCtl=`<div class="listctl" id="movingListCtl"><div class="jumpbar" id="movingJumpBar" hidden></div></div>`;
   $("movingBody").innerHTML = head + alertHTML + jumpCtl + `<div id="movingGroups">${sectionsHTML}</div>`;
+  if(wasPopulated && mvScreen && mvScreen.scrollTop!==keepTop) mvScreen.scrollTop=keepTop;
   observeLazyPosters($("movingBody"));   // CAS-1103: movingLaneHTML's cards carry the same lazy poster tiles
   renderJumpBar({jumpBarId:"movingJumpBar", listCtlId:"movingListCtl", groupsSel:"#movingGroups .group", isOwn:()=>false, label:"Jump to"});
   syncHeaderHeight();   // CAS-852: #movingHead's height can change (window switch) — re-measure so the lane heading's --stickyh offset never drifts
@@ -23484,6 +23493,7 @@ window.openMovingScreen=()=>{
   $("movingScreen").scrollTop=0;
   $("movingScreen").classList.add("open"); lockBodyScroll(true);
   $("movingBtn").classList.add("active"); $("movingBtn").setAttribute("aria-pressed","true");
+  syncHeaderHeight();   // CAS-1475: renderMovingScreen ran before .open, so --stickyh still held the Watch value
   syncWatchChip();
   logEvent("moving_screen_opened",{});
 };
@@ -26591,24 +26601,29 @@ let _sectionJumpToken = 0;
 function cancelPendingSectionJump(){ _sectionJumpToken++; }
 window.jumpToSection = (k, opts) => {
   const token = ++_sectionJumpToken;
-  const {groupsSel="#groups .group", chromeId="cascbar", scrollerId=null, instant=false} = opts||{};
+  const {groupsSel="#groups .group", chromeId="cascbar", scrollerId=null, instant=false, gap=8} = opts||{};
   const scroller = scrollerId ? document.getElementById(scrollerId) : window;
   if(!scroller) return;
   // How far the section's heading still has to travel to sit just clear of the sticky chrome.
   const delta = () => {
     const g=document.querySelector(`${groupsSel}[data-g="${k}"]`); if(!g) return null;
-    return g.getBoundingClientRect().top - jumpOccludedBottom(chromeId) - 8;
+    return g.getBoundingClientRect().top - jumpOccludedBottom(chromeId) - gap;
   };
   const first=delta(); if(first===null) return;
   // CAS-1238: honour prefers-reduced-motion for the jump itself, same gate REDUCE_MOTION already applies
   // to card animations elsewhere — the settle corrections below are already instant.
   scroller.scrollBy({top:first, behavior: (instant || REDUCE_MOTION.matches) ? "auto" : "smooth"});
-  let tries=0;
+  let tries=0, expectedTop=null;
+  // CAS-1475: a jump is one-shot. Any user input, or a scroll position we did not put there, ends the chase.
+  const stopOnUser=()=>{ if(token===_sectionJumpToken) _sectionJumpToken++; };
+  if(scrollerId){ ["wheel","touchstart","pointerdown","keydown"].forEach(ev=>scroller.addEventListener(ev,stopOnUser,{once:true,passive:true})); }
   const settle=()=>{
     if(token!==_sectionJumpToken) return;   // superseded by a newer jump, or explicitly cancelled
+    if(scrollerId && expectedTop!==null && Math.abs(scroller.scrollTop-expectedTop)>2) return;   // moved by someone else
     const d=delta();
-    if(d===null || Math.abs(d)<=4 || tries++>=40) return;   // arrived, gone, or given up rather than loop
+    if(d===null || Math.abs(d)<=(scrollerId?2:4) || tries++>=40) return;   // arrived, gone, or given up rather than loop
     scroller.scrollBy(0,d);
+    expectedTop=scroller.scrollTop;
     setTimeout(settle,80);
   };
   setTimeout(settle, instant ? 60 : 420);                    // let the smooth scroll have its run first
@@ -26626,7 +26641,7 @@ function scrollWatchListingToTop(){
 document.addEventListener("click", e=>{
   const b=e.target.closest(".jumpbar .nowstop"); if(!b) return;
   if(b.closest("#movingJumpBar")){
-    jumpToSection(b.dataset.jump, {groupsSel:"#movingGroups .group", chromeId:"movingHead", scrollerId:"movingScreen"});
+    jumpToSection(b.dataset.jump, {groupsSel:"#movingGroups .group", chromeId:"movingHead", scrollerId:"movingScreen", gap:0});
   }else if(b.closest("#jumpBar")){
     jumpToSection(b.dataset.jump);
   }
