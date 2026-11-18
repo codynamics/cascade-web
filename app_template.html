@@ -23139,12 +23139,37 @@ function movingLedgerTruncated(win){
 // CAS-858: a film with no current owning agent is dropped, not rendered under a fallback "Other" lane — a
 // row that cannot name an agent is not a row. `dropped` carries just enough (the date) for
 // movingWindowRows to tell "nothing moved" apart from "something moved but every entry was ownerless".
+// CAS-1473: Alerts must not read a half-loaded account as "no agent owns it". A signed-in device waits for
+// the ledger (movingReady) AND the agent list (cascadesReady) AND agent_films (agentFilmsReady) before it
+// paints rows; a guest has nothing to wait on.
+function refreshMovingIfOpen(){
+  updateMovingBadge();
+  const el=$("movingScreen");
+  if(el && el.classList.contains("open") && typeof renderMovingScreen==="function") renderMovingScreen();
+}
+function movingLoadsReady(){
+  if(!movingReady) return false;
+  if(!cascadesReady) return false;
+  const cp=window.CascadePersistence;
+  return !cp || !cp.accountActive() || cp.agentFilmsReady;
+}
+// CAS-1473: Alerts' owner = filmOwnerCascade (pins, client membership), else the server membership — the
+// lowest-ranked active, non-paused agent holding an agent_films row for the film, never one the film was
+// hand-moved out of. CAS-858 stands: no agent_films row anywhere means no owner, row dropped.
+function movingOwnerCascade(m){
+  const own=filmOwnerCascade(m);
+  if(own) return own;
+  const cp=window.CascadePersistence;
+  if(!cp || !cp.getAgentFilm) return null;
+  return cascades.filter(c=>!c.paused && !movedOutOf(m.tmdb_id,c) && cp.getAgentFilm(c.id, m.tmdb_id))
+    .sort(cascadeOrderCmp)[0] || null;
+}
 function movingData(){
   const guest=movingIsGuestDevice();
   // CAS-667: a signed-in device must never paint the guest ledger while the real one is still in flight —
   // Moving is the landing screen, so the first render reliably lost this race. Render nothing until
   // loadRealAlerts has actually answered; a genuine guest has nothing to wait for and is unaffected.
-  if(!guest && !movingReady) return {rows:[], dropped:[]};
+  if(!guest && !movingLoadsReady()) return {rows:[], dropped:[]};
   const rows=[], dropped=[];
   if(guest){
     // firstFound only ever says "this film is newly found" — it carries no notion of a level being
@@ -23168,7 +23193,7 @@ function movingData(){
       if(byFilm.has(fid) || droppedByFilm.has(fid)) return;
       const m=MOVIES.find(x=>String(x.tmdb_id)===fid);
       if(!m) return;
-      const owner=filmOwnerCascade(m);
+      const owner=movingOwnerCascade(m);
       if(!owner){ droppedByFilm.set(fid,{date:a.emailed_at}); return; }
       byFilm.set(fid,{filmId:fid, m, tag:movingIsNewMoment(a.moment)?"new":"changed",
         reason:REAL_MOMENT_SAID[a.moment]||a.moment,
@@ -23343,7 +23368,7 @@ function renderMovingScreen(markSeen){
   // paint — say so explicitly instead of falling through to the "nothing has moved" empty state, which
   // would read as a real (and wrong) answer rather than "still loading".
   const guest=movingIsGuestDevice();
-  if(!guest && !movingReady){
+  if(!guest && !movingLoadsReady()){
     $("movingBody").innerHTML = `<h2 class="osh">Alerts</h2><p class="ossub">${MOVING_SUBTITLE}</p>
       <div class="mvempty"><p class="mvemptymain">Loading what's moved…</p></div>`;
     updateMovingBadge();
@@ -27786,6 +27811,7 @@ function acctFetchKeepalive(init){
     await flushAgentFilmPushes();
     agentFilmsReady=true;
     if(typeof render==="function") render();
+    refreshMovingIfOpen();   // CAS-1473
     // CAS-1035 AC2 (CAS-1100: the old outbox-replay wrapper is retired — acctOp's own persisted queue is
     // this device's only durability story left, so sending the queue directly IS the whole job now):
     // resend anything still queued from before this boot, now that every load above has had its chance to
