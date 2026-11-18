@@ -6121,6 +6121,7 @@ const DEVICE_KEY_ALLOWLIST = {
   "cascade_onboarded": "whether this device has completed onboarding once",
   "cascade_wt_collapsed": "CAS-1283: whether the Watch top bar (stage groups + moods) is collapsed to #wtMini on this device",
   "cascade_starred": "CAS-1295: the starred-film shortlist for a signed-out device — there is no account yet to put view.starred on",
+  "cascade_push_token": "CAS-1474: this device's own APNs token — a property of the phone, not the account; kept so a sign-out can remove it from the leaving account's push_tokens row",
 };
 // CAS-1222 item 5: "the first boot of this build deletes every other cascade_ key" — rather than naming
 // each retired/migrated key by hand (easy to miss one), this sweeps any "cascade_" key NOT in the
@@ -24037,10 +24038,16 @@ function paintInAppDenied(){
   if(n) n.hidden=!inAppDenied;
   if(h) h.hidden=inAppDenied;
 }
+// CAS-1474: the APNs token this device last reported, kept so a sign-out can remove it from the account
+// that is leaving (the registration event only fires on register(), long after that account is gone).
+const PUSH_TOKEN_KEY="cascade_push_token";
+function rememberPushToken(token){ try{ localStorage.setItem(PUSH_TOKEN_KEY, token); }catch(e){} }
+function lastPushToken(){ try{ return localStorage.getItem(PUSH_TOKEN_KEY); }catch(e){ return null; } }
 async function upsertPushToken(token){
   const a=window.CascadeAuth, c=(a && a.enabled && a.client) ? a.client : null;
   const owner=(a && a.session && a.session.user) ? a.session.user.id : null;
   if(!c || !owner || !token) return;
+  rememberPushToken(token);
   try{
     const { error } = await c.from("push_tokens").upsert(
       [{ user_id:owner, device_token:token, platform:"ios", app_version:(BUILD_INFO||{}).version || null,
@@ -24048,6 +24055,34 @@ async function upsertPushToken(token){
       { onConflict:"user_id,device_token" });
     if(error) console.warn("push_tokens upsert", error);
   }catch(e){ console.warn("Cascade: push token upsert failed", e); }
+  // CAS-1474: one device token belongs to one user. RLS lets a user touch only their own rows, so taking the
+  // token off a previous account needs the claim_push_token() SECURITY DEFINER function (Lee-gated SQL, see
+  // the ticket comment). Best-effort: until it is applied this just warns, and the sign-out removal below
+  // covers the normal sign-out → sign-in-as-someone-else path.
+  try{
+    const { error } = await c.rpc("claim_push_token", { p_device_token: token });
+    if(error) console.warn("claim_push_token", error);
+  }catch(e){ console.warn("Cascade: claim_push_token failed", e); }
+}
+// CAS-1474: on sign-out, drop this device's token from the account that is leaving. Must run BEFORE
+// auth.signOut() — afterwards there is no session left to authorise the delete.
+async function removeMyPushToken(){
+  const a=window.CascadeAuth, c=(a && a.enabled && a.client) ? a.client : null;
+  const owner=(a && a.session && a.session.user) ? a.session.user.id : null;
+  const token=lastPushToken();
+  if(!c || !owner || !token) return false;
+  try{
+    const { error } = await c.from("push_tokens").delete().eq("user_id",owner).eq("device_token",token);
+    if(error){ console.warn("push_tokens delete", error); return false; }
+    return true;
+  }catch(e){ console.warn("Cascade: push token removal failed", e); return false; }
+}
+window.removeMyPushToken=removeMyPushToken;
+let pushListenerOn=false;
+function attachPushListener(PN){
+  if(pushListenerOn) return;   // CAS-1474: one listener however many times register() runs
+  pushListenerOn=true;
+  PN.addListener("registration", token => upsertPushToken(token && token.value));
 }
 // CAS-1194: registerPush() only ever runs when the user exercises the in-app toggle — a device
 // that was granted permission on some earlier launch never otherwise refreshes its APNs token
@@ -24061,7 +24096,7 @@ async function reRegisterPushIfGranted(){
     if(!PN) return false;
     const perm=await PN.checkPermissions();
     if(perm.receive!=="granted") return false;
-    PN.addListener("registration", token => upsertPushToken(token && token.value));
+    attachPushListener(PN);
     await PN.register();
     return true;
   }catch(e){ console.warn("Cascade: push re-registration failed", e); return false; }
@@ -24079,7 +24114,7 @@ function registerPush(){
         if(!PN) return false;
         const perm=await PN.requestPermissions();
         if(perm.receive!=="granted") return false;
-        PN.addListener("registration", token => upsertPushToken(token && token.value));
+        attachPushListener(PN);
         await PN.register();
         return true;
       }
@@ -27913,6 +27948,7 @@ function acctFetchKeepalive(init){
         // adding the confirmation panel on top.
         refreshOpenFilmPage();
         applyPendingAnswer();   // CAS-1196: signed in, confirmed just now — see applyPendingAnswer's own comment
+        reRegisterPushIfGranted();   // CAS-1474: every sign-in re-points this device's token at THIS account
       }
     } else if(currentUser !== null){
       currentUser = null;
@@ -30105,6 +30141,7 @@ function acctFetchKeepalive(init){
       // CAS-401: signOut() drives the SIGNED_OUT branch above (setSignedOut), which is what routes
       // to splash now — every sign-out path lands there the same way, button included. This handler's
       // own job shrinks to just closing the modal.
+      if(window.removeMyPushToken){ try{ await window.removeMyPushToken(); }catch(err){ console.warn(err); } }   // CAS-1474
       try { await supa.auth.signOut(); } catch(err){ console.warn(err); }
       closeAuth();
     });
