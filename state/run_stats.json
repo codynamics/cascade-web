@@ -1,20 +1,26 @@
 {
-  "date": "2026-11-17",
+  "date": "2026-11-18",
   "tmdb": {
-    "calls": 10083,
+    "calls": 10087,
     "errors": 0,
     "not_found": 0,
     "status_counts": {}
   },
   "watchmode": {
     "quota": 2500,
-    "quota_used": 622,
-    "remaining_monthly_credits": 1878,
+    "quota_used": 685,
+    "remaining_monthly_credits": 1815,
     "calls": 63,
     "errors": 0,
-    "mismatch": 0,
-    "mismatch_ids": [],
-    "quarantined": 32
+    "mismatch": 8,
+    "mismatch_ids": [
+      1716604,
+      1750165,
+      1600761,
+      1689002,
+      1751877
+    ],
+    "quarantined": 15
   },
   "oscarbase": {
     "calls": 750,
@@ -23,62 +29,64 @@
   "cinema_chains": {
     "chains": {
       "hoyts": {
-        "fetched": 50,
+        "fetched": 45,
         "matched": 29,
-        "unmatched": 21,
+        "unmatched": 16,
         "unmatched_titles": [
-          "OM - Chapter 1: Udhiram - The Blood Wood (Tamil, Eng Sub)",
           "Festive Fun with Peppa Cinema Experience",
+          "OM - Chapter 1: Udhiram - The Blood Wood (Tamil, Eng Sub)",
           "The Rings of Power S3 Ep7 - Forging the One Ring",
           "Hadoota (Arabic, Eng Sub)",
           "DOCTOR WHO: THE SATAN PIT",
           "George Michael: The Faith Tour",
-          "The Songs of John Farnham: Celebration Concert Encore",
           "Aakasamlo Oka Tara (Telugu, Eng Sub)",
+          "The Songs of John Farnham: Celebration Concert Encore",
           "OM - Chapter 1: Udhiram - The Blood Wood (Telugu, Eng Sub)",
           "Scene (Tamil, Eng Sub)",
-          "Traces Of Justice (Mandarin, Eng Sub)",
           "Aakasamlo Oka Tara (Malayalam, Eng Sub)",
+          "Traces Of Justice (Mandarin, Eng Sub)",
           "BTS WORLD TOUR ARIRANG IN KAOHSIUNG LIVE VIEWING",
           "JEONGHAN X JOSHUA JOURNEY INTO - DREAMING",
-          "Remember (Tagalog, Eng Sub)",
           "Drishyam: The Conclusion",
-          "Hadestown: The Musical",
-          "Parkway Drive: Home",
-          "Aadarsha Kutumbam House No: 47 #AK47 (Telugu, Eng Sub)",
-          "Kabaddi 5 (Nepali, Eng Sub)",
-          "Matloob Aelian (Arabic, Eng Sub)"
+          "Remember (Tagalog, Eng Sub)"
         ],
         "ignored": false
       },
       "event": {
-        "fetched": 51,
-        "matched": 28,
-        "unmatched": 23,
+        "fetched": 60,
+        "matched": 30,
+        "unmatched": 30,
         "unmatched_titles": [
           "Festive Fun With Peppa",
           "George Michael - The Faith Tour",
+          "Om \u2013 Chapter 1: Udhiram \u2013 The Blood Wood",
+          "Doctor Who: The Satan Pit",
+          "Bachelor Party D'eux",
+          "Dive in Wonderland (Subbed)",
+          "Aakasamlo Oka Tara (Telugu)",
+          "ENE Repeat",
+          "The Rings of Power S3 - Forging the One Ring",
+          "Aakasamlo Oka Tara (Malayalam)",
+          "Chakkven",
+          "BTS World Tour 'Arirang' in Kaohsiung",
           "Scene (Tamil)",
+          "Erupcja",
+          "Om \u2013 Chapter 1: Udhiram \u2013 The Blood Wood (Telugu)",
           "Love Actually",
           "Home Alone",
-          "Traces of Justice",
-          "Parkway Drive: Home",
           "3D Deep Sea",
-          "Mookuthi Amman 2",
-          "Remember",
           "Elf",
-          "Made in the West",
           "The Polar Express",
           "Arthur Christmas",
-          "Donga Naa Koduku",
           "Home Alone 2 - Lost In New York",
           "The Holiday",
+          "Made in the West",
           "3D Under the Sea",
           "Shrek (25th Anniversary)",
           "The Rosie Awards - Rosemeadow Public School",
           "3D Born To Be Wild",
           "How The Grinch Stole Christmas",
-          "Scene (Telugu)"
+          "Moana [Live Action]"
         ],
         "ignored": false
       }
