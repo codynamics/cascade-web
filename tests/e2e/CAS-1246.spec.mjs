@@ -20,17 +20,23 @@ for(const width of [360, 390, 430]){
       // AC1
       const chips = page.locator(".hdr-actions .modechip");
       await expect(chips).toHaveCount(4);
-      const ids = await chips.evaluateAll(els => els.map(el => el.id));
-      expect(ids).toEqual(["moviesBtn", "movingBtn", "findBtn", "agentsBtn"]);
+      // Lee, 2026-11-20: on screen the row reads Taste (agentsBtn), Alerts, Watch, Database — ordered with
+      // flex `order`, so check left-to-right position, not DOM order. Watch is the main item and is wider;
+      // the other three stay equal.
+      const ids = await chips.evaluateAll(els => [...els].sort((a, b) =>
+        a.getBoundingClientRect().left - b.getBoundingClientRect().left).map(el => el.id));
+      expect(ids).toEqual(["agentsBtn", "movingBtn", "moviesBtn", "findBtn"]);
       for(const id of ids) await expect(page.locator(`#${id}`)).toBeVisible();
-      const widths = await chips.evaluateAll(els => els.map(el => el.getBoundingClientRect().width));
-      expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(1);
+      const w = async id => page.locator(`#${id}`).evaluate(el => el.getBoundingClientRect().width);
+      const others = [await w("agentsBtn"), await w("movingBtn"), await w("findBtn")];
+      expect(Math.max(...others) - Math.min(...others)).toBeLessThanOrEqual(1);
+      expect(await w("moviesBtn")).toBeGreaterThan(Math.max(...others) + 10);
 
       // AC2
       await expect(page.locator("#navMenuBtn")).toBeVisible();
       const menuLeft = await page.locator("#navMenuBtn").evaluate(el => el.getBoundingClientRect().left);
-      const agentsRight = await page.locator("#agentsBtn").evaluate(el => el.getBoundingClientRect().right);
-      expect(menuLeft).toBeGreaterThanOrEqual(agentsRight);
+      const lastChipRight = await page.locator("#findBtn").evaluate(el => el.getBoundingClientRect().right);
+      expect(menuLeft).toBeGreaterThanOrEqual(lastChipRight);
       const docFits = await page.evaluate(() =>
         document.documentElement.scrollWidth <= document.documentElement.clientWidth);
       expect(docFits).toBe(true);

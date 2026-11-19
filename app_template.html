@@ -4209,6 +4209,14 @@
     color:#fff!important}
   .hdr-actions .modechip.active .mclabel{font-weight:700}
   .hdr-actions .modechip.ag.active .mcicon{color:#fff}
+  /* Lee, 2026-11-20: nav order Taste, Alerts, Watch, Database (menu stays last), and Watch is the main
+     destination — wider, taller, bigger label and icon, with a glow when selected. DOM order is unchanged;
+     the row is ordered with flex `order`. */
+  #agentsBtn{order:1} #movingBtn{order:2} #moviesBtn{order:3} #findBtn{order:4}
+  .hdr-actions #moviesBtn{flex:1.3 1 0;height:48px;border-width:1.5px!important}
+  .hdr-actions #moviesBtn .mcicon{width:20px;height:20px}
+  .hdr-actions #moviesBtn .mclabel{font-size:14px}
+  .hdr-actions #moviesBtn.active{box-shadow:0 6px 20px -4px rgba(76,125,255,.85)!important}
   /* ==== WATCH TOP: TWO STAGE GROUPS, MOODS, AND A BAR THAT COLLAPSES ON SCROLL (Lee, 2026-10-10) ====
      Replaces the stage line + agent column (CAS-1223/1226) and the tools row (sort switch, search, filter).
      The selected stage and the selected mood use the same --sel-bg / --sel-bd as the selected nav item. */
@@ -20518,7 +20526,7 @@ function renderOneAgentScreen(c){
   const n=tasteProfile().n;
   const changedMain=oaRecentVerdictGenres();
   const rows=order.map(style=>oaRowHTML(c, style, counts[style]||0, changedMain.has(style))).join("");
-  const title = (c.name||"").trim() || "Your agent";   // CAS-1352: unnamed agents keep the generic title
+  const title = "Taste";   // Lee, 2026-11-20: the one-agent screen is Taste (was the agent's own name, CAS-1352)
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">${n} verdict${n===1?"":"s"} learned</p>
@@ -20931,10 +20939,10 @@ function updateAgentNavDot(){
     if(!badge){ badge=document.createElement("span"); badge.className="oabadge"; btn.appendChild(badge); }
     badge.textContent=String(n);
   } else if(badge) badge.remove();
-  // CAS-1345 Part 3: a v2 account has one agent, so the nav label reads "Agent" (singular); every other
-  // account keeps "Agents".
-  const label = c ? "Agent" : "Agents";
+  // CAS-1345 Part 3 / Lee, 2026-11-20: a v2 account's one agent lives in "Taste"; every other account keeps "Agents".
+  const label = c ? "Taste" : "Agents";
   btn.querySelectorAll(".mclabel").forEach(el=>{ el.textContent=label; });
+  btn.title=label; btn.setAttribute("aria-label", label);
 }
 window.oaToggleComboFilms=(key)=>{
   if(oaComboFilmsOpen.has(key)) oaComboFilmsOpen.delete(key); else oaComboFilmsOpen.add(key);
@@ -21485,7 +21493,7 @@ function oamOverrideFilterHTML(d){
         <div class="oaslidewrap">
           <div class="oastrip oastripfull">${oamFilterBoxesHTML(share)}</div>
           <input type="range" class="oarange" min="1" max="100" step="1" value="${share}" ${on?"":"disabled"}
-            oninput="oamFilterOnDrag(this)" onchange="oamFilterOnRelease(this)" aria-label="Mood Override share">
+            oninput="oamFilterOnDrag(this)" onchange="oamFilterOnRelease(this)" aria-label="Override share">
         </div>
         <span class="oarowval">${oamOverrideValHTML(share, on)}</span>
       </div>
@@ -21644,10 +21652,10 @@ function renderOamMoodSheetBody(){
           <div class="oamlvl">
             <div class="oamlvlhd">Genre levels</div>
             <div class="agovseg lvl2" role="radiogroup" aria-label="Genre levels">
-              <button type="button" role="radio" class="${d.topShare==null?"on":""}" aria-checked="${d.topShare==null}" onclick="setOamAgentOverride(false)">Agent settings</button>
-              <button type="button" role="radio" class="${d.topShare!=null?"on":""}" aria-checked="${d.topShare!=null}" onclick="setOamAgentOverride(true)">Agent override</button>
+              <button type="button" role="radio" class="${d.topShare==null?"on":""}" aria-checked="${d.topShare==null}" onclick="setOamAgentOverride(false)">My taste</button>
+              <button type="button" role="radio" class="${d.topShare!=null?"on":""}" aria-checked="${d.topShare!=null}" onclick="setOamAgentOverride(true)">Override</button>
             </div>
-            <p class="oamgenreintro oamlvlnote">${d.topShare==null ? "Each genre uses the level set for it in your agent." : "Every genre in this mood uses the level below."}</p>
+            <p class="oamgenreintro oamlvlnote">${d.topShare==null ? "Each genre uses the level set for it in Taste." : "Every genre in this mood uses the level below."}</p>
             ${d.topShare!=null ? oamOverrideFilterHTML(d) : ""}
           </div>
           ${order.notInMood.length ? `<div class="oalist">
@@ -25419,7 +25427,7 @@ const TOURS = {
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .mgenre .oalist"]},
     // Lee, 2026-11-17: the Agent settings / Agent override switch sits under the genre rows.
     {html:TUT_P("Sometimes you want just the best of the best.",
-      "Under the genres, choose <b>Agent override</b> to set one level for every genre in this mood, in place of your agent's settings."),
+      "Under the genres, choose <b>Override</b> to set one level for every genre in this list, in place of your taste settings."),
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .agovseg"]},
     // The "during account setup" lines only appear when that setup mood exists (Lee, 16 Nov).
     {get html(){ return TUT_P("Instead of building a mood around genres, you can use a keyword search around an actor, director or title.",
@@ -25474,7 +25482,7 @@ const TOURS = {
 function tutWatchFinaleHTML(finished){
   // Lee, 16 Nov: one list — "There are tutorials for Moods, Alerts, Database and your Agent too". Moods is
   // named only once that tutorial exists.
-  const names=[...(TOURS.moods ? ["<b>Moods</b>"] : []), "<b>Alerts</b>", "<b>Database</b>", "your <b>Agent</b>"];
+  const names=[...(TOURS.moods ? ["<b>Lists</b>"] : []), "<b>Alerts</b>", "<b>Database</b>", "<b>Taste</b>"];
   return TUT_P((finished ? "That's Watch. " : "") + "You can replay this tutorial any time.",
     `There are tutorials for ${names.slice(0,-1).join(", ")} and ${names[names.length-1]} too, under <b>Tutorials</b> in the menu.`);
 }
@@ -25844,7 +25852,7 @@ const TUTORIAL_ROWS = [
   {key:"moods", icon:"watch", name:"Moods", sub:"The powerful filters behind every mood."},
   {key:"alerts", icon:"alerts", name:"Alerts", sub:"What your agent tells you about, and when."},
   {key:"database", icon:"find", name:"Database", sub:"Finding any film in Cascade."},
-  {key:"agent", icon:"agent", name:"Agent", sub:"How your agent learns your taste."},
+  {key:"agent", icon:"agent", name:"Taste", sub:"How your agent learns your taste."},
 ];
 const TUT_FIND_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>`;
 function tutorialsBodyHTML(){
