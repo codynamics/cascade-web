@@ -2091,7 +2091,7 @@ test("CAS-1371 AC1: Delete this mood arms visibly red on a touch tap, and a seco
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
   const delBtn = page.locator("#moodDeleteBtn");
-  await expect(delBtn).toHaveText("Delete this mood");
+  await expect(delBtn).toHaveText("Delete this list");
   await expect(delBtn).not.toHaveClass(/armed/);
 
   const tapDelete = () => page.evaluate(() => {

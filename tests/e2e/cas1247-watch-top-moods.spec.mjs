@@ -85,7 +85,7 @@ test("AC7/AC8: creating and deleting a mood", async ({ page }) => {
   await toWatchScreen(page);
 
   await page.locator("#moodAddBtn").click();
-  await expect(page.locator("#watchSheetTitle")).toHaveText("New mood");
+  await expect(page.locator("#watchSheetTitle")).toHaveText("New list");
   await page.locator("#moodSaveBtn").click();
   await expect(page.locator(".moodchip")).toHaveCount(2);   // empty name saves nothing
   await expect(page.locator("#moodName")).toBeFocused();
