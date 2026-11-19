@@ -72,8 +72,8 @@ test("CAS-1370 AC4: Find names the real ages mismatch instead of falsely blaming
     assert.equal(E.filmInOneAgentMood(film, E.watchMoods[0], c), false, "sanity: excluded by this mood's own rules");
     const r = E.oamWilCase(film, c);
     assert.match(r.sentence, /Not shown in Family Night:/);
-    assert.match(r.sentence, /it's rated MA 15\+ and this mood shows PG/);
-    assert.doesNotMatch(r.sentence, /none of your moods include/,
+    assert.match(r.sentence, /it's rated MA 15\+ and this list shows PG/);
+    assert.doesNotMatch(r.sentence, /none of your lists include/,
       "must never fall through to the generic genre-missing claim when the genre IS ticked");
   } finally {
     E.watchMoods.length = 0; E.watchMoods.push(...savedMoods);
@@ -88,7 +88,7 @@ test("CAS-1370 AC4: Find still uses the generic genre-missing reason when no moo
     const c = criteriaWith("Action", 1);
     const film = filmWith({ age_rating:"M" });
     const r = E.oamWilCase(film, c);
-    assert.match(r.sentence, /none of your moods include/);
+    assert.match(r.sentence, /none of your lists include/);
   } finally {
     E.watchMoods.length = 0; E.watchMoods.push(...savedMoods);
   }
@@ -152,7 +152,7 @@ test("CAS-1388 AC3: the CAS-1364 \"Include watched films in <mood>\" offer still
   E.watched.add(film.tmdb_id);
   try{
     const r = E.oamWilCase(film, c);
-    assert.match(r.sentence, /It would be in Movie night, but that mood doesn't include watched films\./);
+    assert.match(r.sentence, /It would be in Movie night, but that list doesn't include watched films\./);
     assert.ok(r.buttons.some(b => b.label === "Include watched films in Movie night"));
   } finally {
     E.watched.delete(film.tmdb_id);

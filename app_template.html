@@ -4792,7 +4792,7 @@
          renderWatchTop() fills #watchTop in; #wtMini is the one-row summary shown while collapsed.
          CAS-1283: collapse is tap-only now (via #wtHandle/#wtMini) — scrolling never changes this bar's
          state (the toggle itself lives near the bottom of this script). -->
-    <div id="wtMini" role="button" tabindex="0" aria-label="Show stages and moods"></div>
+    <div id="wtMini" role="button" tabindex="0" aria-label="Show stages and lists"></div>
     <div class="watchtop" id="watchTop"></div>
     <!-- CAS-1223: the standalone sort button is gone from Watch — kept only as inert state (hidden, never
          focused) so syncSortCtl's own #sort option lookup is untouched. -->
@@ -4827,16 +4827,16 @@
        unchanged from the Filters sheet it replaces. Slides up from the bottom over a scrim; position:fixed so
        its place in the DOM doesn't matter. -->
   <div class="wsheetscrim" id="watchSheetScrim" onclick="closeWatchSheet()"></div>
-  <div class="wsheet" id="watchSheet" role="dialog" aria-modal="true" aria-label="Mood">
+  <div class="wsheet" id="watchSheet" role="dialog" aria-modal="true" aria-label="List">
     <div class="wsheethead">
-      <h3 id="watchSheetTitle">Mood</h3>
+      <h3 id="watchSheetTitle">List</h3>
       <button type="button" class="wsheetclose" aria-label="Close" onclick="closeWatchSheet()">×</button>
     </div>
     <div class="wsheetbody" id="watchSheetBody"></div>
     <div class="wsheetfoot">
       <button type="button" class="ebtn ghost" id="moodDeleteBtn" onpointerdown="this._ptr=true"
-        onfocus="if(this._ptr){this._ptr=false;this.blur();}" onclick="handleMoodDeleteBtn()">Delete mood</button>
-      <button type="button" class="donebtn" id="moodSaveBtn" onclick="saveMoodFromSheet()">Save mood</button>
+        onfocus="if(this._ptr){this._ptr=false;this.blur();}" onclick="handleMoodDeleteBtn()">Delete list</button>
+      <button type="button" class="donebtn" id="moodSaveBtn" onclick="saveMoodFromSheet()">Save list</button>
     </div>
   </div>
   <!-- ONE listing (CAS-134, and now literally one: CAS-150 removed the New / All scopes). It is everything
@@ -10984,7 +10984,7 @@ function renderWatchTop(){
   const restMoods=releasesMood ? moods.filter(m=>m.id!=="releases") : moods;
   const moodHTML = (releasesMood ? moodChipHTML(releasesMood, true)+`<div class="mooddivider" aria-hidden="true"></div>` : "")
     + restMoods.map(m=>moodChipHTML(m, false)).join("");
-  const addHTML = moods.length>=MOOD_MAX ? "" : `<button type="button" class="moodadd" id="moodAddBtn" onclick="openMoodSheetForNew()">+ Mood</button>`;
+  const addHTML = moods.length>=MOOD_MAX ? "" : `<button type="button" class="moodadd" id="moodAddBtn" onclick="openMoodSheetForNew()">+ List</button>`;
   // CAS-1300: innerHTML always restarts a fresh .moodrow at scrollLeft 0, so the previous row's position has
   // to be captured before it's thrown away and reapplied (or adjusted) on the new one below.
   const prevRow=el.querySelector(".moodrow");
@@ -10992,7 +10992,7 @@ function renderWatchTop(){
   // CAS-1413: a re-render that keeps the same selected mood (focus/visibility reconcile, prefs poll) must not
   // move the row — only a changed selection brings the selected chip into view.
   const prevSel=prevRow ? prevRow.dataset.sel : null;
-  el.innerHTML = `<div class="moodrow" role="group" aria-label="Mood" data-sel="${escA(watchMoodSel)}">${moodHTML}${addHTML}</div>${stageHTML}`;
+  el.innerHTML = `<div class="moodrow" role="group" aria-label="List" data-sel="${escA(watchMoodSel)}">${moodHTML}${addHTML}</div>${stageHTML}`;
   // Keeps #wtMini's own text honest immediately after a stage/mood change, independent of the next scroll
   // event — the collapse listener itself (defined later in this script) only ever touches it on scroll.
   if(typeof wtRefreshMini==="function") wtRefreshMini();
@@ -11787,8 +11787,8 @@ function renderMoodSheetBody(){
     ? [...ONB_GENRES].sort((a,b)=>a.localeCompare(b))
     : [...new Set(cascades.filter(c=>!d.agentsOff.has(c.id)).flatMap(c=>ONB_GENRES.filter(g=>styleGridState(c,g)==="+")))].sort((a,b)=>a.localeCompare(b));
   watchSheetGenres[watchTab]=genres;
-  const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "Mood" : "New mood";
-  const sheet=$("watchSheet"); if(sheet) sheet.setAttribute("aria-label", d.editingId ? "Mood" : "New mood");
+  const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "List" : "New list";
+  const sheet=$("watchSheet"); if(sheet) sheet.setAttribute("aria-label", d.editingId ? "List" : "New list");
   const agentsHTML=watchTopAgentsRanked().map(c=>{
     const on=!d.agentsOff.has(c.id);
     return `<button type="button" class="chip${on?" on":""}" data-agent="${escA(c.id)}" aria-pressed="${on}"
@@ -11895,7 +11895,7 @@ function renderMoodSheetBody(){
   if(delBtn){
     if(!d.editingId){ delBtn.textContent="Cancel"; delBtn.disabled=false; delBtn.classList.remove("armed"); }
     else {
-      delBtn.textContent = moodDeleteArmed ? "Tap again to delete" : "Delete mood";
+      delBtn.textContent = moodDeleteArmed ? "Tap again to delete" : "Delete list";
       delBtn.disabled = watchMoods.length<=1;
       delBtn.classList.toggle("armed", moodDeleteArmed);
     }
@@ -14272,7 +14272,7 @@ function watchMineOnlyDeadEndHTML(){
   return `<div class="empty">
     <div class="emoji">📺</div>
     <div class="eh">This scope is on and you haven't picked any services yet, so nothing qualifies.</div>
-    <div class="ep">Pick the ones you actually have, or turn off "Show only available on my services" in this mood.</div>
+    <div class="ep">Pick the ones you actually have, or turn off "Show only available on my services" in this list.</div>
     <div class="ebtns">${pickServicesCTA()}</div>
   </div>`;
 }
@@ -14368,8 +14368,8 @@ function emptyResultsHTML(){
   if(cascades.length && agentOff.size && !acs.length){
     return `<div class="empty">
       <div class="emoji">🔍</div>
-      <div class="eh">This mood has no agents selected.</div>
-      <div class="ebtns"><button class="ebtn" onclick="openMoodSheetFor('${escA(watchMoodSel)}')"><span>Edit this mood</span></button></div>
+      <div class="eh">This list has no agents selected.</div>
+      <div class="ebtns"><button class="ebtn" onclick="openMoodSheetFor('${escA(watchMoodSel)}')"><span>Edit this list</span></button></div>
     </div>`;
   }
   if(!acs.some(c=>windowUsable(c, watchTab))){
@@ -14386,7 +14386,7 @@ function emptyResultsHTML(){
       return `<div class="empty">
         <div class="emoji">🔍</div>
         <div class="eh">No titles match the current selections</div>
-        <div class="ebtns"><button class="ebtn" onclick="openMoodSheetFor('${escA(watchMoodSel)}')"><span>Edit this mood</span>
+        <div class="ebtns"><button class="ebtn" onclick="openMoodSheetFor('${escA(watchMoodSel)}')"><span>Edit this list</span>
           <b>→ ${n} film${n===1?"":"s"}</b></button></div>
       </div>`;
     }
@@ -15193,7 +15193,7 @@ function renderSvcAnalysis(){
       ? `<div class="pnote">You haven't told Cascade which services you have yet — add them in My Streaming Services.</div>`
       : mineRows.map(svcRowHTML).join("");
     const worthBody = !a.worth.length
-      ? `<div class="pnote">No other service would add a film your moods list that you can't already watch.</div>`
+      ? `<div class="pnote">No other service would add a film your lists show that you can't already watch.</div>`
       : a.worth.map(svcWorthRowHTML).join("")
         + `<div class="advfoot">We don't hold subscription prices, so this is films gained, not a cost comparison.</div>`;
     // CAS-1124 AC4: a streaming total of 0 (population exists, but none of it is on a streaming service)
@@ -15204,7 +15204,7 @@ function renderSvcAnalysis(){
           <div class="svcbar"><span class="human" style="width:${a.coveredTotal/a.total*100}%"></span></div>
           ${a.notCovered ? `<div class="svcleg">The other ${a.notCovered} are only on services you don't have — see what you'd gain below.</div>` : ""}
         </div>`
-      : `<div class="pnote">None of the films your moods list are on a streaming service yet.</div>`;
+      : `<div class="pnote">None of the films your lists show are on a streaming service yet.</div>`;
     body=`
       <div class="svcpop">Every number here counts the <b>${a.total}</b> film${a.total===1?"":"s"} your moods list
         that are on a streaming service — not the whole catalogue. Films you've watched are included.</div>
@@ -15217,7 +15217,7 @@ function renderSvcAnalysis(){
   el.innerHTML=`
     <div class="ostop"><button class="osback" type="button" onclick="closeSvcAnalysis()" aria-label="Back">←</button>
       <h2 class="osh">Streaming Analysis</h2></div>
-    <p class="ossub">How many of the films your moods list you'd lose by dropping a service, or gain by adding one.</p>
+    <p class="ossub">How many of the films your lists show you'd lose by dropping a service, or gain by adding one.</p>
     ${body}`;
 }
 window.openSvcAnalysis=()=>{
@@ -20529,7 +20529,7 @@ function renderOneAgentScreen(c){
   const title = "Taste";   // Lee, 2026-11-20: the one-agent screen is Taste (was the agent's own name, CAS-1352)
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
-    <p class="ossub">${n} verdict${n===1?"":"s"} learned</p>
+    <p class="ossub">Your agent · ${n} verdict${n===1?"":"s"} learned</p>
     <div class="oaintro"><p>Your agent learns from your verdicts.</p><p>It can suggest a new minimum score for a genre, and it nudges sub-genres up or down so you see more of what you enjoy.</p><p><b>Gold rows</b> are the genres you've watched most recently. Tap a genre to open it.</p></div>
     <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
@@ -21239,7 +21239,7 @@ function oamEmptyResultsHTML(){
   return `<div class="empty">
     <div class="emoji">🔍</div>
     <div class="eh">No titles in ${esc(mood?moodDisplayName(mood):"this list")} here yet.</div>
-    <div class="ebtns"><button class="ebtn" onclick="openOamMoodSheetFor('${escA(watchMoodSel)}')"><span>Edit this mood</span></button></div>
+    <div class="ebtns"><button class="ebtn" onclick="openOamMoodSheetFor('${escA(watchMoodSel)}')"><span>Edit this list</span></button></div>
   </div>`;
 }
 
@@ -21346,7 +21346,7 @@ function oamFromFindLineText(d, c){
   if(!d.fromFind) return "";
   const T=d.fromFind.total;
   const N=oamFromFindCount(findRowsCache, oamMoodFromDraft(d), c);
-  let text=`This mood will show ${N} of the ${T} films Find listed.`;
+  let text=`This list will show ${N} of the ${T} films Find listed.`;
   if(N<T) text+=" The rest are below your agent's scores or genres, or already watched.";
   return text;
 }
@@ -21619,7 +21619,7 @@ function renderOamMoodSheetBody(){
   // part of this ordering, so it gets no Position row of its own.
   const posList = oamMoodsListReal().filter(m=>m.id!=="releases");
   const posIdx = d.editingId ? posList.findIndex(m=>m.id===d.editingId) : -1;
-  const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "Mood" : "New mood";
+  const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "List" : "New list";
   const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
   const kwMode = d.mode==="keyword";
   const order = d.rowOrder || {inMood:[], notInMood:[]};
@@ -21631,7 +21631,7 @@ function renderOamMoodSheetBody(){
   const body=$("watchSheetBody");
   if(body) body.innerHTML=`
     <div class="wsheetsec oamhead">
-      <input id="oamMoodName" class="mfinput" type="text" maxlength="24" placeholder="Mood name" autocomplete="off"
+      <input id="oamMoodName" class="mfinput" type="text" maxlength="24" placeholder="List name" autocomplete="off"
         value="${escA(d.name)}" oninput="setOamDraftName(this.value)">
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
@@ -21645,7 +21645,7 @@ function renderOamMoodSheetBody(){
         <section class="mgenre" aria-hidden="${kwMode}">
           <!-- Lee, 2026-11-17: the agent's levels always show, and the genre rows never move — the Agent settings /
                Agent override switch and the override slider sit UNDER the rows, so switching never pushes them. -->
-          <p class="oamgenreintro">Tick the genres for this mood.</p>
+          <p class="oamgenreintro">Tick the genres for this list.</p>
           <div class="oalist">
             ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
           </div>
@@ -21660,7 +21660,7 @@ function renderOamMoodSheetBody(){
           </div>
           ${order.notInMood.length ? `<div class="oalist">
               <button type="button" class="oamexpand${oamNotInMoodOpen?" open":""}" onclick="toggleOamNotInMood()" aria-expanded="${oamNotInMoodOpen}">
-                <span>Not in this mood <b>${order.notInMood.length}</b></span><span class="chev" aria-hidden="true">&rsaquo;</span>
+                <span>Not in this list <b>${order.notInMood.length}</b></span><span class="chev" aria-hidden="true">&rsaquo;</span>
               </button>
               ${oamNotInMoodOpen ? order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("") : ""}
             </div>` : ""}
@@ -21726,7 +21726,7 @@ function renderOamMoodSheetBody(){
           aria-pressed="${on}" onclick="setOamDraftYears(${k})">${esc(l)}</button>`; }).join("")}</div>
       </div>
       ${posIdx>=0 ? `<div class="wsheetsec">
-        <div class="wsheethd"><span>Position in your mood row</span></div>
+        <div class="wsheethd"><span>Position in your list row</span></div>
         <div class="mfseg" role="group" aria-label="Position">
           <button type="button" ${posIdx<=0?"disabled":""} onclick="oamMoveMood(-1)">&lsaquo; Move left</button>
           <button type="button" ${posIdx>=posList.length-1?"disabled":""} onclick="oamMoveMood(1)">Move right &rsaquo;</button>
@@ -21740,9 +21740,9 @@ function renderOamMoodSheetBody(){
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
     delBtn.style.display="";
-    if(isBuiltin){ delBtn.textContent="Delete this mood"; delBtn.disabled=true; delBtn.classList.remove("armed"); }
+    if(isBuiltin){ delBtn.textContent="Delete this list"; delBtn.disabled=true; delBtn.classList.remove("armed"); }
     else {
-      delBtn.textContent = oamDeleteArmed ? "Tap again to delete" : "Delete this mood";
+      delBtn.textContent = oamDeleteArmed ? "Tap again to delete" : "Delete this list";
       delBtn.disabled=false;
       delBtn.classList.toggle("armed", oamDeleteArmed);
     }
@@ -21861,9 +21861,9 @@ function oamFilmHandTouched(id){
 function oamListChipHTML(id){
   const c=oneAgentCriteria(); if(!c) return "";
   const moods=oamMoodsForFilm(id, c);
-  const lbl = moods.length ? (moods.length>1 ? `${moods[0].name} +${moods.length-1}` : moods[0].name) : "Add to mood";
+  const lbl = moods.length ? (moods.length>1 ? `${moods[0].name} +${moods.length-1}` : moods[0].name) : "Add to list";
   const hand=oamFilmHandTouched(id);
-  const title = moods.length ? `In your moods: ${moods.map(m=>m.name).join(", ")}. Tap to change.` : "Not in any mood yet. Tap to add.";
+  const title = moods.length ? `In your lists: ${moods.map(m=>m.name).join(", ")}. Tap to change.` : "Not in any list yet. Tap to add.";
   return `<button type="button" class="ctl oamlist${hand?" handmark":""}${filmIsNew(id)?" isnew":""}" data-lid="${id}" onclick="openOamListPanel(${id},this)"
       aria-haspopup="true" aria-expanded="false" title="${escA(title)}" aria-label="${escA(title)}">
     <span class="cmini"><i class="cfill" style="width:${moods.length?100:0}%;background:var(--accent)"></i>
@@ -21984,17 +21984,17 @@ function oamWilMoodGateReason(m, c, main){
     const name=esc(moodDisplayName(mood));
     const age=oamFilmAge(m);
     if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)){
-      return `<span class="wilnot">Not shown in ${name}:</span> it's rated ${esc(age)} and this mood shows ${esc(mood.ages.join(", "))}.`;
+      return `<span class="wilnot">Not shown in ${name}:</span> it's rated ${esc(age)} and this list shows ${esc(mood.ages.join(", "))}.`;
     }
     if(mood.awards && mood.awards!=="any" && !oamFilmMatchesAwards(m, mood.awards)){
       const word = mood.awards==="won" ? "award winners" : "award-nominated films";
-      return `<span class="wilnot">Not shown in ${name}:</span> this mood only shows ${word}.`;
+      return `<span class="wilnot">Not shown in ${name}:</span> this list only shows ${word}.`;
     }
     if(mood.years && !releasedSince(m, yearsCutoff(mood.years))){
-      return `<span class="wilnot">Not shown in ${name}:</span> it's older than this mood's last ${esc(String(mood.years))} years.`;
+      return `<span class="wilnot">Not shown in ${name}:</span> it's older than this list's last ${esc(String(mood.years))} years.`;
     }
     if(oamKeywordOn(mood) && !filmMatchesSearch(m, mood.people)){
-      return `<span class="wilnot">Not shown in ${name}:</span> it doesn't match this mood's "${esc("PEOPLE")}" filter.`;
+      return `<span class="wilnot">Not shown in ${name}:</span> it doesn't match this list's "${esc("PEOPLE")}" filter.`;
     }
   }
   return null;
@@ -22101,7 +22101,7 @@ function oamWilCase(m, c){
   const {main, keys} = mainOtherCombos(m);
   if(main===undefined){
     return {sentence:notListed("It has no score yet."),
-      buttons:[{label:"Add to a mood by hand", action:`oamWilAddToMood(${id})`}]};
+      buttons:[{label:"Add to a list by hand", action:`oamWilAddToMood(${id})`}]};
   }
   const name=oneAgentShortName(main);
   const style=(c.styles||{})[main];
@@ -22118,14 +22118,14 @@ function oamWilCase(m, c){
   const score=oneScoreFor(m,c);
   if(score===-1){
     return {sentence:notListed("It has no score yet."),
-      buttons:[{label:"Add to a mood by hand", action:`oamWilAddToMood(${id})`}]};
+      buttons:[{label:"Add to a list by hand", action:`oamWilAddToMood(${id})`}]};
   }
   if(score<style.bar){
     const x=oneTopPct(main, style.bar), y=oneTopPct(main, score);
     return {sentence:notListed(`${esc(name)} lists Top ${x}% (score ${style.bar}+). This scores ${score}.`),
       buttons:[
         {label:`Widen ${esc(name)} to Top ${y}%`, primary:true, action:`oamWilWidenGenre(${id},'${escA(main)}',${score})`},
-        {label:"Add to a mood by hand", action:`oamWilAddToMood(${id})`}
+        {label:"Add to a list by hand", action:`oamWilAddToMood(${id})`}
       ]};
   }
   if(watched.has(id)){
@@ -22134,7 +22134,7 @@ function oamWilCase(m, c){
     const wouldMood=oamMoodsListReal().find(mood=>!mood.watched && filmInOneAgentMood(m, {...mood, watched:true}, c));
     if(wouldMood){
       const name=esc(moodDisplayName(wouldMood));
-      return {sentence:notListed(`It would be in ${name}, but that mood doesn't include watched films.`),
+      return {sentence:notListed(`It would be in ${name}, but that list doesn't include watched films.`),
         buttons:[{label:`Include watched films in ${name}`, primary:true, action:`oamWilIncludeWatched(${id},'${escA(wouldMood.id)}')`}]};
     }
     return {sentence:notListed("You've watched it."), buttons:[]};
@@ -22143,9 +22143,9 @@ function oamWilCase(m, c){
   // CAS-1370: before blaming the genre, check whether some mood actually has it ticked and is excluding
   // the film on ages/awards/years alone — that is the true reason, not "none of your moods include".
   const gate=oamWilMoodGateReason(m, c, main);
-  if(gate) return {sentence:gate, buttons:[{label:"Add to a mood by hand", action:`oamWilAddToMood(${id})`}]};
-  return {sentence:`Not in a mood. Your agent lists it, but none of your moods include ${esc(name)}.`,
-    buttons:[{label:"Add to a mood", action:`oamWilAddToMood(${id})`}]};
+  if(gate) return {sentence:gate, buttons:[{label:"Add to a list by hand", action:`oamWilAddToMood(${id})`}]};
+  return {sentence:`Not in a list. Your agent picks it, but none of your lists include ${esc(name)}.`,
+    buttons:[{label:"Add to a list", action:`oamWilAddToMood(${id})`}]};
 }
 function oamWilButtonHTML(b){
   return `<button type="button" class="wilbtn${b.primary?" primary":" wilsec"}" onclick="${b.action}">${esc(b.label)}</button>`;
@@ -22556,7 +22556,7 @@ function oneAgentCommit(draft){
 // this ticket and must never be able to see this flow running. ===========================================
 function oafWelcomeHTML(){
   if(oafMode==="migrate") return `<h2 class="osh">We've simplified your agents</h2>
-    <p class="obintrotext">Cascade now has one agent that learns your taste, and moods for the lists you like to browse. A few quick questions and you're set.</p>`;
+    <p class="obintrotext">Cascade now has one agent that learns your taste, and smart lists of the films you like to browse. A few quick questions and you're set.</p>`;
   // Lee, 13 Nov (pm): the same message, broken into three illustrated beats that rise in one after another —
   // a film travelling the cascade (cinema → rent → stream), your alerts and moods, and the agent that learns.
   return `<h2 class="osh">Let's get you set up.</h2>
@@ -22567,7 +22567,7 @@ function oafWelcomeHTML(){
     </div>
     <div class="oafwbeat" style="--d:.55s">
       <div class="oafwart oafwico alerts" aria-hidden="true">${OAF_DONE_ICONS.alerts}</div>
-      <p class="obintrotext">Always know what to watch next, with personalised <b>alerts</b> and <b>moods</b> by genre, actor or director.</p>
+      <p class="obintrotext">Always know what to watch next, with personalised <b>alerts</b> and <b>lists</b> by genre, actor or director.</p>
     </div>
     <div class="oafwbeat" style="--d:.95s">
       <div class="oafwart oafwico agent" aria-hidden="true">${OAF_DONE_ICONS.agent}</div>
@@ -22691,7 +22691,7 @@ function oafWireFavourites(){ oafWireFavGrid("oafFavGrid", oafState.favs); }
 function oafTopSvcHTML(){
   const subs=[...prefs.sub].sort((a,b)=>svcName(a).localeCompare(svcName(b)));
   return `<h2 class="osh">Which streaming service do you use most?</h2>
-    <p class="ossub">We'll set up a mood of the best films on it for you.</p>
+    <p class="ossub">We'll set up a list of the best films on it for you.</p>
     <div class="svcsec"><div class="svcsech">My Streaming Services</div>
       <div class="chips" id="oafTopSvcOpts" role="radiogroup">${subs.map(k=>`<button type="button" class="chip svc${oafState.topSvc===k?" on":""}"
         role="radio" aria-checked="${oafState.topSvc===k}" data-val="${escA(k)}">${esc(svcName(k))}</button>`).join("")}</div></div>`;
@@ -22700,7 +22700,7 @@ function oafTopSvcHTML(){
 // (Lee, 16 Nov: no film count under it.)
 function oafPeopleHTML(){
   return `<h2 class="osh">A favourite actor or director?</h2>
-    <p class="ossub">We'll make them a mood, so you never miss their films. Or skip this.</p>
+    <p class="ossub">We'll make them a list, so you never miss their films. Or skip this.</p>
     <label class="oafpfield"><input type="text" class="osfield" id="oafP_person" placeholder="e.g. Cate Blanchett" maxlength="40"
       autocomplete="off" value="${escA(oafState.person||"")}" aria-label="Favourite actor or director">
 </label>`;
@@ -22718,7 +22718,7 @@ function oafWirePeople(){
 }
 function oafAgeHTML(){
   return `<h2 class="osh">How old are you?</h2>
-    <p class="ossub">So we show the right age ratings. You can change them on any mood.</p>
+    <p class="ossub">So we show the right age ratings. You can change them on any list.</p>
     <div class="obopts" id="oafAgeOpts">${obOptHTML([
       ["18plus", "18 or over", "M, MA 15+ and R 18+"],
       ["under18", "Under 18", "PG, M and MA 15+"],
@@ -22726,18 +22726,18 @@ function oafAgeHTML(){
 }
 function oafPartnerHTML(){
   return `<h2 class="osh">Do you watch with a partner?</h2>
-    <p class="ossub">If you do, we'll make a <b>Partner</b> mood: a list of films for the two of you.</p>
+    <p class="ossub">If you do, we'll make a <b>Partner</b> list: films for the two of you.</p>
     <div class="obopts" id="oafPartnerOpts">${obOptHTML([["yes","Yes"],["no","No"]], oafState.partner)}</div>`;
 }
 function oafTogetherHTML(){
   return `<h2 class="osh">What do you watch together?</h2>
-    <p class="ossub">Switch on the genres for your <b>Partner</b> mood, and ♥ the ones you watch together most.</p>
+    <p class="ossub">Switch on the genres for your <b>Partner</b> list, and ♥ the ones you watch together most.</p>
     ${oafFavLegendHTML()}
     <div class="favgrid" id="oafTogetherGrid">${oafFavGridCellsHTML(oafState.together)}</div>`;
 }
 function oafChildrenHTML(){
   return `<h2 class="osh">Do you watch with a young family?</h2>
-    <p class="ossub">If you do, we'll make a <b>Family</b> mood: films rated G, PG and M.</p>
+    <p class="ossub">If you do, we'll make a <b>Family</b> list: films rated G, PG and M.</p>
     <div class="obopts" id="oafChildrenOpts">${obOptHTML([["yes","Yes"],["no","No"]], oafState.children)}</div>`;
 }
 function oafFamilyHTML(){
@@ -22849,7 +22849,7 @@ function oafDoneHTML(){
     </div>
     <div class="oafdcount"><b id="oafDoneCount">0</b><span>films already found for you</span></div>
     ${posters ? `<div class="oafdposters" aria-hidden="true">${posters}<span class="oafdmore">+ more</span></div>` : ""}
-    <div class="oafdmoods"><div class="oafdtoldh">Sorted into your moods</div>
+    <div class="oafdmoods"><div class="oafdtoldh">Sorted into your lists</div>
       ${draft.moods.map((m,i)=>`<span class="oafdmood" style="--i:${i}">${esc(m.name)}</span>`).join("")}</div>
     <div class="oafdtold"><div class="oafdtoldh">${name} is working for you</div>${told}</div>`;
 }
@@ -23561,7 +23561,7 @@ function findRenderList(){
   // CAS-1395: Save as mood rides the count line itself, right of the count text.
   const showSaveAsMood = findSaveAsMoodVisible(oneAgentCriteria(), findSearch, findSvc, findCollectionFilter, oamMoodsListReal().length);
   const saveAsMoodHTML = showSaveAsMood
-    ? `<button type="button" class="ca-btn" id="findSaveAsMoodBtn" onclick="openOamMoodSheetFromFind()">Save as mood</button>` : "";
+    ? `<button type="button" class="ca-btn" id="findSaveAsMoodBtn" onclick="openOamMoodSheetFromFind()">Save as list</button>` : "";
   const countEl=$("findCount"); if(countEl) countEl.innerHTML = `${chip}<div class="findcountrow"><span class="findcounttext">${n} movie${n===1?"":"s"}${svcTxt}</span>${saveAsMoodHTML}</div>`;
   const clr=$("findSearchClear"); if(clr){ clr.hidden=!findSearchRaw; clr.classList.toggle("show", !!findSearchRaw); }
   const wrap=$("findListWrap"); if(!wrap) return;
@@ -25374,29 +25374,29 @@ const TOURS = {
       before(){ showAgentsHome(); }},
     // Lee, 16 Nov: the moods run is split so each step points at what it talks about — the row, All Latest,
     // the moods made from the setup answers, then how to edit and add moods.
-    {html:TUT_P("Your Watch area is organised into <b>moods</b>.", "Moods are filtered collections of movies."),
+    {html:TUT_P("Your Watch area is organised into <b>lists</b>.", "Lists are filtered collections of movies."),
       before(){ setWatchMood("releases"); tutMoodRowTo(null); }, sel:[".moodrow"], trail:TUT_W},
-    {html:TUT_P("<b>All Latest</b> is a special mood designed to give you a forward view of all upcoming and cinema releases."),
+    {html:TUT_P("<b>All Latest</b> is a special list designed to give you a forward view of all upcoming and cinema releases."),
       before(){ tutMoodRowTo(null); }, sel:[`.moodrow .moodchip[data-mood="releases"]`], trail:TUT_W},
-    {html:TUT_P("Some moods have been created from the questions you answered."),
+    {html:TUT_P("Some lists have been created from the questions you answered."),
       before(){ tutMoodRowTo(`.moodrow .moodchip[data-mood="me"]`); },
       sel:[`.moodrow .moodchip[data-mood="me"]`,`.moodrow .moodchip[data-mood="date"]`,`.moodrow .moodchip[data-mood="family"]`], trail:TUT_W},
     // Lee, 14 Nov: point at the moods setup made from the first-run answers. Skipped (CAS-976 rule) when the
     // account has neither.
     {get html(){ return tutMadeMoodsHTML(); }, sel:[`.moodrow .moodchip[data-mood="topsvc"]`,`.moodrow .moodchip[data-mood="fav-person"]`],
       before(){ tutRevealMadeMoods(); }, trail:TUT_W},
-    {get html(){ return TUT_P(`You can edit any mood: tap its <span class="tutico">${MOOD_EDIT_SVG}</span> filter icon.` +
-        (TOURS.moods ? " There's a detailed tutorial on moods in the main menu." : ""),
-      "You can also create your own moods with <b>+ Mood</b>."); },
+    {get html(){ return TUT_P(`You can edit any list: tap its <span class="tutico">${MOOD_EDIT_SVG}</span> filter icon.` +
+        (TOURS.moods ? " There's a detailed tutorial on lists in the main menu." : ""),
+      "You can also create your own lists with <b>+ List</b>."); },
       before(){ tutMoodRowTo("#moodAddBtn"); }, sel:["#moodAddBtn"], trail:TUT_W},
-    {html:TUT_P("Each mood lets you see its movies by viewing status."), before(){ setWatchMood("releases"); }, sel:[".stgroups"], trail:TUT_WM},
+    {html:TUT_P("Each list lets you see its movies by viewing status."), before(){ setWatchMood("releases"); }, sel:[".stgroups"], trail:TUT_WM},
     {html:TUT_P("This is a film card."),
       before(){ tutExpandCard(false); setWatchMood("releases"); v2CaptureCard(); }, wholeCard:true, trail:TUT_WMS},
     {html:TUT_P("The Cascade score blends public and critics' opinion.",
       "As Cascade learns what you like, it adjusts scores up or down for the genres and sub-genres you enjoy most and least."),
       before(){ tutExpandCard(false); }, scope:"card", sel:[".qone",".title .qscore"], trail:TUT_WMS, trailCard:true, demo:"score"},
-    {html:TUT_P("Tap ☆ to star a movie. Starred movies appear at the top of your mood lists.",
-      "You can also make a mood of just your starred movies."),
+    {html:TUT_P("Tap ☆ to star a movie. Starred movies appear at the top of your lists.",
+      "You can also make a list of just your starred movies."),
       before(){ tutExpandCard(false); }, scope:"card", sel:[".starbtn"], trail:TUT_WMS, trailCard:true, demo:"star", tap:true},
     {html:TUT_P("Expanded, a film card shows its trailers. Tap one to watch it."),
       before(){ tutExpandCard(true); }, scope:"card", sel:[".trailers",".notrailer"], trail:TUT_WMS, trailCard:true},
@@ -25405,8 +25405,8 @@ const TOURS = {
     {html:TUT_P("For your favourite genres, your agent automatically sets alerts so you never miss the most important movies when they arrive at the cinema, on rental and on streaming.",
       "You can also set an alert yourself on any individual movie."),
       before(){ tutExpandCard(false); }, scope:"card", sel:[".ctl.notify"], trail:TUT_WMS, trailCard:true},
-    {html:TUT_P("This shows which moods a movie appears in.",
-      "You can add a movie to a mood, or take it out, by hand. For example, if a movie is in <b>Me</b> but you want to watch it with your partner, set it to appear only in <b>Partner</b>."),
+    {html:TUT_P("This shows which lists a movie appears in.",
+      "You can add a movie to a list, or take it out, by hand. For example, if a movie is in <b>Me</b> but you want to watch it with your partner, set it to appear only in <b>Partner</b>."),
       before(){ tutExpandCard(false); }, scope:"card", sel:[".ctl.oamlist"], trail:TUT_WMS, trailCard:true},
     {html:TUT_P("Seen it? Say what you thought. Every verdict teaches your agent your taste.",
       "The more films you rate, the better your agent gets at picking films you'll love."),
@@ -25415,32 +25415,32 @@ const TOURS = {
   ]},
   // Lee, 16 Nov: the Moods tutorial — run on the Me mood's filter sheet (or the first mood that isn't All
   // Latest), closing it unsaved at the end.
-  moods:{ title:"Moods tutorial", steps:[
-    {html:TUT_P("Every mood has its own filters.", `Tap a mood's <span class="tutico">${MOOD_EDIT_SVG}</span> filter icon to change what it shows.`),
+  moods:{ title:"Lists tutorial", steps:[
+    {html:TUT_P("Every list has its own filters.", `Tap a list's <span class="tutico">${MOOD_EDIT_SVG}</span> filter icon to change what it shows.`),
       // The filter icon only shows on the selected mood, so select it first.
       before(){ closeWatchSheetQuiet(); showAgentsHome(); const id=tutMoodsTourMoodId(); setWatchMood(id); tutMoodRowTo(`.moodrow .moodchip[data-mood="${id}"]`); },
       get sel(){ return [`.moodrow .moodchip[data-mood="${tutMoodsTourMoodId()}"] .moodedit`]; }, trail:TUT_WM, tap:true},
-    {html:TUT_P("Give the mood a name. It's the label on the mood row."),
+    {html:TUT_P("Give the list a name. It's the label on the list row."),
       before(){ tutOpenMoodsTourSheet(); }, after(){ closeWatchSheetQuiet(); }, sel:["#oamMoodName"]},
-    {html:TUT_P("A mood starts with your agent's genre preferences, so you get the films that matter most to you.",
-      "Switch genres on or off to make a special mood. For example, to create a mood with only drama movies, switch everything else off."),
+    {html:TUT_P("A list starts with your agent's genre preferences, so you get the films that matter most to you.",
+      "Switch genres on or off to make a special list. For example, to create a list with only drama movies, switch everything else off."),
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .mgenre .oalist"]},
     // Lee, 2026-11-17: the Agent settings / Agent override switch sits under the genre rows.
     {html:TUT_P("Sometimes you want just the best of the best.",
       "Under the genres, choose <b>Override</b> to set one level for every genre in this list, in place of your taste settings."),
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .agovseg"]},
     // The "during account setup" lines only appear when that setup mood exists (Lee, 16 Nov).
-    {get html(){ return TUT_P("Instead of building a mood around genres, you can use a keyword search around an actor, director or title.",
-      ...(watchMoods.some(m=>m.id==="fav-person") ? ["During account setup, we set up a mood with your favourite actor or director to show you how this is done."] : [])); },
+    {get html(){ return TUT_P("Instead of building a list around genres, you can use a keyword search around an actor, director or title.",
+      ...(watchMoods.some(m=>m.id==="fav-person") ? ["During account setup, we set up a list with your favourite actor or director to show you how this is done."] : [])); },
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:[`#watchSheet .mtabs button[data-mode="keyword"]`], tap:true},
-    {get html(){ return TUT_P("Show only films included on one of your services, so the whole mood is ready to watch tonight.",
-      ...(watchMoods.some(m=>m.id==="topsvc") ? ["During account setup, we created a mood with your most-used streaming service to show you how this is done."] : [])); },
+    {get html(){ return TUT_P("Show only films included on one of your services, so the whole list is ready to watch tonight.",
+      ...(watchMoods.some(m=>m.id==="topsvc") ? ["During account setup, we created a list with your most-used streaming service to show you how this is done."] : [])); },
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); }, sel:["#oamSvcSec"]},
-    {html:TUT_P("Choose how many films the mood shows, and in what order."),
+    {html:TUT_P("Choose how many films the list shows, and in what order."),
       before(){ tutOpenMoodsTourSheet(); }, sel:["#oamHowSec"]},
     {html:TUT_P("<b>More filters</b> narrow it further: age ratings, awards, how far back, films you've seen, and more."),
       before(){ tutOpenMoodsTourSheet(); }, sel:["#watchSheet .morebtn"]},
-    {html:TUT_P("To make a new mood, tap <b>+ Mood</b>. You can have up to 10."),
+    {html:TUT_P("To make a new list, tap <b>+ List</b>. You can have up to 10."),
       before(){ closeWatchSheetQuiet(); showAgentsHome(); tutMoodRowTo("#moodAddBtn"); }, sel:["#moodAddBtn"], trail:TUT_W},
   ]},
   alerts:{ title:"Alerts tutorial", steps:[
@@ -25457,10 +25457,10 @@ const TOURS = {
       before(){ tutFindSearch("Nolan", true); }, sel:["#findSearchInput"], trail:["#findBtn"]},
     {html:TUT_P("Searched for something? Narrow the results to one of your streaming services."),
       before(){ tutFindSearch("Nolan"); }, sel:["#findSvcFilt"], trail:["#findBtn"]},
-    {html:TUT_P("This shows which of your moods the film is in. Tap <b>Show in Watch</b> to jump to it.",
-      "If it isn't in a mood you'd expect, tap <b>Add it to…</b> to put it there."),
+    {html:TUT_P("This shows which of your lists the film is in. Tap <b>Show in Watch</b> to jump to it.",
+      "If it isn't in a list you'd expect, tap <b>Add it to…</b> to put it there."),
       before(){ tutFindSearch("Nolan"); }, sel:["#findListWrap .wilpanel"], trail:["#findBtn"]},
-    {html:TUT_P("Like a search? Tap <b>Save as mood</b> to turn it into a mood, so its films are always one tap away in Watch."),
+    {html:TUT_P("Like a search? Tap <b>Save as list</b> to turn it into a list, so its films are always one tap away in Watch."),
       before(){ tutFindSearch("Nolan"); }, sel:["#findSaveAsMoodBtn"], trail:["#findBtn"]},
   ]},
   agent:{ title:"Agent tutorial", steps:[
@@ -25848,8 +25848,8 @@ function endTutorial(markSeen){
 // Bypasses tutorialSeen()/tourV2Seen() on purpose, same as any other explicit "show me that again" control.
 // CAS-1349: plays the v2 script on a v2 account, the CAS-1317 script on every other account.
 const TUTORIAL_ROWS = [
-  {key:"watch", icon:"watch", name:"Watch", sub:"Moods, viewing status and the film card."},
-  {key:"moods", icon:"watch", name:"Moods", sub:"The powerful filters behind every mood."},
+  {key:"watch", icon:"watch", name:"Watch", sub:"Lists, viewing status and the film card."},
+  {key:"moods", icon:"watch", name:"Lists", sub:"The powerful filters behind every list."},
   {key:"alerts", icon:"alerts", name:"Alerts", sub:"What your agent tells you about, and when."},
   {key:"database", icon:"find", name:"Database", sub:"Finding any film in Cascade."},
   {key:"agent", icon:"agent", name:"Taste", sub:"How your agent learns your taste."},

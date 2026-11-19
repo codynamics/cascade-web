@@ -69,7 +69,7 @@ test("CAS-1144 AC2/AC3: a Watch filter hiding everything prices an honest Edit t
   await expect(empty).not.toContainText(/Drop the|Look beyond my services/);
   const btn = empty.locator(".ebtn");
   await expect(btn).toHaveCount(1);
-  await expect(btn).toContainText("Edit this mood");
+  await expect(btn).toContainText("Edit this list");
   const n = Number((await btn.locator("b").textContent()).replace(/\D+/g, ""));
   expect(n).toBeGreaterThan(0);
 
