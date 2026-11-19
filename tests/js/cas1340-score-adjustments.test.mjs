@@ -157,7 +157,7 @@ test("CAS-1457: a timestamped verdict that moves a pair >=1 point is a change; t
       assert.equal(E.oaChangedGenres(c, 0).has("Science Fiction"), true);
       assert.equal(E.oaChangedGenres(c, 5000).has("Science Fiction"), false, "nothing newer than the cut-off");
       const html = E.oaChangeLogHTML(c, "Science Fiction");
-      assert.ok(html.includes('<details class="oalog"') && html.includes("RECENT CHANGES IN"), html);
+      assert.ok(html.includes('<details class="oalog"') && html.includes("RECENT RECOMMENDATIONS IN"), html);
       assert.ok(html.includes("after Dud Two"), html);
       const rowHTML = E.oaComboRowHTML(c, "Science Fiction", E.oaComboStats(c, "Science Fiction")[0]);
       assert.ok(!rowHTML.includes("ADJUSTED") && !rowHTML.includes("Mark as seen"), "old tags are gone");
