@@ -12745,6 +12745,15 @@ function oneComboAdj(key){
   const pr = P.pairs[key];
   return Math.round(youScore({pub:0, pairs:[{sum: pr?pr.sum:0, n: pr?pr.n:0}], b:P.baseline}).adj);
 }
+// CAS-1479: the points a non-overridden combo contributes to a score. Scoring uses the APPLIED value (c.applied
+// [key], 0 when absent), not the learned one — Pixel keeps learning (oneComboAdj), but nothing moves in a list
+// until the person applies it (tasteApply). A criteria object not yet seeded (no appliedSeeded flag) keeps
+// today's learned behaviour, so no list moves before tasteSeedApplied has run.
+function oneAppliedPoints(c, key){
+  if(!c || !c.appliedSeeded) return oneComboAdj(key);
+  const v = (c.applied || {})[key];
+  return typeof v === "number" ? v : 0;
+}
 // The real arithmetic behind oneScore/oneScoreParts, parameterised by the criteria object the CALLER
 // already has (matchesCriteria's v2 branch passes its own `c`; the exported single-argument wrappers
 // below fall back to oneAgentCriteria()). "never" combos are not numeric, so they are never an override —
@@ -12763,12 +12772,21 @@ function oneScorePartsFor(m, c){
     const n = pr ? pr.n : 0;
     const ov = combo[key];
     const overridden = typeof ov === "number";
-    return {other, points: overridden ? ov : oneComboAdj(key), n, overridden};
+    return {other, points: overridden ? ov : oneAppliedPoints(c, key), n, overridden};
   });
   const hasOverride = parts.some(p => p.overridden);
   let value, adj;
   if(!hasOverride){
-    const pairs = keys.map(({key}) => { const pr=P.pairs[key]; return {sum: pr?pr.sum:0, n: pr?pr.n:0}; });
+    // CAS-1479: a pair whose applied value matches its learned value reads its real verdict stats (so the
+    // day-one seed moves no score); a pair whose applied value differs is stood in for by a synthetic pair
+    // whose lean, once youScore scales it, gives exactly the applied points.
+    const pairs = keys.map(({key}) => {
+      const pr=P.pairs[key], n = pr?pr.n:0, sum = pr?pr.sum:0;
+      const applied = oneAppliedPoints(c, key);
+      if(applied === oneComboAdj(key)) return {sum, n};
+      const lean = P.baseline + (applied < 0 ? applied/45 : applied/20);
+      return {sum: lean*(n+TASTE_K) - TASTE_K*P.baseline, n};
+    });
     const ys = youScore({pub, pairs, b:P.baseline});
     value = ys.value; adj = ys.adj;
   } else {
@@ -12820,6 +12838,79 @@ function barAdvice(style){
     if(below.length >= 3 && likedShare(below) >= 0.75) return {dir:"down", from:bar, to:Math.max(50, bar-10), lo:below, hi:[]};
   }
   return null;
+}
+// ---- CAS-1479: Taste recommendations (engine side; the UI is CAS-1480) -------------------------------------
+// Pixel's learned sub-genre adjustments (oneComboAdj) no longer change scores by themselves. A combo is
+// PENDING when its learned value sits >= 2 away from the applied value (c.applied) and has not been skipped
+// at about its current learned value (c.skipped). The person applies or skips per genre.
+const TASTE_REC_GAP = 2;
+// Day-one seed: applied[key] = learned for every combo that has verdicts, so no score moves the day this ships.
+function tasteSeedApplied(c){
+  if(!c || c.v !== 2 || c.appliedSeeded) return false;
+  const P = oneAgentProfile();
+  c.applied = c.applied || {};
+  Object.keys(P.pairs).forEach(key => { if(P.pairs[key].n > 0 && !(key in c.applied)) c.applied[key] = oneComboAdj(key); });
+  c.appliedSeeded = true;
+  return true;
+}
+function tasteRecs(){
+  const c = oneAgentCriteria();
+  if(!c) return [];
+  const P = oneAgentProfile();
+  const combo = c.combo || {}, applied = c.applied || {}, skipped = c.skipped || {};
+  const byStyle = {};
+  Object.keys(P.pairs).forEach(key => {
+    const ov = combo[key];
+    if(typeof ov === "number" || ov === "never") return;
+    const learned = oneComboAdj(key);
+    const from = typeof applied[key] === "number" ? applied[key] : 0;
+    if(Math.abs(learned - from) < TASTE_REC_GAP) return;
+    if(typeof skipped[key] === "number" && Math.abs(learned - skipped[key]) < TASTE_REC_GAP) return;
+    const pr = P.pairs[key];
+    (byStyle[pr.primary] = byStyle[pr.primary] || []).push({key, other: pr.other, from, to: learned});
+  });
+  // A genre with only minimum-score advice (no pending combo) is not a recommendation on its own: the
+  // advice belongs to the genre's recommendation, which exists when a combo is pending.
+  const out = Object.keys(byStyle).map(style => ({style, keys: byStyle[style], bar: barAdvice(style)}));
+  const mag = r => r.keys.reduce((a,k) => a + Math.abs(k.to - k.from), 0);
+  out.sort((a,b) => mag(b) - mag(a));
+  return out;
+}
+function tasteAfterChange(){
+  saveCascades();
+  if(typeof recomputeFound === "function") recomputeFound();
+  if(typeof render === "function") render();
+  if(typeof renderAgentsScreen === "function") renderAgentsScreen();
+}
+function tasteApplyNoSave(style){
+  const c = oneAgentCriteria(); if(!c) return false;
+  const rec = tasteRecs().find(r => r.style === style); if(!rec) return false;
+  c.applied = c.applied || {};
+  rec.keys.forEach(k => { c.applied[k.key] = k.to; });
+  if(rec.bar){
+    c.styles = c.styles || {};
+    const st = c.styles[style] || (c.styles[style] = {al:{cinema:false,rent:false,stream:false}});
+    st.bar = rec.bar.to;
+  }
+  return true;
+}
+function tasteSkipNoSave(style){
+  const c = oneAgentCriteria(); if(!c) return false;
+  const rec = tasteRecs().find(r => r.style === style); if(!rec) return false;
+  c.skipped = c.skipped || {};
+  rec.keys.forEach(k => { c.skipped[k.key] = k.to; });
+  if(rec.bar){
+    c.dismissed = c.dismissed || [];
+    if(!c.dismissed.includes("bar:"+style)) c.dismissed.push("bar:"+style);
+  }
+  return true;
+}
+function tasteApply(style){ if(tasteApplyNoSave(style)) tasteAfterChange(); }
+function tasteSkip(style){ if(tasteSkipNoSave(style)) tasteAfterChange(); }
+function tasteApplyAll(){
+  let any = false;
+  tasteRecs().forEach(r => { if(tasteApplyNoSave(r.style)) any = true; });
+  if(any) tasteAfterChange();
 }
 // oneTopPct(style, score): the share of this style's SCORED catalogue (Public ≥ 0) that clears `score` —
 // the "shows you the top N%" line barAdvice's own card reads alongside the raise/lower suggestion. Named
@@ -20745,7 +20836,7 @@ function oaComboStats(c, style){
     const ov = combo[key];
     const never = ov==="never";
     const overridden = typeof ov==="number";
-    const points = overridden ? ov : learned;
+    const points = overridden ? ov : oneAppliedPoints(c, key);   // CAS-1479: rows show/drag the applied value
     return {key, other, n, filmCount:filmCounts[key], learned, override:ov, overridden, never, points};
   });
 }
@@ -20933,7 +21024,7 @@ function updateAgentNavDot(){
   const btn = typeof $==="function" ? $("agentsBtn") : null;
   if(!btn || !btn.classList) return;
   const c = oneAgentCriteria();
-  const n = c ? oaChangedGenres(c, c.agentSeenAt||0).size : 0;
+  const n = c ? tasteRecs().length : 0;   // CAS-1479: genres with a recommendation, no longer agentSeenAt
   let badge = btn.querySelector(".oabadge");
   if(n>0){
     if(!badge){ badge=document.createElement("span"); badge.className="oabadge"; btn.appendChild(badge); }
@@ -22540,7 +22631,8 @@ function oneAgentCommit(draft){
   const seenAdj={};
   MOVIES.forEach(m=>{ mainOtherCombos(m).keys.forEach(({key})=>{ if(!(key in seenAdj)) seenAdj[key]=oneComboAdj(key); }); });
   // CAS-1352: the agent's name is now whatever "Name your agent" collected, not a hard-coded default.
-  const agent={id:cascadeNewId(), name:draft.name||"My agent", v:2, styles:draft.styles, combo:{}, seenAdj, seenAdjAt:{}, dismissed:[]};
+  const agent={id:cascadeNewId(), name:draft.name||"My agent", v:2, styles:draft.styles, combo:{}, seenAdj, seenAdjAt:{}, dismissed:[], applied:{}, skipped:{}};
+  tasteSeedApplied(agent);   // CAS-1479: existing verdicts seed applied = learned, so no score moves
   cascades.push(agent);
   saveCascades();
   setActive(agent.id);
@@ -27834,6 +27926,8 @@ function acctFetchKeepalive(init){
     // CAS-1347: same reasoning as applyWatchPrefsToCascades just above — the CAS-1345 starter-mood repair
     // needs the account's real v2 agent styles, which loadUserPrefs (inside allLoads) cannot trust yet.
     oneAgentApplyStarterRepair();
+    // CAS-1479: day-one seed — verdicts are loaded now (allLoads settled), so applied = learned for every judged combo.
+    { const oc=oneAgentCriteria(); if(oc && tasteSeedApplied(oc)) saveCascades(); }
     // CAS-1224: redo the cold-boot landing-tab pick now that cascades/watchPrefs hold the account's real
     // answer, not the empty-device default pickLandingWatchTab() saw at boot. Only when the boot-time pick
     // is still pending AND the device is still sitting on whatever it provisionally guessed — a real tap
