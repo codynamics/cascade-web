@@ -24849,5 +24849,100 @@
     "lost_window": "in_cinema",
     "label": "In Cinema",
     "detected": "2026-11-18"
+  },
+  {
+    "tmdb_id": 1514026,
+    "title": "Buddy",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-11-19"
+  },
+  {
+    "tmdb_id": 1300968,
+    "title": "The Hunger Games: Sunrise on the Reaping",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-11-19"
+  },
+  {
+    "tmdb_id": 1300968,
+    "title": "The Hunger Games: Sunrise on the Reaping",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-11-19"
+  },
+  {
+    "tmdb_id": 1198654,
+    "title": "Bad Apples",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-11-19"
+  },
+  {
+    "tmdb_id": 1198654,
+    "title": "Bad Apples",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-11-19"
+  },
+  {
+    "tmdb_id": 512200,
+    "title": "Jumanji: The Next Level",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-11-19"
+  },
+  {
+    "tmdb_id": 1457866,
+    "title": "THE FURTHER MIS-ADVENTURES OF CLIFF BOOTH",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-11-19"
+  },
+  {
+    "tmdb_id": 1473148,
+    "title": "Gentle Monster",
+    "kind": "arrived",
+    "new_window": "included_streaming",
+    "label": "Included Streaming",
+    "services": [
+      "Netflix",
+      "Netflix Standard with Ads"
+    ],
+    "detected": "2026-11-19"
+  },
+  {
+    "tmdb_id": 1473148,
+    "title": "Gentle Monster",
+    "kind": "left",
+    "lost_window": "in_cinema",
+    "label": "In Cinema",
+    "detected": "2026-11-19"
+  },
+  {
+    "tmdb_id": 1492865,
+    "title": "Steal This Story, Please!",
+    "kind": "arrived",
+    "new_window": "in_cinema",
+    "label": "In Cinema",
+    "services": [],
+    "detected": "2026-11-19"
+  },
+  {
+    "tmdb_id": 1492865,
+    "title": "Steal This Story, Please!",
+    "kind": "left",
+    "lost_window": "upcoming",
+    "label": "Upcoming",
+    "detected": "2026-11-19"
   }
 ]
