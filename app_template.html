@@ -29003,7 +29003,14 @@ function acctFetchKeepalive(init){
   let oneAgentRepairPending = false;
   function riderReviewSessionsOnto(patch){
     if(reviewSessionsPushPending){ reviewSessionsPushPending=false; patch.reviewSessions=reviewPromptSessionsCount; }
-    if(moodsProvisionPending){ Object.assign(patch, moodsProvisionPending); moodsProvisionPending=null; }
+    // Lee, 2026-11-20: a key the caller is writing NOW always beats the load-time snapshot riding along — the
+    // snapshot was taken before this write, so letting it overwrite (e.g. a list just saved, pushed as "moods")
+    // silently put the account back to the pre-edit lists on the server, and the next prefs poll reverted the
+    // device too. Every account took this path after CAS-1491's one-time Latest and Best load repair.
+    if(moodsProvisionPending){
+      for(const k of Object.keys(moodsProvisionPending)) if(!(k in patch)) patch[k]=moodsProvisionPending[k];
+      moodsProvisionPending=null;
+    }
     return patch;
   }
   // CAS-1347: the style-aware half of the CAS-1345 starter-mood repair loadUserPrefs flagged above. Called
