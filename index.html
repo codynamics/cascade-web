@@ -21177,9 +21177,10 @@ const ONE_AGENT_MOOD_BUILTINS=[
   // Lee, 2026-11-09 (later): All Latest is now an ORDINARY mood, configured rather than hard-coded — the new
   // "Only films with a cinema release" filter on, How far back 1 yr, watched films in, and the Mood Override
   // On at 100% (every film in every on genre, whatever its score). releasesV:3.
-  {id:"releases", name:"All Latest", sort:"release", show:"all", years:1, watched:true, cinemaOnly:true, topShare:100, releasesV:3},
-  // CAS-1368: Best of the best — every on genre, raised to a floor of 85 regardless of its own bar, Best 40.
-  {id:"best", name:"Best of the best", topShare:20, show:"40"},
+  // CAS-1491 (Lee, 2026-11-20): All Latest and Best of the best merged into ONE list, Latest and Best — top 20%
+  // of every genre the agent follows, Best 40, by score, watched in, any age of film. releasesV:4. Best of the
+  // best is gone (new and existing accounts); the id stays "releases" (pinned first, Watch opens on it).
+  {id:"releases", name:"Latest and Best", styles:[], topShare:20, show:"40", sort:"score", watched:true, cinemaOnly:false, handOnly:false, awards:"any", years:0, svc:null, releasesV:4, releasesSortV:1},
 ];
 function oamMoodDefaultFields(){
   return {v2:true, handOnly:false, watched:false, cinemaOnly:false, styles:[], topShare:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[], svc:null, people:""};
@@ -21946,7 +21947,7 @@ window.oamSaveMoodFromSheet=()=>{
   // one-time load repair below (loadUserPrefs) never reverts a deliberate choice of Score back to release.
   // 13 Nov: moodSort() only honours Releases' saved sort once sortChosen is stamped — the v1 sheet's
   // save did that (CAS-1331/1333), this v2 save never did, so Score / A–Z on Releases silently reverted.
-  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=3; mood.sortChosen=true; }
+  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=4; mood.sortChosen=true; }
   const list=oamMoodsListReal();
   const idx=list.findIndex(m=>m.id===mood.id);
   watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
@@ -22632,7 +22633,7 @@ function oneAgentStarterMoods(who, ages){
   who = who || {};
   ages = ages || [];
   const pick = id => ({...oamMoodDefaultFields(), ...ONE_AGENT_MOOD_BUILTINS.find(b=>b.id===id), ages, watched:true});
-  const list = [pick("releases"), pick("best"),
+  const list = [pick("releases"),
     {...oamMoodDefaultFields(), id:"me", name:"Me", show:"40", ages, watched:true}];
   if(who.partner) list.push({...oamMoodDefaultFields(), id:"date", name:"Partner",
     styles:[...(who.dateStyles||[])], show:"40", ages, watched:true});
@@ -25537,7 +25538,7 @@ const TOURS = {
     // the moods made from the setup answers, then how to edit and add moods.
     {html:TUT_P("Your Watch area is organised into <b>lists</b>.", "Lists are filtered collections of movies."),
       before(){ setWatchMood("releases"); tutMoodRowTo(null); }, sel:[".moodrow"], trail:TUT_W},
-    {html:TUT_P("<b>All Latest</b> is a special list designed to give you a forward view of all upcoming and cinema releases."),
+    {html:TUT_P("<b>Latest and Best</b> is your main list: the top 20% of every genre your agent follows."),
       before(){ tutMoodRowTo(null); }, sel:[`.moodrow .moodchip[data-mood="releases"]`], trail:TUT_W},
     {html:TUT_P("Some lists have been created from the questions you answered."),
       before(){ tutMoodRowTo(`.moodrow .moodchip[data-mood="me"]`); },
@@ -29263,6 +29264,20 @@ function acctFetchKeepalive(init){
               watched: first ? true : m.watched,
               cinemaOnly:true, topShare: m.topShare==null ? 100 : m.topShare, releasesV:3};
           });
+          moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
+        }
+        // CAS-1491: All Latest + Best of the best became ONE list, Latest and Best (releasesV:4). A releases
+        // record below 4 takes the new settings once (its own ages/in/out kept), any "best" mood is dropped,
+        // and a saved selection of "best" points at releases — in memory, piggybacked onto the next real
+        // view write (a load must never write — CAS-1218/1243). A record already at 4 is left alone.
+        if(watchMoods.some(m=>m && m.v2 && ((m.id==="releases" && (m.releasesV||0)<4) || m.id==="best"))){
+          watchMoods = watchMoods.filter(m=>!(m && m.v2 && m.id==="best")).map(m=>{
+            if(!(m && m.v2 && m.id==="releases" && (m.releasesV||0)<4)) return m;
+            return {...m, name:"Latest and Best", styles:[], topShare:20, show:"40", sort:"score", watched:true,
+              cinemaOnly:false, handOnly:false, awards:"any", years:0, svc:null,
+              releasesV:4, releasesSortV:1, sortChosen:true};
+          });
+          if(v.mood==="best") v.mood="releases";
           moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
         }
         // CAS-1374: Best 10 is retired — a v2 mood still saved with show:"10" reads as "20" once, in

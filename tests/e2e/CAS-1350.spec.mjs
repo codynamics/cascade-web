@@ -102,7 +102,7 @@ test("CAS-1350/CAS-1368: the first run completes end to end, welcome through Sta
   await expect(page.locator("#oafCta")).toHaveText("Proceed");
   // CAS-1368: the moods table follows the answers (partner+kids both yes) — and the done screen shows it (Lee, 13 Nov).
   await expect(page.locator("#oafInner .oafdmood"))
-    .toHaveText(["All Latest", "Best of the best", "Me", "Partner", "Family"]);   // no Starred (Lee, 14 Nov)
+    .toHaveText(["Latest and Best", "Me", "Partner", "Family"]);   // no Starred (Lee, 14 Nov)
   await page.locator("#oafCta").click();
 
   // CAS-1361 part 1: after Start watching, the setup header/nav must not float over Watch underneath.

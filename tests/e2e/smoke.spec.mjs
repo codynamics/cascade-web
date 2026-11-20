@@ -2086,10 +2086,10 @@ test("CAS-1371 AC1: Delete this mood arms visibly red on a touch tap, and a seco
     cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
     saveCascades();
     setActive(cascades[0].id);
-    watchMoods = [];   // never provisioned — oamMoodsListReal() falls back to the in-memory builtins
-    watchMoodSel = "best";
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), { ...oamMoodDefaultFields(), id: "extra", name: "Extra" }];   // CAS-1491: the only built-in is pinned, so delete a custom mood
+    watchMoodSel = "extra";
     render();
-    window.openOamMoodSheetFor("best");
+    window.openOamMoodSheetFor("extra");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
@@ -2114,7 +2114,7 @@ test("CAS-1371 AC1: Delete this mood arms visibly red on a touch tap, and a seco
   await tapDelete();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
   const ids = await page.evaluate(() => watchMoods.map(m => m.id));
-  expect(ids).not.toContain("best");
+  expect(ids).not.toContain("extra");
 });
 
 // CAS-1371 AC3: a Position row with Move left/Move right is the reliable fallback for press-and-hold
@@ -2132,21 +2132,21 @@ test("CAS-1371 AC3: Move left / Move right in the mood sheet reorders", async ({
     setActive(cascades[0].id);
     // CAS-1440 dropped Starred from the built-in moods, leaving only All Latest and Best of the best; a third
     // (custom) mood gives the reorder a neighbour to move past.
-    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), { ...oamMoodDefaultFields(), id: "extra", name: "Extra" }];
-    watchMoodSel = "best";
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), { ...oamMoodDefaultFields(), id: "extra", name: "Extra" }, { ...oamMoodDefaultFields(), id: "extra2", name: "Extra 2" }];
+    watchMoodSel = "extra";
     render();
-    window.openOamMoodSheetFor("best");
+    window.openOamMoodSheetFor("extra");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
   const before = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
-  expect(before.indexOf("best")).toBeGreaterThan(0);
+  expect(before.indexOf("extra")).toBeGreaterThan(0);
 
   // CAS-1394: CAS-1391 moved Position inside More filters, which opens collapsed.
   await page.locator('#watchSheetBody .morebtn').click();
   await page.locator('#watchSheetBody button:has-text("Move right")').click();
   const afterRight = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
-  expect(afterRight.indexOf("best")).toBe(before.indexOf("best") + 1);
+  expect(afterRight.indexOf("extra")).toBe(before.indexOf("extra") + 1);
 
   await page.locator('#watchSheetBody button:has-text("Move left")').click();
   const afterLeft = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
@@ -2402,9 +2402,9 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
     saveCascades();
     setActive(cascades[0].id);
     watchMoods = [];
-    watchMoodSel = "best";
+    watchMoodSel = "releases";
     render();
-    window.openOamMoodSheetFor("best");
+    window.openOamMoodSheetFor("releases");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
@@ -2467,12 +2467,12 @@ test("CAS-1403: Any service chip lists films beyond my services and clears when 
     prefs.sub = new Set([SUB_SERVICES[0]]);
     prefs.on = true;
     watchMoods = [];
-    watchMoodSel = "best";
+    watchMoodSel = "releases";
     // The my-services gate only bites films with streaming offers, so count on the Stream tab; the default
     // Cinema tab's films carry no offers and read the same with or without Any service.
     watchTab = "stream";
     render();
-    window.openOamMoodSheetFor("best");
+    window.openOamMoodSheetFor("releases");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
@@ -2493,7 +2493,7 @@ test("CAS-1403: Any service chip lists films beyond my services and clears when 
   const after = await countPool();
   expect(after).toBeGreaterThan(before);
 
-  await page.evaluate(() => window.openOamMoodSheetFor("best"));
+  await page.evaluate(() => window.openOamMoodSheetFor("releases"));
   await page.locator("#watchSheetBody .chip[onclick^=\"setOamDraftSvc('\"]").first().click();
   expect(await page.evaluate(() => oamDraft.anySvc)).toBe(false);
   expect(await page.evaluate(() => !!oamDraft.svc)).toBe(true);
@@ -2516,7 +2516,7 @@ test("CAS-1414: a starred film leads the mood list and survives a Best 20 cut", 
     prefs.sub = new Set(SUB_SERVICES);   // Stream-tab films only list on a service the user has
     prefs.on = true;
     watchMoods = [];
-    watchMoodSel = "best";
+    watchMoodSel = "releases";
     watchTab = "stream";
     starredIds.clear();
     render();
