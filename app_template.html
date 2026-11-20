@@ -3414,6 +3414,7 @@
     text-overflow:ellipsis;white-space:nowrap}
   .oarowfilms{display:block;font-size:11px;color:var(--faint);margin-top:1px}
   .oaalertmark{display:inline-flex;align-items:center;gap:3px;margin-left:4px;white-space:nowrap}
+  .oarowfilms .oaalertmark{margin-left:6px;vertical-align:middle}
   .oadot{display:inline-block;width:7px;height:7px;border-radius:50%}
   .oarowstrip{display:flex;gap:3px;position:relative}
   .oarowval{font-size:12.5px;font-weight:800;text-align:right;color:var(--ink);white-space:nowrap}
@@ -20535,7 +20536,7 @@ function oaAlertDotsHTML(c, style){
   const al=((c.styles||{})[style]||{}).al || {};
   const active=ONE_AGENT_WINDOWS.filter(w=>al[w.key]);
   if(!active.length) return "";
-  return `<span class="oaalertmark" aria-hidden="true">🔔${active.map(w=>`<i class="oadot" style="background:${w.color}"></i>`).join("")}</span>`;
+  return `<span class="oaalertmark" aria-hidden="true">${active.map(w=>`<i class="oadot" style="background:${w.color}"></i>`).join("")}</span>`;
 }
 // AGENT SUGGESTION — only when barAdvice(style) has something to say. CAS-1345 Part 5: collapsed to a
 // single row by default (oaSuggestionOpen, reset on every style open by oaToggleStyle above); tapping it
@@ -20644,8 +20645,8 @@ function oaRowHTML(c, style, filmCount, changed){
       ${favBtn}
       <div class="oarowhead">
         <button type="button" class="oarowleft" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
-          <span class="oastyname">${esc(name)}${oaAlertDotsHTML(c, style)}</span>
-          <span class="oarowfilms">${filmsLine}</span>
+          <span class="oastyname">${esc(name)}</span>
+          <span class="oarowfilms">${filmsLine}${oaAlertDotsHTML(c, style)}</span>
         </button>
         ${strip}
         <button type="button" class="oachev" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}" aria-label="${open?"Close":"Open"} ${escA(name)}"></button>
@@ -20687,14 +20688,14 @@ function renderOneAgentScreen(c){
   const counts=oaFilmCounts(c);
   const order=oaOrder(c);
   const n=tasteProfile().n;
-  const changedMain=oaRecentVerdictGenres();
+  const changedMain=new Set(tasteRecs().map(r=>r.style));
   const rows=order.map(style=>oaRowHTML(c, style, counts[style]||0, changedMain.has(style))).join("");
   const title = "Your taste";   // CAS-1480: the screen heading (was the agent's own name, CAS-1352)
   const agentName = (c.name||"").trim() || "your agent";
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">Built from your ${n} verdict${n===1?"":"s"}</p>
-    <div class="oaintro"><p>This is your space. Slide any genre to see more or fewer of its films. Nothing changes unless you change it.</p><p>Your agent, ${esc(agentName)}, studies your verdicts and suggests tweaks. You decide what to apply.</p><p>A <b>gold edge</b> marks the genres you've rated most recently. Tap a genre to open it.</p></div>
+    <div class="oaintro"><p>This is your space. Slide any genre to see more or fewer of its films. Nothing changes unless you change it.</p><p>Your agent, ${esc(agentName)}, studies your verdicts and suggests tweaks. You decide what to apply.</p><p>A <b>gold edge</b> marks a genre with an agent recommendation. Tap a genre to open it.</p></div>
     ${tasteRecsCardHTML()}
     <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
@@ -21048,20 +21049,6 @@ function oaChangedGenres(c, cutoff){
 // "Since your last visit" cut-off for this visit: set once when the Agent screen opens (the previous
 // agentSeenAt), so the rows stay gold for the whole visit. Falls back to the stored value before any open.
 let oaVisitCutoff = null;
-// CAS-1461: gold rows are the genres (main style) of the account's 10 most recent verdicts, newest first by
-// verdictAt. A verdict with no timestamp is ignored.
-function oaRecentVerdictGenres(){
-  const ids = new Set(watched); blocked.forEach(id=>ids.add(id));
-  const rec = [];
-  ids.forEach(id=>{
-    if(!opinionOf(id)) return;
-    const at = verdictAt.get(id)||0; if(!at) return;
-    const m = MOVIES.find(x=>x.tmdb_id===id); if(!m) return;
-    rec.push({at, main: mainOtherCombos(m).main});
-  });
-  rec.sort((a,b)=>b.at-a.at);
-  return new Set(rec.slice(0,10).map(r=>r.main));
-}
 let oaLogShown = 5;      // changes listed in the open genre's recent-changes log (+10 per "Show more")
 let oaLogOpen = false;   // the log's <details> open state, kept across re-renders
 function oaChangeLogHTML(c, style){
