@@ -3406,15 +3406,16 @@
   .oarow.off .oarowhead{opacity:.55}
   .oarowhead{display:grid;grid-template-columns:104px 1fr 64px 28px;align-items:center;gap:8px;
     padding:11px 4px;cursor:pointer;background:none;border:0;flex:1;min-width:0;text-align:left;font:inherit;color:inherit}
-  .oarowhead:hover,.oarowhead:focus-visible{background:rgba(255,255,255,.03)}
-  .oarowhead:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
-  .oarowleft{min-width:0}
+  .oarowhead:hover{background:rgba(255,255,255,.03)}
+  .oarowhead button:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
+  .oarowleft{min-width:0;background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+  button.oachev{border:0;padding:0;margin:0;cursor:pointer;color:inherit}
   .oastyname{display:block;font-size:14px;font-weight:800;color:var(--ink);overflow:hidden;
     text-overflow:ellipsis;white-space:nowrap}
   .oarowfilms{display:block;font-size:11px;color:var(--faint);margin-top:1px}
   .oaalertmark{display:inline-flex;align-items:center;gap:3px;margin-left:4px;white-space:nowrap}
   .oadot{display:inline-block;width:7px;height:7px;border-radius:50%}
-  .oarowstrip{display:flex;gap:3px}
+  .oarowstrip{display:flex;gap:3px;position:relative}
   .oarowval{font-size:12.5px;font-weight:800;text-align:right;color:var(--ink);white-space:nowrap}
   .oarowval i{display:block;font-style:normal;font-weight:600;font-size:10px;color:var(--faint);margin-top:1px}
   .oachev{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.07);display:grid;place-items:center;font-size:0}
@@ -3504,7 +3505,7 @@
   .tkstyle b.up{color:#2dd4bf}
   .tkstyle b.down{color:#f0883a}
   .tkfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
-  .tkdrag{position:absolute;z-index:5;margin:0;height:22px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
+  .tkdrag{position:absolute;z-index:5;margin:0;left:-5px;width:calc(100% + 10px);top:50%;transform:translateY(-50%);height:22px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
   .tkdrag::-webkit-slider-runnable-track{height:22px;background:transparent}
   .tkdrag::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:20px;border-radius:5px;background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);margin-top:1px}
   .tkdrag::-moz-range-track{height:22px;background:transparent;border:none}
@@ -20617,8 +20618,12 @@ function oaRowHTML(c, style, filmCount, changed){
   const name=oneAgentShortName(style);
   const filmsLine = on ? `${filmCount} film${filmCount===1?"":"s"}` : "off";
   const rowTop = on ? oneTopPct(style,bar) : 0;
+  // CAS-1481: the closed row's slider lives inside the strip and is placed by CSS alone (no measuring).
+  const dragInp = on && !open ? `<input type="range" class="tkdrag" min="0" max="100" step="1" value="${rowTop}"
+        data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
+        aria-label="${escA(name)} minimum score">` : "";
   const strip = open ? `<span class="oarowstrip"></span><span class="oarowval"></span>`
-    : `<span class="oarowstrip">${oaShareBoxesHTML(style, bar)}</span>
+    : `<span class="oarowstrip">${oaShareBoxesHTML(style, bar)}${dragInp}</span>
        <span class="oarowval">${on?`Score ${bar}+<i>top ${rowTop}%</i>`:"Off"}</span>`;
   const tick=`<label class="oarowtick">
       <input type="checkbox" ${on?"checked":""} onchange="oaToggleStyleOn('${escA(style)}')" aria-label="Turn ${escA(name)} on or off">
@@ -20630,17 +20635,14 @@ function oaRowHTML(c, style, filmCount, changed){
     <div class="oarowwrap">
       ${tick}
       ${favBtn}
-      <button type="button" class="oarowhead" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
-        <span class="oarowleft">
+      <div class="oarowhead">
+        <button type="button" class="oarowleft" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
           <span class="oastyname">${esc(name)}${oaAlertDotsHTML(c, style)}</span>
           <span class="oarowfilms">${filmsLine}</span>
-        </span>
+        </button>
         ${strip}
-        <span class="oachev" aria-hidden="true"></span>
-      </button>
-      ${on && !open ? `<input type="range" class="tkdrag" min="0" max="100" step="1" value="${rowTop}"
-        data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
-        aria-label="${escA(name)} minimum score">` : ""}
+        <button type="button" class="oachev" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}" aria-label="${open?"Close":"Open"} ${escA(name)}"></button>
+      </div>
     </div>`;
   return `<div class="oarow${on?"":" off"}${changed?" oa-changed":""}${open?" oa-open":""}" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
 }
@@ -20670,19 +20672,6 @@ function tasteRecsCardHTML(){
 window.tasteToggleRecs=()=>{ tasteRecsOpen=!tasteRecsOpen; renderAgentsScreen(); };
 window.tasteCloseRecs=()=>{ tasteRecsOpen=false; renderAgentsScreen(); };
 window.tasteApply=tasteApply; window.tasteSkip=tasteSkip; window.tasteApplyAll=tasteApplyAll;
-// CAS-1480: lay each closed row's slider over its strip (thumb centre maps onto the strip's ends).
-function oaPositionRowSliders(){
-  document.querySelectorAll("#oaList .tkdrag").forEach(inp=>{
-    const wrap=inp.closest(".oarowwrap"), st=wrap&&wrap.querySelector(".oarowstrip");
-    if(!st) return;
-    const w=wrap.getBoundingClientRect(), r=st.getBoundingClientRect();
-    if(!r.width) return;
-    inp.style.left=(r.left-w.left-5)+"px";
-    inp.style.width=(r.width+10)+"px";
-    inp.style.top=(r.top-w.top+r.height/2-11)+"px";
-  });
-}
-window.addEventListener("resize", oaPositionRowSliders);
 function renderOneAgentScreen(c){
   const counts=oaFilmCounts(c);
   const order=oaOrder(c);
@@ -20698,8 +20687,6 @@ function renderOneAgentScreen(c){
     ${tasteRecsCardHTML()}
     <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
-  oaPositionRowSliders();
-  if(typeof requestAnimationFrame==="function") requestAnimationFrame(oaPositionRowSliders);
 }
 // CAS-1461: open/close morph. The open genre's .oastripfull animates from/to the closed row's own bar
 // (Web Animations API, 800ms); the rest of the panel fades. All skipped under prefers-reduced-motion.
