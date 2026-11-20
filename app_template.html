@@ -3701,12 +3701,19 @@
   .mtabs button+button{margin-left:-1px}
   .mtabs button.on{background:var(--panel2);color:var(--ink);border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
   .mtabs button:not(.on){border-color:transparent;border-bottom:1px solid color-mix(in srgb,var(--accent) 55%,var(--line))}
-  .mpanel{border:1px solid color-mix(in srgb,var(--accent) 55%,var(--line));border-top:0;border-radius:0 0 12px 12px;background:var(--panel2);overflow:hidden;transition:height .3s ease;margin-bottom:22px}
+  /* Lee, 2026-11-20: Genre / Keyword is a single either/or switch (same look as My taste / Override), not tabs —
+     the panel under it is a plain rounded box. */
+  .oamfindhd{margin:2px 2px 8px}
+  .mtabs{background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px}
+  .mtabs button,.mtabs button.on,.mtabs button:not(.on){border:0!important;border-radius:999px;padding:8px 0;font-size:13px;margin:0}
+  .mtabs button.on{background:var(--accent);color:#fff}
+  .oammodenote{margin:8px 2px 12px}
+  .mpanel{border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden;transition:height .3s ease;margin-bottom:22px}
   .mtrack{display:flex;width:200%;align-items:flex-start;transition:transform .32s cubic-bezier(.4,0,.2,1)}
   .mtrack>section{flex:0 0 50%;box-sizing:border-box;padding:12px 6px 8px;margin:0;min-width:0}
   .mtrack.kw{transform:translateX(-50%)}
   .mfbox .mfsub{display:block;font-size:11px;color:var(--faint)}
-  .mfbox .mfdesc{font-size:11.5px;color:var(--dim);line-height:1.45;margin:8px 4px 0}
+  .mfbox .mfdesc{font-size:11.5px;color:var(--dim);line-height:1.45;margin:8px 4px 0;min-height:2.9em}
   .oaslidewrap{position:relative}
   .mfline{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;background:#e9edff;border-radius:2px;pointer-events:none;z-index:3;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
   .mfmask{position:absolute;top:0;bottom:0;pointer-events:none;z-index:2;backdrop-filter:grayscale(1) brightness(.55);-webkit-backdrop-filter:grayscale(1) brightness(.55);border-radius:4px}
@@ -4226,6 +4233,14 @@
      ("Streaming service analysis") rather than wrapping it. */
   .navmenu .navitem{white-space:nowrap}
   #navMenuBtn{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  /* Lee, 2026-11-20: the menu is a fifth nav button the same width as Taste/Alerts/Database (☰ over "Menu"),
+     so there are two equal buttons each side of the wider Watch and Watch sits dead centre. Width: the row is
+     4 chips (1+1+1.3+1 flex) + 3×5px gaps inside .hdr-actions, a 6px row gap, then this one — so one chip is
+     (row − 21px) / 5.3. */
+  .navmenu-wrap{flex:0 0 calc((100% - 21px)/5.3)}   /* height matches .modechip (38px) */
+  .navmenu-wrap #navMenuBtn{box-sizing:border-box;width:100%;height:38px;padding:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:3px;font-size:17px;line-height:1}
+  #navMenuBtn .mclabel{font:600 10.5px/1 var(--font-body);letter-spacing:.1px;color:var(--dim)}
   .hdr-actions{flex:1 1 auto;margin-left:0;display:flex!important;gap:5px;min-width:0}
   .hdr-actions .modechip{flex:1 1 0;min-width:0;width:auto;padding:0 2px;gap:3px;flex-direction:column;
     border-radius:10px;background:var(--panel)!important;border:1px solid var(--line)!important;
@@ -4687,7 +4702,7 @@
            trailing edge (see .navmenu's right:0, below). -->
       <div class="navmenu-wrap">
         <div class="iconbtn" id="navMenuBtn" title="Menu" role="button" tabindex="0" aria-haspopup="true"
-             aria-expanded="false" aria-controls="navMenu" aria-label="Menu" onclick="toggleNavMenu(event)">☰
+             aria-expanded="false" aria-controls="navMenu" aria-label="Menu" onclick="toggleNavMenu(event)">☰<span class="mclabel" aria-hidden="true">Menu</span>
           <span class="navcountbadge" id="navMenuDot" style="display:none" aria-hidden="true"></span>
         </div>
         <div class="navmenu" id="navMenu" role="menu" aria-label="Menu">
@@ -21571,9 +21586,14 @@ function oamSizeMoodPanel(animate){
   panel.style.height=sec.offsetHeight+"px";
   if(!animate){ void panel.offsetHeight; panel.style.transition=""; }
 }
+function oamModeNoteText(kw){
+  return kw ? "Every film with this name or word. Your Taste and genre settings aren't used."
+            : "Your ticked genres at their Taste levels. A keyword isn't used.";
+}
 function oamApplyModeToDOM(animate){
   const body=$("watchSheetBody"); if(!body || !oamDraft) return;
   const kw=oamDraft.mode==="keyword";
+  const note=$("oamModeNote"); if(note) note.textContent=oamModeNoteText(kw);
   const track=body.querySelector(".mtrack");
   if(track) track.classList.toggle("kw", kw);
   body.querySelectorAll(".mtabs button").forEach(b=>{
@@ -21636,11 +21656,13 @@ function oamFilterBoxesHTML(share){
 // same top share — lowered (greyed) or raised (striped) from your agent's own setting; 100 is All. Off, each
 // genre keeps the agent's setting and the strip is greyed out.
 function oamOverrideValHTML(share, on){
-  if(!on) return `Off<i>agent's</i>`;
+  if(!on) return `Off<i>using Taste</i>`;
   return share>=100 ? `All<i>every genre</i>` : `Top ${share}%<i>every genre</i>`;
 }
 function oamOverrideFilterDesc(share, on){
-  return `Every ticked genre shows its ${share>=100?"whole catalog":`top ${share}%`} here, instead of your agent's level.`;
+  // Lee, 2026-11-20: the slider always shows (greyed under My taste) so switching never moves the genre rows.
+  if(!on) return `Switch to Override to give every ticked genre one level instead of its Taste level.`;
+  return `Every ticked genre shows its ${share>=100?"whole catalog":`top ${share}%`} here, instead of its Taste level.`;
 }
 function oamOverrideFilterHTML(d){
   const on = d.topShare!=null;
@@ -21795,10 +21817,14 @@ function renderOamMoodSheetBody(){
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
     ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
+    <!-- Lee, 2026-11-20: Genre and Keyword are EITHER/OR — the tabs read as two things you could both set, so
+         they are now one switch ("Find films by") with a line saying what the chosen one uses. -->
+    <div class="oamlvlhd oamfindhd">Find films by</div>
     <div class="mtabs" role="tablist">
       <button type="button" role="tab" data-mode="genre" class="${kwMode?"":"on"}" aria-selected="${!kwMode}" onclick="setOamDraftMode('genre')">Genre</button>
       <button type="button" role="tab" data-mode="keyword" class="${kwMode?"on":""}" aria-selected="${kwMode}" onclick="setOamDraftMode('keyword')">Keyword</button>
     </div>
+    <p class="oamgenreintro oammodenote" id="oamModeNote">${oamModeNoteText(kwMode)}</p>
     <div class="mpanel">
       <div class="mtrack${kwMode?" kw":""}">
         <section class="mgenre" aria-hidden="${kwMode}">
@@ -21811,7 +21837,7 @@ function renderOamMoodSheetBody(){
               <button type="button" role="radio" class="${d.topShare!=null?"on":""}" aria-checked="${d.topShare!=null}" onclick="setOamAgentOverride(true)">Override</button>
             </div>
             <p class="oamgenreintro oamlvlnote">${d.topShare==null ? "Each genre uses the level set for it in Taste." : "Every genre in this list uses the level below."}</p>
-            ${d.topShare!=null ? oamOverrideFilterHTML(d) : ""}
+            ${oamOverrideFilterHTML(d)}
           </div>
           <p class="oamgenreintro">Tick the genres for this list.</p>
           <div class="oalist">
