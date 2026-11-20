@@ -3494,6 +3494,8 @@
   .tkbtn.ghost{background:none;color:var(--ink);border:1px solid rgba(255,255,255,.2)}
   .tkbody{display:none;padding:0 12px 12px}
   .tkrec.open .tkbody{display:block}
+  .tkrec.tkrec-empty{opacity:.85}
+  .tkrec.tkrec-empty .tkrechd{cursor:default}
   .tksum{font-size:12.5px;opacity:.8;line-height:1.45;margin:0 0 8px}
   .tkstyle{padding:10px 0;border-top:1px solid rgba(255,255,255,.08)}
   .tkstyle .hd{display:flex;align-items:center;gap:8px}
@@ -11609,6 +11611,7 @@ window.setWatchMood = id => {
   watchEnsureStageNonEmpty();   // Lee, 2026-11-17
   pushViewField("mood", id);   // C4: selecting a different mood
   logEvent("watch_mood", {action:"select"});
+  watchSkipRecomputeOnce = true;   // Lee, 2026-11-20: navigation only — see render()
   render();
   scrollWatchListingToTop();
 };
@@ -20654,7 +20657,11 @@ function oaRowHTML(c, style, filmCount, changed){
 let tasteRecsOpen=false;
 function tasteRecsCardHTML(){
   const recs=tasteRecs();
-  if(!recs.length) return "";
+  if(!recs.length){
+    const c0 = oneAgentCriteria();
+    const nm0 = ((c0 && c0.name)||"").trim() || "Your agent";
+    return `<div class="tkrec tkrec-empty"><div class="tkrechd"><div class="tkrecic">✦</div><div class="tkrect">Agent recommendations<i>None right now. ${esc(nm0)} will suggest tweaks as you rate more films.</i></div></div></div>`;
+  }
   const c=oneAgentCriteria();
   const agentName=((c&&c.name)||"").trim() || "Your agent";
   const n=recs.length;
@@ -20687,7 +20694,7 @@ function renderOneAgentScreen(c){
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">Built from your ${n} verdict${n===1?"":"s"}</p>
-    <div class="oaintro"><p>This is your space. Slide any genre to see more or fewer of its films. Nothing changes unless you change it.</p><p>Your agent, ${esc(agentName)}, studies your verdicts and suggests tweaks. You decide what to apply.</p><p><b>Gold rows</b> are the genres you've watched most recently. Tap a genre to open it.</p></div>
+    <div class="oaintro"><p>This is your space. Slide any genre to see more or fewer of its films. Nothing changes unless you change it.</p><p>Your agent, ${esc(agentName)}, studies your verdicts and suggests tweaks. You decide what to apply.</p><p>A <b>gold edge</b> marks the genres you've rated most recently. Tap a genre to open it.</p></div>
     ${tasteRecsCardHTML()}
     <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
@@ -26547,7 +26554,13 @@ function reconcilePatchSettledList(){
   });
   updatePrefSwitch(); updatePrefBtn(); updateUxSwitch();
 }
+// Lee, 2026-11-20: switching list is pure navigation — it changes which of the already-found films are shown, never
+// which films each agent has found — so it skips recomputeFound (≈370ms of a ≈450ms switch on desktop, seconds on
+// an iPhone, which made a first tap look ignored). Every other render still recomputes. The flag is read and
+// cleared at the top of the very next render, so it can never leak into a later one.
+let watchSkipRecomputeOnce = false;
 function render(){
+  const skipRecompute = watchSkipRecomputeOnce; watchSkipRecomputeOnce = false;
   renderCallCount++;
   renderGen++;   // CAS-129: supersede any card-fill still streaming from a previous render
   const myGen=renderGen;   // CAS-421: only THIS render may lift the blur it didn't set
@@ -26565,7 +26578,7 @@ function render(){
   // top — so a criteria edit, a new Cascade, a deleted one, a film you just marked watched, a service you just
   // picked, all land in the Found list immediately, and none of them can clobber an override. It's cheap
   // (Cascades × titles) and it means membership has exactly one definition, evaluated in exactly one place.
-  recomputeFound();
+  if(!skipRecompute) recomputeFound();
   updateAgentNavDot();   // CAS-1340: the Agent nav chip's gold dot — cheap, and every full render is a fine time to resync it
   ensureWatchTab();   // CAS-725: keep the active tab valid before it drives rows/scope-bar below
   // CAS-1236: everything above must run even on a settled (non-navigating) pass — recomputeFound is what
