@@ -124,7 +124,10 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
     // (cinema_date null) can never satisfy. Push an uncapped v2 mood instead: every on genre, no cinema filter.
     const uncappedMood = { ...oamMoodDefaultFields(), id: "t-cas1236-ac3-uncapped", name: "Test",
       sort: "score", show: "all", watched: true, topShare: 100 };
-    watchMoods.push(uncappedMood);
+    // Lee, 2026-11-20: saved the way the sheet saves (pushViewField) and built from the account's own list,
+    // so a prefs reload can't drop it and fall back to Latest and Best, whose Best 40 cap pins the count.
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), uncappedMood];
+    pushViewField("moods", watchMoods.map(m => ({ ...m })));
     window.setWatchMood(uncappedMood.id);
   });
   await settleListing(page);

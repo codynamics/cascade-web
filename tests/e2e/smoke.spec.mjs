@@ -237,9 +237,16 @@ test("Watch listing scroll position survives a long scroll to the bottom and bac
   // broaden the roster with, so the same condition is set up directly: the one v2 agent is made wide open
   // (every style, bar 0, all three windows on), as the integrity suite's seeded agent is.
   await makeAgentWideOpen(page);
-  // CAS-1247: the default mood (Top scores) now caps each stage at its best 10 — too short to scroll
-  // meaningfully regardless of roster size. Releases carries no such cap, so select it for this scroll test.
-  await page.locator('.moodchip[data-mood="releases"]').click();
+  // Lee, 2026-11-20: every list now honours its own Best N (Latest and Best ships as Best 40 per stage), so
+  // no built-in list is uncapped any more. Push an uncapped test list, save it the way the sheet does
+  // (pushViewField) so a prefs reload can't drop it, and select it.
+  await page.evaluate(() => {
+    const uncapped = { ...oamMoodDefaultFields(), id: "t-cas1036-uncapped", name: "Test",
+      sort: "score", show: "all", watched: true, topShare: 100 };
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), uncapped];
+    pushViewField("moods", watchMoods.map(m => ({ ...m })));
+    window.setWatchMood(uncapped.id);
+  });
   const rendered = await settleListing(page);
   expect(rendered).toBeGreaterThan(15);
 
