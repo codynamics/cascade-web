@@ -3032,6 +3032,11 @@
   .obopt.on{border-color:var(--accent);background:rgba(124,92,255,.12)}
   .obopt.on .obradio{border-color:var(--accent)}
   .obopt.on .obradio::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--accent)}
+  /* Multi-select cards (role="checkbox", the first run's "Where do you watch movies?") read as checkboxes, not radios. */
+  .obopt[role="checkbox"] .obradio{border-radius:6px}
+  .obopt[role="checkbox"].on .obradio{background:var(--accent)}
+  .obopt[role="checkbox"].on .obradio::after{inset:auto;left:6px;top:2px;width:6px;height:11px;border-radius:0;
+    background:none;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
   /* The label and its sub-line are two rows, not two inline spans — without this they render as
      "YesOften enough to plan around it". .oboptsub's own margin-top only applies once it is a block. */
   .obopttext{display:flex;flex-direction:column;min-width:0}
