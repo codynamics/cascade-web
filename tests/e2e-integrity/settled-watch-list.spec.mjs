@@ -95,6 +95,9 @@ test("AC2: a reconcile that changes nothing on the server calls render() zero ti
 // any reconcile pass would trigger: the mechanism under test lives in render() itself, not in how a caller
 // got there.
 test("AC3: a film that newly belongs on Streaming never appears, moves a card, or changes a count until the next navigation", async ({ page }) => {
+  // Lee, 2026-11-20: the uncapped test list now really is in effect (CAS-1495), so the wide-open agent lists the
+  // whole Streaming catalogue and the settle after the navigation below no longer fits the 90s default.
+  test.setTimeout(240_000);
   const email = testEmail("cas1236-ac3");
   const user = await createTestUser(email);
   const agent = await seedWideOpenAgent(user.id);
