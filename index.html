@@ -4226,6 +4226,14 @@
      ("Streaming service analysis") rather than wrapping it. */
   .navmenu .navitem{white-space:nowrap}
   #navMenuBtn{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  /* Lee, 2026-11-20: the menu is a fifth nav button the same width as Taste/Alerts/Database (☰ over "Menu"),
+     so there are two equal buttons each side of the wider Watch and Watch sits dead centre. Width: the row is
+     4 chips (1+1+1.3+1 flex) + 3×5px gaps inside .hdr-actions, a 6px row gap, then this one — so one chip is
+     (row − 21px) / 5.3. */
+  .navmenu-wrap{flex:0 0 calc((100% - 21px)/5.3)}   /* height matches .modechip (38px) */
+  .navmenu-wrap #navMenuBtn{box-sizing:border-box;width:100%;height:38px;padding:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:3px;font-size:17px;line-height:1}
+  #navMenuBtn .mclabel{font:600 10.5px/1 var(--font-body);letter-spacing:.1px;color:var(--dim)}
   .hdr-actions{flex:1 1 auto;margin-left:0;display:flex!important;gap:5px;min-width:0}
   .hdr-actions .modechip{flex:1 1 0;min-width:0;width:auto;padding:0 2px;gap:3px;flex-direction:column;
     border-radius:10px;background:var(--panel)!important;border:1px solid var(--line)!important;
@@ -4687,7 +4695,7 @@
            trailing edge (see .navmenu's right:0, below). -->
       <div class="navmenu-wrap">
         <div class="iconbtn" id="navMenuBtn" title="Menu" role="button" tabindex="0" aria-haspopup="true"
-             aria-expanded="false" aria-controls="navMenu" aria-label="Menu" onclick="toggleNavMenu(event)">☰
+             aria-expanded="false" aria-controls="navMenu" aria-label="Menu" onclick="toggleNavMenu(event)">☰<span class="mclabel" aria-hidden="true">Menu</span>
           <span class="navcountbadge" id="navMenuDot" style="display:none" aria-hidden="true"></span>
         </div>
         <div class="navmenu" id="navMenu" role="menu" aria-label="Menu">
