@@ -12876,9 +12876,12 @@ function tasteSeedApplied(c){
   if(!c || c.v !== 2 || c.appliedSeeded) return false;
   const P = oneAgentProfile();
   c.applied = c.applied || {};
-  Object.keys(P.pairs).forEach(key => { if(P.pairs[key].n > 0 && !(key in c.applied)) c.applied[key] = oneComboAdj(key); });
+  let seeded = false;
+  Object.keys(P.pairs).forEach(key => { if(P.pairs[key].n > 0 && !(key in c.applied)){ c.applied[key] = oneComboAdj(key); seeded = true; } });
   c.appliedSeeded = true;
-  return true;
+  // Only report a change (so the caller saves) when a value was really seeded; an agent with no verdicts
+  // carries the flag in memory and persists it with its next real save, so a clean load writes nothing.
+  return seeded;
 }
 function tasteRecs(){
   const c = oneAgentCriteria();
