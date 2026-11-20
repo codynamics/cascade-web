@@ -3696,14 +3696,20 @@
   .mfscale{padding:0 0 3px}
   .mfscale span{grid-column:2;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;text-align:center;font-size:9px;font-weight:700;color:var(--faint)}
   .mfscale span i{font-style:normal}
-  /* Lee, 2026-11-20: ONE control type for every either/or in the list sheet — the .mfseg row used by Show and
-     Order. Find films by (Genre | Keyword) and Genre levels (My taste | Override) use it too; headings use the
-     sheet's own section / sub-heading styles. The panel below slides between the two modes (CAS-1400). */
-  .mtabs.mfseg{margin-bottom:12px}
-  .mpanel{border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden;transition:height .3s ease;margin-bottom:22px}
-  .mtrack{display:flex;width:200%;align-items:flex-start;transition:transform .32s cubic-bezier(.4,0,.2,1)}
-  .mtrack>section{flex:0 0 50%;box-sizing:border-box;padding:12px 6px 8px;margin:0;min-width:0}
-  .mtrack.kw{transform:translateX(-50%)}
+  /* Lee, 2026-11-20: Genres first; "Or find films by name" under them. A name in the box greys out Genres. */
+  .oamnamehd{margin:0 0 6px}
+  .mpanel{border:1px solid var(--line);border-radius:12px;background:var(--panel2);margin-bottom:8px}
+  .mpanel>.mgenre{padding:12px 6px 8px;margin:0;min-width:0}
+  .oamgensec .oamoff{display:none;margin-left:8px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.1);
+    color:var(--dim);font-size:10.5px;letter-spacing:.04em;vertical-align:1px}
+  .oamgensec.off .oamoff{display:inline-block}
+  .oamgensec.off .mpanel{opacity:.32;filter:grayscale(1);pointer-events:none;transition:opacity .2s}
+  .oamkwsec .oamkwbody{display:none}
+  .oamkwsec.open .oamkwbody{display:block}
+  .oamkwsec.open .oamkwopen{display:none}
+  .oamkwsec .oamkwopen{margin:0}
+  .oamkwsec .oamusegen{background:none;border:0;color:var(--dim);font:700 12px var(--font-body);cursor:pointer;padding:4px 0}
+  #oamKwInput{width:100%;box-sizing:border-box}
   .mfbox .mfsub{display:block;font-size:11px;color:var(--faint)}
   .mfbox .mfdesc{font-size:11.5px;color:var(--dim);line-height:1.45;margin:8px 4px 0;min-height:2.9em}
   .oaslidewrap{position:relative}
@@ -21440,7 +21446,8 @@ function oamMoodDraftFrom(mood){
     // even while the account's "Only show films on my services" switch is on. Never set alongside svc.
     anySvc: mood ? (!!mood.anySvc && !oamMoodEffectiveSvc(mood)) : false,
     // CAS-1390: title/actor/director text filter, same comma-AND matcher as Find (filmMatchesSearch).
-    people: mood ? (mood.people||"") : "",
+    // Lee, 2026-11-20: the name box decides the mode, so a genre list never carries a leftover (ignored) keyword.
+    people: mood && oamMoodMode(mood)==="keyword" ? (mood.people||"") : "",
   };
 }
 // CAS-1400: the bar a style shows in the sheet is always the agent's own — a mood never changes the agent.
@@ -21553,35 +21560,26 @@ window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMood
 window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; oamDraft.anySvc=false; renderOamMoodSheetBody(); };
 window.setOamDraftAnySvc=()=>{ if(!oamDraft) return; oamDraft.svc=null; oamDraft.anySvc=true; renderOamMoodSheetBody(); };
 window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
-window.setOamDraftPeople=v=>{ if(oamDraft) oamDraft.people=v; };
-// CAS-1400: tapping a tab sets the draft's mode and slides the track WITHOUT re-rendering the sheet.
+// Lee, 2026-11-20: no Genre/Keyword switch. Genres come first; "Or find films by name" opens a name box under them.
+// Typing a name makes the list a keyword list and greys out (and disables) the Genres section; clearing it, or
+// "Use genres", brings Genres back. Nothing re-renders, so the box keeps focus while typing.
+window.setOamDraftPeople=v=>{ const d=oamDraft; if(!d) return; d.people=v; d.mode=v.trim() ? "keyword" : "genre"; oamApplyModeToDOM(); };
+// Kept for callers: "keyword" opens the name box; "genre" empties it.
 window.setOamDraftMode=mode=>{
-  const d=oamDraft; if(!d || (mode!=="genre" && mode!=="keyword")) return;
-  d.mode=mode;
-  oamApplyModeToDOM(true);
+  const d=oamDraft; if(!d) return;
+  if(mode==="keyword") d.kwOpen=true;
+  else if(mode==="genre"){ d.people=""; d.mode="genre"; d.kwOpen=false; const i=$("oamKwInput"); if(i) i.value=""; }
+  oamApplyModeToDOM();
 };
-function oamSizeMoodPanel(animate){
-  const body=$("watchSheetBody"); if(!body) return;
-  const panel=body.querySelector(".mpanel"), track=body.querySelector(".mtrack");
-  if(!panel || !track || !oamDraft) return;
-  const sec=track.children[oamDraft.mode==="keyword" ? 1 : 0]; if(!sec) return;
-  if(!animate) panel.style.transition="none";
-  panel.style.height=sec.offsetHeight+"px";
-  if(!animate){ void panel.offsetHeight; panel.style.transition=""; }
-}
-function oamApplyModeToDOM(animate){
-  const body=$("watchSheetBody"); if(!body || !oamDraft) return;
-  const kw=oamDraft.mode==="keyword";
-  const track=body.querySelector(".mtrack");
-  if(track) track.classList.toggle("kw", kw);
-  body.querySelectorAll(".mtabs button").forEach(b=>{
-    const on=(b.dataset.mode==="keyword")===kw;
-    b.classList.toggle("on", on); b.setAttribute("aria-checked", on);
-  });
-  const secs=track ? track.children : [];
-  if(secs[0]){ secs[0].setAttribute("aria-hidden", kw); secs[0].inert=kw; }
-  if(secs[1]){ secs[1].setAttribute("aria-hidden", !kw); secs[1].inert=!kw; }
-  oamSizeMoodPanel(animate);
+window.oamOpenKeyword=()=>{ setOamDraftMode("keyword"); const i=$("oamKwInput"); if(i) i.focus(); };
+function oamSizeMoodPanel(){}   // the genre panel sizes itself now (no sliding track)
+function oamApplyModeToDOM(){
+  const d=oamDraft; const body=$("watchSheetBody"); if(!body || !d) return;
+  const kw=d.mode==="keyword";
+  const gen=$("oamGenreSec"), panel=gen && gen.querySelector(".mpanel");
+  if(gen) gen.classList.toggle("off", kw);
+  if(panel){ panel.inert=kw; panel.setAttribute("aria-disabled", kw); }
+  const kws=$("oamKwSec"); if(kws) kws.classList.toggle("open", kw || !!d.kwOpen);
 }
 // Every other saved mood that would ALSO list this style — "also in <names>" under a style row.
 function oamStylesAlsoIn(style, excludeId){
@@ -21789,24 +21787,17 @@ function renderOamMoodSheetBody(){
   const moreN=oamMoreFiltersCount(d);
   const body=$("watchSheetBody");
   if(body) body.innerHTML=`
+    <div class="wsheethd oamnamehd"><span>LIST NAME</span></div>
     <div class="wsheetsec oamhead">
       <input id="oamMoodName" class="mfinput" type="text" maxlength="24" placeholder="List name" autocomplete="off"
         value="${escA(d.name)}" oninput="setOamDraftName(this.value)">
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
     ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
-    <!-- Lee, 2026-11-20: Genre and Keyword are EITHER/OR — the tabs read as two things you could both set, so
-         they are now one switch ("Find films by") with a line saying what the chosen one uses. -->
-    <div class="wsheetsec mainsec oamfindsec">
-      <div class="wsheethd"><span>FIND FILMS BY</span></div>
-      <div class="mfseg mtabs" role="radiogroup" aria-label="Find films by">
-        <button type="button" role="radio" data-mode="genre" class="${kwMode?"":"on"}" aria-checked="${!kwMode}" onclick="setOamDraftMode('genre')">Genre</button>
-        <button type="button" role="radio" data-mode="keyword" class="${kwMode?"on":""}" aria-checked="${kwMode}" onclick="setOamDraftMode('keyword')">Keyword</button>
-      </div>
-    </div>
-    <div class="mpanel">
-      <div class="mtrack${kwMode?" kw":""}">
-        <section class="mgenre" aria-hidden="${kwMode}">
+    <div class="wsheetsec mainsec oamgensec${kwMode?" off":""}" id="oamGenreSec">
+      <div class="wsheethd"><span>GENRES<span class="oamoff">OFF · FINDING BY NAME</span></span></div>
+      <div class="mpanel">
+        <section class="mgenre">
           <!-- Lee, 2026-11-20: the My taste / Override switch is back at the top, above the override slider and the
                genre rows (it sat under the rows from 2026-11-17). The agent's levels always show. -->
           <div class="oamlvl">
@@ -21817,7 +21808,6 @@ function renderOamMoodSheetBody(){
             </div>
             ${oamOverrideFilterHTML(d)}
           </div>
-          <div class="subhd">Genres</div>
           <div class="oalist">
             ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
           </div>
@@ -21828,11 +21818,15 @@ function renderOamMoodSheetBody(){
               ${oamNotInMoodOpen ? order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("") : ""}
             </div>` : ""}
         </section>
-        <section class="mkeyword" aria-hidden="${!kwMode}">
-          <input class="search" type="text" enterkeyhint="done" placeholder="e.g. Tom Cruise, Russo"
-            value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
-          <p class="oamgenreintro">Title, actor or director. Commas combine — every part must match.</p>
-        </section>
+      </div>
+    </div>
+    <div class="wsheetsec mainsec oamkwsec${(kwMode||d.kwOpen)?" open":""}" id="oamKwSec">
+      <button type="button" class="morebtn oamkwopen" onclick="oamOpenKeyword()"><span>OR FIND FILMS BY NAME</span><span aria-hidden="true">&rsaquo;</span></button>
+      <div class="oamkwbody">
+        <div class="wsheethd"><span>FIND FILMS BY NAME</span><button type="button" class="oamusegen" onclick="setOamDraftMode('genre')">Use genres</button></div>
+        <input id="oamKwInput" class="search" type="text" enterkeyhint="done" placeholder="Actor, director or title"
+          value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
+        <p class="oamgenreintro">Commas combine — every part must match.</p>
       </div>
     </div>
     ${(!d.handOnly && prefs.sub.size) ? `<div class="wsheetsec mainsec" id="oamSvcSec">
@@ -21897,9 +21891,7 @@ function renderOamMoodSheetBody(){
       </div>` : ""}
     </div>` : ""}`;
   if(d.topShare!=null) oamDrawFilterLines(d, c, d.topShare);
-  // CAS-1400: the panel opens in the saved mode with no animation; the hidden half is inert.
-  oamApplyModeToDOM(false);
-  requestAnimationFrame(()=>{ if(oamDraft) oamSizeMoodPanel(false); });
+  oamApplyModeToDOM();   // Lee, 2026-11-20: a keyword list opens with Genres greyed and the name box open
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
     delBtn.style.display="";
@@ -21930,7 +21922,7 @@ function oamMoodFromDraft(d){
     svc: d.svc || null,
     anySvc: !!d.anySvc && !d.svc,
     people: (d.people||"").trim(),
-    mode: d.mode==="keyword" ? "keyword" : "genre",   // CAS-1400
+    mode: (d.people||"").trim() ? "keyword" : "genre",   // Lee, 2026-11-20: a name in the box IS keyword mode
   };
 }
 window.oamSaveMoodFromSheet=()=>{
@@ -25596,7 +25588,7 @@ const TOURS = {
     // The "during account setup" lines only appear when that setup mood exists (Lee, 16 Nov).
     {get html(){ return TUT_P("Instead of building a list around genres, you can use a keyword search around an actor, director or title.",
       ...(watchMoods.some(m=>m.id==="fav-person") ? ["During account setup, we set up a list with your favourite actor or director to show you how this is done."] : [])); },
-      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:[`#watchSheet .mtabs button[data-mode="keyword"]`], tap:true},
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet #oamKwSec .oamkwopen"], tap:true},
     {get html(){ return TUT_P("Show only films included on one of your services, so the whole list is ready to watch tonight.",
       ...(watchMoods.some(m=>m.id==="topsvc") ? ["During account setup, we created a list with your most-used streaming service to show you how this is done."] : [])); },
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); }, sel:["#oamSvcSec"]},
@@ -25668,10 +25660,7 @@ function tutOpenMoodsTourSheet(){
   if(document.getElementById("watchSheet").classList.contains("open")) return;
   openOamMoodSheetFor(tutMoodsTourMoodId());
 }
-function tutSheetMode(mode){
-  const b=document.querySelector(`#watchSheet .mtabs button[data-mode="${mode}"]`);
-  if(b && !b.classList.contains("on")) setOamDraftMode(mode);
-}
+function tutSheetMode(mode){ /* Lee, 2026-11-20: Genres always show and there is no mode switch — nothing to do */ }
 // Database tutorial: puts `q` in the search box and runs it. With `typed`, the letters appear one by one first.
 let tutTypeTimer=null;
 function tutFindSearch(q, typed){
