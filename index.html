@@ -11611,6 +11611,7 @@ window.setWatchMood = id => {
   watchEnsureStageNonEmpty();   // Lee, 2026-11-17
   pushViewField("mood", id);   // C4: selecting a different mood
   logEvent("watch_mood", {action:"select"});
+  watchSkipRecomputeOnce = true;   // Lee, 2026-11-20: navigation only — see render()
   render();
   scrollWatchListingToTop();
 };
@@ -26553,7 +26554,13 @@ function reconcilePatchSettledList(){
   });
   updatePrefSwitch(); updatePrefBtn(); updateUxSwitch();
 }
+// Lee, 2026-11-20: switching list is pure navigation — it changes which of the already-found films are shown, never
+// which films each agent has found — so it skips recomputeFound (≈370ms of a ≈450ms switch on desktop, seconds on
+// an iPhone, which made a first tap look ignored). Every other render still recomputes. The flag is read and
+// cleared at the top of the very next render, so it can never leak into a later one.
+let watchSkipRecomputeOnce = false;
 function render(){
+  const skipRecompute = watchSkipRecomputeOnce; watchSkipRecomputeOnce = false;
   renderCallCount++;
   renderGen++;   // CAS-129: supersede any card-fill still streaming from a previous render
   const myGen=renderGen;   // CAS-421: only THIS render may lift the blur it didn't set
@@ -26571,7 +26578,7 @@ function render(){
   // top — so a criteria edit, a new Cascade, a deleted one, a film you just marked watched, a service you just
   // picked, all land in the Found list immediately, and none of them can clobber an override. It's cheap
   // (Cascades × titles) and it means membership has exactly one definition, evaluated in exactly one place.
-  recomputeFound();
+  if(!skipRecompute) recomputeFound();
   updateAgentNavDot();   // CAS-1340: the Agent nav chip's gold dot — cheap, and every full render is a fine time to resync it
   ensureWatchTab();   // CAS-725: keep the active tab valid before it drives rows/scope-bar below
   // CAS-1236: everything above must run even on a settled (non-navigating) pass — recomputeFound is what
