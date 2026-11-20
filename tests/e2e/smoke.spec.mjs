@@ -2320,14 +2320,15 @@ test("CAS-1274: the agent screen opens as plain genre rows, and a row's details 
   expect(gone.fn).toBe("undefined");
 
   // One tap on a row opens its details: the minimum score, the three alert windows, the adjustments.
-  await page.locator('.oarow[data-style="Drama"] .oarowhead').click();
+  // CAS-1480: a closed row carries a slider over its strip; tap the name side of the head.
+  await page.locator('.oarow[data-style="Drama"] .oarowhead').click({ position: { x: 12, y: 12 } });
   await expect(page.locator(".oaopen")).toHaveCount(1);
   await expect(page.locator(".oaopen .oasechdr", { hasText: "MOVIE MINIMUM SCORE" })).toBeVisible();
   await expect(page.locator(".oaopen .oasechdr", { hasText: "FILM ALERTS" })).toBeVisible();
   await expect(page.locator(".oaopen .oachip")).toHaveCount(3);
 
   // Tapping the same row again folds it back to the plain list.
-  await page.locator('.oarow[data-style="Drama"] .oarowhead').click();
+  await page.locator('.oarow[data-style="Drama"] .oarowhead').click({ position: { x: 12, y: 12 } });
   await expect(page.locator(".oaopen")).toHaveCount(0);
 });
 
@@ -2359,37 +2360,26 @@ async function openStyleGrid(page){
   await expect(page.locator(".tmap")).toBeVisible();
 }
 
-test("CAS-1269 AC1: the agent flags a taste disagreement on a genre, and Keep clears it", async ({ page }) => {
-  // CAS-1425: the Styles card / suggestions panel went with the Edit Agent hub. On a v2 account the same
-  // "your verdicts disagree with this setting" flag is the genre row's AGENT SUGGESTION (barAdvice), and
-  // dismissing it (Keep) is what clears it. barAdvice's evidence maths is covered by the engine tests; this
-  // drives the screen's flag -> Keep path, so the advice is stubbed to fire until its own dismissed marker
-  // ("bar:<style>", the check barAdvice itself makes) is set.
+test("CAS-1269 AC1: the agent recommends a minimum-score change on a genre, and Apply sets it", async ({ page }) => {
+  // CAS-1480: the in-genre AGENT SUGGESTION moved to the Taste screen's recommendations card (tasteRecs
+  // from CAS-1479). tasteRecs' own maths is covered by the engine tests; this drives the card's
+  // review -> Apply path with one stubbed Drama recommendation carrying a minimum-score change.
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await makeAgentWideOpen(page);
   await page.evaluate(() => {
     cascades[0].styles.Drama.bar = 70;
-    window.barAdvice = style => {
-      const c = oneAgentCriteria();
-      if(style !== "Drama" || !c || (c.dismissed || []).includes("bar:" + style)) return null;
-      return { dir: "up", from: 70, to: 80, lo: [], hi: [] };
-    };
+    window.tasteRecs = () => [{ style: "Drama", keys: [], bar: { from: 70, to: 80 } }];
   });
   await openAgentsScreenFromNav(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
-  await page.locator('.oarow[data-style="Drama"] .oarowhead').click();
 
-  await expect(page.locator(".oasuggest")).toHaveCount(1);
-  await page.locator(".oasuglbl").click();
-  await expect(page.locator(".oasugtext")).toContainText("Your verdicts suggest");
-  await expect(page.locator(".oasugchange")).toContainText("Change to Top");
-  await expect(page.locator(".oasugkeep")).toContainText("Keep Top");
-
-  await page.locator(".oasugkeep").click();
-  expect(await page.evaluate(() => oneAgentCriteria().dismissed.includes("bar:Drama"))).toBe(true);
-  await expect(page.locator(".oasuggest")).toHaveCount(0);
+  await expect(page.locator(".tkrec")).toHaveCount(1);
+  await page.locator(".tkrechd").click();
+  await expect(page.locator(".tkrec .tkstyle")).toContainText("Minimum score");
+  await page.locator(".tkstyle .ap").click();
+  expect(await page.evaluate(() => oneAgentCriteria().styles.Drama.bar)).toBe(80);
 });
 
 // CAS-1400 AC2/AC3/AC4: the v2 mood sheet's Genre | Keyword tabs. Genre rows are one line each under a

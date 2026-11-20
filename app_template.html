@@ -3483,6 +3483,33 @@
      precedent rather than inventing a new token for the same two colours. */
   .oaintro{font-size:13.5px;line-height:1.45;color:var(--ink);opacity:.85;margin:8px 0 12px}
   .oaintro p{margin:0 0 6px}
+  .tkrec{border:1px solid rgba(124,92,255,.45);background:rgba(124,92,255,.08);border-radius:12px;margin:6px 0 14px;overflow:hidden}
+  .tkrechd{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer}
+  .tkrecic{width:28px;height:28px;border-radius:8px;background:rgba(124,92,255,.35);display:grid;place-items:center;font-size:15px}
+  .tkrect{flex:1;font-size:13.5px;font-weight:800;color:var(--ink)}
+  .tkrect i{display:block;font-style:normal;font-weight:500;font-size:12px;opacity:.7;margin-top:1px}
+  .tkn{background:var(--gold);color:#161000;font-weight:900;font-size:11px;border-radius:9px;min-width:18px;height:18px;display:grid;place-items:center;padding:0 5px}
+  .tkbtn{background:var(--gold);color:#161000;border:0;border-radius:8px;font-weight:800;font-size:12.5px;padding:7px 12px;cursor:pointer}
+  .tkbtn.ghost{background:none;color:var(--ink);border:1px solid rgba(255,255,255,.2)}
+  .tkbody{display:none;padding:0 12px 12px}
+  .tkrec.open .tkbody{display:block}
+  .tksum{font-size:12.5px;opacity:.8;line-height:1.45;margin:0 0 8px}
+  .tkstyle{padding:10px 0;border-top:1px solid rgba(255,255,255,.08)}
+  .tkstyle .hd{display:flex;align-items:center;gap:8px}
+  .tkstyle .hd .nm{flex:1;font-weight:800;font-size:14px;color:var(--ink)}
+  .tkstyle .hd button{background:none;border:1px solid rgba(255,255,255,.18);color:var(--ink);border-radius:7px;font-size:12px;padding:5px 10px;cursor:pointer}
+  .tkstyle .hd button.ap{background:var(--gold);color:#161000;border:0;font-weight:800}
+  .tkstyle .ln{font-size:12.5px;line-height:1.45;margin-top:3px;opacity:.9}
+  .tkstyle .ln span{opacity:.7}
+  .tkstyle b.up{color:#2dd4bf}
+  .tkstyle b.down{color:#f0883a}
+  .tkfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+  .tkdrag{position:absolute;z-index:5;margin:0;height:22px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
+  .tkdrag::-webkit-slider-runnable-track{height:22px;background:transparent}
+  .tkdrag::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:20px;border-radius:5px;background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);margin-top:1px}
+  .tkdrag::-moz-range-track{height:22px;background:transparent;border:none}
+  .tkdrag::-moz-range-thumb{width:10px;height:20px;border-radius:5px;background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5)}
+  .oarowwrap{position:relative}
   .oaintro b{color:var(--gold)}
   .oaalertnote{font-size:12.5px;line-height:1.45;opacity:.8;margin:8px 0 4px}
   .oalog{border:1px solid rgba(255,213,74,.2);background:rgba(255,213,74,.03);border-radius:10px;margin:0 0 14px;padding:0}
@@ -4750,8 +4777,8 @@
           <span class="mclabel mclabel-short">Database</span>
         </div>
         <!-- Agents is a main nav destination again, the fourth item (Lee, 2026-10-10). -->
-        <div class="modechip ag" id="agentsBtn" title="Agents" role="button" tabindex="0"
-             aria-pressed="false" aria-label="Agents" onclick="openAgentsScreen()">
+        <div class="modechip ag" id="agentsBtn" title="Taste" role="button" tabindex="0"
+             aria-pressed="false" aria-label="Taste" onclick="openAgentsScreen()">
           <svg class="mcicon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
             <rect x="4.5" y="8" width="15" height="11" rx="3"/>
@@ -4759,8 +4786,8 @@
             <circle cx="12" cy="3.6" r="1.1"/>
             <path d="M9.3 13.2v1.6M14.7 13.2v1.6"/>
           </svg>
-          <span class="mclabel mclabel-full">Agents</span>
-          <span class="mclabel mclabel-short">Agents</span>
+          <span class="mclabel mclabel-full">Taste</span>
+          <span class="mclabel mclabel-short">Taste</span>
         </div>
       </div>
     </div>
@@ -12745,6 +12772,15 @@ function oneComboAdj(key){
   const pr = P.pairs[key];
   return Math.round(youScore({pub:0, pairs:[{sum: pr?pr.sum:0, n: pr?pr.n:0}], b:P.baseline}).adj);
 }
+// CAS-1479: the points a non-overridden combo contributes to a score. Scoring uses the APPLIED value (c.applied
+// [key], 0 when absent), not the learned one — Pixel keeps learning (oneComboAdj), but nothing moves in a list
+// until the person applies it (tasteApply). A criteria object not yet seeded (no appliedSeeded flag) keeps
+// today's learned behaviour, so no list moves before tasteSeedApplied has run.
+function oneAppliedPoints(c, key){
+  if(!c || !c.appliedSeeded) return oneComboAdj(key);
+  const v = (c.applied || {})[key];
+  return typeof v === "number" ? v : 0;
+}
 // The real arithmetic behind oneScore/oneScoreParts, parameterised by the criteria object the CALLER
 // already has (matchesCriteria's v2 branch passes its own `c`; the exported single-argument wrappers
 // below fall back to oneAgentCriteria()). "never" combos are not numeric, so they are never an override —
@@ -12763,12 +12799,21 @@ function oneScorePartsFor(m, c){
     const n = pr ? pr.n : 0;
     const ov = combo[key];
     const overridden = typeof ov === "number";
-    return {other, points: overridden ? ov : oneComboAdj(key), n, overridden};
+    return {other, points: overridden ? ov : oneAppliedPoints(c, key), n, overridden};
   });
   const hasOverride = parts.some(p => p.overridden);
   let value, adj;
   if(!hasOverride){
-    const pairs = keys.map(({key}) => { const pr=P.pairs[key]; return {sum: pr?pr.sum:0, n: pr?pr.n:0}; });
+    // CAS-1479: a pair whose applied value matches its learned value reads its real verdict stats (so the
+    // day-one seed moves no score); a pair whose applied value differs is stood in for by a synthetic pair
+    // whose lean, once youScore scales it, gives exactly the applied points.
+    const pairs = keys.map(({key}) => {
+      const pr=P.pairs[key], n = pr?pr.n:0, sum = pr?pr.sum:0;
+      const applied = oneAppliedPoints(c, key);
+      if(applied === oneComboAdj(key)) return {sum, n};
+      const lean = P.baseline + (applied < 0 ? applied/45 : applied/20);
+      return {sum: lean*(n+TASTE_K) - TASTE_K*P.baseline, n};
+    });
     const ys = youScore({pub, pairs, b:P.baseline});
     value = ys.value; adj = ys.adj;
   } else {
@@ -12820,6 +12865,82 @@ function barAdvice(style){
     if(below.length >= 3 && likedShare(below) >= 0.75) return {dir:"down", from:bar, to:Math.max(50, bar-10), lo:below, hi:[]};
   }
   return null;
+}
+// ---- CAS-1479: Taste recommendations (engine side; the UI is CAS-1480) -------------------------------------
+// Pixel's learned sub-genre adjustments (oneComboAdj) no longer change scores by themselves. A combo is
+// PENDING when its learned value sits >= 2 away from the applied value (c.applied) and has not been skipped
+// at about its current learned value (c.skipped). The person applies or skips per genre.
+const TASTE_REC_GAP = 2;
+// Day-one seed: applied[key] = learned for every combo that has verdicts, so no score moves the day this ships.
+function tasteSeedApplied(c){
+  if(!c || c.v !== 2 || c.appliedSeeded) return false;
+  const P = oneAgentProfile();
+  c.applied = c.applied || {};
+  let seeded = false;
+  Object.keys(P.pairs).forEach(key => { if(P.pairs[key].n > 0 && !(key in c.applied)){ c.applied[key] = oneComboAdj(key); seeded = true; } });
+  c.appliedSeeded = true;
+  // Only report a change (so the caller saves) when a value was really seeded; an agent with no verdicts
+  // carries the flag in memory and persists it with its next real save, so a clean load writes nothing.
+  return seeded;
+}
+function tasteRecs(){
+  const c = oneAgentCriteria();
+  if(!c) return [];
+  const P = oneAgentProfile();
+  const combo = c.combo || {}, applied = c.applied || {}, skipped = c.skipped || {};
+  const byStyle = {};
+  Object.keys(P.pairs).forEach(key => {
+    const ov = combo[key];
+    if(typeof ov === "number" || ov === "never") return;
+    const learned = oneComboAdj(key);
+    const from = typeof applied[key] === "number" ? applied[key] : 0;
+    if(Math.abs(learned - from) < TASTE_REC_GAP) return;
+    if(typeof skipped[key] === "number" && Math.abs(learned - skipped[key]) < TASTE_REC_GAP) return;
+    const pr = P.pairs[key];
+    (byStyle[pr.primary] = byStyle[pr.primary] || []).push({key, other: pr.other, from, to: learned});
+  });
+  // A genre with only minimum-score advice (no pending combo) is not a recommendation on its own: the
+  // advice belongs to the genre's recommendation, which exists when a combo is pending.
+  const out = Object.keys(byStyle).map(style => ({style, keys: byStyle[style], bar: barAdvice(style)}));
+  const mag = r => r.keys.reduce((a,k) => a + Math.abs(k.to - k.from), 0);
+  out.sort((a,b) => mag(b) - mag(a));
+  return out;
+}
+function tasteAfterChange(){
+  saveCascades();
+  if(typeof recomputeFound === "function") recomputeFound();
+  if(typeof render === "function") render();
+  if(typeof renderAgentsScreen === "function") renderAgentsScreen();
+}
+function tasteApplyNoSave(style){
+  const c = oneAgentCriteria(); if(!c) return false;
+  const rec = tasteRecs().find(r => r.style === style); if(!rec) return false;
+  c.applied = c.applied || {};
+  rec.keys.forEach(k => { c.applied[k.key] = k.to; });
+  if(rec.bar){
+    c.styles = c.styles || {};
+    const st = c.styles[style] || (c.styles[style] = {al:{cinema:false,rent:false,stream:false}});
+    st.bar = rec.bar.to;
+  }
+  return true;
+}
+function tasteSkipNoSave(style){
+  const c = oneAgentCriteria(); if(!c) return false;
+  const rec = tasteRecs().find(r => r.style === style); if(!rec) return false;
+  c.skipped = c.skipped || {};
+  rec.keys.forEach(k => { c.skipped[k.key] = k.to; });
+  if(rec.bar){
+    c.dismissed = c.dismissed || [];
+    if(!c.dismissed.includes("bar:"+style)) c.dismissed.push("bar:"+style);
+  }
+  return true;
+}
+function tasteApply(style){ if(tasteApplyNoSave(style)) tasteAfterChange(); }
+function tasteSkip(style){ if(tasteSkipNoSave(style)) tasteAfterChange(); }
+function tasteApplyAll(){
+  let any = false;
+  tasteRecs().forEach(r => { if(tasteApplyNoSave(r.style)) any = true; });
+  if(any) tasteAfterChange();
 }
 // oneTopPct(style, score): the share of this style's SCORED catalogue (Public ≥ 0) that clears `score` —
 // the "shows you the top N%" line barAdvice's own card reads alongside the raise/lower suggestion. Named
@@ -20480,7 +20601,7 @@ function oaOpenBodyHTML(c, style){
   return `<div class="oaopen">
       <div class="oatop"><div class="oasechdr">MOVIE MINIMUM SCORE</div>
       ${sectionHTML}
-      ${oaSuggestionHTML(style)}</div>
+      </div>
       <div class="oasechdr">FILM ALERTS</div>
       ${oaAlertsHTML(c, style)}
       ${oaAlertNoteHTML(c, style)}
@@ -20517,22 +20638,68 @@ function oaRowHTML(c, style, filmCount, changed){
         ${strip}
         <span class="oachev" aria-hidden="true"></span>
       </button>
+      ${on && !open ? `<input type="range" class="tkdrag" min="0" max="100" step="1" value="${rowTop}"
+        data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
+        aria-label="${escA(name)} minimum score">` : ""}
     </div>`;
   return `<div class="oarow${on?"":" off"}${changed?" oa-changed":""}${open?" oa-open":""}" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
 }
+// CAS-1480: the Agent recommendations card (from CAS-1479's tasteRecs). Open state survives re-renders.
+let tasteRecsOpen=false;
+function tasteRecsCardHTML(){
+  const recs=tasteRecs();
+  if(!recs.length) return "";
+  const c=oneAgentCriteria();
+  const agentName=((c&&c.name)||"").trim() || "Your agent";
+  const n=recs.length;
+  const list=(keys,cls)=>keys.slice().sort((a,b)=>Math.abs(b.to)-Math.abs(a.to))
+    .map(k=>`${esc(k.other)} <b class="${cls}">${oaFmtPoints(k.to)}</b>`).join(", ");
+  const blocks=recs.map(r=>{
+    const less=r.keys.filter(k=>k.to<k.from), more=r.keys.filter(k=>k.to>k.from);
+    const lines=[];
+    if(r.bar){
+      const to=oneTopPct(r.style, r.bar.to), from=oneTopPct(r.style, r.bar.from);
+      lines.push(`<div class="ln"><span>Minimum score</span> Top ${to}% <b class="${r.bar.to>r.bar.from?"down":"up"}">(from ${from}%)</b></div>`);
+    }
+    if(less.length) lines.push(`<div class="ln"><span>Less with</span> ${list(less,"down")}</div>`);
+    if(more.length) lines.push(`<div class="ln"><span>More with</span> ${list(more,"up")}</div>`);
+    return `<div class="tkstyle"><div class="hd"><span class="nm">${esc(oneAgentShortName(r.style))}</span><button type="button" class="sk" onclick="tasteSkip('${escA(r.style)}')">Skip</button><button type="button" class="ap" onclick="tasteApply('${escA(r.style)}')">Apply</button></div>${lines.join("")}</div>`;
+  }).join("");
+  return `<div class="tkrec${tasteRecsOpen?" open":""}"><div class="tkrechd" onclick="tasteToggleRecs()"><div class="tkrecic">✦</div><div class="tkrect">Agent recommendations<i>Suggestions for ${n} genre${n===1?"":"s"}</i></div><span class="tkn">${n}</span><button type="button" class="tkbtn">Review</button></div><div class="tkbody"><p class="tksum">${esc(agentName)} has looked at your verdicts in ${n} genre${n===1?"":"s"}. Apply or skip each genre in one tap. Your genre sliders stay where you set them.</p>${blocks}<div class="tkfoot"><button type="button" class="tkbtn ghost" onclick="tasteCloseRecs()">Not now</button><button type="button" class="tkbtn" onclick="tasteApplyAll()">Apply all</button></div></div></div>`;
+}
+window.tasteToggleRecs=()=>{ tasteRecsOpen=!tasteRecsOpen; renderAgentsScreen(); };
+window.tasteCloseRecs=()=>{ tasteRecsOpen=false; renderAgentsScreen(); };
+window.tasteApply=tasteApply; window.tasteSkip=tasteSkip; window.tasteApplyAll=tasteApplyAll;
+// CAS-1480: lay each closed row's slider over its strip (thumb centre maps onto the strip's ends).
+function oaPositionRowSliders(){
+  document.querySelectorAll("#oaList .tkdrag").forEach(inp=>{
+    const wrap=inp.closest(".oarowwrap"), st=wrap&&wrap.querySelector(".oarowstrip");
+    if(!st) return;
+    const w=wrap.getBoundingClientRect(), r=st.getBoundingClientRect();
+    if(!r.width) return;
+    inp.style.left=(r.left-w.left-5)+"px";
+    inp.style.width=(r.width+10)+"px";
+    inp.style.top=(r.top-w.top+r.height/2-11)+"px";
+  });
+}
+window.addEventListener("resize", oaPositionRowSliders);
 function renderOneAgentScreen(c){
   const counts=oaFilmCounts(c);
   const order=oaOrder(c);
   const n=tasteProfile().n;
   const changedMain=oaRecentVerdictGenres();
   const rows=order.map(style=>oaRowHTML(c, style, counts[style]||0, changedMain.has(style))).join("");
-  const title = "Taste";   // Lee, 2026-11-20: the one-agent screen is Taste (was the agent's own name, CAS-1352)
+  const title = "Your taste";   // CAS-1480: the screen heading (was the agent's own name, CAS-1352)
+  const agentName = (c.name||"").trim() || "your agent";
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
-    <p class="ossub">Your agent · ${n} verdict${n===1?"":"s"} learned</p>
-    <div class="oaintro"><p>Your agent learns from your verdicts.</p><p>It can suggest a new minimum score for a genre, and it nudges sub-genres up or down so you see more of what you enjoy.</p><p><b>Gold rows</b> are the genres you've watched most recently. Tap a genre to open it.</p></div>
+    <p class="ossub">Built from your ${n} verdict${n===1?"":"s"}</p>
+    <div class="oaintro"><p>This is your space. Slide any genre to see more or fewer of its films. Nothing changes unless you change it.</p><p>Your agent, ${esc(agentName)}, studies your verdicts and suggests tweaks. You decide what to apply.</p><p><b>Gold rows</b> are the genres you've watched most recently. Tap a genre to open it.</p></div>
+    ${tasteRecsCardHTML()}
     <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
+  oaPositionRowSliders();
+  if(typeof requestAnimationFrame==="function") requestAnimationFrame(oaPositionRowSliders);
 }
 // CAS-1461: open/close morph. The open genre's .oastripfull animates from/to the closed row's own bar
 // (Web Animations API, 800ms); the rest of the panel fades. All skipped under prefers-reduced-motion.
@@ -20614,7 +20781,7 @@ window.oaOnDrag=(input)=>{
   const style=input.dataset.style;
   const share=Math.max(20, Math.min(100, parseInt(input.value,10)));
   input.value=share;
-  const wrap=input.closest(".oaslidewrap");
+  const wrap=input.closest(".oaslidewrap") || input.closest(".oarowwrap");   // CAS-1480: the closed row's own slider
   const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
   ONE_AGENT_SHARE_BRACKETS.forEach((b,i)=>{
     const fill=boxes[i] && boxes[i].querySelector(".oafill");
@@ -20622,6 +20789,11 @@ window.oaOnDrag=(input)=>{
   });
   const bar = oneBarForTopPct(style, share);
   const name=oneAgentShortName(style);
+  if(input.classList.contains("tkdrag")){
+    const rv=wrap && wrap.querySelector(".oarowval");
+    if(rv) rv.innerHTML = `Score ${bar}+<i>top ${share}%</i>`;
+    return;
+  }
   const valEl=$("oaSliderVal");
   if(valEl) valEl.innerHTML = `Score ${bar}+<i>top ${share}%</i>`;
   const descEl=$("oaSliderDesc");
@@ -20745,7 +20917,7 @@ function oaComboStats(c, style){
     const ov = combo[key];
     const never = ov==="never";
     const overridden = typeof ov==="number";
-    const points = overridden ? ov : learned;
+    const points = overridden ? ov : oneAppliedPoints(c, key);   // CAS-1479: rows show/drag the applied value
     return {key, other, n, filmCount:filmCounts[key], learned, override:ov, overridden, never, points};
   });
 }
@@ -20904,7 +21076,7 @@ function oaChangeLogHTML(c, style){
     return ch.moves.map(mv=>`<div class="oalogch ${mv.to>mv.from?"up":"down"}"><span class="s">${mv.to>mv.from?"▲":"▼"} ${esc(mv.other)}</span><span class="v">${oaFmtPoints(mv.from)} → ${oaFmtPoints(mv.to)}</span><span class="w">after ${esc(ch.title)} · ${esc(lbl)} · ${esc(d)}</span></div>`);
   }).flat();
   const more = all.length>shown.length ? `<button type="button" class="oalogmore" onclick="oaLogMore()">Show more ›</button>` : "";
-  return `<details class="oalog"${oaLogOpen?" open":""} ontoggle="oaLogToggled(this)"><summary>RECENT CHANGES IN ${esc(oneAgentShortName(style).toUpperCase())} <span class="oalogn">${lines.length}</span></summary><div class="oalogbody">${lines.join("")}${more}</div></details>`;
+  return `<details class="oalog"${oaLogOpen?" open":""} ontoggle="oaLogToggled(this)"><summary>RECENT RECOMMENDATIONS IN ${esc(oneAgentShortName(style).toUpperCase())} <span class="oalogn">${lines.length}</span></summary><div class="oalogbody">${lines.join("")}${more}</div></details>`;
 }
 window.oaLogToggled=(el)=>{ oaLogOpen=el.open; };
 window.oaLogMore=()=>{ oaLogShown+=10; oaLogOpen=true; renderAgentsScreen(); };
@@ -20925,7 +21097,7 @@ function oaAdjustSectionHTML(c, style){
     ${oaChangeLogHTML(c, style)}
     <div class="oaclist">${shown.map(r=>oaComboRowHTML(c, style, r)).join("")}</div>
     ${showAllHTML}
-    <p class="oacfoot">The white line is ${esc(name)}'s ${bar}+. Drag a row to set it yourself; all the way left means never list it. Your agent keeps learning underneath and tells you if your verdicts start to disagree.</p></div>`;
+    <p class="oacfoot">The white line is ${esc(name)}'s ${bar}+. Drag a row to set it yourself; all the way left means never list it. Sub-genres only change when you set them or apply a recommendation.</p></div>`;
 }
 // CAS-1457: the Agent nav chip's gold count badge — pure DOM sync, called from both the full render() and
 // the lean verdict-repaint path (repaintAfterOpinion's fastPatchFindRow branch skips a full render()).
@@ -20933,14 +21105,14 @@ function updateAgentNavDot(){
   const btn = typeof $==="function" ? $("agentsBtn") : null;
   if(!btn || !btn.classList) return;
   const c = oneAgentCriteria();
-  const n = c ? oaChangedGenres(c, c.agentSeenAt||0).size : 0;
+  const n = c ? tasteRecs().length : 0;   // CAS-1479: genres with a recommendation, no longer agentSeenAt
   let badge = btn.querySelector(".oabadge");
   if(n>0){
     if(!badge){ badge=document.createElement("span"); badge.className="oabadge"; btn.appendChild(badge); }
     badge.textContent=String(n);
   } else if(badge) badge.remove();
   // CAS-1345 Part 3 / Lee, 2026-11-20: a v2 account's one agent lives in "Taste"; every other account keeps "Agents".
-  const label = c ? "Taste" : "Agents";
+  const label = "Taste";
   btn.querySelectorAll(".mclabel").forEach(el=>{ el.textContent=label; });
   btn.title=label; btn.setAttribute("aria-label", label);
 }
@@ -22540,7 +22712,8 @@ function oneAgentCommit(draft){
   const seenAdj={};
   MOVIES.forEach(m=>{ mainOtherCombos(m).keys.forEach(({key})=>{ if(!(key in seenAdj)) seenAdj[key]=oneComboAdj(key); }); });
   // CAS-1352: the agent's name is now whatever "Name your agent" collected, not a hard-coded default.
-  const agent={id:cascadeNewId(), name:draft.name||"My agent", v:2, styles:draft.styles, combo:{}, seenAdj, seenAdjAt:{}, dismissed:[]};
+  const agent={id:cascadeNewId(), name:draft.name||"My agent", v:2, styles:draft.styles, combo:{}, seenAdj, seenAdjAt:{}, dismissed:[], applied:{}, skipped:{}};
+  tasteSeedApplied(agent);   // CAS-1479: existing verdicts seed applied = learned, so no score moves
   cascades.push(agent);
   saveCascades();
   setActive(agent.id);
@@ -27834,6 +28007,8 @@ function acctFetchKeepalive(init){
     // CAS-1347: same reasoning as applyWatchPrefsToCascades just above — the CAS-1345 starter-mood repair
     // needs the account's real v2 agent styles, which loadUserPrefs (inside allLoads) cannot trust yet.
     oneAgentApplyStarterRepair();
+    // CAS-1479: day-one seed — verdicts are loaded now (allLoads settled), so applied = learned for every judged combo.
+    { const oc=oneAgentCriteria(); if(oc && tasteSeedApplied(oc)) saveCascades(); }
     // CAS-1224: redo the cold-boot landing-tab pick now that cascades/watchPrefs hold the account's real
     // answer, not the empty-device default pickLandingWatchTab() saw at boot. Only when the boot-time pick
     // is still pending AND the device is still sitting on whatever it provisionally guessed — a real tap

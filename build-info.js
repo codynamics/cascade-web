@@ -1,1 +1,1 @@
-window.BUILD_INFO = {"version": "1.0.0", "major": 1, "minor": 0, "patch": 0, "build": 3907, "commit": "5c85d08", "builtAt": "2026-11-19T23:16:14Z", "providers": {"TMDB": "unconfigured", "Watchmode": "unconfigured"}};
+window.BUILD_INFO = {"version": "1.0.0", "major": 1, "minor": 0, "patch": 0, "build": 3912, "commit": "841aaeb", "builtAt": "2026-11-20T00:54:35Z", "providers": {"TMDB": "unconfigured", "Watchmode": "unconfigured"}};

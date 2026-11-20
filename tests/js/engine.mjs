@@ -323,6 +323,8 @@ if(typeof window.CascadeAuth === "undefined"){
   // CAS-1339: oneAgentCriteria is the account's one v2 agent lookup barAdvice/oneScore/oneScoreParts
   // already fall back to — exported directly so a test can assert the v2/non-v2 gate itself.
   oneAgentCriteria,
+  // CAS-1479: Taste recommendations (engine side) — applied values, day-one seed, per-genre apply/skip.
+  tasteSeedApplied, tasteRecs, tasteApply, tasteSkip, tasteApplyAll, oneAppliedPoints, updateAgentNavDot,
   // CAS-1338: oneScoreBoxHTML/oneScoreTextHTML are the v2 agent's single score box (collapsed card) and
   // its expanded-card sentence companion — exported so a test can assert their markup directly, the same
   // convention matchBadgeHTML/publicLozengeHTML above use.
