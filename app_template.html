@@ -3494,6 +3494,8 @@
   .tkbtn.ghost{background:none;color:var(--ink);border:1px solid rgba(255,255,255,.2)}
   .tkbody{display:none;padding:0 12px 12px}
   .tkrec.open .tkbody{display:block}
+  .tkrec.tkrec-empty{opacity:.85}
+  .tkrec.tkrec-empty .tkrechd{cursor:default}
   .tksum{font-size:12.5px;opacity:.8;line-height:1.45;margin:0 0 8px}
   .tkstyle{padding:10px 0;border-top:1px solid rgba(255,255,255,.08)}
   .tkstyle .hd{display:flex;align-items:center;gap:8px}
@@ -20654,7 +20656,11 @@ function oaRowHTML(c, style, filmCount, changed){
 let tasteRecsOpen=false;
 function tasteRecsCardHTML(){
   const recs=tasteRecs();
-  if(!recs.length) return "";
+  if(!recs.length){
+    const c0 = oneAgentCriteria();
+    const nm0 = ((c0 && c0.name)||"").trim() || "Your agent";
+    return `<div class="tkrec tkrec-empty"><div class="tkrechd"><div class="tkrecic">✦</div><div class="tkrect">Agent recommendations<i>None right now. ${esc(nm0)} will suggest tweaks as you rate more films.</i></div></div></div>`;
+  }
   const c=oneAgentCriteria();
   const agentName=((c&&c.name)||"").trim() || "Your agent";
   const n=recs.length;
@@ -20687,7 +20693,7 @@ function renderOneAgentScreen(c){
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">Built from your ${n} verdict${n===1?"":"s"}</p>
-    <div class="oaintro"><p>This is your space. Slide any genre to see more or fewer of its films. Nothing changes unless you change it.</p><p>Your agent, ${esc(agentName)}, studies your verdicts and suggests tweaks. You decide what to apply.</p><p><b>Gold rows</b> are the genres you've watched most recently. Tap a genre to open it.</p></div>
+    <div class="oaintro"><p>This is your space. Slide any genre to see more or fewer of its films. Nothing changes unless you change it.</p><p>Your agent, ${esc(agentName)}, studies your verdicts and suggests tweaks. You decide what to apply.</p><p>A <b>gold edge</b> marks the genres you've rated most recently. Tap a genre to open it.</p></div>
     ${tasteRecsCardHTML()}
     <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
