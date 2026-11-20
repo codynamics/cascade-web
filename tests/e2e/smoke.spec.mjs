@@ -2143,7 +2143,7 @@ test("CAS-1371 AC3: Move left / Move right in the mood sheet reorders", async ({
   expect(before.indexOf("extra")).toBeGreaterThan(0);
 
   // CAS-1394: CAS-1391 moved Position inside More filters, which opens collapsed.
-  await page.locator('#watchSheetBody .morebtn').click();
+  await page.locator('#watchSheetBody .morebtn:not(.oamkwopen)').click();
   await page.locator('#watchSheetBody button:has-text("Move right")').click();
   const afterRight = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
   expect(afterRight.indexOf("extra")).toBe(before.indexOf("extra") + 1);
@@ -2154,7 +2154,7 @@ test("CAS-1371 AC3: Move left / Move right in the mood sheet reorders", async ({
 
   // Releases is pinned first in the row and never reorders, so its own sheet gets no Position row.
   await page.evaluate(() => window.openOamMoodSheetFor("releases"));
-  await page.locator('#watchSheetBody .morebtn').click();
+  await page.locator('#watchSheetBody .morebtn:not(.oamkwopen)').click();
   await expect(page.locator('#watchSheetBody .wsheethd:has-text("Position")')).toHaveCount(0);
 });
 
