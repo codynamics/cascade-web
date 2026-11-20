@@ -3032,6 +3032,11 @@
   .obopt.on{border-color:var(--accent);background:rgba(124,92,255,.12)}
   .obopt.on .obradio{border-color:var(--accent)}
   .obopt.on .obradio::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--accent)}
+  /* Multi-select cards (role="checkbox", the first run's "Where do you watch movies?") read as checkboxes, not radios. */
+  .obopt[role="checkbox"] .obradio{border-radius:6px}
+  .obopt[role="checkbox"].on .obradio{background:var(--accent)}
+  .obopt[role="checkbox"].on .obradio::after{inset:auto;left:6px;top:2px;width:6px;height:11px;border-radius:0;
+    background:none;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
   /* The label and its sub-line are two rows, not two inline spans — without this they render as
      "YesOften enough to plan around it". .oboptsub's own margin-top only applies once it is a block. */
   .obopttext{display:flex;flex-direction:column;min-width:0}
@@ -3696,14 +3701,20 @@
   .mfscale{padding:0 0 3px}
   .mfscale span{grid-column:2;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;text-align:center;font-size:9px;font-weight:700;color:var(--faint)}
   .mfscale span i{font-style:normal}
-  /* Lee, 2026-11-20: ONE control type for every either/or in the list sheet — the .mfseg row used by Show and
-     Order. Find films by (Genre | Keyword) and Genre levels (My taste | Override) use it too; headings use the
-     sheet's own section / sub-heading styles. The panel below slides between the two modes (CAS-1400). */
-  .mtabs.mfseg{margin-bottom:12px}
-  .mpanel{border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden;transition:height .3s ease;margin-bottom:22px}
-  .mtrack{display:flex;width:200%;align-items:flex-start;transition:transform .32s cubic-bezier(.4,0,.2,1)}
-  .mtrack>section{flex:0 0 50%;box-sizing:border-box;padding:12px 6px 8px;margin:0;min-width:0}
-  .mtrack.kw{transform:translateX(-50%)}
+  /* Lee, 2026-11-20: Genres first; "Or find films by name" under them. A name in the box greys out Genres. */
+  .oamnamehd{margin:0 0 6px}
+  .mpanel{border:1px solid var(--line);border-radius:12px;background:var(--panel2);margin-bottom:8px}
+  .mpanel>.mgenre{padding:12px 6px 8px;margin:0;min-width:0}
+  .oamgensec .oamoff{display:none;margin-left:8px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.1);
+    color:var(--dim);font-size:10.5px;letter-spacing:.04em;vertical-align:1px}
+  .oamgensec.off .oamoff{display:inline-block}
+  .oamgensec.off .mpanel{opacity:.32;filter:grayscale(1);pointer-events:none;transition:opacity .2s}
+  .oamkwsec .oamkwbody{display:none}
+  .oamkwsec.open .oamkwbody{display:block}
+  .oamkwsec.open .oamkwopen{display:none}
+  .oamkwsec .oamkwopen{margin:0}
+  .oamkwsec .oamusegen{background:none;border:0;color:var(--dim);font:700 12px var(--font-body);cursor:pointer;padding:4px 0}
+  #oamKwInput{width:100%;box-sizing:border-box}
   .mfbox .mfsub{display:block;font-size:11px;color:var(--faint)}
   .mfbox .mfdesc{font-size:11.5px;color:var(--dim);line-height:1.45;margin:8px 4px 0;min-height:2.9em}
   .oaslidewrap{position:relative}
@@ -21166,9 +21177,10 @@ const ONE_AGENT_MOOD_BUILTINS=[
   // Lee, 2026-11-09 (later): All Latest is now an ORDINARY mood, configured rather than hard-coded — the new
   // "Only films with a cinema release" filter on, How far back 1 yr, watched films in, and the Mood Override
   // On at 100% (every film in every on genre, whatever its score). releasesV:3.
-  {id:"releases", name:"All Latest", sort:"release", show:"all", years:1, watched:true, cinemaOnly:true, topShare:100, releasesV:3},
-  // CAS-1368: Best of the best — every on genre, raised to a floor of 85 regardless of its own bar, Best 40.
-  {id:"best", name:"Best of the best", topShare:20, show:"40"},
+  // CAS-1491 (Lee, 2026-11-20): All Latest and Best of the best merged into ONE list, Latest and Best — top 20%
+  // of every genre the agent follows, Best 40, by score, watched in, any age of film. releasesV:4. Best of the
+  // best is gone (new and existing accounts); the id stays "releases" (pinned first, Watch opens on it).
+  {id:"releases", name:"Latest and Best", styles:[], topShare:20, show:"40", sort:"score", watched:true, cinemaOnly:false, handOnly:false, awards:"any", years:0, svc:null, releasesV:4, releasesSortV:1},
 ];
 function oamMoodDefaultFields(){
   return {v2:true, handOnly:false, watched:false, cinemaOnly:false, styles:[], topShare:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[], svc:null, people:""};
@@ -21327,41 +21339,27 @@ function oamOrderScore(m, c){
   const {main}=mainOtherCombos(m);
   return (main!==undefined && oaFav(c, main)) ? score+OAM_FAV_LIFT : score;
 }
-// Show cap — All/Best 20/40/60/80 by oamOrderScore (CAS-1369's lifted order), applied AFTER membership.
-// Hand-added films always show and count towards the limit (ticket's own words): they're never cut, and
-// they eat into the N rule-based films get.
+// Show cap — All/Best 20/40/60/80 by oamOrderScore, applied AFTER membership, once per stage.
+// Lee, 2026-11-20: Best N is a hard MAXIMUM of N films in each stage (Upcoming, In cinema, Rental,
+// Streaming) — `rows` is only ever one stage's pool (oamStagePool), so one cut here is one stage's cap.
+// Every film counts: watched films, Rental soon films and starred films all spend a slot (this retires
+// CAS-1369's "watched doesn't count", CAS-1375's "Rental soon on top" and the starred-on-top exemption).
+// Hand-added and starred films are explicit picks, so they are kept first; the remaining slots go to the
+// best of the rest by score. Only a film held open by an action in progress (heldThisTab) can briefly sit
+// above N, so a card never vanishes under the person's finger.
 function oamApplyShowCap(rows, mood, c, heldThisTab){
   const n = OAM_SHOW_N[mood.show] || null;
   if(n==null) return rows;
-  const handIds=new Set(mood.in||[]);
-  const hand=rows.filter(m=>handIds.has(m.tmdb_id));
-  // CAS-1375: a Rental soon film (primaryStatus "released") is kept off the cut entirely — ON TOP of the N
-  // rule-based films a Best N mood promises, unlike a hand add, which eats into that same N. Only ever
-  // populated on the Rental tab (filmMatchesWatchTab/oamStagePool are the only source of these rows), so
-  // this is a no-op for every other tab's rows.
-  const soon=rows.filter(m=>!handIds.has(m.tmdb_id) && primaryStatus(m)==="released");
-  // Lee, 2026-11-09: a starred film the mood lists is never cut by Best N — it shows (at the top, see
-  // listingGroups) on top of the N, like a Rental soon film.
-  const starred=rows.filter(m=>!handIds.has(m.tmdb_id) && isStarred(m.tmdb_id));
-  const rest=rows.filter(m=>!handIds.has(m.tmdb_id) && primaryStatus(m)!=="released")
+  const pinned=rows.filter(m=>oamShowCapPinned(m, mood));
+  const rest=rows.filter(m=>!oamShowCapPinned(m, mood))
     .sort((a,b)=>{ const d=oamOrderScore(b,c)-oamOrderScore(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
-  const remaining=Math.max(0, n-hand.length);
-  // CAS-1369: a watched film ranked among `rest` (only possible with mood.watched:true — its own
-  // excludeWatched:false override is what let it reach membership at all) is kept in its own score
-  // position but never spends a slot of `remaining` — walk the sorted list, counting only unwatched films
-  // against the budget, so "Best 40" means the 40 best unwatched films plus any watched ones that rank
-  // among them, same example the ticket gives.
-  const ranked=[];
-  let unwatchedKept=0;
-  for(const m of rest){
-    if(unwatchedKept>=remaining) break;
-    ranked.push(m);
-    if(!watched.has(m.tmdb_id)) unwatchedKept++;
-  }
-  const keep=new Set([...hand, ...soon, ...starred, ...ranked].map(m=>m.tmdb_id));
+  const ranked=rest.slice(0, Math.max(0, n-pinned.length));
+  const keep=new Set([...pinned, ...ranked].map(m=>m.tmdb_id));
   rows.forEach(m=>{ if(heldThisTab.has(m.tmdb_id)) keep.add(m.tmdb_id); });
   return rows.filter(m=>keep.has(m.tmdb_id));
 }
+// A film the Best N cut always keeps: added to the list by hand, or starred.
+function oamShowCapPinned(m, mood){ return (mood.in||[]).includes(m.tmdb_id) || isStarred(m.tmdb_id); }
 // Every film standing in the CURRENT watchTab's own stage — the same scoping v1's catalogue-sourced moods use
 // (watchScopeRows' own "catalogue" branch), reused verbatim since a v2 account's one mood pool is always
 // catalogue-wide.
@@ -21387,8 +21385,8 @@ function oamVisibleRows(){
   const preSheetRows=pool;
   const wsearch=watchSearch[watchTab];
   if(wsearch) pool=pool.filter(m=>m.title.toLowerCase().includes(wsearch));
-  const rows = (mood.id==="releases" || mood.id==="starred" || mood.starredOnly)
-    ? pool : oamApplyShowCap(pool, mood, c, heldThisTab);
+  // Lee, 2026-11-20: every list, All Latest included, honours its own Show setting — no list is exempt.
+  const rows = oamApplyShowCap(pool, mood, c, heldThisTab);
   return {rows, preSheetRows, preMineOnlyRows:rows, mineOnly:false};
 }
 function oamEmptyResultsHTML(){
@@ -21440,7 +21438,8 @@ function oamMoodDraftFrom(mood){
     // even while the account's "Only show films on my services" switch is on. Never set alongside svc.
     anySvc: mood ? (!!mood.anySvc && !oamMoodEffectiveSvc(mood)) : false,
     // CAS-1390: title/actor/director text filter, same comma-AND matcher as Find (filmMatchesSearch).
-    people: mood ? (mood.people||"") : "",
+    // Lee, 2026-11-20: the name box decides the mode, so a genre list never carries a leftover (ignored) keyword.
+    people: mood && oamMoodMode(mood)==="keyword" ? (mood.people||"") : "",
   };
 }
 // CAS-1400: the bar a style shows in the sheet is always the agent's own — a mood never changes the agent.
@@ -21553,35 +21552,26 @@ window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMood
 window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; oamDraft.anySvc=false; renderOamMoodSheetBody(); };
 window.setOamDraftAnySvc=()=>{ if(!oamDraft) return; oamDraft.svc=null; oamDraft.anySvc=true; renderOamMoodSheetBody(); };
 window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
-window.setOamDraftPeople=v=>{ if(oamDraft) oamDraft.people=v; };
-// CAS-1400: tapping a tab sets the draft's mode and slides the track WITHOUT re-rendering the sheet.
+// Lee, 2026-11-20: no Genre/Keyword switch. Genres come first; "Or find films by name" opens a name box under them.
+// Typing a name makes the list a keyword list and greys out (and disables) the Genres section; clearing it, or
+// "Use genres", brings Genres back. Nothing re-renders, so the box keeps focus while typing.
+window.setOamDraftPeople=v=>{ const d=oamDraft; if(!d) return; d.people=v; d.mode=v.trim() ? "keyword" : "genre"; oamApplyModeToDOM(); };
+// Kept for callers: "keyword" opens the name box; "genre" empties it.
 window.setOamDraftMode=mode=>{
-  const d=oamDraft; if(!d || (mode!=="genre" && mode!=="keyword")) return;
-  d.mode=mode;
-  oamApplyModeToDOM(true);
+  const d=oamDraft; if(!d) return;
+  if(mode==="keyword") d.kwOpen=true;
+  else if(mode==="genre"){ d.people=""; d.mode="genre"; d.kwOpen=false; const i=$("oamKwInput"); if(i) i.value=""; }
+  oamApplyModeToDOM();
 };
-function oamSizeMoodPanel(animate){
-  const body=$("watchSheetBody"); if(!body) return;
-  const panel=body.querySelector(".mpanel"), track=body.querySelector(".mtrack");
-  if(!panel || !track || !oamDraft) return;
-  const sec=track.children[oamDraft.mode==="keyword" ? 1 : 0]; if(!sec) return;
-  if(!animate) panel.style.transition="none";
-  panel.style.height=sec.offsetHeight+"px";
-  if(!animate){ void panel.offsetHeight; panel.style.transition=""; }
-}
-function oamApplyModeToDOM(animate){
-  const body=$("watchSheetBody"); if(!body || !oamDraft) return;
-  const kw=oamDraft.mode==="keyword";
-  const track=body.querySelector(".mtrack");
-  if(track) track.classList.toggle("kw", kw);
-  body.querySelectorAll(".mtabs button").forEach(b=>{
-    const on=(b.dataset.mode==="keyword")===kw;
-    b.classList.toggle("on", on); b.setAttribute("aria-checked", on);
-  });
-  const secs=track ? track.children : [];
-  if(secs[0]){ secs[0].setAttribute("aria-hidden", kw); secs[0].inert=kw; }
-  if(secs[1]){ secs[1].setAttribute("aria-hidden", !kw); secs[1].inert=!kw; }
-  oamSizeMoodPanel(animate);
+window.oamOpenKeyword=()=>{ setOamDraftMode("keyword"); const i=$("oamKwInput"); if(i) i.focus(); };
+function oamSizeMoodPanel(){}   // the genre panel sizes itself now (no sliding track)
+function oamApplyModeToDOM(){
+  const d=oamDraft; const body=$("watchSheetBody"); if(!body || !d) return;
+  const kw=d.mode==="keyword";
+  const gen=$("oamGenreSec"), panel=gen && gen.querySelector(".mpanel");
+  if(gen) gen.classList.toggle("off", kw);
+  if(panel){ panel.inert=kw; panel.setAttribute("aria-disabled", kw); }
+  const kws=$("oamKwSec"); if(kws) kws.classList.toggle("open", kw || !!d.kwOpen);
 }
 // Every other saved mood that would ALSO list this style — "also in <names>" under a style row.
 function oamStylesAlsoIn(style, excludeId){
@@ -21789,24 +21779,17 @@ function renderOamMoodSheetBody(){
   const moreN=oamMoreFiltersCount(d);
   const body=$("watchSheetBody");
   if(body) body.innerHTML=`
+    <div class="wsheethd oamnamehd"><span>LIST NAME</span></div>
     <div class="wsheetsec oamhead">
       <input id="oamMoodName" class="mfinput" type="text" maxlength="24" placeholder="List name" autocomplete="off"
         value="${escA(d.name)}" oninput="setOamDraftName(this.value)">
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
     ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
-    <!-- Lee, 2026-11-20: Genre and Keyword are EITHER/OR — the tabs read as two things you could both set, so
-         they are now one switch ("Find films by") with a line saying what the chosen one uses. -->
-    <div class="wsheetsec mainsec oamfindsec">
-      <div class="wsheethd"><span>FIND FILMS BY</span></div>
-      <div class="mfseg mtabs" role="radiogroup" aria-label="Find films by">
-        <button type="button" role="radio" data-mode="genre" class="${kwMode?"":"on"}" aria-checked="${!kwMode}" onclick="setOamDraftMode('genre')">Genre</button>
-        <button type="button" role="radio" data-mode="keyword" class="${kwMode?"on":""}" aria-checked="${kwMode}" onclick="setOamDraftMode('keyword')">Keyword</button>
-      </div>
-    </div>
-    <div class="mpanel">
-      <div class="mtrack${kwMode?" kw":""}">
-        <section class="mgenre" aria-hidden="${kwMode}">
+    <div class="wsheetsec mainsec oamgensec${kwMode?" off":""}" id="oamGenreSec">
+      <div class="wsheethd"><span>GENRES<span class="oamoff">OFF · FINDING BY NAME</span></span></div>
+      <div class="mpanel">
+        <section class="mgenre">
           <!-- Lee, 2026-11-20: the My taste / Override switch is back at the top, above the override slider and the
                genre rows (it sat under the rows from 2026-11-17). The agent's levels always show. -->
           <div class="oamlvl">
@@ -21817,7 +21800,6 @@ function renderOamMoodSheetBody(){
             </div>
             ${oamOverrideFilterHTML(d)}
           </div>
-          <div class="subhd">Genres</div>
           <div class="oalist">
             ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
           </div>
@@ -21828,11 +21810,15 @@ function renderOamMoodSheetBody(){
               ${oamNotInMoodOpen ? order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("") : ""}
             </div>` : ""}
         </section>
-        <section class="mkeyword" aria-hidden="${!kwMode}">
-          <input class="search" type="text" enterkeyhint="done" placeholder="e.g. Tom Cruise, Russo"
-            value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
-          <p class="oamgenreintro">Title, actor or director. Commas combine — every part must match.</p>
-        </section>
+      </div>
+    </div>
+    <div class="wsheetsec mainsec oamkwsec${(kwMode||d.kwOpen)?" open":""}" id="oamKwSec">
+      <button type="button" class="morebtn oamkwopen" onclick="oamOpenKeyword()"><span>OR FIND FILMS BY NAME</span><span aria-hidden="true">&rsaquo;</span></button>
+      <div class="oamkwbody">
+        <div class="wsheethd"><span>FIND FILMS BY NAME</span><button type="button" class="oamusegen" onclick="setOamDraftMode('genre')">Use genres</button></div>
+        <input id="oamKwInput" class="search" type="text" enterkeyhint="done" placeholder="Actor, director or title"
+          value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
+        <p class="oamgenreintro">Commas combine — every part must match.</p>
       </div>
     </div>
     ${(!d.handOnly && prefs.sub.size) ? `<div class="wsheetsec mainsec" id="oamSvcSec">
@@ -21897,9 +21883,7 @@ function renderOamMoodSheetBody(){
       </div>` : ""}
     </div>` : ""}`;
   if(d.topShare!=null) oamDrawFilterLines(d, c, d.topShare);
-  // CAS-1400: the panel opens in the saved mode with no animation; the hidden half is inert.
-  oamApplyModeToDOM(false);
-  requestAnimationFrame(()=>{ if(oamDraft) oamSizeMoodPanel(false); });
+  oamApplyModeToDOM();   // Lee, 2026-11-20: a keyword list opens with Genres greyed and the name box open
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
     delBtn.style.display="";
@@ -21930,7 +21914,7 @@ function oamMoodFromDraft(d){
     svc: d.svc || null,
     anySvc: !!d.anySvc && !d.svc,
     people: (d.people||"").trim(),
-    mode: d.mode==="keyword" ? "keyword" : "genre",   // CAS-1400
+    mode: (d.people||"").trim() ? "keyword" : "genre",   // Lee, 2026-11-20: a name in the box IS keyword mode
   };
 }
 window.oamSaveMoodFromSheet=()=>{
@@ -21949,7 +21933,7 @@ window.oamSaveMoodFromSheet=()=>{
   // one-time load repair below (loadUserPrefs) never reverts a deliberate choice of Score back to release.
   // 13 Nov: moodSort() only honours Releases' saved sort once sortChosen is stamped — the v1 sheet's
   // save did that (CAS-1331/1333), this v2 save never did, so Score / A–Z on Releases silently reverted.
-  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=3; mood.sortChosen=true; }
+  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=4; mood.sortChosen=true; }
   const list=oamMoodsListReal();
   const idx=list.findIndex(m=>m.id===mood.id);
   watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
@@ -22193,18 +22177,14 @@ function oamWilRankInMood(m, mood, c, stageKey){
     watchTab=savedTab; watchCinemaStage=savedStage; watchMoodSel=savedMood;
     watchWatchedSel[stop.tabKey]=savedWatched;
   }
-  const handIds=new Set(mood.in||[]);
-  // CAS-1375: a Rental soon film is never part of the ranked pool either (oamApplyShowCap's own rule above)
-  // — excluded here too, or this could tell a real rank-based film it's competing against a film the cut
-  // never actually counted against it.
-  const rest=preSheetRows.filter(x=>!handIds.has(x.tmdb_id) && primaryStatus(x)!=="released")
+  // Same order as oamApplyShowCap: hand-added and starred films take the first slots, then everything
+  // else — watched and Rental soon films included — by score.
+  const pinnedN=preSheetRows.filter(x=>oamShowCapPinned(x, mood)).length;
+  const rest=preSheetRows.filter(x=>!oamShowCapPinned(x, mood))
     .sort((a,b)=>{ const d=oamOrderScore(b,c)-oamOrderScore(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
   const idx=rest.findIndex(x=>x.tmdb_id===m.tmdb_id);
   if(idx<0) return null;
-  // CAS-1369: a watched film ahead of `m` never spends a Best-N slot (oamApplyShowCap's own rule above) —
-  // only the unwatched films ranked ahead of it count, so this stays exactly as true to the cut as the
-  // comment above this function promises.
-  const rank = rest.slice(0, idx).filter(x=>!watched.has(x.tmdb_id)).length + 1;
+  const rank = pinnedN + idx + 1;
   return {rank, n};
 }
 function oamWilCase(m, c){
@@ -22635,7 +22615,7 @@ function oneAgentStarterMoods(who, ages){
   who = who || {};
   ages = ages || [];
   const pick = id => ({...oamMoodDefaultFields(), ...ONE_AGENT_MOOD_BUILTINS.find(b=>b.id===id), ages, watched:true});
-  const list = [pick("releases"), pick("best"),
+  const list = [pick("releases"),
     {...oamMoodDefaultFields(), id:"me", name:"Me", show:"40", ages, watched:true}];
   if(who.partner) list.push({...oamMoodDefaultFields(), id:"date", name:"Partner",
     styles:[...(who.dateStyles||[])], show:"40", ages, watched:true});
@@ -25540,7 +25520,7 @@ const TOURS = {
     // the moods made from the setup answers, then how to edit and add moods.
     {html:TUT_P("Your Watch area is organised into <b>lists</b>.", "Lists are filtered collections of movies."),
       before(){ setWatchMood("releases"); tutMoodRowTo(null); }, sel:[".moodrow"], trail:TUT_W},
-    {html:TUT_P("<b>All Latest</b> is a special list designed to give you a forward view of all upcoming and cinema releases."),
+    {html:TUT_P("<b>Latest and Best</b> is your main list: the top 20% of every genre your agent follows."),
       before(){ tutMoodRowTo(null); }, sel:[`.moodrow .moodchip[data-mood="releases"]`], trail:TUT_W},
     {html:TUT_P("Some lists have been created from the questions you answered."),
       before(){ tutMoodRowTo(`.moodrow .moodchip[data-mood="me"]`); },
@@ -25596,7 +25576,7 @@ const TOURS = {
     // The "during account setup" lines only appear when that setup mood exists (Lee, 16 Nov).
     {get html(){ return TUT_P("Instead of building a list around genres, you can use a keyword search around an actor, director or title.",
       ...(watchMoods.some(m=>m.id==="fav-person") ? ["During account setup, we set up a list with your favourite actor or director to show you how this is done."] : [])); },
-      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:[`#watchSheet .mtabs button[data-mode="keyword"]`], tap:true},
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet #oamKwSec .oamkwopen"], tap:true},
     {get html(){ return TUT_P("Show only films included on one of your services, so the whole list is ready to watch tonight.",
       ...(watchMoods.some(m=>m.id==="topsvc") ? ["During account setup, we created a list with your most-used streaming service to show you how this is done."] : [])); },
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); }, sel:["#oamSvcSec"]},
@@ -25668,10 +25648,7 @@ function tutOpenMoodsTourSheet(){
   if(document.getElementById("watchSheet").classList.contains("open")) return;
   openOamMoodSheetFor(tutMoodsTourMoodId());
 }
-function tutSheetMode(mode){
-  const b=document.querySelector(`#watchSheet .mtabs button[data-mode="${mode}"]`);
-  if(b && !b.classList.contains("on")) setOamDraftMode(mode);
-}
+function tutSheetMode(mode){ /* Lee, 2026-11-20: Genres always show and there is no mode switch — nothing to do */ }
 // Database tutorial: puts `q` in the search box and runs it. With `typed`, the letters appear one by one first.
 let tutTypeTimer=null;
 function tutFindSearch(q, typed){
@@ -29026,7 +29003,14 @@ function acctFetchKeepalive(init){
   let oneAgentRepairPending = false;
   function riderReviewSessionsOnto(patch){
     if(reviewSessionsPushPending){ reviewSessionsPushPending=false; patch.reviewSessions=reviewPromptSessionsCount; }
-    if(moodsProvisionPending){ Object.assign(patch, moodsProvisionPending); moodsProvisionPending=null; }
+    // Lee, 2026-11-20: a key the caller is writing NOW always beats the load-time snapshot riding along — the
+    // snapshot was taken before this write, so letting it overwrite (e.g. a list just saved, pushed as "moods")
+    // silently put the account back to the pre-edit lists on the server, and the next prefs poll reverted the
+    // device too. Every account took this path after CAS-1491's one-time Latest and Best load repair.
+    if(moodsProvisionPending){
+      for(const k of Object.keys(moodsProvisionPending)) if(!(k in patch)) patch[k]=moodsProvisionPending[k];
+      moodsProvisionPending=null;
+    }
     return patch;
   }
   // CAS-1347: the style-aware half of the CAS-1345 starter-mood repair loadUserPrefs flagged above. Called
@@ -29269,6 +29253,20 @@ function acctFetchKeepalive(init){
               watched: first ? true : m.watched,
               cinemaOnly:true, topShare: m.topShare==null ? 100 : m.topShare, releasesV:3};
           });
+          moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
+        }
+        // CAS-1491: All Latest + Best of the best became ONE list, Latest and Best (releasesV:4). A releases
+        // record below 4 takes the new settings once (its own ages/in/out kept), any "best" mood is dropped,
+        // and a saved selection of "best" points at releases — in memory, piggybacked onto the next real
+        // view write (a load must never write — CAS-1218/1243). A record already at 4 is left alone.
+        if(watchMoods.some(m=>m && m.v2 && ((m.id==="releases" && (m.releasesV||0)<4) || m.id==="best"))){
+          watchMoods = watchMoods.filter(m=>!(m && m.v2 && m.id==="best")).map(m=>{
+            if(!(m && m.v2 && m.id==="releases" && (m.releasesV||0)<4)) return m;
+            return {...m, name:"Latest and Best", styles:[], topShare:20, show:"40", sort:"score", watched:true,
+              cinemaOnly:false, handOnly:false, awards:"any", years:0, svc:null,
+              releasesV:4, releasesSortV:1, sortChosen:true};
+          });
+          if(v.mood==="best") v.mood="releases";
           moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
         }
         // CAS-1374: Best 10 is retired — a v2 mood still saved with show:"10" reads as "20" once, in

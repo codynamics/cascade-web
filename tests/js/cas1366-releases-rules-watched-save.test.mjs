@@ -87,8 +87,8 @@ test("CAS-1366: a hand take-out still beats Releases' own rules", () => {
 
 test("CAS-1366 AC2: the built-in Releases mood defaults to release order, showing all", () => {
   const releases = E.ONE_AGENT_MOOD_BUILTINS.find(b => b.id === "releases");
-  assert.equal(releases.sort, "release");
-  assert.equal(releases.show, "all");
+  assert.equal(releases.sort, "score", "CAS-1491: Latest and Best opens by score");
+  assert.equal(releases.show, "40");
 });
 
 test("CAS-1366 AC2: a never-saved v2 account's Releases (oamMoodsListReal's own fallback) opens in release order", () => {
@@ -96,8 +96,8 @@ test("CAS-1366 AC2: a never-saved v2 account's Releases (oamMoodsListReal's own 
   E.watchMoods.length = 0;   // simulate an account with nothing provisioned yet
   try{
     const releases = E.oamMoodsListReal().find(m => m.id === "releases");
-    assert.equal(releases.sort, "release");
-    assert.equal(releases.show, "all");
+    assert.equal(releases.sort, "score", "CAS-1491: Latest and Best opens by score");
+    assert.equal(releases.show, "40");
   } finally {
     E.watchMoods.length = 0; E.watchMoods.push(...savedMoods);
   }
@@ -176,7 +176,7 @@ function makeFakeClient(row){
 }
 const settle = () => new Promise(r => setTimeout(r, 0));
 
-test("CAS-1366 AC2: a stored Releases mood with sort \"score\" and no releasesSortV is repaired to \"release\" once, with no write on load", async () => {
+test("CAS-1366 AC2: a stored Releases mood with sort \"score\" and no releasesSortV is repaired once (CAS-1491: now on to Latest and Best, score order), with no write on load", async () => {
   const legacyMood = { ...E.oamMoodDefaultFields(), id:"releases", name:"Releases", sort:"score" };
   const client = makeFakeClient({ user_id:"cas1366-test-user", view:{ moods:[legacyMood], mood:"releases" } });
   const auth = E.CascadeAuth;
@@ -185,7 +185,7 @@ test("CAS-1366 AC2: a stored Releases mood with sort \"score\" and no releasesSo
     await E.CascadePersistence.loadUserPrefs();
     await settle();
     const releases = E.watchMoods.find(m => m.id === "releases");
-    assert.equal(releases.sort, "release", "repaired once, in memory");
+    assert.equal(releases.sort, "score", "CAS-1491: the v4 repair settles it on score order, in memory");
     assert.equal(releases.releasesSortV, 1, "marked so a future deliberate Score choice sticks");
     assert.equal(client.rpcCalls.length, 0, "CAS-1218/1243: loading an account must never write anything back");
   } finally {
@@ -216,14 +216,60 @@ test("CAS-1366 AC3: \"Documentary\" is no longer shortened to \"Doco\"", () => {
   assert.equal(E.oneAgentShortName("TV Movie"), "TV movie");
 });
 
-test("CAS-1410: starter All Latest is cinemaOnly + Override 100; cinemaOnly excludes a film with no cinema release", () => {
+test("CAS-1410: starter Latest and Best is Override 20, not cinemaOnly (CAS-1491); cinemaOnly still excludes a film with no cinema release", () => {
   const s = E.oneAgentStarterMoods()[0];
-  assert.equal(s.cinemaOnly, true);
-  assert.equal(s.topShare, 100);
+  assert.equal(s.cinemaOnly, false);
+  assert.equal(s.topShare, 20);
   const c = criteriaWith("Action", 1);
   const noCinema = releaseFilm("Action", { cinema_release:false, cinema_date:null });
   const on = moodWith({ cinemaOnly:true, topShare:100 });
   const off = moodWith({ cinemaOnly:false, topShare:100 });
   assert.equal(E.filmInOneAgentMood(noCinema, on, c), false);
   assert.equal(E.oamFilmMeetsMoodRules(noCinema, off, c), true, "not excluded for the cinema reason when off");
+});
+
+// CAS-1491: All Latest + Best of the best merged into Latest and Best (releasesV:4).
+test("CAS-1491: a releasesV:3 All Latest + a best mood load as Latest and Best, best gone, selection moved, no write", async () => {
+  const old = { ...E.oamMoodDefaultFields(), id:"releases", name:"All Latest", sort:"release", releasesSortV:1, releasesV:3,
+    cinemaOnly:true, years:1, topShare:100, show:"all", ages:["PG","M"], in:[123] };
+  const best = { ...E.oamMoodDefaultFields(), id:"best", name:"Best of the best", topShare:20, show:"40" };
+  const client = makeFakeClient({ user_id:"cas1491-test-user", view:{ moods:[old, best], mood:"best" } });
+  const auth = E.CascadeAuth;
+  auth.enabled = true; auth.client = client; auth.session = { user:{ id:"cas1491-test-user" } };
+  try{
+    await E.CascadePersistence.loadUserPrefs();
+    await settle();
+    const r = E.watchMoods.find(m => m.id === "releases");
+    assert.equal(r.name, "Latest and Best");
+    assert.deepEqual([...r.styles], []);
+    assert.equal(r.topShare, 20); assert.equal(r.show, "40"); assert.equal(r.sort, "score");
+    assert.equal(r.watched, true); assert.equal(r.cinemaOnly, false); assert.equal(r.handOnly, false);
+    assert.equal(r.awards, "any"); assert.equal(r.years, 0); assert.equal(r.svc, null);
+    assert.equal(r.releasesV, 4); assert.equal(r.releasesSortV, 1); assert.equal(r.sortChosen, true);
+    assert.deepEqual([...r.ages], ["PG","M"]);
+    assert.deepEqual([...r.in], [123]);
+    assert.equal(E.watchMoods.some(m => m.id === "best"), false);
+    assert.equal(E.watchMoodSel, "releases");
+    assert.equal(client.rpcCalls.length, 0, "a load must never write");
+  } finally {
+    auth.enabled = false; auth.client = null; auth.session = null;
+  }
+});
+
+test("CAS-1491: the repair is a no-op on a releases record already at releasesV:4", async () => {
+  const cur = { ...E.oamMoodDefaultFields(), id:"releases", name:"My own name", sort:"release", releasesSortV:1, releasesV:4,
+    topShare:50, show:"20", years:2 };
+  const client = makeFakeClient({ user_id:"cas1491-test-user-2", view:{ moods:[cur], mood:"releases" } });
+  const auth = E.CascadeAuth;
+  auth.enabled = true; auth.client = client; auth.session = { user:{ id:"cas1491-test-user-2" } };
+  try{
+    await E.CascadePersistence.loadUserPrefs();
+    await settle();
+    const r = E.watchMoods.find(m => m.id === "releases");
+    assert.equal(r.name, "My own name"); assert.equal(r.topShare, 50); assert.equal(r.years, 2);
+    assert.equal(r.sort, "release"); assert.equal(r.show, "20");
+    assert.equal(client.rpcCalls.length, 0);
+  } finally {
+    auth.enabled = false; auth.client = null; auth.session = null;
+  }
 });

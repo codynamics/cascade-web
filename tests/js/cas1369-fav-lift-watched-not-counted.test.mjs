@@ -1,9 +1,8 @@
 // CAS-1369: a film whose MAIN genre is a ♥ favourite in the agent (c.styles[style].fav) ranks as if its
 // score were OAM_FAV_LIFT (+5) higher — ordering and the Best-N cut only; oamOrderScore is the one
 // chokepoint that applies it, never oneScoreFor/oneScore itself (the score box, "score N+" text,
-// membership and alerts all stay untouched). And a mood with watched:true no longer spends a Best-N slot
-// on a watched film — oamApplyShowCap's own cut now counts only unwatched films against its budget, so
-// "Best 40" lists the 40 best unwatched films plus any watched ones that rank among them. oaFav/oaToggleFav
+// membership and alerts all stay untouched). Lee, 2026-11-20: Best N is now a hard maximum per stage —
+// watched films spend a slot like any other film, and All Latest honours its Show setting too. oaFav/oaToggleFav
 // are the Agent screen's own read/write pair for the ♥ switch (CAS-1368's first run writes the same field).
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -128,49 +127,44 @@ test("the Best-N cut is by the shown score: a ♥ film below every decoy is cut"
 
 // ---- 3. Watched films don't spend a Best-N slot ----------------------------------------------------------
 
-test("CAS-1369 AC2: a Best 40 mood with watched:true lists 50 cards — 40 unwatched plus 10 watched ranked among them", () => {
+// Lee, 2026-11-20: Best N is a hard maximum per stage — watched films spend a slot like any other film.
+test("Best N is a hard maximum: a Best 40 mood with watched:true lists exactly 40, watched films included by score", () => {
   const c = oneAgent({ styles: { Action: styleOn(1, { fav:false }) } });
   const mood = moodWith({ show:"40", watched:true });
-  // 50 films, strictly descending score 99..50 — the top 10 (99..90) are watched, the rest unwatched.
   const films = Array.from({ length:50 }, (_, i) => scoredFilm(["Action"], 99 - i));
   const watchedIds = films.slice(0, 10).map(m => m.tmdb_id);
   withWatched(watchedIds, () => {
     const kept = E.oamApplyShowCap(films, mood, c, new Set());
-    assert.equal(kept.length, 50, "40 unwatched + the 10 watched films ranked among them");
+    assert.equal(kept.length, 40, "never more than 40");
     const keptIds = new Set(kept.map(m => m.tmdb_id));
-    films.forEach(m => assert.ok(keptIds.has(m.tmdb_id)));
+    films.slice(0, 40).forEach(m => assert.ok(keptIds.has(m.tmdb_id), "the 40 best by score, watched or not"));
   });
 });
 
-test("CAS-1369 AC2: a watched film ranked below the cut is still dropped — it's exempt from spending a slot, not from the cut itself", () => {
-  const c = oneAgent({ styles: { Action: styleOn(1, { fav:false }) } });
-  const mood = moodWith({ show:"40", watched:true });
-  // 40 unwatched films (scores 99..60) fill the whole Best-40 budget on their own; one watched film scores
-  // lower than all of them — it never ranks "among" the kept 40, so the cut still drops it.
-  const unwatched = Array.from({ length:40 }, (_, i) => scoredFilm(["Action"], 99 - i));
-  const watchedFilm = scoredFilm(["Action"], 20);
-  withWatched([watchedFilm.tmdb_id], () => {
-    const kept = E.oamApplyShowCap([...unwatched, watchedFilm], mood, c, new Set());
-    const keptIds = new Set(kept.map(m => m.tmdb_id));
-    assert.equal(kept.length, 40);
-    assert.ok(!keptIds.has(watchedFilm.tmdb_id));
-  });
-});
-
-test("CAS-1369 AC2: oamWilRankInMood's rank stays honest to the watched-doesn't-count cut", () => {
-  // 40 unwatched decoys (scores 99,97,...,21) fill a Best 40 mood; a watched film ranks genuinely ahead of
-  // several of them on score but spends no slot (CAS-1369's own rule) — it must not push a genuinely-41st
-  // unwatched film's reported rank to 42.
-  const decoys = Array.from({ length:40 }, (_, i) => scoredFilm(["Action"], 99 - i*2));
-  const target = scoredFilm(["Action"], 20);        // one below the weakest decoy (21) — genuinely 41st
-  const watchedAhead = scoredFilm(["Action"], 50);  // ranks ahead of target, but watched
+test("Best N: oamWilRankInMood counts a watched film ahead of the target", () => {
+  const decoys = Array.from({ length:39 }, (_, i) => scoredFilm(["Action"], 99 - i*2));
+  const target = scoredFilm(["Action"], 20);
+  const watchedAhead = scoredFilm(["Action"], 50);
   const c = oneAgent({ styles: { Action: styleOn(1, { fav:false }) } });
   const mood = moodWith({ show:"40", watched:true });
   withMoviesAndMoods(c, [...decoys, target, watchedAhead], [mood], () => {
     withWatched([watchedAhead.tmdb_id], () => {
-      assert.equal(E.filmInOneAgentMood(target, mood, c), true, "sanity: it still passes the mood's own rules");
-      const r = E.oamWilCase(target, c);
-      assert.match(r.sentence, /ranks 41st, below its best 40/);
+      assert.equal(E.filmInOneAgentMood(target, mood, c), true);
+      assert.match(E.oamWilCase(target, c).sentence, /ranks 41st, below its best 40/);
+    });
+  });
+});
+
+test("All Latest honours its own Show setting: Best 20 shows at most 20 films in a stage", () => {
+  const c = oneAgent({ styles: { Action: styleOn(1, { fav:false }) } });
+  const mood = moodWith({ id:"releases", name:"All Latest", sort:"release", show:"20", years:1, watched:true, cinemaOnly:true, topShare:100 });
+  assert.equal(mood.id, "releases");
+  const films = Array.from({ length:30 }, (_, i) => scoredFilm(["Action"], 99 - i));
+  withMoviesAndMoods(c, films, [mood], () => {
+    withWatched([], () => {
+      const shown = films.filter(m => E.oamFilmShownInMood(m.tmdb_id, mood, c));
+      assert.equal(shown.length, 20);
+      assert.ok(shown.every(m => films.indexOf(m) < 20), "the 20 best by score");
     });
   });
 });

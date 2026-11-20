@@ -105,35 +105,28 @@ test("CAS-1375 AC1: the card capsule reads Rental soon in the Upcoming purple, w
   assert.doesNotMatch(html, /In cinemas/, "AC1: capsule must never read In cinemas");
 });
 
-// ---- AC2: the Best N cut keeps every Rental soon film on top of its N real-rental-offer films -------------
+// ---- Lee, 2026-11-20: Rental soon films compete for the Best N slots like any other Rental film -------------
 
-test("CAS-1375 AC2: a Best 40 mood keeps exactly 40 real-rental-offer films plus every Rental soon film on top", () => {
+test("Best N is a hard maximum on Rental: Rental soon films spend slots by score", () => {
   const c = criteriaWith("Action", 1);
   const mood = moodWith({ show:"40" });
   const rentalRows = Array.from({ length: 50 }, (_, i) => filmWith({ status:["rental"], wm_user_rating: 9 - i*0.01 }));
   const soonRows = Array.from({ length: 5 }, (_, i) => filmWith({ wm_user_rating: 9.9 - i*0.001 }));
   const kept = E.oamApplyShowCap([...soonRows, ...rentalRows], mood, c, new Set());
+  assert.equal(kept.length, 40, "never more than 40");
   const keptIds = new Set(kept.map(m => m.tmdb_id));
-  assert.equal(kept.length, 45, "AC2: must keep 40 real-rental-offer films plus all 5 Rental soon films");
-  soonRows.forEach(m => assert.ok(keptIds.has(m.tmdb_id), "AC2: every Rental soon film must survive the cut"));
-  const keptRentalCount = kept.filter(m => E.primaryStatus(m) === "rental").length;
-  assert.equal(keptRentalCount, 40, "AC2: the cut must still keep exactly 40 real-rental-offer films");
+  soonRows.forEach(m => assert.ok(keptIds.has(m.tmdb_id), "the higher-scoring Rental soon films win slots"));
 });
 
-test("CAS-1375 AC2: Find's rank-in-mood check never counts a Rental soon film as part of the ranked pool", () => {
+test("Best N: Find's rank-in-mood check counts Rental soon films ahead of the target", () => {
   const c = criteriaWith("Action", 1);
   const mood = moodWith({ show:"40" });
-  // 40 real-rental decoys that outscore the target, plus the target itself — genuinely 41st among the
-  // rental-offer films, 1 below the cut — with 5 Rental soon films (higher score than everything) mixed in,
-  // which must never be allowed to shift that rank.
   const rentalOffer = [{ service:"Prime Video", type:"rent", price:6, format:"HD" }];
-  const decoys = Array.from({ length: 40 }, (_, i) => filmWith({ status:["rental"], offers:rentalOffer, wm_user_rating: 9 - i*0.001 }));
+  const decoys = Array.from({ length: 35 }, (_, i) => filmWith({ status:["rental"], offers:rentalOffer, wm_user_rating: 9 - i*0.001 }));
   const target = filmWith({ status:["rental"], offers:rentalOffer, wm_user_rating: 1 });
   const soonRows = Array.from({ length: 5 }, () => filmWith({ wm_user_rating: 9.9 }));
   withMoviesAndMoods(c, [...decoys, target, ...soonRows], [mood], () => {
-    const r = E.oamWilCase(target, c);
-    assert.match(r.sentence, /ranks 41st, below its best 40/,
-      "AC2: Rental soon films must not count as competitors for the real-offer films' own rank");
+    assert.match(E.oamWilCase(target, c).sentence, /ranks 41st, below its best 40/);
   });
 });
 

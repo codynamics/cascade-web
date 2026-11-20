@@ -237,9 +237,16 @@ test("Watch listing scroll position survives a long scroll to the bottom and bac
   // broaden the roster with, so the same condition is set up directly: the one v2 agent is made wide open
   // (every style, bar 0, all three windows on), as the integrity suite's seeded agent is.
   await makeAgentWideOpen(page);
-  // CAS-1247: the default mood (Top scores) now caps each stage at its best 10 — too short to scroll
-  // meaningfully regardless of roster size. Releases carries no such cap, so select it for this scroll test.
-  await page.locator('.moodchip[data-mood="releases"]').click();
+  // Lee, 2026-11-20: every list now honours its own Best N (Latest and Best ships as Best 40 per stage), so
+  // no built-in list is uncapped any more. Push an uncapped test list, save it the way the sheet does
+  // (pushViewField) so a prefs reload can't drop it, and select it.
+  await page.evaluate(() => {
+    const uncapped = { ...oamMoodDefaultFields(), id: "t-cas1036-uncapped", name: "Test",
+      sort: "score", show: "all", watched: true, topShare: 100 };
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), uncapped];
+    pushViewField("moods", watchMoods.map(m => ({ ...m })));
+    window.setWatchMood(uncapped.id);
+  });
   const rendered = await settleListing(page);
   expect(rendered).toBeGreaterThan(15);
 
@@ -1771,7 +1778,8 @@ test("CAS-1296 AC1: the mood sheet's first section is Name, and there is no manu
   // CAS-1425: the v2 (CAS-1341) mood sheet leads with the name input in its .oamhead block; Order is the
   // derived Score / Release date / A-Z choice, never a manual ordering control.
   const firstIsName = await page.locator("#watchSheetBody").evaluate(
-    body => body.firstElementChild?.querySelector("#oamMoodName") != null);
+    // Lee, 2026-11-20 (CAS-1489): a LIST NAME heading now sits above the name block, so Name is still first.
+    body => body.firstElementChild?.classList.contains("oamnamehd") && body.children[1]?.querySelector("#oamMoodName") != null);
   expect(firstIsName).toBe(true);
   const orderLabels = await page.locator('.mfseg[aria-label="Order"] button').evaluateAll(els => els.map(el => el.textContent.trim()));
   expect(orderLabels).toEqual(["Score", "Release date", "A–Z"]);
@@ -1943,7 +1951,9 @@ test(`CAS-1296 AC3: "+ Mood" opens on the agent's genres with every style includ
   await page.evaluate(() => window.openMoodSheetForNew());
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
-  await expect(page.locator('.mtabs [data-mode="genre"]')).toHaveClass(/on/);
+  // Lee, 2026-11-20: no Genre/Keyword switch — a new list opens with Genres live (not greyed) and the name box closed.
+  await expect(page.locator("#oamGenreSec")).not.toHaveClass(/off/);
+  await expect(page.locator("#oamKwSec")).not.toHaveClass(/open/);
   const draft = await page.evaluate(() => ({ stylesAll: oamDraft.stylesAll, mode: oamDraft.mode, watched: oamDraft.watched }));
   expect(draft).toEqual({ stylesAll: true, mode: "genre", watched: true });
   // Nothing the agent has ON sits under "Not in this mood" — only genres the agent has off (oaBar null) do,
@@ -2083,10 +2093,10 @@ test("CAS-1371 AC1: Delete this mood arms visibly red on a touch tap, and a seco
     cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, styles: {}, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [] });
     saveCascades();
     setActive(cascades[0].id);
-    watchMoods = [];   // never provisioned — oamMoodsListReal() falls back to the in-memory builtins
-    watchMoodSel = "best";
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), { ...oamMoodDefaultFields(), id: "extra", name: "Extra" }];   // CAS-1491: the only built-in is pinned, so delete a custom mood
+    watchMoodSel = "extra";
     render();
-    window.openOamMoodSheetFor("best");
+    window.openOamMoodSheetFor("extra");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
@@ -2111,7 +2121,7 @@ test("CAS-1371 AC1: Delete this mood arms visibly red on a touch tap, and a seco
   await tapDelete();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
   const ids = await page.evaluate(() => watchMoods.map(m => m.id));
-  expect(ids).not.toContain("best");
+  expect(ids).not.toContain("extra");
 });
 
 // CAS-1371 AC3: a Position row with Move left/Move right is the reliable fallback for press-and-hold
@@ -2129,21 +2139,21 @@ test("CAS-1371 AC3: Move left / Move right in the mood sheet reorders", async ({
     setActive(cascades[0].id);
     // CAS-1440 dropped Starred from the built-in moods, leaving only All Latest and Best of the best; a third
     // (custom) mood gives the reorder a neighbour to move past.
-    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), { ...oamMoodDefaultFields(), id: "extra", name: "Extra" }];
-    watchMoodSel = "best";
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), { ...oamMoodDefaultFields(), id: "extra", name: "Extra" }, { ...oamMoodDefaultFields(), id: "extra2", name: "Extra 2" }];
+    watchMoodSel = "extra";
     render();
-    window.openOamMoodSheetFor("best");
+    window.openOamMoodSheetFor("extra");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
   const before = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
-  expect(before.indexOf("best")).toBeGreaterThan(0);
+  expect(before.indexOf("extra")).toBeGreaterThan(0);
 
   // CAS-1394: CAS-1391 moved Position inside More filters, which opens collapsed.
-  await page.locator('#watchSheetBody .morebtn').click();
+  await page.locator('#watchSheetBody .morebtn:not(.oamkwopen)').click();
   await page.locator('#watchSheetBody button:has-text("Move right")').click();
   const afterRight = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
-  expect(afterRight.indexOf("best")).toBe(before.indexOf("best") + 1);
+  expect(afterRight.indexOf("extra")).toBe(before.indexOf("extra") + 1);
 
   await page.locator('#watchSheetBody button:has-text("Move left")').click();
   const afterLeft = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
@@ -2151,7 +2161,7 @@ test("CAS-1371 AC3: Move left / Move right in the mood sheet reorders", async ({
 
   // Releases is pinned first in the row and never reorders, so its own sheet gets no Position row.
   await page.evaluate(() => window.openOamMoodSheetFor("releases"));
-  await page.locator('#watchSheetBody .morebtn').click();
+  await page.locator('#watchSheetBody .morebtn:not(.oamkwopen)').click();
   await expect(page.locator('#watchSheetBody .wsheethd:has-text("Position")')).toHaveCount(0);
 });
 
@@ -2399,9 +2409,9 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
     saveCascades();
     setActive(cascades[0].id);
     watchMoods = [];
-    watchMoodSel = "best";
+    watchMoodSel = "releases";
     render();
-    window.openOamMoodSheetFor("best");
+    window.openOamMoodSheetFor("releases");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
@@ -2419,7 +2429,7 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
       stripLeftDiff: Math.abs(rowStrip.left - fStrip.left),
       stripWidthDiff: Math.abs(rowStrip.width - fStrip.width),
       rangeInRow: document.querySelectorAll("#watchSheetBody .oamstylerow input[type=range]").length,
-      headingsInTrack: document.querySelectorAll("#watchSheetBody .mtrack .wsheethd").length,
+      headingsInTrack: document.querySelectorAll("#watchSheetBody .mpanel .wsheethd").length,
     };
   });
   expect(m.rowCount).toBeGreaterThan(0);
@@ -2431,9 +2441,12 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
   expect(m.headingsInTrack).toBe(0);
 
   // AC3: a marker set on the body's own child survives the tap — the sheet is not re-rendered.
+  // Lee, 2026-11-20: "Or find films by name" opens the name box; typing a name greys out Genres and makes it a
+  // keyword list — still without re-rendering the sheet.
   await page.evaluate(() => { document.querySelector("#watchSheetBody .mpanel").dataset.marker = "kept"; });
-  await page.locator('#watchSheetBody .mtabs button[data-mode="keyword"]').click();
-  await expect(page.locator("#watchSheetBody .mtrack")).toHaveClass(/kw/);
+  await page.locator("#oamKwSec .oamkwopen").click();
+  await page.locator("#oamKwInput").fill("Tom Cruise");
+  await expect(page.locator("#oamGenreSec")).toHaveClass(/off/);
   const after = await page.evaluate(() => ({
     marker: document.querySelector("#watchSheetBody .mpanel").dataset.marker,
     mode: oamDraft.mode,
@@ -2461,12 +2474,12 @@ test("CAS-1403: Any service chip lists films beyond my services and clears when 
     prefs.sub = new Set([SUB_SERVICES[0]]);
     prefs.on = true;
     watchMoods = [];
-    watchMoodSel = "best";
+    watchMoodSel = "releases";
     // The my-services gate only bites films with streaming offers, so count on the Stream tab; the default
     // Cinema tab's films carry no offers and read the same with or without Any service.
     watchTab = "stream";
     render();
-    window.openOamMoodSheetFor("best");
+    window.openOamMoodSheetFor("releases");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
@@ -2487,7 +2500,7 @@ test("CAS-1403: Any service chip lists films beyond my services and clears when 
   const after = await countPool();
   expect(after).toBeGreaterThan(before);
 
-  await page.evaluate(() => window.openOamMoodSheetFor("best"));
+  await page.evaluate(() => window.openOamMoodSheetFor("releases"));
   await page.locator("#watchSheetBody .chip[onclick^=\"setOamDraftSvc('\"]").first().click();
   expect(await page.evaluate(() => oamDraft.anySvc)).toBe(false);
   expect(await page.evaluate(() => !!oamDraft.svc)).toBe(true);
@@ -2510,7 +2523,7 @@ test("CAS-1414: a starred film leads the mood list and survives a Best 20 cut", 
     prefs.sub = new Set(SUB_SERVICES);   // Stream-tab films only list on a service the user has
     prefs.on = true;
     watchMoods = [];
-    watchMoodSel = "best";
+    watchMoodSel = "releases";
     watchTab = "stream";
     starredIds.clear();
     render();

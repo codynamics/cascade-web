@@ -50,12 +50,20 @@ test("CAS-1400 AC1: mode absent defaults to keyword when people is set, else gen
   assert.equal(E.filmInOneAgentMood(dramaCruise, moodWith({ people:"" }), c), false);
 });
 
-test("CAS-1400: the draft carries mode and Save's mood shape stores it; the people text survives a genre save", () => {
+// Lee, 2026-11-20 (replaces "people survives a genre save"): the name box decides the mode. A draft with a name
+// saves as keyword; an empty box saves as genre; a genre list opens with an empty box, so no ignored keyword lingers.
+test("Lee 2026-11-20: Save's mode comes from the name box; a genre list's draft carries no leftover keyword", () => {
   const withPeople = E.oamMoodDraftFrom({ ...moodWith({ people:"Tom Cruise" }) });
   assert.equal(withPeople.mode, "keyword");
   assert.equal(E.oamMoodDraftFrom(null).mode, "genre");
-  withPeople.mode = "genre";
-  const saved = E.oamMoodFromDraft(withPeople);
-  assert.equal(saved.mode, "genre");
-  assert.equal(saved.people, "Tom Cruise", "people stays stored so switching back restores it");
+  const kept = E.oamMoodFromDraft(withPeople);
+  assert.equal(kept.mode, "keyword");
+  assert.equal(kept.people, "Tom Cruise");
+  withPeople.people = "";
+  const cleared = E.oamMoodFromDraft(withPeople);
+  assert.equal(cleared.mode, "genre");
+  assert.equal(cleared.people, "");
+  const genreWithLeftover = E.oamMoodDraftFrom({ ...moodWith({ mode:"genre", people:"Adam Sandler" }) });
+  assert.equal(genreWithLeftover.mode, "genre");
+  assert.equal(genreWithLeftover.people, "");
 });

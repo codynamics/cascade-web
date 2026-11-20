@@ -95,6 +95,9 @@ test("AC2: a reconcile that changes nothing on the server calls render() zero ti
 // any reconcile pass would trigger: the mechanism under test lives in render() itself, not in how a caller
 // got there.
 test("AC3: a film that newly belongs on Streaming never appears, moves a card, or changes a count until the next navigation", async ({ page }) => {
+  // Lee, 2026-11-20: the uncapped test list now really is in effect (CAS-1495), so the wide-open agent lists the
+  // whole Streaming catalogue and the settle after the navigation below no longer fits the 90s default.
+  test.setTimeout(240_000);
   const email = testEmail("cas1236-ac3");
   const user = await createTestUser(email);
   const agent = await seedWideOpenAgent(user.id);
@@ -124,7 +127,10 @@ test("AC3: a film that newly belongs on Streaming never appears, moves a card, o
     // (cinema_date null) can never satisfy. Push an uncapped v2 mood instead: every on genre, no cinema filter.
     const uncappedMood = { ...oamMoodDefaultFields(), id: "t-cas1236-ac3-uncapped", name: "Test",
       sort: "score", show: "all", watched: true, topShare: 100 };
-    watchMoods.push(uncappedMood);
+    // Lee, 2026-11-20: saved the way the sheet saves (pushViewField) and built from the account's own list,
+    // so a prefs reload can't drop it and fall back to Latest and Best, whose Best 40 cap pins the count.
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), uncappedMood];
+    pushViewField("moods", watchMoods.map(m => ({ ...m })));
     window.setWatchMood(uncappedMood.id);
   });
   await settleListing(page);
