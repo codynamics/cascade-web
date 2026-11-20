@@ -3671,9 +3671,7 @@
   .agovhd + .mfbox{margin:4px 0 8px;border-top:0;border-bottom:1px solid var(--line);padding:4px 4px 10px}
   /* Lee, 2026-11-17: the level switch sits under the genre rows, full width. */
   .oamlvl{margin:2px 0 10px;padding-bottom:10px;border-bottom:1px solid var(--line)}
-  .oamlvlhd{font:800 11px/1 var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin:0 2px 8px}
-  .agovseg.lvl2{grid-column:auto;width:100%}
-  .agovseg.lvl2 button{padding:8px 0;font-size:12.5px}
+  .oamlvlhd{margin:0 0 6px}   /* also .subhd — same look as SHOW / ORDER */
   .oamlvlnote{margin:8px 2px 0}
   .oamlvl .mfbox{margin:8px 0 0;border-top:0;padding:4px 4px 0}
   .mfrowgrid{align-items:center}
@@ -3695,19 +3693,10 @@
   .mfscale{padding:0 0 3px}
   .mfscale span{grid-column:2;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;text-align:center;font-size:9px;font-weight:700;color:var(--faint)}
   .mfscale span i{font-style:normal}
-  /* CAS-1400: Genre | Keyword tabs joined to a bordered panel; the track slides, the sheet never re-renders. */
-  .mtabs{display:flex;position:relative;z-index:1}
-  .mtabs button{flex:1;border:1px solid var(--line);border-bottom:0;background:transparent;color:var(--faint);font:inherit;font-size:13.5px;font-weight:800;padding:11px 0;border-radius:12px 12px 0 0;cursor:pointer;transition:color .2s,background .2s}
-  .mtabs button+button{margin-left:-1px}
-  .mtabs button.on{background:var(--panel2);color:var(--ink);border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
-  .mtabs button:not(.on){border-color:transparent;border-bottom:1px solid color-mix(in srgb,var(--accent) 55%,var(--line))}
-  /* Lee, 2026-11-20: Genre / Keyword is a single either/or switch (same look as My taste / Override), not tabs —
-     the panel under it is a plain rounded box. */
-  .oamfindhd{margin:2px 2px 8px}
-  .mtabs{background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px}
-  .mtabs button,.mtabs button.on,.mtabs button:not(.on){border:0!important;border-radius:999px;padding:8px 0;font-size:13px;margin:0}
-  .mtabs button.on{background:var(--accent);color:#fff}
-  .oammodenote{margin:8px 2px 12px}
+  /* Lee, 2026-11-20: ONE control type for every either/or in the list sheet — the .mfseg row used by Show and
+     Order. Find films by (Genre | Keyword) and Genre levels (My taste | Override) use it too; headings use the
+     sheet's own section / sub-heading styles. The panel below slides between the two modes (CAS-1400). */
+  .mtabs.mfseg{margin-bottom:12px}
   .mpanel{border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden;transition:height .3s ease;margin-bottom:22px}
   .mtrack{display:flex;width:200%;align-items:flex-start;transition:transform .32s cubic-bezier(.4,0,.2,1)}
   .mtrack>section{flex:0 0 50%;box-sizing:border-box;padding:12px 6px 8px;margin:0;min-width:0}
@@ -21586,19 +21575,14 @@ function oamSizeMoodPanel(animate){
   panel.style.height=sec.offsetHeight+"px";
   if(!animate){ void panel.offsetHeight; panel.style.transition=""; }
 }
-function oamModeNoteText(kw){
-  return kw ? "Every film with this name or word. Your Taste and genre settings aren't used."
-            : "Your ticked genres at their Taste levels. A keyword isn't used.";
-}
 function oamApplyModeToDOM(animate){
   const body=$("watchSheetBody"); if(!body || !oamDraft) return;
   const kw=oamDraft.mode==="keyword";
-  const note=$("oamModeNote"); if(note) note.textContent=oamModeNoteText(kw);
   const track=body.querySelector(".mtrack");
   if(track) track.classList.toggle("kw", kw);
   body.querySelectorAll(".mtabs button").forEach(b=>{
     const on=(b.dataset.mode==="keyword")===kw;
-    b.classList.toggle("on", on); b.setAttribute("aria-selected", on);
+    b.classList.toggle("on", on); b.setAttribute("aria-checked", on);
   });
   const secs=track ? track.children : [];
   if(secs[0]){ secs[0].setAttribute("aria-hidden", kw); secs[0].inert=kw; }
@@ -21819,27 +21803,27 @@ function renderOamMoodSheetBody(){
     ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
     <!-- Lee, 2026-11-20: Genre and Keyword are EITHER/OR — the tabs read as two things you could both set, so
          they are now one switch ("Find films by") with a line saying what the chosen one uses. -->
-    <div class="oamlvlhd oamfindhd">Find films by</div>
-    <div class="mtabs" role="tablist">
-      <button type="button" role="tab" data-mode="genre" class="${kwMode?"":"on"}" aria-selected="${!kwMode}" onclick="setOamDraftMode('genre')">Genre</button>
-      <button type="button" role="tab" data-mode="keyword" class="${kwMode?"on":""}" aria-selected="${kwMode}" onclick="setOamDraftMode('keyword')">Keyword</button>
+    <div class="wsheetsec mainsec oamfindsec">
+      <div class="wsheethd"><span>FIND FILMS BY</span></div>
+      <div class="mfseg mtabs" role="radiogroup" aria-label="Find films by">
+        <button type="button" role="radio" data-mode="genre" class="${kwMode?"":"on"}" aria-checked="${!kwMode}" onclick="setOamDraftMode('genre')">Genre</button>
+        <button type="button" role="radio" data-mode="keyword" class="${kwMode?"on":""}" aria-checked="${kwMode}" onclick="setOamDraftMode('keyword')">Keyword</button>
+      </div>
     </div>
-    <p class="oamgenreintro oammodenote" id="oamModeNote">${oamModeNoteText(kwMode)}</p>
     <div class="mpanel">
       <div class="mtrack${kwMode?" kw":""}">
         <section class="mgenre" aria-hidden="${kwMode}">
           <!-- Lee, 2026-11-20: the My taste / Override switch is back at the top, above the override slider and the
                genre rows (it sat under the rows from 2026-11-17). The agent's levels always show. -->
           <div class="oamlvl">
-            <div class="oamlvlhd">Genre levels</div>
-            <div class="agovseg lvl2" role="radiogroup" aria-label="Genre levels">
+            <div class="subhd oamlvlhd">Genre levels</div>
+            <div class="mfseg oamlvlseg" role="radiogroup" aria-label="Genre levels">
               <button type="button" role="radio" class="${d.topShare==null?"on":""}" aria-checked="${d.topShare==null}" onclick="setOamAgentOverride(false)">My taste</button>
               <button type="button" role="radio" class="${d.topShare!=null?"on":""}" aria-checked="${d.topShare!=null}" onclick="setOamAgentOverride(true)">Override</button>
             </div>
-            <p class="oamgenreintro oamlvlnote">${d.topShare==null ? "Each genre uses the level set for it in Taste." : "Every genre in this list uses the level below."}</p>
             ${oamOverrideFilterHTML(d)}
           </div>
-          <p class="oamgenreintro">Tick the genres for this list.</p>
+          <div class="subhd">Genres</div>
           <div class="oalist">
             ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
           </div>
@@ -21853,7 +21837,7 @@ function renderOamMoodSheetBody(){
         <section class="mkeyword" aria-hidden="${!kwMode}">
           <input class="search" type="text" enterkeyhint="done" placeholder="e.g. Tom Cruise, Russo"
             value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
-          <p class="oamgenreintro">Title, actor or director. Commas combine — every part must match. Every matching film shows, whatever your agent's genres.</p>
+          <p class="oamgenreintro">Title, actor or director. Commas combine — every part must match.</p>
         </section>
       </div>
     </div>
@@ -25614,7 +25598,7 @@ const TOURS = {
     // Lee, 2026-11-17: the Agent settings / Agent override switch sits under the genre rows.
     {html:TUT_P("Sometimes you want just the best of the best.",
       "Under the genres, choose <b>Override</b> to set one level for every genre in this list, in place of your taste settings."),
-      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .agovseg"]},
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .oamlvlseg"]},
     // The "during account setup" lines only appear when that setup mood exists (Lee, 16 Nov).
     {get html(){ return TUT_P("Instead of building a list around genres, you can use a keyword search around an actor, director or title.",
       ...(watchMoods.some(m=>m.id==="fav-person") ? ["During account setup, we set up a list with your favourite actor or director to show you how this is done."] : [])); },
