@@ -1771,7 +1771,8 @@ test("CAS-1296 AC1: the mood sheet's first section is Name, and there is no manu
   // CAS-1425: the v2 (CAS-1341) mood sheet leads with the name input in its .oamhead block; Order is the
   // derived Score / Release date / A-Z choice, never a manual ordering control.
   const firstIsName = await page.locator("#watchSheetBody").evaluate(
-    body => body.firstElementChild?.querySelector("#oamMoodName") != null);
+    // Lee, 2026-11-20 (CAS-1489): a LIST NAME heading now sits above the name block, so Name is still first.
+    body => body.firstElementChild?.classList.contains("oamnamehd") && body.children[1]?.querySelector("#oamMoodName") != null);
   expect(firstIsName).toBe(true);
   const orderLabels = await page.locator('.mfseg[aria-label="Order"] button').evaluateAll(els => els.map(el => el.textContent.trim()));
   expect(orderLabels).toEqual(["Score", "Release date", "A–Z"]);
