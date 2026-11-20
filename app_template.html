@@ -3701,7 +3701,14 @@
   .mtabs button+button{margin-left:-1px}
   .mtabs button.on{background:var(--panel2);color:var(--ink);border-color:color-mix(in srgb,var(--accent) 55%,var(--line))}
   .mtabs button:not(.on){border-color:transparent;border-bottom:1px solid color-mix(in srgb,var(--accent) 55%,var(--line))}
-  .mpanel{border:1px solid color-mix(in srgb,var(--accent) 55%,var(--line));border-top:0;border-radius:0 0 12px 12px;background:var(--panel2);overflow:hidden;transition:height .3s ease;margin-bottom:22px}
+  /* Lee, 2026-11-20: Genre / Keyword is a single either/or switch (same look as My taste / Override), not tabs —
+     the panel under it is a plain rounded box. */
+  .oamfindhd{margin:2px 2px 8px}
+  .mtabs{background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:2px}
+  .mtabs button,.mtabs button.on,.mtabs button:not(.on){border:0!important;border-radius:999px;padding:8px 0;font-size:13px;margin:0}
+  .mtabs button.on{background:var(--accent);color:#fff}
+  .oammodenote{margin:8px 2px 12px}
+  .mpanel{border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow:hidden;transition:height .3s ease;margin-bottom:22px}
   .mtrack{display:flex;width:200%;align-items:flex-start;transition:transform .32s cubic-bezier(.4,0,.2,1)}
   .mtrack>section{flex:0 0 50%;box-sizing:border-box;padding:12px 6px 8px;margin:0;min-width:0}
   .mtrack.kw{transform:translateX(-50%)}
@@ -21579,9 +21586,14 @@ function oamSizeMoodPanel(animate){
   panel.style.height=sec.offsetHeight+"px";
   if(!animate){ void panel.offsetHeight; panel.style.transition=""; }
 }
+function oamModeNoteText(kw){
+  return kw ? "Every film with this name or word. Your Taste and genre settings aren't used."
+            : "Your ticked genres at their Taste levels. A keyword isn't used.";
+}
 function oamApplyModeToDOM(animate){
   const body=$("watchSheetBody"); if(!body || !oamDraft) return;
   const kw=oamDraft.mode==="keyword";
+  const note=$("oamModeNote"); if(note) note.textContent=oamModeNoteText(kw);
   const track=body.querySelector(".mtrack");
   if(track) track.classList.toggle("kw", kw);
   body.querySelectorAll(".mtabs button").forEach(b=>{
@@ -21805,10 +21817,14 @@ function renderOamMoodSheetBody(){
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
     ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
+    <!-- Lee, 2026-11-20: Genre and Keyword are EITHER/OR — the tabs read as two things you could both set, so
+         they are now one switch ("Find films by") with a line saying what the chosen one uses. -->
+    <div class="oamlvlhd oamfindhd">Find films by</div>
     <div class="mtabs" role="tablist">
       <button type="button" role="tab" data-mode="genre" class="${kwMode?"":"on"}" aria-selected="${!kwMode}" onclick="setOamDraftMode('genre')">Genre</button>
       <button type="button" role="tab" data-mode="keyword" class="${kwMode?"on":""}" aria-selected="${kwMode}" onclick="setOamDraftMode('keyword')">Keyword</button>
     </div>
+    <p class="oamgenreintro oammodenote" id="oamModeNote">${oamModeNoteText(kwMode)}</p>
     <div class="mpanel">
       <div class="mtrack${kwMode?" kw":""}">
         <section class="mgenre" aria-hidden="${kwMode}">
