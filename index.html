@@ -7135,6 +7135,9 @@ function matchesServices(m, w){
   // changing their real services, which defeats the harness. Isolation from genuine agent matching (CAS-486)
   // is untouched — this only lifts the SERVICES filter, never the taste/criteria one.
   if(m._fixture) return true;
+  // CAS-1508: cinema windows are never service-scoped (2026-09-08 rule), even when the film already carries a
+  // PVOD offer — no offer can belong to in_cinema/upcoming, so the window check below would always reject it.
+  if(w==="in_cinema" || w==="upcoming" || w==="opening_week") return true;
   const o=m.offers||[];
   if(!o.length) return true;                 // in cinema / upcoming — always visible
   // CAS-342: scoped to a specific window, "on your services" has to mean an offer that actually BELONGS to
