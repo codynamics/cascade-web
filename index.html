@@ -3748,6 +3748,26 @@
     color:var(--dim);font-size:10.5px;letter-spacing:.04em;vertical-align:1px}
   /* Lee, 2026-11-21: PRIMARY SEARCH — one box holding the genre levels and, under them, the name box. */
   .oamprimbox{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:0 0 12px}
+  /* Lee, 2026-11-22: collapsible sections (mockup list-sheet-collapsed-mockup.png) — each a bordered card whose
+     header names the section, says what is set, and carries a purple dot (+ purple edge) when changed from default. */
+  #watchSheetBody .oamsec{border:1px solid var(--line);background:var(--panel);border-radius:14px;margin:0 0 10px;padding:0;overflow:hidden}
+  #watchSheetBody .oamsec.set{border-color:rgba(124,92,255,.55)}
+  .oamsechd{display:flex;align-items:center;gap:12px;width:100%;padding:14px;background:none;border:0;color:var(--ink);
+    text-align:left;cursor:pointer;font:inherit}
+  .oamsechd .oamsect{flex:1;min-width:0}
+  .oamsechd .wsheethd{margin:0;padding:0;border:0}
+  .oamsechd .wsheethd>span:first-child{font-size:13.5px;font-weight:800;letter-spacing:.06em;color:var(--ink)}
+  .oamsecsum{display:block;font-style:normal;font-size:13px;color:var(--dim);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .oamsec.set .oamsecsum{color:#cfc4ff}
+  .oamsecdot{flex:none;width:9px;height:9px;border-radius:50%;border:1.5px solid var(--faint)}
+  .oamsec.set .oamsecdot{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,92,255,.25)}
+  .oamsecchev{flex:none;color:var(--dim);font-size:22px;line-height:1;transform:rotate(90deg);transition:transform .2s ease}
+  .oamsec.open .oamsecchev{transform:rotate(-90deg)}
+  .oamsecbody{display:none;border-top:1px solid var(--line);padding:12px 12px 14px}
+  .oamsec.open .oamsecbody{display:block}
+  .oamsecbody .morebody{margin:0;padding:0;border:0}
+  .oamsechd.morebtn{margin:0;border:0;border-radius:0;background:none;justify-content:flex-start;font-size:inherit;
+    font-weight:inherit;letter-spacing:normal;text-transform:none;padding:14px}
   .oamprimbox>.mpanel{border:0;background:none;margin:0}
   .oamprimbox>.oamkwsec{margin:4px 12px 0;padding-top:12px;border-top:1px solid var(--line)}
   .oamprimbox .oamkwhd{margin:0 0 8px}
@@ -21551,7 +21571,7 @@ window.openOamMoodSheetFor=id=>{
   oamDraft=oamMoodDraftFrom(mood);
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  oamNotInMoodOpen=false; oamMoreFiltersOpen=false;
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set();
   openWatchSheet();
 };
 window.openOamMoodSheetForNew=()=>{
@@ -21559,7 +21579,7 @@ window.openOamMoodSheetForNew=()=>{
   oamDraft=oamMoodDraftFrom(null);
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  oamNotInMoodOpen=false; oamMoreFiltersOpen=false;
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set();
   openWatchSheet();
 };
 // CAS-1395: the new-mood draft's own people/svc/name/watched fields, built from Find's current search and
@@ -21606,7 +21626,7 @@ window.openOamMoodSheetFromFind=()=>{
   oamDraft.fromFind={total, label:fields.name};
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  oamNotInMoodOpen=false; oamMoreFiltersOpen=false;
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set();
   openWatchSheet();
   logEvent("mood_from_find");
 };
@@ -21659,6 +21679,7 @@ function oamApplyModeToDOM(){
   if(gen) gen.classList.toggle("off", kw);
   if(panel){ panel.inert=kw; panel.setAttribute("aria-disabled", kw); }
   const kws=$("oamKwSec"); if(kws) kws.classList.toggle("open", kw || !!d.kwOpen);
+  oamRefreshSecSummaries();   // Lee, 2026-11-22: typing a name updates PRIMARY SEARCH's header line
 }
 // Every other saved mood that would ALSO list this style — "also in <names>" under a style row.
 function oamStylesAlsoIn(style, excludeId){
@@ -21774,7 +21795,7 @@ let oamTasteReturn=null;
 window.oamOpenTasteFromList=()=>{
   const d=oamDraft; if(!d) return;
   const body=$("watchSheetBody");
-  const parked={draft:d, scroll: body ? body.scrollTop : 0};
+  const parked={draft:d, scroll: body ? body.scrollTop : 0, secs:new Set(oamSecOpen), notIn:oamNotInMoodOpen};
   closeWatchSheet();
   openAgentsScreen();
   oamTasteReturn=parked;
@@ -21787,6 +21808,7 @@ window.oamBackToListFromTaste=()=>{
   render();
   oamDraft=r.draft;
   oamFreezeMoodRowOrder();   // Taste may have switched a genre on or off
+  oamSecOpen=new Set(r.secs||[]); oamNotInMoodOpen=!!r.notIn;   // Lee, 2026-11-22: same sections open as when you left
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
   openWatchSheet();
   const body=$("watchSheetBody"); if(body) body.scrollTop=r.scroll;
@@ -21885,6 +21907,51 @@ const OAM_SHOW_N={"20":20,"40":40,"60":60,"80":80};
 const OAM_SORT_OPTS=[["score","Score"],["release","Release date"],["title","A–Z"]];
 // CAS-1391: More filters' own "N set" count — exactly the five fields the ticket names, each worth one
 // regardless of magnitude (an age-ratings chip ticked twice is still "1 set", same as every other chip group).
+// Lee, 2026-11-22: the list sheet's collapsible sections. Fresh on every sheet open; kept across a Taste trip.
+let oamSecOpen=new Set();
+window.oamToggleSec=key=>{
+  if(oamSecOpen.has(key)) oamSecOpen.delete(key); else oamSecOpen.add(key);
+  const el=document.querySelector(`#watchSheetBody .oamsec[data-sec="${key}"]`);
+  if(el){ const open=oamSecOpen.has(key); el.classList.toggle("open", open);
+    const hd=el.querySelector(".oamsechd"); if(hd) hd.setAttribute("aria-expanded", String(open)); }
+};
+// One line per section header saying what is set; `set` = changed from a new list's default (purple dot).
+function oamSecSummaries(d, c, posList, posIdx){
+  const lbl=(opts,k)=>{ const o=opts.find(([kk])=>kk===k); return o?o[1]:String(k); };
+  const kw = d.mode==="keyword" && (d.people||"").trim();
+  const nGen = ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null && (d.stylesAll || d.styles.has(g))).length;
+  const primary = kw
+    ? {text:`Finding by name: ${d.people.trim()}`, set:true}
+    : {text:`${nGen} genre${nGen===1?"":"s"} · ${d.topShare==null?"My taste":`Override, top ${d.topShare}%`}`,
+       set: d.topShare!=null || !d.stylesAll};
+  const svc = d.svc ? {text:`${oamSvcChipLabel(d.svc)} only`, set:true}
+    : d.anySvc ? {text:"Any service", set:true}
+    : {text: prefs.on ? "My services" : "All services", set:false};
+  const how = {text:`${lbl(OAM_SHOW_OPTS, d.show)} · ${d.sort==="score"?"By score":lbl(OAM_SORT_OPTS, d.sort)}`, set: d.show!=="all"};
+  const parts=[];
+  if(d.ages.size) parts.push(`Ages ${[...d.ages].join(", ")}`);
+  if(d.awards!=="any") parts.push(lbl(OAM_AWARDS_OPTS, d.awards));
+  if(d.years) parts.push(`Last ${d.years} yr${d.years===1?"":"s"}`);
+  if(d.cinemaOnly) parts.push("Cinema releases only");
+  if(d.handOnly) parts.push("Hand-picked only");
+  if(d.watched) parts.push("Includes watched");
+  const n=oamMoreFiltersCount(d);
+  const more = {text: n ? `${n} set · ${parts.join(" · ")}` : "None set", set: n>0};
+  const pos = posIdx>=0 ? {text:`${oamOrdinal(posIdx+1)} of ${posList.length}`, set:false} : {text:"", set:false};
+  return {primary, svc, how, more, pos};
+}
+// Refreshes every header line in place — for edits that don't re-render the sheet (typing a name, ticking a genre).
+function oamRefreshSecSummaries(){
+  const d=oamDraft, c=oneAgentCriteria(); if(!d || !c) return;
+  const posList=oamMoodsListReal().filter(m=>m.id!=="releases");
+  const posIdx=d.editingId ? posList.findIndex(m=>m.id===d.editingId) : -1;
+  const sum=oamSecSummaries(d, c, posList, posIdx);
+  document.querySelectorAll("#watchSheetBody .oamsec").forEach(el=>{
+    const sm=sum[el.dataset.sec]; if(!sm) return;
+    el.classList.toggle("set", sm.set);
+    const t=el.querySelector(".oamsecsum"); if(t) t.textContent=sm.text;
+  });
+}
 function oamMoreFiltersCount(d){
   let n=0;
   if(d.handOnly) n++;
@@ -21912,7 +21979,21 @@ function renderOamMoodSheetBody(){
       ${opts.map(([k,l])=>{ const on=cur===k; return `<button type="button" aria-pressed="${on}" class="${on?"on":""}"
         onclick="${setter}(${typeof k==="number"?k:`'${k}'`})">${esc(l)}</button>`; }).join("")}
     </div>`;
-  const moreN=oamMoreFiltersCount(d);
+  // Lee, 2026-11-22: every major section opens CLOSED; its header says what is set (purple dot + line when changed
+  // from the default). Opening/closing a section toggles a class only — no re-render — and which ones are open
+  // (oamSecOpen) survives a trip to Taste and back, so the sheet comes back exactly as it was left.
+  const sum=oamSecSummaries(d, c, posList, posIdx);
+  const sec=(key, id, title, inner, extraCls="", hdCls="")=>{
+    const open=oamSecOpen.has(key), sm=sum[key]||{text:"",set:false};
+    return `<div class="wsheetsec mainsec oamsec${open?" open":""}${sm.set?" set":""}${extraCls}" id="${id}" data-sec="${key}">
+      <button type="button" class="oamsechd${hdCls}" aria-expanded="${open}" onclick="oamToggleSec('${key}')">
+        <span class="oamsecdot" aria-hidden="true"></span>
+        <span class="oamsect"><span class="wsheethd"><span>${title}</span></span><i class="oamsecsum">${esc(sm.text)}</i></span>
+        <span class="oamsecchev" aria-hidden="true">&rsaquo;</span>
+      </button>
+      <div class="oamsecbody">${inner}</div>
+    </div>`;
+  };
   const body=$("watchSheetBody");
   if(body) body.innerHTML=`
     <div class="wsheethd oamnamehd"><span>LIST NAME</span></div>
@@ -21922,10 +22003,7 @@ function renderOamMoodSheetBody(){
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
     ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
-    <div class="wsheetsec mainsec oamgensec oamprimary${kwMode?" off":""}" id="oamGenreSec">
-      <!-- Lee, 2026-11-21: one PRIMARY SEARCH box — genre levels, then "Or find films by name" (always open).
-           A name in the box greys out the genres; clearing it brings them back. -->
-      <div class="wsheethd"><span>PRIMARY SEARCH</span><span class="oamoff">GENRES OFF · FINDING BY NAME</span></div>
+    ${sec("primary", "oamGenreSec", "PRIMARY SEARCH", `
       <div class="oamprimbox">
       <div class="mpanel">
         <section class="mgenre">
@@ -21958,10 +22036,8 @@ function renderOamMoodSheetBody(){
           value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
         <p class="oamgenreintro">A name here switches genres off; clear it to use genres again. Commas combine — every part must match.</p>
       </div>
-      </div>
-    </div>
-    ${(!d.handOnly && prefs.sub.size) ? `<div class="wsheetsec mainsec" id="oamSvcSec">
-      <div class="wsheethd"><span>STREAMING ON</span></div>
+      </div>`, ` oamgensec oamprimary${kwMode?" off":""}`)}
+    ${(!d.handOnly && prefs.sub.size) ? sec("svc", "oamSvcSec", "STREAMING ON", `
       <div class="chips">
         ${prefs.on ? `<button type="button" class="chip${(d.svc||d.anySvc)?"":" on"}" aria-pressed="${!d.svc&&!d.anySvc}" onclick="setOamDraftSvc(null)">My services</button>
         <button type="button" class="chip${d.anySvc?" on":""}" aria-pressed="${!!d.anySvc}" onclick="setOamDraftAnySvc()">Any service</button>`
@@ -21969,20 +22045,13 @@ function renderOamMoodSheetBody(){
         ${SUB_SERVICES.filter(s=>prefs.sub.has(s)).map(s=>{ const on=d.svc===s; return `<button type="button" class="chip${on?" on":""}"
           aria-pressed="${on}" onclick="setOamDraftSvc('${escA(s)}')">${esc(oamSvcChipLabel(s))}</button>`; }).join("")}
       </div>
-      <p class="oamgenreintro">${prefs.on ? "Any service also lists films on services you don't have. " : ""}Pick one service to see only what's included on it. Cinema and Rental stay empty while a service is picked.</p>
-    </div>` : ""}
-    <div class="wsheetsec mainsec" id="oamHowSec">
-      <div class="wsheethd"><span>HOW MANY, AND IN WHAT ORDER</span></div>
+      <p class="oamgenreintro">${prefs.on ? "Any service also lists films on services you don't have. " : ""}Pick one service to see only what's included on it. Cinema and Rental stay empty while a service is picked.</p>`) : ""}
+    ${sec("how", "oamHowSec", "HOW MANY, AND IN WHAT ORDER", `
       <div class="subhd">SHOW</div>
       ${seg(OAM_SHOW_OPTS, d.show, "setOamDraftShow", "Show")}
       <div class="subhd">ORDER</div>
-      ${seg(OAM_SORT_OPTS, d.sort, "setOamDraftSort", "Order")}
-    </div>
-    <button type="button" class="morebtn${oamMoreFiltersOpen?" open":""}" onclick="toggleOamMoreFilters()" aria-expanded="${oamMoreFiltersOpen}">
-      <span>MORE FILTERS${moreN?`<span class="set">${moreN} set</span>`:""}</span>
-      <span aria-hidden="true">${oamMoreFiltersOpen?"&#8963;":"&#8964;"}</span>
-    </button>
-    ${oamMoreFiltersOpen ? `<div class="morebody">
+      ${seg(OAM_SORT_OPTS, d.sort, "setOamDraftSort", "Order")}`)}
+    ${sec("more", "oamMoreSec", "MORE FILTERS", `<div class="morebody">
       <div class="wsheetsec">
         <div class="wsheethd"><span>WHO'S WATCHING: AGE RATINGS</span></div>
         <div class="chips">${OAM_AGE_OPTS.map(a=>{ const on=d.ages.has(a); return `<button type="button" class="chip${on?" on":""}"
@@ -22013,14 +22082,12 @@ function renderOamMoodSheetBody(){
         <div class="chips">${OAM_YEARS_OPTS.map(([k,l])=>{ const on=d.years===k; return `<button type="button" class="chip${on?" on":""}"
           aria-pressed="${on}" onclick="setOamDraftYears(${k})">${esc(l)}</button>`; }).join("")}</div>
       </div>
-      ${posIdx>=0 ? `<div class="wsheetsec">
-        <div class="wsheethd"><span>Position in your list row</span></div>
+    </div>`, "", " morebtn")}
+    ${posIdx>=0 ? sec("pos", "oamPosSec", "POSITION IN YOUR LIST ROW", `
         <div class="mfseg" role="group" aria-label="Position">
           <button type="button" ${posIdx<=0?"disabled":""} onclick="oamMoveMood(-1)">&lsaquo; Move left</button>
           <button type="button" ${posIdx>=posList.length-1?"disabled":""} onclick="oamMoveMood(1)">Move right &rsaquo;</button>
-        </div>
-      </div>` : ""}
-    </div>` : ""}`;
+        </div>`) : ""}`;
   if(d.topShare!=null) oamDrawFilterLines(d, c, d.topShare);
   oamApplyModeToDOM();   // Lee, 2026-11-20: a keyword list opens with Genres greyed and the name box open
   const delBtn=$("moodDeleteBtn");
@@ -25851,8 +25918,9 @@ function tutMoodsTourMoodId(){
   return (ms.find(m=>m.id==="me") || ms.find(m=>m.id!=="releases") || ms[0] || {}).id;
 }
 function tutOpenMoodsTourSheet(){
-  if(document.getElementById("watchSheet").classList.contains("open")) return;
-  openOamMoodSheetFor(tutMoodsTourMoodId());
+  if(!document.getElementById("watchSheet").classList.contains("open")) openOamMoodSheetFor(tutMoodsTourMoodId());
+  // Lee, 2026-11-22: sections open closed — the tour's steps point inside PRIMARY SEARCH, so open it.
+  if(!oamSecOpen.has("primary")) window.oamToggleSec("primary");
 }
 function tutSheetMode(mode){ /* Lee, 2026-11-20: Genres always show and there is no mode switch — nothing to do */ }
 // Database tutorial: puts `q` in the search box and runs it. With `typed`, the letters appear one by one first.

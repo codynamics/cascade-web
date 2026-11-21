@@ -1834,6 +1834,7 @@ test("CAS-1296 AC2: a mood with Show top You set sorts the listing by You, desce
   // CAS-1425: Show top You is gone with the old sheet; a signed-in mood sorted by Score is what derives
   // filt.sort === "you" now (applyMoodToState), so pick that and Save.
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
+  await page.evaluate(() => { if (!oamSecOpen.has("how")) window.oamToggleSec("how"); });   // Lee, 2026-11-22: sheet sections open closed
   await page.locator('.mfseg[aria-label="Order"] button', { hasText: "Score" }).click();
   await page.locator("#watchSheetBody .oamhead .donebtn").click();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
@@ -1874,6 +1875,7 @@ test("CAS-1303: a new mood's Sort defaults to Score; picking Release date explic
 
   const moodId = await page.evaluate(() => watchMoodSel);
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
+  await page.evaluate(() => { if (!oamSecOpen.has("how")) window.oamToggleSec("how"); });   // Lee, 2026-11-22: sheet sections open closed
   await page.locator('.mfseg[aria-label="Order"] button', { hasText: "Release date" }).click();
   await page.locator("#watchSheetBody .oamhead .donebtn").click();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
@@ -1894,7 +1896,8 @@ test("CAS-1303 AC1: the mood sheet's Order options are Score, Release date, A-Z 
 
   // CAS-1425: the v2 sheet's last section is "HOW MANY, AND IN WHAT ORDER" (Show, then Order); More filters
   // sits below it, collapsed. Order is still the three options in the same order, the draft's saved value on.
-  await expect(page.locator("#watchSheetBody .wsheetsec").last().locator(".wsheethd")).toHaveText("HOW MANY, AND IN WHAT ORDER");
+  // Lee, 2026-11-22: sections are collapsible cards now; HOW MANY is its own section, More filters and Position follow it.
+  await expect(page.locator("#oamHowSec .oamsechd .wsheethd")).toHaveText("HOW MANY, AND IN WHAT ORDER");
   const sortBtns = page.locator('.mfseg[aria-label="Order"] button');
   await expect(sortBtns).toHaveCount(3);
   const labels = await sortBtns.evaluateAll(els => els.map(el => el.textContent.trim()));
@@ -1914,6 +1917,7 @@ test("CAS-1303 AC2: Sort A-Z orders titles ascending; Sort Release date uses the
 
   const moodId = await page.evaluate(() => watchMoodSel);
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
+  await page.evaluate(() => { if (!oamSecOpen.has("how")) window.oamToggleSec("how"); });   // Lee, 2026-11-22: sheet sections open closed
   await page.locator('.mfseg[aria-label="Order"] button', { hasText: "A–Z" }).click();
   await page.locator("#watchSheetBody .oamhead .donebtn").click();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
@@ -1933,6 +1937,7 @@ test("CAS-1303 AC2: Sort A-Z orders titles ascending; Sort Release date uses the
   expect(titles).toEqual([...titles].sort((a, b) => a.localeCompare(b)));
 
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
+  await page.evaluate(() => { if (!oamSecOpen.has("how")) window.oamToggleSec("how"); });   // Lee, 2026-11-22: sheet sections open closed
   await page.locator('.mfseg[aria-label="Order"] button', { hasText: "Release date" }).click();
   await page.locator("#watchSheetBody .oamhead .donebtn").click();
   await expect(page.locator("#watchSheet")).not.toHaveClass(/open/);
@@ -1953,6 +1958,7 @@ test(`CAS-1296 AC3: "+ Mood" opens on the agent's genres with every style includ
 
   // Lee, 2026-11-21: a new list opens with Genres live (not greyed) and the name box always open and empty.
   await expect(page.locator("#oamGenreSec")).not.toHaveClass(/off/);
+  await page.evaluate(() => { if (!oamSecOpen.has("primary")) window.oamToggleSec("primary"); });   // Lee, 2026-11-22: sheet sections open closed
   await expect(page.locator("#oamKwInput")).toBeVisible();
   await expect(page.locator("#oamKwInput")).toHaveValue("");
   const draft = await page.evaluate(() => ({ stylesAll: oamDraft.stylesAll, mode: oamDraft.mode, watched: oamDraft.watched }));
@@ -2151,7 +2157,8 @@ test("CAS-1371 AC3: Move left / Move right in the mood sheet reorders", async ({
   expect(before.indexOf("extra")).toBeGreaterThan(0);
 
   // CAS-1394: CAS-1391 moved Position inside More filters, which opens collapsed.
-  await page.locator('#watchSheetBody .morebtn:not(.oamkwopen)').click();
+  // Lee, 2026-11-22: Position is its own collapsible section now.
+  await page.locator('#oamPosSec .oamsechd').click();
   await page.locator('#watchSheetBody button:has-text("Move right")').click();
   const afterRight = await page.evaluate(() => oamMoodsListReal().map(m => m.id));
   expect(afterRight.indexOf("extra")).toBe(before.indexOf("extra") + 1);
@@ -2162,8 +2169,7 @@ test("CAS-1371 AC3: Move left / Move right in the mood sheet reorders", async ({
 
   // Releases is pinned first in the row and never reorders, so its own sheet gets no Position row.
   await page.evaluate(() => window.openOamMoodSheetFor("releases"));
-  await page.locator('#watchSheetBody .morebtn:not(.oamkwopen)').click();
-  await expect(page.locator('#watchSheetBody .wsheethd:has-text("Position")')).toHaveCount(0);
+  await expect(page.locator('#oamPosSec')).toHaveCount(0);
 });
 
 // CAS-1371 AC2: a still hold on a mood chip lifts it and a drag with it reorders. Real iOS Safari can
@@ -2417,6 +2423,7 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
   // CAS-1467: the levels always show; the Agent override switch sits under the genre rows.
+  await page.evaluate(() => { if (!oamSecOpen.has("primary")) window.oamToggleSec("primary"); });   // Lee, 2026-11-22: sheet sections open closed
   await page.evaluate(() => { if (!oamAdvancedOn(oamDraft)) window.toggleOamAdvanced(); window.setOamAgentOverride(true); });
   const m = await page.evaluate(() => {
     const rows = [...document.querySelectorAll("#watchSheetBody .oamstylerow")];
@@ -2483,6 +2490,7 @@ test("CAS-1403: Any service chip lists films beyond my services and clears when 
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
+  await page.evaluate(() => { if (!oamSecOpen.has("svc")) window.oamToggleSec("svc"); });   // Lee, 2026-11-22: sheet sections open closed
   const myBtn = page.locator('#watchSheetBody .chip:text-is("My services")');
   const anyBtn = page.locator('#watchSheetBody .chip:text-is("Any service")');
   await expect(myBtn).toHaveAttribute("aria-pressed", "true");
@@ -2501,6 +2509,7 @@ test("CAS-1403: Any service chip lists films beyond my services and clears when 
   expect(after).toBeGreaterThan(before);
 
   await page.evaluate(() => window.openOamMoodSheetFor("releases"));
+  await page.evaluate(() => { if (!oamSecOpen.has("svc")) window.oamToggleSec("svc"); });   // Lee, 2026-11-22: sheet sections open closed
   await page.locator("#watchSheetBody .chip[onclick^=\"setOamDraftSvc('\"]").first().click();
   expect(await page.evaluate(() => oamDraft.anySvc)).toBe(false);
   expect(await page.evaluate(() => !!oamDraft.svc)).toBe(true);
