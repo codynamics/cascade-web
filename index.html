@@ -3727,13 +3727,14 @@
   .mpanel>.mgenre{padding:12px 6px 8px;margin:0;min-width:0}
   .oamgensec .oamoff{display:none;margin-left:8px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.1);
     color:var(--dim);font-size:10.5px;letter-spacing:.04em;vertical-align:1px}
+  /* Lee, 2026-11-21: PRIMARY SEARCH — one box holding the genre levels and, under them, the name box. */
+  .oamprimbox{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:0 0 12px}
+  .oamprimbox>.mpanel{border:0;background:none;margin:0}
+  .oamprimbox>.oamkwsec{margin:4px 12px 0;padding-top:12px;border-top:1px solid var(--line)}
+  .oamprimbox .oamkwhd{margin:0 0 8px}
+  .oamprimbox .oamkwsec .oamgenreintro{margin:8px 0 0}
   .oamgensec.off .oamoff{display:inline-block}
   .oamgensec.off .mpanel{opacity:.32;filter:grayscale(1);pointer-events:none;transition:opacity .2s}
-  .oamkwsec .oamkwbody{display:none}
-  .oamkwsec.open .oamkwbody{display:block}
-  .oamkwsec.open .oamkwopen{display:none}
-  .oamkwsec .oamkwopen{margin:0}
-  .oamkwsec .oamusegen{background:none;border:0;color:var(--dim);font:700 12px var(--font-body);cursor:pointer;padding:4px 0}
   #oamKwInput{width:100%;box-sizing:border-box}
   .mfbox .mfsub{display:block;font-size:11px;color:var(--faint)}
   .mfbox .mfdesc{font-size:11.5px;color:var(--dim);line-height:1.45;margin:8px 4px 0;min-height:2.9em}
@@ -11756,6 +11757,10 @@ window.saveMoodFromSheet = () => {
   if(selectionChanged) pushViewField("mood", mood.id);
   logEvent("watch_mood", {action: d.editingId ? "save" : "create"});
   closeWatchSheet();
+  // Lee, 2026-11-21: saving a list is a navigation — its rules just changed. Editing the list already on screen
+  // leaves watchNavKey() unchanged, so without this the settled list (CAS-1236) kept showing the OLD list until
+  // you switched lists and back.
+  watchSettledNavKey = null;
   render();
   scrollWatchListingToTop();
 };
@@ -21442,7 +21447,9 @@ function oamMoodDraftFrom(mood){
     stylesAll: mood ? !(mood.styles && mood.styles.length) : true,
     styles: new Set(mood && mood.styles ? mood.styles : []),
     // CAS-1400: genre | keyword — which way this mood finds films. Nothing stored before Save.
-    mode: mood ? oamMoodMode(mood) : "genre",
+    // Lee, 2026-11-21: keyword only when there's actually a name in the box — a stored mode:"keyword" with no
+    // name (Max) is a genre list, and the sheet must not grey out Genres for it.
+    mode: (mood && oamKeywordOn(mood)) ? "keyword" : "genre",
     topShare: mood ? oamMoodEffectiveTopShare(mood) : null,   // CAS-1391: the Mood Override Filter's own share
     rowOrder: null,   // frozen IN THIS MOOD / NOT IN THIS MOOD section membership — see oamFreezeMoodRowOrder
     ages: new Set(mood ? (mood.ages||[]) : []),
@@ -21810,8 +21817,11 @@ function renderOamMoodSheetBody(){
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
     ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
-    <div class="wsheetsec mainsec oamgensec${kwMode?" off":""}" id="oamGenreSec">
-      <div class="wsheethd"><span>GENRES<span class="oamoff">OFF · FINDING BY NAME</span></span></div>
+    <div class="wsheetsec mainsec oamgensec oamprimary${kwMode?" off":""}" id="oamGenreSec">
+      <!-- Lee, 2026-11-21: one PRIMARY SEARCH box — genre levels, then "Or find films by name" (always open).
+           A name in the box greys out the genres; clearing it brings them back. -->
+      <div class="wsheethd"><span>PRIMARY SEARCH</span><span class="oamoff">GENRES OFF · FINDING BY NAME</span></div>
+      <div class="oamprimbox">
       <div class="mpanel">
         <section class="mgenre">
           <!-- Lee, 2026-11-20: the My taste / Override switch is back at the top, above the override slider and the
@@ -21835,14 +21845,12 @@ function renderOamMoodSheetBody(){
             </div>` : ""}
         </section>
       </div>
-    </div>
-    <div class="wsheetsec mainsec oamkwsec${(kwMode||d.kwOpen)?" open":""}" id="oamKwSec">
-      <button type="button" class="morebtn oamkwopen" onclick="oamOpenKeyword()"><span>OR FIND FILMS BY NAME</span><span aria-hidden="true">&rsaquo;</span></button>
-      <div class="oamkwbody">
-        <div class="wsheethd"><span>FIND FILMS BY NAME</span><button type="button" class="oamusegen" onclick="setOamDraftMode('genre')">Use genres</button></div>
+      <div class="oamkwsec open" id="oamKwSec">
+        <div class="subhd oamkwhd">Or find films by name</div>
         <input id="oamKwInput" class="search" type="text" enterkeyhint="done" placeholder="Actor, director or title"
           value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
-        <p class="oamgenreintro">Commas combine — every part must match.</p>
+        <p class="oamgenreintro">A name here switches genres off; clear it to use genres again. Commas combine — every part must match.</p>
+      </div>
       </div>
     </div>
     ${(!d.handOnly && prefs.sub.size) ? `<div class="wsheetsec mainsec" id="oamSvcSec">
@@ -21969,6 +21977,10 @@ window.oamSaveMoodFromSheet=()=>{
   if(selectionChanged) pushViewField("mood", mood.id);
   logEvent("watch_mood", {action: d.editingId ? "save" : "create"});
   closeWatchSheet();
+  // Lee, 2026-11-21: saving a list is a navigation — its rules just changed. Editing the list already on screen
+  // leaves watchNavKey() unchanged, so without this the settled list (CAS-1236) kept showing the OLD list until
+  // you switched lists and back.
+  watchSettledNavKey = null;
   render();
   scrollWatchListingToTop();
 };
@@ -22009,22 +22021,55 @@ function oamMoodsForFilm(id, c){
 // current status belongs to (CAS-1362 cause 1: "Listed in X" claimed a film was shown whenever it passed
 // X's rules, even when X's Best 20 cut it from the page). Same save/swap/restore device watchStageCountFor
 // uses above, so this can never drift from what oamVisibleRows() itself renders.
-function oamFilmShownInMood(id, mood, c){
-  const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return false;
-  const stageKey=oamWilStageKeyFor(m); if(!stageKey) return false;
-  const stop=watchStageStopsNow().find(s=>s.key===stageKey); if(!stop) return false;
+// Lee, 2026-11-21 (Database was slow to open): one list's view of one stage — which films it shows, and the
+// Best N ranking — computed by the real listing pipeline (oamVisibleRows). Database's "Where it lists" panel
+// asks this for every row × every list, so while a batch of rows renders (oamWilMemoRun) each (list, stage)
+// is computed ONCE and reused instead of re-running the whole pipeline per film (~1s per 50 rows before).
+let oamWilMemo=null;
+function oamWilMemoRun(fn){
+  if(oamWilMemo) return fn();
+  oamWilMemo=new Map();
+  try{ return fn(); } finally { oamWilMemo=null; }
+}
+function oamWilStageView(mood, stageKey, c){
+  const key=mood.id+"|"+stageKey;
+  if(oamWilMemo && oamWilMemo.has(key)) return oamWilMemo.get(key);
+  const stop=watchStageStopsNow().find(s=>s.key===stageKey); if(!stop) return null;
   const savedTab=watchTab, savedStage=watchCinemaStage, savedMood=watchMoodSel;
   const savedWatched=watchWatchedSel[stop.tabKey];
+  let rows, preSheetRows;
   try{
     watchTab=stop.tabKey;
     if(stop.tabKey==="in_cinema") watchCinemaStage = stop.key==="upcoming" ? "upcoming" : "in_cinema";
     watchMoodSel=mood.id;
     watchWatchedSel[stop.tabKey]=moodWatchedSel(mood);   // CAS-1411
-    return oamVisibleRows().rows.some(r=>r.tmdb_id===id);
+    ({rows, preSheetRows}=oamVisibleRows());
   } finally {
     watchTab=savedTab; watchCinemaStage=savedStage; watchMoodSel=savedMood;
     watchWatchedSel[stop.tabKey]=savedWatched;
   }
+  let rankOf=null;   // built on first use — same order as oamApplyShowCap
+  const view={
+    shown:new Set(rows.map(r=>r.tmdb_id)),
+    rank(id){
+      if(!rankOf){
+        rankOf=new Map();
+        const pinnedN=preSheetRows.filter(x=>oamShowCapPinned(x, mood)).length;
+        preSheetRows.filter(x=>!oamShowCapPinned(x, mood))
+          .sort((a,b)=>{ const d=oamOrderScore(b,c)-oamOrderScore(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; })
+          .forEach((x,i)=>rankOf.set(x.tmdb_id, pinnedN+i+1));
+      }
+      return rankOf.has(id) ? rankOf.get(id) : null;
+    }
+  };
+  if(oamWilMemo) oamWilMemo.set(key, view);
+  return view;
+}
+function oamFilmShownInMood(id, mood, c){
+  const m=MOVIES.find(x=>x.tmdb_id===id); if(!m) return false;
+  const stageKey=oamWilStageKeyFor(m); if(!stageKey) return false;
+  const view=oamWilStageView(mood, stageKey, c);
+  return !!view && view.shown.has(id);
 }
 function oamFilmHandTouched(id){
   return oamMoodsListReal().some(mood=>(mood.in||[]).includes(id) || (mood.out||[]).includes(id));
@@ -22187,29 +22232,11 @@ function oamWilStageKeyFor(m){
 // Returns null for a mood with no numeric cut, or when (unexpectedly) `m` isn't in its own ranked pool.
 function oamWilRankInMood(m, mood, c, stageKey){
   const n=OAM_SHOW_N[mood.show]; if(n==null) return null;
-  const stop=watchStageStopsNow().find(s=>s.key===stageKey); if(!stop) return null;
-  const savedTab=watchTab, savedStage=watchCinemaStage, savedMood=watchMoodSel;
-  const savedWatched=watchWatchedSel[stop.tabKey];
-  let preSheetRows;
-  try{
-    watchTab=stop.tabKey;
-    if(stop.tabKey==="in_cinema") watchCinemaStage = stop.key==="upcoming" ? "upcoming" : "in_cinema";
-    watchMoodSel=mood.id;
-    watchWatchedSel[stop.tabKey]=moodWatchedSel(mood);   // CAS-1411
-    ({preSheetRows}=oamVisibleRows());
-  } finally {
-    watchTab=savedTab; watchCinemaStage=savedStage; watchMoodSel=savedMood;
-    watchWatchedSel[stop.tabKey]=savedWatched;
-  }
   // Same order as oamApplyShowCap: hand-added and starred films take the first slots, then everything
   // else — watched and Rental soon films included — by score.
-  const pinnedN=preSheetRows.filter(x=>oamShowCapPinned(x, mood)).length;
-  const rest=preSheetRows.filter(x=>!oamShowCapPinned(x, mood))
-    .sort((a,b)=>{ const d=oamOrderScore(b,c)-oamOrderScore(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
-  const idx=rest.findIndex(x=>x.tmdb_id===m.tmdb_id);
-  if(idx<0) return null;
-  const rank = pinnedN + idx + 1;
-  return {rank, n};
+  const view=oamWilStageView(mood, stageKey, c); if(!view) return null;
+  const rank=view.rank(m.tmdb_id);
+  return rank==null ? null : {rank, n};
 }
 function oamWilCase(m, c){
   const id=m.tmdb_id;
@@ -23750,11 +23777,13 @@ function findRenderMore(){
   // row — non-v2 accounts are untouched (AC4).
   const c=oneAgentCriteria();
   let buf="";
-  for(let i=findShown; i<end; i++){
-    const m=findRowsCache[i];
-    const row=showsStub(m) ? stubHTML(m) : cardHTML(m, isFresh(m));
-    buf += c ? oamWilAddHasWil(row) + oamWhereItListsHTML(m, c) : row;
-  }
+  oamWilMemoRun(()=>{
+    for(let i=findShown; i<end; i++){
+      const m=findRowsCache[i];
+      const row=showsStub(m) ? stubHTML(m) : cardHTML(m, isFresh(m));
+      buf += c ? oamWilAddHasWil(row) + oamWhereItListsHTML(m, c) : row;
+    }
+  });
   listEl.insertAdjacentHTML("beforeend", buf);
   observeLazyPosters(listEl);
   findShown=end;
@@ -25600,7 +25629,7 @@ const TOURS = {
     // The "during account setup" lines only appear when that setup mood exists (Lee, 16 Nov).
     {get html(){ return TUT_P("Instead of building a list around genres, you can use a keyword search around an actor, director or title.",
       ...(watchMoods.some(m=>m.id==="fav-person") ? ["During account setup, we set up a list with your favourite actor or director to show you how this is done."] : [])); },
-      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet #oamKwSec .oamkwopen"], tap:true},
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet #oamKwSec"]},
     {get html(){ return TUT_P("Show only films included on one of your services, so the whole list is ready to watch tonight.",
       ...(watchMoods.some(m=>m.id==="topsvc") ? ["During account setup, we created a list with your most-used streaming service to show you how this is done."] : [])); },
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); }, sel:["#oamSvcSec"]},
