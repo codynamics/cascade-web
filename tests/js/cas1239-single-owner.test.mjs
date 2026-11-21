@@ -174,7 +174,7 @@ test("CAS-1239 AC5: a pin wins over a higher-ranked matching agent for the lane,
 
   E.realAlerts.length = 0;
   E.realAlerts.push({ id: 1, movie_id: id, moment: "new_to_agent", title: film.title,
-    cascade_name: h.name, emailed_at: new Date().toISOString(), read_at: null });
+    cascade_name: h.name, found_at: new Date().toISOString(), read_at: null });
   E.localStorage.setItem("cascade_had_account", "1");
   E.setMovingReady(true);
   const { rows } = E.movingData();

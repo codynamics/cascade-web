@@ -15713,7 +15713,7 @@ const HELP_ARTICLES = [
    body:"Alerts is where Cascade tells you what's happened lately, split into two kinds of row. New is a film's first appearance for a given agent — something it's never found before. Changed is everything else: a film the agent already had, that's now moved to a different window. A film is never counted as both at once.\n\nYou choose how far back to look — Today, Week, 2 weeks or Month — and Alerts shows only what falls inside that window, measured back from right now. Every row names the agent that actually owns the film today, so nothing is shown under an agent that no longer has it."},
   {slug:"notifications", title:"Notifications",
    summary:"Exactly what will reach you, by which channel, and when the daily report runs.",
-   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, overnight (about 3am Sydney time). Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Status tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for every agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
+   body:"Cascade can tell you about a film two ways: as a push notification, and by email. Your agent checks overnight. New films are in Alerts by morning, with one push at about 7:30am. The 5pm email only lists the ones you haven't already seen in the app. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Status tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for every agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe push and the email each gather whatever every agent found overnight, rather than notifying you separately every time something is found."},
   {slug:"your-account-and-data", title:"Your account and data",
    summary:"What is stored, where, and how to delete it.",
    body:`Signed out, everything Cascade knows about you — your agents, what you've watched, your preferences — is stored only on this device, in this browser or app install. Nothing about it reaches anywhere else.\n\nSigned in, that same information is mirrored to your account so it's there again on another device you sign into. Signing out doesn't erase it — it's still on your account, waiting for you to sign back in.\n\nDeleting your account is on the Account screen itself: type DELETE to confirm, and it permanently removes your agents, everything they've found for you, what you've marked watched, your invites and friends, your notification history and your sign-in — there's nothing left to undo.${MEMBERSHIP_ENABLED ? " It doesn't cancel an active App Store subscription, which you'll need to manage separately." : ""}`},
@@ -23327,7 +23327,7 @@ function sydneyDaysAgo(dateStr){
   if(!t || isNaN(t)) return null;
   return Math.round((Date.parse(sydneyYMD(Date.now())) - Date.parse(sydneyYMD(t)))/864e5);
 }
-// A row's `date` is either a realAlerts emailed_at timestamp or a firstFound day string — both parse with
+// A row's `date` is either a realAlerts found_at timestamp or a firstFound day string — both parse with
 // Date.parse. "today" is the Sydney calendar date (CAS-1237); the longer windows stay rolling, measured
 // back from now.
 function movingInWindow(dateStr, windowKey){
@@ -23342,7 +23342,7 @@ function movingInWindow(dateStr, windowKey){
 // renderMovingScreen (whose own truncation notice is DOM-only, not reachable from a test) so the predicate
 // can be asserted directly.
 function movingLedgerTruncated(win){
-  return realAlerts.length>=200 && realAlerts.filter(a=>movingInWindow(a.emailed_at, win)).length>=200;
+  return realAlerts.length>=200 && realAlerts.filter(a=>movingInWindow(a.found_at, win)).length>=200;
 }
 // CAS-848: every row names its OWNER agent (filmOwnerCascade, the same single-owner answer the Watch
 // listing's own per-agent blocks use) rather than the ledger entry's own agent-name field, which can list
@@ -23395,7 +23395,7 @@ function movingData(){
         agentId:owner.id, date:firstFound[fid]});
     });
   }else{
-    // realAlerts is loaded newest-first (loadRealAlerts orders by emailed_at descending), so the first
+    // realAlerts is loaded newest-first (loadRealAlerts orders by found_at descending), so the first
     // entry seen per film is the most recent — exactly the one whose moment/date should describe the row.
     const byFilm=new Map(), droppedByFilm=new Map();
     realAlerts.forEach(a=>{
@@ -23405,10 +23405,10 @@ function movingData(){
       const m=MOVIES.find(x=>String(x.tmdb_id)===fid);
       if(!m) return;
       const owner=movingOwnerCascade(m);
-      if(!owner){ droppedByFilm.set(fid,{date:a.emailed_at}); return; }
+      if(!owner){ droppedByFilm.set(fid,{date:a.found_at}); return; }
       byFilm.set(fid,{filmId:fid, m, tag:movingIsNewMoment(a.moment)?"new":"changed",
         reason:REAL_MOMENT_SAID[a.moment]||a.moment,
-        agentId:owner.id, date:a.emailed_at, moment:a.moment});
+        agentId:owner.id, date:a.found_at, moment:a.moment});
     });
     rows.push(...byFilm.values());
     dropped.push(...droppedByFilm.values());
@@ -23513,7 +23513,7 @@ function movingSections(rows){
     .map(g=>({g, lanes: movingLanes(rows.filter(r=>primaryStatus(r.m)===g))}))
     .filter(s=>s.lanes.length);
 }
-// A row's `date` is either a realAlerts emailed_at timestamp or a firstFound day string — both parse with
+// A row's `date` is either a realAlerts found_at timestamp or a firstFound day string — both parse with
 // Date.parse. Sydney calendar-day difference from now (CAS-1237), said plainly; never a fabricated
 // precision, and never a 24-hour rolling count that calls 17:00-yesterday "today" the next morning.
 function movingAgeText(dateStr){
@@ -27283,7 +27283,7 @@ function windowOf(o){
 }
 // `realAlerts` is the daily monitor's record, read back out of the `notifications` ledger the job writes.
 // Moving (movingUnseenCount/updateMovingBadge) is the only surface that reads it now.
-let realAlerts=[];            // [{id, movie_id, moment, title, cascade_name, emailed_at, read_at}]
+let realAlerts=[];            // [{id, movie_id, moment, title, cascade_name, found_at, read_at}]
 // The monitor's own moment keys, said the way the app says them everywhere else.
 const REAL_MOMENT_SAID = {
   hits_cinema:"reached a cinema", past_opening_weekend:"is past its opening weekend",
@@ -28910,8 +28910,8 @@ function acctFetchKeepalive(init){
     // that never gets an answer isn't left showing Moving's loading state forever.
     const c=client(); if(!c||!accountActive()){ realAlerts=[]; movingReady=true; updateMovingBadge(); return; }
     const { data, error } = await c.from("notifications")
-      .select("id,movie_id,moment,title,cascade_name,emailed_at,read_at")
-      .order("emailed_at", { ascending:false }).limit(200);
+      .select("id,movie_id,moment,title,cascade_name,found_at,read_at")
+      .order("found_at", { ascending:false }).limit(200);
     if(error){ console.warn("notifications load", error); logSyncFailed("notifications", error); movingReady=true; return; }
     realAlerts = data || [];
     movingReady=true;

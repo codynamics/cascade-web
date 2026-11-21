@@ -1,9 +1,13 @@
-name: Cascade alerts (03:00 Sydney)
+name: Cascade alerts (find 03:00 / push 07:30 / email 17:00 Sydney)
 
 # CAS-993: user alerts (the monitor's email digests + push notifications) used to be a step
 # inside daily.yml, scheduled at 20:00 UTC (~6-7am Sydney) and in practice starting 2-3 hours
 # later than that (run #75 started 22:53 UTC, run #76 at 22:36 UTC) — so alerts landed at a
 # random morning time. CAS-1503: alerts now go out overnight, 03:00 Sydney, after the 01:00 refresh.
+# CAS-1504: the one run is now three PHASES, chosen by the `phase` input, each dispatched by the
+# scheduler Worker at its own Sydney time: `find` at 03:00 (diff -> match -> write the notifications
+# ledger, sends nothing), `push` at 07:30 (one push per member with unread alerts), `email` at 17:00
+# (only the alerts the member has not seen in the app). All three share the daily-refresh concurrency group.
 # This workflow is the monitor and nothing else: it waits until 03:00
 # Australia/Sydney (daylight-saving aware), then runs exactly the monitor step daily.yml used to
 # run. The catalogue refresh itself stays in daily.yml.
@@ -15,6 +19,12 @@ name: Cascade alerts (03:00 Sydney)
 on:
   workflow_dispatch:             # manual "Run workflow" button — does NOT wait for 03:00 Sydney.
     inputs:
+      phase:
+        description: "CAS-1504: which phase to run. find = record the night's alerts to the ledger (sends nothing); push = the one 07:30 push; email = the 17:00 digest of unseen alerts. The scheduler Worker passes this."
+        required: false
+        default: "find"
+        type: choice
+        options: [find, push, email]
       days_back:
         description: "Demo: diff the monitor against the catalogue this many days ago so real transitions fire and a digest actually sends (for building/validating the notification UX). 0 = normal ~yesterday behaviour."
         required: false
@@ -58,7 +68,7 @@ jobs:
         with:
           node-version: 20
 
-      - name: Run the Cascade monitor (diff → match → de-dupe → email)
+      - name: Run the Cascade monitor, phase ${{ github.event.inputs.phase || 'find' }} (CAS-1504)
         # Reads yesterday's catalogue from git history (last refresh on an earlier calendar day). With the Supabase +
         # Resend secrets present it does the real thing; without them it runs --dry-run so the
         # workflow still passes (no writes, no email). CAS-825: matching now shells out once to
@@ -70,6 +80,7 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           CASCADE_EMAIL_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}   # optional; defaults to Resend's test sender
           CASCADE_SITE_URL: ${{ secrets.SITE_URL }}               # optional; defaults to the live Pages URL
+          PHASE: ${{ github.event.inputs.phase || 'find' }}        # CAS-1504: find | push | email
           DAYS_BACK: ${{ github.event.inputs.days_back }}          # demo look-back (0/blank on schedule)
           BASELINE_REF: ${{ github.event.inputs.baseline_ref }}    # demo exact-ref override
           APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}                 # CAS-483: without these four, push silently no-ops
@@ -93,10 +104,10 @@ jobs:
           fi
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] && [ -n "$RESEND_API_KEY" ]; then
             echo "Secrets present — live run (will send digests + write the notifications ledger)."
-            python -m monitor $BASELINE_ARGS
+            python -m monitor --phase "$PHASE" $BASELINE_ARGS
           else
             echo "Supabase/Resend secrets absent — running --dry-run (no writes, no email)."
-            python -m monitor --dry-run $BASELINE_ARGS
+            python -m monitor --phase "$PHASE" --dry-run $BASELINE_ARGS
           fi
 
       - name: Persist the held-ids snapshot (CAS-986)

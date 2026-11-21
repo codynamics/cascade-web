@@ -9,6 +9,7 @@ import worker, {
   RETRY_DELAY_MS,
   UNSENT_MAIL_CHECKS,
   targetForCron,
+  inputsForCron,
   dispatchWorkflow,
   hasUnsentMail,
 } from "../src/worker.mjs";
@@ -44,6 +45,80 @@ test("during AEST, 17:00 UTC dispatches alerts.yml and 16:00 UTC does not", () =
   // 2026-07-15 is outside AU DST -> Sydney is UTC+10.
   assert.equal(targetForCron(CRON.ALERTS_A, Date.parse("2026-07-15T16:00:00Z")), null);
   assert.equal(targetForCron(CRON.ALERTS_B, Date.parse("2026-07-15T17:00:00Z")), "alerts.yml");
+});
+
+// CAS-1504: 07:30 push pair and 17:00 email pair.
+
+test("during AEDT, 20:30 UTC dispatches the push phase and 21:30 UTC does not", () => {
+  assert.equal(targetForCron(CRON.PUSH_A, Date.parse("2026-11-22T20:30:00Z")), "alerts.yml");
+  assert.equal(targetForCron(CRON.PUSH_B, Date.parse("2026-11-22T21:30:00Z")), null);
+});
+
+test("during AEST, 21:30 UTC dispatches the push phase and 20:30 UTC does not", () => {
+  assert.equal(targetForCron(CRON.PUSH_A, Date.parse("2026-07-15T20:30:00Z")), null);
+  assert.equal(targetForCron(CRON.PUSH_B, Date.parse("2026-07-15T21:30:00Z")), "alerts.yml");
+});
+
+test("the push pair only dispatches at 07:00-07:59 Sydney, on each side of DST", () => {
+  // AEDT (UTC+11): 20:00 UTC is 07:00, 20:59 is 07:59, 21:00 is 08:00, 19:59 is 06:59.
+  assert.equal(targetForCron(CRON.PUSH_A, Date.parse("2026-11-22T20:00:00Z")), "alerts.yml");
+  assert.equal(targetForCron(CRON.PUSH_A, Date.parse("2026-11-22T20:59:00Z")), "alerts.yml");
+  assert.equal(targetForCron(CRON.PUSH_A, Date.parse("2026-11-22T21:00:00Z")), null);
+  assert.equal(targetForCron(CRON.PUSH_A, Date.parse("2026-11-22T19:59:00Z")), null);
+  // AEST (UTC+10): 21:00 UTC is 07:00, 21:59 is 07:59, 22:00 is 08:00, 20:59 is 06:59.
+  assert.equal(targetForCron(CRON.PUSH_B, Date.parse("2026-07-15T21:00:00Z")), "alerts.yml");
+  assert.equal(targetForCron(CRON.PUSH_B, Date.parse("2026-07-15T21:59:00Z")), "alerts.yml");
+  assert.equal(targetForCron(CRON.PUSH_B, Date.parse("2026-07-15T22:00:00Z")), null);
+  assert.equal(targetForCron(CRON.PUSH_B, Date.parse("2026-07-15T20:59:00Z")), null);
+});
+
+test("during AEDT, 06:00 UTC dispatches the email phase and 07:00 UTC does not", () => {
+  assert.equal(targetForCron(CRON.EMAIL_A, Date.parse("2026-11-22T06:00:00Z")), "alerts.yml");
+  assert.equal(targetForCron(CRON.EMAIL_B, Date.parse("2026-11-22T07:00:00Z")), null);
+});
+
+test("during AEST, 07:00 UTC dispatches the email phase and 06:00 UTC does not", () => {
+  assert.equal(targetForCron(CRON.EMAIL_A, Date.parse("2026-07-15T06:00:00Z")), null);
+  assert.equal(targetForCron(CRON.EMAIL_B, Date.parse("2026-07-15T07:00:00Z")), "alerts.yml");
+});
+
+test("each alerts cron passes its own phase input; other crons pass none", () => {
+  assert.deepEqual(inputsForCron(CRON.ALERTS_A), { phase: "find" });
+  assert.deepEqual(inputsForCron(CRON.ALERTS_B), { phase: "find" });
+  assert.deepEqual(inputsForCron(CRON.PUSH_A), { phase: "push" });
+  assert.deepEqual(inputsForCron(CRON.PUSH_B), { phase: "push" });
+  assert.deepEqual(inputsForCron(CRON.EMAIL_A), { phase: "email" });
+  assert.deepEqual(inputsForCron(CRON.EMAIL_B), { phase: "email" });
+  assert.equal(inputsForCron(CRON.UPTIME), null);
+  assert.equal(inputsForCron(CRON.DAILY_A), null);
+});
+
+test("dispatching with a phase puts it in the request body's inputs", async () => {
+  const calls = [];
+  const fetchStub = async (url, init) => {
+    calls.push({ url, init });
+    return fakeResponse(204);
+  };
+  await dispatchWorkflow(ENV, "alerts.yml", { fetch: fetchStub, sleep: async () => {}, inputs: { phase: "push" } });
+  assert.equal(calls[0].init.body, JSON.stringify({ ref: "main", inputs: { phase: "push" } }));
+});
+
+test("the scheduled handler dispatches alerts.yml with phase=push at 07:30 AEDT only", async () => {
+  const bodies = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    bodies.push({ url, body: init.body });
+    return fakeResponse(204);
+  };
+  try {
+    await worker.scheduled({ cron: CRON.PUSH_A, scheduledTime: Date.parse("2026-11-22T20:30:00Z") }, ENV);
+    await worker.scheduled({ cron: CRON.PUSH_B, scheduledTime: Date.parse("2026-11-22T21:30:00Z") }, ENV);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(bodies.length, 1);
+  assert.match(bodies[0].url, /workflows\/alerts\.yml\/dispatches$/);
+  assert.equal(bodies[0].body, JSON.stringify({ ref: "main", inputs: { phase: "push" } }));
 });
 
 test("during AEDT, 14:00 UTC dispatches daily.yml and 15:00 UTC does not", () => {
