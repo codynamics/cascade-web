@@ -9515,6 +9515,16 @@ function cardHTML(m, markNew=false, {hideDismiss=false, inWatch=false}={}){
   // screens, not Watch, so they keep following the open agent's own scope via prefsActive(), unchanged.
   const svcScoped = inWatch ? (!ignoreScope && accountScopedFor()) : prefsActive();
   if(svcScoped && !m._fixture) offers=offers.filter(myService);   // CAS-491: see matchesServices
+  // Lee, 2026-11-22: a list set to one service (e.g. "Stan") already lists only films included on it, but the
+  // card showed whichever of your services came first (Disney, Netflix…), so the list looked unfiltered. On
+  // Watch, that service's own included offer now leads, so the card names the service the list is about.
+  if(inWatch && !m._fixture){
+    const listSvc=oamActiveMoodSvc();
+    if(listSvc){
+      const onList=o=>(o.type==="sub"||o.type==="free") && svcCanon(o.service)===listSvc;
+      offers=[...offers.filter(onList), ...offers.filter(o=>!onList(o))];
+    }
+  }
   // CAS-285: the per-title provider credit is gone from the card. The attribution is REQUIRED but it is not
   // information about the film, and repeating it under every "where to watch" list on a 2,000-card listing
   // is the same sentence a thousand times. It is stated once, in About & credits, which is where TMDB's own
