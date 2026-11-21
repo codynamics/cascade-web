@@ -1951,9 +1951,10 @@ test(`CAS-1296 AC3: "+ Mood" opens on the agent's genres with every style includ
   await page.evaluate(() => window.openMoodSheetForNew());
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
-  // Lee, 2026-11-20: no Genre/Keyword switch — a new list opens with Genres live (not greyed) and the name box closed.
+  // Lee, 2026-11-21: a new list opens with Genres live (not greyed) and the name box always open and empty.
   await expect(page.locator("#oamGenreSec")).not.toHaveClass(/off/);
-  await expect(page.locator("#oamKwSec")).not.toHaveClass(/open/);
+  await expect(page.locator("#oamKwInput")).toBeVisible();
+  await expect(page.locator("#oamKwInput")).toHaveValue("");
   const draft = await page.evaluate(() => ({ stylesAll: oamDraft.stylesAll, mode: oamDraft.mode, watched: oamDraft.watched }));
   expect(draft).toEqual({ stylesAll: true, mode: "genre", watched: true });
   // Nothing the agent has ON sits under "Not in this mood" — only genres the agent has off (oaBar null) do,
@@ -2444,7 +2445,6 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
   // Lee, 2026-11-20: "Or find films by name" opens the name box; typing a name greys out Genres and makes it a
   // keyword list — still without re-rendering the sheet.
   await page.evaluate(() => { document.querySelector("#watchSheetBody .mpanel").dataset.marker = "kept"; });
-  await page.locator("#oamKwSec .oamkwopen").click();
   await page.locator("#oamKwInput").fill("Tom Cruise");
   await expect(page.locator("#oamGenreSec")).toHaveClass(/off/);
   const after = await page.evaluate(() => ({
