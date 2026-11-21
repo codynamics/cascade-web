@@ -34,20 +34,26 @@ test("17 * * * * always dispatches uptime.yml", () => {
   assert.equal(targetForCron(CRON.UPTIME, Date.parse("2026-09-17T00:17:00Z")), "uptime.yml");
 });
 
-test("0 20 * * * always dispatches daily.yml", () => {
-  assert.equal(targetForCron(CRON.DAILY, Date.parse("2026-09-17T20:00:00Z")), "daily.yml");
+test("during AEDT, 16:00 UTC dispatches alerts.yml and 17:00 UTC does not", () => {
+  // 2026-11-22 is after AU DST starts (first Sunday of October) -> Sydney is UTC+11.
+  assert.equal(targetForCron(CRON.ALERTS_A, Date.parse("2026-11-22T16:00:00Z")), "alerts.yml");
+  assert.equal(targetForCron(CRON.ALERTS_B, Date.parse("2026-11-22T17:00:00Z")), null);
 });
 
-test("during AEDT, 06:00 UTC dispatches alerts.yml and 07:00 UTC does not", () => {
-  // 2026-11-01 is after AU DST starts (first Sunday of October) -> Sydney is UTC+11.
-  assert.equal(targetForCron(CRON.ALERTS_A, Date.parse("2026-11-01T06:00:00Z")), "alerts.yml");
-  assert.equal(targetForCron(CRON.ALERTS_B, Date.parse("2026-11-01T07:00:00Z")), null);
+test("during AEST, 17:00 UTC dispatches alerts.yml and 16:00 UTC does not", () => {
+  // 2026-07-15 is outside AU DST -> Sydney is UTC+10.
+  assert.equal(targetForCron(CRON.ALERTS_A, Date.parse("2026-07-15T16:00:00Z")), null);
+  assert.equal(targetForCron(CRON.ALERTS_B, Date.parse("2026-07-15T17:00:00Z")), "alerts.yml");
 });
 
-test("during AEST, 07:00 UTC dispatches alerts.yml and 06:00 UTC does not", () => {
-  // 2026-09-17 is before AU DST starts -> Sydney is UTC+10.
-  assert.equal(targetForCron(CRON.ALERTS_A, Date.parse("2026-09-17T06:00:00Z")), null);
-  assert.equal(targetForCron(CRON.ALERTS_B, Date.parse("2026-09-17T07:00:00Z")), "alerts.yml");
+test("during AEDT, 14:00 UTC dispatches daily.yml and 15:00 UTC does not", () => {
+  assert.equal(targetForCron(CRON.DAILY_A, Date.parse("2026-11-22T14:00:00Z")), "daily.yml");
+  assert.equal(targetForCron(CRON.DAILY_B, Date.parse("2026-11-22T15:00:00Z")), null);
+});
+
+test("during AEST, 15:00 UTC dispatches daily.yml and 14:00 UTC does not", () => {
+  assert.equal(targetForCron(CRON.DAILY_A, Date.parse("2026-07-15T14:00:00Z")), null);
+  assert.equal(targetForCron(CRON.DAILY_B, Date.parse("2026-07-15T15:00:00Z")), "daily.yml");
 });
 
 test("a 204 makes exactly one request and needs no retry or alert", async () => {

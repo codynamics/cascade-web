@@ -1,18 +1,19 @@
-name: Cascade alerts (17:00 Sydney)
+name: Cascade alerts (03:00 Sydney)
 
 # CAS-993: user alerts (the monitor's email digests + push notifications) used to be a step
 # inside daily.yml, scheduled at 20:00 UTC (~6-7am Sydney) and in practice starting 2-3 hours
 # later than that (run #75 started 22:53 UTC, run #76 at 22:36 UTC) — so alerts landed at a
-# random morning time. This workflow is the monitor and nothing else: it waits until 17:00
+# random morning time. CAS-1503: alerts now go out overnight, 03:00 Sydney, after the 01:00 refresh.
+# This workflow is the monitor and nothing else: it waits until 03:00
 # Australia/Sydney (daylight-saving aware), then runs exactly the monitor step daily.yml used to
 # run. The catalogue refresh itself stays in daily.yml.
 #
 # Secrets are read from GitHub Actions secrets only (never hardcoded). When the Supabase + Resend
 # secrets are absent, the monitor runs in --dry-run so the workflow still passes (no writes, no
-# email). The repo is public, so runner minutes spent waiting for 17:00 Sydney are free.
+# email). The repo is public, so runner minutes spent waiting for 03:00 Sydney are free.
 
 on:
-  workflow_dispatch:             # manual "Run workflow" button — does NOT wait for 17:00 Sydney.
+  workflow_dispatch:             # manual "Run workflow" button — does NOT wait for 03:00 Sydney.
     inputs:
       days_back:
         description: "Demo: diff the monitor against the catalogue this many days ago so real transitions fire and a digest actually sends (for building/validating the notification UX). 0 = normal ~yesterday behaviour."
@@ -46,7 +47,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Wait until 17:00 Sydney (CAS-993)
+      - name: Wait until 03:00 Sydney (CAS-993, CAS-1503)
         # A manual dispatch is someone deliberately testing right now, so it skips the wait.
         # zoneinfo (stdlib) handles daylight saving automatically from the runner's system tzdata.
         if: ${{ github.event_name == 'schedule' }}

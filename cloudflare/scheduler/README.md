@@ -6,19 +6,21 @@ calling `workflow_dispatch` is not subject to the same delay.
 
 ## What it triggers
 
-Five Cron Triggers (UTC, declared in `wrangler.toml`), each calling
+Seven Cron Triggers (UTC, declared in `wrangler.toml`), each calling
 `POST /repos/codynamics/cascade-web/actions/workflows/<file>/dispatches` with `{"ref":"main"}`:
 
 | Cron | Fires | Dispatches |
 | --- | --- | --- |
 | `17 * * * *` | every hour, :17 | `uptime.yml` |
-| `0 20 * * *` | once a day, 20:00 UTC | `daily.yml` |
-| `0 6 * * *` | once a day, 06:00 UTC | `alerts.yml`, only if this instant is 17:00 in `Australia/Sydney` |
-| `0 7 * * *` | once a day, 07:00 UTC | `alerts.yml`, only if this instant is 17:00 in `Australia/Sydney` |
+| `0 14 * * *` | once a day, 14:00 UTC | `daily.yml`, only if this instant is 01:00 in `Australia/Sydney` (AEDT) |
+| `0 15 * * *` | once a day, 15:00 UTC | `daily.yml`, only if this instant is 01:00 in `Australia/Sydney` (AEST) |
+| `0 16 * * *` | once a day, 16:00 UTC | `alerts.yml`, only if this instant is 03:00 in `Australia/Sydney` (AEDT) |
+| `0 17 * * *` | once a day, 17:00 UTC | `alerts.yml`, only if this instant is 03:00 in `Australia/Sydney` (AEST) |
 | `*/5 * * * *` | every 5 minutes | `recommend.yml`, only if Supabase reports unsent mail (or can't be reached) |
 
-The alerts crons cover both sides of AU daylight saving — exactly one of them fires
-`alerts.yml` on any given day. `uptime.yml` keeps its own GitHub `schedule` as a backup; the
+CAS-1503: the refresh runs at 01:00 Sydney and alerts go out at 03:00 Sydney, so alerts are built
+from that night's data. Each pair of crons covers both sides of AU daylight saving — exactly one of
+each pair fires on any given day. `uptime.yml` keeps its own GitHub `schedule` as a backup; the
 Worker is additive there, not a replacement.
 
 CAS-1130: the `*/5 * * * *` cron reads one row (`limit=1`) from each of

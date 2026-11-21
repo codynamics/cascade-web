@@ -7,7 +7,8 @@ name: Daily AU movie refresh
 #
 # CAS-993: the Cascade monitor (diff today vs yesterday, match to each user's Cascades, de-dupe,
 # email/push one alert per user) moved out of this workflow into alerts.yml, which sends at a
-# fixed 17:00 Sydney time instead of whenever this refresh happens to run. This workflow no longer
+# fixed 03:00 Sydney time (CAS-1503; this refresh runs at 01:00 Sydney) instead of whenever this
+# refresh happens to run. This workflow no longer
 # runs the monitor at all — see alerts.yml.
 #
 # Secrets are read from GitHub Actions secrets only (never hardcoded). When the Supabase + Resend

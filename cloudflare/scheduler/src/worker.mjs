@@ -8,12 +8,14 @@
 //
 // Cron Triggers (UTC, declared in wrangler.toml):
 //   17 * * * *  -> uptime.yml every hour
-//   0 20 * * *  -> daily.yml once a day
-//   0 6 * * *   -> alerts.yml, ONLY if this instant is 17:00 in Australia/Sydney (AEDT)
-//   0 7 * * *   -> alerts.yml, ONLY if this instant is 17:00 in Australia/Sydney (AEST)
+//   0 14 * * * -> daily.yml, ONLY if this instant is 01:00 in Australia/Sydney (AEDT)
+//   0 15 * * * -> daily.yml, ONLY if this instant is 01:00 in Australia/Sydney (AEST)
+//   0 16 * * * -> alerts.yml, ONLY if this instant is 03:00 in Australia/Sydney (AEDT)
+//   0 17 * * * -> alerts.yml, ONLY if this instant is 03:00 in Australia/Sydney (AEST)
 //   */5 * * * * -> recommend.yml, ONLY if Supabase reports unsent mail (or can't be reached)
-// Exactly one of the alerts crons fires per day across the daylight-saving switch, computed with
-// Intl.DateTimeFormat rather than a fixed UTC offset.
+// CAS-1503: alerts go out overnight (03:00 Sydney); the refresh runs at 01:00 so the alerts are built
+// from that night's data. Exactly one of each pair of crons fires per day across the daylight-saving
+// switch, computed with Intl.DateTimeFormat rather than a fixed UTC offset.
 
 export const REPO = "codynamics/cascade-web";
 export const GITHUB_API = "https://api.github.com";
@@ -23,15 +25,18 @@ export const RETRY_DELAY_MS = 30000;
 
 export const CRON = {
   UPTIME: "17 * * * *",
-  DAILY: "0 20 * * *",
-  ALERTS_A: "0 6 * * *",
-  ALERTS_B: "0 7 * * *",
+  DAILY_A: "0 14 * * *",
+  DAILY_B: "0 15 * * *",
+  ALERTS_A: "0 16 * * *",
+  ALERTS_B: "0 17 * * *",
   RECOMMEND: "*/5 * * * *",
 };
 
+export const DAILY_SYDNEY_HOUR = 1;
+export const ALERTS_SYDNEY_HOUR = 3;
+
 const WORKFLOW_FOR_CRON = {
   [CRON.UPTIME]: "uptime.yml",
-  [CRON.DAILY]: "daily.yml",
 };
 
 // Tables/columns CAS-1130 checks for unsent outgoing mail before dispatching recommend.yml.
@@ -54,7 +59,10 @@ export function sydneyHour(epochMs) {
 // Which workflow file (if any) this cron firing, at this instant, should dispatch.
 export function targetForCron(cron, epochMs) {
   if (cron === CRON.ALERTS_A || cron === CRON.ALERTS_B) {
-    return sydneyHour(epochMs) === 17 ? "alerts.yml" : null;
+    return sydneyHour(epochMs) === ALERTS_SYDNEY_HOUR ? "alerts.yml" : null;
+  }
+  if (cron === CRON.DAILY_A || cron === CRON.DAILY_B) {
+    return sydneyHour(epochMs) === DAILY_SYDNEY_HOUR ? "daily.yml" : null;
   }
   return WORKFLOW_FOR_CRON[cron] ?? null;
 }
@@ -182,7 +190,7 @@ export default {
 
     const workflowFile = targetForCron(event.cron, event.scheduledTime ?? Date.now());
     if (!workflowFile) {
-      console.log(`scheduler: cron "${event.cron}" fired, no dispatch (not 17:00 Sydney)`);
+      console.log(`scheduler: cron "${event.cron}" fired, no dispatch (not the Sydney target hour)`);
       return;
     }
     try {
