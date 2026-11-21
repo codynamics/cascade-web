@@ -12941,6 +12941,9 @@ function barAdvice(style){
 // PENDING when its learned value sits >= 2 away from the applied value (c.applied) and has not been skipped
 // at about its current learned value (c.skipped). The person applies or skips per genre.
 const TASTE_REC_GAP = 2;
+// Lee, 22 Nov 2026: Pixel never proposes an adjustment from a single film — a combo needs at least this many
+// verdicts before it can be a recommendation. Scoring is untouched: an unrecommended combo keeps its applied value.
+const TASTE_REC_MIN_VERDICTS = 2;
 // Day-one seed: applied[key] = learned for every combo that has verdicts, so no score moves the day this ships.
 function tasteSeedApplied(c){
   if(!c || c.v !== 2 || c.appliedSeeded) return false;
@@ -12962,6 +12965,7 @@ function tasteRecs(){
   Object.keys(P.pairs).forEach(key => {
     const ov = combo[key];
     if(typeof ov === "number" || ov === "never") return;
+    if(P.pairs[key].n < TASTE_REC_MIN_VERDICTS) return;
     const learned = oneComboAdj(key);
     const from = typeof applied[key] === "number" ? applied[key] : 0;
     if(Math.abs(learned - from) < TASTE_REC_GAP) return;
