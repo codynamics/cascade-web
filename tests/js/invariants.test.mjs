@@ -924,7 +924,7 @@ test("CAS-667 AC2: opening Moving before and after the ledger resolves ends on t
   setSignedIn(true);
   E.realAlerts.length = 0;
   E.realAlerts.push({ id: 1, movie_id: film.tmdb_id, moment: "announced_stream", title: film.title,
-    cascade_name: "Test agent", emailed_at: new Date().toISOString(), read_at: null });
+    cascade_name: "Test agent", found_at: new Date().toISOString(), read_at: null });
 
   // Landing on Moving before the account answer comes back — the reported symptom.
   E.setMovingReady(false);

@@ -61,7 +61,7 @@ test("CAS-829 AC2(a): every row movingData() returns names exactly one agent, fr
   E.notify[film.tmdb_id] = { cascadeIds: [owner.id] };
   E.realAlerts.length = 0;
   E.realAlerts.push({ id: 1, movie_id: film.tmdb_id, moment: "announced_stream", title: film.title,
-    cascade_name: "Some Other Name", emailed_at: new Date().toISOString(), read_at: null });
+    cascade_name: "Some Other Name", found_at: new Date().toISOString(), read_at: null });
   E.setMovingReady(true);
 
   const { rows } = E.movingData();
@@ -80,7 +80,7 @@ test("CAS-858 AC1: a realAlerts entry for a film with empty cascadeIds produces 
   E.notify[film.tmdb_id] = { cascadeIds: [] };
   E.realAlerts.length = 0;
   E.realAlerts.push({ id: 1, movie_id: film.tmdb_id, moment: "announced_stream", title: film.title,
-    cascade_name: "Some Agent", emailed_at: new Date().toISOString(), read_at: null });
+    cascade_name: "Some Agent", found_at: new Date().toISOString(), read_at: null });
   E.setMovingReady(true);
 
   const { rows, dropped } = E.movingData();
@@ -101,7 +101,7 @@ test("CAS-829 AC2(c): a ledger entry naming a non-owner agent still produces a r
   E.notify[film.tmdb_id] = { cascadeIds: [owner.id] };   // owner.order (0) beats other.order (5)
   E.realAlerts.length = 0;
   E.realAlerts.push({ id: 1, movie_id: film.tmdb_id, moment: "announced_stream", title: film.title,
-    cascade_name: other.name, emailed_at: new Date().toISOString(), read_at: null });
+    cascade_name: other.name, found_at: new Date().toISOString(), read_at: null });
   E.setMovingReady(true);
 
   const { rows } = E.movingData();
@@ -142,9 +142,9 @@ test("CAS-848 AC1: two agents of rank 1 and 2 each owning one row produce two la
   E.realAlerts.length = 0;
   E.realAlerts.push(
     { id: 1, movie_id: filmA.tmdb_id, moment: "new_to_agent", title: filmA.title,
-      cascade_name: rank2.name, emailed_at: new Date().toISOString(), read_at: null },
+      cascade_name: rank2.name, found_at: new Date().toISOString(), read_at: null },
     { id: 2, movie_id: filmB.tmdb_id, moment: "new_to_agent", title: filmB.title,
-      cascade_name: rank1.name, emailed_at: new Date().toISOString(), read_at: null },
+      cascade_name: rank1.name, found_at: new Date().toISOString(), read_at: null },
   );
   E.setMovingReady(true);
 
@@ -167,9 +167,9 @@ test("CAS-848 AC2: new_to_agent renders the New tag, hits_stream renders the Cha
   E.realAlerts.length = 0;
   E.realAlerts.push(
     { id: 1, movie_id: filmNew.tmdb_id, moment: "new_to_agent", title: filmNew.title,
-      cascade_name: owner.name, emailed_at: new Date().toISOString(), read_at: null },
+      cascade_name: owner.name, found_at: new Date().toISOString(), read_at: null },
     { id: 2, movie_id: filmChanged.tmdb_id, moment: "hits_stream", title: filmChanged.title,
-      cascade_name: owner.name, emailed_at: new Date().toISOString(), read_at: null },
+      cascade_name: owner.name, found_at: new Date().toISOString(), read_at: null },
   );
   E.setMovingReady(true);
 
@@ -222,9 +222,9 @@ test("CAS-852 AC2: rows inside one lane, same window, are ordered newest first",
   const now = Date.now();
   E.realAlerts.push(
     { id: 1, movie_id: older.tmdb_id, moment: "new_to_agent", title: older.title,
-      cascade_name: owner.name, emailed_at: new Date(now - 5 * 864e5).toISOString(), read_at: null },
+      cascade_name: owner.name, found_at: new Date(now - 5 * 864e5).toISOString(), read_at: null },
     { id: 2, movie_id: newer.tmdb_id, moment: "new_to_agent", title: newer.title,
-      cascade_name: owner.name, emailed_at: new Date(now - 1 * 864e5).toISOString(), read_at: null },
+      cascade_name: owner.name, found_at: new Date(now - 1 * 864e5).toISOString(), read_at: null },
   );
   E.setMovingReady(true);
 
@@ -249,11 +249,11 @@ test("CAS-852 AC1: a lane with one stream, one in-cinema and one upcoming film e
   // cinema, upcoming) would survive unchanged, so this also proves window rank is what's actually deciding.
   E.realAlerts.push(
     { id: 1, movie_id: streamFilm.tmdb_id, moment: "hits_stream", title: streamFilm.title,
-      cascade_name: owner.name, emailed_at: new Date(now).toISOString(), read_at: null },
+      cascade_name: owner.name, found_at: new Date(now).toISOString(), read_at: null },
     { id: 2, movie_id: cinemaFilm.tmdb_id, moment: "hits_cinema", title: cinemaFilm.title,
-      cascade_name: owner.name, emailed_at: new Date(now).toISOString(), read_at: null },
+      cascade_name: owner.name, found_at: new Date(now).toISOString(), read_at: null },
     { id: 3, movie_id: upcomingFilm.tmdb_id, moment: "announced", title: upcomingFilm.title,
-      cascade_name: owner.name, emailed_at: new Date(now).toISOString(), read_at: null },
+      cascade_name: owner.name, found_at: new Date(now).toISOString(), read_at: null },
   );
   E.setMovingReady(true);
 
@@ -269,13 +269,13 @@ test("CAS-852 AC3: movingLedgerTruncated reads false under the 200-row cap and t
   const now = Date.now();
   for(let i = 0; i < 199; i++){
     E.realAlerts.push({ id: i, movie_id: 9990000 + i, moment: "new_to_agent", title: "x",
-      cascade_name: "x", emailed_at: new Date(now - i * 3600e3).toISOString(), read_at: null });
+      cascade_name: "x", found_at: new Date(now - i * 3600e3).toISOString(), read_at: null });
   }
   assert.equal(E.movingLedgerTruncated("2weeks"), false,
     "AC3: below the 200-row cap, the truncation notice's predicate must read false");
 
   E.realAlerts.push({ id: 199, movie_id: 9990199, moment: "new_to_agent", title: "x",
-    cascade_name: "x", emailed_at: new Date(now).toISOString(), read_at: null });
+    cascade_name: "x", found_at: new Date(now).toISOString(), read_at: null });
   assert.equal(E.realAlerts.length, 200, "sanity: exactly 200 seeded");
   assert.equal(E.movingLedgerTruncated("2weeks"), true,
     "AC3: at the 200-row cap, the truncation notice's predicate must read true");
@@ -287,7 +287,7 @@ test("CAS-858 AC2: a window whose entries are ALL ownerless renders MOVING_EMPTY
   E.notify[film.tmdb_id] = { cascadeIds: [] };
   E.realAlerts.length = 0;
   E.realAlerts.push({ id: 1, movie_id: film.tmdb_id, moment: "announced_stream", title: film.title,
-    cascade_name: "Some Agent", emailed_at: new Date().toISOString(), read_at: null });
+    cascade_name: "Some Agent", found_at: new Date().toISOString(), read_at: null });
   E.setMovingReady(true);
 
   assert.equal(E.movingEmptyCopy("2weeks"), E.MOVING_EMPTY_NO_OWNER_COPY,
@@ -341,7 +341,7 @@ test("CAS-861 AC1: services-only ON, Foxtel not subscribed, a HELD film produces
     E.notify[film.tmdb_id] = { cascadeIds: [owner.id] };
     E.realAlerts.length = 0;
     E.realAlerts.push({ id: 1, movie_id: film.tmdb_id, moment: "announced_stream", title: film.title,
-      cascade_name: owner.name, emailed_at: new Date().toISOString(), read_at: null });
+      cascade_name: owner.name, found_at: new Date().toISOString(), read_at: null });
     E.setMovingReady(true);
 
     const { rows } = E.movingData();
@@ -359,7 +359,7 @@ test("CAS-861 AC2: the same film stays HELD — cascadeIds is untouched by the M
     E.notify[film.tmdb_id] = { cascadeIds: [owner.id] };
     E.realAlerts.length = 0;
     E.realAlerts.push({ id: 1, movie_id: film.tmdb_id, moment: "announced_stream", title: film.title,
-      cascade_name: owner.name, emailed_at: new Date().toISOString(), read_at: null });
+      cascade_name: owner.name, found_at: new Date().toISOString(), read_at: null });
     E.setMovingReady(true);
 
     E.movingData();
@@ -379,7 +379,7 @@ test("CAS-861 AC3: turning the account services switch off makes the row appear 
     E.notify[film.tmdb_id] = { cascadeIds: [owner.id] };
     E.realAlerts.length = 0;
     E.realAlerts.push({ id: 1, movie_id: film.tmdb_id, moment: "announced_stream", title: film.title,
-      cascade_name: owner.name, emailed_at: new Date().toISOString(), read_at: null });
+      cascade_name: owner.name, found_at: new Date().toISOString(), read_at: null });
     E.setMovingReady(true);
 
     assert.ok(!E.movingData().rows.find(r => r.filmId === String(film.tmdb_id)),
@@ -400,7 +400,7 @@ test("CAS-861 AC4: a film on a service the account DOES have is unaffected", () 
     E.notify[film.tmdb_id] = { cascadeIds: [owner.id] };
     E.realAlerts.length = 0;
     E.realAlerts.push({ id: 1, movie_id: film.tmdb_id, moment: "announced_stream", title: film.title,
-      cascade_name: owner.name, emailed_at: new Date().toISOString(), read_at: null });
+      cascade_name: owner.name, found_at: new Date().toISOString(), read_at: null });
     E.setMovingReady(true);
 
     const row = E.movingData().rows.find(r => r.filmId === String(film.tmdb_id));
@@ -431,9 +431,9 @@ test("CAS-858 AC3: the unseen badge count excludes ownerless entries", () => wit
   E.realAlerts.length = 0;
   E.realAlerts.push(
     { id: 1, movie_id: ownedFilm.tmdb_id, moment: "new_to_agent", title: ownedFilm.title,
-      cascade_name: owner.name, emailed_at: new Date().toISOString(), read_at: null },
+      cascade_name: owner.name, found_at: new Date().toISOString(), read_at: null },
     { id: 2, movie_id: unownedFilm.tmdb_id, moment: "new_to_agent", title: unownedFilm.title,
-      cascade_name: "Some Agent", emailed_at: new Date().toISOString(), read_at: null },
+      cascade_name: "Some Agent", found_at: new Date().toISOString(), read_at: null },
   );
   E.setMovingReady(true);
 

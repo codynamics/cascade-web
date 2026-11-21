@@ -537,7 +537,7 @@ create table if not exists public.notifications (
   cascade_id  uuid references public.cascades(id) on delete cascade,
   movie_id    text not null,
   moment      text not null,
-  emailed_at  timestamptz not null default now(),
+  emailed_at  timestamptz,
   unique (cascade_id, movie_id, moment)
 );
 
@@ -548,6 +548,15 @@ create table if not exists public.notifications (
 alter table public.notifications add column if not exists cascade_name text;
 alter table public.notifications add column if not exists title text;
 alter table public.notifications add column if not exists read_at timestamptz;
+
+-- CAS-1504: the ledger is written at 03:00, pushed at 07:30 and emailed at 17:00, so a row needs its own
+-- creation time and one stamp per channel. `emailed_at` (above) now means only "the 17:00 digest covered
+-- this row"; the app and the monitor's de-dupe use `found_at`. See migrations/0011.
+alter table public.notifications add column if not exists found_at  timestamptz not null default now();
+alter table public.notifications add column if not exists pushed_at timestamptz;
+alter table public.notifications add column if not exists detail    jsonb;
+alter table public.notifications alter column emailed_at drop not null;
+alter table public.notifications alter column emailed_at drop default;
 
 alter table public.notifications enable row level security;
 

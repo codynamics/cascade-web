@@ -5,8 +5,13 @@ compatibility_date = "2026-09-01"
 [triggers]
 crons = [
   "17 * * * *",  # every hour -> uptime.yml
-  "0 20 * * *",  # once a day -> daily.yml
-  "0 6 * * *",   # candidate -> alerts.yml, only when this is 17:00 in Sydney (AEDT)
-  "0 7 * * *",   # candidate -> alerts.yml, only when this is 17:00 in Sydney (AEST)
+  "0 14 * * *",  # candidate -> daily.yml, only when this is 01:00 in Sydney (AEDT)
+  "0 15 * * *",  # candidate -> daily.yml, only when this is 01:00 in Sydney (AEST)
+  "0 16 * * *",  # candidate -> alerts.yml phase=find, only when this is 03:00 in Sydney (AEDT)
+  "0 17 * * *",  # candidate -> alerts.yml phase=find, only when this is 03:00 in Sydney (AEST)
+  "30 20 * * *", # candidate -> alerts.yml phase=push, only when this is Sydney hour 07 (07:30 AEDT)
+  "30 21 * * *", # candidate -> alerts.yml phase=push, only when this is Sydney hour 07 (07:30 AEST)
+  "0 6 * * *",   # candidate -> alerts.yml phase=email, only when this is 17:00 in Sydney (AEDT)
+  "0 7 * * *",   # candidate -> alerts.yml phase=email, only when this is 17:00 in Sydney (AEST)
   "*/5 * * * *", # candidate -> recommend.yml, only when Supabase reports unsent mail
 ]

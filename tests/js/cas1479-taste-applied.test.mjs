@@ -126,3 +126,23 @@ test("CAS-1479: overrides and never are untouched; unseeded criteria keep learne
     assert.ok(unseeded <= 80);
   });
 });
+
+test("CAS-1505: a combo needs 2+ verdicts before it can be recommended", () => {
+  withVerdicts(dislikes(2), () => {
+    const c = agent();
+    withAgent(c, () => {
+      E.tasteSeedApplied(c);
+      assert.equal(E.tasteRecs().length, 0);
+      const hasKey = key => E.tasteRecs().some(r => r.keys.some(k => k.key === key));
+      const one = scoredFilm(["Science Fiction","Western"], 50);
+      E.MOVIES.push(one); E.watched.add(one.tmdb_id); E.disliked.add(one.tmdb_id);
+      E.invalidateComputeCaches();
+      assert.equal(hasKey("Science Fiction|Western"), false, "one verdict is not enough to propose");
+      const two = scoredFilm(["Science Fiction","Western"], 50);
+      E.MOVIES.push(two); E.watched.add(two.tmdb_id); E.disliked.add(two.tmdb_id);
+      E.invalidateComputeCaches();
+      assert.equal(hasKey("Science Fiction|Western"), true, "two verdicts can be proposed");
+      [one, two].forEach(m => E.MOVIES.splice(E.MOVIES.indexOf(m), 1));
+    });
+  });
+});

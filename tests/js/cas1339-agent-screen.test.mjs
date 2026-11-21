@@ -152,11 +152,12 @@ test("CAS-1339 AC2: oaRowHTML hides the collapsed strip/value while its own styl
 
 // ---- CAS-1367: the slider no longer goes to off; releasing at its far left clamps to Top 20% -----------------
 
-test("CAS-1367: releasing a drag at share 0 clamps to the slider's own floor (Top 20%), it does not turn the style off", () => {
+// Lee, 2026-11-22: the floor is now Top 5% (was 20%).
+test("CAS-1367: releasing a drag at share 0 clamps to the slider's own floor (Top 5%), it does not turn the style off", () => {
   withCascades([oneAgent({ styles: { "War": styleOn(50) } })], () => {
     const c = E.cascades[0];
     E.oaOnRelease({ dataset:{style:"War"}, value:"0" });
-    assert.equal(c.styles.War.bar, E.oneBarForTopPct("War", 20), "clamped to share 20, not Never");
+    assert.equal(c.styles.War.bar, E.oneBarForTopPct("War", 5), "clamped to share 5, not Never");
     assert.notEqual(c.styles.War.bar, null);
   });
 });

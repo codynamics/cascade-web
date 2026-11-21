@@ -58,7 +58,7 @@ test("CAS-1208: markRealAlertsRead() clears the native badge exactly once", asyn
   signIn(E, client);
   const cap = makeCapacitor();
   E.window.Capacitor = cap;
-  E.realAlerts.push({ id: "n1", movie_id: 1, moment: "stream", title: "Cascade Test", cascade_name: "Massive Movies", emailed_at: "2026-10-06T10:00:00.000Z", read_at: null });
+  E.realAlerts.push({ id: "n1", movie_id: 1, moment: "stream", title: "Cascade Test", cascade_name: "Massive Movies", found_at: "2026-10-06T10:00:00.000Z", read_at: null });
   try {
     await E.window.markRealAlertsRead();
     assert.equal(cap._clearCalls.length, 1, "the native badge clear must be called exactly once");
@@ -74,7 +74,7 @@ test("CAS-1208: markRealAlertsRead() is a no-op on badge clearing when Capacitor
   const E = loadEngine();
   const client = makeFakeClient();
   signIn(E, client);
-  E.realAlerts.push({ id: "n2", movie_id: 2, moment: "stream", title: "Cascade Test 2", cascade_name: "Massive Movies", emailed_at: "2026-10-06T10:00:00.000Z", read_at: null });
+  E.realAlerts.push({ id: "n2", movie_id: 2, moment: "stream", title: "Cascade Test 2", cascade_name: "Massive Movies", found_at: "2026-10-06T10:00:00.000Z", read_at: null });
   try {
     await assert.doesNotReject(E.window.markRealAlertsRead());
   } finally {

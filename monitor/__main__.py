@@ -12,7 +12,14 @@
 Default catalogue: today = movies.json, yesterday = git show HEAD~1:movies.json.
 Default Cascade source: Supabase via the service_role key.
 
-Stages:
+CAS-1504: the run is split into three PHASES (--phase), each on its own Sydney clock time:
+  find  (03:00) diff -> match -> de-dupe -> write the `notifications` ledger. Sends NOTHING.
+  push  (07:30) ONE push per member with unread alerts from that night; reads the ledger, no diff.
+  email (17:00) ONE digest per member of only the alerts they have not seen in the app
+                (`read_at` is null); no email when every one has been seen. Reads the ledger, no diff.
+  all   (default; manual runs and the notify-test harness) the original single run: find + send now.
+
+Stages (find / all):
   1. diff today vs yesterday  -> transitions                                       (CAS-84)
   2. match the `announced` moment to active Cascades' taste (agent-level, CAS-506) and every other
      moment to per-film Watch-it ticks (CAS-484), de-dupe against `notifications`, group per user
@@ -39,6 +46,7 @@ from . import (compute_transitions, DEFAULT_WEEKEND_N, MOMENTS, match, notificat
                compute_admission, compute_auto_placements, compute_scores, synthesize_auto_watch_rows,
                format_invite_reply, hand_picked_pairs)
 from .catalogue import load_catalogue_file, load_today, load_yesterday_from_git
+from .phases import email_phase, push_phase
 from .store import FIXTURE_ID_MAX, FIXTURE_ID_MIN, InMemoryStore, store_from_env
 
 # CAS-986: the two-tier catalogue's demotion-safety net. Written at the end of every real (non-
@@ -96,6 +104,10 @@ def _parse_args(argv):
                         "fetch_undigested_invite_replies() store call.")
     p.add_argument("--print-html", action="store_true",
                    help="With --dry-run, print the full digest HTML (default: subject + text preview).")
+    p.add_argument("--phase", choices=("all", "find", "push", "email"), default="all",
+                   help="CAS-1504: which part of the alert pipeline to run - find (record to the ledger, "
+                        "send nothing), push (07:30), email (17:00), or all (the original single run, "
+                        "default).")
     p.add_argument("--target-user", metavar="USER_ID",
                    help="CAS-486 test-harness safety valve: restrict matching to exactly this "
                         "user_id — every other user's cascades and per-film watches are dropped "
@@ -143,8 +155,48 @@ def _store_call(store, name, default):
         return default
 
 
+def _build_store(args):
+    """The Cascade / notifications / email source for this run: fixtures when --cascades is given,
+    Supabase (service_role) otherwise. Returns (store, source), or (None, source) with no credentials."""
+    if args.cascades is not None:
+        return InMemoryStore(cascades=_load_json(args.cascades),
+                             notifications=_load_json(args.notifications) if args.notifications else [],
+                             emails=_load_json(args.emails) if args.emails else {},
+                             prefs=_load_json(args.prefs) if args.prefs else {},
+                             picks=_load_json(args.picks) if args.picks else [],
+                             watches=_load_json(args.watches) if args.watches else [],
+                             agent_films=_load_json(args.agent_films) if args.agent_films else [],
+                             invite_replies=_load_json(args.replies) if args.replies else []), "fixtures"
+    return store_from_env(), "supabase(service_role)"
+
+
+def _run_ledger_phase(args) -> int:
+    """CAS-1504: the push (07:30) and email (17:00) phases. Both read the ledger the find phase wrote;
+    neither re-runs the catalogue diff."""
+    store, _ = _build_store(args)
+    if store is None:
+        print(f"[monitor] no SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY and no --cascades - "
+              f"skipping the {args.phase} phase.")
+        return 0
+    now = _dt.datetime.now(_dt.timezone.utc)
+    target = args.target_user
+    if args.phase == "push":
+        stats = push_phase(store, now, dry_run=args.dry_run, target_user=target)
+        if stats["attempted"] and not args.dry_run:
+            runstats.bump("push", attempted=stats["attempted"], delivered=stats["delivered"],
+                          errors=stats["failed"])
+    else:
+        stats = email_phase(store, load_catalogue_file(args.today) if args.today else load_today(), now, dry_run=args.dry_run, target_user=target)
+        if stats["attempted"] and not args.dry_run:
+            runstats.bump("email", attempted=stats["attempted"], delivered=stats["sent"],
+                          errors=stats["failed"])
+    return 0
+
+
 def main(argv=None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
+    if args.phase in ("push", "email"):
+        return _run_ledger_phase(args)
 
     today_movies = load_catalogue_file(args.today) if args.today else load_today()
     prev_movies = load_catalogue_file(args.yesterday) if args.yesterday else load_yesterday_from_git()
@@ -159,23 +211,12 @@ def main(argv=None) -> int:
         print("    • " + t.summary())
 
     # --- Cascade / notifications / email source ---
-    if args.cascades is not None:
-        store = InMemoryStore(cascades=_load_json(args.cascades),
-                              notifications=_load_json(args.notifications) if args.notifications else [],
-                              emails=_load_json(args.emails) if args.emails else {},
-                              prefs=_load_json(args.prefs) if args.prefs else {},
-                              picks=_load_json(args.picks) if args.picks else [],
-                              watches=_load_json(args.watches) if args.watches else [],
-                              agent_films=_load_json(args.agent_films) if args.agent_films else [],
-                              invite_replies=_load_json(args.replies) if args.replies else [])
-        source = "fixtures"
-    else:
-        store = store_from_env()
-        source = "supabase(service_role)"
-        if store is None:
-            print("[monitor] no SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY and no --cascades — "
-                  "skipping match/email (diff only).")
-            return 0
+    store, source = _build_store(args)
+    if store is None:
+        print("[monitor] no SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY and no --cascades — "
+              "skipping match/email (diff only).")
+        return 0
+    find_only = args.phase == "find"   # CAS-1504: record to the ledger, send nothing
 
     # CAS-942: 180-day retention for usage_events, run once per day alongside everything else this
     # job already does with the service_role credential. Skipped on --dry-run, same as every other
@@ -383,7 +424,8 @@ def main(argv=None) -> int:
     # against today's catalogue for its window text; a film that has since left the catalogue just
     # renders with no window line rather than inventing one (honesty guardrail). `replies_rows`
     # follows the same override-else-store pattern as --picks/--watches above.
-    replies_rows = (_load_json(args.replies) if args.replies
+    replies_rows = ([] if find_only else
+                    _load_json(args.replies) if args.replies
                     else _store_call(store, "fetch_undigested_invite_replies", []))
     if args.target_user:
         replies_rows = [r for r in replies_rows if str(r.get("sender_id")) == args.target_user]
@@ -424,7 +466,7 @@ def main(argv=None) -> int:
     # CAS-1196: ONE call to the shipped engine for every film any digest might show a score chip
     # for — never once per film, never once per user (same reasoning as compute_admission() above).
     digest_movie_ids = {h.transition.movie_id for hits in by_user.values() for h in hits}
-    scores = compute_scores(digest_movie_ids)
+    scores = {} if find_only else compute_scores(digest_movie_ids)   # CAS-1504: the find phase renders no digest
 
     # --- one consolidated digest per user ---
     # CAS-185: there are TWO deliveries now, and they have different failure modes.
@@ -437,6 +479,7 @@ def main(argv=None) -> int:
     # CAS-887 AC2: a user with replies but no film transitions still reaches this loop (from
     # replies_by_user) and still gets an email — the replies alone are worth sending.
     sent, written_total, inapp, pushed_total = 0, 0, 0, 0
+    _found_now = _dt.datetime.now(_dt.timezone.utc).isoformat()
     # CAS-974: attempted/failed tallies alongside the existing sent/pushed_total counters above,
     # for monitor.health's email_send/push_send checks — written to runstats at the end of this
     # function, never mid-loop, so a run that sends nothing writes nothing (an absent section
@@ -487,6 +530,11 @@ def main(argv=None) -> int:
         # There is no in-app/push delivery for a reply here; the Invites screen and its own Moving
         # alert already cover that, live, straight off invite_replies.
         mail_replies = reply_pairs if plan == "email" else []
+        if find_only:
+            # CAS-1504: the 03:00 run only RECORDS. The row is what the 07:30 push and the 17:00 email
+            # read, so it must exist for every hit a channel could later deliver; whether that channel
+            # still applies is re-decided against the member's prefs when it runs.
+            pushable = []
         if not mailable and not appable and not mail_replies:
             print(f"[monitor] {user_id}: every matching agent has its channels off — nothing sent or written.")
             continue
@@ -495,7 +543,7 @@ def main(argv=None) -> int:
         # failure here is a logged outcome for THIS channel only, never a `continue` that skips the
         # in-app/push delivery and the ledger write still owed to this user.
         email_ok = False
-        if mailable or mail_replies:
+        if (mailable or mail_replies) and not find_only:
             # only what's delivered
             digest = render_digest(mailable, replies=[f for _, f in mail_replies], scores=scores,
                                    watch_windows=watch_windows)
@@ -511,21 +559,22 @@ def main(argv=None) -> int:
                 print(f"[monitor] {user_id}: email channel — failed: {err} — ledger not written for "
                       "it, will retry; in-app/push are unaffected.")
         if appable:
-            print(f"[monitor] {user_id}: in-app channel — delivered ({len(appable)} alert(s)).")
+            print(f"[monitor] {user_id}: in-app channel — "
+                  f"{'recorded' if find_only else 'delivered'} ({len(appable)} alert(s)).")
             if not email_ok:
                 inapp += 1
         # One row per hit that WAS delivered, by either channel, and never one for a hit whose only
         # offered channel(s) all failed — that's what keeps a failed channel retried next run.
         delivered = {}
-        if email_ok:
+        if email_ok or find_only:
             delivered.update({id(h): h for h in mailable})
         delivered.update({id(h): h for h in appable})
         # CAS-465: sent before the ledger insert below (same send-before-ledger ordering as email),
         # to every registered device, one push per hit. Badge = what the bell badge will read once
         # this run's in-app rows land — the existing unread count plus what this run is delivering.
+        pushed = 0
         if pushable:
             badge = unread_counts.get(str(user_id), 0) + len(delivered)
-            pushed = 0
             # CAS-1194: a token APNs just declared permanently dead is dropped from the DB and
             # skipped for the rest of THIS user's hits too, so one bad device doesn't eat a
             # repeated, pointless APNs round trip per remaining hit in the same run.
@@ -556,7 +605,19 @@ def main(argv=None) -> int:
         # or in-app was chosen), so a DB/ledger hiccup here must be a logged warning, never a crash
         # that aborts the rest of the run — the alternative is silently dropping every later user.
         try:
-            written_total += store.insert_notifications(notification_rows({user_id: list(delivered.values())}))
+            rows = notification_rows({user_id: list(delivered.values())})
+            # CAS-1504: every row carries when it was found, and - in the single-run `all` mode, where
+            # delivery happens in this same pass - which channels already covered it. In `find` the
+            # push/email stamps stay null: that is exactly what the later phases look for.
+            mailed_ids = {id(m) for m in mailable} if email_ok else set()
+            pushed_ids = {id(p) for p in pushable} if pushed else set()
+            for h, row in zip(delivered.values(), rows):
+                row["found_at"] = _found_now
+                if id(h) in mailed_ids:
+                    row["emailed_at"] = _found_now
+                if id(h) in pushed_ids:
+                    row["pushed_at"] = _found_now
+            written_total += store.insert_notifications(rows)
         except Exception as err:  # noqa: BLE001 — a ledger-write failure must not abort the run
             print(f"[monitor] could not write ledger for {user_id}: {err} — delivery stands, will "
                   "retry the ledger row next run.")
@@ -576,6 +637,9 @@ def main(argv=None) -> int:
         would_replies = sum(len(v) for v in replies_by_user.values())
         print(f"[monitor] --dry-run: rendered {len(all_user_ids)} digest(s) covering {would} "
               f"alert(s) and {would_replies} invite reply(s); sent NOTHING, wrote NOTHING.")
+    elif find_only:
+        print(f"[monitor] find phase: recorded {written_total} notification row(s); sent NOTHING "
+              "(push at 07:30, email at 17:00).")
     else:
         print(f"[monitor] sent {sent} email digest(s), {inapp} in-app-only, {pushed_total} push "
               f"notification(s); wrote {written_total} notification row(s).")

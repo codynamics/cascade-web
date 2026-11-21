@@ -230,7 +230,7 @@ class MatchTests(unittest.TestCase):
             # that caught the film and the film's title — enough for the bell to draw itself
             # without re-deriving anything from a catalogue that has moved on since.
             self.assertEqual(set(r), {"user_id", "cascade_id", "movie_id", "moment",
-                                      "cascade_name", "title"})
+                                      "cascade_name", "title", "detail"})   # CAS-1504: detail
             self.assertTrue(r["title"])
             self.assertTrue(r["cascade_name"])
 

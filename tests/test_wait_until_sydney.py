@@ -1,4 +1,4 @@
-"""CAS-993 AC3 — scripts/wait_until_sydney.py's wait decision, injected times only (no real sleep).
+"""CAS-993 AC3 / CAS-1503 — scripts/wait_until_sydney.py's wait decision, injected times only (no real sleep).
 
 Run:  python -m unittest tests.test_wait_until_sydney
 """
@@ -12,40 +12,40 @@ import wait_until_sydney as wus  # noqa: E402
 
 
 class ComputeWait(unittest.TestCase):
-    def test_1317_aest_waits_until_1700(self):
+    def test_0117_aest_waits_until_0300(self):
         # 2026-07-01 is well outside AU daylight saving (AEST, UTC+10).
-        now = datetime.datetime(2026, 7, 1, 13, 17, tzinfo=wus.SYDNEY)
+        now = datetime.datetime(2026, 7, 1, 1, 17, tzinfo=wus.SYDNEY)
         decision = wus.compute_wait(now)
         self.assertGreater(decision.wait_seconds, 0)
         self.assertFalse(decision.warn)
         wake = now + datetime.timedelta(seconds=decision.wait_seconds)
-        self.assertEqual((wake.hour, wake.minute), (17, 0))
+        self.assertEqual((wake.hour, wake.minute), (3, 0))
 
-    def test_1417_aedt_waits_until_1700(self):
-        # 2026-01-15 is mid AU daylight saving (AEDT, UTC+11) — same 17:00 target, different
+    def test_0217_aedt_waits_until_0300(self):
+        # 2026-01-15 is mid AU daylight saving (AEDT, UTC+11) — same 03:00 target, different
         # UTC offset, proving the conversion is DST-aware rather than a fixed hour count.
-        now = datetime.datetime(2026, 1, 15, 14, 17, tzinfo=wus.SYDNEY)
+        now = datetime.datetime(2026, 1, 15, 2, 17, tzinfo=wus.SYDNEY)
         decision = wus.compute_wait(now)
         self.assertGreater(decision.wait_seconds, 0)
         self.assertFalse(decision.warn)
         wake = now + datetime.timedelta(seconds=decision.wait_seconds)
-        self.assertEqual((wake.hour, wake.minute), (17, 0))
+        self.assertEqual((wake.hour, wake.minute), (3, 0))
 
-    def test_1730_does_not_wait(self):
-        now = datetime.datetime(2026, 7, 1, 17, 30, tzinfo=wus.SYDNEY)
+    def test_0330_does_not_wait(self):
+        now = datetime.datetime(2026, 7, 1, 3, 30, tzinfo=wus.SYDNEY)
         decision = wus.compute_wait(now)
         self.assertEqual(decision.wait_seconds, 0)
         self.assertFalse(decision.warn)
 
-    def test_2130_does_not_wait_and_warns(self):
-        now = datetime.datetime(2026, 7, 1, 21, 30, tzinfo=wus.SYDNEY)
+    def test_0730_does_not_wait_and_warns(self):
+        now = datetime.datetime(2026, 7, 1, 7, 30, tzinfo=wus.SYDNEY)
         decision = wus.compute_wait(now)
         self.assertEqual(decision.wait_seconds, 0)
         self.assertTrue(decision.warn)
 
     def test_utc_input_converted_before_comparison(self):
-        # 06:00 UTC in July (AEST, UTC+10) is 16:00 Sydney — still before the 17:00 target.
-        now = datetime.datetime(2026, 7, 1, 6, 0, tzinfo=datetime.timezone.utc)
+        # 16:00 UTC on 30 Jun (AEST, UTC+10) is 02:00 Sydney on 1 Jul — still before the 03:00 target.
+        now = datetime.datetime(2026, 6, 30, 16, 0, tzinfo=datetime.timezone.utc)
         decision = wus.compute_wait(now)
         self.assertGreater(decision.wait_seconds, 0)
         self.assertLessEqual(decision.wait_seconds, 3600)

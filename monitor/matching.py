@@ -86,6 +86,8 @@ class Hit:
             "moment": self.transition.moment,
             "cascade_name": self.cascade_name,
             "title": self.transition.title,
+            # CAS-1504: what the 17:00 email needs to draw the same card without re-running the diff.
+            "detail": {"services": list(self.transition.services), "price": self.transition.price},
         }
 
 

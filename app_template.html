@@ -3533,9 +3533,15 @@
   .tkstyle b.up{color:#2dd4bf}
   .tkstyle b.down{color:#f0883a}
   .tkfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
-  .tkdrag{position:absolute;z-index:5;margin:0;left:-5px;width:calc(100% + 10px);top:50%;transform:translateY(-50%);height:22px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
-  .tkdrag::-webkit-slider-runnable-track{height:22px;background:transparent}
-  .tkdrag::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:20px;border-radius:5px;background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);margin-top:1px}
+  /* Lee, 2026-11-22: a 40px-tall touch target (was 22px) so a finger reliably catches the slider; the thumb
+     itself is unchanged in look, centred in the taller track. */
+  .tkdrag{position:absolute;z-index:5;margin:0;left:-5px;width:calc(100% + 10px);top:50%;transform:translateY(-50%);height:40px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer;touch-action:none}
+  .tkdrag::-webkit-slider-runnable-track{height:40px;background:transparent}
+  .tkdrag::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:22px;border-radius:6px;background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);margin-top:9px}
+  /* Lee, 2026-11-22: while a genre is being dragged, its Score / top % reads much larger */
+  .oarowwrap .oarowval{transition:transform .12s ease;transform-origin:right center}
+  .oarowwrap.oadragging .oarowval{transform:scale(1.45)}
+  .oarowwrap.oadragging{z-index:6}
   .tkdrag::-moz-range-track{height:22px;background:transparent;border:none}
   .tkdrag::-moz-range-thumb{width:10px;height:20px;border-radius:5px;background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5)}
   .oarowwrap{position:relative}
@@ -3701,13 +3707,26 @@
   .oamlvl{margin:2px 0 10px;padding-bottom:10px;border-bottom:1px solid var(--line)}
   .oamlvlhd{margin:0 0 6px}   /* also .subhd — same look as SHOW / ORDER */
   .oamlvlnote{margin:8px 2px 0}
-  .oamlvl .mfbox{margin:8px 0 0;border-top:0;padding:4px 4px 0}
+  .oamlvl .mfbox{margin:8px 0 0;border-top:0;padding:4px 4px 0;overflow:hidden;max-height:260px;opacity:1;
+    transition:max-height .34s cubic-bezier(.4,0,.2,1),opacity .26s ease,margin .34s cubic-bezier(.4,0,.2,1),padding .34s cubic-bezier(.4,0,.2,1)}
+  .oamtastelink{display:flex;align-items:center;justify-content:space-between;width:100%;margin:12px 0 4px;
+    padding:11px 14px;border-radius:12px;border:1px solid rgba(124,92,255,.55);background:rgba(124,92,255,.14);
+    color:var(--ink);font:700 14px var(--font-body);cursor:pointer}
+  .oamtastelink span[aria-hidden]{font-size:20px;line-height:1;color:var(--accent)}
+  .oamtasteback{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 14px;padding:12px 14px;border-radius:12px;
+    border:1px solid rgba(124,92,255,.55);background:rgba(124,92,255,.16);color:var(--ink);font:600 15px var(--font-body);
+    text-align:left;cursor:pointer}
+  .oamtasteback span[aria-hidden]{font-size:22px;line-height:1;color:var(--accent)}
+  .oamlvl .mfbox.shut{max-height:0;opacity:0;margin-top:0;padding-top:0;padding-bottom:0}
+  @media (prefers-reduced-motion: reduce){ .oamlvl .mfbox{transition:none} }
   .mfrowgrid{align-items:center}
   .mfrowgrid .mflbl{font-size:12px;color:var(--dim);line-height:1.35}
   .mfrowgrid .mflbl b{color:var(--ink);font-size:12.5px}
   .oastrip{display:flex;gap:3px}
-  .oamstylerow .oaslidewrap{flex:none;height:12px}
-  .oamstylerow .oastrip .oabox{height:12px;border-radius:3px}
+  .oamstylerow .oaslidewrap{flex:none;height:16px}
+  .oamstylerow .oastrip .oabox{height:16px;border-radius:3px}
+  .oamthumb{position:absolute;top:-2px;width:10px;height:20px;margin-left:-5px;border-radius:5px;background:#fff;
+    border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);pointer-events:none}
   .mfrowgrid .oaslidewrap{flex:none;height:16px}
   .mfrowgrid .oastrip .oabox{height:16px;border-radius:3px}
   .mfrowgrid .oarange{height:22px;margin-top:-3px}
@@ -3729,6 +3748,26 @@
     color:var(--dim);font-size:10.5px;letter-spacing:.04em;vertical-align:1px}
   /* Lee, 2026-11-21: PRIMARY SEARCH — one box holding the genre levels and, under them, the name box. */
   .oamprimbox{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:0 0 12px}
+  /* Lee, 2026-11-22: collapsible sections (mockup list-sheet-collapsed-mockup.png) — each a bordered card whose
+     header names the section, says what is set, and carries a purple dot (+ purple edge) when changed from default. */
+  #watchSheetBody .oamsec{border:1px solid var(--line);background:var(--panel);border-radius:14px;margin:0 0 10px;padding:0;overflow:hidden}
+  #watchSheetBody .oamsec.set{border-color:rgba(124,92,255,.55)}
+  .oamsechd{display:flex;align-items:center;gap:12px;width:100%;padding:14px;background:none;border:0;color:var(--ink);
+    text-align:left;cursor:pointer;font:inherit}
+  .oamsechd .oamsect{flex:1;min-width:0}
+  .oamsechd .wsheethd{margin:0;padding:0;border:0}
+  .oamsechd .wsheethd>span:first-child{font-size:13.5px;font-weight:800;letter-spacing:.06em;color:var(--ink)}
+  .oamsecsum{display:block;font-style:normal;font-size:13px;color:var(--dim);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .oamsec.set .oamsecsum{color:#cfc4ff}
+  .oamsecdot{flex:none;width:9px;height:9px;border-radius:50%;border:1.5px solid var(--faint)}
+  .oamsec.set .oamsecdot{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,92,255,.25)}
+  .oamsecchev{flex:none;color:var(--dim);font-size:22px;line-height:1;transform:rotate(90deg);transition:transform .2s ease}
+  .oamsec.open .oamsecchev{transform:rotate(-90deg)}
+  .oamsecbody{display:none;border-top:1px solid var(--line);padding:12px 12px 14px}
+  .oamsec.open .oamsecbody{display:block}
+  .oamsecbody .morebody{margin:0;padding:0;border:0}
+  .oamsechd.morebtn{margin:0;border:0;border-radius:0;background:none;justify-content:flex-start;font-size:inherit;
+    font-weight:inherit;letter-spacing:normal;text-transform:none;padding:14px}
   .oamprimbox>.mpanel{border:0;background:none;margin:0}
   .oamprimbox>.oamkwsec{margin:4px 12px 0;padding-top:12px;border-top:1px solid var(--line)}
   .oamprimbox .oamkwhd{margin:0 0 8px}
@@ -7116,6 +7155,9 @@ function matchesServices(m, w){
   // changing their real services, which defeats the harness. Isolation from genuine agent matching (CAS-486)
   // is untouched — this only lifts the SERVICES filter, never the taste/criteria one.
   if(m._fixture) return true;
+  // CAS-1508: cinema windows are never service-scoped (2026-09-08 rule), even when the film already carries a
+  // PVOD offer — no offer can belong to in_cinema/upcoming, so the window check below would always reject it.
+  if(w==="in_cinema" || w==="upcoming" || w==="opening_week") return true;
   const o=m.offers||[];
   if(!o.length) return true;                 // in cinema / upcoming — always visible
   // CAS-342: scoped to a specific window, "on your services" has to mean an offer that actually BELONGS to
@@ -9496,6 +9538,16 @@ function cardHTML(m, markNew=false, {hideDismiss=false, inWatch=false}={}){
   // screens, not Watch, so they keep following the open agent's own scope via prefsActive(), unchanged.
   const svcScoped = inWatch ? (!ignoreScope && accountScopedFor()) : prefsActive();
   if(svcScoped && !m._fixture) offers=offers.filter(myService);   // CAS-491: see matchesServices
+  // Lee, 2026-11-22: a list set to one service (e.g. "Stan") already lists only films included on it, but the
+  // card showed whichever of your services came first (Disney, Netflix…), so the list looked unfiltered. On
+  // Watch, that service's own included offer now leads, so the card names the service the list is about.
+  if(inWatch && !m._fixture){
+    const listSvc=oamActiveMoodSvc();
+    if(listSvc){
+      const onList=o=>(o.type==="sub"||o.type==="free") && svcCanon(o.service)===listSvc;
+      offers=[...offers.filter(onList), ...offers.filter(o=>!onList(o))];
+    }
+  }
   // CAS-285: the per-title provider credit is gone from the card. The attribution is REQUIRED but it is not
   // information about the film, and repeating it under every "where to watch" list on a 2,000-card listing
   // is the same sentence a thousand times. It is stated once, in About & credits, which is where TMDB's own
@@ -12922,6 +12974,9 @@ function barAdvice(style){
 // PENDING when its learned value sits >= 2 away from the applied value (c.applied) and has not been skipped
 // at about its current learned value (c.skipped). The person applies or skips per genre.
 const TASTE_REC_GAP = 2;
+// Lee, 22 Nov 2026: Pixel never proposes an adjustment from a single film — a combo needs at least this many
+// verdicts before it can be a recommendation. Scoring is untouched: an unrecommended combo keeps its applied value.
+const TASTE_REC_MIN_VERDICTS = 2;
 // Day-one seed: applied[key] = learned for every combo that has verdicts, so no score moves the day this ships.
 function tasteSeedApplied(c){
   if(!c || c.v !== 2 || c.appliedSeeded) return false;
@@ -12943,6 +12998,7 @@ function tasteRecs(){
   Object.keys(P.pairs).forEach(key => {
     const ov = combo[key];
     if(typeof ov === "number" || ov === "never") return;
+    if(P.pairs[key].n < TASTE_REC_MIN_VERDICTS) return;
     const learned = oneComboAdj(key);
     const from = typeof applied[key] === "number" ? applied[key] : 0;
     if(Math.abs(learned - from) < TASTE_REC_GAP) return;
@@ -15713,7 +15769,7 @@ const HELP_ARTICLES = [
    body:"Alerts is where Cascade tells you what's happened lately, split into two kinds of row. New is a film's first appearance for a given agent — something it's never found before. Changed is everything else: a film the agent already had, that's now moved to a different window. A film is never counted as both at once.\n\nYou choose how far back to look — Today, Week, 2 weeks or Month — and Alerts shows only what falls inside that window, measured back from right now. Every row names the agent that actually owns the film today, so nothing is shown under an agent that no longer has it."},
   {slug:"notifications", title:"Notifications",
    summary:"Exactly what will reach you, by which channel, and when the daily report runs.",
-   body:"Cascade can tell you about a film two ways: as a push notification, and by email, folded into one daily digest sent to the address on your account — both go out together, once a day, at 5pm Sydney time. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Status tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for every agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe daily digest gathers whatever every agent's channels found since the last one, rather than emailing or pushing to you separately every time something is found."},
+   body:"Cascade can tell you about a film two ways: as a push notification, and by email. Your agent checks overnight. New films are in Alerts by morning, with one push at about 7:30am. The 5pm email only lists the ones you haven't already seen in the app. Which of those exist for you at all is your account's own decision — an individual agent can only switch an available channel off for itself, never turn on one your account hasn't enabled.\n\nWhat actually triggers a notification is a window being switched on in Status tracking — Upcoming, In cinema, Premium, Rent, Stream: watch in a window and Cascade tells you when a film arrives there. Upcoming has two switches of its own, for a film that hasn't opened yet: When announced (the day it first reaches Cascade) and Opening next week (a week out from its published cinema date). Turn a window off there and nothing on it will alert you, however an agent tracking it is set up.\n\nEach agent also carries its own Alerts switch, on its Edit screen. It starts on for every agent — switch it off and that agent keeps watching quietly, with nothing sent about it, whatever your account's window switches say; switch it on and it follows them like any other agent.\n\nThe push and the email each gather whatever every agent found overnight, rather than notifying you separately every time something is found."},
   {slug:"your-account-and-data", title:"Your account and data",
    summary:"What is stored, where, and how to delete it.",
    body:`Signed out, everything Cascade knows about you — your agents, what you've watched, your preferences — is stored only on this device, in this browser or app install. Nothing about it reaches anywhere else.\n\nSigned in, that same information is mirrored to your account so it's there again on another device you sign into. Signing out doesn't erase it — it's still on your account, waiting for you to sign back in.\n\nDeleting your account is on the Account screen itself: type DELETE to confirm, and it permanently removes your agents, everything they've found for you, what you've marked watched, your invites and friends, your notification history and your sign-in — there's nothing left to undo.${MEMBERSHIP_ENABLED ? " It doesn't cancel an active App Store subscription, which you'll need to manage separately." : ""}`},
@@ -20559,7 +20615,14 @@ function oaComputeOrder(c){
 }
 // Frozen while a style is open (the ticket's own "does NOT re-sort" rule — Lee hit a score edit re-sorting
 // the list under his finger in the prototype); recomputed fresh every time nothing is open.
-function oaOrder(c){ return (oaOpenStyle && oaOrderSnapshot) ? oaOrderSnapshot : oaComputeOrder(c); }
+// Lee, 2026-11-22: rows never reorder while Taste is open — the order is frozen when the screen opens
+// (oaScreenOrder) and recomputed on the next visit. An open style's own snapshot still wins while it is open.
+let oaScreenOrder=null, oaListingDirty=false;
+function oaOrder(c){
+  if(oaOpenStyle && oaOrderSnapshot) return oaOrderSnapshot;
+  if(oaScreenOrder) return oaScreenOrder;
+  return oaComputeOrder(c);
+}
 // One matchesCriteria pass over the whole catalogue (not one pass per style) — the films-admitted count for
 // every style at once, keyed by each film's own MAIN style (mainOtherCombos, CAS-1337's own convention).
 function oaFilmCounts(c){
@@ -20671,6 +20734,7 @@ function oaRowHTML(c, style, filmCount, changed){
   // CAS-1481: the closed row's slider lives inside the strip and is placed by CSS alone (no measuring).
   const dragInp = on && !open ? `<input type="range" class="tkdrag" min="0" max="100" step="1" value="${rowTop}"
         data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
+        onpointerup="oaDragEnd(this)" ontouchend="oaDragEnd(this)" onblur="oaDragEnd(this)"
         aria-label="${escA(name)} minimum score">` : "";
   const strip = open ? `<span class="oarowstrip"></span><span class="oarowval"></span>`
     : `<span class="oarowstrip">${oaShareBoxesHTML(style, bar)}${dragInp}</span>
@@ -20738,6 +20802,7 @@ function renderOneAgentScreen(c){
   const title = "Your taste";   // CAS-1480: the screen heading (was the agent's own name, CAS-1352)
   const agentName = (c.name||"").trim() || "your agent";
   $("agentsBody").innerHTML=`
+    ${oamTasteBackHTML()}
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">Built from your ${n} verdict${n===1?"":"s"}</p>
     <div class="oaintro"><p>This is your space. Slide any genre to see more or fewer of its films. Nothing changes unless you change it.</p><p>Your agent, ${esc(agentName)}, studies your verdicts and suggests tweaks. You decide what to apply.</p><p>A <b>gold edge</b> marks a genre with an agent recommendation. Tap a genre to open it.</p></div>
@@ -20821,9 +20886,12 @@ window.oaToggleStyle=(style)=>{
 // full re-render, so neither the drag gesture nor the frozen row order is disturbed mid-drag.
 // CAS-1367: the slider's range is now Top 20%..All only — it never produces off (bar null) any more, so
 // there is no "Never" branch here; the row's own tick is the only way to turn a style off.
+// Lee, 2026-11-22: a genre can go as narrow as its top 5% (was 20%). Still never 0 — only the tick turns a genre off.
+const OA_MIN_SHARE=5;
 window.oaOnDrag=(input)=>{
+  { const rw=input.closest(".oarowwrap"); if(rw) rw.classList.add("oadragging"); }   // big value while dragging
   const style=input.dataset.style;
-  const share=Math.max(20, Math.min(100, parseInt(input.value,10)));
+  const share=Math.max(OA_MIN_SHARE, Math.min(100, parseInt(input.value,10)));
   input.value=share;
   const wrap=input.closest(".oaslidewrap") || input.closest(".oarowwrap");   // CAS-1480: the closed row's own slider
   const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
@@ -20851,15 +20919,18 @@ window.oaOnDrag=(input)=>{
 window.oaOnRelease=(input)=>{
   const style=input.dataset.style;
   const c=oneAgentCriteria(); if(!c) return;
-  const share=Math.max(20, Math.min(100, parseInt(input.value,10)));
+  const share=Math.max(OA_MIN_SHARE, Math.min(100, parseInt(input.value,10)));
   input.value=share;
   c.styles=c.styles||{};
   const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
   st.bar = oneBarForTopPct(style, share);
   saveCascades();
-  if(typeof render==="function") render();
+  // Lee, 2026-11-22: the listing behind Taste is rebuilt when Taste closes (closeAgentsScreen), not on every
+  // release — a full render here took the phone's main thread for a second or more and swallowed the next drag.
+  oaListingDirty=true;
   renderAgentsScreen();
 };
+window.oaDragEnd=(input)=>{ const rw=input.closest(".oarowwrap"); if(rw) rw.classList.remove("oadragging"); };
 // CAS-1367: the row's tick — the only way a style turns off. Switching off remembers the bar as lastBar so
 // switching back on restores the same share; a style that has never had one starts at score 80. Shared with
 // Find's "Turn <Genre> on" button (oamWilTurnOnGenre, below), so both paths restore the same way.
@@ -20876,7 +20947,7 @@ window.oaToggleStyleOn=(style)=>{
   if(st.bar!=null){ st.lastBar=st.bar; st.lastAl={...(st.al||{})}; st.bar=null; }
   else { oaTurnStyleOn(st); }
   saveCascades();
-  if(typeof render==="function") render();
+  oaListingDirty=true;   // Lee, 2026-11-22: rebuilt when Taste closes
   renderAgentsScreen();
 };
 window.oaApplySuggestion=(style,to)=>{
@@ -21500,7 +21571,7 @@ window.openOamMoodSheetFor=id=>{
   oamDraft=oamMoodDraftFrom(mood);
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  oamNotInMoodOpen=false; oamMoreFiltersOpen=false;
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set();
   openWatchSheet();
 };
 window.openOamMoodSheetForNew=()=>{
@@ -21508,7 +21579,7 @@ window.openOamMoodSheetForNew=()=>{
   oamDraft=oamMoodDraftFrom(null);
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  oamNotInMoodOpen=false; oamMoreFiltersOpen=false;
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set();
   openWatchSheet();
 };
 // CAS-1395: the new-mood draft's own people/svc/name/watched fields, built from Find's current search and
@@ -21555,7 +21626,7 @@ window.openOamMoodSheetFromFind=()=>{
   oamDraft.fromFind={total, label:fields.name};
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  oamNotInMoodOpen=false; oamMoreFiltersOpen=false;
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set();
   openWatchSheet();
   logEvent("mood_from_find");
 };
@@ -21608,6 +21679,7 @@ function oamApplyModeToDOM(){
   if(gen) gen.classList.toggle("off", kw);
   if(panel){ panel.inert=kw; panel.setAttribute("aria-disabled", kw); }
   const kws=$("oamKwSec"); if(kws) kws.classList.toggle("open", kw || !!d.kwOpen);
+  oamRefreshSecSummaries();   // Lee, 2026-11-22: typing a name updates PRIMARY SEARCH's header line
 }
 // Every other saved mood that would ALSO list this style — "also in <names>" under a style row.
 function oamStylesAlsoIn(style, excludeId){
@@ -21622,9 +21694,18 @@ function oamStyleValHTML(style, bar, filterShare){
   if(bar==null) return "Never";
   const agentShare=oneTopPct(style, bar);
   if(filterShare!=null && agentShare!==filterShare){
-    return `${filterShare>=100?"All":`Top ${filterShare}%`}<i><s class="was">${agentShare}%</s> · ${oneBarForTopPct(style, filterShare)}+</i>`;
+    return `${filterShare>=100?"All":`Score ${oneBarForTopPct(style, filterShare)}+`}<i><s class="was">top ${agentShare}%</s> · top ${filterShare}%</i>`;
   }
-  return `Top ${agentShare}%<i>score ${bar}+</i>`;
+  return `Score ${bar}+<i>top ${agentShare}%</i>`;   // Lee, 2026-11-22: same order as the Taste screen
+}
+// Lee, 2026-11-22: a read-only copy of the Taste screen's white thumb, sat at the genre's level so the list's rows
+// read like the Taste rows. Same box geometry as the fill: box floor(p/20), (p mod 20)/20 of the way across it;
+// 5 boxes with 3px gaps.
+function oamThumbHTML(share){
+  const p=Math.max(0, Math.min(100, share));
+  const idx = p>=100 ? 4 : Math.floor(p/20);
+  const frac = p>=100 ? 1 : (p%20)/20;
+  return `<i class="oamthumb" aria-hidden="true" style="left:calc((100% - 12px) * ${(idx+frac)/5} + ${idx*3}px)"></i>`;
 }
 function oamStyleRowHTML(c, d, style){
   const bar=oamDraftBar(d, c, style);
@@ -21642,7 +21723,7 @@ function oamStyleRowHTML(c, d, style){
           ${subText?`<span class="oamalso">${esc(subText)}</span>`:""}
         </span>
       </label>
-      <div class="oaslidewrap"><div class="oastrip">${oaShareBoxesHTML(style, bar)}</div></div>
+      <div class="oaslidewrap"><div class="oastrip">${oaShareBoxesHTML(style, bar)}</div>${(!never && d.topShare==null) ? oamThumbHTML(oneTopPct(style, bar)) : ""}</div>
       <span class="oarowval">${oamStyleValHTML(style, bar, null)}</span>
     </div>`;
 }
@@ -21668,10 +21749,15 @@ function oamOverrideFilterDesc(share, on){
   if(!on) return `Switch to Override to give every ticked genre one level instead of its Taste level.`;
   return `Every ticked genre shows its ${share>=100?"whole catalog":`top ${share}%`} here, instead of its Taste level.`;
 }
+// Lee, 2026-11-22: under My taste the override slider is hidden ("shut"); switching animates it open or closed.
+// toggleOamOverride renders it in its OLD state (oamOvAnimFrom), then flips "shut" two frames later so the CSS
+// transition actually plays on the freshly rendered element.
+let oamOvAnimFrom=null;
 function oamOverrideFilterHTML(d){
   const on = d.topShare!=null;
   const share = on ? d.topShare : (d.lastTopShare || 40);
-  return `<div class="mfbox${on?"":" off"}">
+  const shut = oamOvAnimFrom!=null ? !oamOvAnimFrom : !on;
+  return `<div class="mfbox${on?"":" off"}${shut?" shut":""}" id="oamOvBox">
       <div class="mfscale"><span>${ONE_AGENT_SHARE_BRACKETS.map(b=>`<i>${esc(oaShareLabel(b.pct))}</i>`).join("")}</span></div>
       <div class="mfrowgrid">
         <div class="mflbl"><b>Every genre</b><span class="mfsub">same level</span></div>
@@ -21687,15 +21773,51 @@ function oamOverrideFilterHTML(d){
 }
 window.toggleOamOverride=()=>{
   const d=oamDraft; if(!d) return;
-  if(d.topShare!=null){ d.lastTopShare=d.topShare; d.topShare=null; }
+  const was = d.topShare!=null;
+  if(was){ d.lastTopShare=d.topShare; d.topShare=null; }
   else d.topShare=d.lastTopShare || 60;
-  renderOamMoodSheetBody();
+  oamOvAnimFrom=was;
+  try{ renderOamMoodSheetBody(); } finally { oamOvAnimFrom=null; }
+  const nowOn = d.topShare!=null;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const box=document.getElementById("oamOvBox"); if(box) box.classList.toggle("shut", !nowOn);
+  }));
 };
 // Lee, 2026-11-17: Agent settings (off) / Agent override (on, starting at 60% the first time).
 // Lee, 2026-11-17 (later): no hidden/simple view — the agent's levels always show, so nothing filters out of sight.
 // Kept as always-on so existing callers (tutorial, e2e) still work.
 function oamAdvancedOn(d){ return true; }
 window.toggleOamAdvanced=()=>{};
+// Lee, 2026-11-22: List sheet → Taste and back. The open draft (unsaved edits included) is parked while Taste is
+// open; "Back to list" reopens the sheet with it, re-reading every genre's level from Taste, and rebuilds the
+// listing so a Taste change shows at once. Leaving Taste any other way drops the way back.
+let oamTasteReturn=null;
+window.oamOpenTasteFromList=()=>{
+  const d=oamDraft; if(!d) return;
+  const body=$("watchSheetBody");
+  const parked={draft:d, scroll: body ? body.scrollTop : 0, secs:new Set(oamSecOpen), notIn:oamNotInMoodOpen};
+  closeWatchSheet();
+  openAgentsScreen();
+  oamTasteReturn=parked;
+  renderAgentsScreen();
+};
+window.oamBackToListFromTaste=()=>{
+  const r=oamTasteReturn; if(!r) return;
+  closeAgentsScreen();
+  watchSettledNavKey=null;   // a Taste change re-ranks the listing — rebuild it, don't patch it
+  render();
+  oamDraft=r.draft;
+  oamFreezeMoodRowOrder();   // Taste may have switched a genre on or off
+  oamSecOpen=new Set(r.secs||[]); oamNotInMoodOpen=!!r.notIn;   // Lee, 2026-11-22: same sections open as when you left
+  oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
+  openWatchSheet();
+  const body=$("watchSheetBody"); if(body) body.scrollTop=r.scroll;
+};
+function oamTasteBackHTML(){
+  if(!oamTasteReturn) return "";
+  const nm=(oamTasteReturn.draft.name||"").trim() || "your list";
+  return `<button type="button" class="oamtasteback" onclick="oamBackToListFromTaste()"><span aria-hidden="true">&lsaquo;</span><span>Back to list <b>${esc(nm)}</b></span></button>`;
+}
 window.setOamAgentOverride=(on)=>{
   const d=oamDraft; if(!d) return;
   if(!!on === (d.topShare!=null)) return;
@@ -21785,6 +21907,51 @@ const OAM_SHOW_N={"20":20,"40":40,"60":60,"80":80};
 const OAM_SORT_OPTS=[["score","Score"],["release","Release date"],["title","A–Z"]];
 // CAS-1391: More filters' own "N set" count — exactly the five fields the ticket names, each worth one
 // regardless of magnitude (an age-ratings chip ticked twice is still "1 set", same as every other chip group).
+// Lee, 2026-11-22: the list sheet's collapsible sections. Fresh on every sheet open; kept across a Taste trip.
+let oamSecOpen=new Set();
+window.oamToggleSec=key=>{
+  if(oamSecOpen.has(key)) oamSecOpen.delete(key); else oamSecOpen.add(key);
+  const el=document.querySelector(`#watchSheetBody .oamsec[data-sec="${key}"]`);
+  if(el){ const open=oamSecOpen.has(key); el.classList.toggle("open", open);
+    const hd=el.querySelector(".oamsechd"); if(hd) hd.setAttribute("aria-expanded", String(open)); }
+};
+// One line per section header saying what is set; `set` = changed from a new list's default (purple dot).
+function oamSecSummaries(d, c, posList, posIdx){
+  const lbl=(opts,k)=>{ const o=opts.find(([kk])=>kk===k); return o?o[1]:String(k); };
+  const kw = d.mode==="keyword" && (d.people||"").trim();
+  const nGen = ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null && (d.stylesAll || d.styles.has(g))).length;
+  const primary = kw
+    ? {text:`Finding by name: ${d.people.trim()}`, set:true}
+    : {text:`${nGen} genre${nGen===1?"":"s"} · ${d.topShare==null?"My taste":`Override, top ${d.topShare}%`}`,
+       set: d.topShare!=null || !d.stylesAll};
+  const svc = d.svc ? {text:`${oamSvcChipLabel(d.svc)} only`, set:true}
+    : d.anySvc ? {text:"Any service", set:true}
+    : {text: prefs.on ? "My services" : "All services", set:false};
+  const how = {text:`${lbl(OAM_SHOW_OPTS, d.show)} · ${d.sort==="score"?"By score":lbl(OAM_SORT_OPTS, d.sort)}`, set: d.show!=="all"};
+  const parts=[];
+  if(d.ages.size) parts.push(`Ages ${[...d.ages].join(", ")}`);
+  if(d.awards!=="any") parts.push(lbl(OAM_AWARDS_OPTS, d.awards));
+  if(d.years) parts.push(`Last ${d.years} yr${d.years===1?"":"s"}`);
+  if(d.cinemaOnly) parts.push("Cinema releases only");
+  if(d.handOnly) parts.push("Hand-picked only");
+  if(d.watched) parts.push("Includes watched");
+  const n=oamMoreFiltersCount(d);
+  const more = {text: n ? `${n} set · ${parts.join(" · ")}` : "None set", set: n>0};
+  const pos = posIdx>=0 ? {text:`${oamOrdinal(posIdx+1)} of ${posList.length}`, set:false} : {text:"", set:false};
+  return {primary, svc, how, more, pos};
+}
+// Refreshes every header line in place — for edits that don't re-render the sheet (typing a name, ticking a genre).
+function oamRefreshSecSummaries(){
+  const d=oamDraft, c=oneAgentCriteria(); if(!d || !c) return;
+  const posList=oamMoodsListReal().filter(m=>m.id!=="releases");
+  const posIdx=d.editingId ? posList.findIndex(m=>m.id===d.editingId) : -1;
+  const sum=oamSecSummaries(d, c, posList, posIdx);
+  document.querySelectorAll("#watchSheetBody .oamsec").forEach(el=>{
+    const sm=sum[el.dataset.sec]; if(!sm) return;
+    el.classList.toggle("set", sm.set);
+    const t=el.querySelector(".oamsecsum"); if(t) t.textContent=sm.text;
+  });
+}
 function oamMoreFiltersCount(d){
   let n=0;
   if(d.handOnly) n++;
@@ -21812,7 +21979,21 @@ function renderOamMoodSheetBody(){
       ${opts.map(([k,l])=>{ const on=cur===k; return `<button type="button" aria-pressed="${on}" class="${on?"on":""}"
         onclick="${setter}(${typeof k==="number"?k:`'${k}'`})">${esc(l)}</button>`; }).join("")}
     </div>`;
-  const moreN=oamMoreFiltersCount(d);
+  // Lee, 2026-11-22: every major section opens CLOSED; its header says what is set (purple dot + line when changed
+  // from the default). Opening/closing a section toggles a class only — no re-render — and which ones are open
+  // (oamSecOpen) survives a trip to Taste and back, so the sheet comes back exactly as it was left.
+  const sum=oamSecSummaries(d, c, posList, posIdx);
+  const sec=(key, id, title, inner, extraCls="", hdCls="")=>{
+    const open=oamSecOpen.has(key), sm=sum[key]||{text:"",set:false};
+    return `<div class="wsheetsec mainsec oamsec${open?" open":""}${sm.set?" set":""}${extraCls}" id="${id}" data-sec="${key}">
+      <button type="button" class="oamsechd${hdCls}" aria-expanded="${open}" onclick="oamToggleSec('${key}')">
+        <span class="oamsecdot" aria-hidden="true"></span>
+        <span class="oamsect"><span class="wsheethd"><span>${title}</span></span><i class="oamsecsum">${esc(sm.text)}</i></span>
+        <span class="oamsecchev" aria-hidden="true">&rsaquo;</span>
+      </button>
+      <div class="oamsecbody">${inner}</div>
+    </div>`;
+  };
   const body=$("watchSheetBody");
   if(body) body.innerHTML=`
     <div class="wsheethd oamnamehd"><span>LIST NAME</span></div>
@@ -21822,10 +22003,7 @@ function renderOamMoodSheetBody(){
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
     ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
-    <div class="wsheetsec mainsec oamgensec oamprimary${kwMode?" off":""}" id="oamGenreSec">
-      <!-- Lee, 2026-11-21: one PRIMARY SEARCH box — genre levels, then "Or find films by name" (always open).
-           A name in the box greys out the genres; clearing it brings them back. -->
-      <div class="wsheethd"><span>PRIMARY SEARCH</span><span class="oamoff">GENRES OFF · FINDING BY NAME</span></div>
+    ${sec("primary", "oamGenreSec", "PRIMARY SEARCH", `
       <div class="oamprimbox">
       <div class="mpanel">
         <section class="mgenre">
@@ -21839,6 +22017,8 @@ function renderOamMoodSheetBody(){
             </div>
             ${oamOverrideFilterHTML(d)}
           </div>
+          <!-- Lee, 2026-11-22: straight to Taste to change a genre's own level; Taste shows a way back here. -->
+          <button type="button" class="oamtastelink" onclick="oamOpenTasteFromList()"><span>Change your Taste levels</span><span aria-hidden="true">&rsaquo;</span></button>
           <div class="oalist">
             ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
           </div>
@@ -21856,10 +22036,8 @@ function renderOamMoodSheetBody(){
           value="${escA(d.people)}" oninput="setOamDraftPeople(this.value)">
         <p class="oamgenreintro">A name here switches genres off; clear it to use genres again. Commas combine — every part must match.</p>
       </div>
-      </div>
-    </div>
-    ${(!d.handOnly && prefs.sub.size) ? `<div class="wsheetsec mainsec" id="oamSvcSec">
-      <div class="wsheethd"><span>STREAMING ON</span></div>
+      </div>`, ` oamgensec oamprimary${kwMode?" off":""}`)}
+    ${(!d.handOnly && prefs.sub.size) ? sec("svc", "oamSvcSec", "STREAMING ON", `
       <div class="chips">
         ${prefs.on ? `<button type="button" class="chip${(d.svc||d.anySvc)?"":" on"}" aria-pressed="${!d.svc&&!d.anySvc}" onclick="setOamDraftSvc(null)">My services</button>
         <button type="button" class="chip${d.anySvc?" on":""}" aria-pressed="${!!d.anySvc}" onclick="setOamDraftAnySvc()">Any service</button>`
@@ -21867,20 +22045,13 @@ function renderOamMoodSheetBody(){
         ${SUB_SERVICES.filter(s=>prefs.sub.has(s)).map(s=>{ const on=d.svc===s; return `<button type="button" class="chip${on?" on":""}"
           aria-pressed="${on}" onclick="setOamDraftSvc('${escA(s)}')">${esc(oamSvcChipLabel(s))}</button>`; }).join("")}
       </div>
-      <p class="oamgenreintro">${prefs.on ? "Any service also lists films on services you don't have. " : ""}Pick one service to see only what's included on it. Cinema and Rental stay empty while a service is picked.</p>
-    </div>` : ""}
-    <div class="wsheetsec mainsec" id="oamHowSec">
-      <div class="wsheethd"><span>HOW MANY, AND IN WHAT ORDER</span></div>
+      <p class="oamgenreintro">${prefs.on ? "Any service also lists films on services you don't have. " : ""}Pick one service to see only what's included on it. Cinema and Rental stay empty while a service is picked.</p>`) : ""}
+    ${sec("how", "oamHowSec", "HOW MANY, AND IN WHAT ORDER", `
       <div class="subhd">SHOW</div>
       ${seg(OAM_SHOW_OPTS, d.show, "setOamDraftShow", "Show")}
       <div class="subhd">ORDER</div>
-      ${seg(OAM_SORT_OPTS, d.sort, "setOamDraftSort", "Order")}
-    </div>
-    <button type="button" class="morebtn${oamMoreFiltersOpen?" open":""}" onclick="toggleOamMoreFilters()" aria-expanded="${oamMoreFiltersOpen}">
-      <span>MORE FILTERS${moreN?`<span class="set">${moreN} set</span>`:""}</span>
-      <span aria-hidden="true">${oamMoreFiltersOpen?"&#8963;":"&#8964;"}</span>
-    </button>
-    ${oamMoreFiltersOpen ? `<div class="morebody">
+      ${seg(OAM_SORT_OPTS, d.sort, "setOamDraftSort", "Order")}`)}
+    ${sec("more", "oamMoreSec", "MORE FILTERS", `<div class="morebody">
       <div class="wsheetsec">
         <div class="wsheethd"><span>WHO'S WATCHING: AGE RATINGS</span></div>
         <div class="chips">${OAM_AGE_OPTS.map(a=>{ const on=d.ages.has(a); return `<button type="button" class="chip${on?" on":""}"
@@ -21911,14 +22082,12 @@ function renderOamMoodSheetBody(){
         <div class="chips">${OAM_YEARS_OPTS.map(([k,l])=>{ const on=d.years===k; return `<button type="button" class="chip${on?" on":""}"
           aria-pressed="${on}" onclick="setOamDraftYears(${k})">${esc(l)}</button>`; }).join("")}</div>
       </div>
-      ${posIdx>=0 ? `<div class="wsheetsec">
-        <div class="wsheethd"><span>Position in your list row</span></div>
+    </div>`, "", " morebtn")}
+    ${posIdx>=0 ? sec("pos", "oamPosSec", "POSITION IN YOUR LIST ROW", `
         <div class="mfseg" role="group" aria-label="Position">
           <button type="button" ${posIdx<=0?"disabled":""} onclick="oamMoveMood(-1)">&lsaquo; Move left</button>
           <button type="button" ${posIdx>=posList.length-1?"disabled":""} onclick="oamMoveMood(1)">Move right &rsaquo;</button>
-        </div>
-      </div>` : ""}
-    </div>` : ""}`;
+        </div>`) : ""}`;
   if(d.topShare!=null) oamDrawFilterLines(d, c, d.topShare);
   oamApplyModeToDOM();   // Lee, 2026-11-20: a keyword list opens with Genres greyed and the name box open
   const delBtn=$("moodDeleteBtn");
@@ -23327,7 +23496,7 @@ function sydneyDaysAgo(dateStr){
   if(!t || isNaN(t)) return null;
   return Math.round((Date.parse(sydneyYMD(Date.now())) - Date.parse(sydneyYMD(t)))/864e5);
 }
-// A row's `date` is either a realAlerts emailed_at timestamp or a firstFound day string — both parse with
+// A row's `date` is either a realAlerts found_at timestamp or a firstFound day string — both parse with
 // Date.parse. "today" is the Sydney calendar date (CAS-1237); the longer windows stay rolling, measured
 // back from now.
 function movingInWindow(dateStr, windowKey){
@@ -23342,7 +23511,7 @@ function movingInWindow(dateStr, windowKey){
 // renderMovingScreen (whose own truncation notice is DOM-only, not reachable from a test) so the predicate
 // can be asserted directly.
 function movingLedgerTruncated(win){
-  return realAlerts.length>=200 && realAlerts.filter(a=>movingInWindow(a.emailed_at, win)).length>=200;
+  return realAlerts.length>=200 && realAlerts.filter(a=>movingInWindow(a.found_at, win)).length>=200;
 }
 // CAS-848: every row names its OWNER agent (filmOwnerCascade, the same single-owner answer the Watch
 // listing's own per-agent blocks use) rather than the ledger entry's own agent-name field, which can list
@@ -23395,7 +23564,7 @@ function movingData(){
         agentId:owner.id, date:firstFound[fid]});
     });
   }else{
-    // realAlerts is loaded newest-first (loadRealAlerts orders by emailed_at descending), so the first
+    // realAlerts is loaded newest-first (loadRealAlerts orders by found_at descending), so the first
     // entry seen per film is the most recent — exactly the one whose moment/date should describe the row.
     const byFilm=new Map(), droppedByFilm=new Map();
     realAlerts.forEach(a=>{
@@ -23405,10 +23574,10 @@ function movingData(){
       const m=MOVIES.find(x=>String(x.tmdb_id)===fid);
       if(!m) return;
       const owner=movingOwnerCascade(m);
-      if(!owner){ droppedByFilm.set(fid,{date:a.emailed_at}); return; }
+      if(!owner){ droppedByFilm.set(fid,{date:a.found_at}); return; }
       byFilm.set(fid,{filmId:fid, m, tag:movingIsNewMoment(a.moment)?"new":"changed",
         reason:REAL_MOMENT_SAID[a.moment]||a.moment,
-        agentId:owner.id, date:a.emailed_at, moment:a.moment});
+        agentId:owner.id, date:a.found_at, moment:a.moment});
     });
     rows.push(...byFilm.values());
     dropped.push(...droppedByFilm.values());
@@ -23513,7 +23682,7 @@ function movingSections(rows){
     .map(g=>({g, lanes: movingLanes(rows.filter(r=>primaryStatus(r.m)===g))}))
     .filter(s=>s.lanes.length);
 }
-// A row's `date` is either a realAlerts emailed_at timestamp or a firstFound day string — both parse with
+// A row's `date` is either a realAlerts found_at timestamp or a firstFound day string — both parse with
 // Date.parse. Sydney calendar-day difference from now (CAS-1237), said plainly; never a fabricated
 // precision, and never a 24-hour rolling count that calls 17:00-yesterday "today" the next morning.
 function movingAgeText(dateStr){
@@ -23673,6 +23842,7 @@ window.openAgentsScreen=()=>{
       // CAS-1218 server-first: only stamp agentSeenAt when there is something new to clear — opening Agent with
       // nothing changed must write nothing.
       if(oaChangedGenres(oc, oaVisitCutoff).size){ oc.agentSeenAt=Date.now(); saveCascades(); updateAgentNavDot(); } } }
+  { const oc=oneAgentCriteria(); oaScreenOrder = oc ? oaComputeOrder(oc) : null; }   // Lee, 2026-11-22
   renderAgentsScreen();
   $("agentsScreen").scrollTop=0;
   $("agentsScreen").classList.add("open"); lockBodyScroll(true);
@@ -23681,6 +23851,9 @@ window.openAgentsScreen=()=>{
   logEvent("agents_screen_opened",{count:cascades.length});
 };
 window.closeAgentsScreen=()=>{
+  oamTasteReturn=null;   // Lee, 2026-11-22: the way back to a list lasts only while Taste is open
+  oaScreenOrder=null;    // Lee, 2026-11-22: rows re-sort on the next visit, never mid-visit
+  if(oaListingDirty){ oaListingDirty=false; watchSettledNavKey=null; if(typeof render==="function") render(); }
   $("agentsScreen").classList.remove("open"); lockBodyScroll(false);
   $("agentsBtn").classList.remove("active"); $("agentsBtn").setAttribute("aria-pressed","false");
   syncWatchChip();
@@ -25505,7 +25678,7 @@ const TOUR_STEPS = [
     before(){ closeSettings(); openAgentsScreen(); }, after(){ showAgentsHome(); }, sel:["#agList .agrow"]},
   {text:"Change your streaming services any time from this menu, under My Streaming Services — and see which services suit you best in Streaming Analysis.",
     before(){ closeSettings(); showAgentsHome(); }, sel:["#navMenuBtn"]},
-  {text:"You're all set. Your agents report every day at 5pm.",
+  {text:"You're all set. Your agents report every morning.",
     before(){ closeSettings(); showAgentsHome(); }, center:true},
 ];
 // ---- GUIDED TOUR v2 (CAS-1349, v2/one-agent accounts only) -------------------------------------------
@@ -25677,7 +25850,7 @@ const TOURS = {
       center:true},
     {html:TUT_P("So your agent tracks each genre together with its sub-genres. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here. Each sub-genre has its own slider; drag one to set it yourself."),
       before(){ v2OpenFirstOnStyle(); }, sel:["#oaAdjustSection"], trail:["#agentsBtn"]},
-    {html:TUT_P("That's it. Your agent checks the whole catalogue every day and reports at 5pm."),
+    {html:TUT_P("That's it. Your agent checks the whole catalogue overnight and reports every morning."),
       before(){ oaOpenStyle=null; oaOrderSnapshot=null; closeSettings(); showAgentsHome(); }, center:true},
   ]},
   // Lee, 21 Nov: the Invite a friend tutorial. Signed-in only (the invite button needs an account), so every
@@ -25745,8 +25918,9 @@ function tutMoodsTourMoodId(){
   return (ms.find(m=>m.id==="me") || ms.find(m=>m.id!=="releases") || ms[0] || {}).id;
 }
 function tutOpenMoodsTourSheet(){
-  if(document.getElementById("watchSheet").classList.contains("open")) return;
-  openOamMoodSheetFor(tutMoodsTourMoodId());
+  if(!document.getElementById("watchSheet").classList.contains("open")) openOamMoodSheetFor(tutMoodsTourMoodId());
+  // Lee, 2026-11-22: sections open closed — the tour's steps point inside PRIMARY SEARCH, so open it.
+  if(!oamSecOpen.has("primary")) window.oamToggleSec("primary");
 }
 function tutSheetMode(mode){ /* Lee, 2026-11-20: Genres always show and there is no mode switch — nothing to do */ }
 // Database tutorial: puts `q` in the search box and runs it. With `typed`, the letters appear one by one first.
@@ -27283,7 +27457,7 @@ function windowOf(o){
 }
 // `realAlerts` is the daily monitor's record, read back out of the `notifications` ledger the job writes.
 // Moving (movingUnseenCount/updateMovingBadge) is the only surface that reads it now.
-let realAlerts=[];            // [{id, movie_id, moment, title, cascade_name, emailed_at, read_at}]
+let realAlerts=[];            // [{id, movie_id, moment, title, cascade_name, found_at, read_at}]
 // The monitor's own moment keys, said the way the app says them everywhere else.
 const REAL_MOMENT_SAID = {
   hits_cinema:"reached a cinema", past_opening_weekend:"is past its opening weekend",
@@ -28910,8 +29084,8 @@ function acctFetchKeepalive(init){
     // that never gets an answer isn't left showing Moving's loading state forever.
     const c=client(); if(!c||!accountActive()){ realAlerts=[]; movingReady=true; updateMovingBadge(); return; }
     const { data, error } = await c.from("notifications")
-      .select("id,movie_id,moment,title,cascade_name,emailed_at,read_at")
-      .order("emailed_at", { ascending:false }).limit(200);
+      .select("id,movie_id,moment,title,cascade_name,found_at,read_at")
+      .order("found_at", { ascending:false }).limit(200);
     if(error){ console.warn("notifications load", error); logSyncFailed("notifications", error); movingReady=true; return; }
     realAlerts = data || [];
     movingReady=true;
@@ -29891,7 +30065,20 @@ function acctFetchKeepalive(init){
   // the next flush (a reconnect, or the next acctOp call).
   let ACCT_OP_RETRY_DELAYS = [400, 1200, 3600];
   function opWait(ms){ return new Promise(res => setTimeout(res, ms)); }
+  // Lee, 2026-11-22 ("I moved 4 sliders, then a couple of seconds later they all jumped back"): each queued update
+  // captured the row's updated_at when it was QUEUED. Several quick edits to one agent queue several updates
+  // before the first is confirmed, so the 2nd onwards carried a stamp this device's OWN 1st write had already
+  // replaced — refused as "another device won", and the UI adopted the row as it stood after the 1st edit only.
+  // ownStampAdvance records every updated_at this device's own successful update moved a row from → to; at send
+  // time an op's expected stamp is walked forward through those, so only a write from ANOTHER device conflicts.
+  const ownStampAdvance = new Map();
+  function ownStampKey(op, stamp){ return op.table + "|" + JSON.stringify(op.match) + "|" + stamp; }
   async function processOp(c, op){
+    if(op.kind === "update" && op.expectUpdatedAt !== undefined){
+      let e = op.expectUpdatedAt, hops = 0;
+      while(ownStampAdvance.has(ownStampKey(op, e)) && hops++ < 50) e = ownStampAdvance.get(ownStampKey(op, e));
+      op.expectUpdatedAt = e;
+    }
     for(let attempt=0; attempt<=ACCT_OP_RETRY_DELAYS.length; attempt++){
       let result;
       try{ result = await sendOnceWithTimeout(c, op); }
@@ -29923,6 +30110,9 @@ function acctFetchKeepalive(init){
             // different device had won, when nothing else ever touched it — the self-conflict storm the
             // incident's own point 3 logged (one device alternating refused/accepted against itself).
             Object.assign(row, data[0]);
+          }
+          if(data.length && data[0] && data[0].updated_at && data[0].updated_at !== op.expectUpdatedAt){
+            ownStampAdvance.set(ownStampKey(op, op.expectUpdatedAt), data[0].updated_at);
           }
         }
         if(op.onDone) op.onDone(true, null);

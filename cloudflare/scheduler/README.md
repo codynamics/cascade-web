@@ -6,20 +6,32 @@ calling `workflow_dispatch` is not subject to the same delay.
 
 ## What it triggers
 
-Five Cron Triggers (UTC, declared in `wrangler.toml`), each calling
+Eleven Cron Triggers (UTC, declared in `wrangler.toml`), each calling
 `POST /repos/codynamics/cascade-web/actions/workflows/<file>/dispatches` with `{"ref":"main"}`:
 
 | Cron | Fires | Dispatches |
 | --- | --- | --- |
 | `17 * * * *` | every hour, :17 | `uptime.yml` |
-| `0 20 * * *` | once a day, 20:00 UTC | `daily.yml` |
-| `0 6 * * *` | once a day, 06:00 UTC | `alerts.yml`, only if this instant is 17:00 in `Australia/Sydney` |
-| `0 7 * * *` | once a day, 07:00 UTC | `alerts.yml`, only if this instant is 17:00 in `Australia/Sydney` |
+| `0 14 * * *` | once a day, 14:00 UTC | `daily.yml`, only if this instant is 01:00 in `Australia/Sydney` (AEDT) |
+| `0 15 * * *` | once a day, 15:00 UTC | `daily.yml`, only if this instant is 01:00 in `Australia/Sydney` (AEST) |
+| `0 16 * * *` | once a day, 16:00 UTC | `alerts.yml` `phase=find`, only if this instant is 03:00 in `Australia/Sydney` (AEDT) |
+| `0 17 * * *` | once a day, 17:00 UTC | `alerts.yml` `phase=find`, only if this instant is 03:00 in `Australia/Sydney` (AEST) |
+| `30 20 * * *` | once a day, 20:30 UTC | `alerts.yml` `phase=push`, only if this instant is in Sydney hour 07 (07:30 AEDT) |
+| `30 21 * * *` | once a day, 21:30 UTC | `alerts.yml` `phase=push`, only if this instant is in Sydney hour 07 (07:30 AEST) |
+| `0 6 * * *` | once a day, 06:00 UTC | `alerts.yml` `phase=email`, only if this instant is 17:00 in `Australia/Sydney` (AEDT) |
+| `0 7 * * *` | once a day, 07:00 UTC | `alerts.yml` `phase=email`, only if this instant is 17:00 in `Australia/Sydney` (AEST) |
 | `*/5 * * * *` | every 5 minutes | `recommend.yml`, only if Supabase reports unsent mail (or can't be reached) |
 
-The alerts crons cover both sides of AU daylight saving — exactly one of them fires
-`alerts.yml` on any given day. `uptime.yml` keeps its own GitHub `schedule` as a backup; the
+CAS-1503: the refresh runs at 01:00 Sydney and alerts go out at 03:00 Sydney, so alerts are built
+from that night's data. Each pair of crons covers both sides of AU daylight saving — exactly one of
+each pair fires on any given day. `uptime.yml` keeps its own GitHub `schedule` as a backup; the
 Worker is additive there, not a replacement.
+
+CAS-1504: alerts are split by channel, all three dispatching `alerts.yml` with a `phase` input
+(`{"ref":"main","inputs":{"phase":"..."}}`): 03:00 `find` records the night's alerts to the ledger and
+sends nothing; 07:30 `push` sends one push per member with unread alerts; 17:00 `email` sends the digest of
+only the alerts the member has not seen in the app. Every other workflow is still dispatched with just
+`{"ref":"main"}`.
 
 CAS-1130: the `*/5 * * * *` cron reads one row (`limit=1`) from each of
 `recommendations?sent_at=is.null`, `invite_emails?sent_at=is.null` and

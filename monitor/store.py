@@ -12,6 +12,7 @@ Interface:
   fetch_active_cascades() -> list[cascade row]
   fetch_notification_keys() -> set[(cascade_id, movie_id, moment)]   # for de-dupe
   insert_notifications(rows) -> int                                  # ledger write; returns count
+  fetch_recent_notifications(since) -> [row]; mark_notifications(ids, column, stamp) -> int  # CAS-1504
   fetch_user_email(user_id) -> str | None
   fetch_notify_prefs() -> {user_id: {in_app, email_on, email_address, excluded_moments}}  # CAS-185
   fetch_picks() -> [{user_id, movie_id, state, pinned_to, not_in}]                # CAS-185/CAS-925
@@ -88,6 +89,12 @@ def _fixture_ids_only(movie_ids) -> list:
     return out
 
 
+def _found_at(n: dict) -> str:
+    """CAS-1504: a ledger row's creation time. A fixture (or a row from before migration 0011) carries
+    only `emailed_at`, which was the creation time then — so it is the honest fallback."""
+    return n.get("found_at") or n.get("emailed_at") or ""
+
+
 class InMemoryStore:
     """A store backed by plain Python lists — used for dry-run and tests."""
 
@@ -118,6 +125,24 @@ class InMemoryStore:
     def fetch_notification_keys(self) -> set:
         return {(n.get("cascade_id"), str(n.get("movie_id")), n.get("moment"))
                 for n in self._notifications}
+
+    def fetch_recent_notifications(self, since: str) -> list:
+        """CAS-1504: ledger rows found at or after `since` (ISO), oldest first — what the 07:30 push
+        and 17:00 email phases read instead of re-running the diff."""
+        rows = [dict(n) for n in self._notifications if _found_at(n) >= since]
+        return sorted(rows, key=lambda n: (_found_at(n), str(n.get("id") or "")))
+
+    def mark_notifications(self, ids, column: str, stamp: str) -> int:
+        """CAS-1504: stamp `pushed_at` / `emailed_at` on the given rows, after the send."""
+        if column not in ("pushed_at", "emailed_at"):
+            raise ValueError(f"cannot stamp {column}")
+        ids = {str(i) for i in ids}
+        n = 0
+        for r in self._notifications:
+            if str(r.get("id")) in ids:
+                r[column] = stamp
+                n += 1
+        return n
 
     def insert_notifications(self, rows) -> int:
         self._notifications.extend(rows)
@@ -178,14 +203,14 @@ class InMemoryStore:
         """CAS-1203: the notify-test harness's real-film mode cleanup — a real film's tmdb_id lives
         outside the reserved fixture range delete_notifications_for_movie_ids() is scoped to, so
         that sweep can never find it. Scoped precisely instead: exactly this (user_id, movie_id,
-        moment), and only a row this run itself could have created (``emailed_at`` >= `since`,
+        moment), and only a row this run itself could have created (``found_at`` >= `since`,
         the arm phase's own timestamp) — never a real alert this user already had standing before
         the run, and never any OTHER moment for the same film."""
         before = len(self._notifications)
         self._notifications = [
             n for n in self._notifications
             if not (str(n.get("user_id")) == str(user_id) and str(n.get("movie_id")) == str(movie_id)
-                    and n.get("moment") == moment and (n.get("emailed_at") or "") >= since)
+                    and n.get("moment") == moment and _found_at(n) >= since)
         ]
         return before - len(self._notifications)
 
@@ -193,11 +218,11 @@ class InMemoryStore:
         """CAS-1207: real-film mode's verify() proves delivery by counting the ledger row rather
         than deleting it (CAS-1207's observed bug: deleting it removed the alert from the member's
         own Alerts seconds after it was delivered) — same precise (user_id, movie_id, moment,
-        emailed_at >= since) scope delete_notifications_for_user_film uses."""
+        found_at >= since) scope delete_notifications_for_user_film uses."""
         return sum(
             1 for n in self._notifications
             if str(n.get("user_id")) == str(user_id) and str(n.get("movie_id")) == str(movie_id)
-            and n.get("moment") == moment and (n.get("emailed_at") or "") >= since
+            and n.get("moment") == moment and _found_at(n) >= since
         )
 
     def upsert_film_watch(self, user_id, movie_id, window: str) -> None:
@@ -776,6 +801,36 @@ class SupabaseStore:
             return None
         return data.get("email") or (data.get("user") or {}).get("email")
 
+    def fetch_recent_notifications(self, since: str) -> list:
+        """CAS-1504: ledger rows found at or after `since` (ISO), oldest first."""
+        return self._get(
+            "/notifications?select=id,user_id,cascade_id,movie_id,moment,cascade_name,title,detail,"
+            "found_at,read_at,pushed_at,emailed_at"
+            f"&found_at=gte.{urllib.parse.quote(since)}&order=found_at.asc,id.asc"
+        )
+
+    def mark_notifications(self, ids, column: str, stamp: str) -> int:
+        """CAS-1504: PATCH `pushed_at` / `emailed_at` onto the given rows after the send. Only those two
+        columns are ever written here — `read_at` stays the app's alone."""
+        if column not in ("pushed_at", "emailed_at"):
+            raise ValueError(f"cannot stamp {column}")
+        ids = list(ids)
+        if not ids:
+            return 0
+        quoted = ",".join(urllib.parse.quote(str(i)) for i in ids)
+        req = urllib.request.Request(
+            self._base + f"/notifications?id=in.({quoted})",
+            data=json.dumps({column: stamp}).encode("utf-8"),
+            headers=self._headers({"Prefer": "return=representation"}),
+            method="PATCH",
+        )
+        with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+            body = resp.read().decode("utf-8")
+        try:
+            return len(json.loads(body))
+        except (json.JSONDecodeError, TypeError):
+            return 0
+
     def insert_notifications(self, rows) -> int:
         """CAS-1294: `on_conflict` + `resolution=ignore-duplicates` makes the ledger write
         idempotent against its own unique (cascade_id, movie_id, moment) constraint — one row
@@ -821,13 +876,13 @@ class SupabaseStore:
         """CAS-1203: precise DELETE for the notify-test harness's real-film mode — a real film's
         tmdb_id is never in the reserved fixture range delete_notifications_for_movie_ids() is
         scoped to, so that sweep can't find it. Filtered on all four of user_id/movie_id/moment/
-        `emailed_at` >= `since` (the arm phase's own run-start timestamp) directly in the PostgREST
+        `found_at` >= `since` (the arm phase's own run-start timestamp) directly in the PostgREST
         query, so this can only ever remove a row this run itself could have created."""
         req = urllib.request.Request(
             self._base + (f"/notifications?user_id=eq.{urllib.parse.quote(str(user_id))}"
                          f"&movie_id=eq.{urllib.parse.quote(str(movie_id))}"
                          f"&moment=eq.{urllib.parse.quote(moment)}"
-                         f"&emailed_at=gte.{urllib.parse.quote(since)}"),
+                         f"&found_at=gte.{urllib.parse.quote(since)}"),
             headers=self._headers({"Prefer": "return=representation"}),
             method="DELETE",
         )
@@ -846,7 +901,7 @@ class SupabaseStore:
             f"/notifications?select=id&user_id=eq.{urllib.parse.quote(str(user_id))}"
             f"&movie_id=eq.{urllib.parse.quote(str(movie_id))}"
             f"&moment=eq.{urllib.parse.quote(moment)}"
-            f"&emailed_at=gte.{urllib.parse.quote(since)}&order=id.asc"
+            f"&found_at=gte.{urllib.parse.quote(since)}&order=id.asc"
         )
         return len(rows)
 
