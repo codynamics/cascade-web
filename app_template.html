@@ -4219,7 +4219,8 @@
   .card:not(.expanded) .ctl .cmini{box-shadow:none!important}
   /* Watched carries the same outline as the other two action buttons */
   .card:not(.expanded) .ctl.watch .cmini{border-color:var(--brand-blue)}
-  .card:not(.expanded) .ctl.watch .clab.dim{color:var(--dim)}
+  /* Lee, 2026-11-21: an unanswered Watched reads like Alert and List — same white label, not a dimmed one */
+  .card:not(.expanded) .ctl.watch .clab.dim{color:var(--ink)}
   /* ==== HEADER: FOUR NAV ITEMS, MENU ON THE RIGHT, NO LOGO OR DATE (Lee, 2026-10-10) ====
      --sel-bg / --sel-bd are the ONE selected style ("violet haze") shared by the nav, the Watch stages and
      the moods. The logo and the update date are hidden, not removed: their elements stay in the markup so
@@ -4666,7 +4667,7 @@
   .card:not(.expanded) .ctl.notify.wsrc-auto .cmini,.card:not(.expanded) .ctl.casc.csrc-auto .cmini{
     background:transparent;border:1px solid rgba(255,255,255,.32)}
   .card:not(.expanded) .ctl .cmini .clab{color:var(--ink);font-weight:600}
-  .card:not(.expanded) .ctl .cmini .clab.dim{color:var(--dim);font-weight:500}
+  .card:not(.expanded) .ctl .cmini .clab.dim{color:var(--ink);font-weight:600}   /* Lee, 2026-11-21: unset reads like set */
   .card:not(.expanded) .ctl.notify.wsrc-manual .cmini,.card:not(.expanded) .ctl.casc.csrc-manual .cmini,
   .card:not(.expanded) .ctl.watch:has(.clab:not(.dim)) .cmini{border-color:#ffd54a}
   /* Lee, 2026-11-17: the lit "open" look must also beat the collapsed-card Watched rules above (CAS-1467 missed them). */
