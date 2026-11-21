@@ -3510,6 +3510,26 @@
   .tkstyle .hd button.ap{background:var(--gold);color:#161000;border:0;font-weight:800}
   .tkstyle .ln{font-size:12.5px;line-height:1.45;margin-top:3px;opacity:.9}
   .tkstyle .ln span{opacity:.7}
+  /* Lee, 21 Nov 2026: one line per sub-genre — current adjustment (dashed, as the Watch score box's "was"
+     ghost), the direction arrow, and the proposed adjustment (solid; teal adds, orange takes away). */
+  .tkstyle .sg{display:flex;align-items:center;gap:12px;margin-top:10px}
+  .tkstyle .sg .l{flex:1;min-width:0}
+  .tkstyle .sg .t{font-size:13px;font-weight:700;color:var(--ink)}
+  .tkstyle .sg .w{font-size:11.5px;color:var(--dim);margin-top:2px}
+  .tkstyle .sg .w .y{color:#5eead4}
+  .tkstyle .sg .w .n{color:#f0a060}
+  .tkadj{flex:none;display:flex;align-items:flex-end;gap:8px}
+  .tkadj .cl{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .tkadj .cl small{font-size:10px;font-weight:600;color:var(--dim);white-space:nowrap;letter-spacing:.02em}
+  .tkadj .bd{height:26px;min-width:40px;padding:0 6px;box-sizing:border-box;border-radius:7px;display:flex;align-items:center;
+    justify-content:center;font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums}
+  .tkadj .bd.was{border:1.5px dashed rgba(255,255,255,.5);color:var(--dim)}
+  .tkadj .bd.new{border:1.5px solid;background:rgba(255,255,255,.03)}
+  .tkadj .bd.new.up{border-color:#5eead4;color:#5eead4}
+  .tkadj .bd.new.down{border-color:#f0a060;color:#f0a060}
+  .tkadj .ar{height:26px;display:flex;align-items:center;font-size:14px;font-weight:800}
+  .tkadj .ar.up{color:#5eead4}
+  .tkadj .ar.down{color:#f0a060}
   .tkstyle b.up{color:#2dd4bf}
   .tkstyle b.down{color:#f0883a}
   .tkfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
@@ -20678,20 +20698,23 @@ function tasteRecsCardHTML(){
   const c=oneAgentCriteria();
   const agentName=((c&&c.name)||"").trim() || "Your agent";
   const n=recs.length;
-  const list=(keys,cls)=>keys.slice().sort((a,b)=>Math.abs(b.to)-Math.abs(a.to))
-    .map(k=>`${esc(k.other)} <b class="${cls}">${oaFmtPoints(k.to)}</b>`).join(", ");
+  // Lee, 21 Nov 2026: one line per sub-genre, biggest change first — liked/not from the same verdicts the open
+  // genre panel counts (oaComboFilms), then Current (dashed) ▲/▼ Proposed (solid, coloured by its own sign).
+  const subLine=k=>{
+    const films=oaComboFilms(k.key), liked=films.filter(f=>f.good).length, notN=films.length-liked;
+    const dir=k.to>k.from?"up":"down", sign=k.to>0?" up":k.to<0?" down":"";
+    return `<div class="sg"><div class="l"><div class="t">With ${esc(oneAgentShortName(k.other))}</div><div class="w"><span class="y">${liked} liked</span> · <span class="n">${notN} not</span></div></div><div class="tkadj"><span class="cl"><small>Current</small><span class="bd was">${oaFmtPoints(k.from)}</span></span><span class="ar ${dir}" aria-hidden="true">${dir==="up"?"▲":"▼"}</span><span class="cl"><small>Proposed</small><span class="bd new${sign}">${oaFmtPoints(k.to)}</span></span></div></div>`;
+  };
   const blocks=recs.map(r=>{
-    const less=r.keys.filter(k=>k.to<k.from), more=r.keys.filter(k=>k.to>k.from);
     const lines=[];
     if(r.bar){
       const to=oneTopPct(r.style, r.bar.to), from=oneTopPct(r.style, r.bar.from);
       lines.push(`<div class="ln"><span>Minimum score</span> Top ${to}% <b class="${r.bar.to>r.bar.from?"down":"up"}">(from ${from}%)</b></div>`);
     }
-    if(less.length) lines.push(`<div class="ln"><span>Less with</span> ${list(less,"down")}</div>`);
-    if(more.length) lines.push(`<div class="ln"><span>More with</span> ${list(more,"up")}</div>`);
+    r.keys.slice().sort((a,b)=>Math.abs(b.to-b.from)-Math.abs(a.to-a.from)).forEach(k=>lines.push(subLine(k)));
     return `<div class="tkstyle"><div class="hd"><span class="nm">${esc(oneAgentShortName(r.style))}</span><button type="button" class="sk" onclick="tasteSkip('${escA(r.style)}')">Skip</button><button type="button" class="ap" onclick="tasteApply('${escA(r.style)}')">Apply</button></div>${lines.join("")}</div>`;
   }).join("");
-  return `<div class="tkrec${tasteRecsOpen?" open":""}"><div class="tkrechd" onclick="tasteToggleRecs()"><div class="tkrecic">✦</div><div class="tkrect">Agent recommendations<i>Suggestions for ${n} genre${n===1?"":"s"}</i></div><span class="tkn">${n}</span><button type="button" class="tkbtn">Review</button></div><div class="tkbody"><p class="tksum">${esc(agentName)} has looked at your verdicts in ${n} genre${n===1?"":"s"}. Apply or skip each genre in one tap. Your genre sliders stay where you set them.</p>${blocks}<div class="tkfoot"><button type="button" class="tkbtn ghost" onclick="tasteCloseRecs()">Not now</button><button type="button" class="tkbtn" onclick="tasteApplyAll()">Apply all</button></div></div></div>`;
+  return `<div class="tkrec${tasteRecsOpen?" open":""}"><div class="tkrechd" onclick="tasteToggleRecs()"><div class="tkrecic">✦</div><div class="tkrect">Agent recommendations<i>Suggestions for ${n} genre${n===1?"":"s"}</i></div><span class="tkn">${n}</span><button type="button" class="tkbtn">Review</button></div><div class="tkbody"><p class="tksum">${esc(agentName)} tracks how you rate the films you watch, right down to each sub-genre. From that, it suggests adjustments to public scores, so the films you'll want to see rise up your list and the ones you won't sink. Apply or skip each genre in one tap.</p>${blocks}<div class="tkfoot"><button type="button" class="tkbtn ghost" onclick="tasteCloseRecs()">Not now</button><button type="button" class="tkbtn" onclick="tasteApplyAll()">Apply all</button></div></div></div>`;
 }
 window.tasteToggleRecs=()=>{ tasteRecsOpen=!tasteRecsOpen; renderAgentsScreen(); };
 window.tasteCloseRecs=()=>{ tasteRecsOpen=false; renderAgentsScreen(); };
