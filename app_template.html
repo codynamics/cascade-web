@@ -25675,7 +25675,46 @@ const TOURS = {
     {html:TUT_P("That's it. Your agent checks the whole catalogue every day and reports at 5pm."),
       before(){ oaOpenStyle=null; oaOrderSnapshot=null; closeSettings(); showAgentsHome(); }, center:true},
   ]},
+  // Lee, 21 Nov: the Invite a friend tutorial. Signed-in only (the invite button needs an account), so every
+  // step is needsAccount. It opens the real invite sheet on the tour card's film and sends nothing.
+  invite:{ title:"Invite a friend tutorial", steps:[
+    {html:TUT_P("Watching with someone? Open any film and tap <b>Invite a friend to watch this</b>."),
+      before(){ closeSettings(); tutCloseInviteSheet(); tutMenuShow(false); showAgentsHome(); if(tourCardId==null) tutCaptureCard(); tutExpandCard(true); },
+      after(){ tutExpandCard(false); }, scope:"card", sel:[".exsharebtn"], trail:TUT_W, trailCard:true, needsAccount:true},
+    {html:TUT_P("Pick who's coming from your friends, or add someone new with their email or mobile."),
+      before(){ tutMenuShow(false); tutOpenInviteSheet(); }, after(){ tutCloseInviteSheet(); },
+      sel:["#filmInvite .fnewbtn","#filmInvitePicker"], needsAccount:true},
+    {html:TUT_P("Suggest a date and add a note if you like. Both are optional."),
+      before(){ tutMenuShow(false); tutOpenInviteSheet(); }, after(){ tutCloseInviteSheet(); },
+      sel:["#filmInvite .invdaterow","#filmInviteNote"], needsAccount:true},
+    {html:TUT_P("Tap <b>Invite</b>. They get a link with the film and a simple Yes / No. No app needed."),
+      before(){ tutMenuShow(false); tutOpenInviteSheet(); }, after(){ tutCloseInviteSheet(); },
+      sel:["#filmInviteSend"], needsAccount:true},
+    {html:TUT_P("Their replies arrive in <b>Movie Invites</b>. A number on the Menu tells you when there's a new one."),
+      before(){ tutCloseInviteSheet(); tutExpandCard(false); tutMenuShow(true); }, after(){ tutMenuShow(false); },
+      sel:['#navMenu .navitem[onclick*="invites"]'], trail:["#navMenuBtn"], needsAccount:true},
+    {html:TUT_P("Everyone you invite is saved in <b>Friends</b>, so next time it's one tap."),
+      before(){ tutCloseInviteSheet(); tutMenuShow(true); }, after(){ tutMenuShow(false); },
+      sel:['#navMenu .navitem[onclick*="friends"]'], trail:["#navMenuBtn"], needsAccount:true},
+  ]},
 };
+// Invite a friend tutorial helpers. The sheet is opened exactly as openFilmInvite opens it, minus its
+// invite_opened event (a tour is not an invite), and closed unsent; the menu is opened and closed in place.
+function tutOpenInviteSheet(){
+  if($("filmInvite").classList.contains("open") || tourCardId==null) return;
+  const m=MOVIES.find(x=>x.tmdb_id===tourCardId); if(!m) return;
+  filmInviteId=m.tmdb_id; inviteFriendSel=new Map(); inviteFriendAdding=false; inviteCapMsg=null;
+  inviteSentInfo=null; inviteNameVal=null; inviteDateVal=null; inviteNoteVal=null;
+  renderFilmInviteSheet(m);
+  openModal($("filmInvite"));
+}
+function tutCloseInviteSheet(){
+  if($("filmInvite").classList.contains("open")) closeModal($("filmInvite"));
+}
+function tutMenuShow(on){
+  if(on===$("navMenu").classList.contains("open")) return;
+  if(on) toggleNavMenu(); else closeNavMenu();
+}
 // The Watch tutorial's closing words: its last step (finished=true) and the box "Skip tutorial" shows
 // (finished=false — no "That's Watch", no step count). The moods line appears once a "moods" tutorial
 // exists (Lee, 14 Nov), so it is never pointing at something that isn't there.
@@ -26050,14 +26089,16 @@ const TUTORIAL_ROWS = [
   {key:"alerts", icon:"alerts", name:"Alerts", sub:"What your agent tells you about, and when."},
   {key:"database", icon:"find", name:"Database", sub:"Finding any film in Cascade."},
   {key:"agent", icon:"agent", name:"Taste", sub:"How your agent learns your taste."},
+  {key:"invite", icon:"invite", name:"Invite a friend", sub:"Asking someone to watch a film with you.", needsAccount:true},
 ];
 const TUT_FIND_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>`;
 function tutorialsBodyHTML(){
-  const ic = k => k==="find" ? TUT_FIND_SVG : OAF_DONE_ICONS[k];
+  const ic = k => k==="find" ? TUT_FIND_SVG : k==="invite" ? ICON.share : OAF_DONE_ICONS[k];
+  const a=window.CascadeAuth, signedIn=!!(a && a.enabled && a.status==="signed-in");
   return `<div class="ostop menutop"><button class="osback" type="button" onclick="closeTutorials()" aria-label="Back">←</button>
       <h2 class="osh">Tutorials</h2></div>
     <p class="ossub">Short guided tours over your own Cascade. Play any of them as often as you like.</p>
-    <div class="ucard tutlist">${TUTORIAL_ROWS.map(t=>`<button type="button" class="tutrow" onclick="playTutorial('${t.key}')">
+    <div class="ucard tutlist">${TUTORIAL_ROWS.filter(t=>!t.needsAccount || signedIn).map(t=>`<button type="button" class="tutrow" onclick="playTutorial('${t.key}')">
       <span class="ic" aria-hidden="true">${ic(t.icon)}</span><span><b>${esc(t.name)}</b><small>${esc(t.sub)}</small></span>
       <span class="chev" aria-hidden="true">›</span></button>`).join("")}</div>`;
 }
