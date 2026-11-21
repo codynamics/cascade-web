@@ -13,7 +13,9 @@ import unittest
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALERTS_YML = os.path.join(_REPO_ROOT, ".github", "workflows", "alerts.yml")
 DAILY_YML = os.path.join(_REPO_ROOT, ".github", "workflows", "daily.yml")
-MONITOR_STEP_NAME = "Run the Cascade monitor (diff → match → de-dupe → email)"
+MONITOR_STEP_NAME = "Run the Cascade monitor (diff → match → de-dupe → email)"   # daily.yml's old name
+# CAS-1504 renamed alerts.yml's step when it split the run into find / push / email phases.
+ALERTS_STEP_NAME = "Run the Cascade monitor, phase ${{ github.event.inputs.phase || 'find' }} (CAS-1504)"
 
 # Verbatim from daily.yml's monitor step before CAS-993 removed it.
 DAILY_MONITOR_ENV_BEFORE = {
@@ -70,22 +72,26 @@ def _extract_run(step_lines: list) -> str:
 class AlertsMonitorStepMatchesDaily(unittest.TestCase):
     def setUp(self):
         with open(ALERTS_YML, encoding="utf-8") as f:
-            self.alerts_step = _step_lines(f.read().splitlines(), MONITOR_STEP_NAME)
+            self.alerts_step = _step_lines(f.read().splitlines(), ALERTS_STEP_NAME)
 
     def test_daily_no_longer_has_the_monitor_step(self):
         with open(DAILY_YML, encoding="utf-8") as f:
             self.assertNotIn(f"- name: {MONITOR_STEP_NAME}", f.read())
 
     def test_env_matches_daily_before_the_move_no_secret_dropped(self):
-        self.assertEqual(_extract_env(self.alerts_step), DAILY_MONITOR_ENV_BEFORE)
+        # CAS-1504 added PHASE; every secret and input daily.yml passed must still be there, unchanged.
+        env = _extract_env(self.alerts_step)
+        for k, v in DAILY_MONITOR_ENV_BEFORE.items():
+            self.assertEqual(env.get(k), v, k)
+        self.assertEqual(set(env) - set(DAILY_MONITOR_ENV_BEFORE), {"PHASE"})
 
     def test_command_matches_daily_before_the_move(self):
         run = _extract_run(self.alerts_step)
         self.assertIn(
             'if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] && '
             '[ -n "$RESEND_API_KEY" ]; then', run)
-        self.assertIn("python -m monitor $BASELINE_ARGS", run)
-        self.assertIn("python -m monitor --dry-run $BASELINE_ARGS", run)
+        self.assertIn('python -m monitor --phase "$PHASE" $BASELINE_ARGS', run)          # CAS-1504
+        self.assertIn('python -m monitor --phase "$PHASE" --dry-run $BASELINE_ARGS', run)
 
 
 if __name__ == "__main__":
