@@ -3709,11 +3709,12 @@
   .oamlvlnote{margin:8px 2px 0}
   .oamlvl .mfbox{margin:8px 0 0;border-top:0;padding:4px 4px 0;overflow:hidden;max-height:260px;opacity:1;
     transition:max-height .34s cubic-bezier(.4,0,.2,1),opacity .26s ease,margin .34s cubic-bezier(.4,0,.2,1),padding .34s cubic-bezier(.4,0,.2,1)}
-  .oamtastelink{display:flex;align-items:center;justify-content:space-between;width:100%;margin:12px 0 4px;
+  /* Lee, 2026-11-22: Taste sits left of Watch in the nav — "to Taste" points left, "back to list" points right */
+  .oamtastelink{display:flex;align-items:center;justify-content:flex-start;gap:12px;width:100%;margin:12px 0 4px;
     padding:11px 14px;border-radius:12px;border:1px solid rgba(124,92,255,.55);background:rgba(124,92,255,.14);
     color:var(--ink);font:700 14px var(--font-body);cursor:pointer}
   .oamtastelink span[aria-hidden]{font-size:20px;line-height:1;color:var(--accent)}
-  .oamtasteback{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 14px;padding:12px 14px;border-radius:12px;
+  .oamtasteback{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin:0 0 14px;padding:12px 14px;border-radius:12px;
     border:1px solid rgba(124,92,255,.55);background:rgba(124,92,255,.16);color:var(--ink);font:600 15px var(--font-body);
     text-align:left;cursor:pointer}
   .oamtasteback span[aria-hidden]{font-size:22px;line-height:1;color:var(--accent)}
@@ -21816,7 +21817,7 @@ window.oamBackToListFromTaste=()=>{
 function oamTasteBackHTML(){
   if(!oamTasteReturn) return "";
   const nm=(oamTasteReturn.draft.name||"").trim() || "your list";
-  return `<button type="button" class="oamtasteback" onclick="oamBackToListFromTaste()"><span aria-hidden="true">&lsaquo;</span><span>Back to list <b>${esc(nm)}</b></span></button>`;
+  return `<button type="button" class="oamtasteback" onclick="oamBackToListFromTaste()"><span>Back to list <b>${esc(nm)}</b></span><span aria-hidden="true">&rsaquo;</span></button>`;
 }
 window.setOamAgentOverride=(on)=>{
   const d=oamDraft; if(!d) return;
@@ -22018,7 +22019,7 @@ function renderOamMoodSheetBody(){
             ${oamOverrideFilterHTML(d)}
           </div>
           <!-- Lee, 2026-11-22: straight to Taste to change a genre's own level; Taste shows a way back here. -->
-          <button type="button" class="oamtastelink" onclick="oamOpenTasteFromList()"><span>Change your Taste levels</span><span aria-hidden="true">&rsaquo;</span></button>
+          <button type="button" class="oamtastelink" onclick="oamOpenTasteFromList()"><span aria-hidden="true">&lsaquo;</span><span>Change your Taste levels</span></button>
           <div class="oalist">
             ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
           </div>
