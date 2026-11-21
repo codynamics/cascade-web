@@ -25623,11 +25623,10 @@ const TOURS = {
       "Switch genres on or off to make a special list. For example, to create a list with only drama movies, switch everything else off."),
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .mgenre .oalist"]},
     // Lee, 2026-11-17: the Agent settings / Agent override switch sits under the genre rows.
-    {html:TUT_P("Sometimes you want just the best of the best.",
-      "Under the genres, choose <b>Override</b> to set one level for every genre in this list, in place of your taste settings."),
+    {html:TUT_P("Want only the very best? Under the genres, choose <b>Override</b> to set one level for every genre in this list."),
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .oamlvlseg"]},
     // The "during account setup" lines only appear when that setup mood exists (Lee, 16 Nov).
-    {get html(){ return TUT_P("Instead of building a list around genres, you can use a keyword search around an actor, director or title.",
+    {get html(){ return TUT_P("<b>Or find films by name</b>: type an actor, director or title instead. A name here switches the genres off.",
       ...(watchMoods.some(m=>m.id==="fav-person") ? ["During account setup, we set up a list with your favourite actor or director to show you how this is done."] : [])); },
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet #oamKwSec"]},
     {get html(){ return TUT_P("Show only films included on one of your services, so the whole list is ready to watch tonight.",
@@ -25660,14 +25659,18 @@ const TOURS = {
     {html:TUT_P("Like a search? Tap <b>Save as list</b> to turn it into a list, so its films are always one tap away in Watch."),
       before(){ tutFindSearch("Nolan"); }, sel:["#findSaveAsMoodBtn"], trail:["#findBtn"]},
   ]},
-  agent:{ title:"Agent tutorial", steps:[
-    {html:TUT_P("Your <b>agent</b>. Each genre shows how much of the catalogue you want, and the bells show which availability statuses alert you. Tap a genre to change it."),
+  agent:{ title:"Taste tutorial", steps:[
+    {html:TUT_P("<b>Taste</b>: how much of each genre you want. Slide a genre to see more or fewer of its films; untick it to switch it off."),
       before(){ closeSettings(); oaOpenStyle=null; oaOrderSnapshot=null; openAgentsScreen(); },
       after(){ oaOpenStyle=null; oaOrderSnapshot=null; showAgentsHome(); }, sel:["#oaList .oarow"], trail:["#agentsBtn"]},
+    // Lee, 21 Nov: the Agent recommendations card (CAS-1479/1480/1498).
+    {html:TUT_P("<b>Agent recommendations</b>: as you rate films, your agent suggests adjustments for each genre. A gold edge marks one waiting. Nothing changes until you apply it."),
+      before(){ closeSettings(); oaOpenStyle=null; oaOrderSnapshot=null; openAgentsScreen(); },
+      after(){ oaOpenStyle=null; oaOrderSnapshot=null; showAgentsHome(); }, sel:[".tkrec"], trail:["#agentsBtn"]},
     {html:TUT_P("Most movies have a main genre, listed first, and sub-genres after it: a Sci-fi that is also a Thriller, a Comedy that is also a Romance.",
       "Your Cascade agent studies those combinations in what you watch and rate, and works out which ones you're most and least likely to enjoy."),
       center:true},
-    {html:TUT_P("So your agent tracks each genre together with its sub-genres. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here, and you can override any of them."),
+    {html:TUT_P("So your agent tracks each genre together with its sub-genres. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here. Each sub-genre has its own slider; drag one to set it yourself."),
       before(){ v2OpenFirstOnStyle(); }, sel:["#oaAdjustSection"], trail:["#agentsBtn"]},
     {html:TUT_P("That's it. Your agent checks the whole catalogue every day and reports at 5pm."),
       before(){ oaOpenStyle=null; oaOrderSnapshot=null; closeSettings(); showAgentsHome(); }, center:true},
