@@ -3533,9 +3533,15 @@
   .tkstyle b.up{color:#2dd4bf}
   .tkstyle b.down{color:#f0883a}
   .tkfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
-  .tkdrag{position:absolute;z-index:5;margin:0;left:-5px;width:calc(100% + 10px);top:50%;transform:translateY(-50%);height:22px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
-  .tkdrag::-webkit-slider-runnable-track{height:22px;background:transparent}
-  .tkdrag::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:20px;border-radius:5px;background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);margin-top:1px}
+  /* Lee, 2026-11-22: a 40px-tall touch target (was 22px) so a finger reliably catches the slider; the thumb
+     itself is unchanged in look, centred in the taller track. */
+  .tkdrag{position:absolute;z-index:5;margin:0;left:-5px;width:calc(100% + 10px);top:50%;transform:translateY(-50%);height:40px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer;touch-action:none}
+  .tkdrag::-webkit-slider-runnable-track{height:40px;background:transparent}
+  .tkdrag::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:22px;border-radius:6px;background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);margin-top:9px}
+  /* Lee, 2026-11-22: while a genre is being dragged, its Score / top % reads much larger */
+  .oarowwrap .oarowval{transition:transform .12s ease;transform-origin:right center}
+  .oarowwrap.oadragging .oarowval{transform:scale(1.45)}
+  .oarowwrap.oadragging{z-index:6}
   .tkdrag::-moz-range-track{height:22px;background:transparent;border:none}
   .tkdrag::-moz-range-thumb{width:10px;height:20px;border-radius:5px;background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5)}
   .oarowwrap{position:relative}
@@ -3701,13 +3707,26 @@
   .oamlvl{margin:2px 0 10px;padding-bottom:10px;border-bottom:1px solid var(--line)}
   .oamlvlhd{margin:0 0 6px}   /* also .subhd — same look as SHOW / ORDER */
   .oamlvlnote{margin:8px 2px 0}
-  .oamlvl .mfbox{margin:8px 0 0;border-top:0;padding:4px 4px 0}
+  .oamlvl .mfbox{margin:8px 0 0;border-top:0;padding:4px 4px 0;overflow:hidden;max-height:260px;opacity:1;
+    transition:max-height .34s cubic-bezier(.4,0,.2,1),opacity .26s ease,margin .34s cubic-bezier(.4,0,.2,1),padding .34s cubic-bezier(.4,0,.2,1)}
+  .oamtastelink{display:flex;align-items:center;justify-content:space-between;width:100%;margin:12px 0 4px;
+    padding:11px 14px;border-radius:12px;border:1px solid rgba(124,92,255,.55);background:rgba(124,92,255,.14);
+    color:var(--ink);font:700 14px var(--font-body);cursor:pointer}
+  .oamtastelink span[aria-hidden]{font-size:20px;line-height:1;color:var(--accent)}
+  .oamtasteback{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 14px;padding:12px 14px;border-radius:12px;
+    border:1px solid rgba(124,92,255,.55);background:rgba(124,92,255,.16);color:var(--ink);font:600 15px var(--font-body);
+    text-align:left;cursor:pointer}
+  .oamtasteback span[aria-hidden]{font-size:22px;line-height:1;color:var(--accent)}
+  .oamlvl .mfbox.shut{max-height:0;opacity:0;margin-top:0;padding-top:0;padding-bottom:0}
+  @media (prefers-reduced-motion: reduce){ .oamlvl .mfbox{transition:none} }
   .mfrowgrid{align-items:center}
   .mfrowgrid .mflbl{font-size:12px;color:var(--dim);line-height:1.35}
   .mfrowgrid .mflbl b{color:var(--ink);font-size:12.5px}
   .oastrip{display:flex;gap:3px}
-  .oamstylerow .oaslidewrap{flex:none;height:12px}
-  .oamstylerow .oastrip .oabox{height:12px;border-radius:3px}
+  .oamstylerow .oaslidewrap{flex:none;height:16px}
+  .oamstylerow .oastrip .oabox{height:16px;border-radius:3px}
+  .oamthumb{position:absolute;top:-2px;width:10px;height:20px;margin-left:-5px;border-radius:5px;background:#fff;
+    border:1px solid rgba(0,0,0,.35);box-shadow:0 2px 6px rgba(0,0,0,.5);pointer-events:none}
   .mfrowgrid .oaslidewrap{flex:none;height:16px}
   .mfrowgrid .oastrip .oabox{height:16px;border-radius:3px}
   .mfrowgrid .oarange{height:22px;margin-top:-3px}
@@ -20559,7 +20578,14 @@ function oaComputeOrder(c){
 }
 // Frozen while a style is open (the ticket's own "does NOT re-sort" rule — Lee hit a score edit re-sorting
 // the list under his finger in the prototype); recomputed fresh every time nothing is open.
-function oaOrder(c){ return (oaOpenStyle && oaOrderSnapshot) ? oaOrderSnapshot : oaComputeOrder(c); }
+// Lee, 2026-11-22: rows never reorder while Taste is open — the order is frozen when the screen opens
+// (oaScreenOrder) and recomputed on the next visit. An open style's own snapshot still wins while it is open.
+let oaScreenOrder=null, oaListingDirty=false;
+function oaOrder(c){
+  if(oaOpenStyle && oaOrderSnapshot) return oaOrderSnapshot;
+  if(oaScreenOrder) return oaScreenOrder;
+  return oaComputeOrder(c);
+}
 // One matchesCriteria pass over the whole catalogue (not one pass per style) — the films-admitted count for
 // every style at once, keyed by each film's own MAIN style (mainOtherCombos, CAS-1337's own convention).
 function oaFilmCounts(c){
@@ -20671,6 +20697,7 @@ function oaRowHTML(c, style, filmCount, changed){
   // CAS-1481: the closed row's slider lives inside the strip and is placed by CSS alone (no measuring).
   const dragInp = on && !open ? `<input type="range" class="tkdrag" min="0" max="100" step="1" value="${rowTop}"
         data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
+        onpointerup="oaDragEnd(this)" ontouchend="oaDragEnd(this)" onblur="oaDragEnd(this)"
         aria-label="${escA(name)} minimum score">` : "";
   const strip = open ? `<span class="oarowstrip"></span><span class="oarowval"></span>`
     : `<span class="oarowstrip">${oaShareBoxesHTML(style, bar)}${dragInp}</span>
@@ -20738,6 +20765,7 @@ function renderOneAgentScreen(c){
   const title = "Your taste";   // CAS-1480: the screen heading (was the agent's own name, CAS-1352)
   const agentName = (c.name||"").trim() || "your agent";
   $("agentsBody").innerHTML=`
+    ${oamTasteBackHTML()}
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">Built from your ${n} verdict${n===1?"":"s"}</p>
     <div class="oaintro"><p>This is your space. Slide any genre to see more or fewer of its films. Nothing changes unless you change it.</p><p>Your agent, ${esc(agentName)}, studies your verdicts and suggests tweaks. You decide what to apply.</p><p>A <b>gold edge</b> marks a genre with an agent recommendation. Tap a genre to open it.</p></div>
@@ -20821,9 +20849,12 @@ window.oaToggleStyle=(style)=>{
 // full re-render, so neither the drag gesture nor the frozen row order is disturbed mid-drag.
 // CAS-1367: the slider's range is now Top 20%..All only — it never produces off (bar null) any more, so
 // there is no "Never" branch here; the row's own tick is the only way to turn a style off.
+// Lee, 2026-11-22: a genre can go as narrow as its top 5% (was 20%). Still never 0 — only the tick turns a genre off.
+const OA_MIN_SHARE=5;
 window.oaOnDrag=(input)=>{
+  { const rw=input.closest(".oarowwrap"); if(rw) rw.classList.add("oadragging"); }   // big value while dragging
   const style=input.dataset.style;
-  const share=Math.max(20, Math.min(100, parseInt(input.value,10)));
+  const share=Math.max(OA_MIN_SHARE, Math.min(100, parseInt(input.value,10)));
   input.value=share;
   const wrap=input.closest(".oaslidewrap") || input.closest(".oarowwrap");   // CAS-1480: the closed row's own slider
   const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
@@ -20851,15 +20882,18 @@ window.oaOnDrag=(input)=>{
 window.oaOnRelease=(input)=>{
   const style=input.dataset.style;
   const c=oneAgentCriteria(); if(!c) return;
-  const share=Math.max(20, Math.min(100, parseInt(input.value,10)));
+  const share=Math.max(OA_MIN_SHARE, Math.min(100, parseInt(input.value,10)));
   input.value=share;
   c.styles=c.styles||{};
   const st=c.styles[style]||(c.styles[style]={al:{cinema:false,rent:false,stream:false}});
   st.bar = oneBarForTopPct(style, share);
   saveCascades();
-  if(typeof render==="function") render();
+  // Lee, 2026-11-22: the listing behind Taste is rebuilt when Taste closes (closeAgentsScreen), not on every
+  // release — a full render here took the phone's main thread for a second or more and swallowed the next drag.
+  oaListingDirty=true;
   renderAgentsScreen();
 };
+window.oaDragEnd=(input)=>{ const rw=input.closest(".oarowwrap"); if(rw) rw.classList.remove("oadragging"); };
 // CAS-1367: the row's tick — the only way a style turns off. Switching off remembers the bar as lastBar so
 // switching back on restores the same share; a style that has never had one starts at score 80. Shared with
 // Find's "Turn <Genre> on" button (oamWilTurnOnGenre, below), so both paths restore the same way.
@@ -20876,7 +20910,7 @@ window.oaToggleStyleOn=(style)=>{
   if(st.bar!=null){ st.lastBar=st.bar; st.lastAl={...(st.al||{})}; st.bar=null; }
   else { oaTurnStyleOn(st); }
   saveCascades();
-  if(typeof render==="function") render();
+  oaListingDirty=true;   // Lee, 2026-11-22: rebuilt when Taste closes
   renderAgentsScreen();
 };
 window.oaApplySuggestion=(style,to)=>{
@@ -21622,9 +21656,18 @@ function oamStyleValHTML(style, bar, filterShare){
   if(bar==null) return "Never";
   const agentShare=oneTopPct(style, bar);
   if(filterShare!=null && agentShare!==filterShare){
-    return `${filterShare>=100?"All":`Top ${filterShare}%`}<i><s class="was">${agentShare}%</s> · ${oneBarForTopPct(style, filterShare)}+</i>`;
+    return `${filterShare>=100?"All":`Score ${oneBarForTopPct(style, filterShare)}+`}<i><s class="was">top ${agentShare}%</s> · top ${filterShare}%</i>`;
   }
-  return `Top ${agentShare}%<i>score ${bar}+</i>`;
+  return `Score ${bar}+<i>top ${agentShare}%</i>`;   // Lee, 2026-11-22: same order as the Taste screen
+}
+// Lee, 2026-11-22: a read-only copy of the Taste screen's white thumb, sat at the genre's level so the list's rows
+// read like the Taste rows. Same box geometry as the fill: box floor(p/20), (p mod 20)/20 of the way across it;
+// 5 boxes with 3px gaps.
+function oamThumbHTML(share){
+  const p=Math.max(0, Math.min(100, share));
+  const idx = p>=100 ? 4 : Math.floor(p/20);
+  const frac = p>=100 ? 1 : (p%20)/20;
+  return `<i class="oamthumb" aria-hidden="true" style="left:calc((100% - 12px) * ${(idx+frac)/5} + ${idx*3}px)"></i>`;
 }
 function oamStyleRowHTML(c, d, style){
   const bar=oamDraftBar(d, c, style);
@@ -21642,7 +21685,7 @@ function oamStyleRowHTML(c, d, style){
           ${subText?`<span class="oamalso">${esc(subText)}</span>`:""}
         </span>
       </label>
-      <div class="oaslidewrap"><div class="oastrip">${oaShareBoxesHTML(style, bar)}</div></div>
+      <div class="oaslidewrap"><div class="oastrip">${oaShareBoxesHTML(style, bar)}</div>${(!never && d.topShare==null) ? oamThumbHTML(oneTopPct(style, bar)) : ""}</div>
       <span class="oarowval">${oamStyleValHTML(style, bar, null)}</span>
     </div>`;
 }
@@ -21668,10 +21711,15 @@ function oamOverrideFilterDesc(share, on){
   if(!on) return `Switch to Override to give every ticked genre one level instead of its Taste level.`;
   return `Every ticked genre shows its ${share>=100?"whole catalog":`top ${share}%`} here, instead of its Taste level.`;
 }
+// Lee, 2026-11-22: under My taste the override slider is hidden ("shut"); switching animates it open or closed.
+// toggleOamOverride renders it in its OLD state (oamOvAnimFrom), then flips "shut" two frames later so the CSS
+// transition actually plays on the freshly rendered element.
+let oamOvAnimFrom=null;
 function oamOverrideFilterHTML(d){
   const on = d.topShare!=null;
   const share = on ? d.topShare : (d.lastTopShare || 40);
-  return `<div class="mfbox${on?"":" off"}">
+  const shut = oamOvAnimFrom!=null ? !oamOvAnimFrom : !on;
+  return `<div class="mfbox${on?"":" off"}${shut?" shut":""}" id="oamOvBox">
       <div class="mfscale"><span>${ONE_AGENT_SHARE_BRACKETS.map(b=>`<i>${esc(oaShareLabel(b.pct))}</i>`).join("")}</span></div>
       <div class="mfrowgrid">
         <div class="mflbl"><b>Every genre</b><span class="mfsub">same level</span></div>
@@ -21687,15 +21735,50 @@ function oamOverrideFilterHTML(d){
 }
 window.toggleOamOverride=()=>{
   const d=oamDraft; if(!d) return;
-  if(d.topShare!=null){ d.lastTopShare=d.topShare; d.topShare=null; }
+  const was = d.topShare!=null;
+  if(was){ d.lastTopShare=d.topShare; d.topShare=null; }
   else d.topShare=d.lastTopShare || 60;
-  renderOamMoodSheetBody();
+  oamOvAnimFrom=was;
+  try{ renderOamMoodSheetBody(); } finally { oamOvAnimFrom=null; }
+  const nowOn = d.topShare!=null;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const box=document.getElementById("oamOvBox"); if(box) box.classList.toggle("shut", !nowOn);
+  }));
 };
 // Lee, 2026-11-17: Agent settings (off) / Agent override (on, starting at 60% the first time).
 // Lee, 2026-11-17 (later): no hidden/simple view — the agent's levels always show, so nothing filters out of sight.
 // Kept as always-on so existing callers (tutorial, e2e) still work.
 function oamAdvancedOn(d){ return true; }
 window.toggleOamAdvanced=()=>{};
+// Lee, 2026-11-22: List sheet → Taste and back. The open draft (unsaved edits included) is parked while Taste is
+// open; "Back to list" reopens the sheet with it, re-reading every genre's level from Taste, and rebuilds the
+// listing so a Taste change shows at once. Leaving Taste any other way drops the way back.
+let oamTasteReturn=null;
+window.oamOpenTasteFromList=()=>{
+  const d=oamDraft; if(!d) return;
+  const body=$("watchSheetBody");
+  const parked={draft:d, scroll: body ? body.scrollTop : 0};
+  closeWatchSheet();
+  openAgentsScreen();
+  oamTasteReturn=parked;
+  renderAgentsScreen();
+};
+window.oamBackToListFromTaste=()=>{
+  const r=oamTasteReturn; if(!r) return;
+  closeAgentsScreen();
+  watchSettledNavKey=null;   // a Taste change re-ranks the listing — rebuild it, don't patch it
+  render();
+  oamDraft=r.draft;
+  oamFreezeMoodRowOrder();   // Taste may have switched a genre on or off
+  oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
+  openWatchSheet();
+  const body=$("watchSheetBody"); if(body) body.scrollTop=r.scroll;
+};
+function oamTasteBackHTML(){
+  if(!oamTasteReturn) return "";
+  const nm=(oamTasteReturn.draft.name||"").trim() || "your list";
+  return `<button type="button" class="oamtasteback" onclick="oamBackToListFromTaste()"><span aria-hidden="true">&lsaquo;</span><span>Back to list <b>${esc(nm)}</b></span></button>`;
+}
 window.setOamAgentOverride=(on)=>{
   const d=oamDraft; if(!d) return;
   if(!!on === (d.topShare!=null)) return;
@@ -21839,6 +21922,8 @@ function renderOamMoodSheetBody(){
             </div>
             ${oamOverrideFilterHTML(d)}
           </div>
+          <!-- Lee, 2026-11-22: straight to Taste to change a genre's own level; Taste shows a way back here. -->
+          <button type="button" class="oamtastelink" onclick="oamOpenTasteFromList()"><span>Change your Taste levels</span><span aria-hidden="true">&rsaquo;</span></button>
           <div class="oalist">
             ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
           </div>
@@ -23673,6 +23758,7 @@ window.openAgentsScreen=()=>{
       // CAS-1218 server-first: only stamp agentSeenAt when there is something new to clear — opening Agent with
       // nothing changed must write nothing.
       if(oaChangedGenres(oc, oaVisitCutoff).size){ oc.agentSeenAt=Date.now(); saveCascades(); updateAgentNavDot(); } } }
+  { const oc=oneAgentCriteria(); oaScreenOrder = oc ? oaComputeOrder(oc) : null; }   // Lee, 2026-11-22
   renderAgentsScreen();
   $("agentsScreen").scrollTop=0;
   $("agentsScreen").classList.add("open"); lockBodyScroll(true);
@@ -23681,6 +23767,9 @@ window.openAgentsScreen=()=>{
   logEvent("agents_screen_opened",{count:cascades.length});
 };
 window.closeAgentsScreen=()=>{
+  oamTasteReturn=null;   // Lee, 2026-11-22: the way back to a list lasts only while Taste is open
+  oaScreenOrder=null;    // Lee, 2026-11-22: rows re-sort on the next visit, never mid-visit
+  if(oaListingDirty){ oaListingDirty=false; watchSettledNavKey=null; if(typeof render==="function") render(); }
   $("agentsScreen").classList.remove("open"); lockBodyScroll(false);
   $("agentsBtn").classList.remove("active"); $("agentsBtn").setAttribute("aria-pressed","false");
   syncWatchChip();
@@ -29891,7 +29980,20 @@ function acctFetchKeepalive(init){
   // the next flush (a reconnect, or the next acctOp call).
   let ACCT_OP_RETRY_DELAYS = [400, 1200, 3600];
   function opWait(ms){ return new Promise(res => setTimeout(res, ms)); }
+  // Lee, 2026-11-22 ("I moved 4 sliders, then a couple of seconds later they all jumped back"): each queued update
+  // captured the row's updated_at when it was QUEUED. Several quick edits to one agent queue several updates
+  // before the first is confirmed, so the 2nd onwards carried a stamp this device's OWN 1st write had already
+  // replaced — refused as "another device won", and the UI adopted the row as it stood after the 1st edit only.
+  // ownStampAdvance records every updated_at this device's own successful update moved a row from → to; at send
+  // time an op's expected stamp is walked forward through those, so only a write from ANOTHER device conflicts.
+  const ownStampAdvance = new Map();
+  function ownStampKey(op, stamp){ return op.table + "|" + JSON.stringify(op.match) + "|" + stamp; }
   async function processOp(c, op){
+    if(op.kind === "update" && op.expectUpdatedAt !== undefined){
+      let e = op.expectUpdatedAt, hops = 0;
+      while(ownStampAdvance.has(ownStampKey(op, e)) && hops++ < 50) e = ownStampAdvance.get(ownStampKey(op, e));
+      op.expectUpdatedAt = e;
+    }
     for(let attempt=0; attempt<=ACCT_OP_RETRY_DELAYS.length; attempt++){
       let result;
       try{ result = await sendOnceWithTimeout(c, op); }
@@ -29923,6 +30025,9 @@ function acctFetchKeepalive(init){
             // different device had won, when nothing else ever touched it — the self-conflict storm the
             // incident's own point 3 logged (one device alternating refused/accepted against itself).
             Object.assign(row, data[0]);
+          }
+          if(data.length && data[0] && data[0].updated_at && data[0].updated_at !== op.expectUpdatedAt){
+            ownStampAdvance.set(ownStampKey(op, op.expectUpdatedAt), data[0].updated_at);
           }
         }
         if(op.onDone) op.onDone(true, null);
