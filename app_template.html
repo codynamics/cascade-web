@@ -3733,6 +3733,11 @@
   .oamprimbox>.oamkwsec{margin:4px 12px 0;padding-top:12px;border-top:1px solid var(--line)}
   .oamprimbox .oamkwhd{margin:0 0 8px}
   .oamprimbox .oamkwsec .oamgenreintro{margin:8px 0 0}
+  /* Lee, 2026-11-22: the name box was the same colour as the box around it (both --panel2, --line border), so it
+     didn't read as a field. Darker well, brighter edge, accent ring when focused. */
+  .oamprimbox #oamKwInput{background:var(--bg);border:1px solid rgba(255,255,255,.28)}
+  .oamprimbox #oamKwInput:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,92,255,.25)}
+  .oamprimbox #oamKwInput::placeholder{color:var(--dim)}
   .oamgensec.off .oamoff{display:inline-block}
   .oamgensec.off .mpanel{opacity:.32;filter:grayscale(1);pointer-events:none;transition:opacity .2s}
   #oamKwInput{width:100%;box-sizing:border-box}
