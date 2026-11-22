@@ -21695,7 +21695,8 @@ function oamStyleValHTML(style, bar, filterShare){
   if(bar==null) return "Never";
   const agentShare=oneTopPct(style, bar);
   if(filterShare!=null && agentShare!==filterShare){
-    return `${filterShare>=100?"All":`Score ${oneBarForTopPct(style, filterShare)}+`}<i><s class="was">top ${agentShare}%</s> · top ${filterShare}%</i>`;
+    // Lee, 2026-11-22: shorter second line so it fits beside the strip on a phone
+    return `${filterShare>=100?"All":`Score ${oneBarForTopPct(style, filterShare)}+`}<i><s class="was">${agentShare}%</s> top ${filterShare}%</i>`;
   }
   return `Score ${bar}+<i>top ${agentShare}%</i>`;   // Lee, 2026-11-22: same order as the Taste screen
 }
@@ -21915,6 +21916,11 @@ window.oamToggleSec=key=>{
   const el=document.querySelector(`#watchSheetBody .oamsec[data-sec="${key}"]`);
   if(el){ const open=oamSecOpen.has(key); el.classList.toggle("open", open);
     const hd=el.querySelector(".oamsechd"); if(hd) hd.setAttribute("aria-expanded", String(open)); }
+  // Lee, 2026-11-22: the Override lines are placed in pixels from the boxes (oamMfBoxPos), so drawn while
+  // PRIMARY SEARCH was closed they all landed at 0 — redraw them once the section is open and measurable.
+  if(key==="primary" && oamSecOpen.has(key) && oamDraft && oamDraft.topShare!=null){
+    const c=oneAgentCriteria(); if(c) oamDrawFilterLines(oamDraft, c, oamDraft.topShare);
+  }
 };
 // One line per section header saying what is set; `set` = changed from a new list's default (purple dot).
 function oamSecSummaries(d, c, posList, posIdx){
