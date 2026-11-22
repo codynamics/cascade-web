@@ -140,7 +140,7 @@ jobs:
             git checkout HEAD -- . ':!docs/appraisals/cas-catalogue-sizing.md'
             python poc_pipeline.py --build-html
             git add docs/appraisals/cas-catalogue-sizing.md
-            git commit -m "CAS-354: catalogue sizing $(date -u +%F)" || echo "nothing to commit"
+            git commit -m "catalogue sizing $(date -u +%F)" || echo "nothing to commit"
             if git push origin HEAD:staging; then
               pushed=1
               break
