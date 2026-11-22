@@ -3,12 +3,14 @@
 Run:  python -m unittest monitor.tests.test_emailer
 """
 import datetime as _dt
+import html
 import io
 import unittest
 import urllib.error
 from unittest import mock
 
 from monitor import render_digest, digest_subject
+from monitor.emailer import track_url
 from monitor.emailer import (
     USER_AGENT, send_via_resend, format_invite_reply, _invite_window_text, _invite_age_text,
     _format_short_date, _weekday_date, _event_pill, _event_context,
@@ -27,6 +29,11 @@ def _hit(title, moment, cascade="Some Agent", movie_id="1", movie=None, services
     rank = _rank_key({"criteria": {"order": order}})
     cid = f"id-{cascade}" if cascade_id is _UNSET else cascade_id
     return Hit(user_id="user-A", cascade_id=cid, cascade_name=cascade, transition=t, rank=rank)
+
+
+def _answer_href(value, film=9):
+    """The html-escaped, click-tracked href of a digest answer button (CAS-1513)."""
+    return html.escape(track_url(f"https://x.test/?answer={value}#/film/{film}", "daily_alert", f"answer_{value}"))
 
 
 class EventPillTests(unittest.TestCase):
@@ -192,7 +199,7 @@ class CardRenderTests(unittest.TestCase):
     def test_view_in_cascade_link(self):
         hit = _hit("Film", "hits_cinema", movie_id="42")
         d = render_digest([hit], site_url="https://example.test/app/")
-        self.assertIn("https://example.test/app/#/film/42", d["html"])
+        self.assertIn(html.escape(track_url("https://example.test/app/#/film/42", "daily_alert", "view_film")), d["html"])
         self.assertIn("View in Cascade", d["html"])
 
     def test_site_url_default_is_the_live_site(self):
@@ -208,7 +215,7 @@ class ButtonTests(unittest.TestCase):
         hit = _hit("Other Mommy", "opens_soon", movie={"status": ["upcoming"]}, movie_id="9")
         d = render_digest([hit], site_url="https://x.test/")
         for value in ("cinema", "rent", "stream", "never"):
-            self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
+            self.assertIn(_answer_href(value), d["html"])
         self.assertIn("WATCH ON", d["html"])
 
     def test_rent_switched_off_removes_the_rent_button(self):
@@ -225,7 +232,7 @@ class ButtonTests(unittest.TestCase):
                    movie={"status": ["included_streaming"]}, movie_id="9")
         d = render_digest([hit], site_url="https://x.test/")
         for value in ("stream", "never"):
-            self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
+            self.assertIn(_answer_href(value), d["html"])
         self.assertNotIn("answer=cinema", d["html"])
         self.assertNotIn("answer=seen", d["html"])
 
@@ -233,7 +240,7 @@ class ButtonTests(unittest.TestCase):
         hit = _hit("Ex Machina", "hits_rent", movie={"status": ["rental"]}, movie_id="9")
         d = render_digest([hit], site_url="https://x.test/")
         for value in ("rent", "stream", "never"):
-            self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
+            self.assertIn(_answer_href(value), d["html"])
         self.assertNotIn("answer=cinema", d["html"])
         self.assertNotIn("answer=seen", d["html"])
 
@@ -246,21 +253,21 @@ class WatchedColumnTests(unittest.TestCase):
     def test_unreleased_film_has_five_watched_links_in_order(self):
         hit = _hit("Other Mommy", "opens_soon", movie={"status": ["upcoming"]}, movie_id="9")
         d = render_digest([hit], site_url="https://x.test/")
-        positions = [d["html"].index(f"https://x.test/?answer={v}#/film/9") for v in self._WATCHED_VALUES]
+        positions = [d["html"].index(_answer_href(v)) for v in self._WATCHED_VALUES]
         self.assertEqual(positions, sorted(positions))
 
     def test_rental_film_has_five_watched_links(self):
         hit = _hit("Ex Machina", "hits_rent", movie={"status": ["rental"]}, movie_id="9")
         d = render_digest([hit], site_url="https://x.test/")
         for value in self._WATCHED_VALUES:
-            self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
+            self.assertIn(_answer_href(value), d["html"])
 
     def test_streaming_film_has_five_watched_links(self):
         hit = _hit("Spotlight", "hits_stream", services=["Netflix"],
                    movie={"status": ["included_streaming"]}, movie_id="9")
         d = render_digest([hit], site_url="https://x.test/")
         for value in self._WATCHED_VALUES:
-            self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
+            self.assertIn(_answer_href(value), d["html"])
 
     def test_watched_links_survive_every_service_tracking_setting(self):
         hit = _hit("Other Mommy", "opens_soon", movie={"status": ["upcoming"]}, movie_id="9")
@@ -268,7 +275,7 @@ class WatchedColumnTests(unittest.TestCase):
                           watch_windows={"in_cinema": {"list": False}, "rent": {"list": False},
                                          "stream": {"list": False}})
         for value in self._WATCHED_VALUES:
-            self.assertIn(f"https://x.test/?answer={value}#/film/9", d["html"])
+            self.assertIn(_answer_href(value), d["html"])
 
     def test_no_rendered_email_contains_answer_seen(self):
         hits = [

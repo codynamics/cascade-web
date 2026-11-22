@@ -300,7 +300,16 @@ def _window_tracked(watch_windows, key) -> bool:
     return bool(entry.get("list"))
 
 
-def _buttons_for(movie, movie_id, site_url, watch_windows):
+def track_url(url: str, cmp: str, cta: str) -> str:
+    """CAS-1513: tag an email link with its click-through attribution — src=email, cmp=<email kind>,
+    cta=<button key> — added to the query string ahead of any #fragment. The app logs email_click from
+    these on arrival and strips them. No open-tracking pixel: attribution only ever rides a link."""
+    base, hash_sep, frag = url.partition("#")
+    sep = "&" if "?" in base else "?"
+    return f"{base}{sep}src=email&cmp={cmp}&cta={cta}{hash_sep}{frag}"
+
+
+def _buttons_for(movie, movie_id, site_url, watch_windows, kind="daily_alert"):
     """(heading-or-None, [{"value","label","href","primary"}, ...]) for one film, filtered to the
     windows switched on in the account's Service tracking (CAS-1196 item 3) — "never"/"seen" are
     never gated. `primary` marks the bucket's own first-defined button (the filled blue one),
@@ -312,13 +321,13 @@ def _buttons_for(movie, movie_id, site_url, watch_windows):
         if not _window_tracked(watch_windows, gate):
             continue
         buttons.append({"value": value, "label": label, "primary": i == 0,
-                         "href": f"{site_url}?answer={value}#/film/{movie_id}"})
+                         "href": track_url(f"{site_url}?answer={value}#/film/{movie_id}", kind, f"answer_{value}")})
     return heading, buttons
 
 
-def _watched_buttons_for(movie_id, site_url):
+def _watched_buttons_for(movie_id, site_url, kind="daily_alert"):
     return [{"value": value, "label": label, "color": color,
-             "href": f"{site_url}?answer={value}#/film/{movie_id}"}
+             "href": track_url(f"{site_url}?answer={value}#/film/{movie_id}", kind, f"answer_{value}")}
             for value, label, color in _WATCHED_DEFS]
 
 
@@ -384,7 +393,7 @@ def _column_html(heading, buttons, esc) -> str:
             + "".join(_button_html(b, esc) for b in buttons))
 
 
-def _card_html(hit, esc, site_url, score, watch_windows, today) -> str:
+def _card_html(hit, esc, site_url, score, watch_windows, today, kind="daily_alert") -> str:
     t = hit.transition
     m = t.movie or {}
     pill_text, color_key = _event_pill(t, m, today)
@@ -393,10 +402,10 @@ def _card_html(hit, esc, site_url, score, watch_windows, today) -> str:
     year_html = (f' <span style="font-weight:400;color:#8b95a5;font-size:14px;">{esc(year)}</span>'
                  if year and year != "----" else "")
     meta = _meta_line(m)
-    heading, buttons = _buttons_for(m, t.movie_id, site_url, watch_windows)
-    film_url = f"{site_url}#/film/{t.movie_id}"
+    heading, buttons = _buttons_for(m, t.movie_id, site_url, watch_windows, kind)
+    film_url = track_url(f"{site_url}#/film/{t.movie_id}", kind, "view_film")
 
-    watched = _watched_buttons_for(t.movie_id, site_url)
+    watched = _watched_buttons_for(t.movie_id, site_url, kind)
     buttons_html = (
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;"><tr>'
         f'<td width="50%" valign="top" style="padding-right:6px;">{_column_html(heading, buttons, esc)}</td>'
@@ -426,7 +435,7 @@ def _card_html(hit, esc, site_url, score, watch_windows, today) -> str:
     )
 
 
-def _card_text(hit, score, today, site_url) -> list:
+def _card_text(hit, score, today, site_url, kind="daily_alert") -> list:
     t = hit.transition
     m = t.movie or {}
     year = m.get("year")
@@ -435,7 +444,7 @@ def _card_text(hit, score, today, site_url) -> list:
     return [
         f"{t.title}{year_s} — {pill_text}",
         f"  {_context_line(hit, today)}",
-        f"  {site_url}#/film/{t.movie_id}",
+        f"  {track_url(f'{site_url}#/film/{t.movie_id}', kind, 'view_film')}",
         "",
     ]
 
@@ -521,7 +530,7 @@ def _replies_block_html(replies, esc) -> str:
 # ---- the digest itself --------------------------------------------------------------------------
 
 def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_windows=None,
-                  today=None) -> dict:
+                  today=None, kind: str = "daily_alert") -> dict:
     """Return {'subject', 'html', 'text'} for one user's consolidated digest (CAS-1196: one card
     per film, no status/agent section headings — see the per-film helpers above).
 
@@ -531,6 +540,8 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
     watch_windows : the account's own Service tracking object (user_prefs.watch_windows) — gates
                     which "when will you watch it?" buttons are offered (item 3). None reads as the
                     on-device "never touched this" default (every window on).
+    kind          : the email kind for click-through attribution (CAS-1513): "daily_alert", or
+                    "unseen_alert" for the 5pm unseen-alerts email.
     today         : the date "in N days"/subject phrasing is relative to; defaults to today (UTC).
     """
     site_url = site_url or os.environ.get(SITE_URL_ENV) or DEFAULT_SITE_URL
@@ -551,12 +562,12 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
         text_lines.append(f"{len(ordered)} film{'' if len(ordered) == 1 else 's'} for you today")
         text_lines.append("")
         for h in shown:
-            text_lines.extend(_card_text(h, _score_of(scores, h.transition.movie_id), today, site_url))
+            text_lines.extend(_card_text(h, _score_of(scores, h.transition.movie_id), today, site_url, kind))
         if overflow > 0:
-            text_lines.append(f"...and {overflow} more in Cascade: {site_url}")
+            text_lines.append(f"...and {overflow} more in Cascade: {track_url(site_url, kind, 'more_in_cascade')}")
             text_lines.append("")
     text_lines += [
-        f"Change what I'm told: {site_url}",
+        f"Change what I'm told: {track_url(site_url, kind, 'change_alerts')}",
         "Cascade only writes when one of your agents has something worth your time.",
     ]
     text = "\n".join(text_lines)
@@ -575,13 +586,13 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
             '</td></tr>'
             '<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
             + "".join(_card_html(h, esc, site_url, _score_of(scores, h.transition.movie_id),
-                                 watch_windows, today) for h in shown)
+                                 watch_windows, today, kind) for h in shown)
             + '</table></td></tr>'
         )
         if overflow > 0:
             body_rows += (
                 '<tr><td style="padding-top:12px;">'
-                f'<a href="{esc(site_url)}" style="font-size:14px;color:#6b48f2;font-weight:700;'
+                f'<a href="{esc(track_url(site_url, kind, "more_in_cascade"))}" style="font-size:14px;color:#6b48f2;font-weight:700;'
                 f'text-decoration:none;">and {overflow} more in Cascade</a></td></tr>'
             )
     html_doc = (
@@ -601,7 +612,7 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
         + body_rows +
         '<tr><td style="padding-top:20px;font-size:12px;color:#8b95a5;">'
         'Cascade only writes when one of your agents has something worth your time. '
-        f'<a href="{esc(site_url)}" style="color:#6b48f2;font-weight:700;text-decoration:none;">'
+        f'<a href="{esc(track_url(site_url, kind, "change_alerts"))}" style="color:#6b48f2;font-weight:700;text-decoration:none;">'
         'Change what I&rsquo;m told</a>'
         '</td></tr>'
         '</table></td></tr></table></body></html>'

@@ -28,7 +28,7 @@ import os
 import sys
 
 from .catalogue import load_today
-from .emailer import DEFAULT_SITE_URL, SITE_URL_ENV, send_via_resend
+from .emailer import DEFAULT_SITE_URL, SITE_URL_ENV, send_via_resend, track_url
 from .store import InMemoryStore, store_from_env
 
 
@@ -65,7 +65,7 @@ def render_email(row, movie=None) -> dict:
     to_name = row.get("to_name") or "there"
     sender = row.get("sender_name") or "A friend"
     film = row.get("film_title") or "a film"
-    url = invite_url(row)
+    url = track_url(invite_url(row), "invite", "view_invite")
     poster = (movie or {}).get("poster")
     suggested_date = row.get("suggested_date")
     note = row.get("note")

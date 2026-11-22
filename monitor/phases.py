@@ -206,7 +206,7 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
         digest = render_digest(
             hits, replies=[format_invite_reply(r, today_by_id.get(str(r.get("tmdb_id"))), now=now)
                            for r in replies],
-            scores=scores, today=now.date())
+            scores=scores, today=now.date(), kind="unseen_alert")
         print(f"[monitor] email: {user_id} ({email}): {len(hits)} unseen alert(s), {len(replies)} "
               f"invite reply(s) - subject: {digest['subject']!r}")
         if dry_run:

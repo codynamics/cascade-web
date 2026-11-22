@@ -1415,7 +1415,7 @@ select
   count(distinct client_key) filter (where type = 'app_open')    as devices_app_open,
   count(distinct client_key) filter (where type = 'splash_cta')  as devices_splash_cta,
   count(distinct client_key)
-    filter (where type = 'onbstep_shown' and data->>'step' = 'v2_done') as devices_finished_onboarding,
+    filter (where type = 'onbstep_shown' and data->>'step' in ('v2_done','oaf_done')) as devices_finished_onboarding,
   count(distinct client_key)
     filter (where type in ('agent_created','cascade_created')) as devices_created_agent,
   count(distinct client_key) filter (where user_id is not null) as devices_signed_up

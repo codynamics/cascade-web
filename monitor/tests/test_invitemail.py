@@ -2,9 +2,11 @@
 
 Run:  python -m unittest monitor.tests.test_invitemail
 """
+import html
 import unittest
 from unittest import mock
 
+from monitor.emailer import track_url
 from monitor.invitemail import email_subject, invite_url, main, render_email
 from monitor.store import InMemoryStore
 
@@ -41,8 +43,9 @@ class RenderTests(unittest.TestCase):
     def test_email_contains_the_token_s_own_invite_link(self):
         email = render_email(_row(token="abc1234567", tmdb_id=12345))
         url = invite_url(_row(token="abc1234567", tmdb_id=12345))
-        self.assertIn(url, email["html"])
-        self.assertIn(url, email["text"])
+        tracked = track_url(url, "invite", "view_invite")   # CAS-1513
+        self.assertIn(html.escape(tracked), email["html"])
+        self.assertIn(tracked, email["text"])
         self.assertIn("inv=abc1234567", url)
         self.assertIn("#/film/12345", url)
 
