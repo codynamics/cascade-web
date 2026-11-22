@@ -2179,6 +2179,17 @@ def revalidate_published_floor(movies: list[dict], engine_scoreable_ids: set, he
     return survivors, dropped
 
 
+JOURNEY_ORDER = ["upcoming", "opening_week", "in_cinema", "pvod", "rental", "included_streaming"]
+
+
+def order_status(status) -> list[str]:
+    """CAS-1518: a status list in journey (WINDOWS) order, de-duplicated. primaryStatus() reads the LAST
+    window, so ['rental','in_cinema'] would show a rentable film as In Cinema. Unknown values (e.g.
+    'released') sort last, stable."""
+    seen = list(dict.fromkeys(status or []))
+    return sorted(seen, key=lambda w: JOURNEY_ORDER.index(w) if w in JOURNEY_ORDER else len(JOURNEY_ORDER))
+
+
 def derive_from_providers(movie: dict, prov: dict, today: datetime.date) -> list[str]:
     """Headline Cascade window from TMDB/JustWatch AU providers (CAS-127 cascade):
       flatrate|free|ads  -> included_streaming
@@ -2207,7 +2218,7 @@ def derive_from_providers(movie: dict, prov: dict, today: datetime.date) -> list
     if not windows:
         windows.append(_offerless_window(movie.get("cinema_date"), today,
                                           _record_year(movie), movie.get("release_dates")))
-    return windows
+    return order_status(windows)
 
 
 def has_provider_rows(prov: dict) -> bool:
@@ -2296,7 +2307,7 @@ def derive_status(movie: dict, offers: list[dict], today: datetime.date) -> list
     # cinema run with no priced offer is released-and-unavailable, not upcoming.
     if not status:
         status.add(_offerless_window(cd, today, _record_year(movie), movie.get("release_dates")))
-    return sorted(status)
+    return order_status(status)
 
 
 # ---------------------------------------------------------------------------
@@ -2331,6 +2342,7 @@ def apply_monotonic_status(m: dict, candidate: list[str], confidence: str, today
     stamped "estimated" was never confirmed by an offer in the first place (or already lost
     the one it had), so holding it back just freezes a phantom listing for longer — commit
     the offer-honest candidate immediately instead of waiting on DOWNGRADE_CONFIRM_RUNS."""
+    candidate = order_status(candidate)
     prev = m.get("status") or []
     prev_confidence = m.get("availability_confidence")
     if not prev or tier_rank(candidate) >= tier_rank(prev) or prev_confidence == "estimated":
@@ -2355,6 +2367,7 @@ def apply_monotonic_status(m: dict, candidate: list[str], confidence: str, today
         held = list(m.get("status") or [])
         if "in_cinema" in held and not m.get("on_screen") and HOME_WINDOWS & set(held):
             m["status"] = [w for w in held if w != "in_cinema"]
+        m["status"] = order_status(m["status"])   # CAS-1518: a held list may already be out of order
 
 
 # ---------------------------------------------------------------------------
