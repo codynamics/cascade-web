@@ -33963,8 +33963,7 @@
         }
       ],
       "status": [
-        "rental",
-        "in_cinema"
+        "rental"
       ],
       "availability_confidence": "confirmed",
       "window_dates": {

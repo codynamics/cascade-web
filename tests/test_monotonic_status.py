@@ -680,3 +680,23 @@ class MassStampGuardAcknowledgement(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HeldStatusNeverCarriesStaleInCinema(unittest.TestCase):
+    """CAS-1516 — Shaun the Sheep: The Beast of Mossy Bottom. Yesterday on_screen licensed
+    [rental, in_cinema]; today on_screen is gone and a provider gap reads back in_cinema alone, a backward
+    move that is HELD. The held status must not keep in_cinema next to the rent offers."""
+
+    def test_held_rental_plus_in_cinema_drops_in_cinema_without_on_screen(self):
+        today = datetime.date(2026, 11, 22)
+        m = _title(status=["rental", "in_cinema"], cinema_date="2026-09-17",
+                   offers=[{"service": "Apple TV Store", "type": "rent"}])
+        pp.apply_monotonic_status(m, ["in_cinema"], "estimated", today)
+        self.assertEqual(m["status"], ["rental"])
+        self.assertIn("pending_downgrade", m)
+
+    def test_on_screen_keeps_the_pair(self):
+        today = datetime.date(2026, 11, 22)
+        m = _title(status=["rental", "in_cinema"], on_screen=True)
+        pp.apply_monotonic_status(m, ["in_cinema"], "estimated", today)
+        self.assertEqual(m["status"], ["rental", "in_cinema"])

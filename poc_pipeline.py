@@ -2349,6 +2349,12 @@ def apply_monotonic_status(m: dict, candidate: list[str], confidence: str, today
         m.pop("pending_downgrade", None)
     else:
         m["pending_downgrade"] = pending   # held back — m["status"] stays at `prev`
+        # CAS-1516: ...but a held status must not carry in_cinema next to a home window once on_screen
+        # (the only thing that licenses the pair — CAS-1376) is gone, or the film sits on the Cinema tab
+        # while it is on rent (engine invariant #55). Strip it from the held status only.
+        held = list(m.get("status") or [])
+        if "in_cinema" in held and not m.get("on_screen") and HOME_WINDOWS & set(held):
+            m["status"] = [w for w in held if w != "in_cinema"]
 
 
 # ---------------------------------------------------------------------------
