@@ -1020,6 +1020,40 @@ def _parse_args(argv):
     return p.parse_args(argv)
 
 
+def _monitor_state_request(method, url_suffix, body=None, timeout=15):
+    """CAS-1514: tiny service-role call to public.monitor_state. Returns parsed JSON (GET) or True;
+    None when unconfigured or on any failure — publishing must never fail a health run."""
+    base = (os.environ.get(SUPABASE_URL_ENV) or "").rstrip("/")
+    key = os.environ.get(SUPABASE_SERVICE_ROLE_KEY_ENV)
+    if not (base and key):
+        return None
+    headers = {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    data = None
+    if body is not None:
+        headers["Prefer"] = "resolution=merge-duplicates,return=minimal"
+        data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(f"{base}/rest/v1/monitor_state{url_suffix}", data=data,
+                                 method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read()
+        return json.loads(raw) if method == "GET" else True
+    except Exception as err:  # noqa: BLE001 — never fail the run over publishing
+        print(f"[health] monitor_state {method} failed: {err}")
+        return None
+
+
+def fetch_published_health():
+    rows = _monitor_state_request("GET", "?key=eq.health&select=payload")
+    return rows[0]["payload"] if rows else None
+
+
+def publish_health(report) -> bool:
+    return bool(_monitor_state_request("POST", "?on_conflict=key", {
+        "key": "health", "payload": report,
+        "updated_at": _dt.datetime.now(_dt.timezone.utc).isoformat()}))
+
+
 def main(argv=None) -> int:
     args = _parse_args(sys.argv[1:] if argv is None else argv)
     now_dt = _dt.datetime.now(_dt.timezone.utc)
@@ -1034,6 +1068,13 @@ def main(argv=None) -> int:
             existing = json.load(open(out_path, encoding="utf-8"))
         except Exception:
             existing = None
+    # CAS-1514: the published copy in Supabase monitor_state is the source of truth now that
+    # daily.yml no longer commits state/health.json — alerts.yml's scope=alerts run must merge into
+    # the daily report, which only lives there. Falls back to the local file when unconfigured.
+    if args.scope in ("daily", "alerts") and not args.dry_run and not args.out:
+        published = fetch_published_health()
+        if published:
+            existing = published
 
     def _prev_check_value(name):
         return next((c.get("value") for c in (existing.get("checks", []) if existing else [])
@@ -1091,6 +1132,8 @@ def main(argv=None) -> int:
     else:
         report = build_report(checks, checked_at)
     json.dump(report, open(out_path, "w", encoding="utf-8"), indent=2)
+    if not args.dry_run and not args.out:
+        publish_health(report)
 
     # Exit status is about THIS run's own checks, never a merged-in failure the other scope
     # already reported (and already alerted on) earlier today — merging two scopes into one

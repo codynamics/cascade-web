@@ -1940,3 +1940,24 @@ grant execute on function public.is_active_member(uuid) to authenticated;
 -- CAS-1458: temporary testing bypass for the membership gate, switched off on the server before App Review.
 insert into public.app_config (key, value) values ('membership_bypass', 'true'::jsonb)
   on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- monitor_state (CAS-1514) — monitoring results published here instead of committed to git.
+-- Rows: 'uptime', 'health', 'run_stats', 'refresh_log'. uptime.yml / daily.yml / monitor.health
+-- upsert with the service-role key (bypasses RLS); the admin site reads it as an admin.
+-- No insert/update/delete policy for anon/authenticated, so they cannot write.
+-- ---------------------------------------------------------------------------
+create table if not exists public.monitor_state (
+  key        text primary key,
+  payload    jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.monitor_state enable row level security;
+
+drop policy if exists monitor_state_select_admin on public.monitor_state;
+create policy monitor_state_select_admin on public.monitor_state
+  for select to authenticated
+  using (exists (select 1 from public.analytics_admins a where a.user_id = auth.uid()));
+
+revoke all on public.monitor_state from anon, authenticated;
+grant select on public.monitor_state to authenticated;

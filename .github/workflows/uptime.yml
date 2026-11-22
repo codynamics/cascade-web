@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   actions: read   # CAS-995: alerts_ran reads alerts.yml's run history via the Actions API
 
 jobs:
@@ -47,6 +47,12 @@ jobs:
       - name: Read main's VERSION into the environment
         run: echo "CASCADE_MAIN_VERSION=$(cat main-ref/VERSION)" >> "$GITHUB_ENV"
 
+      - name: Pull the previous run's flap-control state (CAS-1514 — Supabase, not git)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/monitor_state.mjs pull uptime=state/uptime.json
+
       - name: Run the eight probes, decide alerting, write state/uptime.json
         env:
           CASCADE_MAIN_VERSION: ${{ env.CASCADE_MAIN_VERSION }}
@@ -67,35 +73,14 @@ jobs:
           node scripts/uptime_probe.mjs --json || PROBE_EXIT=$?
           echo "PROBE_EXIT=$PROBE_EXIT" >> "$GITHUB_ENV"
 
-      - name: Commit state/uptime.json
-        # Same bounded fetch/reset-soft/push retry every other state-writing workflow step in this
-        # repo uses (see daily.yml's CAS-974 step) — reset --soft onto the current staging tip never
-        # conflicts with a concurrent ticket push, it just re-parents this commit onto it.
-        run: |
-          git config user.name  "cascade-bot"
-          git config user.email "actions@users.noreply.github.com"
-          attempt=1
-          pushed=0
-          while [ "$attempt" -le 3 ]; do
-            git fetch origin staging
-            if ! git reset --soft origin/staging; then
-              echo "::error::git reset --soft onto origin/staging failed"
-              exit 1
-            fi
-            git checkout HEAD -- . ':!state/uptime.json'
-            git add state/uptime.json
-            git commit -m "CAS-975: hourly uptime report $(date -u +%FT%H)" || echo "nothing to commit"
-            if git push origin HEAD:staging; then
-              pushed=1
-              break
-            fi
-            echo "push rejected (attempt $attempt/3), retrying after reset"
-            attempt=$((attempt + 1))
-          done
-          if [ "$pushed" -ne 1 ]; then
-            echo "::error::failed to push state/uptime.json to staging after 3 attempts"
-            exit 1
-          fi
+      - name: Publish state/uptime.json to Supabase monitor_state (CAS-1514)
+        # Replaces the old hourly "CAS-975: hourly uptime report" git commit (~720/month, each one
+        # triggering a Pages build, and invisible to the admin site until promote ran). The row is
+        # also the next run's flap-control input (pulled above).
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/monitor_state.mjs push uptime=state/uptime.json
 
       - name: Fail the job if any probe was red
         # Kept as the LAST step, after the state commit above always runs regardless of probe

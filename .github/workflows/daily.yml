@@ -213,31 +213,12 @@ jobs:
           python -m monitor.health --scope daily || HEALTH_EXIT=$?
           git config user.name  "cascade-bot"
           git config user.email "actions@users.noreply.github.com"
-          # Same reset-soft-and-commit retry as the catalogue-sizing step above, minus the rebuild
-          # step — state/health.json and state/run_stats.json are plain data, never derived from
-          # app_template.html, so there is nothing to regenerate before committing them.
-          attempt=1
-          pushed=0
-          while [ "$attempt" -le 3 ]; do
-            git fetch origin staging
-            if ! git reset --soft origin/staging; then
-              echo "::error::git reset --soft onto origin/staging failed"
-              exit 1
-            fi
-            git checkout HEAD -- . ':!state/health.json' ':!state/run_stats.json'
-            git add state/health.json state/run_stats.json
-            git commit -m "CAS-974: nightly health report $(date -u +%F)" || echo "nothing to commit"
-            if git push origin HEAD:staging; then
-              pushed=1
-              break
-            fi
-            echo "push rejected (attempt $attempt/3), retrying after reset"
-            attempt=$((attempt + 1))
-          done
-          if [ "$pushed" -ne 1 ]; then
-            echo "::error::failed to push the health report to staging after 3 attempts"
-            exit 1
-          fi
+          # CAS-1514: no git commit any more. monitor.health publishes state/health.json to Supabase
+          # monitor_state itself; run_stats and refresh_log are published here. refresh_log.json (and
+          # run_stats.json) are ALSO still committed by the "Commit refreshed app + data" step above
+          # (it `git add state`), so the in-repo copies keep working for anything that reads them
+          # from git — only the separate nightly "CAS-974: nightly health report" commit is gone.
+          node scripts/monitor_state.mjs push run_stats=state/run_stats.json refresh_log=state/refresh_log.json
           exit $HEALTH_EXIT
 
   # CAS-973: email someone the moment this workflow breaks, instead of leaving it to be
