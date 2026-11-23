@@ -83,7 +83,7 @@ class AlertsMonitorStepMatchesDaily(unittest.TestCase):
         env = _extract_env(self.alerts_step)
         for k, v in DAILY_MONITOR_ENV_BEFORE.items():
             self.assertEqual(env.get(k), v, k)
-        self.assertEqual(set(env) - set(DAILY_MONITOR_ENV_BEFORE), {"PHASE"})
+        self.assertEqual(set(env) - set(DAILY_MONITOR_ENV_BEFORE), {"PHASE", "ALERT_ANSWER_SECRET"})  # CAS-1537 added the signing secret
 
     def test_command_matches_daily_before_the_move(self):
         run = _extract_run(self.alerts_step)
