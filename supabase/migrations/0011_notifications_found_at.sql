@@ -32,3 +32,5 @@ begin
 end $$;
 
 create index if not exists notifications_found_at_idx on public.notifications (found_at);
+
+insert into public.schema_migrations (version) values ('0011') on conflict do nothing;

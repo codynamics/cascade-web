@@ -7,3 +7,5 @@
 alter table public.notifications drop constraint if exists notifications_answer_check;
 alter table public.notifications add constraint notifications_answer_check
   check (answer is null or answer in ('in_cinema', 'premium', 'rent', 'stream', 'never', 'wow', 'liked', 'enjoyed', 'soso', 'disliked'));
+
+insert into public.schema_migrations (version) values ('0015') on conflict do nothing;

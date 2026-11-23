@@ -19,3 +19,5 @@ $$;
 revoke all on function public.is_web_access_approved() from public;
 grant execute on function public.is_web_access_approved() to authenticated;
 insert into public.web_access (email, note) values ('@codynamics.com.au', 'Whole domain (Lee, 23 Nov)') on conflict do nothing;
+
+insert into public.schema_migrations (version) values ('0013') on conflict do nothing;

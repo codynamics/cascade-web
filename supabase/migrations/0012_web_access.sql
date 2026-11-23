@@ -33,3 +33,5 @@ grant execute on function public.is_web_access_approved() to authenticated;
 
 -- The CAS-1458 testing bypass is retired (LifeOS task 28: off before App Review).
 delete from public.app_config where key = 'membership_bypass';
+
+insert into public.schema_migrations (version) values ('0012') on conflict do nothing;

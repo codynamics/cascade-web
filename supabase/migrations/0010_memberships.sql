@@ -51,3 +51,5 @@ grant execute on function public.is_active_member(uuid) to authenticated;
 -- CAS-1458: temporary testing bypass for the membership gate, switched off on the server before App Review.
 insert into public.app_config (key, value) values ('membership_bypass', 'true'::jsonb)
   on conflict (key) do nothing;
+
+insert into public.schema_migrations (version) values ('0010') on conflict do nothing;
