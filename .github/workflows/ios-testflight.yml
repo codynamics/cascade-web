@@ -20,6 +20,13 @@ name: ios-testflight
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: "Which Supabase environment the bundled app talks to (CAS-1521). No default — choose deliberately."
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
       version:
         description: "Marketing version x.y.z, next after the newest v* git tag"
         required: true
@@ -57,10 +64,24 @@ jobs:
       - name: Install web deps, build www/, sync the iOS project
         env:
           WEB_URL: ${{ inputs.web_url }}
+          CASCADE_ENV_INPUT: ${{ inputs.environment }}
         run: |
           set -euo pipefail
           npm ci
           npm run build
+
+          # CAS-1521: bake the chosen environment into the bundled app only. env.js sets window.CASCADE_ENV and
+          # is loaded before config.js, which picks the matching Supabase project. Web hosts never get it.
+          case "$CASCADE_ENV_INPUT" in
+            staging|production) ;;
+            *) echo "::error::environment must be staging or production. Got: '$CASCADE_ENV_INPUT'"; exit 1 ;;
+          esac
+          printf 'window.CASCADE_ENV = "%s";
+' "$CASCADE_ENV_INPUT" > www/env.js
+          grep -q '<script src="config.js"></script>' www/index.html             || { echo "::error::www/index.html has no config.js script tag to load env.js before"; exit 1; }
+          sed -i.bak 's#<script src="config.js"></script>#<script src="env.js"></script><script src="config.js"></script>#' www/index.html
+          rm -f www/index.html.bak
+          echo "Bundled app environment: $CASCADE_ENV_INPUT" >> "$GITHUB_STEP_SUMMARY"
 
           if [ -n "$WEB_URL" ]; then
             case "$WEB_URL" in

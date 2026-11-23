@@ -15,6 +15,20 @@ backend surface the browser talks to, plus the ledger the daily monitoring job w
 > Resend, add the GitHub Actions secrets, fill `config.js`) lives in **`SETUP-cascade-web.md`**.
 > This file covers just the database step.
 
+## Environments (CAS-1521)
+
+There are two Supabase projects: **production** (`ypccfyatejejslzlfrbf`) and **staging**
+(`oenvezqluwqdwlzfhisc`). Apply every migration to both, staging first. The tracked `config.js` holds
+both projects' anon keys and picks one at load:
+
+1. `cascademovies.com` / `www.cascademovies.com` → production.
+2. Otherwise `window.CASCADE_ENV` if set — the iOS build's `environment` input (`ios-testflight.yml`)
+   writes it to `www/env.js`, loaded before `config.js` in the bundled app only.
+3. Otherwise → staging (`*.pages.dev` previews, localhost, Playwright).
+
+The result is `window.CASCADE_CONFIG.ENV`, shown in the footer build stamp and the diagnostics panel.
+`tests/js/env-config.test.mjs` pins the mapping. Only anon keys ever go in `config.js`.
+
 ## How to apply a change (Lee — one time per migration)
 
 1. Open the Supabase project → **SQL Editor** → **New query**.

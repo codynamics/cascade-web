@@ -6778,8 +6778,10 @@ $("updated").textContent = fmtDay(BUILD_DATE);
 // label themselves apart is to look at where they are actually being served. So env is derived from
 // the hostname here, at runtime, for display only.
 const BUILD_INFO = window.BUILD_INFO || {};
-const RUNTIME_ENV = ["cascademovies.com","www.cascademovies.com"].includes(location.hostname)
-  ? "production" : "staging";
+// CAS-1521: config.js owns the hostname / CASCADE_ENV decision (the installed app's hostname is localhost, so
+// hostname alone cannot tell a production bundle from a staging one). A missing config.js falls back to hostname.
+const RUNTIME_ENV = (window.CASCADE_CONFIG && window.CASCADE_CONFIG.ENV)
+  || (["cascademovies.com","www.cascademovies.com"].includes(location.hostname) ? "production" : "staging");
 const buildCore = () => {
   const b = BUILD_INFO || {};
   return ["v" + (b.version || "0.0.0"),
@@ -6884,6 +6886,7 @@ function diagReport(){
       ["Built at", b.builtAt || "unknown"],
       ["Protocol", location.protocol],
       ["Origin", location.origin],
+      ["Environment", RUNTIME_ENV],
       ["Capacitor bridge", cap ? "yes (" + ((window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || "?") + ")" : "no"],
       ["User agent", navigator.userAgent]
     ],
