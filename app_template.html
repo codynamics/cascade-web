@@ -2215,6 +2215,12 @@
     background:rgba(255,255,255,.05);border-radius:11px}
   .mbtx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
   .mbt{font-family:var(--font-display);font-weight:700;font-size:15.5px;color:var(--ink)}
+  .membsub{margin:-2px 0 16px;color:var(--dim);font-size:15px}
+  #membScreen .mbrow .oafwart{flex:none;width:52px;height:44px;border-radius:12px;display:grid;place-items:center;
+    background:rgba(255,255,255,.05);border:1px solid var(--line);position:relative}
+  #membScreen .mbrow .oafwflow{display:flex}
+  #membScreen .mbrow .mbt{font-family:inherit;font-weight:400;font-size:15px;line-height:1.4;color:var(--ink)}
+  #membScreen .mbrow .mbt b.wc{color:var(--amber)} #membScreen .mbrow .mbt b.wr{color:var(--blue)} #membScreen .mbrow .mbt b.ws{color:var(--green)}
   .mbd{font-size:12.5px;color:var(--dim);line-height:1.35}
   /* The haul, under the button — four across, so it reads as a wall rather than a shelf. */
   .membgrid{grid-template-columns:repeat(4,1fr);gap:7px;margin:18px 0 4px}
@@ -3061,21 +3067,22 @@
   #oafScreen .oafwbeat .obintrotext{margin:0}
   #oafScreen .oafwbeat b.wc{color:var(--amber)} #oafScreen .oafwbeat b.wr{color:var(--blue)} #oafScreen .oafwbeat b.ws{color:var(--green)}
   @keyframes oafwIn{to{opacity:1;transform:none}}
-  #oafScreen .oafwart{flex:none;width:52px;height:44px;border-radius:12px;display:grid;place-items:center;
+  #oafScreen .oafwart,#membScreen .oafwart{flex:none;width:52px;height:44px;border-radius:12px;display:grid;place-items:center;
     background:rgba(255,255,255,.05);border:1px solid var(--line)}
-  #oafScreen .oafwico{color:var(--dc)}
-  #oafScreen .oafwico svg{width:24px;height:24px}
+  #oafScreen .oafwico,#membScreen .oafwico{color:var(--dc)}
+  #oafScreen .oafwico svg,#membScreen .oafwico svg{width:24px;height:24px}
   #oafScreen .oafwico.alerts{--dc:#ffd54a;animation:oafwPulse 2.4s ease-in-out 1.4s infinite}
-  #oafScreen .oafwico.agent{--dc:#a78bfa}
+  #oafScreen .oafwico.agent,#membScreen .oafwico.agent{--dc:#a78bfa}
+  #oafScreen .oafwico.services,#membScreen .oafwico.services{--dc:var(--green)}
   #oafScreen .oafwico.agent svg circle{animation:oafwBlink 3s ease-in-out 2s infinite;transform-origin:12px 3.6px}
   @keyframes oafwPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 14px rgba(255,213,74,.35)}}
   @keyframes oafwBlink{0%,90%,100%{opacity:1}95%{opacity:.2}}
   /* the cascade: three stage dots joined by lines, a film travelling along them */
-  #oafScreen .oafwflow{position:relative;display:flex;align-items:center;justify-content:center;gap:0;padding:0 6px}
-  #oafScreen .oafwflow i{width:8px;height:8px;border-radius:50%;flex:none}
-  #oafScreen .oafwflow i.c{background:var(--amber)} #oafScreen .oafwflow i.r{background:var(--blue)} #oafScreen .oafwflow i.s{background:var(--green)}
-  #oafScreen .oafwflow b{width:9px;height:2px;background:var(--line);flex:none}
-  #oafScreen .oafwfilm{position:absolute;top:50%;left:8px;width:10px;height:10px;margin-top:-5px;border-radius:3px;
+  #oafScreen .oafwflow,#membScreen .oafwflow{position:relative;display:flex;align-items:center;justify-content:center;gap:0;padding:0 6px}
+  #oafScreen .oafwflow i,#membScreen .oafwflow i{width:8px;height:8px;border-radius:50%;flex:none}
+  #oafScreen .oafwflow i.c,#membScreen .oafwflow i.c{background:var(--amber)} #oafScreen .oafwflow i.r,#membScreen .oafwflow i.r{background:var(--blue)} #oafScreen .oafwflow i.s,#membScreen .oafwflow i.s{background:var(--green)}
+  #oafScreen .oafwflow b,#membScreen .oafwflow b{width:9px;height:2px;background:var(--line);flex:none}
+  #oafScreen .oafwfilm,#membScreen .oafwfilm{position:absolute;top:50%;left:8px;width:10px;height:10px;margin-top:-5px;border-radius:3px;
     background:#fff;box-shadow:0 0 8px #fff;animation:oafwTravel 3s ease-in-out .8s infinite}
   @keyframes oafwTravel{0%{left:8px;background:var(--amber);box-shadow:0 0 8px var(--amber)}
     45%{left:21px;background:var(--blue);box-shadow:0 0 8px var(--blue)}
@@ -22946,15 +22953,15 @@ function oafWelcomeHTML(){
     <p class="oafwlede">Cascade is your movie-watching engine.</p>
     <div class="oafwbeat" style="--d:.15s">
       <div class="oafwart oafwflow" aria-hidden="true"><i class="c"></i><b></b><i class="r"></i><b></b><i class="s"></i><span class="oafwfilm"></span></div>
-      <p class="obintrotext">It tracks the films you mustn't miss as they move from <b class="wc">cinema</b> to <b class="wr">rental</b> to <b class="ws">streaming</b>.</p>
+      <p class="obintrotext">Always know what to watch next across <b class="wc">cinema</b>, <b class="wr">rental</b> and <b class="ws">streaming</b>, with movie tracking and <b>alerts</b>.</p>
     </div>
     <div class="oafwbeat" style="--d:.55s">
-      <div class="oafwart oafwico alerts" aria-hidden="true">${OAF_DONE_ICONS.alerts}</div>
-      <p class="obintrotext">Always know what to watch next, with personalised <b>alerts</b> and <b>lists</b> by genre, actor or director.</p>
+      <div class="oafwart oafwico services" aria-hidden="true">${OAF_WELCOME_SERVICES_ICON}</div>
+      <p class="obintrotext"><b>Navigate and organise your streaming services</b>, and get more from the subscriptions you already pay for.</p>
     </div>
     <div class="oafwbeat" style="--d:.95s">
       <div class="oafwart oafwico agent" aria-hidden="true">${OAF_DONE_ICONS.agent}</div>
-      <p class="obintrotext">Rate what you watch. Your <b>agent</b> learns your taste and gets better at finding films for you.</p>
+      <p class="obintrotext"><b>Tuned to your taste.</b> Rate what you watch and your <b>agent</b> gets better and better at finding films for you.</p>
     </div>
     <p class="obintrotext oafwclose" style="--d:1.35s">Answer a few quick questions to set up your membership and get your agent started.</p>`;
 }
@@ -23186,6 +23193,8 @@ function oafAlertRowsHTML(){
 // Lee, 13 Nov: the done screen is sectioned by the three main-nav destinations it set up, each headed by that
 // nav item's own icon and colour — Agent (what it watches), Alerts (what it will tell you) and Watch (the moods
 // you browse) — so the screen reads as a map of the app the person is about to land in.
+// Lee, 23 Nov: the welcome's streaming-services beat — a screen with a play mark, in the same 24px stroke style.
+const OAF_WELCOME_SERVICES_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6.5" width="18" height="12.5" rx="2.5"/><path d="M8.5 3 12 6.5 15.5 3"/><path d="M10.4 10.2v5.1l4.2-2.55z"/></svg>`;
 const OAF_DONE_ICONS = {
   agent:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4.5" y="8" width="15" height="11" rx="3"/><path d="M12 4.5V8"/><circle cx="12" cy="3.6" r="1.1"/><path d="M9.3 13.2v1.6M14.7 13.2v1.6"/></svg>`,
   alerts:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15.5 10 9.5 14 13.5 20 5.5"/><path d="M14 5.5h6v6"/></svg>`,
@@ -25035,10 +25044,16 @@ function onbTopFilms(limit){
 // key off #membEmail/#membEmailErr/.membcta by id/class, not by which function painted them); only the
 // content differs, and only for this, onboarding's own final step. The poster wall is gone (Change E4) —
 // three real films already made the case on S6, immediately before this screen.
-const OB_MEMB_BENEFITS = ["Something to watch for every occasion.",
-                          "Alerts for the movies you care about.",
-                          "An agent working for you.",
-                          "Streaming service advice."];
+// Lee, 23 Nov: the sign-up step repeats the welcome's three beats — same words, same icons — so what the
+// person is signing up for is exactly what they were told on the first screen. `html` is trusted static markup.
+const OB_MEMB_BENEFITS = [
+  {art:`<span class="oafwart oafwflow" aria-hidden="true"><i class="c"></i><b></b><i class="r"></i><b></b><i class="s"></i><span class="oafwfilm"></span></span>`,
+   html:`Always know what to watch next across <b class="wc">cinema</b>, <b class="wr">rental</b> and <b class="ws">streaming</b>, with movie tracking and <b>alerts</b>.`},
+  {art:`<span class="oafwart oafwico services" aria-hidden="true">${OAF_WELCOME_SERVICES_ICON}</span>`,
+   html:`<b>Navigate and organise your streaming services</b>, and get more from the subscriptions you already pay for.`},
+  {art:`<span class="oafwart oafwico agent" aria-hidden="true">${OAF_DONE_ICONS.agent}</span>`,
+   html:`<b>Tuned to your taste.</b> Rate what you watch and your <b>agent</b> gets better and better at finding films for you.`},
+];
 // CAS-954: the honest set for a headline that counts every agent is the union of their real lists, not
 // any one agent's haul — MOVIES.filter already dedupes this by construction, since each film is admitted
 // once regardless of how many agents would have matched it. Its own function so the roster grid's real
@@ -25053,10 +25068,11 @@ function openOnbMembership(){
   const posters = onbMembershipFilms(agents).slice(0, MEMB_POSTERS).map(rvPosterHTML).join("");
   $("membBody").innerHTML = `
     <span class="cascpill" id="membPill">CASCADE</span>
-    <h2 class="membh" id="membHead">Membership benefits</h2>
+    <h2 class="membh" id="membHead">Create your account</h2>
+    <p class="membsub">Start your free month of Cascade.</p>
     <div class="membenefits">
-      ${OB_MEMB_BENEFITS.map(b=>`<div class="mbrow"><span class="mbic">✓</span>
-        <span class="mbtx"><span class="mbt">${esc(b)}</span></span></div>`).join("")}
+      ${OB_MEMB_BENEFITS.map(b=>`<div class="mbrow">${b.art}
+        <span class="mbtx"><span class="mbt">${b.html}</span></span></div>`).join("")}
     </div>
     ${membOfferHTML()}
     <p class="memfine" id="membFine"${membFineText()?"":" hidden"}>${esc(membFineText())}</p>
@@ -25495,6 +25511,8 @@ function membOfferHTML(){
 }
 function membHasFreeTrial(p){ return !!(p && p.introductoryPrice && Number(p.introductoryPrice.price)===0); }
 function membCtaLabel(){
+  // Lee, 23 Nov: on the email step this screen is plainly a sign-up — say so on the button.
+  if(membNeedsEmail()) return "Create account";
   if(!membIsNativeApp()) return "Continue";
   return (membProduct && !membHasFreeTrial(membProduct)) ? "Subscribe" : "Start free trial";
 }
