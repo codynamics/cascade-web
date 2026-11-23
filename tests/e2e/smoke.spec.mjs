@@ -980,6 +980,9 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
       // sees a group.
       rpc: async (fn, params) => {
         if(fn === "email_has_account") return { data: false, error: null };
+        // CAS-1540: CAS-1531 made membEnsureMember() ask is_web_access_approved on the web; an unstubbed
+        // answer ("created") is not true, so the invite-only screen kept #membScreen open. Approved here.
+        if(fn === "is_web_access_approved") return { data: true, error: null };
         if(fn === "complete_membership"){
           // CAS-1176 AC7: recorded so a test can inspect what membCompleteNewMembership actually sent,
           // without this fixture needing its own notify_prefs table (every other table here falls through
@@ -1157,6 +1160,9 @@ const CAS1169_FAKE_SUPABASE_GLOBAL = `
       from: (table) => table === "cascades" ? cascadesTable() : chain(),
       rpc: async (fn, params) => {
         if(fn === "email_has_account") return { data: false, error: null };
+        // CAS-1540: CAS-1531 made membEnsureMember() ask is_web_access_approved on the web; an unstubbed
+        // answer ("created") is not true, so the invite-only screen kept #membScreen open. Approved here.
+        if(fn === "is_web_access_approved") return { data: true, error: null };
         if(fn === "complete_membership"){
           const agents = (params && params.p && params.p.agents) || [];
           agents.forEach(a => {
@@ -1453,6 +1459,9 @@ const CAS1035_FAKE_SUPABASE_GLOBAL = `
       // test's onboarding-built agent only exists once this mock creates it from p.agents.
       rpc: async (fn, params) => {
         if(fn === "email_has_account") return { data: false, error: null };
+        // CAS-1540: CAS-1531 made membEnsureMember() ask is_web_access_approved on the web; an unstubbed
+        // answer ("created") is not true, so the invite-only screen kept #membScreen open. Approved here.
+        if(fn === "is_web_access_approved") return { data: true, error: null };
         if(fn === "complete_membership"){
           const agents = (params && params.p && params.p.agents) || [];
           agents.forEach(a => {
