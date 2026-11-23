@@ -1579,24 +1579,22 @@ group by user_id, (coalesce(data ->> 'step', data ->> 'key', '(unknown)'));
 -- analytics_admins guard inside its body. admin_member_emails_list() carries that same guard as
 -- an explicit SECURITY DEFINER function instead, and the view is now a security_invoker = true
 -- wrapper around it — no public view depends on auth.users directly any more.
-create or replace function public.admin_member_emails_list()
-returns table (user_id uuid, email text)
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select u.id, u.email::text
+-- CAS-1527: also returns created_at (applied live 23 Nov) so the admin site can count new members.
+drop view if exists public.admin_member_emails;
+drop function if exists public.admin_member_emails_list();
+create function public.admin_member_emails_list()
+returns table (user_id uuid, email text, created_at timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select u.id, u.email::text, u.created_at
   from auth.users u
-  where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid())
+  where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid());
 $$;
-
 revoke all on function public.admin_member_emails_list() from public, anon;
 grant execute on function public.admin_member_emails_list() to authenticated, service_role;
-
-create or replace view public.admin_member_emails
-with (security_invoker = true) as
-select user_id, email from public.admin_member_emails_list();
+create view public.admin_member_emails with (security_invoker = true) as
+  select user_id, email, created_at from public.admin_member_emails_list();
+revoke all on public.admin_member_emails from public, anon, authenticated;
+grant select on public.admin_member_emails to authenticated, service_role;
 
 -- CAS-1092: cascades can now carry a soft delete (deleted_at); exclude those rows here too.
 create or replace view admin_priv.admin_cascades
@@ -1937,9 +1935,33 @@ $$;
 revoke all on function public.is_active_member(uuid) from public;
 grant execute on function public.is_active_member(uuid) to authenticated;
 
--- CAS-1458: temporary testing bypass for the membership gate, switched off on the server before App Review.
-insert into public.app_config (key, value) values ('membership_bypass', 'true'::jsonb)
-  on conflict (key) do nothing;
+-- CAS-1531: web_access — approved emails for the invite-only web (migration 0012_web_access.sql).
+create table if not exists public.web_access (
+  email    text primary key,
+  note     text,
+  added_at timestamptz not null default now()
+);
+-- RLS on with NO policy for any client role: a client can neither list nor write the table. The only read
+-- path is is_web_access_approved() below, which answers yes/no for the caller's own email.
+alter table public.web_access enable row level security;
+
+create or replace function public.is_web_access_approved()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.web_access w
+    where lower(w.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+  );
+$$;
+revoke all on function public.is_web_access_approved() from public;
+grant execute on function public.is_web_access_approved() to authenticated;
+
+-- The CAS-1458 testing bypass is retired (LifeOS task 28: off before App Review).
+delete from public.app_config where key = 'membership_bypass';
 
 -- ---------------------------------------------------------------------------
 -- monitor_state (CAS-1514) — monitoring results published here instead of committed to git.

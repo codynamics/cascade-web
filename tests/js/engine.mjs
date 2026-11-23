@@ -136,7 +136,7 @@ if(typeof window.CascadeAuth === "undefined"){
 }
 ;globalThis.__ENGINE__ = {
   membClassifyPurchase, membBuy, membRestore, membRowActive, membLoadEntitlement, membGateCheck, membEnsureMember, membPriceLine, membFineText, membCtaLabel,
-  get membEnt(){ return membEnt; }, get membGated(){ return membGated; }, get membBypassShown(){ return membBypassShown; }, get membLastMessage(){ return membLastMessage; },
+  get membEnt(){ return membEnt; }, get membGated(){ return membGated; }, get membLastMessage(){ return membLastMessage; },
   MOVIES, CASCADE, STATUS_LABEL, SHOWABLE_N,
   // CAS-1327: TRACK_MIN is the agent score track's own floor — exported so scripts/scoreable_shim.mjs
   // can hand poc_pipeline.py the catalogue's publication floor straight from the shipped engine instead

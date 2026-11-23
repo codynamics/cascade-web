@@ -44,13 +44,13 @@ class AdminEmailsFunctionMigration(unittest.TestCase):
                 self.migration_src)
 
     def test_schema_sql_declares_the_function(self):
-        self.assertIn("create or replace function public.admin_member_emails_list()", self.schema_src)
+        # CAS-1527: now drop + create, and also returns created_at.
+        self.assertIn("create function public.admin_member_emails_list()", self.schema_src)
         self.assertIn("security definer", self.schema_src)
 
     def test_schema_sql_view_is_security_invoker_over_the_function(self):
-        self.assertIn("create or replace view public.admin_member_emails", self.schema_src)
-        self.assertIn("with (security_invoker = true) as", self.schema_src)
-        self.assertIn("select user_id, email from public.admin_member_emails_list();", self.schema_src)
+        self.assertIn("create view public.admin_member_emails with (security_invoker = true) as", self.schema_src)
+        self.assertIn("select user_id, email, created_at from public.admin_member_emails_list();", self.schema_src)
 
     def test_schema_sql_declares_analytics_admins_select_self_policy(self):
         self.assertIn("create policy analytics_admins_select_self on public.analytics_admins", self.schema_src)
