@@ -76,8 +76,7 @@ jobs:
             staging|production) ;;
             *) echo "::error::environment must be staging or production. Got: '$CASCADE_ENV_INPUT'"; exit 1 ;;
           esac
-          printf 'window.CASCADE_ENV = "%s";
-' "$CASCADE_ENV_INPUT" > www/env.js
+          printf 'window.CASCADE_ENV = "%s";\n' "$CASCADE_ENV_INPUT" > www/env.js
           grep -q '<script src="config.js"></script>' www/index.html             || { echo "::error::www/index.html has no config.js script tag to load env.js before"; exit 1; }
           sed -i.bak 's#<script src="config.js"></script>#<script src="env.js"></script><script src="config.js"></script>#' www/index.html
           rm -f www/index.html.bak
