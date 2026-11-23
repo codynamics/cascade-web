@@ -622,6 +622,15 @@ if(typeof window.CascadeAuth === "undefined"){
   pickNever: (id) => window.pickNever(id),
   filmRouteId, openFilmPage, applyPendingAnswer, watchStepsSegmentsHTML,
   setPendingAnswer(v){ pendingAnswer = v; },
+  // CAS-1536: the "From your email" batch view - the link parser, the pending/apply pair, the filtered view's
+  // pure row/controls builders, To decide, and the answer write. Mutable bindings go through getters/setters.
+  parseBatchLink, applyPendingBatch, BATCH_UUID_RE, BATCH_ANSWER_KEYS,
+  get pendingBatch(){ return pendingBatch; }, setPendingBatch(v){ pendingBatch = v; },
+  get movingBatch(){ return movingBatch; },
+  get alertBatches(){ return alertBatches; }, setAlertBatches(v){ alertBatches = v; },
+  openBatchView: (...a) => window.openBatchView(...a), closeBatchView: () => window.closeBatchView(),
+  batchViewRows, batchControlsHTML, batchBandHTML, batchDateLabel, toDecideBatches, toDecideCount, toDecideHTML,
+  noteBatchAnswer, updateMovingBadge, WATCH_LEVEL_SHORT_LABEL,
   location,
   get watchPrefs(){ return watchPrefs; },
   setWatchPrefs(w){ watchPrefs = w; },

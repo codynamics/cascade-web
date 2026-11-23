@@ -45,8 +45,12 @@ class AlertBatchesSchema(unittest.TestCase):
                               "references public.alert_batches(id) on delete set null;", src)
                 self.assertIn("alter table public.notifications add column if not exists answer text;", src)
                 self.assertIn("alter table public.notifications add column if not exists answered_at timestamptz;", src)
-                self.assertIn("check (answer is null or answer in ('cinema', 'home', 'notfor'))", src)
                 self.assertIn("create index if not exists notifications_batch_id_idx on public.notifications (batch_id);", src)
+
+    def test_0014_itself_still_carries_its_original_answer_check(self):
+        # CAS-1536's migration 0015 replaces this constraint in schema.sql's end state; 0014 stays as applied.
+        self.assertIn("check (answer is null or answer in ('cinema', 'home', 'notfor'))",
+                      self.sources["0014_alert_batches.sql"])
 
     def test_a_member_reads_only_their_own_batches(self):
         for name, src in self.sources.items():
