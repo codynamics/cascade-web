@@ -1501,6 +1501,24 @@
      top:var(--hdrh,0px), below the header, not the viewport's true top:0, so this scrollport never reaches
      the notch and needs no safe-area padding. */
   .mvhead{position:sticky;top:0;z-index:20;background:var(--bg)}
+  /* ---- CAS-1536: "From your email" — a filtered state of Alerts, not a screen. The band names the email and
+     carries the way back; each film carries the app's own Watch On / Watched controls (.fpcols/.cseg, the film
+     page's own classes) under its card. A Never film stays but greys; a spent window is greyed and inert. ---- */
+  .mvband{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:0 2px 10px;border-radius:10px;
+    background:rgba(124,92,255,.12);border:1px solid var(--accent)}
+  .mvbandtxt{flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--ink);line-height:1.35}
+  .mvbandbtn{flex:0 0 auto;font:inherit;font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;cursor:pointer;
+    background:var(--panel2);border:1px solid var(--line);color:var(--accenttext)}
+  .mvchip.watched{background:var(--panel2);border-color:var(--line);color:var(--dim)}
+  .mvbctl{margin-top:6px}
+  .mvbctl .cseg.spent{opacity:.4;cursor:not-allowed}
+  .mvitem.mvnever{opacity:.55}
+  .mvdecide{display:flex;align-items:center;gap:10px;width:calc(100% - 4px);margin:0 2px 8px;padding:10px 12px;
+    font:inherit;text-align:left;cursor:pointer;border-radius:10px;background:rgba(124,92,255,.10);
+    border:1px solid var(--accent);color:var(--ink)}
+  .mvdecidelead{font-size:10.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:var(--accenttext)}
+  .mvdecidetxt{flex:1;min-width:0;font-size:12.5px;font-weight:600;line-height:1.35}
+  .mvdecidecount{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--dim)}
   .mvempty{padding:40px 16px;text-align:center}
   .mvemptymain{font-size:14px;font-weight:700;color:var(--ink)}
   .mvemptysub{font-size:12px;color:var(--faint);margin-top:6px}
@@ -6166,6 +6184,27 @@ const didReset = URLQ.has("reset");
 const DEEPLINK_DESTINATIONS = new Set(["cinema","streaming","moving","family"]);
 const dlParam = URLQ.get("dl");
 let pendingDeepLink = DEEPLINK_DESTINATIONS.has(dlParam) ? dlParam : null;
+// CAS-1536: an alert email's own batch link — `?dl=alerts:batch:<uuid>` (optionally `&film=<movie_id>`), the
+// CAS-1535 contract. Not one of the four named destinations above: anything that is not a well-formed uuid
+// is ignored outright (lands as today). Read here and stripped below like ?dl, but APPLIED later —
+// applyPendingBatch(), once the main app is up AND this device is signed in (a signed-out device never
+// applies it), the same pending/apply pattern as pendingDeepLink/pendingAnswer.
+const BATCH_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function parseBatchLink(dl, film){
+  const m=/^alerts:batch:(.+)$/.exec(dl||"");
+  if(!m || !BATCH_UUID_RE.test(m[1])) return null;
+  const f=Number(film);
+  return {id:m[1].toLowerCase(), film:(Number.isInteger(f) && f>0) ? f : null};
+}
+let pendingBatch = parseBatchLink(dlParam, URLQ.get("film"));
+const batchDlSeen = /^alerts:batch:/.test(dlParam||"");   // a malformed one is ignored but still stripped
+// CAS-1536: the ten answer keys written to notifications.answer — exactly the app's own Watch On (WATCH_LEVEL_KEYS
+// + Never) and Watched (WATCH_STEPS) button keys. A test keeps this, migration 0015 and schema.sql in step.
+const BATCH_ANSWER_KEYS = ["in_cinema","premium","rent","stream","never","wow","liked","enjoyed","soso","disliked"];
+let movingBatch = null;       // the "From your email" filtered view: {id, ymd, headline, rows:[notification rows], film}
+let movingBatchOpening = false;
+let movingBatchSeq = 0;
+let alertBatches = [];        // [{id, sydney_date, headline, films:[{movie_id, answer}]}] — To decide's source
 // CAS-1196: the alert email's own "when will you watch it?"/"seen it" answer buttons
 // (`?answer=<value>#/film/<id>`). Read here, stripped below like ?dl, but APPLIED later —
 // applyPendingAnswer(), called once this device's sign-in state is actually known — because signed
@@ -6184,8 +6223,8 @@ if(didReset){
 }
 // Strip only what we consumed. `?c=` (a shared Cascade) and `?log` are read further down and clean up after
 // themselves — taking the whole query string here would swallow a share link that arrived alongside ?setup.
-if(didReset || forceSetup || previewStep || pendingDeepLink || pendingAnswer){
-  ["reset","setup","onboard","step","agent","dl","answer"].forEach(k=>URLQ.delete(k));
+if(didReset || forceSetup || previewStep || pendingDeepLink || pendingAnswer || pendingBatch || batchDlSeen){
+  ["reset","setup","onboard","step","agent","dl","answer"].concat(batchDlSeen ? ["film"] : []).forEach(k=>URLQ.delete(k));
   const q=URLQ.toString();
   history.replaceState(null, "", location.pathname + (q?"?"+q:"") + location.hash);
 }
@@ -8967,9 +9006,11 @@ function fpWatchOnSegmentsHTML(id){
     const on=filmOptOn(id,row);
     const label=WATCH_LEVEL_SHORT_LABEL[key];
     const icon=WIN_ICON[WATCH_LEVEL_WIN_ICON[key]];
-    return `<button type="button" class="cseg${on?" on":""}" data-key="${key}" style="--segc:${row.cd};${on?`background:${row.cd};color:#fff`:""}"
-      onclick="toggleFilmOpt(${id},'${key}')" aria-pressed="${on}"
-      title="${escA(on?`${label} — tap to undo`:label)}"><span class="ci">${icon}</span><span class="cl">${esc(label)}</span></button>`;
+    // CAS-1536: a spent (already-passed) level is greyed and inert here exactly as on the card's own Watch On
+    // panel (.nopt.spent) — toggleFilmOpt itself ignores it too.
+    return `<button type="button" class="cseg${on?" on":""}${row.spent?" spent":""}" data-key="${key}" style="--segc:${row.cd};${on?`background:${row.cd};color:#fff`:""}"
+      ${row.spent?"disabled":`onclick="toggleFilmOpt(${id},'${key}')"`} aria-pressed="${on}"
+      title="${escA(row.spent?"Already reached":on?`${label} — tap to undo`:label)}"><span class="ci">${icon}</span><span class="cl">${esc(label)}</span></button>`;
   });
   return segs.join("");
 }
@@ -10202,6 +10243,7 @@ window.toggleFilmOpt=(id,key)=>{
     logEvent("film_watch_claim",{level:key});
     repaintWatchControl(id);
     closeWatchPanel();   // CAS-1037: dismiss on pick, matching the Watched panel's pickWatch
+    noteBatchAnswer(id, key);   // CAS-1536
     return;
   }
   // CAS-716: Watch On is single-select — ticking a level clears every other key first, so at most one is ever
@@ -10223,6 +10265,7 @@ window.toggleFilmOpt=(id,key)=>{
   logEvent("film_watch_level",{level:key, on:!!e.wins[key]});
   repaintWatchControl(id);
   closeWatchPanel();   // CAS-1037: dismiss on pick/clear, matching the Watched panel's pickWatch
+  noteBatchAnswer(id, key);   // CAS-1536
 };
 // "Never" clears every future tick (the greyed/passed ones are left alone — they're a record, not a promise)
 // and sets the same `blocked` flag Watched's old "Won't Watch" always did. CAS-349 only moved and relabelled
@@ -10239,6 +10282,7 @@ window.pickNever=(id)=>{
                                  // a second real request, so this stays "one operation" for the one row.
   closeWatchPanel();
   setOpinion(id,"notfor");
+  noteBatchAnswer(id, "never");   // CAS-1536 (setOpinion skips "notfor" — this is its one note)
 };
 // ---- CAS-282: press-then-slide ---------------------------------------------------------------------------
 // Open the control, then keep your finger down and run it over the options: the one under it lights up, and
@@ -10408,7 +10452,7 @@ function armPanelAnchor(){
 // filmPageHTML's own inline "seen" chooser (the alert email's `?answer=seen` landing) can render the exact
 // same ramp, wired to the exact same pickWatch — tapping one records a real verdict there too, there is
 // just no popover around it.
-function watchStepsSegmentsHTML(id){
+function watchStepsSegmentsHTML(id, withNever=true){
   const cur=opinionOf(id);
   return WATCH_STEPS.map(s=>{
     const on=cur===s.key;
@@ -10416,15 +10460,15 @@ function watchStepsSegmentsHTML(id){
     return `<button type="button" class="cseg${on?" on":""}" data-key="${s.key}" style="--segc:${s.cd};${on?`background:${s.cd};color:#fff`:""}"
       onclick="pickWatch(${id},'${s.key}')" aria-pressed="${on}"
       title="${escA(on?`${s.lbl} — tap to undo`:s.lbl)}"><span class="ci">${ICON[s.ico]}</span><span class="cl">${s.lbl}</span></button>`;
-  }).join("") + willNeverSegHTML(id);
+  }).join("") + (withNever ? willNeverSegHTML(id) : "");
 }
 // Lee, 2026-11-09: "Will never" is the Watched panel's last option — the same blocked/"notfor" flag the old
 // Watch On panel's Never set (pickNever), so every downstream reader of that flag is unchanged.
-function willNeverSegHTML(id){
+function willNeverSegHTML(id, label="Will never"){
   const never=blocked.has(id);
   return `<button type="button" class="cseg${never?" on":""}" data-key="never" style="--segc:#d0453f;${never?"background:#d0453f;color:#fff":""}"
     onclick="pickNever(${id})" aria-pressed="${never}"
-    title="${escA(never?"Will never — tap to undo":"I will never watch this — excludes it from your lists")}"><span class="ci">${ICON.block}</span><span class="cl">Will never</span></button>`;
+    title="${escA(never?`${label} — tap to undo`:"I will never watch this — excludes it from your lists")}"><span class="ci">${ICON.block}</span><span class="cl">${esc(label)}</span></button>`;
 }
 window.openWatchPanel=(id, btn)=>{
   // CAS-281: "was MY panel already open?", not "was ANY panel open?". The old test closed whatever was open
@@ -23490,6 +23534,7 @@ window.oafStartWatching=()=>{
   if(typeof render==="function") render();
   applyDeepLink();
   applyPendingPushAlert();
+  applyPendingBatch();   // CAS-1536
   // CAS-1349: the v2 guided tour's one automatic trigger point for a brand-new v2 account — straight after
   // this screen's own render() has painted Watch, same "first listing paint" rule CAS-976 used for the
   // non-v2 tour from membStartWork.
@@ -23697,7 +23742,9 @@ function movingUnseenCount(){
 }
 function updateMovingBadge(){
   const b=$("movingBadge"); if(!b) return;
-  const n=movingUnseenCount();
+  // CAS-1536: while any emailed film is still to decide, the badge counts those instead of the unseen rows.
+  const td=toDecideCount();
+  const n=td>0 ? td : movingUnseenCount();
   if(n){ b.style.display="grid"; b.textContent=n; } else b.style.display="none";
 }
 // CAS-852: the ladder position of a film's own current window, ordering rows within a lane so it reads
@@ -23723,9 +23770,12 @@ function movingWindowRank(m){
 function movingLanes(rows){
   const byKey=new Map();
   rows.forEach(r=>{
-    const cascade = cascades.find(c=>c.id===r.agentId);
-    if(!byKey.has(cascade.id)) byKey.set(cascade.id, {cascade, rows:[]});
-    byKey.get(cascade.id).rows.push(r);
+    // CAS-1536: only the "From your email" view can carry an ownerless row (agentId null) — it lands in a lane
+    // with no agent name. The normal view never does (movingData drops it, CAS-858).
+    const cascade = r.agentId==null ? null : cascades.find(c=>c.id===r.agentId);
+    const key = cascade ? cascade.id : "__none";
+    if(!byKey.has(key)) byKey.set(key, {cascade, rows:[]});
+    byKey.get(key).rows.push(r);
   });
   const lanes=[...byKey.values()];
   // CAS-852: window rank first, newest-first only as the tiebreak within one window — replaces CAS-848's
@@ -23737,7 +23787,7 @@ function movingLanes(rows){
     upcoming ? movingUpcomingCmp(a,b)
       : movingWindowRank(a.m)-movingWindowRank(b.m) || (Date.parse(b.date)||0)-(Date.parse(a.date)||0)
   ));
-  lanes.sort((a,b)=>(a.cascade.order??1e9)-(b.cascade.order??1e9));
+  lanes.sort((a,b)=>(a.cascade?(a.cascade.order??1e9):2e9)-(b.cascade?(b.cascade.order??1e9):2e9));
   return lanes;
 }
 // CAS-890: cinema_date ascending — soonest release first. A film with no cinema_date can't be placed on
@@ -23810,7 +23860,9 @@ function movingCardHTML(row){
 // of their own, so a run of matching rows says its reason exactly once.
 function movingLaneHTML(rows){
   return movingRowGroups(rows).map(g=>
-    g.rows.map((row,i)=>`<div class="mvitem">${i===0?movingWhyHTML(g):""}${movingCardHTML(row)}</div>`).join("")
+    g.rows.map((row,i)=>row.batch
+      ? batchItemHTML(row, i===0?movingWhyHTML(g):"")
+      : `<div class="mvitem">${i===0?movingWhyHTML(g):""}${movingCardHTML(row)}</div>`).join("")
   ).join("");
 }
 // movingSeen no longer decides whether a row renders — every row inside the selected window shows, full
@@ -23828,6 +23880,7 @@ function renderMovingScreen(markSeen){
   // would read as a real (and wrong) answer rather than "still loading".
   const guest=movingIsGuestDevice();
   const mvScreen=$("movingScreen");
+  if(movingBatch && !guest && movingLoadsReady()) return renderBatchView();   // CAS-1536
   if(!guest && !movingLoadsReady()){
     // CAS-1475: a list already on screen stays put while a reload is in flight — never swap it for the
     // loading state.
@@ -23864,7 +23917,7 @@ function renderMovingScreen(markSeen){
     <div class="mvwindows">${pillHTML}</div></div>`;
   // CAS-886: the reply alert is IN THE FLOW, not sticky with #movingHead and not a floating toast — it
   // scrolls away with the rest of the content, the same as everything else here.
-  const alertHTML=inviteAlertHTML();
+  const alertHTML=inviteAlertHTML()+toDecideHTML();
   if(!shownRows.length){
     $("movingBody").innerHTML = `${head}${alertHTML}<div class="mvempty">
       <p class="mvemptymain">${esc(movingEmptyCopy(movingWindow))}</p>
@@ -23948,6 +24001,7 @@ window.closeAgentsScreen=()=>{
 window.openMovingScreen=()=>{
   if($("agentsScreen").classList.contains("open")) closeAgentsScreen();
   if($("findScreen").classList.contains("open")) closeFindScreen();   // CAS-1186: mutually exclusive with Find too
+  if(!movingBatchOpening) movingBatch=null;   // CAS-1536: only openBatchView keeps the filtered view
   movingIsOpen=true;
   movingWindow=movingWindowChosen||"today";   // CAS-1465: Today until the user picks a period this session
   renderMovingScreen(true);
@@ -23961,10 +24015,178 @@ window.openMovingScreen=()=>{
 };
 window.closeMovingScreen=()=>{
   movingIsOpen=false;
+  movingBatch=null;   // CAS-1536
   $("movingScreen").classList.remove("open"); lockBodyScroll(false);
   $("movingBtn").classList.remove("active"); $("movingBtn").setAttribute("aria-pressed","false");
   syncWatchChip();
 };
+// ================= CAS-1536: "From your email" — Alerts filtered to one alert email's batch ================
+// Every alert email is a batch (alert_batches, CAS-1535). Its links carry the batch id; Alerts opens as a
+// FILTERED STATE of #movingScreen (never a new screen, never a pop-up) under a band, listing exactly that
+// batch's films — read from the server by batch_id, not from the 200-row realAlerts cap — each with the app's
+// own Watch On / Watched controls. A tap writes notifications.answer/answered_at (noteBatchAnswer, below).
+function batchDateLabel(ymd){
+  const t=Date.parse(`${ymd}T00:00:00Z`); if(isNaN(t)) return "";
+  const parts=new Intl.DateTimeFormat("en-AU",{timeZone:"UTC", weekday:"short", day:"numeric", month:"short"}).formatToParts(new Date(t));
+  const get=k=>(parts.find(p=>p.type===k)||{value:""}).value;
+  return `${get("weekday")} ${get("day")} ${get("month")}`;
+}
+function batchSignedIn(){
+  const cp=window.CascadePersistence;
+  return !!(cp && cp.accountActive && cp.accountActive());
+}
+// One row per film in the batch (newest notification row wins), whether or not it is still watched, still owned
+// by an agent, or set to Never — the normal view's drops (movingData) do not apply here.
+function batchViewRows(){
+  const byFilm=new Map();
+  (movingBatch ? movingBatch.rows : []).forEach(a=>{
+    const fid=String(a.movie_id);
+    if(byFilm.has(fid)) return;
+    const m=MOVIES.find(x=>String(x.tmdb_id)===fid);
+    if(!m) return;
+    const owner=movingOwnerCascade(m);   // null = no agent owns it now: still shown, in a lane with no agent name
+    byFilm.set(fid,{filmId:fid, m, tag:movingIsNewMoment(a.moment)?"new":"changed",
+      reason:REAL_MOMENT_SAID[a.moment]||a.moment, agentId:owner?owner.id:null,
+      date:a.found_at, moment:a.moment, batch:true});
+  });
+  return [...byFilm.values()];
+}
+// The app's own Watch On (windows the member tracks, spent greyed, then Never) and Watched controls — the film
+// page's markup and handlers, so a tap here is the same toggleFilmOpt/pickNever/setOpinion call a tap on the card makes.
+function batchControlsHTML(row){
+  const id=row.m.tmdb_id;
+  return `<div class="mvbctl"><div class="fpcols">
+    <div class="fpcol"><div class="fpcollead">WATCH ON</div><div class="csegs">${fpWatchOnSegmentsHTML(id)}${willNeverSegHTML(id,"Never")}</div></div>
+    <div class="fpcol"><div class="fpcollead">WATCHED</div><div class="csegs">${watchStepsSegmentsHTML(id,false)}</div></div>
+  </div></div>`;
+}
+function batchItemHTML(row, whyHTML){
+  const id=row.m.tmdb_id;
+  const tag = watched.has(id) ? `<div class="mvwhy"><span class="mvchip watched">Watched</span></div>` : "";
+  return `<div class="mvitem${blocked.has(id)?" mvnever":""}">${whyHTML}${tag}${movingCardHTML(row)}${batchControlsHTML(row)}</div>`;
+}
+function batchBandHTML(){
+  const d=batchDateLabel(movingBatch.ymd), h=movingBatch.headline;
+  return `<div class="mvband" id="movingBand"><span class="mvbandtxt">From your email${d?` · ${esc(d)}`:""}${h?` · ${esc(h)}`:""}</span>
+    <button type="button" class="mvbandbtn" onclick="closeBatchView()">All alerts</button></div>`;
+}
+function renderBatchView(){
+  const mvScreen=$("movingScreen");
+  const keepTop=mvScreen?mvScreen.scrollTop:0;
+  const wasPopulated=!!$("movingGroups");
+  updateMovingBadge();
+  const head=`<div class="mvhead" id="movingHead"><h2 class="osh">Alerts</h2>${batchBandHTML()}</div>`;
+  const rows=batchViewRows();
+  if(!rows.length){
+    $("movingBody").innerHTML=`${head}<div class="mvempty"><p class="mvemptymain">None of this email's films are available to show.</p></div>`;
+    syncHeaderHeight();
+    return;
+  }
+  const sectionsHTML=movingSections(rows).map(({g,lanes})=>{
+    const total=lanes.reduce((n,l)=>n+l.rows.length,0);
+    const lanesHTML=lanes.map(lane=>{
+      if(!lane.cascade) return `<div class="ablock"><div class="mvlist">${movingLaneHTML(lane.rows)}</div></div>`;
+      const tint=cascadeRankTint(lane.cascade);
+      return `<div class="ablock${tint?` agrank-${tint}`:""}">
+        <div class="grouphead sub" role="button" tabindex="0" data-cid="${escA(lane.cascade.id)}" onclick="openMovingAgentEl(this)" style="cursor:pointer"><span>${agentHeadingHTML(lane.cascade)}</span><span class="gcount" style="margin-left:auto">${lane.rows.length}</span></div>
+        <div class="mvlist">${movingLaneHTML(lane.rows)}</div>
+      </div>`;
+    }).join("");
+    return `<div class="group" data-g="${g}">
+      <div class="grouphead"><span class="gdot ${g}"></span>${STATUS_LABEL[g]}<span class="gcount">${total}</span></div>
+      ${lanesHTML}
+    </div>`;
+  }).join("");
+  const jumpCtl=`<div class="listctl" id="movingListCtl"><div class="jumpbar" id="movingJumpBar" hidden></div></div>`;
+  $("movingBody").innerHTML=head+jumpCtl+`<div id="movingGroups">${sectionsHTML}</div>`;
+  if(wasPopulated && mvScreen && mvScreen.scrollTop!==keepTop) mvScreen.scrollTop=keepTop;
+  observeLazyPosters($("movingBody"));
+  renderJumpBar({jumpBarId:"movingJumpBar", listCtlId:"movingListCtl", groupsSel:"#movingGroups .group", isOwn:()=>false, label:"Jump to"});
+  syncHeaderHeight();
+}
+// Reads the batch from the server, then shows it. Resolves true when the batch view opened; false (and nothing
+// on screen changes) when this device is signed out, or the batch isn't this member's / doesn't exist.
+window.openBatchView=async(id, film)=>{
+  if(!batchSignedIn() || !BATCH_UUID_RE.test(id||"") || typeof window.loadAlertBatch!=="function") return false;
+  const seq=++movingBatchSeq;
+  let data=null;
+  try{ data=await window.loadAlertBatch(id); }catch(e){ console.warn("Cascade: batch load failed", e); }
+  if(seq!==movingBatchSeq || !data || !data.batch) return false;
+  movingBatch={id, ymd:data.batch.sydney_date, headline:data.batch.headline||"", rows:data.rows||[], film:film||null};
+  if($("filmPage").classList.contains("open")) closeFilmPage();
+  if(watchSheetOpen) closeWatchSheet();
+  if($("navMenu").classList.contains("open")) closeNavMenu();
+  if($("movingScreen").classList.contains("open")){
+    renderMovingScreen();
+    $("movingScreen").scrollTop=0;
+  } else {
+    movingBatchOpening=true;
+    try{ openMovingScreen(); } finally { movingBatchOpening=false; }
+  }
+  if(film){
+    const row=document.querySelector(`#movingScreen [id="card-${film}"]`);
+    if(row) row.scrollIntoView({behavior:"smooth", block:"center"});
+  }
+  return true;
+};
+// "All alerts": back to the normal view — the period last chosen this session, else Today.
+window.closeBatchView=()=>{
+  movingBatchSeq++;
+  movingBatch=null;
+  movingWindow=movingWindowChosen||"today";
+  renderMovingScreen(true);
+  $("movingScreen").scrollTop=0;
+};
+// CAS-1536: a link (or a push) that arrived before the main app was up / signed in waits here — the same
+// pending/apply pattern as applyDeepLink. Never mid-onboarding; a signed-out device never applies it.
+function applyPendingBatch(){
+  const b=pendingBatch; if(!b) return;
+  if(!batchSignedIn() || !onboardingSeen() || flowOn || briefOn) return;
+  pendingBatch=null;
+  return openBatchView(b.id, b.film).then(ok=>{ if(ok && typeof window.markRealAlertsRead==="function") window.markRealAlertsRead(); return ok; });
+}
+// To decide: every emailed batch from the last 30 days that still has a film the member hasn't answered.
+function batchFilmDecided(f){
+  return !!f.answer || watched.has(Number(f.movie_id));
+}
+function toDecideBatches(){
+  if(movingIsGuestDevice()) return [];
+  const cutoff=sydneyYMD(Date.now()-30*864e5);
+  return alertBatches
+    .filter(b=>b.sydney_date>=cutoff)
+    .map(b=>({batch:b, left:b.films.filter(f=>!batchFilmDecided(f) && MOVIES.some(x=>String(x.tmdb_id)===String(f.movie_id))).length}))
+    .filter(x=>x.left>0)
+    .sort((a,b)=>b.batch.sydney_date.localeCompare(a.batch.sydney_date));
+}
+function toDecideCount(){
+  const ids=new Set();
+  toDecideBatches().forEach(({batch})=>batch.films.forEach(f=>{
+    if(!batchFilmDecided(f) && MOVIES.some(x=>String(x.tmdb_id)===String(f.movie_id))) ids.add(String(f.movie_id));
+  }));
+  return ids.size;
+}
+function toDecideHTML(){
+  return toDecideBatches().map(({batch,left})=>{
+    const d=batchDateLabel(batch.sydney_date);
+    return `<button type="button" class="mvdecide" data-batch="${escA(batch.id)}" onclick="openBatchEl(this)">
+      <span class="mvdecidelead">To decide</span>
+      <span class="mvdecidetxt">${esc(d)}${batch.headline?` · ${esc(batch.headline)}`:""}</span>
+      <span class="mvdecidecount">${left} left</span></button>`;
+  }).join("");
+}
+window.openBatchEl=(el)=>{ openBatchView(el.dataset.batch, null); };
+// Whenever a Watch On / Never / Watched button is used on a film that sits in an emailed batch, the batch row
+// carries the last button tapped (answer) and when (answered_at). Last tap wins, from the app or from the email.
+function noteBatchAnswer(id, key){
+  if(!BATCH_ANSWER_KEYS.includes(key) || !batchSignedIn()) return;
+  const now=new Date().toISOString();
+  const batchIds=new Set();
+  alertBatches.forEach(b=>b.films.forEach(f=>{ if(Number(f.movie_id)===id){ f.answer=key; batchIds.add(b.id); } }));
+  if(movingBatch) movingBatch.rows.forEach(r=>{ if(Number(r.movie_id)===id){ r.answer=key; r.answered_at=now; batchIds.add(movingBatch.id); } });
+  if(!batchIds.size) return;
+  if(typeof window.writeAlertAnswer==="function") window.writeAlertAnswer(id, key, now, [...batchIds]);
+  refreshMovingIfOpen();
+}
 // ================= CAS-1186: Find — the whole catalogue, searchable by name =============================
 // Every film in MOVIES, no agent/tab/service/watched/style/Picked-by narrowing — the one listing in the app
 // a film reaches even when no agent lists it. Cascade score desc (no score last), ties by title A-Z; no
@@ -26558,6 +26780,7 @@ async function membStartWork(viaNewSignup){
   // stacking on top of it (same ordering onbMembBack() already uses the other way).
   applyDeepLink();
   applyPendingPushAlert();   // CAS-1206: same "first run genuinely finished" moment, for a held push tap
+  applyPendingBatch();   // CAS-1536
   // CAS-976: first listing paint after finishing onboarding — the one automatic trigger point. After
   // applyDeepLink() so a deep-link destination it opened wins; maybeStartTutorial's own "any other screen
   // open" check is what actually enforces that.
@@ -27657,6 +27880,7 @@ window.setOpinion=(id,kind)=>{
   // FIRST — so the toast reports what actually happened, not what we assumed. The repaint runs inside
   // keepRowInPlace so the card folds (or unfolds, on the tap that clears it) exactly where you tapped it.
   keepRowInPlace(id, ()=>repaintAfterOpinion(id));   // CAS-129: swap only the tapped row, not the whole list
+  if(kind!=="notfor") noteBatchAnswer(id, kind);   // CAS-1536
 };
 // CAS-287: the toast that used to fire here is gone, and opinionToast with it. It was the worst offender the
 // ticket describes: answering a run of films is the single most repeated gesture in the app, and every answer
@@ -27821,6 +28045,7 @@ function afterSignIn(){
     if(!oneAgentCriteria()){ oafOpen({mode:"migrate"}); return; }
     applyDeepLink();   // CAS-962: arrival, same as the boot path's "onboarding already seen" branch
     applyPendingPushAlert();   // CAS-1206: same arrival moment, for a held push tap
+    applyPendingBatch();   // CAS-1536
     return;
   }
   showFoundList(); render();
@@ -27955,6 +28180,7 @@ else if(!openedShared){
   landingTabPendingAccountData = true;
   applyDeepLink();   // CAS-962: onboarding already seen — a returning user's cold boot is safe to act on now
   applyPendingPushAlert();   // CAS-1206: same "boot decided, safe to act now" moment, for a held push tap
+  applyPendingBatch();   // CAS-1536
   maybeStartTutorial();   // CAS-976: a returning user who finished onboarding before this shipped, or
                            // skipped it too fast to see all five cards, still gets it once on a normal boot.
 }
@@ -28655,6 +28881,7 @@ function acctFetchKeepalive(init){
     notifyPrefs = notifyPrefsDefault();
     Object.keys(movingSeen).forEach(k=>delete movingSeen[k]);
     movingWindowChosen=null;   // CAS-1465: the next account's first Alerts open is Today again
+    movingBatch=null; movingBatchSeq++; alertBatches=[]; pendingBatch=null;   // CAS-1536
     realAlerts=[]; updateMovingBadge();
     invites=[]; invitesReady=true; updateInvitesBadge();   // CAS-886: same reasoning — nothing left to wait on
     agentFilms={}; agentFilmsReady=true;   // CAS-736: nothing left to wait on
@@ -28705,6 +28932,7 @@ function acctFetchKeepalive(init){
         // adding the confirmation panel on top.
         refreshOpenFilmPage();
         applyPendingAnswer();   // CAS-1196: signed in, confirmed just now — see applyPendingAnswer's own comment
+        applyPendingBatch();   // CAS-1536: same moment, for a held "From your email" link
         reRegisterPushIfGranted();   // CAS-1474: every sign-in re-points this device's token at THIS account
       }
     } else if(currentUser !== null){
@@ -28719,6 +28947,7 @@ function acctFetchKeepalive(init){
     fireAccountFanout('boot-restore');
     refreshOpenFilmPage();   // CAS-1205: same reasoning as the auth-change listener's own call, just above
     applyPendingAnswer();   // CAS-1196: already signed in at boot — see applyPendingAnswer's own comment
+    applyPendingBatch();   // CAS-1536: same moment, for a held "From your email" link
     reRegisterPushIfGranted();   // CAS-1194: keep this device's APNs token fresh, every launch
   }
   // CAS-1108: the "at boot" half of the gate — a direct call, not routed through reconcileOnReturn below, so
@@ -29402,7 +29631,49 @@ function acctFetchKeepalive(init){
     // A device parked on Moving as the landing screen — the exact race this ticket fixes — must see its
     // loading state resolve into the real rows once the ledger actually answers, not just on next open.
     if(typeof renderMovingScreen==="function" && $("movingScreen") && $("movingScreen").classList.contains("open")) renderMovingScreen();
+    await loadAlertBatches();   // CAS-1536: To decide's source
   }
+  // CAS-1536: the emailed batches of the last 30 days and which of their films have an answer yet. Failure
+  // leaves the previous list in place (To decide simply doesn't change); never blocks the ledger load above.
+  async function loadAlertBatches(){
+    const c=client(); if(!c||!accountActive()){ alertBatches=[]; updateMovingBadge(); return; }
+    try{
+      const since=sydneyYMD(Date.now()-30*864e5);
+      const b=await c.from("alert_batches").select("id,sydney_date,headline").gte("sydney_date", since)
+        .order("sydney_date", { ascending:false });
+      if(b.error){ console.warn("alert_batches load", b.error); return; }
+      const ids=(b.data||[]).map(x=>x.id);
+      let rows=[];
+      if(ids.length){
+        const n=await c.from("notifications").select("batch_id,movie_id,answer").in("batch_id", ids);
+        if(n.error){ console.warn("batch notifications load", n.error); return; }
+        rows=n.data||[];
+      }
+      alertBatches=(b.data||[]).map(x=>({id:x.id, sydney_date:x.sydney_date, headline:x.headline||"",
+        films:rows.filter(r=>r.batch_id===x.id).map(r=>({movie_id:r.movie_id, answer:r.answer||null}))}));
+    }catch(e){ console.warn("alert_batches load", e); return; }
+    refreshMovingIfOpen();
+  }
+  // CAS-1536: one batch and every notification row in it, by batch_id — not from the 200-row realAlerts cap.
+  // Resolves null when the batch isn't this member's (RLS) or doesn't exist.
+  window.loadAlertBatch = async (id) => {
+    const c=client(); if(!c||!accountActive()) return null;
+    const b=await c.from("alert_batches").select("id,sydney_date,kind,headline").eq("id", id).maybeSingle();
+    if(b.error || !b.data) return null;
+    const n=await c.from("notifications")
+      .select("id,movie_id,moment,title,cascade_name,found_at,read_at,answer,answered_at,batch_id")
+      .eq("batch_id", id).order("found_at", { ascending:false });
+    if(n.error){ console.warn("batch notifications load", n.error); return null; }
+    return { batch:b.data, rows:n.data||[] };
+  };
+  // CAS-1536: last tap wins — the one place the client writes notifications.answer / answered_at (the two columns
+  // 0014 grants it, alongside read_at). Fire-and-forget like markRealAlertsRead; a failure is logged, never shown.
+  window.writeAlertAnswer = async (movieId, key, at, batchIds) => {
+    const c=client(), owner=uid(); if(!c||!owner) return;
+    const { error } = await c.from("notifications").update({answer:key, answered_at:at})
+      .eq("user_id", owner).eq("movie_id", movieId).in("batch_id", batchIds);
+    if(error){ console.warn("notifications answer", error); logSyncFailed("notifications", error); }
+  };
   // CAS-886: the sender's own invites, replies embedded. RLS (invites_owner / invite_replies_sender_read)
   // already scopes both tables to this account, so no .eq("sender_id",...) filter is needed here.
   // invitesReady must resolve on every exit — including a failed fetch — the same reasoning loadRealAlerts'
@@ -29471,6 +29742,9 @@ function acctFetchKeepalive(init){
       PN.addListener("pushNotificationActionPerformed", async (action) => {
         const data=(action && action.notification && action.notification.data) || {};
         const id=Number(data.movie_id);
+        // CAS-1536: a push carrying {"open":"alerts","batch":"<uuid>"} opens that batch's view; anything that is
+        // not a well-formed uuid lands on Alerts exactly as before.
+        const batchTap = data.open==="alerts" ? parseBatchLink("alerts:batch:"+(data.batch||""), id||null) : null;
         // CAS-1513: a tapped push is a click-through — the payload carries src=push and cmp (monitor/__main__.py).
         logEvent("push_open", ARR_TOKEN_RE.test(data.cmp||"") ? {cmp:data.cmp} : {cmp:"alert"});
         await loadRealAlerts();
@@ -29482,9 +29756,11 @@ function acctFetchKeepalive(init){
         if(flowOn || briefOn) return;
         if(onboardingSeen()){
           openAlertsFromPush(id || null);
+          if(batchTap){ pendingBatch=batchTap; await applyPendingBatch(); }
           await markRealAlertsRead();
         } else {
           pendingPushAlert=true; pendingPushAlertId=id || null;
+          if(batchTap) pendingBatch=batchTap;
         }
       });
     }
@@ -29516,6 +29792,9 @@ function acctFetchKeepalive(init){
           // Already signed in (a warm launch) applies it now; a cold launch leaves it pending for the
           // cascade-auth-change/boot-restore call sites (applyPendingAnswer's own comment) to pick up
           // once sign-in resolves.
+          // CAS-1536: `?dl=alerts:batch:<uuid>` (&film=<movie_id>) — the alert email's "From your email" link.
+          const batchLink=parseBatchLink(dl, url.searchParams.get("film"));
+          if(batchLink){ pendingBatch=batchLink; applyPendingBatch(); }
           const answer=url.searchParams.get("answer");
           if(ANSWER_VALUES.has(answer)){
             pendingAnswer=answer;

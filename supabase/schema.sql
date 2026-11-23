@@ -606,7 +606,7 @@ alter table public.notifications add column if not exists answer      text;
 alter table public.notifications add column if not exists answered_at timestamptz;
 alter table public.notifications drop constraint if exists notifications_answer_check;
 alter table public.notifications add constraint notifications_answer_check
-  check (answer is null or answer in ('cinema', 'home', 'notfor'));
+  check (answer is null or answer in ('in_cinema', 'premium', 'rent', 'stream', 'never', 'wow', 'liked', 'enjoyed', 'soso', 'disliked'));
 
 create index if not exists notifications_batch_id_idx on public.notifications (batch_id);
 create index if not exists alert_batches_user_idx on public.alert_batches (user_id);

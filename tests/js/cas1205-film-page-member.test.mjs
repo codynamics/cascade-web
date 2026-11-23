@@ -14,6 +14,18 @@ function signIn(E){
   E.CascadeAuth.status = "signed-in";
 }
 
+// CAS-1544: pick by property, never by MOVIES[n] index. The daily refresh reorders the catalogue and spends
+// windows, so a fixed index silently lands on a film with no Cinema button. watchLevelsFor is what the film
+// page itself consults. Throws (never passes vacuously) when no film has all three windows open.
+function filmWithAllWindowsOpen(E){
+  const m = E.MOVIES.find(f => {
+    const levels = E.watchLevelsFor(f.tmdb_id);
+    return ["in_cinema", "rent", "stream"].every(k => { const l = levels.find(x => x.key === k); return l && l.spent !== true; });
+  });
+  assert.ok(m, "no film with all three windows open in the catalogue");
+  return m;
+}
+
 test("CAS-1205: signed out, the film page is exactly today's visitor markup", () => {
   const E = loadEngine();
   const m = E.MOVIES[0];
@@ -37,7 +49,7 @@ test("CAS-1205: signed in, no membership pitch and no visitor footer", () => {
 test("CAS-1205: the WATCH ON column runs Cinema, Rent, Stream, then Never, on default Service tracking", () => {
   const E = loadEngine();
   signIn(E);
-  const m = E.MOVIES[1];
+  const m = filmWithAllWindowsOpen(E);
   const html = E.filmPageHTML(m);
   const iCin = html.indexOf('data-key="in_cinema"');
   const iRent = html.indexOf('data-key="rent"');
@@ -51,7 +63,7 @@ test("CAS-1205: the WATCH ON column runs Cinema, Rent, Stream, then Never, on de
 test("CAS-1205: tapping a Watch On segment calls toggleFilmOpt, Never calls pickNever — same as the card", () => {
   const E = loadEngine();
   signIn(E);
-  const m = E.MOVIES[2];
+  const m = filmWithAllWindowsOpen(E);
   const html = E.filmPageHTML(m);
   assert.ok(html.includes(`onclick="toggleFilmOpt(${m.tmdb_id},'in_cinema')"`));
   assert.ok(html.includes(`onclick="toggleFilmOpt(${m.tmdb_id},'rent')"`));
