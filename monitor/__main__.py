@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import uuid
 import os
 import sys
 
@@ -46,6 +47,8 @@ from . import (compute_transitions, DEFAULT_WEEKEND_N, MOMENTS, match, notificat
                compute_admission, compute_auto_placements, compute_scores, synthesize_auto_watch_rows,
                format_invite_reply, hand_picked_pairs)
 from .catalogue import load_catalogue_file, load_today, load_yesterday_from_git
+from .batches import agent_name_for, ensure_batch, headline_for, sydney_date
+from .catchup import catchup_hits, due_users, suppress_caught_up
 from .phases import email_phase, push_phase
 from .store import FIXTURE_ID_MAX, FIXTURE_ID_MIN, InMemoryStore, store_from_env
 
@@ -168,6 +171,21 @@ def _build_store(args):
                              agent_films=_load_json(args.agent_films) if args.agent_films else [],
                              invite_replies=_load_json(args.replies) if args.replies else []), "fixtures"
     return store_from_env(), "supabase(service_role)"
+
+
+def _refresh_headline(store, batch_id, agent_name) -> None:
+    """CAS-1535: the batch headline ("Max found 10 films for you") counts the batch's real rows - recomputed
+    after every write, so a re-dispatched find the same night keeps it true. Best-effort."""
+    ids_fn = getattr(store, "fetch_batch_movie_ids", None)
+    upd_fn = getattr(store, "update_alert_batch", None)
+    if not callable(ids_fn) or not callable(upd_fn):
+        return
+    try:
+        n = len(ids_fn(batch_id))
+        if n:
+            upd_fn(batch_id, {"headline": headline_for(agent_name, n)})
+    except Exception as err:  # noqa: BLE001
+        print(f"[monitor] could not refresh the batch headline: {err}")
 
 
 def _run_ledger_phase(args) -> int:
@@ -447,6 +465,29 @@ def main(argv=None) -> int:
             (row.get("id"), format_invite_reply(row, movie, now=_digest_now)))
     total_replies = sum(len(v) for v in replies_by_user.values())
 
+    # CAS-1535: the day +1 catch-up. A member created in the last 24 h with no catch-up batch yet gets their
+    # Me list's top films as `catchup` hits, which then ride the ordinary delivery below (channels, ledger,
+    # push, email). Then every ordinary alert for a film+stage a catch-up row already announced is dropped.
+    run_now = _dt.datetime.now(_dt.timezone.utc)
+    catchup_users: set = set()
+    stage_keys = set(_store_call(store, "fetch_catchup_stage_keys", set()))
+    try:
+        due = due_users(store, run_now, {str(c.get("user_id")) for c in cascades})
+        if due:
+            for uid, hits in catchup_hits(due, cascades, account_prefs, user_prefs_rows, movies_by_id).items():
+                by_user[uid] = hits + [h for h in by_user.get(uid, []) if h.transition.movie_id not in
+                                       {c.transition.movie_id for c in hits}]
+                catchup_users.add(uid)
+                stage_keys |= {(uid, h.transition.movie_id, h.transition.stage) for h in hits}
+                print(f"[monitor] catch-up (CAS-1535): {uid}: {len(hits)} film(s) from the Me list.")
+    except Exception as err:   # noqa: BLE001 - a catch-up failure must never cost the night's ordinary alerts
+        print(f"[monitor] catch-up failed: {err} - carrying on without one.")
+    dropped = suppress_caught_up(by_user, stage_keys)
+    if dropped:
+        print(f"[monitor] catch-up (CAS-1535): {dropped} alert(s) dropped - already announced for that stage.")
+    by_user = {u: hits for u, hits in by_user.items() if hits}
+    total_hits = sum(len(v) for v in by_user.values())
+
     print(f"[monitor] matching against {len(cascades)} active cascade(s) from {source} "
           f"and {len(watches)} per-film Watch-it row(s); "
           f"{sum(len(v) for v in muted.values())} global alert-type exclude(s) across "
@@ -539,39 +580,30 @@ def main(argv=None) -> int:
             print(f"[monitor] {user_id}: every matching agent has its channels off — nothing sent or written.")
             continue
 
-        # CAS-493: channels are independent — a failed send on one must not stop the others, so a
-        # failure here is a logged outcome for THIS channel only, never a `continue` that skips the
-        # in-app/push delivery and the ledger write still owed to this user.
-        email_ok = False
-        if (mailable or mail_replies) and not find_only:
-            # only what's delivered
-            digest = render_digest(mailable, replies=[f for _, f in mail_replies], scores=scores,
-                                   watch_windows=watch_windows)
-            email_attempted += 1
+        # CAS-1535: the order is now batch -> push -> LEDGER -> email. The ledger row (carrying its batch id)
+        # must exist before a film is emailed, so a failed ledger write means no email for this member
+        # (logged; the next member carries on) rather than an emailed film with no row. In-app/push are
+        # unaffected by the email outcome. A failed email leaves its rows unstamped (`emailed_at` null):
+        # the 17:00 email phase mails them from the ledger.
+        delivered = {}
+        delivered.update({id(h): h for h in mailable})
+        delivered.update({id(h): h for h in appable})
+        batch_id = None
+        ledger_ok = True
+        if delivered:
             try:
-                send_via_resend(email, digest["subject"], digest["html"], digest["text"])
-                email_ok = True
-                sent += 1
-                print(f"[monitor] {user_id}: email channel — sent ({len(mailable)} alert(s), "
-                      f"{len(mail_replies)} invite reply(s)).")
-            except Exception as err:  # noqa: BLE001 — never let one bad send abort the run
-                email_failed += 1
-                print(f"[monitor] {user_id}: email channel — failed: {err} — ledger not written for "
-                      "it, will retry; in-app/push are unaffected.")
+                batch = ensure_batch(store, user_id, sydney_date(run_now),
+                                     "catchup" if str(user_id) in catchup_users else "daily")
+                batch_id = str(batch["id"]) if batch else None
+            except Exception as err:  # noqa: BLE001
+                ledger_ok = False
+                print(f"[monitor] could not write the alert batch for {user_id}: {err}")
         if appable:
             print(f"[monitor] {user_id}: in-app channel — "
                   f"{'recorded' if find_only else 'delivered'} ({len(appable)} alert(s)).")
-            if not email_ok:
-                inapp += 1
-        # One row per hit that WAS delivered, by either channel, and never one for a hit whose only
-        # offered channel(s) all failed — that's what keeps a failed channel retried next run.
-        delivered = {}
-        if email_ok or find_only:
-            delivered.update({id(h): h for h in mailable})
-        delivered.update({id(h): h for h in appable})
-        # CAS-465: sent before the ledger insert below (same send-before-ledger ordering as email),
-        # to every registered device, one push per hit. Badge = what the bell badge will read once
-        # this run's in-app rows land — the existing unread count plus what this run is delivering.
+        # CAS-465: sent before the ledger insert below, to every registered device, one push per hit. Badge
+        # = what the bell badge will read once this run's in-app rows land — the existing unread count plus
+        # what this run is delivering.
         pushed = 0
         if pushable:
             badge = unread_counts.get(str(user_id), 0) + len(delivered)
@@ -584,6 +616,8 @@ def main(argv=None) -> int:
                 payload = {"movie_id": h.transition.movie_id, "moment": h.transition.moment,
                            "cascade_id": h.cascade_id,
                            "src": "push", "cmp": "alert"}   # CAS-1513: click-through attribution
+                if batch_id:
+                    payload["batch"] = batch_id             # CAS-1535
                 for tok in tokens:
                     if tok in dead_tokens:
                         continue
@@ -602,26 +636,63 @@ def main(argv=None) -> int:
                 print(f"[monitor] {user_id}: sent {pushed} push notification(s) across "
                       f"{len(tokens)} device(s).")
                 pushed_total += pushed
-        # CAS-416: the ledger write is best-effort. Delivery already happened above (the email sent,
-        # or in-app was chosen), so a DB/ledger hiccup here must be a logged warning, never a crash
-        # that aborts the rest of the run — the alternative is silently dropping every later user.
-        try:
-            rows = notification_rows({user_id: list(delivered.values())})
-            # CAS-1504: every row carries when it was found, and - in the single-run `all` mode, where
-            # delivery happens in this same pass - which channels already covered it. In `find` the
-            # push/email stamps stay null: that is exactly what the later phases look for.
-            mailed_ids = {id(m) for m in mailable} if email_ok else set()
-            pushed_ids = {id(p) for p in pushable} if pushed else set()
-            for h, row in zip(delivered.values(), rows):
-                row["found_at"] = _found_now
-                if id(h) in mailed_ids:
-                    row["emailed_at"] = _found_now
-                if id(h) in pushed_ids:
-                    row["pushed_at"] = _found_now
-            written_total += store.insert_notifications(rows)
-        except Exception as err:  # noqa: BLE001 — a ledger-write failure must not abort the run
-            print(f"[monitor] could not write ledger for {user_id}: {err} — delivery stands, will "
-                  "retry the ledger row next run.")
+        # CAS-416: the ledger write for in-app/push stays best-effort in spirit (a hiccup is a logged
+        # warning, never a crash that aborts later members) - but CAS-1535: it now comes BEFORE the email,
+        # and a failure here suppresses this member's email.
+        row_id_by_hit: dict = {}
+        if delivered and ledger_ok:
+            try:
+                rows = notification_rows({user_id: list(delivered.values())})
+                # CAS-1504: every row carries when it was found, and - in the single-run `all` mode, where
+                # push delivery happens in this same pass - which channel already covered it. `emailed_at`
+                # is stamped only AFTER the email goes (below).
+                pushed_ids = {id(p) for p in pushable} if pushed else set()
+                for h, row in zip(delivered.values(), rows):
+                    row["id"] = str(uuid.uuid4())
+                    row_id_by_hit[id(h)] = row["id"]
+                    row["found_at"] = _found_now
+                    if batch_id:
+                        row["batch_id"] = batch_id
+                    if id(h) in pushed_ids:
+                        row["pushed_at"] = _found_now
+                written_total += store.insert_notifications(rows)
+            except Exception as err:  # noqa: BLE001 — a ledger-write failure must not abort the run
+                ledger_ok = False
+                row_id_by_hit = {}
+                print(f"[monitor] could not write ledger for {user_id}: {err}")
+        if batch_id and ledger_ok:
+            _refresh_headline(store, batch_id, agent_name_for(cascades, user_id))
+        if appable and not (mailable and ledger_ok):
+            inapp += 1
+        email_ok = False
+        if (mailable or mail_replies) and not find_only:
+            if mailable and not ledger_ok:
+                email_failed += 1
+                print(f"[monitor] {user_id}: email channel — NOT sent: the ledger row could not be written "
+                      "first (CAS-1535); carrying on with the next member.")
+            else:
+                # only what's delivered
+                digest = render_digest(
+                    mailable, replies=[f for _, f in mail_replies], scores=scores, watch_windows=watch_windows,
+                    batch_id=batch_id,
+                    kind="catchup_alert" if any(h.transition.moment == "catchup" for h in mailable) else "daily_alert")
+                email_attempted += 1
+                try:
+                    send_via_resend(email, digest["subject"], digest["html"], digest["text"])
+                    email_ok = True
+                    sent += 1
+                    print(f"[monitor] {user_id}: email channel — sent ({len(mailable)} alert(s), "
+                          f"{len(mail_replies)} invite reply(s)).")
+                except Exception as err:  # noqa: BLE001 — never let one bad send abort the run
+                    email_failed += 1
+                    print(f"[monitor] {user_id}: email channel — failed: {err} — rows stay unstamped for the "
+                          "17:00 email phase; in-app/push are unaffected.")
+        if email_ok and mailable and row_id_by_hit:
+            try:
+                store.mark_notifications([row_id_by_hit[id(h)] for h in mailable if id(h) in row_id_by_hit],
+                                         "emailed_at", _found_now)
+            except Exception as err:  # noqa: BLE001 — the email already went; the batch id is already on the rows
+                print(f"[monitor] could not stamp emailed_at for {user_id}: {err}")
         # CAS-887: mark digested only once the send actually succeeded (send-before-ledger, same
         # ordering as insert_notifications above) — stamps digested_at, never seen_at (item 5):
         # that column stays the app's alone, so this can never clear a badge nobody has seen yet.

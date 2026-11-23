@@ -477,6 +477,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // the ledger; CascadeAuth is exposed the same way so a test can flip a device between guest and signed-in
   // by setting .enabled/.client/.session, exactly as the real sign-in path does.
   movingData, realAlerts, firstFound, watched,
+  // CAS-1535: movingIsNewMoment (New vs Changed) and oamVisibleRows (the v2 list pipeline the catch-up shim
+  // replays - monitor/catchup_shim.mjs) are exported so a test and the shim reach the shipped functions.
+  movingIsNewMoment, oamVisibleRows,
   // CAS-742: isNewFound is the decision this ticket moved onto the account (admittedAtFor, read off
   // agent_films.admitted_at) rather than the device-local firstFound stamp above — exported so a test can
   // assert the derived answer directly instead of re-deriving daysSince/admittedAtFor by hand.

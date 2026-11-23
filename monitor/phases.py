@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import datetime as _dt
 
+from .batches import agent_name_for, batch_id_of, ensure_batch, headline_for, sydney_date
+from .catchup import STAGE_ORDER
 from .emailer import format_invite_reply, render_digest, send_via_resend
 from .matching import Hit, agent_channels, compute_scores, delivery_plan, prefs_for
 from .pusher import send_via_apns
@@ -68,18 +70,30 @@ def _group_by_user(rows) -> dict:
     return out
 
 
-def push_copy_for(rows) -> dict:
+def _catchup_first(rows) -> list:
+    """CAS-1535: catch-up rows lead, in the catch-up order (cinemas now, coming, streaming - each group
+    already in the Me list's own order, which is the order they were written in); every other row follows
+    unchanged. Python's sort is stable, so nothing else moves."""
+    def key(r):
+        if r.get("moment") != "catchup":
+            return (1, 0)
+        return (0, STAGE_ORDER.get((r.get("detail") or {}).get("stage"), len(STAGE_ORDER)))
+    return sorted(rows, key=key)
+
+
+def push_copy_for(rows, agent_name: str = "Cascade") -> dict:
     """{'title', 'body'} for ONE member's push covering `rows` (their unread alerts from last night).
-    Built only from the real rows: the count of distinct films, and the first one or two titles."""
+    Built only from the real rows: the count of distinct films, and the first one or two titles.
+    CAS-1535: the title leads with the member's own agent's name ("Max found 10 films for you")."""
     titles, seen = [], set()
-    for r in rows:
+    for r in _catchup_first(rows):
         mid = str(r.get("movie_id"))
         if mid in seen:
             continue
         seen.add(mid)
         titles.append(r.get("title") or "A film")
     n = len(titles)
-    title = f"Cascade found {n} film{'' if n == 1 else 's'} for you"
+    title = headline_for(agent_name or "Cascade", n)
     if n == 1:
         body = f"{titles[0]} is in your Alerts."
     elif n == 2:
@@ -87,6 +101,41 @@ def push_copy_for(rows) -> dict:
     else:
         body = f"{titles[0]}, {titles[1]} and {n - 2} more."
     return {"title": title, "body": body}
+
+
+def _batch_for_rows(store, user_id, rows, cascades_by_id, headline: str = None):
+    """CAS-1535: the batch id `rows` belong to (the newest row's). A row from before batches - or one a
+    find run could not stamp - joins the member's batch for the Sydney date it was found, created now if
+    need be, and the id is written onto every unstamped row BEFORE anything is sent. Returns the id, or
+    None for a store with no batches. Raises if the batch cannot be written; the email phase then sends
+    nothing for the member, the push phase carries on without a link."""
+    if not callable(getattr(store, "fetch_alert_batch", None)):
+        return None
+    batch_id = batch_id_of(rows)
+    unstamped = [r for r in rows if not r.get("batch_id")]
+    if batch_id is None:
+        newest = max(rows, key=lambda r: r.get("found_at") or "")
+        names = {str(r.get("movie_id")) for r in rows}
+        batch = ensure_batch(store, user_id, sydney_date(newest.get("found_at") or _dt.datetime.now(_dt.timezone.utc)),
+                             "daily", headline or headline_for(agent_name_for(cascades_by_id.values(), user_id),
+                                                               len(names)))
+        batch_id = str(batch["id"]) if batch else None
+    if batch_id and unstamped:
+        store.set_notification_batch([r.get("id") for r in unstamped], batch_id)
+        for r in unstamped:
+            r["batch_id"] = batch_id
+    return batch_id
+
+
+def _stamp_batch(store, batch_id, column: str, now) -> None:
+    """Best-effort: record when the batch's push/email went out. The rows' own stamps are what de-dupe."""
+    fn = getattr(store, "update_alert_batch", None)
+    if not batch_id or not callable(fn):
+        return
+    try:
+        fn(batch_id, {column: now.isoformat()})
+    except Exception as err:   # noqa: BLE001
+        print(f"[monitor] could not stamp alert_batches.{column}: {err}")
 
 
 def push_phase(store, now: _dt.datetime, send=send_via_apns, dry_run: bool = False,
@@ -114,7 +163,14 @@ def push_phase(store, now: _dt.datetime, send=send_via_apns, dry_run: bool = Fal
         if not pref["in_app"] or not tokens:
             print(f"[monitor] push: {user_id} has in-app off or no registered device - no push.")
             continue
-        copy = push_copy_for(mine)
+        copy = push_copy_for(mine, agent_name_for(cascades_by_id.values(), user_id))
+        # CAS-1535: the push opens the night's batch in Alerts. A legacy row from before batches gets one
+        # now; if that fails the push still goes, just without the batch link.
+        try:
+            batch_id = _batch_for_rows(store, user_id, mine, cascades_by_id, copy["title"])
+        except Exception as err:   # noqa: BLE001 - a batch hiccup must not cost the member their push
+            batch_id = None
+            print(f"[monitor] push: could not resolve a batch for {user_id}: {err} - pushing without a link.")
         print(f"[monitor] push: {user_id}: {copy['title']!r} - {copy['body']!r}")
         if dry_run:
             continue
@@ -136,8 +192,12 @@ def push_phase(store, now: _dt.datetime, send=send_via_apns, dry_run: bool = Fal
                     except Exception as err:   # noqa: BLE001
                         print(f"[monitor] could not delete push token: {err}")
 
+            payload = {"open": "alerts", "src": "push",
+                       "cmp": "catchup_alert" if any(r.get("moment") == "catchup" for r in mine) else "alert"}
+            if batch_id:
+                payload["batch"] = batch_id
             if send(tok, copy["title"], copy["body"], badge=badge,
-                    payload={"open": "alerts"}, on_invalid_token=_on_invalid):
+                    payload=payload, on_invalid_token=_on_invalid):
                 stats["delivered"] += 1
                 delivered_any = True
             else:
@@ -148,6 +208,7 @@ def push_phase(store, now: _dt.datetime, send=send_via_apns, dry_run: bool = Fal
                 store.mark_notifications([r.get("id") for r in mine], "pushed_at", now.isoformat())
             except Exception as err:   # noqa: BLE001 - the push already went; a ledger hiccup must not abort
                 print(f"[monitor] could not stamp pushed_at for {user_id}: {err}")
+            _stamp_batch(store, batch_id, "pushed_at", now)
     print(f"[monitor] push phase: {stats['delivered']}/{stats['attempted']} device push(es) delivered "
           f"to {stats['users']} member(s).")
     return stats
@@ -162,7 +223,8 @@ def _hits_from_rows(rows, today_by_id: dict, cascades_by_id: dict) -> list:
         detail = r.get("detail") or {}
         t = Transition(movie_id=str(r.get("movie_id")), title=r.get("title") or "",
                        moment=r.get("moment"), services=list(detail.get("services") or []),
-                       price=detail.get("price"), movie=today_by_id.get(str(r.get("movie_id"))) or {})
+                       price=detail.get("price"), movie=today_by_id.get(str(r.get("movie_id"))) or {},
+                       stage=detail.get("stage"))
         hits.append(Hit(user_id=str(r.get("user_id")), cascade_id=r.get("cascade_id"),
                         cascade_name=r.get("cascade_name") or "My Cascade", transition=t,
                         channels=_channels_of(r, cascades_by_id)))
@@ -201,12 +263,24 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
         if not mine and not replies:
             print(f"[monitor] email: {user_id} has nothing unseen - no email.")
             continue
-        hits = _hits_from_rows(mine, today_by_id, cascades_by_id)
+        batch_id = None
+        if mine:
+            # CAS-1535: every film the email names carries the batch id BEFORE the send - if it cannot be
+            # written, nothing is sent and the rows stay unstamped for a re-run.
+            try:
+                batch_id = _batch_for_rows(store, user_id, mine, cascades_by_id)
+            except Exception as err:   # noqa: BLE001
+                stats["failed"] += 1
+                print(f"[monitor] email: {user_id}: could not write the alert batch: {err} - not sending.")
+                continue
+        hits = _hits_from_rows(_catchup_first(mine), today_by_id, cascades_by_id)
         scores = scores_fn({h.transition.movie_id for h in hits}) if hits else {}
+        catchup = any(h.transition.moment == "catchup" for h in hits)
         digest = render_digest(
             hits, replies=[format_invite_reply(r, today_by_id.get(str(r.get("tmdb_id"))), now=now)
                            for r in replies],
-            scores=scores, today=now.date(), kind="unseen_alert")
+            scores=scores, today=now.date(), kind="catchup_alert" if catchup else "unseen_alert",
+            batch_id=batch_id)
         print(f"[monitor] email: {user_id} ({email}): {len(hits)} unseen alert(s), {len(replies)} "
               f"invite reply(s) - subject: {digest['subject']!r}")
         if dry_run:
@@ -223,8 +297,9 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
         stamp = now.isoformat()
         try:
             store.mark_notifications([r.get("id") for r in mine], "emailed_at", stamp)
-        except Exception as err:   # noqa: BLE001
+        except Exception as err:   # noqa: BLE001 - the batch id is already on every row, so the link stays right
             print(f"[monitor] could not stamp emailed_at for {user_id}: {err}")
+        _stamp_batch(store, batch_id, "emailed_at", now)
         if replies:
             try:
                 store.mark_invite_replies_digested([r.get("id") for r in replies], stamp)

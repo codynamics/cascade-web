@@ -23515,7 +23515,8 @@ function movingSubtitle(){ return `What your ${movingAgentsWord()} found and wha
 // film's first appearance for this agent; Changed = anything else (a window move on a film the agent
 // already had). Nothing is both.
 function movingIsNewMoment(moment){
-  return moment==="new_to_agent" || moment==="newly_qualifies";
+  // CAS-1535: "catchup" (the day +1 catch-up film from the member's Me list) is a first appearance too.
+  return moment==="new_to_agent" || moment==="newly_qualifies" || moment==="catchup";
 }
 // CAS-671: the time-window chips, in this exact order (shortest to longest) — rolling windows measured
 // back from now. "Since you last looked" is gone; there is no visit-relative window any more.
@@ -27685,6 +27686,8 @@ const REAL_MOMENT_SAID = {
   // CAS-848: the other two moments the monitor can emit — previously missing here, so a row for either
   // printed its raw moment key instead of a said phrase.
   announced:"just reached Cascade", opens_soon:"opens in cinemas soon",
+  // CAS-1535: the day +1 catch-up (monitor/catchup.py) - a film from the member's own Me list.
+  catchup:"is on your Me list",
 };
 let toastT; function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),3200);}
 

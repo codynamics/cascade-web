@@ -26,6 +26,8 @@ import urllib.request
 # find a film's current window (for grouping, pill colour and button choice), never to re-derive it.
 from poc_pipeline import AVAILABILITY_TIERS, tier_rank
 
+from .batches import batch_url, headline_for
+
 USER_AGENT = "cascade-monitor/1.0 (+https://cascademovies.com)"
 
 RESEND_API_KEY_ENV = "RESEND_API_KEY"
@@ -149,6 +151,13 @@ def _event_pill(transition, movie, today):
     if m in ("newly_qualifies", "new_to_agent"):
         window = _primary_status(movie)
         return ("NEW FOR YOU", _WINDOW_COLOR_KEY.get(window, "violet"))
+    if m == "catchup":   # CAS-1535: the day +1 catch-up; the stage says which window the film is in
+        if transition.stage == "streaming":
+            return ((f"NOW STREAMING · {svc}" if svc else "NOW STREAMING"), "green")
+        if transition.stage == "coming":
+            date = _weekday_date(movie.get("cinema_date"))
+            return ((f"COMING {date}" if date else "COMING TO CINEMAS"), "violet")
+        return ("IN CINEMAS NOW", "violet")
     return (m.upper(), "violet")
 
 
@@ -204,6 +213,8 @@ def _event_context(transition, movie, today):
         return f"since {date}" if date else ""
     if m in ("newly_qualifies", "new_to_agent"):
         return _invite_window_text(movie)
+    if m == "catchup":
+        return "from your Me list"
     return ""
 
 
@@ -223,6 +234,7 @@ _SUBJECT_PHRASE = {
     "announced": "is newly announced",
     "newly_qualifies": "is new for you",
     "new_to_agent": "is new for you",
+    "catchup": "is on your Me list",
 }
 
 
@@ -349,14 +361,14 @@ def _watched_buttons_for(movie_id, site_url, kind="daily_alert"):
 
 # ---- HTML building blocks --------------------------------------------------------------------------
 
-def _poster_html(movie, esc, title) -> str:
+def _poster_html(movie, esc, title, w: int = 92, h: int = 138) -> str:
     poster = movie.get("poster")
     if poster:
         src = f"https://image.tmdb.org/t/p/w185{poster}"
-        return (f'<img src="{esc(src)}" width="92" height="138" alt="{esc(title)}" '
-                'style="display:block;width:92px;height:138px;border-radius:10px;object-fit:cover;'
+        return (f'<img src="{esc(src)}" width="{w}" height="{h}" alt="{esc(title)}" '
+                f'style="display:block;width:{w}px;height:{h}px;border-radius:10px;object-fit:cover;'
                 'background:#e6e8ee;">')
-    return ('<div style="width:92px;height:138px;border-radius:10px;background:#e6e8ee;">'
+    return (f'<div style="width:{w}px;height:{h}px;border-radius:10px;background:#e6e8ee;">'
             '</div>')
 
 
@@ -409,7 +421,19 @@ def _column_html(heading, buttons, esc) -> str:
             + "".join(_button_html(b, esc) for b in buttons))
 
 
-def _card_html(hit, esc, site_url, score, watch_windows, today, kind="daily_alert") -> str:
+def _film_link(site_url, batch_id, movie_id, kind, cta="view_film") -> str:
+    """CAS-1535: a film link opens the film inside the night's batch view in Alerts when there is a batch
+    (`?dl=alerts:batch:<id>&film=<movie_id>`), else the film page as before."""
+    if batch_id:
+        return track_url(batch_url(site_url, batch_id, movie_id), kind, cta)
+    return track_url(f"{site_url}#/film/{movie_id}", kind, cta)
+
+
+def _see_all_link(site_url, batch_id, kind, cta="more_in_cascade") -> str:
+    return track_url(batch_url(site_url, batch_id), kind, cta) if batch_id else track_url(site_url, kind, cta)
+
+
+def _card_html(hit, esc, site_url, score, watch_windows, today, kind="daily_alert", batch_id=None) -> str:
     t = hit.transition
     m = t.movie or {}
     pill_text, color_key = _event_pill(t, m, today)
@@ -419,7 +443,7 @@ def _card_html(hit, esc, site_url, score, watch_windows, today, kind="daily_aler
                  if year and year != "----" else "")
     meta = _meta_line(m)
     heading, buttons = _buttons_for(m, t.movie_id, site_url, watch_windows, kind)
-    film_url = track_url(f"{site_url}#/film/{t.movie_id}", kind, "view_film")
+    film_url = _film_link(site_url, batch_id, t.movie_id, kind)
 
     watched = _watched_buttons_for(t.movie_id, site_url, kind)
     buttons_html = (
@@ -451,7 +475,7 @@ def _card_html(hit, esc, site_url, score, watch_windows, today, kind="daily_aler
     )
 
 
-def _card_text(hit, score, today, site_url, kind="daily_alert") -> list:
+def _card_text(hit, score, today, site_url, kind="daily_alert", batch_id=None) -> list:
     t = hit.transition
     m = t.movie or {}
     year = m.get("year")
@@ -460,9 +484,110 @@ def _card_text(hit, score, today, site_url, kind="daily_alert") -> list:
     return [
         f"{t.title}{year_s} — {pill_text}",
         f"  {_context_line(hit, today)}",
-        f"  {track_url(f'{site_url}#/film/{t.movie_id}', kind, 'view_film')}",
+        f"  {_film_link(site_url, batch_id, t.movie_id, kind)}",
         "",
     ]
+
+
+# ---- the day +1 catch-up layout (CAS-1535) ---------------------------------------------------------------
+
+def _compact_date(hit) -> str:
+    """The real date the compact card shows: the cinema date for a cinema/coming film, the date the film
+    reached streaming for a streaming one. "" when the catalogue carries none - never a placeholder."""
+    t = hit.transition
+    m = t.movie or {}
+    if t.moment == "catchup":
+        window = {"cinema": "in_cinema", "coming": "upcoming", "streaming": "included_streaming"}.get(t.stage)
+    else:
+        window = _primary_status(m)
+    return _weekday_date(_window_date(m, window)) if window else ""
+
+
+def _compact_card_html(hit, esc, site_url, score, kind, batch_id) -> str:
+    t = hit.transition
+    m = t.movie or {}
+    date = _compact_date(hit)
+    score_html = _score_chip_html(score, esc)
+    return (
+        '<tr><td style="padding:12px 0;border-bottom:1px solid #e6e8ee;">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+        f'<td width="60" valign="top">{_poster_html(m, esc, t.title, 60, 90)}</td>'
+        '<td valign="top" style="padding-left:12px;">'
+        f'<div style="font-size:16px;font-weight:700;color:#141A2A;">{esc(t.title)}</div>'
+        + (f'<div style="font-size:13px;color:#4b5563;margin-top:2px;">{esc(date)}</div>' if date else "")
+        + (f'<div style="margin-top:6px;">{score_html}</div>' if score_html else "")
+        + f'<div style="margin-top:8px;"><a href="{esc(_film_link(site_url, batch_id, t.movie_id, kind))}" '
+        'style="font-size:13px;color:#6b48f2;font-weight:700;text-decoration:none;">View in Cascade ›</a></div>'
+        # Room for the three one-tap answers (T3 adds them here).
+        '<!-- answers:slot -->'
+        '</td></tr></table></td></tr>'
+    )
+
+
+def _compact_groups(ordered_hits):
+    """[(heading, [hits])] - the three catch-up groups in their fixed order (a group with no films is
+    left out), then every other unread alert in the batch as one more group."""
+    from .catchup import STAGES   # local: catchup imports matching, which does not import this module
+    groups = []
+    for stage, heading in STAGES:
+        hs = [h for h in ordered_hits if h.transition.moment == "catchup" and h.transition.stage == stage]
+        if hs:
+            groups.append((heading, hs))
+    rest = [h for h in ordered_hits if h.transition.moment != "catchup"]
+    if rest:
+        groups.append(("Also found for you", rest))
+    return groups
+
+
+def _render_catchup(hits, site_url, replies, scores, kind, batch_id, esc) -> dict:
+    """The catch-up email: compact cards under the three group headings, "See all in Cascade" at the top
+    and the bottom. Each group keeps the Me list's own order (the hits arrive in it); the non-catch-up
+    group is ordered by score like any digest."""
+    cu = [h for h in hits if h.transition.moment == "catchup"]
+    other = _ordered_by_score([h for h in hits if h.transition.moment != "catchup"], scores)
+    ordered = cu + other
+    n = len({h.transition.movie_id for h in ordered})
+    agent = cu[0].cascade_name or "Cascade"
+    subject = headline_for(agent, n)
+    see_all = _see_all_link(site_url, batch_id, kind, "see_all")
+    groups = _compact_groups(ordered)
+
+    text_lines = []
+    if replies:
+        text_lines.extend(_replies_block_text(replies))
+    text_lines += [subject, f"See all in Cascade: {see_all}", ""]
+    for heading, hs in groups:
+        text_lines.append(heading.upper())
+        for h in hs:
+            t = h.transition
+            date = _compact_date(h)
+            score = _score_of(scores, t.movie_id)
+            bits = [b for b in (date, f"Cascade score {score}" if score is not None else "") if b]
+            text_lines.append(f"- {t.title}" + (f" - {' - '.join(bits)}" if bits else ""))
+            text_lines.append(f"  {_film_link(site_url, batch_id, t.movie_id, kind)}")
+        text_lines.append("")
+    text_lines += [f"See all in Cascade: {see_all}",
+                   f"Change what I'm told: {track_url(site_url, kind, 'change_alerts')}"]
+
+    link_style = "font-size:14px;color:#6b48f2;font-weight:700;text-decoration:none;"
+    see_all_html = f'<a href="{esc(see_all)}" style="{link_style}">See all in Cascade ›</a>'
+    body_rows = _replies_block_html(replies, esc) if replies else ""
+    body_rows += (
+        '<tr><td style="padding-bottom:4px;">'
+        f'<div style="font-size:20px;font-weight:800;color:#141A2A;">{esc(subject)}</div>'
+        f'<div style="margin-top:6px;">{see_all_html}</div></td></tr>')
+    for heading, hs in groups:
+        body_rows += (
+            '<tr><td style="padding-top:16px;">'
+            '<div style="font-size:12px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;'
+            f'color:#7C5CFF;">{esc(heading)}</div>'
+            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+            + "".join(_compact_card_html(h, esc, site_url, _score_of(scores, h.transition.movie_id), kind, batch_id)
+                      for h in hs)
+            + '</table></td></tr>')
+    body_rows += f'<tr><td style="padding-top:14px;">{see_all_html}</td></tr>'
+    return {"subject": subject, "html": _wrap_html(body_rows, site_url, kind, esc),
+            "text": "\n".join(text_lines)}
 
 
 # ---- invite replies (CAS-887) — unchanged by the CAS-1196 redesign ----------------------------------
@@ -545,73 +670,9 @@ def _replies_block_html(replies, esc) -> str:
 
 # ---- the digest itself --------------------------------------------------------------------------
 
-def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_windows=None,
-                  today=None, kind: str = "daily_alert") -> dict:
-    """Return {'subject', 'html', 'text'} for one user's consolidated digest (CAS-1196: one card
-    per film, no status/agent section headings — see the per-film helpers above).
-
-    hits          : list of monitor.matching.Hit (all for the same user).
-    scores        : {movie_id str: int|None} — monitor.matching.compute_scores()'s answer; a film
-                    absent here, or mapped to None, shows no score chip (honesty guardrail).
-    watch_windows : the account's own Service tracking object (user_prefs.watch_windows) — gates
-                    which "when will you watch it?" buttons are offered (item 3). None reads as the
-                    on-device "never touched this" default (every window on).
-    kind          : the email kind for click-through attribution (CAS-1513): "daily_alert", or
-                    "unseen_alert" for the 5pm unseen-alerts email.
-    today         : the date "in N days"/subject phrasing is relative to; defaults to today (UTC).
-    """
-    site_url = site_url or os.environ.get(SITE_URL_ENV) or DEFAULT_SITE_URL
-    replies = list(replies or [])
-    scores = scores or {}
-    today = today or _dt.datetime.now(_dt.timezone.utc).date()
-    ordered = _ordered_by_score(hits, scores)
-    subject = digest_subject(ordered, replies, scores=scores, today=today)
-    shown = ordered[:MAX_CARDS]
-    overflow = len(ordered) - len(shown)
-    esc = _html.escape
-
-    # ---- plain-text part ----
-    text_lines = []
-    if replies:
-        text_lines.extend(_replies_block_text(replies))
-    if shown:
-        text_lines.append(f"{len(ordered)} film{'' if len(ordered) == 1 else 's'} for you today")
-        text_lines.append("")
-        for h in shown:
-            text_lines.extend(_card_text(h, _score_of(scores, h.transition.movie_id), today, site_url, kind))
-        if overflow > 0:
-            text_lines.append(f"...and {overflow} more in Cascade: {track_url(site_url, kind, 'more_in_cascade')}")
-            text_lines.append("")
-    text_lines += [
-        f"Change what I'm told: {track_url(site_url, kind, 'change_alerts')}",
-        "Cascade only writes when one of your agents has something worth your time.",
-    ]
-    text = "\n".join(text_lines)
-
-    # ---- HTML part (inline styles; email-client safe — no <style>, no class=, no display:flex/grid) ----
-    body_rows = ""
-    if replies:
-        body_rows += _replies_block_html(replies, esc)
-    if shown:
-        header_text = "1 film for you today" if len(ordered) == 1 else f"{len(ordered)} films for you today"
-        body_rows += (
-            '<tr><td style="padding-bottom:4px;">'
-            f'<div style="font-size:20px;font-weight:800;color:#141A2A;">{esc(header_text)}</div>'
-            f'<div style="font-size:13px;color:#6b7280;margin-top:2px;">'
-            f'{esc(_weekday_date(today.isoformat()))} · picked by your agents</div>'
-            '</td></tr>'
-            '<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
-            + "".join(_card_html(h, esc, site_url, _score_of(scores, h.transition.movie_id),
-                                 watch_windows, today, kind) for h in shown)
-            + '</table></td></tr>'
-        )
-        if overflow > 0:
-            body_rows += (
-                '<tr><td style="padding-top:12px;">'
-                f'<a href="{esc(track_url(site_url, kind, "more_in_cascade"))}" style="font-size:14px;color:#6b48f2;font-weight:700;'
-                f'text-decoration:none;">and {overflow} more in Cascade</a></td></tr>'
-            )
-    html_doc = (
+def _wrap_html(body_rows, site_url, kind, esc) -> str:
+    """The email shell (logo row, footer) shared by the ordinary digest and the catch-up layout."""
+    return (
         '<!doctype html><html><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1"></head>'
         '<body style="margin:0;background:#f4f5f8;'
@@ -633,7 +694,92 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
         '</td></tr>'
         '</table></td></tr></table></body></html>'
     )
-    return {"subject": subject, "html": html_doc, "text": text}
+
+
+def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_windows=None,
+                  today=None, kind: str = "daily_alert", batch_id=None) -> dict:
+    """Return {'subject', 'html', 'text'} for one user's consolidated digest (CAS-1196: one card
+    per film, no status/agent section headings — see the per-film helpers above).
+
+    hits          : list of monitor.matching.Hit (all for the same user).
+    scores        : {movie_id str: int|None} — monitor.matching.compute_scores()'s answer; a film
+                    absent here, or mapped to None, shows no score chip (honesty guardrail).
+    watch_windows : the account's own Service tracking object (user_prefs.watch_windows) — gates
+                    which "when will you watch it?" buttons are offered (item 3). None reads as the
+                    on-device "never touched this" default (every window on).
+    kind          : the email kind for click-through attribution (CAS-1513): "daily_alert", or
+                    "unseen_alert" for the 5pm unseen-alerts email.
+    today         : the date "in N days"/subject phrasing is relative to; defaults to today (UTC).
+    batch_id      : CAS-1535 - the night's alert batch (monitor.batches). When given, every film link and
+                    the "See all in Cascade" link open that batch's own view in Alerts
+                    (`?dl=alerts:batch:<id>[&film=<movie_id>]`) instead of the film page / home screen;
+                    the `?answer=` buttons are untouched. A digest holding any `catchup` hit renders the
+                    compact catch-up layout instead (_render_catchup).
+    """
+    site_url = site_url or os.environ.get(SITE_URL_ENV) or DEFAULT_SITE_URL
+    replies = list(replies or [])
+    scores = scores or {}
+    today = today or _dt.datetime.now(_dt.timezone.utc).date()
+    if any(h.transition.moment == "catchup" for h in hits):
+        return _render_catchup(hits, site_url, replies, scores, kind, batch_id, _html.escape)
+    ordered = _ordered_by_score(hits, scores)
+    subject = digest_subject(ordered, replies, scores=scores, today=today)
+    shown = ordered[:MAX_CARDS]
+    overflow = len(ordered) - len(shown)
+    esc = _html.escape
+
+    # ---- plain-text part ----
+    text_lines = []
+    if replies:
+        text_lines.extend(_replies_block_text(replies))
+    if shown:
+        text_lines.append(f"{len(ordered)} film{'' if len(ordered) == 1 else 's'} for you today")
+        text_lines.append("")
+        for h in shown:
+            text_lines.extend(_card_text(h, _score_of(scores, h.transition.movie_id), today, site_url, kind,
+                                         batch_id))
+        if overflow > 0:
+            text_lines.append(f"...and {overflow} more in Cascade: {_see_all_link(site_url, batch_id, kind)}")
+            text_lines.append("")
+        if batch_id:
+            text_lines.append(f"See all in Cascade: {_see_all_link(site_url, batch_id, kind, 'see_all')}")
+            text_lines.append("")
+    text_lines += [
+        f"Change what I'm told: {track_url(site_url, kind, 'change_alerts')}",
+        "Cascade only writes when one of your agents has something worth your time.",
+    ]
+    text = "\n".join(text_lines)
+
+    # ---- HTML part (inline styles; email-client safe — no <style>, no class=, no display:flex/grid) ----
+    body_rows = ""
+    if replies:
+        body_rows += _replies_block_html(replies, esc)
+    if shown:
+        header_text = "1 film for you today" if len(ordered) == 1 else f"{len(ordered)} films for you today"
+        body_rows += (
+            '<tr><td style="padding-bottom:4px;">'
+            f'<div style="font-size:20px;font-weight:800;color:#141A2A;">{esc(header_text)}</div>'
+            f'<div style="font-size:13px;color:#6b7280;margin-top:2px;">'
+            f'{esc(_weekday_date(today.isoformat()))} · picked by your agents</div>'
+            '</td></tr>'
+            '<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+            + "".join(_card_html(h, esc, site_url, _score_of(scores, h.transition.movie_id),
+                                 watch_windows, today, kind, batch_id) for h in shown)
+            + '</table></td></tr>'
+        )
+        if overflow > 0:
+            body_rows += (
+                '<tr><td style="padding-top:12px;">'
+                f'<a href="{esc(_see_all_link(site_url, batch_id, kind))}" style="font-size:14px;color:#6b48f2;font-weight:700;'
+                f'text-decoration:none;">and {overflow} more in Cascade</a></td></tr>'
+            )
+        if batch_id:
+            body_rows += (
+                '<tr><td style="padding-top:12px;">'
+                f'<a href="{esc(_see_all_link(site_url, batch_id, kind, "see_all"))}" style="font-size:14px;color:#6b48f2;'
+                'font-weight:700;text-decoration:none;">See all in Cascade ›</a></td></tr>'
+            )
+    return {"subject": subject, "html": _wrap_html(body_rows, site_url, kind, esc), "text": text}
 
 
 def send_via_resend(to_addr, subject, html, text, api_key=None, from_addr=None, timeout=30) -> dict:
