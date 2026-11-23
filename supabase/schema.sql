@@ -1579,24 +1579,22 @@ group by user_id, (coalesce(data ->> 'step', data ->> 'key', '(unknown)'));
 -- analytics_admins guard inside its body. admin_member_emails_list() carries that same guard as
 -- an explicit SECURITY DEFINER function instead, and the view is now a security_invoker = true
 -- wrapper around it — no public view depends on auth.users directly any more.
-create or replace function public.admin_member_emails_list()
-returns table (user_id uuid, email text)
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select u.id, u.email::text
+-- CAS-1527: also returns created_at (applied live 23 Nov) so the admin site can count new members.
+drop view if exists public.admin_member_emails;
+drop function if exists public.admin_member_emails_list();
+create function public.admin_member_emails_list()
+returns table (user_id uuid, email text, created_at timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select u.id, u.email::text, u.created_at
   from auth.users u
-  where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid())
+  where exists (select 1 from public.analytics_admins a where a.user_id = auth.uid());
 $$;
-
 revoke all on function public.admin_member_emails_list() from public, anon;
 grant execute on function public.admin_member_emails_list() to authenticated, service_role;
-
-create or replace view public.admin_member_emails
-with (security_invoker = true) as
-select user_id, email from public.admin_member_emails_list();
+create view public.admin_member_emails with (security_invoker = true) as
+  select user_id, email, created_at from public.admin_member_emails_list();
+revoke all on public.admin_member_emails from public, anon, authenticated;
+grant select on public.admin_member_emails to authenticated, service_role;
 
 -- CAS-1092: cascades can now carry a soft delete (deleted_at); exclude those rows here too.
 create or replace view admin_priv.admin_cascades
