@@ -3756,6 +3756,10 @@
     color:var(--dim);font-size:10.5px;letter-spacing:.04em;vertical-align:1px}
   /* Lee, 2026-11-21: PRIMARY SEARCH — one box holding the genre levels and, under them, the name box. */
   .oamprimbox{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:0 0 12px}
+  /* Lee, 2026-11-23: "Services I don't have" — dashed, so it reads as a way to more, not a service itself */
+  .chip.oamothersvc{margin-top:10px;border-style:dashed;color:var(--ink)}
+  .chip.oamothersvc span{margin-left:6px;color:var(--accent);font-weight:800}
+  .oamothersvcs{margin-top:10px}
   /* Lee, 2026-11-22: collapsible sections (mockup list-sheet-collapsed-mockup.png) — each a bordered card whose
      header names the section, says what is set, and carries a purple dot (+ purple edge) when changed from default. */
   #watchSheetBody .oamsec{border:1px solid var(--line);background:var(--panel);border-radius:14px;margin:0 0 10px;padding:0;overflow:hidden}
@@ -9560,7 +9564,9 @@ function cardHTML(m, markNew=false, {hideDismiss=false, inWatch=false}={}){
   // accountScopedFor. Find/the Moving ledger (inWatch:false) are agent builder/admission-adjacent
   // screens, not Watch, so they keep following the open agent's own scope via prefsActive(), unchanged.
   const svcScoped = inWatch ? (!ignoreScope && accountScopedFor()) : prefsActive();
-  if(svcScoped && !m._fixture) offers=offers.filter(myService);   // CAS-491: see matchesServices
+  // Lee, 2026-11-23: on a list set to a service you don't have, that service's offers stay on the card.
+  const cardListSvc = (inWatch && !m._fixture) ? oamActiveMoodSvc() : null;
+  if(svcScoped && !m._fixture) offers=offers.filter(o=>myService(o) || (cardListSvc && svcCanon(o.service)===cardListSvc));   // CAS-491: see matchesServices
   // Lee, 2026-11-22: a list set to one service (e.g. "Stan") already lists only films included on it, but the
   // card showed whichever of your services came first (Disney, Netflix…), so the list looked unfiltered. On
   // Watch, that service's own included offer now leads, so the card names the service the list is about.
@@ -21359,7 +21365,12 @@ function oamMoodBarFor(mood, c, style){
 function oamFilmAge(m){ return AGE_RATING_CANON[m.age_rating] || m.age_rating; }
 // CAS-1384: a saved svc that's no longer one of the account's own services (prefs.sub) reads as null —
 // "any of mine" — without ever rewriting the stored mood (oamSaveMoodFromSheet is the only writer).
-function oamMoodEffectiveSvc(mood){ return (mood && mood.svc && prefs.sub.has(mood.svc)) ? mood.svc : null; }
+// Lee, 2026-11-23: a list may be set to a service you DON'T have ("Services I don't have" in its sheet), e.g. to
+// see what's on Stan before subscribing — so any known streaming service counts, not only your own.
+function oamMoodEffectiveSvc(mood){ return (mood && mood.svc && SUB_SERVICES.includes(mood.svc)) ? mood.svc : null; }
+// A list set to one service, or to Any service, is NOT also limited to your services: the one service already
+// narrows it (and may be one you don't have).
+function oamMoodSkipsMyServices(mood){ return !!(mood && (mood.anySvc || oamMoodEffectiveSvc(mood))); }
 // "Included streaming" on a service: a sub/free offer whose canonical name matches. Rent/buy never count.
 function filmIncludedOnService(m, service){
   return (m.offers||[]).some(o => (o.type==="sub" || o.type==="free") && svcCanon(o.service)===service);
@@ -21394,7 +21405,7 @@ function oamFilmMeetsMoodRules(m, mood, c){
     if(c.excludeBlocked!==false && blocked.has(m.tmdb_id)) return false;
     if(admitC.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
     const ps=primaryStatus(m);
-    if(!mood.anySvc && c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)) return false;
+    if(!oamMoodSkipsMyServices(mood) && c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)) return false;
     if(!filmMatchesSearch(m, mood.people)) return false;
     const age=oamFilmAge(m);
     if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
@@ -21408,7 +21419,7 @@ function oamFilmMeetsMoodRules(m, mood, c){
   const ovrOn = oamMoodEffectiveTopShare(mood)!=null;
   const gateC = ovrOn ? {...admitC, styles:Object.fromEntries(Object.entries(admitC.styles||{})
     .map(([g,s])=>[g, (s && s.bar!=null) ? {...s, bar:0} : s]))} : admitC;
-  if(!matchesCriteriaOneAgent(m, mood.anySvc ? {...gateC, myServices:false} : gateC, false)) return false;
+  if(!matchesCriteriaOneAgent(m, oamMoodSkipsMyServices(mood) ? {...gateC, myServices:false} : gateC, false)) return false;
   const {main}=mainOtherCombos(m);
   if(main===undefined) return false;
   if(!oamMoodStyles(mood, c).includes(main)) return false;
@@ -21597,7 +21608,7 @@ window.openOamMoodSheetFor=id=>{
   oamDraft=oamMoodDraftFrom(mood);
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set();
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set(); oamOtherSvcsOpen=false;
   openWatchSheet();
   { const h=$("watchSheetBody"); tutBannerMount("moods", h, el=>h.prepend(el)); }   // CAS-1534
 };
@@ -21606,7 +21617,7 @@ window.openOamMoodSheetForNew=()=>{
   oamDraft=oamMoodDraftFrom(null);
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set();
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set(); oamOtherSvcsOpen=false;
   openWatchSheet();
 };
 // CAS-1395: the new-mood draft's own people/svc/name/watched fields, built from Find's current search and
@@ -21653,7 +21664,7 @@ window.openOamMoodSheetFromFind=()=>{
   oamDraft.fromFind={total, label:fields.name};
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set();
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set(); oamOtherSvcsOpen=false;
   openWatchSheet();
   logEvent("mood_from_find");
 };
@@ -21683,6 +21694,8 @@ window.toggleOamDraftAge=a=>{ if(!oamDraft) return; oamDraft.ages.has(a)?oamDraf
 window.setOamDraftAwards=v=>{ if(!oamDraft) return; oamDraft.awards=v; renderOamMoodSheetBody(); };
 window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMoodSheetBody(); };
 window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMoodSheetBody(); };
+let oamOtherSvcsOpen=false;
+window.toggleOamOtherSvcs=()=>{ oamOtherSvcsOpen=!oamOtherSvcsOpen; renderOamMoodSheetBody(); };
 window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; oamDraft.anySvc=false; renderOamMoodSheetBody(); };
 window.setOamDraftAnySvc=()=>{ if(!oamDraft) return; oamDraft.svc=null; oamDraft.anySvc=true; renderOamMoodSheetBody(); };
 window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
@@ -22078,6 +22091,13 @@ function renderOamMoodSheetBody(){
         ${SUB_SERVICES.filter(s=>prefs.sub.has(s)).map(s=>{ const on=d.svc===s; return `<button type="button" class="chip${on?" on":""}"
           aria-pressed="${on}" onclick="setOamDraftSvc('${escA(s)}')">${esc(oamSvcChipLabel(s))}</button>`; }).join("")}
       </div>
+      ${(()=>{ // Lee, 2026-11-23: "Services I don't have" — reveals every streaming service you aren't signed up to
+        const others=SUB_SERVICES.filter(s=>!prefs.sub.has(s));
+        if(!others.length) return "";
+        const open = oamOtherSvcsOpen || (d.svc && !prefs.sub.has(d.svc));
+        return `<button type="button" class="chip oamothersvc${open?" open":""}" aria-expanded="${open}" onclick="toggleOamOtherSvcs()">Services I don't have <span aria-hidden="true">${open?"&minus;":"+"}</span></button>
+          ${open ? `<div class="chips oamothersvcs">${others.map(s=>{ const on=d.svc===s; return `<button type="button" class="chip${on?" on":""}"
+            aria-pressed="${on}" onclick="setOamDraftSvc('${escA(s)}')">${esc(oamSvcChipLabel(s))}</button>`; }).join("")}</div>` : ""}`; })()}
       <p class="oamgenreintro">${prefs.on ? "Any service also lists films on services you don't have. " : ""}Pick one service to see only what's included on it. Cinema and Rental stay empty while a service is picked.</p>`) : ""}
     ${sec("how", "oamHowSec", "HOW MANY, AND IN WHAT ORDER", `
       <div class="subhd">SHOW</div>
