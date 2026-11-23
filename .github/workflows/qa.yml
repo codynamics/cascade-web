@@ -473,7 +473,7 @@ jobs:
   # started by a GITHUB_TOKEN-authenticated `workflow_dispatch` call (daily.yml's CAS-523 step) —
   # GitHub's anti-recursion protection suppresses that event the same way it suppresses `push`.
   # A daily-refresh-only push could reach `staging` and pass qa, but never reach `main`. This
-  # job dispatches promote.yml directly for exactly that case. The `workflow_dispatch` guard is
+  # job dispatches promote-data.yml (data files only, CAS-1529) for exactly that case. The `workflow_dispatch` guard is
   # the important half: a qa run triggered by a normal `push` still promotes through
   # promote.yml's own `workflow_run` trigger as before — without the guard every push would
   # dispatch promote twice.
@@ -490,10 +490,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Dispatch promote.yml
+      # CAS-1529: code no longer auto-promotes. Dispatch the data-only promote (allowlist-guarded).
+      # --ref staging: the workflow file is guaranteed present there; it checks out main itself.
+      - name: Dispatch promote-data.yml
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run promote.yml --ref main -f sha=${{ github.sha }}
+        run: gh workflow run promote-data.yml --ref staging -f sha=${{ github.sha }}
 
   # CAS-482: the failure-path mirror of mark-on-staging above. `if: failure()` on a job whose
   # `needs` list is the same QA jobs runs exactly when at least one of them went red — GitHub's
