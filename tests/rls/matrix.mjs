@@ -136,6 +136,16 @@ async function countTable(table) {
 async function probeSelect(table) {
   const res = await fetch(`${REST}/${table}?select=*&limit=5`, { headers: authHeaders({ Prefer: 'count=exact' }) });
   if (res.status === 404) return { verdict: 'SKIPPED', detail: 'not deployed (PGRST205)' };
+  // A table anon has no grant on at all answers 401/403 with Postgres code 42501. That is a rejection,
+  // which is what RLS is meant to produce for a non-public table (monitor_state, CAS-1514).
+  if (res.status === 401 || res.status === 403) {
+    const body = await safeJson(res);
+    if (body && body.code === '42501') {
+      return PUBLIC_READ.has(table)
+        ? { verdict: 'FAIL', detail: 'anon SELECT was rejected but the client needs this read' }
+        : { verdict: 'PASS', detail: 'no anon grant (42501)' };
+    }
+  }
   const total = rangeTotal(res);
   return selectVerdict(table, total, PUBLIC_READ);
 }
