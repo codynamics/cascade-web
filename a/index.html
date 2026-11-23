@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Cascade</title>
+<!-- CAS-1537: the confirmation page for an alert email's one-tap Watch On / Watched buttons. Served at /a/ - the
+     one path .well-known/apple-app-site-association excludes, so iOS opens it in the browser, not the app.
+     A plain GET of this page records nothing: the script POSTs the token to the alert-answer edge function,
+     which verifies the signature and expiry and records the tap. The page shows only the film title and the
+     button's label - nothing about the member. -->
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f4f5f8;
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#141A2A}
+  main{max-width:420px;margin:24px;padding:28px 24px;background:#fff;border-radius:14px;text-align:center}
+  .brand{font-size:18px;font-weight:700;letter-spacing:1px;color:#7C5CFF;text-transform:uppercase;margin-bottom:14px}
+  #msg{font-size:18px;font-weight:700;margin:0 0 20px}
+  a.open{display:inline-block;padding:12px 22px;border-radius:10px;background:#3B5BFF;color:#fff;font-weight:700;text-decoration:none}
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">Cascade</div>
+  <p id="msg" role="status">Saving&hellip;</p>
+  <a class="open" id="open" href="/">Open in Cascade</a>
+</main>
+<script src="/config.js"></script>
+<script>
+(function(){
+  var msg = document.getElementById("msg"), open = document.getElementById("open");
+  var cfg = window.CASCADE_CONFIG || {};
+  var token = new URLSearchParams(location.search).get("t");
+  function expired(){ msg.textContent = "This link has expired."; }
+  if(!token){ expired(); return; }
+  fetch(cfg.SUPABASE_URL + "/functions/v1/alert-answer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "apikey": cfg.SUPABASE_ANON_KEY, "Authorization": "Bearer " + cfg.SUPABASE_ANON_KEY },
+    body: JSON.stringify({ token: token })
+  }).then(function(r){ return r.json().catch(function(){ return {}; }); }).then(function(d){
+    if(d && d.ok){
+      msg.textContent = "Saved: " + d.label + " for " + d.title;
+      if(d.batch) open.href = "/?dl=alerts:batch:" + encodeURIComponent(d.batch) + "&film=" + encodeURIComponent(d.film);
+    } else if(d && d.error === "expired"){
+      expired();
+    } else {
+      msg.textContent = "Couldn’t save that. Please tap the button in your email again.";
+    }
+  }).catch(function(){
+    msg.textContent = "Couldn’t save that. Please tap the button in your email again.";
+  });
+})();
+</script>
+</body>
+</html>

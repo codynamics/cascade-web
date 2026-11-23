@@ -32,8 +32,9 @@ def _hit(title, moment, cascade="Some Agent", movie_id="1", movie=None, services
 
 
 def _answer_href(value, film=9):
-    """The html-escaped, click-tracked href of a digest answer button (CAS-1513)."""
-    return html.escape(track_url(f"https://x.test/?answer={value}#/film/{film}", "daily_alert", f"answer_{value}"))
+    """The html-escaped, click-tracked href of a digest answer button (CAS-1513). CAS-1537: with no signing
+    context (these tests pass none) a button opens the film in Cascade, tagged with its own cta."""
+    return html.escape(track_url(f"https://x.test/#/film/{film}", "daily_alert", f"answer_{value}"))
 
 
 class EventPillTests(unittest.TestCase):
@@ -209,40 +210,51 @@ class CardRenderTests(unittest.TestCase):
 
 
 class ButtonTests(unittest.TestCase):
-    """AC4: buttons depend on where the film stands, gated by Service tracking."""
+    """AC4: buttons depend on where the film stands, gated by Service tracking (CAS-1537: the app's own
+    Cinema / Premium / Rent / Stream / Never, a passed window greyed and not linked)."""
 
     def test_unreleased_film_has_four_gated_answer_buttons(self):
         hit = _hit("Other Mommy", "opens_soon", movie={"status": ["upcoming"]}, movie_id="9")
         d = render_digest([hit], site_url="https://x.test/")
-        for value in ("cinema", "rent", "stream", "never"):
+        for value in ("in_cinema", "rent", "stream", "never"):
             self.assertIn(_answer_href(value), d["html"])
+        self.assertNotIn("cta=answer_premium", d["html"])      # Premium starts off, as in the app
         self.assertIn("WATCH ON", d["html"])
+
+    def test_premium_appears_when_the_member_tracks_it(self):
+        hit = _hit("Other Mommy", "opens_soon", movie={"status": ["upcoming"]}, movie_id="9")
+        d = render_digest([hit], site_url="https://x.test/", watch_windows={"premium": {"list": True}})
+        self.assertIn(_answer_href("premium"), d["html"])
 
     def test_rent_switched_off_removes_the_rent_button(self):
         hit = _hit("Other Mommy", "opens_soon", movie={"status": ["upcoming"]}, movie_id="9")
         d = render_digest([hit], site_url="https://x.test/",
                           watch_windows={"rent": {"list": False}})
-        self.assertNotIn("answer=rent", d["html"])
-        self.assertIn("answer=cinema", d["html"])
-        self.assertIn("answer=stream", d["html"])
-        self.assertIn("answer=never", d["html"])
+        self.assertNotIn("cta=answer_rent", d["html"])
+        self.assertNotIn(">Rent<", d["html"])
+        self.assertIn("cta=answer_in_cinema", d["html"])
+        self.assertIn("cta=answer_stream", d["html"])
+        self.assertIn("cta=answer_never", d["html"])
 
-    def test_streaming_film_has_two_buttons(self):
+    def test_streaming_film_greys_the_passed_windows(self):
         hit = _hit("Spotlight", "hits_stream", services=["Netflix"],
                    movie={"status": ["included_streaming"]}, movie_id="9")
         d = render_digest([hit], site_url="https://x.test/")
         for value in ("stream", "never"):
             self.assertIn(_answer_href(value), d["html"])
-        self.assertNotIn("answer=cinema", d["html"])
+        for value in ("in_cinema", "rent"):                      # shown, greyed, not linked
+            self.assertNotIn(f"cta=answer_{value}", d["html"])
+        self.assertIn(">Cinema<", d["html"])
+        self.assertIn(">Rent<", d["html"])
         self.assertNotIn("answer=seen", d["html"])
 
-    def test_home_pay_film_has_three_buttons(self):
+    def test_home_pay_film_greys_cinema_only(self):
         hit = _hit("Ex Machina", "hits_rent", movie={"status": ["rental"]}, movie_id="9")
         d = render_digest([hit], site_url="https://x.test/")
         for value in ("rent", "stream", "never"):
             self.assertIn(_answer_href(value), d["html"])
-        self.assertNotIn("answer=cinema", d["html"])
-        self.assertNotIn("answer=seen", d["html"])
+        self.assertNotIn("cta=answer_in_cinema", d["html"])
+        self.assertIn(">Cinema<", d["html"])
 
 
 class WatchedColumnTests(unittest.TestCase):

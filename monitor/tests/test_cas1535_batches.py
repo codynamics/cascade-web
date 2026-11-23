@@ -166,9 +166,7 @@ class EmailLinksOpenTheBatch(unittest.TestCase):
             self.assertIn("src=email", h)
             self.assertIn("cmp=unseen_alert", h)
             self.assertIn("cta=", h)
-        for h in links:
-            if "#/film/" in h:
-                self.assertIn("?answer=", h, h)
+        self.assertTrue(any("cta=answer_" in h for h in links))   # CAS-1537: the Watch On / Watched buttons
         self.assertIn(f"dl=alerts:batch:{BATCH}", send.call_args.args[3])   # the text part too
 
     def test_a_legacy_row_gets_its_batch_before_the_send(self):
@@ -347,7 +345,7 @@ class CatchUp(unittest.TestCase):
         self.assertEqual(html.count("View in Cascade"), 4)
         for needle in ("Cinema Opener", "Stream Arrival", "Rent Riser", "Weekend Past", ">80<", "<img"):
             self.assertIn(needle, html)
-        self.assertIn("answers:slot", html)                       # room left for T3's one-tap answers
+        self.assertEqual(html.count("WATCH ON"), 4)               # CAS-1537: every compact card has the buttons
 
     def test_stages_are_the_three_groups_in_order(self):
         self.assertEqual([k for k, _ in STAGES], ["cinema", "coming", "streaming"])

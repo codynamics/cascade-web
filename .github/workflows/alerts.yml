@@ -82,6 +82,7 @@ jobs:
           CASCADE_EMAIL_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}   # optional; defaults to Resend's test sender
           CASCADE_SITE_URL: ${{ secrets.SITE_URL }}               # optional; defaults to the live Pages URL
           PHASE: ${{ github.event.inputs.phase || 'find' }}        # CAS-1504: find | push | email
+          ALERT_ANSWER_SECRET: ${{ secrets.ALERT_ANSWER_SECRET }}  # CAS-1537: signs the email's one-tap answer links
           DAYS_BACK: ${{ github.event.inputs.days_back }}          # demo look-back (0/blank on schedule)
           BASELINE_REF: ${{ github.event.inputs.baseline_ref }}    # demo exact-ref override
           APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}                 # CAS-483: without these four, push silently no-ops

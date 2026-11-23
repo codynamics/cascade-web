@@ -40,6 +40,6 @@ jobs:
             echo "::error::SUPABASE_ACCESS_TOKEN / SUPABASE_PROJECT_REF are not set on the '${{ inputs.environment }}' environment."
             exit 1
           fi
-          for fn in membership-verify membership-notifications; do
+          for fn in membership-verify membership-notifications alert-answer; do
             supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF"
           done

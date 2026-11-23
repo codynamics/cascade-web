@@ -46,7 +46,7 @@ class ClickTrackingTests(unittest.TestCase):
     def test_every_button_has_its_own_cta(self):
         hits = [_hit("Film", "hits_cinema", movie_id="9")]
         hrefs = self._assert_tracked(render_digest(hits, site_url="https://x.test/", today=TODAY), "daily_alert")
-        answers = [parse_qs(urlparse(u).query)["cta"][0] for u in hrefs if "answer=" in u]
+        answers = [parse_qs(urlparse(u).query)["cta"][0] for u in hrefs if "cta=answer_" in u]
         self.assertEqual(len(answers), len(set(answers)))
 
     def test_unseen_alert_links(self):

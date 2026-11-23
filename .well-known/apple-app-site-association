@@ -4,6 +4,7 @@
       {
         "appIDs": ["TA8L5PS6JK.au.com.codynamics.cascade"],
         "components": [
+          { "/": "/a/*", "exclude": true, "comment": "CAS-1537: the alert email's one-tap answer confirmation page (/a/) must open in the browser, never the app; exclusions are matched first, so this precedes the catch-all." },
           { "/": "/*", "comment": "Cascade is a single-page hash-routed app (index.html at the site root) — every real URL path is '/'; the actual route (e.g. #/film/<id>) lives in the fragment, which iOS hands to the app's appUrlOpen handler untouched but never uses for AASA path matching itself." }
         ]
       }
