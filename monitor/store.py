@@ -967,6 +967,32 @@ class SupabaseStore:
             raise ValueError(f"fetch_view({view_name!r}): no known unique key to page on (CAS-1091)")
         return self._get(f"/{view_name}?select=*&order={order}")
 
+    def fetch_auth_users(self) -> list:
+        """CAS-1526: every auth.users account as {id, email, created_at}, via the GoTrue admin API
+        (service_role). Paged by page/per_page until a short page comes back."""
+        base = self._base.rsplit("/rest/v1", 1)[0] + "/auth/v1/admin/users"
+        out: list = []
+        page = 1
+        per_page = 1000
+        while True:
+            req = urllib.request.Request(f"{base}?page={page}&per_page={per_page}",
+                                         headers=self._headers(), method="GET")
+            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+            users = body.get("users", []) if isinstance(body, dict) else body
+            out.extend({"id": u.get("id"), "email": u.get("email"), "created_at": u.get("created_at")}
+                       for u in users)
+            if len(users) < per_page:
+                break
+            page += 1
+        return out
+
+    def fetch_onbstep_events(self, since: str) -> list:
+        """CAS-1526: signed-in onbstep_shown usage_events since an ISO timestamp, as
+        {user_id, data, created_at} — for the daily email's first-run summary."""
+        return self._get("/usage_events?select=id,user_id,data,created_at&type=eq.onbstep_shown"
+                         f"&user_id=not.is.null&created_at=gte.{since}&order=id.asc")
+
     def delete_old_usage_events(self, days: int = 180) -> int:
         """CAS-942: purge usage_events rows older than `days`, with the same service_role
         credential this store already uses for every other call — this is the daily retention

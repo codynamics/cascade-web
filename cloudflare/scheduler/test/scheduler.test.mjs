@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import worker, {
   CRON,
@@ -8,8 +9,8 @@ import worker, {
   REPO,
   RETRY_DELAY_MS,
   UNSENT_MAIL_CHECKS,
-  targetForCron,
-  inputsForCron,
+  sydneyClock,
+  dispatchesForTick,
   dispatchWorkflow,
   hasUnsentMail,
 } from "../src/worker.mjs";
@@ -31,66 +32,130 @@ function fakeJsonResponse(status, rows = []) {
   return { status, ok: status >= 200 && status < 300, json: async () => rows };
 }
 
-test("17 * * * * always dispatches uptime.yml", () => {
-  assert.equal(targetForCron(CRON.UPTIME, Date.parse("2026-09-17T00:17:00Z")), "uptime.yml");
+const AEDT = "2026-11-22"; // Sydney is UTC+11 (the Sydney day starts the previous UTC day at 13:00)
+const AEST = "2026-07-15"; // Sydney is UTC+10
+
+// ISO instant for Sydney local HH:MM on the given Sydney date, using the fixed offset for that date.
+function sydneyInstant(date, hh, mm, offsetHours) {
+  const [y, m, d] = date.split("-").map(Number);
+  return Date.UTC(y, m - 1, d, hh - offsetHours, mm);
+}
+
+const SIDES = [
+  { name: "AEDT", date: AEDT, offset: 11 },
+  { name: "AEST", date: AEST, offset: 10 },
+];
+
+function labels(epochMs) {
+  return dispatchesForTick(epochMs).map((d) => (d.inputs ? `${d.workflow}:${d.inputs.phase}` : d.workflow));
+}
+
+test("wrangler.toml declares exactly one cron, */5 * * * *", () => {
+  const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+  const crons = toml.match(/^crons\s*=\s*\[([^\]]*)\]/m);
+  assert.ok(crons);
+  const entries = [...crons[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(entries, ["*/5 * * * *"]);
+  assert.equal(CRON.TICK, "*/5 * * * *");
 });
 
-test("during AEDT, 16:00 UTC dispatches alerts.yml and 17:00 UTC does not", () => {
-  // 2026-11-22 is after AU DST starts (first Sunday of October) -> Sydney is UTC+11.
-  assert.equal(targetForCron(CRON.ALERTS_A, Date.parse("2026-11-22T16:00:00Z")), "alerts.yml");
-  assert.equal(targetForCron(CRON.ALERTS_B, Date.parse("2026-11-22T17:00:00Z")), null);
+test("sydneyClock gives the Sydney hour and minute on both sides of DST", () => {
+  assert.deepEqual(sydneyClock(Date.parse("2026-11-22T14:00:00Z")), { hour: 1, minute: 0 });
+  assert.deepEqual(sydneyClock(Date.parse("2026-07-15T15:00:00Z")), { hour: 1, minute: 0 });
+  assert.deepEqual(sydneyClock(Date.parse("2026-11-22T20:34:00Z")), { hour: 7, minute: 34 });
 });
 
-test("during AEST, 17:00 UTC dispatches alerts.yml and 16:00 UTC does not", () => {
-  // 2026-07-15 is outside AU DST -> Sydney is UTC+10.
-  assert.equal(targetForCron(CRON.ALERTS_A, Date.parse("2026-07-15T16:00:00Z")), null);
-  assert.equal(targetForCron(CRON.ALERTS_B, Date.parse("2026-07-15T17:00:00Z")), "alerts.yml");
+for (const { name, date, offset } of SIDES) {
+  const at = (hh, mm) => sydneyInstant(date, hh, mm, offset);
+
+  test(`${name}: 01:00-01:04 dispatches daily.yml once; 00:55 and 01:05 do not`, () => {
+    assert.deepEqual(labels(at(1, 0)), ["daily.yml"]);
+    assert.deepEqual(labels(at(1, 5)), []);
+    assert.deepEqual(labels(at(0, 55)), []);
+  });
+
+  test(`${name}: 03:00 dispatches alerts.yml phase=find once; 02:55 and 03:05 do not`, () => {
+    assert.deepEqual(labels(at(3, 0)), ["alerts.yml:find"]);
+    assert.deepEqual(labels(at(3, 5)), []);
+    assert.deepEqual(labels(at(2, 55)), []);
+  });
+
+  test(`${name}: 07:30 dispatches alerts.yml phase=push once; 07:25 and 07:35 do not`, () => {
+    assert.deepEqual(labels(at(7, 30)), ["alerts.yml:push"]);
+    assert.deepEqual(labels(at(7, 25)), []);
+    assert.deepEqual(labels(at(7, 35)), []);
+    assert.deepEqual(labels(at(7, 0)), []);
+  });
+
+  test(`${name}: 17:00 dispatches alerts.yml phase=email once; 16:55 and 17:05 do not`, () => {
+    assert.deepEqual(labels(at(17, 0)), ["alerts.yml:email"]);
+    assert.deepEqual(labels(at(17, 5)), []);
+    assert.deepEqual(labels(at(16, 55)), []);
+  });
+
+  test(`${name}: uptime.yml dispatches once per hour, on the minute 15-19 tick only`, () => {
+    for (const hh of [0, 5, 9, 13, 22]) {
+      let count = 0;
+      for (let mm = 0; mm < 60; mm += 5) if (labels(at(hh, mm)).includes("uptime.yml")) count += 1;
+      assert.equal(count, 1, `hour ${hh}`);
+      assert.deepEqual(labels(at(hh, 15)), ["uptime.yml"]);
+    }
+  });
+
+  test(`${name}: every tick of the day dispatches at most the four daily jobs plus hourly uptime`, () => {
+    const tally = {};
+    for (let hh = 0; hh < 24; hh++) {
+      for (let mm = 0; mm < 60; mm += 5) {
+        for (const l of labels(at(hh, mm))) tally[l] = (tally[l] || 0) + 1;
+      }
+    }
+    assert.deepEqual(tally, {
+      "daily.yml": 1,
+      "alerts.yml:find": 1,
+      "alerts.yml:push": 1,
+      "alerts.yml:email": 1,
+      "uptime.yml": 24,
+    });
+  });
+}
+
+test("the scheduled handler dispatches alerts.yml phase=push at 07:30 AEDT only, with the exact body", async () => {
+  const hits = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    if (url.startsWith(ENV.SUPABASE_URL)) return fakeJsonResponse(200, []);
+    hits.push({ url, body: init.body });
+    return fakeResponse(204);
+  };
+  try {
+    await worker.scheduled({ cron: CRON.TICK, scheduledTime: Date.parse("2026-11-22T20:30:00Z") }, ENV);
+    await worker.scheduled({ cron: CRON.TICK, scheduledTime: Date.parse("2026-11-22T20:35:00Z") }, ENV);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.equal(hits.length, 1);
+  assert.match(hits[0].url, /workflows\/alerts\.yml\/dispatches$/);
+  assert.equal(hits[0].body, JSON.stringify({ ref: "main", inputs: { phase: "push" } }));
 });
 
-// CAS-1504: 07:30 push pair and 17:00 email pair.
-
-test("during AEDT, 20:30 UTC dispatches the push phase and 21:30 UTC does not", () => {
-  assert.equal(targetForCron(CRON.PUSH_A, Date.parse("2026-11-22T20:30:00Z")), "alerts.yml");
-  assert.equal(targetForCron(CRON.PUSH_B, Date.parse("2026-11-22T21:30:00Z")), null);
-});
-
-test("during AEST, 21:30 UTC dispatches the push phase and 20:30 UTC does not", () => {
-  assert.equal(targetForCron(CRON.PUSH_A, Date.parse("2026-07-15T20:30:00Z")), null);
-  assert.equal(targetForCron(CRON.PUSH_B, Date.parse("2026-07-15T21:30:00Z")), "alerts.yml");
-});
-
-test("the push pair only dispatches at 07:00-07:59 Sydney, on each side of DST", () => {
-  // AEDT (UTC+11): 20:00 UTC is 07:00, 20:59 is 07:59, 21:00 is 08:00, 19:59 is 06:59.
-  assert.equal(targetForCron(CRON.PUSH_A, Date.parse("2026-11-22T20:00:00Z")), "alerts.yml");
-  assert.equal(targetForCron(CRON.PUSH_A, Date.parse("2026-11-22T20:59:00Z")), "alerts.yml");
-  assert.equal(targetForCron(CRON.PUSH_A, Date.parse("2026-11-22T21:00:00Z")), null);
-  assert.equal(targetForCron(CRON.PUSH_A, Date.parse("2026-11-22T19:59:00Z")), null);
-  // AEST (UTC+10): 21:00 UTC is 07:00, 21:59 is 07:59, 22:00 is 08:00, 20:59 is 06:59.
-  assert.equal(targetForCron(CRON.PUSH_B, Date.parse("2026-07-15T21:00:00Z")), "alerts.yml");
-  assert.equal(targetForCron(CRON.PUSH_B, Date.parse("2026-07-15T21:59:00Z")), "alerts.yml");
-  assert.equal(targetForCron(CRON.PUSH_B, Date.parse("2026-07-15T22:00:00Z")), null);
-  assert.equal(targetForCron(CRON.PUSH_B, Date.parse("2026-07-15T20:59:00Z")), null);
-});
-
-test("during AEDT, 06:00 UTC dispatches the email phase and 07:00 UTC does not", () => {
-  assert.equal(targetForCron(CRON.EMAIL_A, Date.parse("2026-11-22T06:00:00Z")), "alerts.yml");
-  assert.equal(targetForCron(CRON.EMAIL_B, Date.parse("2026-11-22T07:00:00Z")), null);
-});
-
-test("during AEST, 07:00 UTC dispatches the email phase and 06:00 UTC does not", () => {
-  assert.equal(targetForCron(CRON.EMAIL_A, Date.parse("2026-07-15T06:00:00Z")), null);
-  assert.equal(targetForCron(CRON.EMAIL_B, Date.parse("2026-07-15T07:00:00Z")), "alerts.yml");
-});
-
-test("each alerts cron passes its own phase input; other crons pass none", () => {
-  assert.deepEqual(inputsForCron(CRON.ALERTS_A), { phase: "find" });
-  assert.deepEqual(inputsForCron(CRON.ALERTS_B), { phase: "find" });
-  assert.deepEqual(inputsForCron(CRON.PUSH_A), { phase: "push" });
-  assert.deepEqual(inputsForCron(CRON.PUSH_B), { phase: "push" });
-  assert.deepEqual(inputsForCron(CRON.EMAIL_A), { phase: "email" });
-  assert.deepEqual(inputsForCron(CRON.EMAIL_B), { phase: "email" });
-  assert.equal(inputsForCron(CRON.UPTIME), null);
-  assert.equal(inputsForCron(CRON.DAILY_A), null);
+test("one tick can dispatch uptime and recommend together", async () => {
+  const urls = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (url.startsWith(ENV.SUPABASE_URL)) return fakeJsonResponse(200, [{ id: 1 }]);
+    urls.push(url);
+    return fakeResponse(204);
+  };
+  try {
+    // 2026-11-22T05:15Z = 16:15 AEDT
+    await worker.scheduled({ cron: CRON.TICK, scheduledTime: Date.parse("2026-11-22T05:15:00Z") }, ENV);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assert.deepEqual(urls, [
+    `${GITHUB_API}/repos/${REPO}/actions/workflows/uptime.yml/dispatches`,
+    `${GITHUB_API}/repos/${REPO}/actions/workflows/recommend.yml/dispatches`,
+  ]);
 });
 
 test("dispatching with a phase puts it in the request body's inputs", async () => {
@@ -101,34 +166,6 @@ test("dispatching with a phase puts it in the request body's inputs", async () =
   };
   await dispatchWorkflow(ENV, "alerts.yml", { fetch: fetchStub, sleep: async () => {}, inputs: { phase: "push" } });
   assert.equal(calls[0].init.body, JSON.stringify({ ref: "main", inputs: { phase: "push" } }));
-});
-
-test("the scheduled handler dispatches alerts.yml with phase=push at 07:30 AEDT only", async () => {
-  const bodies = [];
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url, init) => {
-    bodies.push({ url, body: init.body });
-    return fakeResponse(204);
-  };
-  try {
-    await worker.scheduled({ cron: CRON.PUSH_A, scheduledTime: Date.parse("2026-11-22T20:30:00Z") }, ENV);
-    await worker.scheduled({ cron: CRON.PUSH_B, scheduledTime: Date.parse("2026-11-22T21:30:00Z") }, ENV);
-  } finally {
-    globalThis.fetch = realFetch;
-  }
-  assert.equal(bodies.length, 1);
-  assert.match(bodies[0].url, /workflows\/alerts\.yml\/dispatches$/);
-  assert.equal(bodies[0].body, JSON.stringify({ ref: "main", inputs: { phase: "push" } }));
-});
-
-test("during AEDT, 14:00 UTC dispatches daily.yml and 15:00 UTC does not", () => {
-  assert.equal(targetForCron(CRON.DAILY_A, Date.parse("2026-11-22T14:00:00Z")), "daily.yml");
-  assert.equal(targetForCron(CRON.DAILY_B, Date.parse("2026-11-22T15:00:00Z")), null);
-});
-
-test("during AEST, 15:00 UTC dispatches daily.yml and 14:00 UTC does not", () => {
-  assert.equal(targetForCron(CRON.DAILY_A, Date.parse("2026-07-15T14:00:00Z")), null);
-  assert.equal(targetForCron(CRON.DAILY_B, Date.parse("2026-07-15T15:00:00Z")), "daily.yml");
 });
 
 test("a 204 makes exactly one request and needs no retry or alert", async () => {
@@ -259,7 +296,7 @@ test("*/5 * * * * dispatches recommend.yml when an unsent row is present", async
     return fakeResponse(204);
   };
   try {
-    await worker.scheduled({ cron: CRON.RECOMMEND, scheduledTime: Date.now() }, ENV);
+    await worker.scheduled({ cron: CRON.TICK, scheduledTime: Date.parse("2026-11-22T05:07:00Z") }, ENV);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -275,7 +312,7 @@ test("*/5 * * * * makes no dispatch when there is no unsent mail", async () => {
     return fakeResponse(204);
   };
   try {
-    await worker.scheduled({ cron: CRON.RECOMMEND, scheduledTime: Date.now() }, ENV);
+    await worker.scheduled({ cron: CRON.TICK, scheduledTime: Date.parse("2026-11-22T05:07:00Z") }, ENV);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -291,7 +328,7 @@ test("*/5 * * * * dispatches recommend.yml when Supabase can't be reached", asyn
     return fakeResponse(204);
   };
   try {
-    await worker.scheduled({ cron: CRON.RECOMMEND, scheduledTime: Date.now() }, ENV);
+    await worker.scheduled({ cron: CRON.TICK, scheduledTime: Date.parse("2026-11-22T05:07:00Z") }, ENV);
   } finally {
     globalThis.fetch = originalFetch;
   }
