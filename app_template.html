@@ -1124,6 +1124,7 @@
     line-height:1.45;font-weight:600}
   /* CAS-349: a level the film has already passed — shown, not hidden, but not a live choice either. */
   .nopt.spent{opacity:.4;cursor:not-allowed}
+  .nopt .nosub{display:block;font-size:11px;font-weight:500;color:var(--dim);margin-top:2px;white-space:nowrap}
   .nopt.spent:hover{color:var(--dim)}
   /* Never sits apart from the levels above it — a different KIND of answer (exclude, not track) — so it gets
      a hairline rule of its own rather than reading as one more level on the same ladder. */
@@ -10110,15 +10111,20 @@ window.pinFilmToCascadeAndRepaint=(id, cid)=>{
 // account-wide, so hiding a row here just because this cascade doesn't track it is what made a real tick
 // look reset when swapping cascades), then Never at the foot — always present, per the ticket, so it is
 // never a second control to go and find.
+// Lee, 2026-11-23: only alerts that can still happen are offered — a level the film has already gone past (a
+// film out on Rental can no longer open in cinemas or go Premium) is left out, not shown greyed. The Cinema row
+// names the steps it covers: the monitor already fires announced, opening next week, in cinemas and after the
+// opening weekend for a film whose Alert is Cinema (or unset).
+const WATCH_LEVEL_SUB = {in_cinema:"Announced · next week · opening · opening weekend"};
 function watchPanelRowsHTML(id){
-  const levels=watchLevelsFor(id);
+  const levels=watchLevelsFor(id).filter(l=>!l.spent);
   const rows=levels.map(l=>{
     const on=filmOptOn(id,l);
     return `<button type="button" class="nopt${on?" on":""}${l.spent?" spent":""}"
       style="--wwc:${l.cd}" data-wk="${l.key}" aria-pressed="${on}"
       ${l.spent?"disabled":`onclick="toggleFilmOpt(${id},'${l.key}')"`}
       title="${escA(l.spent?"Already reached":`${on?"On":"Off"} — tap to mark ${l.label}`)}">
-      <span class="wwb">✓</span><span class="nol">${esc(l.label)}</span></button>`;
+      <span class="wwb">✓</span><span class="nol">${esc(l.label)}${WATCH_LEVEL_SUB[l.key] ? `<small class="nosub">${esc(WATCH_LEVEL_SUB[l.key])}</small>` : ""}</span></button>`;
   });
   // CAS-280's honesty rule, restated for the new ladder: nothing to say "yes" to is still worth saying,
   // rather than opening onto a near-empty panel that reads as broken.
