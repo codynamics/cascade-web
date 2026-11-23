@@ -571,14 +571,49 @@ drop policy if exists notifications_mark_read on public.notifications;
 create policy notifications_mark_read on public.notifications
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- CAS-1092: the client's only write is markRealAlertsRead's .update({read_at:now}) — confirmed
--- against app_template.html. Lock the column grant to match; the row policy above is unchanged.
-revoke update on public.notifications from authenticated;
-grant update (read_at) on public.notifications to authenticated;
+-- CAS-1092: the client's only write was markRealAlertsRead's .update({read_at:now}); CAS-1535 widens the
+-- column grant to the email-answer columns below, and nothing else. The row policy above is unchanged.
 
 -- The de-dupe check filters by user; the unique() above already indexes
 -- (cascade_id, movie_id, moment).
 create index if not exists notifications_user_id_idx on public.notifications (user_id);
+
+-- CAS-1535: every alert email is a "batch" - one member's alerts for one Sydney night - that opens its own
+-- view in Alerts (?dl=alerts:batch:<id>), plus the day +1 catch-up (kind 'catchup'), plus the answer
+-- columns the one-tap email answers (T3) and the "From your email" view (T2) share.
+create table if not exists public.alert_batches (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  sydney_date date not null,
+  kind        text not null default 'daily' check (kind in ('daily', 'catchup')),
+  headline    text,
+  created_at  timestamptz not null default now(),
+  emailed_at  timestamptz,
+  pushed_at   timestamptz,
+  unique (user_id, sydney_date)
+);
+
+alter table public.alert_batches enable row level security;
+
+-- A member reads only their own batches. No insert/update/delete policy: the monitor writes them with
+-- the service_role key, which bypasses RLS.
+drop policy if exists alert_batches_read_own on public.alert_batches;
+create policy alert_batches_read_own on public.alert_batches
+  for select using (auth.uid() = user_id);
+
+alter table public.notifications add column if not exists batch_id    uuid references public.alert_batches(id) on delete set null;
+alter table public.notifications add column if not exists answer      text;
+alter table public.notifications add column if not exists answered_at timestamptz;
+alter table public.notifications drop constraint if exists notifications_answer_check;
+alter table public.notifications add constraint notifications_answer_check
+  check (answer is null or answer in ('cinema', 'home', 'notfor'));
+
+create index if not exists notifications_batch_id_idx on public.notifications (batch_id);
+create index if not exists alert_batches_user_idx on public.alert_batches (user_id);
+
+-- The client's writes to the ledger: stamping a row read, and answering it from the email view.
+revoke update on public.notifications from authenticated;
+grant update (read_at, answer, answered_at) on public.notifications to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- push_tokens — one row per (user, device) APNs token (CAS-464)
@@ -1952,9 +1987,12 @@ stable
 security definer
 set search_path = public
 as $$
+  with me as (select lower(coalesce(auth.jwt() ->> 'email', '')) as e)
   select exists (
-    select 1 from public.web_access w
-    where lower(w.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+    select 1 from public.web_access w, me
+    where me.e <> ''
+      and ( lower(w.email) = me.e
+         or (left(w.email,1) = '@' and split_part(me.e,'@',2) = lower(substr(w.email,2))) )
   );
 $$;
 revoke all on function public.is_web_access_approved() from public;

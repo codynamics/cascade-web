@@ -72,6 +72,11 @@ export function readEnvField(map, candidateNames, label){
 export function loadSchema(dbUrl){
   console.log("[local-supabase] loading supabase/schema.sql into the fresh local database...");
   run("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-f", "supabase/schema.sql"]);
+  // CAS-1540: the web is invite-only (CAS-1531) and schema.sql leaves public.web_access empty, so every
+  // test account would stop at the invite-only screen. A leading '@' approves a whole domain (CAS-1533).
+  // Harness only — never put these rows in schema.sql or a migration.
+  run("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-c",
+    "insert into public.web_access (email, note) values ('@integrity.test','integrity suite'), ('@e2e.test','e2e suite') on conflict (email) do nothing"]);
 }
 
 /** Runs `fn({ startedFresh })` against a running local Supabase stack: starts one and loads schema.sql

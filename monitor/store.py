@@ -101,7 +101,9 @@ class InMemoryStore:
     def __init__(self, cascades=None, notifications=None, emails=None, prefs=None, picks=None,
                  push_tokens=None, watches=None, user_prefs=None, user_films=None,
                  contact_messages=None, recommendations=None, invite_replies=None,
-                 invite_emails=None, agent_films=None):
+                 invite_emails=None, agent_films=None, alert_batches=None, user_created=None):
+        self._alert_batches = [dict(b) for b in (alert_batches or [])]    # CAS-1535
+        self._user_created = dict(user_created or {})                      # CAS-1535: user_id -> created_at
         self._cascades = list(cascades or [])
         self._notifications = list(notifications or [])
         self._emails = dict(emails or {})
@@ -150,6 +152,52 @@ class InMemoryStore:
 
     def fetch_user_email(self, user_id: str):
         return self._emails.get(user_id)
+
+    # ---- CAS-1535: alert batches (one per member per Sydney night) -------------------------------------
+    def fetch_alert_batch(self, user_id, sydney_date):
+        for b in self._alert_batches:
+            if str(b.get("user_id")) == str(user_id) and str(b.get("sydney_date")) == str(sydney_date):
+                return dict(b)
+        return None
+
+    def insert_alert_batch(self, row: dict) -> dict:
+        import uuid
+        row = dict(row)
+        row.setdefault("id", str(uuid.uuid4()))
+        if self.fetch_alert_batch(row.get("user_id"), row.get("sydney_date")):
+            raise ValueError("alert_batches unique (user_id, sydney_date) violated")
+        self._alert_batches.append(row)
+        return dict(row)
+
+    def update_alert_batch(self, batch_id, fields: dict) -> None:
+        for b in self._alert_batches:
+            if str(b.get("id")) == str(batch_id):
+                b.update(fields)
+
+    def has_catchup_batch(self, user_id) -> bool:
+        return any(str(b.get("user_id")) == str(user_id) and b.get("kind") == "catchup"
+                   for b in self._alert_batches)
+
+    def set_notification_batch(self, ids, batch_id) -> int:
+        ids = {str(i) for i in ids}
+        n = 0
+        for r in self._notifications:
+            if str(r.get("id")) in ids:
+                r["batch_id"] = batch_id
+                n += 1
+        return n
+
+    def fetch_batch_movie_ids(self, batch_id) -> list:
+        return sorted({str(r.get("movie_id")) for r in self._notifications
+                       if str(r.get("batch_id")) == str(batch_id)})
+
+    def fetch_catchup_stage_keys(self) -> set:
+        """{(user_id, movie_id, stage)} for every catch-up row - the stages already announced."""
+        return {(str(r.get("user_id")), str(r.get("movie_id")), (r.get("detail") or {}).get("stage"))
+                for r in self._notifications if r.get("moment") == "catchup"}
+
+    def fetch_user_created_at(self) -> dict:
+        return dict(self._user_created)
 
     def fetch_notify_prefs(self) -> dict:
         return dict(self._prefs)
@@ -801,11 +849,65 @@ class SupabaseStore:
             return None
         return data.get("email") or (data.get("user") or {}).get("email")
 
+    # ---- CAS-1535: alert batches (one per member per Sydney night) -------------------------------------
+    def _write_json(self, method: str, path: str, body, prefer: str = "return=representation"):
+        req = urllib.request.Request(
+            self._base + path, data=json.dumps(body).encode("utf-8"),
+            headers=self._headers({"Prefer": prefer}), method=method)
+        with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+            raw = resp.read().decode("utf-8")
+        try:
+            return json.loads(raw) if raw else None
+        except json.JSONDecodeError:
+            return None
+
+    def fetch_alert_batch(self, user_id, sydney_date):
+        rows = self._get(
+            f"/alert_batches?select=id,user_id,sydney_date,kind,headline&user_id=eq.{urllib.parse.quote(str(user_id))}"
+            f"&sydney_date=eq.{urllib.parse.quote(str(sydney_date))}&order=id.asc")
+        return rows[0] if rows else None
+
+    def insert_alert_batch(self, row: dict) -> dict:
+        out = self._write_json("POST", "/alert_batches", [row])
+        if isinstance(out, list) and out:
+            return out[0]
+        raise RuntimeError("alert_batches insert returned no row")
+
+    def update_alert_batch(self, batch_id, fields: dict) -> None:
+        self._write_json("PATCH", f"/alert_batches?id=eq.{urllib.parse.quote(str(batch_id))}", fields,
+                         prefer="return=minimal")
+
+    def has_catchup_batch(self, user_id) -> bool:
+        rows = self._get(f"/alert_batches?select=id&user_id=eq.{urllib.parse.quote(str(user_id))}"
+                         "&kind=eq.catchup&order=id.asc")
+        return bool(rows)
+
+    def set_notification_batch(self, ids, batch_id) -> int:
+        ids = list(ids)
+        if not ids:
+            return 0
+        quoted = ",".join(urllib.parse.quote(str(i)) for i in ids)
+        out = self._write_json("PATCH", f"/notifications?id=in.({quoted})", {"batch_id": batch_id})
+        return len(out) if isinstance(out, list) else 0
+
+    def fetch_batch_movie_ids(self, batch_id) -> list:
+        rows = self._get(f"/notifications?select=id,movie_id&batch_id=eq.{urllib.parse.quote(str(batch_id))}"
+                         "&order=id.asc")
+        return sorted({str(r.get("movie_id")) for r in rows})
+
+    def fetch_catchup_stage_keys(self) -> set:
+        rows = self._get("/notifications?moment=eq.catchup&select=id,user_id,movie_id,detail&order=id.asc")
+        return {(str(r.get("user_id")), str(r.get("movie_id")), (r.get("detail") or {}).get("stage"))
+                for r in rows}
+
+    def fetch_user_created_at(self) -> dict:
+        return {str(u.get("id")): u.get("created_at") for u in self.fetch_auth_users() if u.get("id")}
+
     def fetch_recent_notifications(self, since: str) -> list:
         """CAS-1504: ledger rows found at or after `since` (ISO), oldest first."""
         return self._get(
             "/notifications?select=id,user_id,cascade_id,movie_id,moment,cascade_name,title,detail,"
-            "found_at,read_at,pushed_at,emailed_at"
+            "found_at,read_at,pushed_at,emailed_at,batch_id"
             f"&found_at=gte.{urllib.parse.quote(since)}&order=found_at.asc,id.asc"
         )
 

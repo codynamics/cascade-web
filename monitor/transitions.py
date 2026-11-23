@@ -87,6 +87,7 @@ class Transition:
     services: list = field(default_factory=list)  # service names relevant to this moment (streaming/rent)
     price: Optional[float] = None                  # cheapest relevant price for rent moments; else None
     movie: dict = field(default_factory=dict)      # the full today record, for downstream criteria matching
+    stage: Optional[str] = None                    # CAS-1535: the catch-up group (cinema|coming|streaming)
 
     def summary(self) -> str:
         bits = self.moment

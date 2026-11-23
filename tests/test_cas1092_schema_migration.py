@@ -87,7 +87,12 @@ class SchemaAndMigrationBothCarryTheChange(unittest.TestCase):
         for name, src in self.sources.items():
             with self.subTest(file=name):
                 self.assertIn("revoke update on public.notifications from authenticated;", src)
-                self.assertIn("grant update (read_at) on public.notifications to authenticated;", src)
+                # CAS-1535 widened the grant in schema.sql (the end state) to the email-answer columns;
+                # the 0001 migration is history and keeps the original read_at-only grant.
+                if name == "schema.sql":
+                    self.assertIn("grant update (read_at, answer, answered_at) on public.notifications to authenticated;", src)
+                else:
+                    self.assertIn("grant update (read_at) on public.notifications to authenticated;", src)
 
     def test_watchlists_unique_user_id(self):
         for name, src in self.sources.items():

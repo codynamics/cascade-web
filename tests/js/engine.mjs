@@ -469,12 +469,17 @@ if(typeof window.CascadeAuth === "undefined"){
   // tutorialSeen/markTutorialSeen are plain top-level functions, exported directly like reviewPromptEligible
   // and friends below.
   agentState, tutorialSeen, markTutorialSeen,
+  // CAS-1534: the tutorial banner's decision, its seen-map writers, and the map itself.
+  tutBannerDecide, tutMarkPlayed, tutAdoptSeen, TOURS, get tutSeenMap(){ return tutSeenMap; },
   // CAS-667: movingData is wire-adjacent (it reads window.CascadePersistence.accountActive()) but its
   // row-selection arithmetic is exactly the kind of decision this harness exists to test. realAlerts and
   // firstFound are exposed by reference (mutated via push, never reassigned, in test use) so a test can seed
   // the ledger; CascadeAuth is exposed the same way so a test can flip a device between guest and signed-in
   // by setting .enabled/.client/.session, exactly as the real sign-in path does.
   movingData, realAlerts, firstFound, watched,
+  // CAS-1535: movingIsNewMoment (New vs Changed) and oamVisibleRows (the v2 list pipeline the catch-up shim
+  // replays - monitor/catchup_shim.mjs) are exported so a test and the shim reach the shipped functions.
+  movingIsNewMoment, oamVisibleRows,
   // CAS-742: isNewFound is the decision this ticket moved onto the account (admittedAtFor, read off
   // agent_films.admitted_at) rather than the device-local firstFound stamp above — exported so a test can
   // assert the derived answer directly instead of re-deriving daysSince/admittedAtFor by hand.

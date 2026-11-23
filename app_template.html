@@ -1124,6 +1124,7 @@
     line-height:1.45;font-weight:600}
   /* CAS-349: a level the film has already passed — shown, not hidden, but not a live choice either. */
   .nopt.spent{opacity:.4;cursor:not-allowed}
+  .nopt .nosub{display:block;font-size:11px;font-weight:500;color:var(--dim);margin-top:2px;white-space:nowrap}
   .nopt.spent:hover{color:var(--dim)}
   /* Never sits apart from the levels above it — a different KIND of answer (exclude, not track) — so it gets
      a hairline rule of its own rather than reading as one more level on the same ladder. */
@@ -3756,6 +3757,10 @@
     color:var(--dim);font-size:10.5px;letter-spacing:.04em;vertical-align:1px}
   /* Lee, 2026-11-21: PRIMARY SEARCH — one box holding the genre levels and, under them, the name box. */
   .oamprimbox{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:0 0 12px}
+  /* Lee, 2026-11-23: "Services I don't have" — dashed, so it reads as a way to more, not a service itself */
+  .chip.oamothersvc{margin-top:10px;border-style:dashed;color:var(--ink)}
+  .chip.oamothersvc span{margin-left:6px;color:var(--accent);font-weight:800}
+  .oamothersvcs{margin-top:10px}
   /* Lee, 2026-11-22: collapsible sections (mockup list-sheet-collapsed-mockup.png) — each a bordered card whose
      header names the section, says what is set, and carries a purple dot (+ purple edge) when changed from default. */
   #watchSheetBody .oamsec{border:1px solid var(--line);background:var(--panel);border-radius:14px;margin:0 0 10px;padding:0;overflow:hidden}
@@ -4746,6 +4751,16 @@
   /* Lee, 2026-11-17: the lit "open" look must also beat the collapsed-card Watched rules above (CAS-1467 missed them). */
   .card:not(.expanded) .actions .ctl.open .cmini,.card:not(.expanded) .actions .ctl.watch.open .cmini,
   .card:not(.expanded) .actions .ctl.watch.open:has(.clab:not(.dim)) .cmini{background:#323b4e;border-color:var(--ink)}
+  /* CAS-1534: tutorial banner */
+  .tutban{display:flex;align-items:center;gap:10px;margin:10px 0 12px;padding:10px 10px 10px 12px;border-radius:14px;
+    background:rgba(124,92,255,.14);border:1px solid rgba(124,92,255,.55)}
+  .tutbanic{flex:none;width:30px;height:30px;border-radius:50%;background:#7C5CFF;display:flex;align-items:center;
+    justify-content:center;color:#fff;font-size:12px}
+  .tutbantx{flex:1;min-width:0}
+  .tutbant{font-size:14px;font-weight:800;color:#fff}
+  .tutbans{font-size:12px;color:#aab3c5;margin-top:1px}
+  .tutbango{flex:none;background:#7C5CFF;color:#fff;border:0;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:800}
+  .tutbanx{flex:none;background:none;border:0;color:#8b95a5;font-size:18px;padding:2px 4px}
 </style>
 </head>
 <body>
@@ -8583,6 +8598,7 @@ window.openFriendsScreen=()=>{
   $("friendsScreen").classList.add("open"); lockBodyScroll(true);
   syncWatchChip();
   logEvent("friends_opened",{count:friends.length});
+  tutBannerAfterFirst("friends", $("friendsBody"));   // CAS-1534
 };
 window.closeFriendsScreen=()=>{ $("friendsScreen").classList.remove("open"); lockBodyScroll(false); syncWatchChip(); };
 window.openFriendsAddForm=()=>{ friendsFormOpen=true; friendsEditingId=null; renderFriendsScreen(); };
@@ -9255,6 +9271,7 @@ window.openInvitesScreen=()=>{
   $("invitesScreen").classList.add("open"); lockBodyScroll(true);
   syncWatchChip();
   logEvent("invites_opened",{unread});
+  tutBannerAfterFirst("invites", $("invitesBody"));   // CAS-1534
   // Stamped AFTER render (item 3 of the ticket) — the person has to actually see which rows were new
   // before the badge clears out from under them.
   markInviteRepliesSeen();
@@ -9548,7 +9565,9 @@ function cardHTML(m, markNew=false, {hideDismiss=false, inWatch=false}={}){
   // accountScopedFor. Find/the Moving ledger (inWatch:false) are agent builder/admission-adjacent
   // screens, not Watch, so they keep following the open agent's own scope via prefsActive(), unchanged.
   const svcScoped = inWatch ? (!ignoreScope && accountScopedFor()) : prefsActive();
-  if(svcScoped && !m._fixture) offers=offers.filter(myService);   // CAS-491: see matchesServices
+  // Lee, 2026-11-23: on a list set to a service you don't have, that service's offers stay on the card.
+  const cardListSvc = (inWatch && !m._fixture) ? oamActiveMoodSvc() : null;
+  if(svcScoped && !m._fixture) offers=offers.filter(o=>myService(o) || (cardListSvc && svcCanon(o.service)===cardListSvc));   // CAS-491: see matchesServices
   // Lee, 2026-11-22: a list set to one service (e.g. "Stan") already lists only films included on it, but the
   // card showed whichever of your services came first (Disney, Netflix…), so the list looked unfiltered. On
   // Watch, that service's own included offer now leads, so the card names the service the list is about.
@@ -10092,15 +10111,20 @@ window.pinFilmToCascadeAndRepaint=(id, cid)=>{
 // account-wide, so hiding a row here just because this cascade doesn't track it is what made a real tick
 // look reset when swapping cascades), then Never at the foot — always present, per the ticket, so it is
 // never a second control to go and find.
+// Lee, 2026-11-23: only alerts that can still happen are offered — a level the film has already gone past (a
+// film out on Rental can no longer open in cinemas or go Premium) is left out, not shown greyed. The Cinema row
+// names the steps it covers: the monitor already fires announced, opening next week, in cinemas and after the
+// opening weekend for a film whose Alert is Cinema (or unset).
+const WATCH_LEVEL_SUB = {in_cinema:"Announced · next week · opening · opening weekend"};
 function watchPanelRowsHTML(id){
-  const levels=watchLevelsFor(id);
+  const levels=watchLevelsFor(id).filter(l=>!l.spent);
   const rows=levels.map(l=>{
     const on=filmOptOn(id,l);
     return `<button type="button" class="nopt${on?" on":""}${l.spent?" spent":""}"
       style="--wwc:${l.cd}" data-wk="${l.key}" aria-pressed="${on}"
       ${l.spent?"disabled":`onclick="toggleFilmOpt(${id},'${l.key}')"`}
       title="${escA(l.spent?"Already reached":`${on?"On":"Off"} — tap to mark ${l.label}`)}">
-      <span class="wwb">✓</span><span class="nol">${esc(l.label)}</span></button>`;
+      <span class="wwb">✓</span><span class="nol">${esc(l.label)}${WATCH_LEVEL_SUB[l.key] ? `<small class="nosub">${esc(WATCH_LEVEL_SUB[l.key])}</small>` : ""}</span></button>`;
   });
   // CAS-280's honesty rule, restated for the new ladder: nothing to say "yes" to is still worth saying,
   // rather than opening onto a near-empty panel that reads as broken.
@@ -12354,6 +12378,7 @@ window.toggleExpand=id=>{
     const wtw=c.querySelector(".wtw"), svcBtn=c.querySelector(".svcbtn");
     if(wtw && !on){ wtw.classList.remove("open"); if(svcBtn) svcBtn.classList.remove("open"); }
   });
+  if(on) tutBannerMountCard(copies.filter(c=>c.getBoundingClientRect().width>0).slice(0,1));   // CAS-1534
 };
 // CAS-1291: re-renders every on-screen copy of one film's row (Watch and Moving can each carry their own,
 // CAS-868) as whichever of stub/card showsStub(m) now says it should be, in place — same single-row swap
@@ -21346,7 +21371,12 @@ function oamMoodBarFor(mood, c, style){
 function oamFilmAge(m){ return AGE_RATING_CANON[m.age_rating] || m.age_rating; }
 // CAS-1384: a saved svc that's no longer one of the account's own services (prefs.sub) reads as null —
 // "any of mine" — without ever rewriting the stored mood (oamSaveMoodFromSheet is the only writer).
-function oamMoodEffectiveSvc(mood){ return (mood && mood.svc && prefs.sub.has(mood.svc)) ? mood.svc : null; }
+// Lee, 2026-11-23: a list may be set to a service you DON'T have ("Services I don't have" in its sheet), e.g. to
+// see what's on Stan before subscribing — so any known streaming service counts, not only your own.
+function oamMoodEffectiveSvc(mood){ return (mood && mood.svc && SUB_SERVICES.includes(mood.svc)) ? mood.svc : null; }
+// A list set to one service, or to Any service, is NOT also limited to your services: the one service already
+// narrows it (and may be one you don't have).
+function oamMoodSkipsMyServices(mood){ return !!(mood && (mood.anySvc || oamMoodEffectiveSvc(mood))); }
 // "Included streaming" on a service: a sub/free offer whose canonical name matches. Rent/buy never count.
 function filmIncludedOnService(m, service){
   return (m.offers||[]).some(o => (o.type==="sub" || o.type==="free") && svcCanon(o.service)===service);
@@ -21381,7 +21411,7 @@ function oamFilmMeetsMoodRules(m, mood, c){
     if(c.excludeBlocked!==false && blocked.has(m.tmdb_id)) return false;
     if(admitC.excludeWatched!==false && watched.has(m.tmdb_id)) return false;
     const ps=primaryStatus(m);
-    if(!mood.anySvc && c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)) return false;
+    if(!oamMoodSkipsMyServices(mood) && c.myServices!==false && (prefs.on || scopeOf(c)[ps]) && !matchesServices(m, ps)) return false;
     if(!filmMatchesSearch(m, mood.people)) return false;
     const age=oamFilmAge(m);
     if(mood.ages && mood.ages.length && age && !mood.ages.includes(age)) return false;
@@ -21395,7 +21425,7 @@ function oamFilmMeetsMoodRules(m, mood, c){
   const ovrOn = oamMoodEffectiveTopShare(mood)!=null;
   const gateC = ovrOn ? {...admitC, styles:Object.fromEntries(Object.entries(admitC.styles||{})
     .map(([g,s])=>[g, (s && s.bar!=null) ? {...s, bar:0} : s]))} : admitC;
-  if(!matchesCriteriaOneAgent(m, mood.anySvc ? {...gateC, myServices:false} : gateC, false)) return false;
+  if(!matchesCriteriaOneAgent(m, oamMoodSkipsMyServices(mood) ? {...gateC, myServices:false} : gateC, false)) return false;
   const {main}=mainOtherCombos(m);
   if(main===undefined) return false;
   if(!oamMoodStyles(mood, c).includes(main)) return false;
@@ -21584,15 +21614,16 @@ window.openOamMoodSheetFor=id=>{
   oamDraft=oamMoodDraftFrom(mood);
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set();
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set(); oamOtherSvcsOpen=false;
   openWatchSheet();
+  { const h=$("watchSheetBody"); tutBannerMount("moods", h, el=>h.prepend(el)); }   // CAS-1534
 };
 window.openOamMoodSheetForNew=()=>{
   if(oamMoodsListReal().length>=MOOD_MAX) return;
   oamDraft=oamMoodDraftFrom(null);
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set();
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set(); oamOtherSvcsOpen=false;
   openWatchSheet();
 };
 // CAS-1395: the new-mood draft's own people/svc/name/watched fields, built from Find's current search and
@@ -21639,7 +21670,7 @@ window.openOamMoodSheetFromFind=()=>{
   oamDraft.fromFind={total, label:fields.name};
   oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set();
+  oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set(); oamOtherSvcsOpen=false;
   openWatchSheet();
   logEvent("mood_from_find");
 };
@@ -21669,6 +21700,8 @@ window.toggleOamDraftAge=a=>{ if(!oamDraft) return; oamDraft.ages.has(a)?oamDraf
 window.setOamDraftAwards=v=>{ if(!oamDraft) return; oamDraft.awards=v; renderOamMoodSheetBody(); };
 window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMoodSheetBody(); };
 window.setOamDraftShow=v=>{ if(!oamDraft) return; oamDraft.show=v; renderOamMoodSheetBody(); };
+let oamOtherSvcsOpen=false;
+window.toggleOamOtherSvcs=()=>{ oamOtherSvcsOpen=!oamOtherSvcsOpen; renderOamMoodSheetBody(); };
 window.setOamDraftSvc=v=>{ if(!oamDraft) return; oamDraft.svc=v||null; oamDraft.anySvc=false; renderOamMoodSheetBody(); };
 window.setOamDraftAnySvc=()=>{ if(!oamDraft) return; oamDraft.svc=null; oamDraft.anySvc=true; renderOamMoodSheetBody(); };
 window.setOamDraftSort=v=>{ if(!oamDraft) return; oamDraft.sort=v; renderOamMoodSheetBody(); };
@@ -22064,6 +22097,13 @@ function renderOamMoodSheetBody(){
         ${SUB_SERVICES.filter(s=>prefs.sub.has(s)).map(s=>{ const on=d.svc===s; return `<button type="button" class="chip${on?" on":""}"
           aria-pressed="${on}" onclick="setOamDraftSvc('${escA(s)}')">${esc(oamSvcChipLabel(s))}</button>`; }).join("")}
       </div>
+      ${(()=>{ // Lee, 2026-11-23: "Services I don't have" — reveals every streaming service you aren't signed up to
+        const others=SUB_SERVICES.filter(s=>!prefs.sub.has(s));
+        if(!others.length) return "";
+        const open = oamOtherSvcsOpen || (d.svc && !prefs.sub.has(d.svc));
+        return `<button type="button" class="chip oamothersvc${open?" open":""}" aria-expanded="${open}" onclick="toggleOamOtherSvcs()">Services I don't have <span aria-hidden="true">${open?"&minus;":"+"}</span></button>
+          ${open ? `<div class="chips oamothersvcs">${others.map(s=>{ const on=d.svc===s; return `<button type="button" class="chip${on?" on":""}"
+            aria-pressed="${on}" onclick="setOamDraftSvc('${escA(s)}')">${esc(oamSvcChipLabel(s))}</button>`; }).join("")}</div>` : ""}`; })()}
       <p class="oamgenreintro">${prefs.on ? "Any service also lists films on services you don't have. " : ""}Pick one service to see only what's included on it. Cinema and Rental stay empty while a service is picked.</p>`) : ""}
     ${sec("how", "oamHowSec", "HOW MANY, AND IN WHAT ORDER", `
       <div class="subhd">SHOW</div>
@@ -23475,7 +23515,8 @@ function movingSubtitle(){ return `What your ${movingAgentsWord()} found and wha
 // film's first appearance for this agent; Changed = anything else (a window move on a film the agent
 // already had). Nothing is both.
 function movingIsNewMoment(moment){
-  return moment==="new_to_agent" || moment==="newly_qualifies";
+  // CAS-1535: "catchup" (the day +1 catch-up film from the member's Me list) is a first appearance too.
+  return moment==="new_to_agent" || moment==="newly_qualifies" || moment==="catchup";
 }
 // CAS-671: the time-window chips, in this exact order (shortest to longest) — rolling windows measured
 // back from now. "Since you last looked" is gone; there is no visit-relative window any more.
@@ -23887,6 +23928,7 @@ window.openAgentsScreen=()=>{
   $("agentsBtn").classList.add("active"); $("agentsBtn").setAttribute("aria-pressed","true");
   syncWatchChip();
   logEvent("agents_screen_opened",{count:cascades.length});
+  tutBannerAfterFirst("agent", $("agentsBody"));   // CAS-1534
 };
 window.closeAgentsScreen=()=>{
   oamTasteReturn=null;   // Lee, 2026-11-22: the way back to a list lasts only while Taste is open
@@ -23915,6 +23957,7 @@ window.openMovingScreen=()=>{
   syncHeaderHeight();   // CAS-1475: renderMovingScreen ran before .open, so --stickyh still held the Watch value
   syncWatchChip();
   logEvent("moving_screen_opened",{});
+  tutBannerAfterFirst("alerts", $("movingBody"));   // CAS-1534
 };
 window.closeMovingScreen=()=>{
   movingIsOpen=false;
@@ -24117,6 +24160,7 @@ window.openFindScreen=()=>{
   $("findBtn").classList.add("active"); $("findBtn").setAttribute("aria-pressed","true");
   syncWatchChip();
   logEvent("find_screen_opened",{});
+  tutBannerAfterFirst("find", $("findBody"));   // CAS-1534
 };
 window.closeFindScreen=()=>{
   $("findScreen").classList.remove("open"); lockBodyScroll(false);
@@ -25745,6 +25789,126 @@ const TOUR_STEPS = [
 let tourV2SeenFlag=false;
 function tourV2Seen(){ return tourV2SeenFlag; }
 function markTourV2Seen(){ tourV2SeenFlag=true; pushViewField("tourV2Seen", true); }
+// ---- TUTORIAL BANNER (CAS-1534) -----------------------------------------------------------------------
+// From a member's second day, the first screen they open on a visit whose tutorial they have never played
+// shows "New to <screen>? View tutorial / ✕". "Seen" is per account, {key:{played:bool, dismissed:n}}, held
+// in memory and adopted off user_prefs.view.tutSeen (same rule as tourV2Seen above: a different account
+// signing in never inherits it). One banner per visit across the whole app; a visit starts when the app opens
+// or returns to the foreground after 30 minutes away.
+let tutSeenMap={};
+let tutVisitShown=false, tutHiddenAt=0;
+const TUT_BANNER_MAX_DISMISS=2, TUT_VISIT_GAP_MS=30*60*1000;
+const TUT_BANNERS={
+  agent:  {key:"agent",    title:"New to Taste?"},
+  alerts: {key:"alerts",   title:"New to Alerts?"},
+  find:   {key:"database", title:"New to Database?"},
+  moods:  {key:"moods",    title:"New to Lists?"},
+  friends:{key:"invite",   title:"Inviting friends?"},
+  invites:{key:"invite",   title:"Inviting friends?"},
+  card:   {key:"invite",   title:"Watching with someone?"},
+};
+function tutSydneyDay(ms){ return new Date(ms).toLocaleDateString("en-CA",{timeZone:"Australia/Sydney"}); }
+// Calendar days (Sydney) from the account's creation day to `now`.
+function tutAccountAgeDays(createdAt, now){
+  const c=Date.parse(createdAt); if(!isFinite(c)) return -1;
+  return Math.round((Date.parse(tutSydneyDay(now)+"T00:00:00Z")-Date.parse(tutSydneyDay(c)+"T00:00:00Z"))/86400000);
+}
+// The decision, pure: should a banner for tutorial `key` show now?
+//   o: {key, now, createdAt, signedIn, seen, steps, shownThisVisit, blocked}
+// Signed-out visitors never see one (no account, so no creation day, and `invite` is signed-in only).
+function tutBannerDecide(o){
+  if(!o || !o.key || !o.signedIn) return false;
+  if(o.blocked || o.shownThisVisit) return false;
+  if(o.key==="alerts" && !(o.steps>1)) return false;   // Alerts is a 1-step placeholder until it has more
+  if(!(o.steps>0)) return false;
+  if(tutAccountAgeDays(o.createdAt, o.now)<1) return false;
+  const s=(o.seen||{})[o.key];
+  if(s && s.played) return false;
+  if(s && (s.dismissed||0)>=TUT_BANNER_MAX_DISMISS) return false;
+  return true;
+}
+function tutMarkPlayed(key){
+  if(!key) return;
+  const s=tutSeenMap[key]||(tutSeenMap[key]={played:false, dismissed:0});
+  if(s.played) return;
+  s.played=true;
+  pushViewField("tutSeen", tutSeenMap);
+}
+// Carry-up merge: played ORs, dismissed takes the larger count.
+function tutAdoptSeen(v){
+  if(!v || typeof v!=="object") return;
+  for(const k in v){
+    const r=v[k]; if(!r || typeof r!=="object") continue;
+    const l=tutSeenMap[k]||{played:false, dismissed:0};
+    tutSeenMap[k]={played:!!(l.played||r.played), dismissed:Math.max(l.dismissed||0, +r.dismissed||0)};
+  }
+}
+function tutBannerBlocked(screen){
+  if($("tutScrim") && $("tutScrim").classList.contains("open")) return true;
+  if(document.querySelector(".modal.open,.filmpage.open,#tutorialsScreen.open")) return true;
+  if(screen!=="moods" && document.querySelector(".wsheetscrim.open")) return true;
+  return false;
+}
+function tutBannerCheck(screen){
+  const cfg=TUT_BANNERS[screen]; if(!cfg) return false;
+  const a=window.CascadeAuth;
+  const signedIn=!!(a && a.enabled && a.status==="signed-in" && a.user);
+  return tutBannerDecide({key:cfg.key, now:Date.now(), createdAt:signedIn?a.user.created_at:null, signedIn,
+    seen:tutSeenMap, steps:(TOURS[cfg.key]||{steps:[]}).steps.length, shownThisVisit:tutVisitShown,
+    blocked:tutBannerBlocked(screen)});
+}
+function tutBannerHTML(cfg){
+  return `<div class="tutban" role="note">
+  <span class="tutbanic" aria-hidden="true">▶</span>
+  <div class="tutbantx"><div class="tutbant">${esc(cfg.title)}</div><div class="tutbans">Quick tour</div></div>
+  <button type="button" class="tutbango" data-tut="${cfg.key}">View tutorial</button>
+  <button type="button" class="tutbanx" aria-label="Dismiss">✕</button>
+</div>`;
+}
+// Draws the banner for `screen` if the rules allow; place(el) puts it where it belongs.
+function tutBannerMount(screen, host, place){
+  if(!host) return;
+  host.querySelectorAll(".tutban").forEach(e=>e.remove());
+  if(!tutBannerCheck(screen)) return;
+  const cfg=TUT_BANNERS[screen];
+  const t=document.createElement("template"); t.innerHTML=tutBannerHTML(cfg).trim();
+  const el=t.content.firstElementChild; if(!el) return;
+  el.dataset.scr=screen;
+  place(el);
+  tutVisitShown=true;
+  logEvent("tutorial_banner_shown",{key:cfg.key, screen});
+}
+function tutBannerAfterFirst(screen, host){
+  if(!host) return;
+  tutBannerMount(screen, host, el=>{ const f=host.firstElementChild; f ? f.after(el) : host.prepend(el); });
+}
+function tutBannerMountCard(copies){
+  copies.forEach(c=>{
+    const ex=c.querySelector(".exshare");
+    if(ex) tutBannerMount("card", c, el=>ex.before(el));
+  });
+}
+document.addEventListener("click", e=>{
+  const t=e.target && e.target.closest ? e.target.closest(".tutban") : null; if(!t) return;
+  const screen=t.dataset.scr, cfg=TUT_BANNERS[screen]; if(!cfg) return;
+  if(e.target.closest(".tutbango")){
+    logEvent("tutorial_banner_play",{key:cfg.key, screen});
+    tutMarkPlayed(cfg.key);
+    t.remove();
+    playTutorial(cfg.key);
+  } else if(e.target.closest(".tutbanx")){
+    const s=tutSeenMap[cfg.key]||(tutSeenMap[cfg.key]={played:false, dismissed:0});
+    s.dismissed=(s.dismissed||0)+1;
+    pushViewField("tutSeen", tutSeenMap);
+    logEvent("tutorial_banner_dismiss",{key:cfg.key, screen});
+    t.remove();
+  }
+});
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="hidden"){ tutHiddenAt=Date.now(); return; }
+  if(tutHiddenAt && Date.now()-tutHiddenAt>=TUT_VISIT_GAP_MS) tutVisitShown=false;
+  tutHiddenAt=0;
+});
 // Card text for this script is set via innerHTML (the ticket's own "¶ = <br><br>" rule, spec verbatim) —
 // splits on the literal ¶, escapes each paragraph, and rejoins with a blank line between them.
 function v2CardHTML(raw){
@@ -26068,6 +26232,7 @@ function maybeStartTutorial(){
 }
 function tutOpen(){
   tutIdx=-1; tutCurrent=null; tutFinale=false;
+  tutMarkPlayed(tutKey||"watch");   // CAS-1534: any start counts as played
   window.addEventListener("resize", tutorialReposition);
   window.addEventListener("scroll", tutorialReposition, true);
   $("tutScrim").classList.add("open");
@@ -27521,6 +27686,8 @@ const REAL_MOMENT_SAID = {
   // CAS-848: the other two moments the monitor can emit — previously missing here, so a row for either
   // printed its raw moment key instead of a said phrase.
   announced:"just reached Cascade", opens_soon:"opens in cinemas soon",
+  // CAS-1535: the day +1 catch-up (monitor/catchup.py) - a film from the member's own Me list.
+  catchup:"is on your Me list",
 };
 let toastT; function toast(msg){const t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove("show"),3200);}
 
@@ -28503,6 +28670,7 @@ function acctFetchKeepalive(init){
     for(const k in watchMineOnly) watchMineOnly[k]=true;
     tutorialSeenFlag=false;
     tourV2SeenFlag=false;
+    tutSeenMap={};   // CAS-1534
     reviewPromptSessionsCount=0; reviewSessionBumpPending=false; reviewSessionsPushPending=false; reviewPromptAskedVer=null;
     Object.assign(agentState, loadAgentState());
     Object.keys(admitDrift).forEach(k=>delete admitDrift[k]); admitDriftSaved=null;
@@ -29706,6 +29874,7 @@ function acctFetchKeepalive(init){
       applyMoodToState(currentMood());
       if(typeof v.tutorialSeen==="boolean") tutorialSeenFlag = v.tutorialSeen;
       if(typeof v.tourV2Seen==="boolean") tourV2SeenFlag = v.tourV2Seen;
+      tutAdoptSeen(v.tutSeen);   // CAS-1534
       // CAS-1222: a bump queued before this load resolved is replayed ON TOP of the account's real count,
       // never trusting this session's bare local default — see bumpReviewPromptSessionCount's own comment.
       // CAS-1243 round 2: computed here, but the write itself rides piggyback on the next real view-field

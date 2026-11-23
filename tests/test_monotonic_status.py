@@ -50,8 +50,20 @@ class StatusIsWrittenInJourneyOrder(unittest.TestCase):
     ['in_cinema','rental'], never ['rental','in_cinema']."""
     def test_derive_from_providers_orders_on_screen_before_home(self):
         m = {"on_screen": True, "cinema_date": "2026-11-01"}
+        # CAS-1532: a TMDB rent row is unpriced, so on_screen no longer pairs in_cinema with it; a
+        # subscription row is not a null-priced rent/buy, so the pair (and its order) still stands.
+        out = pp.derive_from_providers(m, {"flatrate": [{}]}, datetime.date(2026, 11, 20))
+        self.assertEqual(out, ["in_cinema", "included_streaming"])
+
+    def test_derive_from_providers_drops_in_cinema_next_to_an_unpriced_rent(self):
+        m = {"on_screen": True, "cinema_date": "2026-11-01"}
         out = pp.derive_from_providers(m, {"rent": [{}]}, datetime.date(2026, 11, 20))
-        self.assertEqual(out, ["in_cinema", "rental"])
+        self.assertEqual(out, ["rental"])
+
+    def test_on_screen_does_not_keep_in_cinema_outside_the_run(self):
+        m = {"on_screen": True, "cinema_date": "2026-07-16"}
+        self.assertNotIn("in_cinema", pp.derive_status(m, [{"type": "rent", "price": 5.0}],
+                                                        datetime.date(2026, 11, 20)))
 
     def test_derive_status_orders_on_screen_before_home(self):
         m = {"on_screen": True, "cinema_date": "2026-11-01"}

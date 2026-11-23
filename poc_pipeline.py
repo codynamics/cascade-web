@@ -2213,12 +2213,27 @@ def derive_from_providers(movie: dict, prov: dict, today: datetime.date) -> list
     # CAS-1376: a chain's own Now Showing list is a CONFIRMED sighting, not the date guess CAS-418
     # walked back — so a scraped on_screen film restores CAS-395's simultaneous rule for itself alone,
     # whatever else derive_from_providers found.
-    if movie.get("on_screen"):
+    if _on_screen_licenses_cinema(movie, today, bool(prov.get("rent") or prov.get("buy"))):
         windows.append("in_cinema")
     if not windows:
         windows.append(_offerless_window(movie.get("cinema_date"), today,
                                           _record_year(movie), movie.get("release_dates")))
     return order_status(windows)
+
+
+def _on_screen_licenses_cinema(movie: dict, today: datetime.date, unpriced_home_offer: bool) -> bool:
+    """CAS-1532: a chain's Now Showing sighting (CAS-1376) licenses in_cinema alongside a home window only
+    while the film's own AU opening is inside a live run (cinema_date <= today and within CINEMA_RUN_DAYS)
+    and no rent/buy offer is null-priced (CAS-155: an unpriced home offer means the home window is the
+    truth). Outside that, a stale or loosely-matched sighting (Spider-Man: Brand New Day, The Grinch 2018)
+    left in_cinema on a film that is long out of cinemas — the data-quality tests forbid it."""
+    if not movie.get("on_screen") or unpriced_home_offer:
+        return False
+    try:
+        cd = datetime.date.fromisoformat(str(movie.get("cinema_date"))[:10])
+    except ValueError:
+        return False
+    return cd <= today and cd >= today - datetime.timedelta(days=CINEMA_RUN_DAYS)
 
 
 def has_provider_rows(prov: dict) -> bool:
@@ -2300,7 +2315,9 @@ def derive_status(movie: dict, offers: list[dict], today: datetime.date) -> list
     # CAS-1393: ...but only alongside the film's own cinema_date — with _best_cinema_match's fix, on_screen
     # should never be true without one, but this is the same invariant app_template.html's deriveStatus
     # enforces at the claimed-status level, so a stale on_screen+no-date record can't sneak back in here.
-    if movie.get("on_screen") and cd:
+    # CAS-1532: ...and only while that opening is inside a live run with no null-priced rent/buy offer.
+    if _on_screen_licenses_cinema(movie, today, any(o.get("type") in ("rent", "buy") and o.get("price") is None
+                                                       for o in offers)):
         status.add("in_cinema")
 
     # CAS-608: date-only, same as derive_from_providers' offer-less fallback — a title past its
