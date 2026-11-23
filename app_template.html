@@ -22854,17 +22854,19 @@ function oneAgentStarterMoods(who, ages){
   const pick = id => ({...oamMoodDefaultFields(), ...ONE_AGENT_MOOD_BUILTINS.find(b=>b.id===id), ages, watched:true});
   const list = [pick("releases"),
     {...oamMoodDefaultFields(), id:"me", name:"Me", show:"40", ages, watched:true}];
-  if(who.partner) list.push({...oamMoodDefaultFields(), id:"date", name:"Partner",
-    styles:[...(who.dateStyles||[])], show:"40", ages, watched:true});
-  if(who.kids) list.push({...oamMoodDefaultFields(), id:"family", name:"Family",
-    styles:[...(who.familyStyles||[])], show:"40", ages:["G","PG","M"], watched:true});
   // Lee, 14 Nov: a mood for the streaming service they use most (named after it, default agent settings), and
   // one for each favourite actor/director (a keyword mood on their name). Ids are fixed so the Watch tutorial
   // can point at them.
+  // Lee, 23 Nov: the lists follow the order the first run asks its questions — service, then actor/director,
+  // then partner, then family (OAF_ORDER).
   if(who.topSvc) list.push({...oamMoodDefaultFields(), id:"topsvc", name:oafSvcTagName(who.topSvc).slice(0,24),
     svc:who.topSvc, show:"40", ages, watched:true});
   if(who.person) list.push({...oamMoodDefaultFields(), id:"fav-person", name:who.person.slice(0,24), people:who.person,
     show:"all", ages, watched:true});
+  if(who.partner) list.push({...oamMoodDefaultFields(), id:"date", name:"Partner",
+    styles:[...(who.dateStyles||[])], show:"40", ages, watched:true});
+  if(who.kids) list.push({...oamMoodDefaultFields(), id:"family", name:"Family",
+    styles:[...(who.familyStyles||[])], show:"40", ages:["G","PG","M"], watched:true});
   // Lee, 14 Nov: no Starred mood for new accounts (starring films and the "only starred" mood filter remain;
   // existing accounts keep a Starred mood they already have).
   return list;
