@@ -165,6 +165,7 @@ jobs:
       - name: Pipeline invariants
         run: |
           set -o pipefail
+          python -m pip install --quiet pyyaml
           MODULES=$(python -c "import pathlib; print(' '.join(f'tests.{p.stem}' for p in sorted(pathlib.Path('tests').glob('test_*.py')) if p.stem != 'test_data_quality'))")
           python -m unittest $MODULES 2>&1 | tee data.log
 
