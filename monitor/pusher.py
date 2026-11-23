@@ -295,6 +295,11 @@ def send_via_apns(device_token: str, title: str, body: str, badge: int = None,
     BadDeviceToken/Unregistered), `on_invalid_token(device_token)` is called (if given) so the
     caller can delete that row — this function has no store of its own to do it with."""
     global _warned_missing_config
+    # CAS-1523: a device token carries no address to check against the Lee allow-list, so under
+    # CASCADE_ENV=staging no push is sent at all.
+    if (os.environ.get("CASCADE_ENV") or "").strip().lower() == "staging":
+        print("[monitor] staging: push skipped — device tokens cannot be verified as test recipients.")
+        return False
     key_id = os.environ.get(APNS_KEY_ID_ENV)
     team_id = os.environ.get(APNS_TEAM_ID_ENV)
     auth_key_b64 = os.environ.get(APNS_AUTH_KEY_ENV)

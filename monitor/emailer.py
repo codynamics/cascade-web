@@ -18,6 +18,7 @@ import datetime as _dt
 import html as _html
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 
@@ -38,6 +39,21 @@ DEFAULT_FROM = "Cascade <onboarding@resend.dev>"
 
 SITE_URL_ENV = "CASCADE_SITE_URL"
 FROM_ENV = "CASCADE_EMAIL_FROM"
+
+# CAS-1523: staging must never email real customers. When CASCADE_ENV=staging only +tagged
+# Lee addresses may be mailed; every other send is skipped and logged.
+CASCADE_ENV_ENV = "CASCADE_ENV"
+STAGING_ALLOWED_RECIPIENT = re.compile(r"^lee\+.*@codynamics\.com\.au$", re.IGNORECASE)
+
+
+def is_staging() -> bool:
+    return (os.environ.get(CASCADE_ENV_ENV) or "").strip().lower() == "staging"
+
+
+def staging_blocks_recipient(to_addr) -> bool:
+    """True when this run is staging and `to_addr` is not an allowed Lee test address."""
+    return is_staging() and not STAGING_ALLOWED_RECIPIENT.match(str(to_addr or "").strip())
+
 
 # Cards show at most this many films; the rest get one "and N more" line (CAS-1196 item 6).
 MAX_CARDS = 5
@@ -622,7 +638,12 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
 
 def send_via_resend(to_addr, subject, html, text, api_key=None, from_addr=None, timeout=30) -> dict:
     """POST one email to Resend. Reads RESEND_API_KEY / CASCADE_EMAIL_FROM from env when not
-    passed. Raises if there's no API key (callers gate this behind --dry-run)."""
+    passed. Raises if there's no API key (callers gate this behind --dry-run).
+    CAS-1523: under CASCADE_ENV=staging, a recipient other than lee+*@codynamics.com.au is skipped
+    (logged, returns {"skipped": ...}) before anything else — staging never emails customers."""
+    if staging_blocks_recipient(to_addr):
+        print("[monitor] staging: email skipped — recipient is not a lee+*@codynamics.com.au test address.")
+        return {"skipped": "staging-recipient-not-allowed"}
     api_key = api_key or os.environ.get(RESEND_API_KEY_ENV)
     if not api_key:
         raise RuntimeError(f"{RESEND_API_KEY_ENV} is not set — cannot send email.")

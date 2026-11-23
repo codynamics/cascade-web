@@ -12,6 +12,14 @@ name: Notification test harness (CAS-486)
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: "GitHub Environment (Supabase project) to run against. Staging only ever mails lee+*@codynamics.com.au."
+        required: true
+        type: choice
+        default: staging
+        options:
+          - staging
+          - production
       scenario:
         description: "Which moment to fire"
         required: true
@@ -37,6 +45,9 @@ permissions:
 jobs:
   notify-test:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}   # CAS-1523
+    env:
+      CASCADE_ENV: ${{ inputs.environment }}
     steps:
       - name: Check out repo
         uses: actions/checkout@v4

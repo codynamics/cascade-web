@@ -30,6 +30,7 @@ concurrency:
 jobs:
   recommend:
     runs-on: ubuntu-latest
+    environment: production   # CAS-1523: customer-facing sends use production's Supabase only
     steps:
       - uses: actions/checkout@v4
         with:

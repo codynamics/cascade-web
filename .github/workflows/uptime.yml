@@ -27,6 +27,7 @@ permissions:
 jobs:
   uptime:
     runs-on: ubuntu-latest
+    environment: production   # CAS-1523: customer-facing sends use production's Supabase only
     timeout-minutes: 2
     steps:
       - name: Check out staging (the probe script lives here)

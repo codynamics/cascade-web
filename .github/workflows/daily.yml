@@ -42,6 +42,7 @@ concurrency:                     # never let two daily runs overlap
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    environment: production   # CAS-1523: customer-facing sends use production's Supabase only
     steps:
       - name: Check out repo (carries yesterday's state for change-detection)
         uses: actions/checkout@v4
