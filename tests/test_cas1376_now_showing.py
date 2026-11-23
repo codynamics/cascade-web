@@ -113,13 +113,13 @@ def _run_update(records, hoyts=None, event=None, today=datetime.date(2026, 11, 4
 
 class MatchingSetsOnScreen(unittest.TestCase):
     """AC1 — a matched film is on_screen with the matching chain in on_screen_src, and its status
-    carries in_cinema, however long ago it opened, exactly as derive_status now applies CAS-1376."""
+    carries in_cinema while its opening is inside the run (CAS-1532: not however long ago it opened)."""
 
     def test_title_matched_within_a_year_of_cinema_date_is_marked_on_screen(self):
         with tempfile.TemporaryDirectory() as d:
             state_path = os.path.join(d, "cinema_chains_state.json")
-            records = [_film(tmdb_id=1368337, title="The Odyssey", cinema_date="2026-07-16")]
-            hoyts_films = ([{"title": "The Odyssey", "release_date": "2026-07-16"}]
+            records = [_film(tmdb_id=1368337, title="The Odyssey", cinema_date="2026-10-16")]
+            hoyts_films = ([{"title": "The Odyssey", "release_date": "2026-10-16"}]
                            + [{"title": f"Filler {i}", "release_date": None} for i in range(10)])
             report = _run_update(records, hoyts=hoyts_films, event=[], state_path=state_path)
         m = records[0]

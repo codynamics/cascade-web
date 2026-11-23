@@ -65,8 +65,8 @@ class QaDispatchPromoteTests(unittest.TestCase):
 
     def test_dispatch_promote_passes_tested_sha(self):
         lines = self.qa_text.splitlines()
-        step = "\n".join(_step_lines(lines, "Dispatch promote.yml"))
-        self.assertIn("gh workflow run promote.yml", step)
+        step = "\n".join(_step_lines(lines, "Dispatch promote-data.yml"))
+        self.assertIn("gh workflow run promote-data.yml", step)
         self.assertIn("-f sha=${{ github.sha }}", step)
 
 
