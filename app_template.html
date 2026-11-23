@@ -6778,8 +6778,10 @@ $("updated").textContent = fmtDay(BUILD_DATE);
 // label themselves apart is to look at where they are actually being served. So env is derived from
 // the hostname here, at runtime, for display only.
 const BUILD_INFO = window.BUILD_INFO || {};
-const RUNTIME_ENV = ["cascademovies.com","www.cascademovies.com"].includes(location.hostname)
-  ? "production" : "staging";
+// CAS-1521: config.js owns the hostname / CASCADE_ENV decision (the installed app's hostname is localhost, so
+// hostname alone cannot tell a production bundle from a staging one). A missing config.js falls back to hostname.
+const RUNTIME_ENV = (window.CASCADE_CONFIG && window.CASCADE_CONFIG.ENV)
+  || (["cascademovies.com","www.cascademovies.com"].includes(location.hostname) ? "production" : "staging");
 const buildCore = () => {
   const b = BUILD_INFO || {};
   return ["v" + (b.version || "0.0.0"),
@@ -6884,6 +6886,7 @@ function diagReport(){
       ["Built at", b.builtAt || "unknown"],
       ["Protocol", location.protocol],
       ["Origin", location.origin],
+      ["Environment", RUNTIME_ENV],
       ["Capacitor bridge", cap ? "yes (" + ((window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || "?") + ")" : "no"],
       ["User agent", navigator.userAgent]
     ],
@@ -15864,8 +15867,10 @@ window.closeNavMenu=()=>{
   $("navMenu").classList.remove("open");
   $("navMenuBtn").setAttribute("aria-expanded","false");
 };
+let scrMenuLast=null;   // CAS-1513: which menu item opened the shared onboarding-step overlay (My Streaming Services)
 window.navMenuGo=key=>{
   closeNavMenu();
+  scrMenuLast=key;
   logEvent("nav_menu_item",{item:key});
   if(key==="find") openFindScreen();
   else if(key==="agents") openAgentsScreen();
@@ -23324,13 +23329,27 @@ function oafPaint(){
   else if(oafStep==="nameAgent") oafWireNameAgent();
   else if(oafStep==="done"){ oafFitTagRows(); oafAnimateDone(); }
 }
+// CAS-1513: first-run step events. data.step = "oaf_" + the step key; a migration (oafMode "migrate") logs none.
+const OAF_ORDER = ["welcome","where","services","topSvc","favourites","people","age","partner","together","children","family","nameAgent","done"];
+let oafForward = false;   // true only while oafGoContinue is moving the person on (vs Back / first paint)
+function oafLog(type, key){ if(oafMode!=="migrate") logEvent(type, {step:"oaf_"+key}); }
 function oafShow(key){
+  if(oafForward && key!==oafStep){
+    oafLog("onbstep_continue", oafStep);
+    const a=OAF_ORDER.indexOf(oafStep), b=OAF_ORDER.indexOf(key);
+    for(let i=a+1;i<b;i++) oafLog("onbstep_skipped", OAF_ORDER[i]);   // steps this person's answers made irrelevant
+  }
   oafStep=key;
   oafPaint();
   $("oafScreen").scrollTop=0;
+  oafLog("onbstep_shown", key);
 }
 window.oafGoContinue=()=>{
   if(oafBlocked()) return;
+  oafForward=true;
+  try{ oafGoContinueInner(); } finally { oafForward=false; }
+};
+function oafGoContinueInner(){
   if(oafStep==="welcome") return oafShow("where");
   if(oafStep==="where") return oafShow(oafHasServicesStep() ? "services" : "favourites");
   if(oafStep==="services") return oafShow(oafHasTopSvcStep() ? "topSvc" : "favourites");
@@ -23343,7 +23362,7 @@ window.oafGoContinue=()=>{
   if(oafStep==="children") return oafShow(oafState.children==="yes" ? "family" : "nameAgent");
   if(oafStep==="family") return oafShow("nameAgent");
   if(oafStep==="nameAgent") return oafShow("done");
-};
+}
 // Closes the overlay chrome without touching oafState/draft (shared by Start watching, Back-to-splash and the
 // hand-off to membership).
 function oafHide(){
@@ -23396,6 +23415,7 @@ window.oafOpen=(opts)=>{
   $("oafScreen").classList.add("open");
   lockBodyScroll(true);
   oafPaint();
+  oafLog("onbstep_shown", "welcome");
 };
 // The done screen's "Start watching". A migrating account commits straight away (oneAgentCommit) and lands on
 // Watch. A new account commits the draft in memory (nothing reaches the server while onbDraftModeOn), then
@@ -27619,6 +27639,79 @@ function afterSignIn(){
   flowStart();
 }
 
+// ---- CAS-1513: arrival source + screen-visit tracking ------------------------------------------------
+const ARR_TOKEN_RE = /^[a-z0-9_]{1,40}$/;
+function arrivalFromURL(){
+  const out={src:null, cmp:null, cta:null, inv:false, deep:false};
+  try{
+    const q=new URLSearchParams(location.search);
+    const tok=v=>{ v=(v||"").toLowerCase(); return ARR_TOKEN_RE.test(v) ? v : null; };
+    const src=tok(q.get("src"));
+    if(src==="email" || src==="push") out.src=src;
+    out.cmp=tok(q.get("cmp")); out.cta=tok(q.get("cta"));
+    out.inv=!!q.get("inv");
+    out.deep=q.has("dl") || q.has("answer") || q.has("c") || filmRouteId()!=null;
+  }catch(e){}
+  return out;
+}
+const arrivalData = a => ({ ...(a.cmp?{cmp:a.cmp}:{}), ...(a.cta?{cta:a.cta}:{}) });
+// "direct" = the person came back on their own; anything that arrived on a link says which kind.
+function arrivalSource(a){ return a.src || (a.inv ? "invite" : a.deep ? "deeplink" : "direct"); }
+// A return to the foreground after >30 minutes away is a new visit: record its source too (the URL's
+// attribution was already stripped on the first load, so a warm return is "direct").
+const RESUME_GAP_MS = 30*60*1000;
+const SCREEN_MAP = [   // topmost first; the first one open wins, "watch" is what is left when none is
+  ["membScreen","signup"], ["filmPage","film"], ["watchSheet","list_sheet"], ["recommend","recommend"],
+  ["agentsScreen","taste"], ["movingScreen","alerts"], ["findScreen","database"],
+  ["svcAnalysis","streaming_analysis"], ["friendsScreen","friends"], ["settingsScreen","settings"],
+  ["tutorialsScreen","tutorials"], ["helpScreen","help"], ["aboutScreen","about"], ["accountScreen","account"],
+  ["invitesScreen","invites"], ["onbStep","onbstep"], ["oafScreen","first_run"], ["splash","splash"],
+];
+let scrCur=null, scrSince=0, scrHidden=false, scrHiddenAt=0;
+function scrCompute(){
+  for(const [id,key] of SCREEN_MAP){
+    const el=document.getElementById(id);
+    if(el && el.classList.contains("open")) return key==="onbstep" ? (scrMenuLast==="services" ? "my_services" : "first_run") : key;
+  }
+  return "watch";
+}
+function scrSync(){
+  if(scrHidden) return;
+  const k=scrCompute();
+  if(k===scrCur) return;
+  const now=Date.now();
+  if(scrCur) logEvent("screen_leave", {screen:scrCur, ms:now-scrSince});
+  logEvent("screen_view", {screen:k, from:scrCur || "launch"});
+  scrCur=k; scrSince=now;
+}
+function scrHide(){
+  if(scrHidden) return;
+  scrHidden=true; scrHiddenAt=Date.now();
+  if(scrCur) logEvent("screen_leave", {screen:scrCur, ms:scrHiddenAt-scrSince});
+  flushUsageEvents();   // the flush listener registered earlier ran before this leave existed
+}
+function scrShow(){
+  if(!scrHidden) return;
+  scrHidden=false;
+  const now=Date.now();
+  if(now-scrHiddenAt > RESUME_GAP_MS) logEvent("app_open", {resume:true, source:"direct"});
+  scrSince=now;
+  if(scrCur) logEvent("screen_view", {screen:scrCur, from:"background"});
+  scrSync();
+}
+function startScreenTracking(){
+  try{
+    if(typeof MutationObserver!=="undefined"){
+      const mo=new MutationObserver(scrSync);
+      SCREEN_MAP.forEach(([id])=>{ const el=document.getElementById(id); if(el) mo.observe(el, {attributes:true, attributeFilter:["class"]}); });
+    }
+    document.addEventListener("visibilitychange", ()=>{ document.visibilityState==="hidden" ? scrHide() : scrShow(); });
+    window.addEventListener("pagehide", scrHide);
+    window.addEventListener("pageshow", scrShow);
+    scrSync();
+  }catch(e){ console.warn("Cascade: screen tracking failed to start", e); }
+}
+
 // Boot: a Cascade left open on the last visit reopens with its filters applied.
 const booted=activeCascade();
 if(booted){ applyCascade(booted); }
@@ -27632,7 +27725,20 @@ const openedShared = openSharedFromURL();
   try{ const v=localStorage.getItem("cascade_acq"); if(v!=null) acq=JSON.parse(v); }catch(e){}
   const plat = (typeof Capacitor!=="undefined" && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) ? "ios"
     : (matchMedia("(display-mode: standalone)").matches) ? "pwa" : "web";
-  logEvent("app_open", { plat, ver:(BUILD_INFO||{}).version || null, ret:RETURNING, onb:onboardingSeen(), acq });
+  // CAS-1513: click-through first — email_click / push_open lead the session's events — then the arrival
+  // source rides app_open. Only short [a-z0-9_] tokens are ever recorded (no free text in data).
+  const arr = arrivalFromURL();
+  if(arr.src){
+    logEvent(arr.src==="email" ? "email_click" : "push_open", arrivalData(arr));
+    try{
+      const q=new URLSearchParams(location.search);
+      ["src","cmp","cta"].forEach(k=>q.delete(k));
+      const qs=q.toString();
+      history.replaceState(null, "", location.pathname + (qs ? `?${qs}` : "") + location.hash);
+    }catch(e){}
+  }
+  logEvent("app_open", { plat, ver:(BUILD_INFO||{}).version || null, ret:RETURNING, onb:onboardingSeen(), acq,
+                         source:arrivalSource(arr), ...(arr.cmp?{campaign:arr.cmp}:{}), ...(arr.cta?{cta:arr.cta}:{}) });
   bumpReviewPromptSessionCount();   // CAS-969: "a few sessions" counts page loads, same cadence as app_open
 }
 // First run only — the "seen" flag is set by finishing OR skipping, so returning visitors go straight to the app.
@@ -27704,6 +27810,7 @@ else if(!openedShared){
 // and its own higher z-index (85) means it wins the stack without having to touch any of the above.
 const filmId = filmRouteId();
 if(filmId!=null) openFilmPage(filmId);
+startScreenTracking();   // CAS-1513: after boot has decided which screen is up
 // CAS-287: two of the three arrival banners are gone. "Welcome back, N cascades are still watching" and
 // "Cascade found N films since you last looked" were both greetings thrown over the listing at the exact
 // moment you arrived to read it — and both said something the deck and the list say better, permanently,
@@ -29169,6 +29276,8 @@ function acctFetchKeepalive(init){
       PN.addListener("pushNotificationActionPerformed", async (action) => {
         const data=(action && action.notification && action.notification.data) || {};
         const id=Number(data.movie_id);
+        // CAS-1513: a tapped push is a click-through — the payload carries src=push and cmp (monitor/__main__.py).
+        logEvent("push_open", ARR_TOKEN_RE.test(data.cmp||"") ? {cmp:data.cmp} : {cmp:"alert"});
         await loadRealAlerts();
         // CAS-1206: onboarding actively on screen (flowOn/briefOn) drops the tap outright — it is never
         // queued, so finishing onboarding later does not reopen it. Otherwise, if the main app is

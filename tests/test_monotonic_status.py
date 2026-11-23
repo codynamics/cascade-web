@@ -45,6 +45,29 @@ class TierRankIsTheSingleCanonicalOrder(unittest.TestCase):
         self.assertEqual(pp.tier_rank(["past_opening"]), -1)   # a moment, not a tier a film holds
 
 
+class StatusIsWrittenInJourneyOrder(unittest.TestCase):
+    """CAS-1518: primaryStatus() reads the LAST window, so home offers + on_screen must come out
+    ['in_cinema','rental'], never ['rental','in_cinema']."""
+    def test_derive_from_providers_orders_on_screen_before_home(self):
+        m = {"on_screen": True, "cinema_date": "2026-11-01"}
+        out = pp.derive_from_providers(m, {"rent": [{}]}, datetime.date(2026, 11, 20))
+        self.assertEqual(out, ["in_cinema", "rental"])
+
+    def test_derive_status_orders_on_screen_before_home(self):
+        m = {"on_screen": True, "cinema_date": "2026-11-01"}
+        offers = [{"type": "rent", "price": 5.0}]
+        self.assertEqual(pp.derive_status(m, offers, datetime.date(2026, 11, 20)),
+                         ["in_cinema", "rental"])
+
+    def test_held_status_is_reordered(self):
+        m = _title(status=["rental", "in_cinema"], on_screen=True, availability_confidence="confirmed")
+        pp.apply_monotonic_status(m, ["upcoming"], "confirmed", datetime.date(2026, 11, 20))
+        self.assertEqual(m["status"], ["in_cinema", "rental"])
+
+    def test_order_status_dedupes(self):
+        self.assertEqual(pp.order_status(["rental", "in_cinema", "rental"]), ["in_cinema", "rental"])
+
+
 class ApplyMonotonicStatus(unittest.TestCase):
     """Direct unit tests of the guard poc_pipeline writes m['status'] through."""
 
@@ -680,3 +703,23 @@ class MassStampGuardAcknowledgement(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HeldStatusNeverCarriesStaleInCinema(unittest.TestCase):
+    """CAS-1516 — Shaun the Sheep: The Beast of Mossy Bottom. Yesterday on_screen licensed
+    [rental, in_cinema]; today on_screen is gone and a provider gap reads back in_cinema alone, a backward
+    move that is HELD. The held status must not keep in_cinema next to the rent offers."""
+
+    def test_held_rental_plus_in_cinema_drops_in_cinema_without_on_screen(self):
+        today = datetime.date(2026, 11, 22)
+        m = _title(status=["rental", "in_cinema"], cinema_date="2026-09-17",
+                   offers=[{"service": "Apple TV Store", "type": "rent"}])
+        pp.apply_monotonic_status(m, ["in_cinema"], "estimated", today)
+        self.assertEqual(m["status"], ["rental"])
+        self.assertIn("pending_downgrade", m)
+
+    def test_on_screen_keeps_the_pair(self):
+        today = datetime.date(2026, 11, 22)
+        m = _title(status=["rental", "in_cinema"], on_screen=True)
+        pp.apply_monotonic_status(m, ["in_cinema"], "estimated", today)
+        self.assertEqual(m["status"], ["in_cinema", "rental"])   # CAS-1518: journey order

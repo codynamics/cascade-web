@@ -44,6 +44,7 @@ concurrency:                     # share daily.yml's group: refresh and alerts m
 jobs:
   send:
     runs-on: ubuntu-latest
+    environment: production   # CAS-1523: customer-facing sends use production's Supabase only
     timeout-minutes: 360         # covers the longest possible wait (a run starting just after 17:17 the PREVIOUS cycle boundary) plus the monitor itself
     steps:
       - name: Check out repo (carries yesterday's state for change-detection)

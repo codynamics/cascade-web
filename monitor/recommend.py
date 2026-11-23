@@ -27,7 +27,7 @@ import html as _html
 import json
 import sys
 
-from .emailer import send_via_resend
+from .emailer import send_via_resend, track_url
 from .store import InMemoryStore, store_from_env
 
 SIGNUP_URL = "https://cascademovies.com"
@@ -47,7 +47,7 @@ def render_email(row) -> dict:
 
     text = (
         f"{message}\n\n"
-        f"Sign up: {SIGNUP_URL}"
+        f"Sign up: {track_url(SIGNUP_URL, 'recommend', 'sign_up')}"
     )
     html_doc = (
         '<!doctype html><html><head><meta charset="utf-8">'
@@ -65,7 +65,7 @@ def render_email(row) -> dict:
         f'<div style="font-size:15px;color:#141A2A;margin-top:14px;white-space:pre-wrap;">{esc(message)}</div>'
         '</td></tr>'
         '<tr><td style="padding-top:20px;">'
-        f'<a href="{esc(SIGNUP_URL)}" style="display:inline-block;background:#6b48f2;color:#ffffff;'
+        f'<a href="{esc(track_url(SIGNUP_URL, 'recommend', 'sign_up'))}" style="display:inline-block;background:#6b48f2;color:#ffffff;'
         'text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:11px;">'
         'Sign up to Cascade</a>'
         '</td></tr>'

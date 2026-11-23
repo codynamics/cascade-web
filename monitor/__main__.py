@@ -582,7 +582,8 @@ def main(argv=None) -> int:
             for h in pushable:
                 copy = push_copy(h)
                 payload = {"movie_id": h.transition.movie_id, "moment": h.transition.moment,
-                           "cascade_id": h.cascade_id}
+                           "cascade_id": h.cascade_id,
+                           "src": "push", "cmp": "alert"}   # CAS-1513: click-through attribution
                 for tok in tokens:
                     if tok in dead_tokens:
                         continue

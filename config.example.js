@@ -16,7 +16,13 @@
 // it just shows a "connect your account" note in the account panel. That's what lets CI /
 // the dry-run build work with no keys.
 
+// Two environments (CAS-1521): the tracked `config.js` carries a production and a staging Supabase
+// project and picks one at load — cascademovies.com => production; otherwise window.CASCADE_ENV
+// (written to www/env.js by ios-testflight.yml's `environment` input); otherwise staging. The choice
+// is exposed as window.CASCADE_CONFIG.ENV. This template is for a single-project local setup.
+
 window.CASCADE_CONFIG = {
+  ENV: "staging",
   SUPABASE_URL: "https://YOUR-PROJECT-ref.supabase.co",
   SUPABASE_ANON_KEY: "YOUR-ANON-KEY",
 };

@@ -140,7 +140,7 @@
   },
   "1430077": {
     "pvod": "2026-07-12",
-    "rental": "2026-07-22"
+    "included_streaming": "2026-11-22"
   },
   "1325734": {
     "rental": "2026-07-12",
@@ -1391,7 +1391,7 @@
     "included_streaming": "2026-07-22"
   },
   "1515899": {
-    "rental": "2026-07-22"
+    "included_streaming": "2026-11-22"
   },
   "1278950": {
     "included_streaming": "2026-07-22"
@@ -2044,7 +2044,7 @@
     "included_streaming": "2026-07-22"
   },
   "1186350": {
-    "rental": "2026-07-22"
+    "included_streaming": "2026-11-22"
   },
   "1242454": {
     "included_streaming": "2026-07-22"
@@ -4089,7 +4089,8 @@
   "77043": {
     "in_cinema": "2026-08-07",
     "upcoming": "2026-08-08",
-    "released": "2026-09-16"
+    "released": "2026-09-16",
+    "included_streaming": "2026-11-22"
   },
   "1136394": {
     "rental": "2026-07-22"
@@ -9400,7 +9401,7 @@
     "included_streaming": "2026-08-05"
   },
   "1019871": {
-    "rental": "2026-08-05"
+    "included_streaming": "2026-11-22"
   },
   "1530127": {
     "included_streaming": "2026-08-05"
@@ -16787,7 +16788,7 @@
     "included_streaming": "2026-08-08"
   },
   "1486879": {
-    "rental": "2026-08-08"
+    "included_streaming": "2026-11-22"
   },
   "1469882": {
     "included_streaming": "2026-08-08"
@@ -22955,7 +22956,7 @@
     "included_streaming": "2026-09-17"
   },
   "352161": {
-    "included_streaming": "2026-09-17"
+    "rental": "2026-11-22"
   },
   "595671": {
     "rental": "2026-09-17"
@@ -23266,7 +23267,7 @@
     "rental": "2026-09-17"
   },
   "375315": {
-    "included_streaming": "2026-09-17"
+    "rental": "2026-11-22"
   },
   "820530": {
     "included_streaming": "2026-09-17"
@@ -25065,7 +25066,7 @@
     "included_streaming": "2026-09-17"
   },
   "669666": {
-    "rental": "2026-09-17"
+    "included_streaming": "2026-11-22"
   },
   "928631": {
     "included_streaming": "2026-09-17"
@@ -26784,7 +26785,7 @@
     "included_streaming": "2026-09-17"
   },
   "671821": {
-    "rental": "2026-09-17"
+    "included_streaming": "2026-11-22"
   },
   "653658": {
     "included_streaming": "2026-09-17"
@@ -27064,7 +27065,7 @@
     "included_streaming": "2026-09-17"
   },
   "582303": {
-    "rental": "2026-09-17"
+    "included_streaming": "2026-11-22"
   },
   "374954": {
     "included_streaming": "2026-09-17"
@@ -28167,7 +28168,7 @@
     "included_streaming": "2026-11-18"
   },
   "411201": {
-    "included_streaming": "2026-09-17"
+    "rental": "2026-11-22"
   },
   "618748": {
     "included_streaming": "2026-09-17"
@@ -28732,7 +28733,7 @@
     "included_streaming": "2026-09-17"
   },
   "266619": {
-    "included_streaming": "2026-09-17"
+    "rental": "2026-11-22"
   },
   "541487": {
     "included_streaming": "2026-09-17"
@@ -29357,7 +29358,7 @@
     "included_streaming": "2026-09-17"
   },
   "368809": {
-    "rental": "2026-09-17"
+    "included_streaming": "2026-11-22"
   },
   "682747": {
     "included_streaming": "2026-09-17"
@@ -29929,7 +29930,7 @@
     "rental": "2026-09-17"
   },
   "352187": {
-    "rental": "2026-09-17"
+    "included_streaming": "2026-11-22"
   },
   "364257": {
     "included_streaming": "2026-09-17"

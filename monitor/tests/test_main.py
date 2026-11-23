@@ -18,6 +18,26 @@ from monitor.store import InMemoryStore
 
 FIXTURES = "monitor/fixtures"
 
+# CAS-1519: a non-dry-run main() writes the held-ids safety net to the REAL state/user_held_ids.json.
+# Several tests below run main() for real against the 5001/5002 fixtures, so a local run overwrote
+# the 8,720-id file with {"5001","5002"} (committed by accident in CAS-1517) and every user-held
+# below-floor film lost its floor exemption. Point the whole module at a temp file.
+_HELD_TMP = None
+_HELD_PATCH = None
+
+
+def setUpModule():
+    global _HELD_TMP, _HELD_PATCH
+    _HELD_TMP = tempfile.TemporaryDirectory()
+    _HELD_PATCH = mock.patch("monitor.__main__.USER_HELD_IDS_FILE",
+                             os.path.join(_HELD_TMP.name, "user_held_ids.json"))
+    _HELD_PATCH.start()
+
+
+def tearDownModule():
+    _HELD_PATCH.stop()
+    _HELD_TMP.cleanup()
+
 
 class TargetUserSafetyValve(unittest.TestCase):
     """CAS-486: --target-user must scope a run to exactly one user, so the notify-test harness can

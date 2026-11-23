@@ -42,6 +42,7 @@ concurrency:                     # never let two daily runs overlap
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    environment: production   # CAS-1523: customer-facing sends use production's Supabase only
     steps:
       - name: Check out repo (carries yesterday's state for change-detection)
         uses: actions/checkout@v4
@@ -76,6 +77,39 @@ jobs:
           # the run spends.
           WM_RUN_MAX_CREDITS: ${{ vars.WM_RUN_MAX_CREDITS }}
         run: python poc_pipeline.py
+
+      - name: Gate the new catalogue on the blocking data checks (CAS-1520)
+        # Runs the same blocking checks qa.yml's engine + data jobs run, against the catalogue just
+        # built and BEFORE anything is committed. On any failure nothing is committed (yesterday's
+        # catalogue stays live), this step goes red (so the alert job fires, and every later step —
+        # commit, qa dispatch — is skipped), and EVERY failing check is listed in the run summary
+        # rather than just the first. A clean catalogue passes through unchanged.
+        if: ${{ github.event.inputs.probe_title == '' }}
+        run: |
+          python poc_pipeline.py --build-html   # the JS checks read the built index.html
+          FAIL_LIST=""
+          node --test --test-reporter=tap tests/js/invariants.test.mjs tests/js/data-integrity.test.mjs > gate-js.log 2>&1 || {
+            echo "::error::engine/data-integrity checks failed on the new catalogue"
+            FAIL_LIST="${FAIL_LIST}$(grep -E '^\s*not ok' gate-js.log | sed 's/^\s*/- JS: /')"$'\n'
+          }
+          python -m tests.run_data_quality > gate-py.log 2>&1 || {
+            echo "::error::blocking data-quality checks failed on the new catalogue"
+            # only the blocking section: report-only failures also print FAIL:/ERROR: lines above it
+            FAIL_LIST="${FAIL_LIST}$(sed -n '/=== Blocking data-quality/,$p' gate-py.log | grep -E '^(FAIL|ERROR):|^::error::' | sed 's/^/- PY: /')"$'\n'
+          }
+          if [ -n "$(echo "$FAIL_LIST" | tr -d '[:space:]')" ]; then
+            {
+              echo "## Daily refresh NOT committed - catalogue failed blocking checks"
+              echo "Yesterday's catalogue stays live. Every failing check:"
+              echo
+              echo "$FAIL_LIST"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "$FAIL_LIST"
+            echo "--- gate-js.log tail ---"; tail -40 gate-js.log
+            echo "--- gate-py.log tail ---"; tail -40 gate-py.log
+            exit 1
+          fi
+          rm -f gate-js.log gate-py.log
 
       - name: Commit refreshed app + data (this becomes "today" for tomorrow's diff)
         if: ${{ github.event.inputs.probe_title == '' }}
@@ -140,7 +174,7 @@ jobs:
             git checkout HEAD -- . ':!docs/appraisals/cas-catalogue-sizing.md'
             python poc_pipeline.py --build-html
             git add docs/appraisals/cas-catalogue-sizing.md
-            git commit -m "CAS-354: catalogue sizing $(date -u +%F)" || echo "nothing to commit"
+            git commit -m "catalogue sizing $(date -u +%F)" || echo "nothing to commit"
             if git push origin HEAD:staging; then
               pushed=1
               break
@@ -213,31 +247,12 @@ jobs:
           python -m monitor.health --scope daily || HEALTH_EXIT=$?
           git config user.name  "cascade-bot"
           git config user.email "actions@users.noreply.github.com"
-          # Same reset-soft-and-commit retry as the catalogue-sizing step above, minus the rebuild
-          # step — state/health.json and state/run_stats.json are plain data, never derived from
-          # app_template.html, so there is nothing to regenerate before committing them.
-          attempt=1
-          pushed=0
-          while [ "$attempt" -le 3 ]; do
-            git fetch origin staging
-            if ! git reset --soft origin/staging; then
-              echo "::error::git reset --soft onto origin/staging failed"
-              exit 1
-            fi
-            git checkout HEAD -- . ':!state/health.json' ':!state/run_stats.json'
-            git add state/health.json state/run_stats.json
-            git commit -m "CAS-974: nightly health report $(date -u +%F)" || echo "nothing to commit"
-            if git push origin HEAD:staging; then
-              pushed=1
-              break
-            fi
-            echo "push rejected (attempt $attempt/3), retrying after reset"
-            attempt=$((attempt + 1))
-          done
-          if [ "$pushed" -ne 1 ]; then
-            echo "::error::failed to push the health report to staging after 3 attempts"
-            exit 1
-          fi
+          # CAS-1514: no git commit any more. monitor.health publishes state/health.json to Supabase
+          # monitor_state itself; run_stats and refresh_log are published here. refresh_log.json (and
+          # run_stats.json) are ALSO still committed by the "Commit refreshed app + data" step above
+          # (it `git add state`), so the in-repo copies keep working for anything that reads them
+          # from git — only the separate nightly "CAS-974: nightly health report" commit is gone.
+          node scripts/monitor_state.mjs push run_stats=state/run_stats.json refresh_log=state/refresh_log.json
           exit $HEALTH_EXIT
 
   # CAS-973: email someone the moment this workflow breaks, instead of leaving it to be

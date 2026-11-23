@@ -49,14 +49,14 @@ class PromoteDispatchInputTests(unittest.TestCase):
         m = re.search(
             r"if \[.*workflow_dispatch.*\] && \[ -n \"\$\{\{ inputs\.sha \}\}\" \]; then\n"
             r"\s*sha=\"\$\{\{ inputs\.sha \}\}\"\n"
-            r"\s*elif \[.*workflow_dispatch.*\]; then\n"
+            r"\s*(?:elif \[.*workflow_dispatch.*\]; then|else)\n"
             r"\s*git fetch origin staging\n"
             r"\s*sha=\$\(git rev-parse origin/staging\)",
             merge_step,
         )
         self.assertIsNotNone(
             m, "origin/staging must only be used when the sha input is empty")
-        self.assertIn("github.event.workflow_run.head_sha", merge_step)
+        self.assertNotIn("workflow_run", merge_step)
 
 
 class QaDispatchPromoteTests(unittest.TestCase):
