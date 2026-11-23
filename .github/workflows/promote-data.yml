@@ -1,0 +1,62 @@
+# .github/workflows/promote-data.yml — CAS-1522
+# Auto-promote of CODE is retired (promote.yml is workflow_dispatch only). The daily catalogue
+# refresh is the one thing production still needs without a release decision: the web app and the
+# installed app read catalogue.json -> catalogue/<hash>.json live from cascademovies.com (= main).
+# This workflow copies ONLY those data files from the QA'd staging commit onto main. It never
+# touches code, bumps nothing, and fails if the staged diff contains any path outside the
+# allowlist in ci/promote_data_guard.py.
+name: promote-data
+
+on:
+  workflow_run:
+    workflows: [qa]
+    types: [completed]
+    branches: [staging]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Staging commit to take catalogue data from (defaults to head of staging)"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
+
+jobs:
+  promote-data:
+    # Green qa only, and only for a daily.yml commit ("Daily refresh <date>") on the manual path too.
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_commit.message, 'Daily refresh')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Copy catalogue data from staging onto main (allowlist-guarded)
+        run: |
+          set -euo pipefail
+          git config user.name  "ci-promote"
+          git config user.email "ci@codynamics.com.au"
+          git fetch origin staging
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.sha }}" ]; then
+            sha="${{ inputs.sha }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            sha=$(git rev-parse origin/staging)
+          else
+            sha="${{ github.event.workflow_run.head_sha }}"
+          fi
+          git fetch origin "$sha"
+          git checkout "$sha" -- movies.json catalogue.json catalogue
+          # Guard: everything staged on main must be on the data allowlist, else fail.
+          git diff --cached --name-only | python -I ci/promote_data_guard.py
+          if git diff --cached --quiet; then
+            echo "catalogue already current on main"
+            exit 0
+          fi
+          git commit -m "promote-data: catalogue from staging@$sha"
+          git push origin main
