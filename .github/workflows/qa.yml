@@ -127,7 +127,7 @@ jobs:
         if: failure()
         run: |
           mkdir -p qa-failures
-          (grep -m1 -E 'not ok|AssertionError|Error:' engine.log || tail -5 engine.log) \
+          (grep -E '^\s*(not ok|✖)' engine.log || grep -m1 -E 'AssertionError|Error:' engine.log || tail -5 engine.log) \
             > qa-failures/engine.txt
 
       - name: Upload failure detail
@@ -177,7 +177,7 @@ jobs:
         if: failure()
         run: |
           mkdir -p qa-failures
-          (grep -m1 -E 'FAIL:|ERROR:|AssertionError' data.log || tail -5 data.log) \
+          (grep -E '^(FAIL|ERROR):' data.log || grep -m1 -E 'AssertionError' data.log || tail -5 data.log) \
             > qa-failures/data.txt
 
       - name: Upload failure detail
@@ -209,7 +209,7 @@ jobs:
         if: failure()
         run: |
           mkdir -p qa-failures
-          (grep -m1 -E 'FAIL:|ERROR:|AssertionError' monitor.log || tail -5 monitor.log) \
+          (grep -E '^(FAIL|ERROR):' monitor.log || grep -m1 -E 'AssertionError' monitor.log || tail -5 monitor.log) \
             > qa-failures/monitor.txt
 
       - name: Upload failure detail
@@ -270,7 +270,7 @@ jobs:
         if: failure()
         run: |
           mkdir -p qa-failures
-          (grep -m1 -E 'not ok|AssertionError' scheduler.log || tail -5 scheduler.log) \
+          (grep -E '^\s*(not ok|✖)' scheduler.log || grep -m1 -E 'AssertionError' scheduler.log || tail -5 scheduler.log) \
             > qa-failures/scheduler.txt
 
       - name: Upload failure detail
@@ -546,9 +546,9 @@ jobs:
               # failure detail may be qa-failures/e2e.txt, qa-failures/integrity.txt or both — prefer e2e's
               # since the smoke suite runs first.
               if [ -z "$DETAIL" ] && [ "$name" = "integrity" ] && [ -f "qa-failures/e2e.txt" ]; then
-                DETAIL=$(head -1 "qa-failures/e2e.txt")
+                DETAIL=$(head -25 "qa-failures/e2e.txt" | tr '\n' ';')
               elif [ -z "$DETAIL" ] && [ -f "qa-failures/${name}.txt" ]; then
-                DETAIL=$(head -1 "qa-failures/${name}.txt")
+                DETAIL=$(head -25 "qa-failures/${name}.txt" | tr '\n' ';')
               fi
             fi
           done

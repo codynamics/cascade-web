@@ -77,6 +77,39 @@ jobs:
           WM_RUN_MAX_CREDITS: ${{ vars.WM_RUN_MAX_CREDITS }}
         run: python poc_pipeline.py
 
+      - name: Gate the new catalogue on the blocking data checks (CAS-1520)
+        # Runs the same blocking checks qa.yml's engine + data jobs run, against the catalogue just
+        # built and BEFORE anything is committed. On any failure nothing is committed (yesterday's
+        # catalogue stays live), this step goes red (so the alert job fires, and every later step —
+        # commit, qa dispatch — is skipped), and EVERY failing check is listed in the run summary
+        # rather than just the first. A clean catalogue passes through unchanged.
+        if: ${{ github.event.inputs.probe_title == '' }}
+        run: |
+          python poc_pipeline.py --build-html   # the JS checks read the built index.html
+          FAIL_LIST=""
+          node --test --test-reporter=tap tests/js/invariants.test.mjs tests/js/data-integrity.test.mjs > gate-js.log 2>&1 || {
+            echo "::error::engine/data-integrity checks failed on the new catalogue"
+            FAIL_LIST="${FAIL_LIST}$(grep -E '^\s*not ok' gate-js.log | sed 's/^\s*/- JS: /')"$'\n'
+          }
+          python -m tests.run_data_quality > gate-py.log 2>&1 || {
+            echo "::error::blocking data-quality checks failed on the new catalogue"
+            # only the blocking section: report-only failures also print FAIL:/ERROR: lines above it
+            FAIL_LIST="${FAIL_LIST}$(sed -n '/=== Blocking data-quality/,$p' gate-py.log | grep -E '^(FAIL|ERROR):|^::error::' | sed 's/^/- PY: /')"$'\n'
+          }
+          if [ -n "$(echo "$FAIL_LIST" | tr -d '[:space:]')" ]; then
+            {
+              echo "## Daily refresh NOT committed - catalogue failed blocking checks"
+              echo "Yesterday's catalogue stays live. Every failing check:"
+              echo
+              echo "$FAIL_LIST"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "$FAIL_LIST"
+            echo "--- gate-js.log tail ---"; tail -40 gate-js.log
+            echo "--- gate-py.log tail ---"; tail -40 gate-py.log
+            exit 1
+          fi
+          rm -f gate-js.log gate-py.log
+
       - name: Commit refreshed app + data (this becomes "today" for tomorrow's diff)
         if: ${{ github.event.inputs.probe_title == '' }}
         run: |
