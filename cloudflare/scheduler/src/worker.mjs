@@ -2,24 +2,17 @@
 // GitHub's workflow_dispatch API. GitHub's own `schedule` trigger is not dependable for this repo
 // (see the ticket) — workflow_dispatch events are not subject to the same delay.
 //
-// CAS-1130: a fifth cron checks Supabase every 5 minutes for unsent outgoing mail (recommendations,
-// invite emails, invite replies) and only dispatches recommend.yml when there is some to send, so it
-// doesn't cost Actions minutes running unconditionally every 5 minutes.
-//
-// Cron Triggers (UTC, declared in wrangler.toml):
-//   17 * * * *  -> uptime.yml every hour
-//   0 14 * * * -> daily.yml, ONLY if this instant is 01:00 in Australia/Sydney (AEDT)
-//   0 15 * * * -> daily.yml, ONLY if this instant is 01:00 in Australia/Sydney (AEST)
-//   0 16 * * * -> alerts.yml, ONLY if this instant is 03:00 in Australia/Sydney (AEDT)
-//   0 17 * * * -> alerts.yml (phase=find), ONLY if this instant is 03:00 in Australia/Sydney (AEST)
-//   30 20 * * * -> alerts.yml (phase=push), ONLY if this instant is in Sydney hour 07 (07:30 AEDT)
-//   30 21 * * * -> alerts.yml (phase=push), ONLY if this instant is in Sydney hour 07 (07:30 AEST)
-//   0 6 * * *   -> alerts.yml (phase=email), ONLY if this instant is 17:00 in Australia/Sydney (AEDT)
-//   0 7 * * *   -> alerts.yml (phase=email), ONLY if this instant is 17:00 in Australia/Sydney (AEST)
-//   */5 * * * * -> recommend.yml, ONLY if Supabase reports unsent mail (or can't be reached)
-// CAS-1503: alerts go out overnight (03:00 Sydney); the refresh runs at 01:00 so the alerts are built
-// from that night's data. Exactly one of each pair of crons fires per day across the daylight-saving
-// switch, computed with Intl.DateTimeFormat rather than a fixed UTC offset.
+// CAS-1525: the Worker has ONE Cron Trigger, `*/5 * * * *` (UTC), because Cloudflare's free plan allows
+// only 5 per account and the old per-job crons (10) made the deploy fail. Each tick works out the Sydney
+// local hour and minute (DST-aware, via Intl) and dispatches what is due in that 5-minute window:
+//   01:00-01:04 -> daily.yml
+//   03:00-03:04 -> alerts.yml (phase=find)
+//   07:30-07:34 -> alerts.yml (phase=push)
+//   17:00-17:04 -> alerts.yml (phase=email)
+//   minute 15-19 of every hour -> uptime.yml
+//   every tick  -> recommend.yml, ONLY if Supabase reports unsent mail (or can't be reached) (CAS-1130)
+// One tick may dispatch several workflows; each dispatch keeps its own retry-once and failure email.
+// CAS-1503: alerts go out overnight (03:00 Sydney); the refresh runs at 01:00 so alerts use that night's data.
 // CAS-1504: alerts are split by channel. 03:00 finds and records them (sends nothing), 07:30 sends the one
 // push, 17:00 emails only the alerts the member has not seen in the app. All three dispatch alerts.yml; the
 // `phase` workflow input says which.
@@ -31,26 +24,15 @@ export const USER_AGENT = "cascade-scheduler-worker/1.0 (+https://cascademovies.
 export const RETRY_DELAY_MS = 30000;
 
 export const CRON = {
-  UPTIME: "17 * * * *",
-  DAILY_A: "0 14 * * *",
-  DAILY_B: "0 15 * * *",
-  ALERTS_A: "0 16 * * *",
-  ALERTS_B: "0 17 * * *",
-  PUSH_A: "30 20 * * *",
-  PUSH_B: "30 21 * * *",
-  EMAIL_A: "0 6 * * *",
-  EMAIL_B: "0 7 * * *",
-  RECOMMEND: "*/5 * * * *",
+  TICK: "*/5 * * * *",
 };
 
 export const DAILY_SYDNEY_HOUR = 1;
 export const ALERTS_SYDNEY_HOUR = 3;
-export const PUSH_SYDNEY_HOUR = 7;
+export const PUSH_SYDNEY_TIME = { hour: 7, minute: 30 };
 export const EMAIL_SYDNEY_HOUR = 17;
-
-const WORKFLOW_FOR_CRON = {
-  [CRON.UPTIME]: "uptime.yml",
-};
+export const UPTIME_SYDNEY_MINUTE = 15;
+export const TICK_MINUTES = 5;
 
 // Tables/columns CAS-1130 checks for unsent outgoing mail before dispatching recommend.yml.
 export const UNSENT_MAIL_CHECKS = [
@@ -59,40 +41,36 @@ export const UNSENT_MAIL_CHECKS = [
   { table: "invite_replies", column: "notified_at" },
 ];
 
-// The Sydney local hour (0-23) at `epochMs`, DST-aware via the runtime's own tz database.
-export function sydneyHour(epochMs) {
+// The Sydney local hour (0-23) and minute at `epochMs`, DST-aware via the runtime's own tz database.
+export function sydneyClock(epochMs) {
   const parts = new Intl.DateTimeFormat("en-AU", {
     timeZone: "Australia/Sydney",
     hour: "numeric",
+    minute: "numeric",
     hourCycle: "h23",
   }).formatToParts(new Date(epochMs));
-  return Number(parts.find((p) => p.type === "hour").value);
+  const get = (type) => Number(parts.find((p) => p.type === type).value);
+  return { hour: get("hour"), minute: get("minute") };
 }
 
-// Which workflow file (if any) this cron firing, at this instant, should dispatch.
-export function targetForCron(cron, epochMs) {
-  if (cron === CRON.ALERTS_A || cron === CRON.ALERTS_B) {
-    return sydneyHour(epochMs) === ALERTS_SYDNEY_HOUR ? "alerts.yml" : null;
-  }
-  if (cron === CRON.PUSH_A || cron === CRON.PUSH_B) {
-    return sydneyHour(epochMs) === PUSH_SYDNEY_HOUR ? "alerts.yml" : null;
-  }
-  if (cron === CRON.EMAIL_A || cron === CRON.EMAIL_B) {
-    return sydneyHour(epochMs) === EMAIL_SYDNEY_HOUR ? "alerts.yml" : null;
-  }
-  if (cron === CRON.DAILY_A || cron === CRON.DAILY_B) {
-    return sydneyHour(epochMs) === DAILY_SYDNEY_HOUR ? "daily.yml" : null;
-  }
-  return WORKFLOW_FOR_CRON[cron] ?? null;
+// True if `minute` falls in the 5-minute window that starts at `start`.
+function inWindow(minute, start) {
+  return minute >= start && minute < start + TICK_MINUTES;
 }
 
-// CAS-1504: the workflow_dispatch inputs a cron firing passes along. Only the three alerts phases carry
-// any; every other workflow is dispatched with none, exactly as before.
-export function inputsForCron(cron) {
-  if (cron === CRON.ALERTS_A || cron === CRON.ALERTS_B) return { phase: "find" };
-  if (cron === CRON.PUSH_A || cron === CRON.PUSH_B) return { phase: "push" };
-  if (cron === CRON.EMAIL_A || cron === CRON.EMAIL_B) return { phase: "email" };
-  return null;
+// The dispatches (other than recommend.yml) due for the tick at `epochMs`:
+// [{ workflow, inputs }], where inputs is null or a workflow_dispatch inputs object.
+export function dispatchesForTick(epochMs) {
+  const { hour, minute } = sydneyClock(epochMs);
+  const due = [];
+  if (hour === DAILY_SYDNEY_HOUR && inWindow(minute, 0)) due.push({ workflow: "daily.yml", inputs: null });
+  if (hour === ALERTS_SYDNEY_HOUR && inWindow(minute, 0)) due.push({ workflow: "alerts.yml", inputs: { phase: "find" } });
+  if (hour === PUSH_SYDNEY_TIME.hour && inWindow(minute, PUSH_SYDNEY_TIME.minute)) {
+    due.push({ workflow: "alerts.yml", inputs: { phase: "push" } });
+  }
+  if (hour === EMAIL_SYDNEY_HOUR && inWindow(minute, 0)) due.push({ workflow: "alerts.yml", inputs: { phase: "email" } });
+  if (inWindow(minute, UPTIME_SYDNEY_MINUTE)) due.push({ workflow: "uptime.yml", inputs: null });
+  return due;
 }
 
 function sleep(ms) {
@@ -198,10 +176,10 @@ export async function hasUnsentMail(env, deps = {}) {
   return false;
 }
 
-async function handleRecommendCron(event, env) {
+async function handleRecommend(env) {
   const shouldDispatch = await hasUnsentMail(env);
   if (!shouldDispatch) {
-    console.log(`scheduler: cron "${event.cron}" fired, no unsent mail, no dispatch`);
+    console.log("scheduler: no unsent mail, no recommend dispatch");
     return;
   }
   try {
@@ -213,22 +191,18 @@ async function handleRecommendCron(event, env) {
 
 export default {
   async scheduled(event, env) {
-    if (event.cron === CRON.RECOMMEND) {
-      await handleRecommendCron(event, env);
-      return;
+    const when = event.scheduledTime ?? Date.now();
+    const due = dispatchesForTick(when);
+    if (due.length === 0) console.log(`scheduler: cron "${event.cron}" fired, nothing time-based due`);
+    for (const { workflow, inputs } of due) {
+      try {
+        await dispatchWorkflow(env, workflow, { inputs });
+      } catch (err) {
+        // Belt-and-braces: dispatchWorkflow already catches its own errors, but the handler must
+        // never throw out silently regardless.
+        console.log(`scheduler: unexpected error dispatching ${workflow}: ${(err && err.message) || err}`);
+      }
     }
-
-    const workflowFile = targetForCron(event.cron, event.scheduledTime ?? Date.now());
-    if (!workflowFile) {
-      console.log(`scheduler: cron "${event.cron}" fired, no dispatch (not the Sydney target hour)`);
-      return;
-    }
-    try {
-      await dispatchWorkflow(env, workflowFile, { inputs: inputsForCron(event.cron) });
-    } catch (err) {
-      // Belt-and-braces: dispatchWorkflow already catches its own errors, but the handler must
-      // never throw out silently regardless.
-      console.log(`scheduler: unexpected error dispatching ${workflowFile}: ${(err && err.message) || err}`);
-    }
+    await handleRecommend(env);
   },
 };
