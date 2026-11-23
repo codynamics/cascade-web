@@ -26,6 +26,7 @@ import urllib.request
 # find a film's current window (for grouping, pill colour and button choice), never to re-derive it.
 from poc_pipeline import AVAILABILITY_TIERS, tier_rank
 
+from .answer_links import WATCHED, WATCH_ON, answer_url
 from .batches import batch_url, headline_for
 
 USER_AGENT = "cascade-monitor/1.0 (+https://cascademovies.com)"
@@ -279,44 +280,19 @@ def digest_subject(hits, replies=None, scores=None, today=None) -> str:
     return subject
 
 
-# ---- "when will you watch it?" buttons (CAS-1196 item 3) --------------------------------------------
-# (value, label, Service-tracking window key to gate on — None means always offered).
-_BUTTON_DEFS = {
-    "pre_release": ("WATCH ON", [
-        ("cinema", "Cinema", "in_cinema"),
-        ("rent", "Rent", "rent"),
-        ("stream", "Stream", "stream"),
-        ("never", "Never", None),
-    ]),
-    "home_pay": ("WATCH ON", [
-        ("rent", "Rent", "rent"),
-        ("stream", "Stream", "stream"),
-        ("never", "Never", None),
-    ]),
-    "streaming": ("WATCH ON", [
-        ("stream", "Stream", "stream"),
-        ("never", "Never", None),
-    ]),
-}
-# The Watched column: the app's own five-step Watched scale (WATCH_STEPS in app_template.html), same
-# order, same words, same colours. Each link opens Cascade with that verdict recorded.
+# ---- Watch On / Watched buttons (CAS-1196 item 3; CAS-1537: the app's own buttons, one shared definition) ----
+# Keys, labels and order come from supabase/functions/_shared/answer_keys.json (answer_links.WATCH_ON /
+# WATCHED) - the same file the alert-answer edge function reads - and equal the app's WATCH_LEVEL_SHORT_LABEL +
+# Never and WATCH_STEPS (a test compares them against app_template.html). Nothing is hand-copied here.
+_WATCH_ON_HEADING = "WATCH ON"
 _WATCHED_HEADING = "WATCHED"
-_WATCHED_DEFS = [
-    ("wow", "Wow!", "#0E9F6E"),
-    ("liked", "Watch Again", "#2A9D55"),
-    ("enjoyed", "Enjoyed", "#0E94AB"),
-    ("soso", "So-so", "#6B7280"),
-    ("disliked", "Disliked", "#C26A1B"),
-]
-_BUCKET_FOR_WINDOW = {
-    "upcoming": "pre_release", "opening_week": "pre_release", "in_cinema": "pre_release",
-    "pvod": "home_pay", "rental": "home_pay",
-    "included_streaming": "streaming",
-}
+# Where a film sits on the app's ladder (STATUS_RUNG in app_template.html); a Watch On window whose rung is
+# strictly behind it is spent - greyed and not tappable, exactly as the app greys it.
+_FILM_RUNG = {"upcoming": 0, "opening_week": 1, "in_cinema": 1, "pvod": 2, "rental": 3, "included_streaming": 4}
 # A window absent from the account's watch_windows object reads as its own on-device default
-# (watchPrefsDefaults() in app_template.html) — in_cinema/rent/stream all start ON; only an
-# explicit {"list": false} turns one off.
-_WATCH_WINDOW_DEFAULT_ON = {"in_cinema": True, "rent": True, "stream": True}
+# (watchPrefsDefaults() in app_template.html) - in_cinema/rent/stream start ON, premium starts OFF; only an
+# explicit {"list": true/false} overrides.
+_WATCH_WINDOW_DEFAULT_ON = {"in_cinema": True, "premium": False, "rent": True, "stream": True}
 
 
 def _window_tracked(watch_windows, key) -> bool:
@@ -337,26 +313,35 @@ def track_url(url: str, cmp: str, cta: str) -> str:
     return f"{base}{sep}src=email&cmp={cmp}&cta={cta}{hash_sep}{frag}"
 
 
-def _buttons_for(movie, movie_id, site_url, watch_windows, kind="daily_alert"):
-    """(heading-or-None, [{"value","label","href","primary"}, ...]) for one film, filtered to the
-    windows switched on in the account's Service tracking (CAS-1196 item 3) — "never"/"seen" are
-    never gated. `primary` marks the bucket's own first-defined button (the filled blue one),
-    regardless of which buttons survive the filter."""
-    bucket_key = _BUCKET_FOR_WINDOW.get(_primary_status(movie), "pre_release")
-    heading, defs = _BUTTON_DEFS[bucket_key]
+def _answer_href(key, movie_id, site_url, batch_id, kind, answers):
+    """The link behind one button: a signed single-purpose answer link when this email can sign one (the
+    secret is set and the film's ledger row is known), else the film in Cascade where the same buttons live."""
+    token = answers.token_for(movie_id, key) if answers else None
+    if token:
+        return track_url(answer_url(site_url, token), kind, f"answer_{key}")
+    return _film_link(site_url, batch_id, movie_id, kind, cta=f"answer_{key}")
+
+
+def _buttons_for(movie, movie_id, site_url, watch_windows, kind="daily_alert", batch_id=None, answers=None):
+    """[{"key","label","href","spent"}, ...] for the WATCH ON column of one film: the app's Cinema, Premium,
+    Rent, Stream (only the windows switched on in Service tracking) then Never. A window the film has
+    already passed is `spent` - greyed, no href."""
+    rung = _FILM_RUNG.get(_primary_status(movie), -1)
     buttons = []
-    for i, (value, label, gate) in enumerate(defs):
-        if not _window_tracked(watch_windows, gate):
+    for d in WATCH_ON:
+        key = d["key"]
+        if not _window_tracked(watch_windows, key if key != "never" else None):
             continue
-        buttons.append({"value": value, "label": label, "primary": i == 0,
-                         "href": track_url(f"{site_url}?answer={value}#/film/{movie_id}", kind, f"answer_{value}")})
-    return heading, buttons
+        spent = d["rung"] is not None and d["rung"] < rung
+        buttons.append({"key": key, "label": d["label"], "spent": spent,
+                        "href": None if spent else _answer_href(key, movie_id, site_url, batch_id, kind, answers)})
+    return buttons
 
 
-def _watched_buttons_for(movie_id, site_url, kind="daily_alert"):
-    return [{"value": value, "label": label, "color": color,
-             "href": track_url(f"{site_url}?answer={value}#/film/{movie_id}", kind, f"answer_{value}")}
-            for value, label, color in _WATCHED_DEFS]
+def _watched_buttons_for(movie_id, site_url, kind="daily_alert", batch_id=None, answers=None):
+    return [{"key": d["key"], "label": d["label"], "color": d["color"], "spent": False,
+             "href": _answer_href(d["key"], movie_id, site_url, batch_id, kind, answers)}
+            for d in WATCHED]
 
 
 # ---- HTML building blocks --------------------------------------------------------------------------
@@ -402,16 +387,18 @@ def _score_chip_html(score, esc) -> str:
 
 
 def _button_html(btn, esc) -> str:
-    if btn.get("color"):
+    if btn.get("spent"):
+        style = "background:#F4F5F8;color:#B4BAC6;"
+    elif btn.get("color"):
         style = f"background:#F4F5F8;color:{btn['color']};"
-    elif btn["primary"]:
-        style = "background:#3B5BFF;color:#ffffff;"
-    elif btn["value"] == "never":
+    elif btn["key"] == "never":
         style = "background:#FBEAEA;color:#B23B3B;"
     else:
         style = "background:#EEF0F5;color:#141A2A;"
     style = ("display:block;font-weight:700;font-size:13px;line-height:16px;padding:9px 6px;"
              "border-radius:9px;text-decoration:none;text-align:center;margin:0 0 6px 0;") + style
+    if btn.get("spent"):    # already reached: shown, never linked (the app's .spent segment)
+        return f'<span title="Already reached" style="{style}">{esc(btn["label"])}</span>'
     return f'<a href="{esc(btn["href"])}" style="{style}">{esc(btn["label"])}</a>'
 
 
@@ -433,7 +420,20 @@ def _see_all_link(site_url, batch_id, kind, cta="more_in_cascade") -> str:
     return track_url(batch_url(site_url, batch_id), kind, cta) if batch_id else track_url(site_url, kind, cta)
 
 
-def _card_html(hit, esc, site_url, score, watch_windows, today, kind="daily_alert", batch_id=None) -> str:
+def _answer_columns_html(movie, movie_id, esc, site_url, watch_windows, kind, batch_id, answers) -> str:
+    """CAS-1537: the WATCH ON and WATCHED columns every film card in every alert email carries."""
+    on = _buttons_for(movie, movie_id, site_url, watch_windows, kind, batch_id, answers)
+    watched = _watched_buttons_for(movie_id, site_url, kind, batch_id, answers)
+    return (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;"><tr>'
+        f'<td width="50%" valign="top" style="padding-right:6px;">{_column_html(_WATCH_ON_HEADING, on, esc)}</td>'
+        f'<td width="50%" valign="top" style="padding-left:6px;">{_column_html(_WATCHED_HEADING, watched, esc)}</td>'
+        '</tr></table>'
+    )
+
+
+def _card_html(hit, esc, site_url, score, watch_windows, today, kind="daily_alert", batch_id=None,
+               answers=None) -> str:
     t = hit.transition
     m = t.movie or {}
     pill_text, color_key = _event_pill(t, m, today)
@@ -442,16 +442,8 @@ def _card_html(hit, esc, site_url, score, watch_windows, today, kind="daily_aler
     year_html = (f' <span style="font-weight:400;color:#8b95a5;font-size:14px;">{esc(year)}</span>'
                  if year and year != "----" else "")
     meta = _meta_line(m)
-    heading, buttons = _buttons_for(m, t.movie_id, site_url, watch_windows, kind)
     film_url = _film_link(site_url, batch_id, t.movie_id, kind)
-
-    watched = _watched_buttons_for(t.movie_id, site_url, kind)
-    buttons_html = (
-        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;"><tr>'
-        f'<td width="50%" valign="top" style="padding-right:6px;">{_column_html(heading, buttons, esc)}</td>'
-        f'<td width="50%" valign="top" style="padding-left:6px;">{_column_html(_WATCHED_HEADING, watched, esc)}</td>'
-        '</tr></table>'
-    )
+    buttons_html = _answer_columns_html(m, t.movie_id, esc, site_url, watch_windows, kind, batch_id, answers)
 
     score_html = _score_chip_html(score, esc)
 
@@ -503,7 +495,7 @@ def _compact_date(hit) -> str:
     return _weekday_date(_window_date(m, window)) if window else ""
 
 
-def _compact_card_html(hit, esc, site_url, score, kind, batch_id) -> str:
+def _compact_card_html(hit, esc, site_url, score, kind, batch_id, watch_windows=None, answers=None) -> str:
     t = hit.transition
     m = t.movie or {}
     date = _compact_date(hit)
@@ -518,9 +510,9 @@ def _compact_card_html(hit, esc, site_url, score, kind, batch_id) -> str:
         + (f'<div style="margin-top:6px;">{score_html}</div>' if score_html else "")
         + f'<div style="margin-top:8px;"><a href="{esc(_film_link(site_url, batch_id, t.movie_id, kind))}" '
         'style="font-size:13px;color:#6b48f2;font-weight:700;text-decoration:none;">View in Cascade ›</a></div>'
-        # Room for the three one-tap answers (T3 adds them here).
-        '<!-- answers:slot -->'
-        '</td></tr></table></td></tr>'
+        '</td></tr></table>'
+        + _answer_columns_html(m, t.movie_id, esc, site_url, watch_windows, kind, batch_id, answers)
+        + '</td></tr>'
     )
 
 
@@ -539,7 +531,7 @@ def _compact_groups(ordered_hits):
     return groups
 
 
-def _render_catchup(hits, site_url, replies, scores, kind, batch_id, esc) -> dict:
+def _render_catchup(hits, site_url, replies, scores, kind, batch_id, esc, watch_windows=None, answers=None) -> dict:
     """The catch-up email: compact cards under the three group headings, "See all in Cascade" at the top
     and the bottom. Each group keeps the Me list's own order (the hits arrive in it); the non-catch-up
     group is ordered by score like any digest."""
@@ -582,7 +574,8 @@ def _render_catchup(hits, site_url, replies, scores, kind, batch_id, esc) -> dic
             '<div style="font-size:12px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;'
             f'color:#7C5CFF;">{esc(heading)}</div>'
             '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
-            + "".join(_compact_card_html(h, esc, site_url, _score_of(scores, h.transition.movie_id), kind, batch_id)
+            + "".join(_compact_card_html(h, esc, site_url, _score_of(scores, h.transition.movie_id), kind, batch_id,
+                                                 watch_windows, answers)
                       for h in hs)
             + '</table></td></tr>')
     body_rows += f'<tr><td style="padding-top:14px;">{see_all_html}</td></tr>'
@@ -697,7 +690,7 @@ def _wrap_html(body_rows, site_url, kind, esc) -> str:
 
 
 def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_windows=None,
-                  today=None, kind: str = "daily_alert", batch_id=None) -> dict:
+                  today=None, kind: str = "daily_alert", batch_id=None, answers=None) -> dict:
     """Return {'subject', 'html', 'text'} for one user's consolidated digest (CAS-1196: one card
     per film, no status/agent section headings — see the per-film helpers above).
 
@@ -709,11 +702,14 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
                     on-device "never touched this" default (every window on).
     kind          : the email kind for click-through attribution (CAS-1513): "daily_alert", or
                     "unseen_alert" for the 5pm unseen-alerts email.
+    answers       : CAS-1537 - an answer_links.AnswerContext (secret, member, {film: ledger row id}). With it
+                    every button is a signed one-tap link to the confirmation page; without it (no secret
+                    set, or no ledger row for the film) a button opens the film in Cascade instead.
     today         : the date "in N days"/subject phrasing is relative to; defaults to today (UTC).
     batch_id      : CAS-1535 - the night's alert batch (monitor.batches). When given, every film link and
                     the "See all in Cascade" link open that batch's own view in Alerts
                     (`?dl=alerts:batch:<id>[&film=<movie_id>]`) instead of the film page / home screen;
-                    the `?answer=` buttons are untouched. A digest holding any `catchup` hit renders the
+                    the Watch On / Watched buttons are signed answer links (see `answers`). A digest holding any `catchup` hit renders the
                     compact catch-up layout instead (_render_catchup).
     """
     site_url = site_url or os.environ.get(SITE_URL_ENV) or DEFAULT_SITE_URL
@@ -721,7 +717,7 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
     scores = scores or {}
     today = today or _dt.datetime.now(_dt.timezone.utc).date()
     if any(h.transition.moment == "catchup" for h in hits):
-        return _render_catchup(hits, site_url, replies, scores, kind, batch_id, _html.escape)
+        return _render_catchup(hits, site_url, replies, scores, kind, batch_id, _html.escape, watch_windows, answers)
     ordered = _ordered_by_score(hits, scores)
     subject = digest_subject(ordered, replies, scores=scores, today=today)
     shown = ordered[:MAX_CARDS]
@@ -764,7 +760,7 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
             '</td></tr>'
             '<tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
             + "".join(_card_html(h, esc, site_url, _score_of(scores, h.transition.movie_id),
-                                 watch_windows, today, kind, batch_id) for h in shown)
+                                 watch_windows, today, kind, batch_id, answers) for h in shown)
             + '</table></td></tr>'
         )
         if overflow > 0:

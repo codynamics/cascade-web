@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import datetime as _dt
 
+from .answer_links import AnswerContext, secret_from_env
 from .batches import agent_name_for, batch_id_of, ensure_batch, headline_for, sydney_date
 from .catchup import STAGE_ORDER
 from .emailer import format_invite_reply, render_digest, send_via_resend
@@ -240,6 +241,7 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
     cascades_by_id = {str(c.get("id")): c for c in _store_get(store, "fetch_active_cascades", [])}
     today_by_id = {str(m.get("tmdb_id")): m for m in today_movies}
     by_user = _group_by_user(rows)
+    user_prefs = _store_get(store, "fetch_user_prefs", {})    # CAS-1537: Service tracking gates Watch On
 
     # Invite replies ride the account's email plan alone (CAS-887) - they were part of the old single
     # digest and stay part of this one, so a member with replies but no unseen films still gets them.
@@ -276,11 +278,15 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
         hits = _hits_from_rows(_catchup_first(mine), today_by_id, cascades_by_id)
         scores = scores_fn({h.transition.movie_id for h in hits}) if hits else {}
         catchup = any(h.transition.moment == "catchup" for h in hits)
+        # CAS-1537: sign each film's buttons for this member against its ledger row (secret from the env).
+        answers = AnswerContext(secret_from_env(), user_id,
+                                {str(r.get("movie_id")): r.get("id") for r in reversed(mine) if r.get("id")},
+                                now=now.timestamp())
         digest = render_digest(
             hits, replies=[format_invite_reply(r, today_by_id.get(str(r.get("tmdb_id"))), now=now)
                            for r in replies],
-            scores=scores, today=now.date(), kind="catchup_alert" if catchup else "unseen_alert",
-            batch_id=batch_id)
+            scores=scores, watch_windows=(user_prefs.get(user_id) or {}).get("watch_windows"), today=now.date(),
+            kind="catchup_alert" if catchup else "unseen_alert", batch_id=batch_id, answers=answers)
         print(f"[monitor] email: {user_id} ({email}): {len(hits)} unseen alert(s), {len(replies)} "
               f"invite reply(s) - subject: {digest['subject']!r}")
         if dry_run:

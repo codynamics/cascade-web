@@ -1,0 +1,17 @@
+{
+  "_comment": "CAS-1537: THE one definition of the alert email's Watch On and Watched buttons - keys, labels, order. monitor/emailer.py and supabase/functions/alert-answer both read this file. Its labels/order must equal the app's (WATCH_LEVEL_SHORT_LABEL + Never, WATCH_STEPS lbl in app_template.html); tests/js/cas1537-alert-answer.test.mjs and monitor/tests/test_cas1537_answers.py fail if either side drifts. Keys are the ten notifications.answer values (migration 0015).",
+  "watch_on": [
+    { "key": "in_cinema", "label": "Cinema",  "rung": 1 },
+    { "key": "premium",   "label": "Premium", "rung": 2 },
+    { "key": "rent",      "label": "Rent",    "rung": 3 },
+    { "key": "stream",    "label": "Stream",  "rung": 4 },
+    { "key": "never",     "label": "Never",   "rung": null }
+  ],
+  "watched": [
+    { "key": "wow",      "label": "Wow!",        "color": "#0E9F6E" },
+    { "key": "liked",    "label": "Watch Again", "color": "#2A9D55" },
+    { "key": "enjoyed",  "label": "Enjoyed",     "color": "#0E94AB" },
+    { "key": "soso",     "label": "So-so",       "color": "#6B7280" },
+    { "key": "disliked", "label": "Disliked",    "color": "#C26A1B" }
+  ]
+}
