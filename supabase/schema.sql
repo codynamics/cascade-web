@@ -1952,9 +1952,12 @@ stable
 security definer
 set search_path = public
 as $$
+  with me as (select lower(coalesce(auth.jwt() ->> 'email', '')) as e)
   select exists (
-    select 1 from public.web_access w
-    where lower(w.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+    select 1 from public.web_access w, me
+    where me.e <> ''
+      and ( lower(w.email) = me.e
+         or (left(w.email,1) = '@' and split_part(me.e,'@',2) = lower(substr(w.email,2))) )
   );
 $$;
 revoke all on function public.is_web_access_approved() from public;
