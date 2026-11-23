@@ -1935,9 +1935,33 @@ $$;
 revoke all on function public.is_active_member(uuid) from public;
 grant execute on function public.is_active_member(uuid) to authenticated;
 
--- CAS-1458: temporary testing bypass for the membership gate, switched off on the server before App Review.
-insert into public.app_config (key, value) values ('membership_bypass', 'true'::jsonb)
-  on conflict (key) do nothing;
+-- CAS-1531: web_access — approved emails for the invite-only web (migration 0012_web_access.sql).
+create table if not exists public.web_access (
+  email    text primary key,
+  note     text,
+  added_at timestamptz not null default now()
+);
+-- RLS on with NO policy for any client role: a client can neither list nor write the table. The only read
+-- path is is_web_access_approved() below, which answers yes/no for the caller's own email.
+alter table public.web_access enable row level security;
+
+create or replace function public.is_web_access_approved()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.web_access w
+    where lower(w.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+  );
+$$;
+revoke all on function public.is_web_access_approved() from public;
+grant execute on function public.is_web_access_approved() to authenticated;
+
+-- The CAS-1458 testing bypass is retired (LifeOS task 28: off before App Review).
+delete from public.app_config where key = 'membership_bypass';
 
 -- ---------------------------------------------------------------------------
 -- monitor_state (CAS-1514) — monitoring results published here instead of committed to git.
