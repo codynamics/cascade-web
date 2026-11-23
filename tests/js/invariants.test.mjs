@@ -2239,8 +2239,8 @@ function withCas726State(fn){
 }
 
 test("CAS-726 AC2: a manual Watch On tick round-trips through film_watch.sources as \"manual\"", () => withCas726State(async () => {
-  const m = E.MOVIES[0];
-  const level = E.watchLevelsFor(m.tmdb_id).find(l => !l.spent);
+  const m = E.MOVIES.find(f => E.watchLevelsFor(f.tmdb_id).some(l => !l.spent));   // CAS-1544: by open window, not index
+  const level = m && E.watchLevelsFor(m.tmdb_id).find(l => !l.spent);
   assert.ok(level, "no un-spent level to test on this film — the harness catalogue looks wrong");
   const { client } = fakeCas726Supabase({});
   signInWithClient(client);
@@ -2254,8 +2254,8 @@ test("CAS-726 AC2: a manual Watch On tick round-trips through film_watch.sources
 }));
 
 test("CAS-726 AC2: an agent-armed Watch On value round-trips through film_watch.sources as \"auto\"", () => withCas726State(async () => {
-  const m = E.MOVIES[1];
-  const level = E.watchLevelsFor(m.tmdb_id).find(l => !l.spent);
+  const m = E.MOVIES.find(f => E.watchLevelsFor(f.tmdb_id).some(l => !l.spent));   // CAS-1544: by open window, not index
+  const level = m && E.watchLevelsFor(m.tmdb_id).find(l => !l.spent);
   assert.ok(level, "no un-spent level to test on this film — the harness catalogue looks wrong");
   const remoteRow = { user_id: "cas681-test-user", movie_id: String(m.tmdb_id),
     windows: [level.key], sources: { [level.key]: "auto" } };
@@ -2269,8 +2269,8 @@ test("CAS-726 AC2: an agent-armed Watch On value round-trips through film_watch.
 }));
 
 test("CAS-726 AC3: an existing film_watch row with no sources entry loads without error and reads as unset", () => withCas726State(async () => {
-  const m = E.MOVIES[2];
-  const level = E.watchLevelsFor(m.tmdb_id).find(l => !l.spent);
+  const m = E.MOVIES.find(f => E.watchLevelsFor(f.tmdb_id).some(l => !l.spent));   // CAS-1544: by open window, not index
+  const level = m && E.watchLevelsFor(m.tmdb_id).find(l => !l.spent);
   assert.ok(level, "no un-spent level to test on this film — the harness catalogue looks wrong");
   // A row exactly as it existed before this ticket: windows only, no sources column value at all.
   const remoteRow = { user_id: "cas681-test-user", movie_id: String(m.tmdb_id), windows: [level.key] };
