@@ -5,6 +5,7 @@ broken one must fail `npm run qa` rather than go unseen.
 """
 import glob
 import os
+import re
 import unittest
 
 import yaml
@@ -22,6 +23,18 @@ class WorkflowsParse(unittest.TestCase):
             with self.subTest(workflow=os.path.basename(path)):
                 with open(path, encoding="utf-8") as f:
                     yaml.safe_load(f)
+
+    def test_playwright_jobs_pin_ubuntu_2404(self):
+        """CAS-1560 — Playwright WebKit isn't supported on ubuntu-latest (26.04); pin 24.04."""
+        pw = re.compile(r"playwright (install|test)|test:e2e|test:e2e:full|test:integrity")
+        for path in WORKFLOWS:
+            with open(path, encoding="utf-8") as f:
+                doc = yaml.safe_load(f)
+            for name, job in (doc.get("jobs") or {}).items():
+                runs = "\n".join(str(s.get("run", "")) for s in job.get("steps", []) or [])
+                if pw.search(runs):
+                    with self.subTest(workflow=os.path.basename(path), job=name):
+                        self.assertEqual(job.get("runs-on"), "ubuntu-24.04")
 
 
 if __name__ == "__main__":
