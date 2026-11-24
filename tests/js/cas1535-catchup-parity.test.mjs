@@ -88,7 +88,9 @@ function checkSkipAndStepUp(base){
   if(base.coming[0] !== undefined) assert.ok(!got.coming.includes(base.coming[0]));
   if(base.streaming[1] !== undefined) assert.ok(!got.streaming.includes(base.streaming[1]));
   for (const stage of Object.keys(CAPS)) assert.deepEqual(got[stage], expected(stage, statuses), stage);
-  if(base.cinema.length >= 2) assert.equal(got.cinema[0], base.cinema[1]);
+  // The held film is skipped and the stage still fills: a verdict can nudge the taste score and reorder the
+  // rest (CI run 45471963981), so "steps up" is the app's own order (the deepEqual above), not base's [1].
+  if(base.cinema.length >= 2) assert.ok(got.cinema.length >= Math.min(base.cinema.length, CAPS.cinema) - 1 && got.cinema.length > 0);
   return got;
 }
 
