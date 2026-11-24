@@ -36,6 +36,26 @@ class WorkflowsParse(unittest.TestCase):
                     with self.subTest(workflow=os.path.basename(path), job=name):
                         self.assertEqual(job.get("runs-on"), "ubuntu-24.04")
 
+    def test_unittest_jobs_install_pyyaml_when_tests_import_yaml(self):
+        """CAS-1561 — a job running `python -m unittest ... <dir>` over a folder whose tests
+        import yaml must `pip install pyyaml` in that job."""
+        yaml_import = re.compile(r"^\s*(import yaml|from yaml\b)", re.M)
+        for path in WORKFLOWS:
+            with open(path, encoding="utf-8") as f:
+                doc = yaml.safe_load(f)
+            for name, job in (doc.get("jobs") or {}).items():
+                runs = "\n".join(str(s.get("run", "")) for s in job.get("steps", []) or [])
+                dirs = re.findall(r"python -m unittest discover -s (\S+)", runs)
+                needs = False
+                for d in dirs:
+                    for tf in glob.glob(os.path.join(ROOT, d, "**", "*.py"), recursive=True):
+                        with open(tf, encoding="utf-8") as f:
+                            if yaml_import.search(f.read()):
+                                needs = True
+                if needs:
+                    with self.subTest(workflow=os.path.basename(path), job=name):
+                        self.assertRegex(runs, r"pip install[^\n]*pyyaml")
+
 
 if __name__ == "__main__":
     unittest.main()

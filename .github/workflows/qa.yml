@@ -203,6 +203,7 @@ jobs:
         timeout-minutes: 8
         run: |
           set -o pipefail
+          python -m pip install --quiet pyyaml
           python -m unittest discover -s monitor/tests 2>&1 | tee monitor.log
           python -m monitor --dry-run 2>&1 | tee -a monitor.log
 
