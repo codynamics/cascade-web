@@ -1,0 +1,56 @@
+name: Production check (CAS-1552)
+
+# workflow_dispatch ONLY. Created under CAS-1552's explicit authorisation of exactly this one new workflow file,
+# on `staging` only. Read-only against production except one hits_stream test alert to the QA account.
+# qa/prod_check.py refuses an empty qa_user and the user id of lee+c1@codynamics.com.au.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Commit that was released (compared with the live version.json and supabase/migrations/)"
+        required: true
+      qa_user:
+        description: "Production QA account user id (uuid). Never lee+c1 or a real member."
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  prod-check:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 25
+    steps:
+      - name: Refuse an empty qa_user
+        env:
+          QA_USER: ${{ inputs.qa_user }}
+        run: |
+          if [ -z "$QA_USER" ]; then echo "::error::qa_user is empty"; exit 1; fi
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run the production check
+        env:
+          RELEASE: ${{ inputs.release }}
+          QA_USER: ${{ inputs.qa_user }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          CASCADE_EMAIL_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}
+          CASCADE_SITE_URL: ${{ secrets.SITE_URL }}
+          APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          APNS_AUTH_KEY: ${{ secrets.APNS_AUTH_KEY }}
+          APNS_BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
+          CASCADE_ENV: production
+        run: |
+          set -o pipefail
+          python -m qa.prod_check --release "$RELEASE" --qa-user "$QA_USER" | tee -a "$GITHUB_STEP_SUMMARY"
