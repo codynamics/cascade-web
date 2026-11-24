@@ -1,0 +1,210 @@
+name: Nightly QA (CAS-1557)
+
+# Created under CAS-1557's explicit authorisation of exactly this one new workflow file, on `staging` only.
+# Runs every suite against the `staging` branch once a night, in the `staging` GitHub environment (never the live one)
+# and raises one Jira ticket per failing item that has no open `Nightly QA:` ticket (qa/nightly_tickets.py).
+# Not part of the push gate. A green night: the run summary says so and nothing else happens. No email.
+# GitHub cron is UTC and best effort: 15:00 UTC is 02:00 Sydney during daylight saving (03:00 in winter).
+
+on:
+  schedule:
+    - cron: "0 15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CASCADE_ENV: staging
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    environment: staging
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: npx playwright install --with-deps webkit
+      - name: Ensure psql is available
+        run: command -v psql || (sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client)
+      - run: npm run build
+      - name: Full browser suite (same sharding as e2e-full.yml)
+        run: |
+          mkdir -p nightly-logs
+          set -o pipefail
+          npm run test:e2e:full -- --retries=1 --shard=${{ matrix.shard }}/4 2>&1 | tee nightly-logs/e2e-${{ matrix.shard }}.log
+      - name: Keep the shard log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-e2e-${{ matrix.shard }}
+          path: nightly-logs/
+          retention-days: 7
+
+  agents:
+    runs-on: ubuntu-24.04
+    environment: staging
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: python poc_pipeline.py --build-html
+      - name: Agent suite
+        run: |
+          mkdir -p nightly-logs
+          set -o pipefail
+          npm run test:agents 2>&1 | tee nightly-logs/agents.log
+      - name: Keep the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-agents
+          path: nightly-logs/
+          retention-days: 7
+
+  integrity:
+    runs-on: ubuntu-24.04
+    environment: staging
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: npx playwright install --with-deps webkit
+      - name: Ensure psql is available
+        run: command -v psql || (sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client)
+      - name: Account integrity (local Supabase)
+        run: |
+          mkdir -p nightly-logs
+          set -o pipefail
+          npm run test:integrity 2>&1 | tee nightly-logs/integrity.log
+      - name: Keep the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-integrity
+          path: nightly-logs/
+          retention-days: 7
+
+  # Every journey and the first ten days, send=false, against STAGING (same guards as simulate.yml). One job: both
+  # use the same four QA accounts, so they must not overlap.
+  simulate:
+    runs-on: ubuntu-24.04
+    environment: staging
+    timeout-minutes: 45
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+      - name: Refuse to run against the live project
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Supabase secrets absent from the staging environment - aborting."
+            exit 1
+          fi
+          case "$SUPABASE_URL" in
+            *ypccfyatejejslzlfrbf*) echo "SUPABASE_URL is the LIVE project - this workflow is staging only. Aborting."; exit 1 ;;
+          esac
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Account ids (the four QA accounts)
+        run: python -m qa.sim.accounts list | tee "$RUNNER_TEMP/accounts.txt"
+      - name: Every journey (send false)
+        run: |
+          mkdir -p nightly-logs
+          set -o pipefail
+          python -m monitor.journey --journey all --accounts a,b,c,d --accounts-file "$RUNNER_TEMP/accounts.txt" 2>&1 | tee nightly-logs/journeys.log
+      - name: First ten days (send false)
+        if: always()
+        run: |
+          set -o pipefail
+          python -m monitor.firstdays --accounts a,b,c,d --accounts-file "$RUNNER_TEMP/accounts.txt" 2>&1 | tee nightly-logs/firstdays.log
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: log-simulate
+          path: nightly-logs/
+          retention-days: 7
+
+  report:
+    needs: [e2e, agents, integrity, simulate]
+    if: always()
+    runs-on: ubuntu-24.04
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Download every suite log
+        uses: actions/download-artifact@v4
+        with:
+          pattern: log-*
+          path: all-logs
+          merge-multiple: true
+      - name: Merge the e2e shards into one log
+        run: |
+          mkdir -p logs
+          cp all-logs/*.log logs/ 2>/dev/null || true
+          if ls logs/e2e-*.log >/dev/null 2>&1; then cat logs/e2e-*.log > logs/e2e.log; rm logs/e2e-*.log; fi
+      - name: Collect failures and raise tickets
+        env:
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+          AGENTS_RESULT: ${{ needs.agents.result }}
+          INTEGRITY_RESULT: ${{ needs.integrity.result }}
+          SIMULATE_RESULT: ${{ needs.simulate.result }}
+        run: |
+          FAILED=""
+          [ "$E2E_RESULT" != "success" ] && FAILED="$FAILED,e2e"
+          [ "$AGENTS_RESULT" != "success" ] && FAILED="$FAILED,agents"
+          [ "$INTEGRITY_RESULT" != "success" ] && FAILED="$FAILED,integrity"
+          # simulate writes two logs (journeys, firstdays); a failed job with unparsed output is reported as `journeys`
+          [ "$SIMULATE_RESULT" != "success" ] && FAILED="$FAILED,journeys"
+          python -m qa.nightly_tickets --logs logs --failed "${FAILED#,}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --commit "${{ github.sha }}"
