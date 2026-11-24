@@ -1,7 +1,7 @@
 // CAS-232: shared driving for the e2e specs.
 //
 // The rule here is that anything a PERSON does, the test clicks — the splash CTA, the priority answer, an agent
-// card, Continue. Only reading uses page.evaluate. A harness that drove the flow by calling flowPriority() and
+// card, Continue. Only reading uses page.evaluate. A harness that drove the flow by calling flowPriority()
 // pickStarter() directly would still pass with every button on the page unwired, which is most of what an
 // end-to-end suite is for.
 import { expect } from "@playwright/test";
@@ -19,7 +19,7 @@ export const PRESET_NAMES = {
  * membership on the membership screen. A spec's fake supabase-js that answers every table with `{data: []}` (or
  * has no `select` on it) therefore gates the app. Append this to a fake client script, AFTER it assigns
  * window.supabase: it wraps createClient so `from("memberships")` answers one active member row (any chained
- * select/eq/maybeSingle) and rpc("is_web_access_approved") answers true, leaving every other table/rpc to the
+ * select/eq/maybeSingle), leaving every other table/rpc to the
  * spec's own fake. */
 export function withActiveMember(script){
   return script + `
@@ -37,7 +37,7 @@ export function withActiveMember(script){
     const origFrom = client.from && client.from.bind(client);
     client.from = (table) => table === "memberships" ? memberChain() : origFrom(table);
     const origRpc = client.rpc && client.rpc.bind(client);
-    client.rpc = (fn, args) => fn === "is_web_access_approved" ? Promise.resolve({ data: true, error: null }) : (origRpc ? origRpc(fn, args) : Promise.resolve({ data: null, error: null }));
+    client.rpc = (fn, args) => origRpc ? origRpc(fn, args) : Promise.resolve({ data: null, error: null });
     return client;
   };
   sb.__casMemberWrapped = true;
@@ -51,7 +51,7 @@ export async function gotoFresh(page){
   await page.goto("/index.html");
   await page.evaluate(() => { try{ localStorage.clear(); }catch(e){} });
   await page.goto("/index.html");
-  // MOVIES and friends are top-level `const` in a classic script, so they live in the global LEXICAL scope and
+  // MOVIES and friends are top-level `const` in a classic script, so they live in the global LEXICAL scope
   // are NOT properties of window — `window.MOVIES` is undefined while a bare `MOVIES` resolves fine. Worth
   // knowing before writing any page.evaluate against this app; it cost a run to learn.
   await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
@@ -94,7 +94,7 @@ function urlPath(u){
 
 /** CAS-1136 decision 2: on a failed or timed-out test, print every request still in flight (method,
  * path, elapsed so far) and the last 30 buffered [page] console lines for whichever page called
- * freshAppSignedIn. A no-op for guest-mode tests (no diagnostics were ever recorded for their page) and
+ * freshAppSignedIn. A no-op for guest-mode tests (no diagnostics were ever recorded for their page)
  * for passing tests (nothing useful to add). */
 export function dumpSignedInDiagnostics(page, testInfo){
   const diag = netDiagnostics.get(page);
@@ -119,7 +119,7 @@ function e2eTestEmail(){
   return `cas1110-e2e-${Date.now()}-${e2eUserSeq}@e2e.test`;
 }
 
-/** CAS-1110: the signed-in equivalent of freshApp — routes config.js at the local Supabase stack and
+/** CAS-1110: the signed-in equivalent of freshApp — routes config.js at the local Supabase stack
  * injects a brand-new test user's real session into localStorage before the app's first script runs, so
  * CascadeAuth resolves signed-in on boot instead of guest. The storage key matches supabase-js's own
  * default derivation from the project URL (see supabase-js.js / app_template.html's own createClient
@@ -333,8 +333,8 @@ export async function finishFlow(page){
  * { skipTutorial: false } to see the tour as it actually first appears.
  * CAS-1030: membStart() (app_template.html) only proceeds straight to the listing for a guest (or an
  * already signed-in) device — membNeedsEmail() is also true for a device with a REAL (fake or not)
- * Supabase config that hasn't signed in yet, in which case membScreen renders an #membEmail field and
- * membStart() silently no-ops without it (an unfilled/invalid email just sets membEmailError and
+ * Supabase config that hasn't signed in yet, in which case membScreen renders an #membEmail field
+ * membStart() silently no-ops without it (an unfilled/invalid email just sets membEmailError
  * returns), leaving #membScreen.open forever and hanging every caller's own toBeHidden() wait. Every
  * other spec here runs guest-mode (freshApp's config.js 404 keeps CascadeAuth.enabled false, so
  * #membEmail never renders) — only cas913's own configured-but-signed-out scenario hits this, so

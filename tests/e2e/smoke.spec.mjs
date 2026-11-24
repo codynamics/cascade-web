@@ -922,6 +922,13 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
       apply: () => chain(),
     });
   }
+  // CAS-1569: the approved list is retired (CAS-1565); web access is an active memberships row.
+  function memberChain(){
+    return new Proxy(() => {}, {
+      get: (_t, prop) => prop === "then" ? (resolve) => resolve({ data: { status: "active", expires_at: "2099-12-31T00:00:00Z", is_trial: false, source: "promo" }, error: null }) : () => memberChain(),
+      apply: () => memberChain(),
+    });
+  }
   // CAS-1109/CAS-1142: this test's own onboarding walk creates an agent in guest mode, then signs in —
   // syncCascadesToAccount() uploads that agent via an acctOp "insert" (c.from("cascades").upsert(fields,
   // {onConflict:"id", ignoreDuplicates:true})), and toListing()'s settleListing() wait needs that same agent
@@ -966,7 +973,7 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
           return { error: null };
         },
       },
-      from: (table) => table === "cascades" ? cascadesTable() : chain(),
+      from: (table) => table === "memberships" ? memberChain() : table === "cascades" ? cascadesTable() : chain(),
       // CAS-1099: membStart() now calls rpc("email_has_account") before requesting a code, and
       // rpc("complete_membership") once the code verifies — neither existed when this fixture was written,
       // so an un-stubbed client.rpc(...) threw synchronously (client.rpc is not a function) the instant the
@@ -980,9 +987,6 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
       // sees a group.
       rpc: async (fn, params) => {
         if(fn === "email_has_account") return { data: false, error: null };
-        // CAS-1540: CAS-1531 made membEnsureMember() ask is_web_access_approved on the web; an unstubbed
-        // answer ("created") is not true, so the invite-only screen kept #membScreen open. Approved here.
-        if(fn === "is_web_access_approved") return { data: true, error: null };
         if(fn === "complete_membership"){
           // CAS-1176 AC7: recorded so a test can inspect what membCompleteNewMembership actually sent,
           // without this fixture needing its own notify_prefs table (every other table here falls through
@@ -1123,6 +1127,13 @@ const CAS1169_FAKE_SUPABASE_GLOBAL = `
       apply: () => chain(),
     });
   }
+  // CAS-1569: the approved list is retired (CAS-1565); web access is an active memberships row.
+  function memberChain(){
+    return new Proxy(() => {}, {
+      get: (_t, prop) => prop === "then" ? (resolve) => resolve({ data: { status: "active", expires_at: "2099-12-31T00:00:00Z", is_trial: false, source: "promo" }, error: null }) : () => memberChain(),
+      apply: () => memberChain(),
+    });
+  }
   // Same fixture-vs-acctLoad gap CAS913_FAKE_SUPABASE_GLOBAL's own comment explains above.
   let cascadeRows = [];
   function cascadesTable(){
@@ -1157,12 +1168,9 @@ const CAS1169_FAKE_SUPABASE_GLOBAL = `
         },
         signOut: async () => { writeSession(null); return { error: null }; },
       },
-      from: (table) => table === "cascades" ? cascadesTable() : chain(),
+      from: (table) => table === "memberships" ? memberChain() : table === "cascades" ? cascadesTable() : chain(),
       rpc: async (fn, params) => {
         if(fn === "email_has_account") return { data: false, error: null };
-        // CAS-1540: CAS-1531 made membEnsureMember() ask is_web_access_approved on the web; an unstubbed
-        // answer ("created") is not true, so the invite-only screen kept #membScreen open. Approved here.
-        if(fn === "is_web_access_approved") return { data: true, error: null };
         if(fn === "complete_membership"){
           const agents = (params && params.p && params.p.agents) || [];
           agents.forEach(a => {
@@ -1408,6 +1416,13 @@ const CAS1035_FAKE_SUPABASE_GLOBAL = `
       apply: () => chain(),
     });
   }
+  // CAS-1569: the approved list is retired (CAS-1565); web access is an active memberships row.
+  function memberChain(){
+    return new Proxy(() => {}, {
+      get: (_t, prop) => prop === "then" ? (resolve) => resolve({ data: { status: "active", expires_at: "2099-12-31T00:00:00Z", is_trial: false, source: "promo" }, error: null }) : () => memberChain(),
+      apply: () => memberChain(),
+    });
+  }
   function filmWatchTable(){
     return {
       select: () => chain(),   // CAS-1096: acctLoad chains .select().order().range() before its own .then()
@@ -1452,16 +1467,13 @@ const CAS1035_FAKE_SUPABASE_GLOBAL = `
         },
         signOut: async () => { writeSession(null); return { error: null }; },
       },
-      from: (table) => table === "film_watch" ? filmWatchTable() : table === "cascades" ? cascadesTable() : chain(),
+      from: (table) => table === "memberships" ? memberChain() : table === "film_watch" ? filmWatchTable() : table === "cascades" ? cascadesTable() : chain(),
       // CAS-1099: see CAS913_FAKE_SUPABASE_GLOBAL's identical stub above — this test also walks finishFlow
       // + toListing() through membStart(), which now needs both RPCs to resolve rather than throw.
       // CAS-1109: see CAS913_FAKE_SUPABASE_GLOBAL's identical complete_membership handling above — this
       // test's onboarding-built agent only exists once this mock creates it from p.agents.
       rpc: async (fn, params) => {
         if(fn === "email_has_account") return { data: false, error: null };
-        // CAS-1540: CAS-1531 made membEnsureMember() ask is_web_access_approved on the web; an unstubbed
-        // answer ("created") is not true, so the invite-only screen kept #membScreen open. Approved here.
-        if(fn === "is_web_access_approved") return { data: true, error: null };
         if(fn === "complete_membership"){
           const agents = (params && params.p && params.p.agents) || [];
           agents.forEach(a => {
