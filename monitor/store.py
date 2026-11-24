@@ -57,6 +57,7 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import os
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -298,6 +299,51 @@ class InMemoryStore:
 
     def fetch_user_prefs(self) -> dict:
         return dict(self._user_prefs)
+
+    # ---- CAS-1554: the film journey simulator's own writes/cleanup, scoped to named QA accounts -----------
+    def purge_journey_state(self, user_ids, movie_id=None) -> dict:
+        """Delete everything a journey run can have written for exactly `user_ids`: their ledger rows (every
+        film - a stray alert for another film is a FAIL the run must not leave behind), alert batches, and -
+        for `movie_id` only - their Watch On and Watched / Not for me rows. Returns the counts removed."""
+        uids = {str(u) for u in user_ids}
+        out = {}
+        before = len(self._notifications)
+        self._notifications = [n for n in self._notifications if str(n.get("user_id")) not in uids]
+        out["notifications"] = before - len(self._notifications)
+        before = len(self._alert_batches)
+        self._alert_batches = [b for b in self._alert_batches if str(b.get("user_id")) not in uids]
+        out["alert_batches"] = before - len(self._alert_batches)
+        mid = None if movie_id is None else str(movie_id)
+        before = len(self._watches)
+        self._watches = [w for w in self._watches
+                         if not (str(w.get("user_id")) in uids and (mid is None or str(w.get("movie_id")) == mid))]
+        out["film_watch"] = before - len(self._watches)
+        before = len(self._user_films)
+        self._user_films = [r for r in self._user_films
+                            if not (str(r.get("user_id")) in uids and (mid is None or str(r.get("movie_id")) == mid))]
+        out["user_films"] = before - len(self._user_films)
+        before = len(self._agent_films)
+        self._agent_films = [r for r in self._agent_films
+                             if not (str(r.get("user_id")) in uids and (mid is None or str(r.get("movie_id")) == mid))]
+        out["agent_films"] = before - len(self._agent_films)
+        return out
+
+    def upsert_agent_film(self, row: dict) -> None:
+        """CAS-1554: the device sync's own write - an agent's admission of one film (user_id, cascade_id, movie_id,
+        admission_score, admission_status). Keyed on (user_id, cascade_id, movie_id); the first admission wins."""
+        key = (str(row["user_id"]), str(row["cascade_id"]), str(row["movie_id"]))
+        for r in self._agent_films:
+            if (str(r.get("user_id")), str(r.get("cascade_id")), str(r.get("movie_id"))) == key:
+                return
+        self._agent_films.append(dict(row, movie_id=str(row["movie_id"])))
+
+    def upsert_user_film(self, user_id, movie_id, status: str) -> None:
+        """CAS-1554: a member's Watched / Not for me answer on one film (user_films primary key user_id+movie_id)."""
+        for r in self._user_films:
+            if str(r.get("user_id")) == str(user_id) and str(r.get("movie_id")) == str(movie_id):
+                r["status"] = status
+                return
+        self._user_films.append({"user_id": user_id, "movie_id": str(movie_id), "status": status})
 
     def fetch_user_films(self) -> list:
         return list(self._user_films)
@@ -1046,6 +1092,51 @@ class SupabaseStore:
             return len(json.loads(body))
         except (json.JSONDecodeError, TypeError):
             return 0
+
+    # ---- CAS-1554: the film journey simulator's own writes/cleanup, scoped to named QA accounts -----------
+    def _delete_where(self, table: str, query: str) -> int:
+        req = urllib.request.Request(self._base + f"/{table}?{query}",
+                                     headers=self._headers({"Prefer": "return=representation"}), method="DELETE")
+        with urllib.request.urlopen(req, timeout=self._timeout) as resp:
+            body = resp.read().decode("utf-8")
+        try:
+            return len(json.loads(body))
+        except (json.JSONDecodeError, TypeError):
+            return 0
+
+    def purge_journey_state(self, user_ids, movie_id=None) -> dict:
+        """See InMemoryStore.purge_journey_state. Every filter carries an explicit user_id list (uuids only -
+        anything else raises before a request is made), so this can never touch a real member."""
+        ids = [str(u) for u in user_ids]
+        if not ids or not all(re.fullmatch(r"[0-9a-fA-F-]{36}", u) for u in ids):
+            raise ValueError("purge_journey_state needs a non-empty list of user uuids")
+        who = "user_id=in.(" + ",".join(ids) + ")"
+        out = {"notifications": self._delete_where("notifications", who),
+               "alert_batches": self._delete_where("alert_batches", who)}
+        if movie_id is not None:
+            film = "&movie_id=eq." + urllib.parse.quote(str(movie_id))
+            out["film_watch"] = self._delete_where("film_watch", who + film)
+            out["user_films"] = self._delete_where("user_films", who + film)
+            out["agent_films"] = self._delete_where("agent_films", who + film)
+        return out
+
+    def upsert_agent_film(self, row: dict) -> None:
+        """First admission wins (the app's own agent_films rows are frozen at admission): ignore-duplicates."""
+        body = dict(row, movie_id=str(row["movie_id"]))
+        body.setdefault("agent_sig", "journey")
+        req = urllib.request.Request(
+            self._base + "/agent_films?on_conflict=user_id,cascade_id,movie_id", data=json.dumps([body]).encode("utf-8"),
+            headers=self._headers({"Prefer": "resolution=ignore-duplicates,return=minimal"}), method="POST")
+        with urllib.request.urlopen(req, timeout=self._timeout):
+            pass
+
+    def upsert_user_film(self, user_id, movie_id, status: str) -> None:
+        row = {"user_id": user_id, "movie_id": str(movie_id), "status": status}
+        req = urllib.request.Request(
+            self._base + "/user_films?on_conflict=user_id,movie_id", data=json.dumps([row]).encode("utf-8"),
+            headers=self._headers({"Prefer": "resolution=merge-duplicates,return=minimal"}), method="POST")
+        with urllib.request.urlopen(req, timeout=self._timeout):
+            pass
 
     # CAS-1091: none of these views carries a declared primary key (they're plain `group by`
     # aggregates — supabase/schema.sql), so the paging order is each view's own group-by columns,

@@ -1,0 +1,151 @@
+{
+ "name": "full-run",
+ "description": "lee+qa-a: one film through every stage - announced, opening next week, in cinemas, past opening weekend, premium, rent, streaming on Netflix (a service lee+qa-a has).",
+ "criteria": {
+  "genres": [
+   "Drama",
+   "Thriller",
+   "Crime"
+  ],
+  "qualifies": [
+   "a"
+  ],
+  "not_qualifies": []
+ },
+ "steps": [
+  {
+   "name": "announced",
+   "date": "2026-12-01",
+   "status": [
+    "upcoming"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [],
+   "expect": {},
+   "note": "The shipped engine sends no alert for this stage to these accounts (alert_moments carries window arrivals only; announced / opens_soon / past_opening_weekend and premium are not alert types for a one-agent account). Recorded as the engine behaves today - a change here is a product decision for a human, not a journey edit."
+  },
+  {
+   "name": "opening next week",
+   "date": "2026-12-13",
+   "status": [
+    "upcoming"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [],
+   "expect": {},
+   "note": "The shipped engine sends no alert for this stage to these accounts (alert_moments carries window arrivals only; announced / opens_soon / past_opening_weekend and premium are not alert types for a one-agent account). Recorded as the engine behaves today - a change here is a product decision for a human, not a journey edit."
+  },
+  {
+   "name": "in cinemas",
+   "date": "2026-12-20",
+   "status": [
+    "in_cinema"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [],
+   "expect": {
+    "a": [
+     {
+      "moment": "hits_cinema",
+      "channels": [
+       "in_app",
+       "push",
+       "email"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "past opening weekend",
+   "date": "2026-12-24",
+   "status": [
+    "in_cinema"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [],
+   "expect": {},
+   "note": "The shipped engine sends no alert for this stage to these accounts (alert_moments carries window arrivals only; announced / opens_soon / past_opening_weekend and premium are not alert types for a one-agent account). Recorded as the engine behaves today - a change here is a product decision for a human, not a journey edit."
+  },
+  {
+   "name": "premium",
+   "date": "2027-01-10",
+   "status": [
+    "pvod"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [
+    {
+     "service": "Apple TV Store",
+     "type": "buy",
+     "price": 29.99,
+     "format": null
+    }
+   ],
+   "expect": {},
+   "note": "The shipped engine sends no alert for this stage to these accounts (alert_moments carries window arrivals only; announced / opens_soon / past_opening_weekend and premium are not alert types for a one-agent account). Recorded as the engine behaves today - a change here is a product decision for a human, not a journey edit."
+  },
+  {
+   "name": "rent",
+   "date": "2027-01-24",
+   "status": [
+    "rental"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [
+    {
+     "service": "Apple TV Store",
+     "type": "buy",
+     "price": 24.99,
+     "format": null
+    },
+    {
+     "service": "Apple TV Store",
+     "type": "rent",
+     "price": 6.99,
+     "format": null
+    }
+   ],
+   "expect": {
+    "a": [
+     {
+      "moment": "hits_rent",
+      "channels": [
+       "in_app",
+       "push",
+       "email"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "streaming on Netflix",
+   "date": "2027-03-01",
+   "status": [
+    "included_streaming"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [
+    {
+     "service": "Netflix",
+     "type": "sub",
+     "price": null,
+     "format": null
+    }
+   ],
+   "expect": {
+    "a": [
+     {
+      "moment": "hits_stream",
+      "channels": [
+       "in_app",
+       "push",
+       "email"
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}

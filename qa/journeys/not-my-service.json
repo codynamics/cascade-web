@@ -1,0 +1,56 @@
+{
+ "name": "not-my-service",
+ "known_disagreement": "The shipped engine DOES alert lee+qa-a (hits_stream) when the film streams only on a service no QA account has: the QA accounts have services_only OFF, so a window arrival is not filtered by service. The ticket expects none. Reported as a FAIL for a human to judge (CAS-1554: the engine is not changed to fit a journey).",
+ "description": "Streaming on a service no QA account has: none for streaming.",
+ "criteria": {
+  "genres": [
+   "Drama",
+   "Thriller",
+   "Crime"
+  ],
+  "qualifies": [
+   "a"
+  ],
+  "not_qualifies": []
+ },
+ "start": {
+  "date": "2027-01-24",
+  "status": [
+   "rental"
+  ],
+  "release_date": "2026-12-20",
+  "offers": [
+   {
+    "service": "Apple TV Store",
+    "type": "buy",
+    "price": 24.99,
+    "format": null
+   },
+   {
+    "service": "Apple TV Store",
+    "type": "rent",
+    "price": 6.99,
+    "format": null
+   }
+  ]
+ },
+ "steps": [
+  {
+   "name": "streaming on Binge",
+   "date": "2027-03-01",
+   "status": [
+    "included_streaming"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [
+    {
+     "service": "Binge",
+     "type": "sub",
+     "price": null,
+     "format": null
+    }
+   ],
+   "expect": {}
+  }
+ ]
+}
