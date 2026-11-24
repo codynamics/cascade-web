@@ -83,7 +83,7 @@ class K2StatusNeverRegressesAcrossARefresh(unittest.TestCase):
                 f"{before_status} -> candidate {candidate} let rank drop to {m['status']}")
 
 
-class K3ExistingSuitesRunGreenAgainstTheBuiltCatalogue(unittest.TestCase):
+class K3_CAS1558_ExistingSuitesRunGreenAgainstTheBuiltCatalogue(unittest.TestCase):
     """K3: the existing data-quality (blocking half — the same split CI's `data` job runs, via
     tests.run_data_quality) and pipeline-resilience suites, run directly rather than
     re-implemented, so this check is exactly as strict as the real gate."""

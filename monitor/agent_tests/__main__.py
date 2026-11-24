@@ -15,7 +15,7 @@ REPORT_PATH = os.environ.get("QA_AGENTS_REPORT", os.path.join(REPO_ROOT, "qa-age
 # The suite names each check by prefixing its TestCase class with a short id, e.g.
 # `class K1RebuildMatchesTheCommittedIndexExceptItsOwnStamp`; fall back to a fully qualified test
 # id for a class that carries none (CAS-789's own scaffold "Scaffold" class has no such prefix).
-CHECK_ID_RE = re.compile(r"^([A-Z]+\d+)")
+CHECK_ID_RE = re.compile(r"^([A-Z]+\d+(?:_CAS\d+)?)")
 
 
 def check_id(test):

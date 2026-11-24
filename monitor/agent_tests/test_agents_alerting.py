@@ -119,7 +119,7 @@ class D4AFilmWatchWithNoMatchingCascade(unittest.TestCase):
         self.assertIsNone(row["cascade_id"], "D4: the ledger row's cascade_id must be null")
 
 
-class G4AnAnnouncedUnreleasedTitleFires(unittest.TestCase):
+class G4_CAS1558_AnAnnouncedUnreleasedTitleFires(unittest.TestCase):
     """G4: a title absent from yesterday's catalogue, present today, still unreleased ->
     `announced` fires (CAS-242's one first-sighting-is-the-news exception)."""
 
@@ -339,7 +339,7 @@ class J3AFirstSightingAlreadyInsideAWindowFiresNoStatusMoment(unittest.TestCase)
         self.assertEqual(transitions, [])
 
 
-class J4NeitherAnUnrequestedMomentNorAGlobalMuteFires(unittest.TestCase):
+class J4_CAS1558_NeitherAnUnrequestedMomentNorAGlobalMuteFires(unittest.TestCase):
     """J4: a moment absent from the agent's alert_moments, and separately a global mute, each
     independently silence the same real transition."""
 
@@ -375,7 +375,7 @@ class J4NeitherAnUnrequestedMomentNorAGlobalMuteFires(unittest.TestCase):
         self.assertEqual(len(self._match(cascade).get("u1", [])), 1)
 
 
-class J5AllFourNotifyPrefCombinationsChooseTheirChannels(unittest.TestCase):
+class J5_CAS1558_AllFourNotifyPrefCombinationsChooseTheirChannels(unittest.TestCase):
     """J5: {email_on, in_app} x {True, False} - only the chosen channels deliver, and CAS-465's
     push (which rides the same "in_app" gate, not a fourth independent switch) carries the
     existing unread badge count plus what this run delivers. Driven through the real CLI
@@ -462,7 +462,7 @@ class J5AllFourNotifyPrefCombinationsChooseTheirChannels(unittest.TestCase):
         self.assertIn("both channels off", out)
 
 
-class J6RerunningTheSameDayTwiceIsSilent(unittest.TestCase):
+class J6_CAS1558_RerunningTheSameDayTwiceIsSilent(unittest.TestCase):
     """J6: a second run against the same transitions and the ledger the first run wrote must
     send nothing - de-dupe holds."""
 
