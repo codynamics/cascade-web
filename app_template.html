@@ -2228,6 +2228,14 @@
   .memboffer .moprice{font-family:Poppins,system-ui,sans-serif;font-weight:700;font-size:24px;line-height:1.2;color:#fff}
   .memboffer .moterms{font-size:13px;font-weight:500;line-height:1.45;color:#cfd6e6;max-width:300px}
   .memfine b{color:var(--accenttext)}
+  .membpromo{margin:6px 0 2px;text-align:right}
+  .membpromo .linkbtn{font-size:13px;color:var(--muted,#8b95a5);text-decoration:underline;text-underline-offset:2px}
+  .membpromo .flabel{text-align:left}
+  .membpromobox{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .membpromobox .namein{flex:1;min-width:0;text-transform:uppercase;letter-spacing:.06em}
+  .membpromoapply{flex:none;background:none;border:1px solid var(--line,#3a4256);color:var(--text,#e8ecf3);border-radius:10px;padding:10px 12px;font-weight:700;font-size:14px}
+  .membpromook{margin:6px 0 0;font-size:13px;color:#22c55e;font-weight:700;text-align:left}
+  .membpromo .fielderr{text-align:left}
   .membenefits{display:flex;flex-direction:column;gap:15px;margin:0 0 20px}
   .mbrow{display:flex;align-items:center;gap:13px}
   .mbic{flex:0 0 auto;width:38px;height:38px;display:grid;place-items:center;font-size:20px;
@@ -25260,6 +25268,7 @@ function openMembership(agentKey, nameOverride, cascade){
         <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
                 style="vertical-align:baseline">Sign in</button></p>
     </div>
+    ${membPromoHTML()}
     <div id="membCodeState" hidden>
       <p class="pnote" id="membCodeMsg"></p>
       <div class="flabel">Code</div>
@@ -25278,6 +25287,7 @@ function openMembership(agentKey, nameOverride, cascade){
     ${membIsNativeApp() ? `<button type="button" class="linkbtn" id="membRestoreBtn" onclick="membRestoreTap()">Restore Purchases</button>` : ""}
     ${posters?`<div class="rvgrid membgrid" id="membPosterGrid">${posters}</div>`:""}`;
   membResetCodeState();   // B10: always opens in State A
+  membPromoReset("signup");   // CAS-1565
   membLoadProduct();      // CAS-971: StoreKit's localized price/trial text, native only
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
@@ -25352,6 +25362,7 @@ function openOnbMembership(){
         <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
                 style="vertical-align:baseline">Sign in</button></p>
     </div>
+    ${membPromoHTML()}
     <div id="membCodeState" hidden>
       <p class="pnote" id="membCodeMsg"></p>
       <div class="flabel">Code</div>
@@ -25370,6 +25381,7 @@ function openOnbMembership(){
     ${membIsNativeApp() ? `<button type="button" class="linkbtn" id="membRestoreBtn" onclick="membRestoreTap()">Restore Purchases</button>` : ""}
     ${posters?`<div class="rvgrid membgrid" id="membPosterGrid">${posters}</div>`:""}`;
   membResetCodeState();   // B10: always opens in State A
+  membPromoReset("signup");   // CAS-1565
   membLoadProduct();      // CAS-971: StoreKit's localized price/trial text, native only
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
@@ -25489,7 +25501,7 @@ function membSetStateAVisible(visible){
   // Lee, 14 Nov: the privacy consent line shows once, with the email it applies to, not again on the code step.
   // Lee, 16 Nov: the First month free box is the email step's only; the code step just asks for the code.
   [$("membPill"), $("membOffer"), body.querySelector(".membhaul"), body.querySelector(".membenefits"),
-   body.querySelector(".memfine"), $("membEmailField"), $("membPosterGrid"),
+   body.querySelector(".memfine"), $("membEmailField"), $("membPromo"), $("membPosterGrid"),
    // The privacy line specifically — the first .pnote is #membCodeMsg, which holds Change email (CAS-1445).
    body.querySelector('.pnote button[onclick^="openPrivacy"]')?.closest(".pnote")]
     .forEach(el=>{ if(el) el.style.display=d; });
@@ -25702,16 +25714,6 @@ async function membLoadEntitlement(){
     const {data, error}=await a.client.from("memberships").select("status,expires_at,is_trial,source").eq("user_id", a.user.id).maybeSingle();
     if(error){ console.warn("Cascade: memberships read failed", error); membEnt={state:"unknown", row:null}; return membEnt; }
     membEnt={state: membRowActive(data) ? "active" : "none", row:data||null};
-    // CAS-1531: an email on the server's approved list (public.web_access, no client read policy — only this
-    // yes/no function can see it) counts as a member, source "web_access". An unreachable function (migration
-    // 0012 not applied yet) leaves the answer as it was: it never locks anyone out.
-    if(membEnt.state==="none" && typeof a.client.rpc==="function"){
-      try{
-        const r=await a.client.rpc("is_web_access_approved");
-        if(!r.error && r.data===true) membEnt={state:"active", row:{status:"active", expires_at:"2099-12-31T00:00:00Z", is_trial:false, source:"web_access"}};
-        else if(r.error) console.warn("Cascade: web_access check failed", r.error);
-      }catch(e){ console.warn("Cascade: web_access check failed", e); }
-    }
   }catch(e){ console.warn("Cascade: memberships read failed", e); membEnt={state:"unknown", row:null}; }
   return membEnt;
 }
@@ -25740,7 +25742,7 @@ function membAccountPlanText(){
   if(membEnt.state==="active" && r){
     const d=new Date(r.expires_at).toLocaleDateString(undefined,{day:"numeric",month:"long",year:"numeric"});
     if(r.source==="comp") return "Complimentary membership";
-    if(r.source==="web_access") return "Invited access";
+    if(r.source==="promo") return "Complimentary membership until " + d;   // CAS-1565
     return (r.is_trial ? "Free trial until " : "Active · renews ") + d;
   }
   return membEnt.state==="none" ? "No active membership" : "Membership is started in the Cascade iPhone app.";
@@ -25854,9 +25856,17 @@ async function membRestore(){
 async function membEnsureMember(go){
   if(!window.CascadeAuth || window.CascadeAuth.status!=="signed-in") return go();
   if(!membIsNativeApp()){
+    // CAS-1565: a code applied on the sign-up screen is redeemed once, now that there is an account, before
+    // the gate decides. A failure leaves the account where it is and names the reason on the invite-only screen.
+    let promoErr=null;
+    if(membPromoHeld){
+      const code=membPromoHeld; membPromoHeld=null;
+      const r=await membRedeemPromo(code);
+      if(!r.ok) promoErr=r.error;
+    }
     await membLoadEntitlement();
     if(membEnt.state!=="none") return go();
-    membShowInviteOnly();
+    membShowInviteOnly(promoErr);
     return;
   }
   await membLoadEntitlement();
@@ -25866,15 +25876,100 @@ async function membEnsureMember(go){
 }
 // CAS-1531: the web's only screen for a signed-in non-member. Painted into #membBody, so closeMembership()
 // and the screen's chrome are the same as every other membership page.
-function membShowInviteOnly(){
+function membShowInviteOnly(promoErr){
   $("membBody").innerHTML = `
     <span class="cascpill" id="membPill">CASCADE</span>
     <h2 class="membh" id="membHead">Cascade on the web is invite-only</h2>
-    <p class="pnote" id="membInviteMsg">Cascade on the web is invite-only. Membership starts in the Cascade iPhone app; once you're a member, sign in here with the same account.</p>
+    <p class="pnote" id="membInviteMsg">Cascade on the web is invite-only. If a friend gave you a promo code, enter it below. Otherwise membership starts in the Cascade iPhone app.</p>
+    ${promoErr ? `<p class="fielderr" id="membInviteReason" role="alert">${esc(membPromoMsg(promoErr))}</p>` : ""}
+    ${membPromoHTML()}
     <button class="membcta" type="button" id="membSignOutBtn" onclick="membInviteSignOut()">Sign out</button>`;
   membResetCodeState();
+  membPromoReset("invite");
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
+}
+// ---- CAS-1565: promo code (web only — App Store 3.1.1 forbids a code that unlocks a subscription in-app) ----
+// The code lives in memory only and is never logged. `membPromoMode` is where the box is: the sign-up screen
+// (check_promo_code, anon-safe, holds the code) or the invite-only screen (redeem_promo_code straight away).
+let membPromoHeld=null, membPromoOpen=false, membPromoMode="signup", membPromoBusy=false;
+const MEMB_PROMO_MSG={used_up:"That code has been used up.", already_used:"That code has already been used on this account."};
+function membPromoMsg(err){ return MEMB_PROMO_MSG[err] || "That code isn't valid."; }
+function membPromoInner(){
+  if(membPromoHeld) return `<div class="flabel">Promo code</div>
+      <div class="membpromobox"><input class="namein" id="membPromoCode" disabled></div>
+      <p class="membpromook">✓ Code applied: your first year is free.</p>`;
+  if(membPromoOpen) return `<div class="flabel">Promo code</div>
+      <div class="membpromobox"><input class="namein" id="membPromoCode" autocapitalize="characters" autocomplete="off" spellcheck="false"><button type="button" class="membpromoapply" id="membPromoApply">Apply</button></div>
+      <p class="fielderr" id="membPromoErr" role="alert" hidden></p>`;
+  return `<button type="button" class="linkbtn" id="membPromoLink">Have a promo code?</button>`;
+}
+function membPromoHTML(){
+  if(membIsNativeApp()) return "";
+  return `<div id="membPromo" class="membpromo">${membPromoInner()}</div>`;
+}
+function membPromoReset(mode){ membPromoMode=mode; membPromoHeld=null; membPromoOpen=false; membPromoBusy=false; membPromoWire(); }
+function membPromoErr(msg){ const e=$("membPromoErr"); if(e){ e.textContent=msg||""; e.hidden=!msg; } }
+function membPromoWire(){
+  const link=$("membPromoLink");
+  if(link) link.addEventListener("click",()=>{ membPromoOpen=true; membPromoPaint(); const i=$("membPromoCode"); if(i && i.focus) i.focus(); });
+  const apply=$("membPromoApply");
+  if(apply) apply.addEventListener("click",()=>membPromoApply());
+  const input=$("membPromoCode");
+  if(input && !membPromoHeld) input.addEventListener("keydown",ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); membPromoApply(); } });
+}
+function membPromoPaint(){
+  const el=$("membPromo"); if(!el || membIsNativeApp()) return;
+  el.innerHTML=membPromoInner();
+  const input=$("membPromoCode");
+  if(input && membPromoHeld) input.value=membPromoHeld;
+  membPromoWire();
+}
+// Valid on the sign-up screen: the price box becomes the single free-year line, and the confirmation line is
+// scrolled clear of the fixed Continue button.
+function membPromoApplied(){
+  const offer=$("membOffer");
+  if(offer) offer.innerHTML=`<span class="moterms">Your first year is free with your code.</span>`;
+  const ok=document.querySelector("#membPromo .membpromook"), cta=document.querySelector(".membcta"), scr=$("membScreen");
+  if(ok && cta && scr && ok.getBoundingClientRect && cta.getBoundingClientRect){
+    const over=ok.getBoundingClientRect().bottom-(cta.getBoundingClientRect().top-12);
+    if(over>0) scr.scrollTop+=over;
+  }
+}
+async function membRedeemPromo(code){
+  let out;
+  try{
+    const c=window.CascadeAuth && window.CascadeAuth.client;
+    const r=c ? await c.rpc("redeem_promo_code",{p_code:code}) : {error:true};
+    const d=r && r.data;
+    out = (!r.error && d && d.ok===true) ? {ok:true} : {ok:false, error:(d && d.error) || "invalid"};
+  }catch(e){ out={ok:false, error:"invalid"}; }
+  logEvent("promo_redeem",{ok:out.ok, error:out.error||null});
+  return out;
+}
+async function membPromoApply(){
+  if(membPromoBusy || membIsNativeApp()) return;
+  const input=$("membPromoCode");
+  const code=((input && input.value)||"").trim();
+  if(!code){ membPromoErr("Enter the code first."); return; }
+  membPromoBusy=true; membPromoErr(null);
+  try{
+    if(membPromoMode==="invite"){
+      const r=await membRedeemPromo(code);
+      if(r.ok){ await membLoadEntitlement(); closeMembership(); membGateDone(); maybeStartTutorial(); }
+      else membPromoErr(membPromoMsg(r.error));
+    } else {
+      let valid=false;
+      try{
+        const c=window.CascadeAuth && window.CascadeAuth.client;
+        const r=c ? await c.rpc("check_promo_code",{p_code:code}) : {error:true};
+        valid=!r.error && r.data===true;
+      }catch(e){ valid=false; }
+      logEvent("promo_check",{valid});
+      if(valid){ membPromoHeld=code.toUpperCase(); membPromoPaint(); membPromoApplied(); }
+      else membPromoErr("That code isn't valid.");
+    }
+  } finally { membPromoBusy=false; }
 }
 window.membInviteSignOut=async()=>{
   const a=window.CascadeAuth;

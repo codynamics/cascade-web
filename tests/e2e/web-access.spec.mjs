@@ -12,7 +12,7 @@ test.use({ viewport: { width: 390, height: 844 } });
 const SEEDED_CASCADE = { id: "1551aaaa-0000-4000-8000-000000000001", user_id: "cas1551-user",
   name: "Existing agent", criteria: {}, created_at: "2020-01-01T00:00:00.000Z" };
 
-function fakeSupabaseScript(approved){
+function fakeSupabaseScript(approved, signedOut = false){
   return `
     window.__rpcCalls = [];
     window.__signOutCalls = 0;
@@ -27,7 +27,7 @@ function fakeSupabaseScript(approved){
     window.supabase = { createClient(){
       return {
         auth: {
-          getSession: async () => ({ data: { session: SESSION } }),
+          getSession: async () => ({ data: { session: ${signedOut ? "null" : "SESSION"} } }),
           onAuthStateChange: () => ({ data: { subscription: { unsubscribe(){} } } }),
           signOut: async () => { window.__signOutCalls += 1; return { error: null }; },
         },
@@ -39,6 +39,7 @@ function fakeSupabaseScript(approved){
         },
         rpc: async (fn) => {
           window.__rpcCalls.push(fn);
+          if(fn === "check_promo_code") return { data: true, error: null };
           if(fn === "is_web_access_approved") return { data: ${approved ? "true" : "false"}, error: null };
           return { data: null, error: null };
         },
@@ -47,17 +48,18 @@ function fakeSupabaseScript(approved){
   `;
 }
 
-async function bootSignedIn(page, approved){
+async function bootSignedIn(page, approved, signedOut = false){
   await page.route("**/config.js", route => route.fulfill({
     contentType: "application/javascript",
     body: `window.CASCADE_CONFIG = { SUPABASE_URL: "https://fake-project.supabase.test", SUPABASE_ANON_KEY: "fake-anon-key-not-a-real-secret" };`,
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: fakeSupabaseScript(approved),
+    body: fakeSupabaseScript(approved, signedOut),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
+  if(signedOut) return;
   await page.waitForFunction(() => window.CascadeAuth.status === "signed-in", null, { timeout: 30_000 });
   // The gate has asked the server by the time the entitlement is anything but "unknown".
   await page.waitForFunction(() => membEnt.state !== "unknown", null, { timeout: 30_000 });
@@ -66,12 +68,13 @@ async function bootSignedIn(page, approved){
 test("CAS-1551 web access: a signed-in account not on the approved list sees the invite-only screen, with Sign out", async ({ page }) => {
   await bootSignedIn(page, false);
   expect(await page.evaluate(() => membIsNativeApp())).toBe(false);
-  expect(await page.evaluate(() => window.__rpcCalls)).toContain("is_web_access_approved");
+  expect(await page.evaluate(() => window.__rpcCalls)).not.toContain("is_web_access_approved");   // CAS-1565: list retired
 
   await expect(page.locator("#membScreen")).toHaveClass(/open/);
   await expect(page.locator("#membHead")).toHaveText("Cascade on the web is invite-only");
   await expect(page.locator("#membInviteMsg")).toContainText("invite-only");
   await expect(page.locator("#membInviteMsg")).toContainText("iPhone app");
+  await expect(page.locator("#membPromoLink")).toBeVisible();   // CAS-1565
   // No price box and no purchase on the web: Sign out is the only action.
   await expect(page.locator("#membScreen .membcta")).toHaveCount(1);
   await expect(page.locator("#membSignOutBtn")).toBeVisible();
@@ -82,14 +85,18 @@ test("CAS-1551 web access: a signed-in account not on the approved list sees the
   expect(await page.evaluate(() => window.__signOutCalls)).toBe(1);
 });
 
-test("CAS-1551 web access: an approved account gets in", async ({ page }) => {
-  await bootSignedIn(page, true);
-  expect(await page.evaluate(() => window.__rpcCalls)).toContain("is_web_access_approved");
-  expect(await page.evaluate(() => membEnt.state)).toBe("active");
-  expect(await page.evaluate(() => membEnt.row.source)).toBe("web_access");
-
-  await expect(page.locator("#membScreen")).not.toHaveClass(/open/);
-  await expect(page.locator("#membSignOutBtn")).toHaveCount(0);
-  await expect(page.locator("#splash")).not.toHaveClass(/open/);
-  expect(await page.evaluate(() => cascades.length)).toBe(1);
+// CAS-1565 AC4: sign-up screen, web, 390x844 — link -> box -> Apply (stubbed valid) -> the confirmation line is
+// visible, not under the fixed Continue button.
+test("CAS-1565 promo: the applied confirmation line scrolls clear of the Continue button", async ({ page }) => {
+  await bootSignedIn(page, false, true);
+  await page.evaluate(() => { onbFlow.workingAgents = onbFlow.workingAgents || []; openOnbMembership(); });
+  await expect(page.locator("#membPromoLink")).toBeVisible();
+  await page.locator("#membPromoLink").click();
+  await page.locator("#membPromoCode").fill("cascadefriends");
+  await page.locator("#membPromoApply").click();
+  const ok = page.locator("#membPromo .membpromook");
+  await expect(ok).toBeVisible();
+  await expect(page.locator("#membOffer")).toContainText("Your first year is free with your code.");
+  const [okBox, ctaBox] = await Promise.all([ok.boundingBox(), page.locator("#membScreen .membcta").boundingBox()]);
+  expect(okBox.y + okBox.height).toBeLessThanOrEqual(ctaBox.y);
 });
