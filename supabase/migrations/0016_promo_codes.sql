@@ -94,3 +94,5 @@ begin
         expires_at = excluded.expires_at, is_trial = false, source = 'promo', updated_at = now();
   end if;
 end $$;
+
+insert into public.schema_migrations (version) values ('0016') on conflict do nothing;
