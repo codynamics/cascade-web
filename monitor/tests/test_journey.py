@@ -227,7 +227,7 @@ class SimulateWorkflow(unittest.TestCase):
         doc = yaml.safe_load(raw)
         triggers = doc.get("on", doc.get(True))
         self.assertEqual(list(triggers), ["workflow_dispatch"])
-        self.assertEqual(set(triggers["workflow_dispatch"]["inputs"]), {"journey", "send"})
+        self.assertEqual(set(triggers["workflow_dispatch"]["inputs"]), {"journey", "firstdays", "send"})
         self.assertIs(triggers["workflow_dispatch"]["inputs"]["send"]["default"], False)
         self.assertEqual(doc["jobs"]["simulate"]["environment"], "staging")
         self.assertNotIn("production", raw.lower())

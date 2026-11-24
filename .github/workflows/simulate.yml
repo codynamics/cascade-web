@@ -87,7 +87,7 @@ jobs:
         if: ${{ inputs.firstdays }}
         env:
           SEND: ${{ inputs.send }}
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}   # moves auth.users.created_at on STAGING; qa.sim.age_account refuses production
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}   # moves auth.users.created_at on STAGING; qa.sim.age_account refuses any non-staging project
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           CASCADE_EMAIL_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}
           CASCADE_SITE_URL: ${{ secrets.SITE_URL }}
