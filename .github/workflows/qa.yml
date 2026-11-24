@@ -452,6 +452,10 @@ jobs:
   # other jobs (not in parallel with them) and only on green, via `needs:`.
   mark-on-staging:
     needs: [build-check, engine, data, monitor, lint, scheduler, integrity]
+    # CAS-1562: reads earlier qa runs through the API to find the last green head.
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -469,6 +473,7 @@ jobs:
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           RANGE_FROM: ${{ github.event.before }}
           RANGE_TO:   ${{ github.sha }}
+          GH_TOKEN:   ${{ github.token }}
         run: python ci/mark_on_staging.py
 
   # CAS-759: promote.yml's `workflow_run` trigger never fires for a qa run that was itself
