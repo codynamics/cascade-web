@@ -179,6 +179,14 @@ class InMemoryStore:
         return any(str(b.get("user_id")) == str(user_id) and b.get("kind") == "catchup"
                    for b in self._alert_batches)
 
+    def fetch_alert_batches(self, user_id) -> list:
+        """CAS-1555: every alert batch of one member (the first-days simulator reads them back)."""
+        return [dict(b) for b in self._alert_batches if str(b.get("user_id")) == str(user_id)]
+
+    def set_user_created_at(self, user_id, created_at) -> None:
+        """CAS-1555: the in-memory twin of qa.sim.age_account (the real store moves auth.users.created_at)."""
+        self._user_created[str(user_id)] = created_at
+
     def set_notification_batch(self, ids, batch_id) -> int:
         ids = {str(i) for i in ids}
         n = 0
@@ -927,6 +935,10 @@ class SupabaseStore:
         rows = self._get(f"/alert_batches?select=id&user_id=eq.{urllib.parse.quote(str(user_id))}"
                          "&kind=eq.catchup&order=id.asc")
         return bool(rows)
+
+    def fetch_alert_batches(self, user_id) -> list:
+        """CAS-1555: every alert batch of one member (the first-days simulator reads them back)."""
+        return self._get(f"/alert_batches?select=*&user_id=eq.{urllib.parse.quote(str(user_id))}&order=id.asc")
 
     def set_notification_batch(self, ids, batch_id) -> int:
         ids = list(ids)

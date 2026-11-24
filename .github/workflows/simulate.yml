@@ -20,6 +20,11 @@ on:
         required: false
         type: boolean
         default: false
+      firstdays:
+        description: "Run the first-ten-days simulator (CAS-1555) instead of the journeys: ages the QA accounts day 0 to 10 and checks each day"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read   # read-only - this workflow never commits or pushes anything
@@ -61,6 +66,7 @@ jobs:
         run: python -m qa.sim.accounts list | tee "$RUNNER_TEMP/accounts.txt"
 
       - name: Run the journey(s)
+        if: ${{ !inputs.firstdays }}
         env:
           JOURNEY: ${{ inputs.journey }}
           SEND: ${{ inputs.send }}
@@ -76,3 +82,20 @@ jobs:
           if [ "$SEND" = "true" ]; then SEND_FLAG="--send"; fi
           python -m monitor.journey --journey "$JOURNEY" --accounts a,b,c,d \
             --accounts-file "$RUNNER_TEMP/accounts.txt" $SEND_FLAG
+
+      - name: Run the first ten days (CAS-1555)
+        if: ${{ inputs.firstdays }}
+        env:
+          SEND: ${{ inputs.send }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}   # moves auth.users.created_at on STAGING; qa.sim.age_account refuses production
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          CASCADE_EMAIL_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}
+          CASCADE_SITE_URL: ${{ secrets.SITE_URL }}
+          APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          APNS_AUTH_KEY: ${{ secrets.APNS_AUTH_KEY }}
+          APNS_BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+        run: |
+          SEND_FLAG=""
+          if [ "$SEND" = "true" ]; then SEND_FLAG="--send"; fi
+          python -m monitor.firstdays --accounts a,b,c,d --accounts-file "$RUNNER_TEMP/accounts.txt" $SEND_FLAG
