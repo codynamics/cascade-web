@@ -106,10 +106,11 @@ test("CAS-1206 AC2: a tap that arrives before boot finishes is held and opens Al
 test("CAS-1206 AC4 (onboarding showing): a tap that arrives mid-flow is dropped, not queued", async ({ page }) => {
   await stubPushNotifications(page);
   await freshApp(page);
-  await page.waitForFunction(() => flowOn === true || document.querySelector("#splashCta"));
-  if(!(await page.evaluate(() => flowOn === true))) await page.locator("#splashCta").click();
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");
-  expect(await page.evaluate(() => flowOn)).toBe(true);
+  await page.waitForFunction(() => document.querySelector("#oafScreen.open") || document.querySelector("#splashCta"));
+  if(!(await page.evaluate(() => !!document.querySelector("#oafScreen.open")))) await page.locator("#splashCta").click();
+  // CAS-1548: first run is the one-agent flow (#oafScreen, CAS-1344), not the retired #onbStepInner wizard.
+  await expect(page.locator("#oafScreen")).toHaveClass(/open/);
+  await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");
 
   await fireActionPerformed(page, 999999);
 

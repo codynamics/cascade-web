@@ -52,12 +52,33 @@ test.describe("CAS-960 axe scan — zero serious/critical on the five named surf
     expect(serious.map(v => v.id)).toEqual([]);
   });
 
-  test("onboarding — first step", async ({ page }) => {
+  // CAS-1548: onboarding is the one-agent first run (#oafScreen, CAS-1344) — the old #onbStepInner/.obhd
+  // wizard is unreachable. Scan the welcome step and the where step, and check every button on the screen
+  // has an accessible name (the ticket's "its buttons").
+  test("onboarding — first step (#oafScreen welcome)", async ({ page }) => {
     await freshApp(page);
     await page.locator("#splashCta").click();
-    await expect(page.locator(".obhd")).toContainText("Let's get you set up.");
-    const { serious } = await scanSurface(page, "onboarding — v2_about step");
+    await expect(page.locator("#oafScreen")).toHaveClass(/open/);
+    await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");
+    const { serious } = await scanSurface(page, "onboarding — #oafScreen welcome", "#oafScreen");
     expect(serious.map(v => v.id)).toEqual([]);
+    const unnamed = await page.evaluate(() => [...document.querySelectorAll("#oafScreen button")]
+      .filter(b => b.offsetParent !== null && !(b.getAttribute("aria-label") || b.textContent || "").trim())
+      .map(b => b.id || b.className));
+    expect(unnamed).toEqual([]);
+  });
+
+  test("onboarding — where step (#oafScreen options and buttons)", async ({ page }) => {
+    await freshApp(page);
+    await page.locator("#splashCta").click();
+    await page.locator("#oafCta").click();
+    await expect(page.locator("#oafWhereOpts")).toBeVisible();
+    const { serious } = await scanSurface(page, "onboarding — #oafScreen where", "#oafScreen");
+    expect(serious.map(v => v.id)).toEqual([]);
+    const unnamed = await page.evaluate(() => [...document.querySelectorAll("#oafScreen button, #oafScreen .obopt")]
+      .filter(b => b.offsetParent !== null && !(b.getAttribute("aria-label") || b.textContent || "").trim())
+      .map(b => b.id || b.className));
+    expect(unnamed).toEqual([]);
   });
 
   test("Watch listing", async ({ page }) => {
@@ -174,9 +195,9 @@ test("Dynamic Type: onboarding does not clip and the CTA stays reachable (CAS-96
   await assertNoOverflow(page, "onboarding — splash");
 
   await page.locator("#splashCta").click();
-  await expect(page.locator(".obhd")).toContainText("Let's get you set up.");
-  await expect(page.locator("#onbStepCta:visible, #flowCta:visible").first()).toBeInViewport();
-  await assertNoOverflow(page, "onboarding — v2_about step");
+  await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");
+  await expect(page.locator("#oafCta")).toBeInViewport();
+  await assertNoOverflow(page, "onboarding — #oafScreen welcome");
 });
 
 test("Dynamic Type: Watch, the film card, Agents and Moving do not clip (CAS-960 AC6)", async ({ page }) => {
@@ -225,14 +246,14 @@ test.describe("reduced motion (CAS-960 AC7)", () => {
 
   test("onboarding honours reduced motion", async ({ page }) => {
     // CAS-1163: test.use({ reducedMotion }) does not make matchMedia("(prefers-reduced-motion: reduce)")
-    // report true in this environment — page.emulateMedia does, same as CAS-909/cas752 already use.
+    // report true in this environment — page.emulateMedia does, same as cas752 already uses.
     await page.emulateMedia({ reducedMotion: "reduce" });
     await freshApp(page);
     await expect(page.locator("#splashCta")).toBeVisible();
     await assertNoAnimation(page, "onboarding — splash");
     await page.locator("#splashCta").click();
-    await expect(page.locator(".obhd")).toContainText("Let's get you set up.");
-    await assertNoAnimation(page, "onboarding — v2_about step");
+    await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");
+    await assertNoAnimation(page, "onboarding — #oafScreen welcome");
   });
 
   test("Watch, the film card, Agents and Moving honour reduced motion", async ({ page }) => {

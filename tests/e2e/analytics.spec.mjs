@@ -63,7 +63,7 @@ test("CAS-940: first-touch acquisition capture, utm stripping, and one app_open 
 // titles, so even disabling that switch can land on a tab with nothing released into it yet — not a
 // mineOnly gap alone. "cinema" kind lands on the Cinema tab instead, whose own standing (upcoming/
 // opening_week/in_cinema) is never gated by "my services" and is exactly what Massive Movies always
-// has plenty of (confirmed via CAS-909's own watchCount checks) — the same reliably-populated tab
+// has plenty of — the same reliably-populated tab
 // smoke.spec.mjs's own Cinema-tab assertions lean on, with no extra toggle needed.
 test("CAS-941: expanding and collapsing a card on the Watch listing logs card_expand", async ({ page }) => {
   await toShortlist(page, "cinema");
@@ -128,11 +128,11 @@ test("CAS-955: every onboarding step fires onbstep_shown once per entry, ahead o
   const continues = log.filter(e => e.type === "onbstep_continue");
 
   // AC(b): the flow's first step shows before any continue exists in the log at all.
-  // CAS-953 inserted v2_about ahead of v2_intro as the first-run entry step (see gotoStep's own
-  // comment), so that — not v2_intro — is the first step this log should ever show.
+  // CAS-1548: the first run is the one-agent flow now (#oafScreen, CAS-1344); oafLog() prefixes its step keys
+  // with "oaf_", so the funnel's first step — `welcome` — is logged as "oaf_welcome".
   const firstRelevant = log.find(e => e.type === "onbstep_shown" || e.type === "onbstep_continue");
   expect(firstRelevant.type).toBe("onbstep_shown");
-  expect(firstRelevant.step).toBe("v2_about");
+  expect(firstRelevant.step).toBe("oaf_welcome");
 
   // AC(a): every step that produced a continue also produced a shown with the identical step value.
   const shownSteps = new Set(shown.map(e => e.step));
