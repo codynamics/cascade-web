@@ -458,6 +458,19 @@ export async function closeNotifyScreen(page){
   await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
 }
 
+/** CAS-1551: a fresh, fully onboarded GUEST device with one real one-agent account (no Supabase stack needed) —
+ * the same recipe CAS-1206's onboardedGuestDevice uses: splash (or the auto-started flow) -> services ->
+ * finishFlow -> listing. Pass { skipTutorial: false } to leave the Watch tutorial running as it first appears. */
+export async function guestOnboarded(page, opts = {}){
+  await freshApp(page);
+  await page.waitForFunction(() => flowOn === true || document.querySelector("#splashCta"));
+  if(!(await page.evaluate(() => flowOn === true))) await page.locator("#splashCta").click();
+  await walkToServices(page, "cinema");
+  await finishFlow(page);
+  await toListing(page, opts);
+  return page;
+}
+
 /** The listing's section headers, as {window, count}. */
 export function sectionCounts(page){
   return page.locator("#groups .group").evaluateAll(gs => gs.map(g => ({
