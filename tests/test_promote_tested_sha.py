@@ -59,6 +59,48 @@ class PromoteDispatchInputTests(unittest.TestCase):
         self.assertNotIn("workflow_run", merge_step)
 
 
+class PromoteRollbackTests(unittest.TestCase):
+    """CAS-1550 — rollback mode: main's tree := a previous release's tree, in one new commit."""
+
+    def setUp(self):
+        self.text = _read(PROMOTE_YML)
+        self.lines = self.text.splitlines()
+        self.rollback = "\n".join(_step_lines(self.lines, "Roll main back to a previous release"))
+        self.merge = "\n".join(_step_lines(self.lines, "Merge the QA'd staging commit into main"))
+
+    def test_rollback_input_exists_and_sha_stays_first(self):
+        self.assertRegex(self.text, r"workflow_dispatch:\s*\n\s*inputs:\s*\n\s*sha:")
+        self.assertRegex(self.text, r"\n      rollback_to:\n")
+
+    def test_rollback_builds_new_commit_from_target_tree(self):
+        self.assertIn('git commit-tree "${target}^{tree}" -p HEAD', self.rollback)
+        self.assertIn('rollback: main to $ROLLBACK_TO', self.rollback)
+        self.assertIn("git merge --ff-only", self.rollback)
+
+    def test_non_ancestor_is_refused(self):
+        self.assertIn('git merge-base --is-ancestor "$target" HEAD', self.rollback)
+        self.assertRegex(self.rollback, r"not an ancestor of main[^\n]*\n\s*exit 1")
+
+    def test_no_force_push_or_history_rewrite(self):
+        for bad in ("--force", "push -f", "push origin +", "reset --hard"):
+            self.assertNotIn(bad, self.text)
+
+    def test_normal_path_unchanged_and_gated_on_empty_input(self):
+        self.assertIn("if: ${{ inputs.rollback_to == '' }}", self.merge)
+        self.assertIn('git merge --no-ff -X theirs FETCH_HEAD -m "promote: staging@$sha"', self.merge)
+        self.assertIn("if: ${{ inputs.rollback_to != '' }}", self.text)
+        # the rollback step runs before the normal merge, and the push is shared by both paths
+        self.assertLess(self.text.index("Roll main back"), self.text.index("Merge the QA'd staging"))
+        self.assertEqual(self.text.count("git push origin main"), 1)
+
+    def test_normal_promote_tags_release_timestamp(self):
+        tag = "\n".join(_step_lines(self.lines, "Tag the release commit on main"))
+        self.assertIn("if: ${{ inputs.rollback_to == '' }}", tag)
+        self.assertIn("release-$(date -u +%Y%m%dT%H%M%SZ)", tag)
+        self.assertIn('git push origin "$tag"', tag)
+        self.assertLess(self.text.index("git push origin main"), self.text.index("Tag the release commit"))
+
+
 class QaDispatchPromoteTests(unittest.TestCase):
     def setUp(self):
         self.qa_text = _read(QA_YML)

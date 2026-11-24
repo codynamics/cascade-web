@@ -15,6 +15,9 @@ on:
       sha:
         description: "Commit to merge into main (defaults to the head of staging when empty)"
         required: false
+      rollback_to:
+        description: "Rollback: a tag vX.Y.Z or a commit already on main. When set, main's tree is made equal to it in one new commit (no force push). Leave empty for a normal promote."
+        required: false
 
 permissions:
   contents: write
@@ -38,8 +41,32 @@ jobs:
         with:
           python-version: "3.12"
 
+      # CAS-1550: rollback. main's tree becomes the target's tree in ONE new commit on top of main —
+      # history is never rewritten and nothing is force-pushed. The target must already be an
+      # ancestor of main. The normal merge step below is skipped when this one runs.
+      - name: Roll main back to a previous release
+        id: rollback
+        if: ${{ inputs.rollback_to != '' }}
+        env:
+          ROLLBACK_TO: ${{ inputs.rollback_to }}
+        run: |
+          set -euo pipefail
+          git config user.name  "ci-promote"
+          git config user.email "ci@codynamics.com.au"
+          before=$(git rev-parse HEAD)
+          echo "before=$before" >> "$GITHUB_OUTPUT"
+          target=$(git rev-parse --verify --quiet "${ROLLBACK_TO}^{commit}") || {
+            echo "::error::rollback_to '$ROLLBACK_TO' is not a known tag or commit"; exit 1; }
+          if ! git merge-base --is-ancestor "$target" HEAD; then
+            echo "::error::rollback_to '$ROLLBACK_TO' ($target) is not an ancestor of main - refusing"
+            exit 1
+          fi
+          new=$(git commit-tree "${target}^{tree}" -p HEAD -m "rollback: main to $ROLLBACK_TO")
+          git merge --ff-only "$new"
+
       - name: Merge the QA'd staging commit into main
         id: merge
+        if: ${{ inputs.rollback_to == '' }}
         run: |
           set -euo pipefail
           git config user.name  "ci-promote"
@@ -64,7 +91,17 @@ jobs:
       - name: Push main — the production deploy (main -> Pages)
         run: git push origin main
 
+      # CAS-1550: every normal promote leaves a tag, so there is always something to roll back to.
+      - name: Tag the release commit on main
+        if: ${{ inputs.rollback_to == '' }}
+        run: |
+          set -euo pipefail
+          tag="release-$(date -u +%Y%m%dT%H%M%SZ)"
+          git tag "$tag" HEAD
+          git push origin "$tag"
+
       - name: Close the board — Done + v<version> on every ticket that shipped
+        if: ${{ inputs.rollback_to == '' }}
         env:
           JIRA_BASE_URL:  ${{ secrets.JIRA_BASE_URL }}
           JIRA_EMAIL:     ${{ secrets.JIRA_EMAIL }}
