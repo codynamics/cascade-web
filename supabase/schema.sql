@@ -610,6 +610,10 @@ alter table public.notifications add constraint notifications_answer_check
 
 create index if not exists notifications_batch_id_idx on public.notifications (batch_id);
 create index if not exists alert_batches_user_idx on public.alert_batches (user_id);
+-- CAS-1567: the day-7 recap is a third batch kind (migration 0017_alert_batch_recap_kind.sql).
+alter table public.alert_batches drop constraint if exists alert_batches_kind_check;
+alter table public.alert_batches add constraint alert_batches_kind_check
+  check (kind in ('daily', 'catchup', 'recap'));
 
 -- The client's writes to the ledger: stamping a row read, and answering it from the email view.
 revoke update on public.notifications from authenticated;

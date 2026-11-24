@@ -57,8 +57,10 @@ def ensure_batch(store, user_id, date_str: str, kind: str = "daily", headline: s
     existing = fetch(user_id, date_str)
     if existing:
         fields = {}
-        if kind == "catchup" and existing.get("kind") != "catchup":
+        if kind == "catchup" and existing.get("kind") not in ("catchup", "recap"):
             fields["kind"] = "catchup"
+        if kind == "recap" and existing.get("kind") != "recap":    # CAS-1567: the day-7 recap joins and upgrades too
+            fields["kind"] = "recap"
         if headline and existing.get("headline") != headline:
             fields["headline"] = headline
         if fields:

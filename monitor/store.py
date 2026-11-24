@@ -208,6 +208,11 @@ class InMemoryStore:
     def fetch_user_created_at(self) -> dict:
         return dict(self._user_created)
 
+    def fetch_user_notifications(self, user_id) -> list:
+        """CAS-1567: every ledger row of one member, oldest first (the day-7 recap's raw material)."""
+        rows = [dict(n) for n in self._notifications if str(n.get("user_id")) == str(user_id)]
+        return sorted(rows, key=lambda n: (_found_at(n), str(n.get("id") or "")))
+
     def fetch_notify_prefs(self) -> dict:
         return dict(self._prefs)
 
@@ -917,7 +922,7 @@ class SupabaseStore:
 
     def fetch_alert_batch(self, user_id, sydney_date):
         rows = self._get(
-            f"/alert_batches?select=id,user_id,sydney_date,kind,headline&user_id=eq.{urllib.parse.quote(str(user_id))}"
+            f"/alert_batches?select=id,user_id,sydney_date,kind,headline,emailed_at&user_id=eq.{urllib.parse.quote(str(user_id))}"
             f"&sydney_date=eq.{urllib.parse.quote(str(sydney_date))}&order=id.asc")
         return rows[0] if rows else None
 
@@ -960,6 +965,13 @@ class SupabaseStore:
 
     def fetch_user_created_at(self) -> dict:
         return {str(u.get("id")): u.get("created_at") for u in self.fetch_auth_users() if u.get("id")}
+
+    def fetch_user_notifications(self, user_id) -> list:
+        """CAS-1567: every ledger row of one member, oldest first (the day-7 recap's raw material)."""
+        return self._get(
+            "/notifications?select=id,user_id,cascade_id,movie_id,moment,cascade_name,title,detail,"
+            "found_at,read_at,pushed_at,emailed_at,batch_id,answer"
+            f"&user_id=eq.{urllib.parse.quote(str(user_id))}&order=found_at.asc,id.asc")
 
     def fetch_recent_notifications(self, since: str) -> list:
         """CAS-1504: ledger rows found at or after `since` (ISO), oldest first."""

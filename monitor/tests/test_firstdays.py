@@ -101,6 +101,25 @@ class FirstTenDays(unittest.TestCase):
         self.assertTrue(firstdays.check_day({"catchup": "arrives", "banner": True}, obs))
 
 
+class RecapDay(unittest.TestCase):
+    """CAS-1567: the simulator expects exactly one recap batch + email, and no push, on the recap day."""
+    OBS = {"new_rows": 3, "new_batches": 1, "new_catchup_batches": 0, "total_catchup_batches": 1, "catchup_rows": 0,
+           "recap_due": True, "new_recap_batches": 1, "recap_rows": 3, "pushes": 0, "mails": 1, "banner": True}
+
+    def test_a_recap_day_passes(self):
+        self.assertEqual(firstdays.check_day({"catchup": "none", "banner": True}, self.OBS), [])
+
+    def test_a_missing_or_pushed_or_doubled_recap_is_caught(self):
+        for change in ({"new_recap_batches": 0}, {"new_recap_batches": 2}, {"pushes": 1}, {"mails": 0},
+                       {"new_rows": 4}):
+            with self.subTest(change=change):
+                self.assertTrue(firstdays.check_day({"catchup": "none", "banner": True}, dict(self.OBS, **change)))
+
+    def test_an_ordinary_day_still_expects_nothing(self):
+        obs = dict(self.OBS, recap_due=False, new_recap_batches=0, recap_rows=0, mails=0)
+        self.assertTrue(firstdays.check_day({"catchup": "none", "banner": True}, obs))
+
+
 class RestoresCreatedAt(unittest.TestCase):
     def test_restored_after_a_pass(self):
         rc, _, store, accounts, original, _ = run()

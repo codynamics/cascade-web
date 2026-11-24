@@ -9,6 +9,10 @@ an UNCHANGED catalogue (yesterday == today, so only first-days behaviour can ale
 notifications, push and email records, and checks them against qa/firstdays/<account>.json. App-side rules are not
 re-derived: monitor/firstdays_shim.mjs asks the built index.html's own tutBannerDecide with the aged created_at.
 
+CAS-1567: the day-7 recap lands on whichever nightly run is 7 Sydney calendar days after the aged sign-up date
+(that depends on the clock's time of day, so it is computed here from the same date rule monitor/recap.py uses,
+not hard-coded to a day number): it must bring exactly one recap batch + one email and no push.
+
 Day N's created_at is `now - (N - 0.5) days` (day 0: now): at day 1 the account is 12 h old, inside the catch-up
 window (CATCHUP_WINDOW_H), so day 1 is the first nightly run after sign-up; from day 2 it is outside it. Day 0 has
 `"run": false`: the account was just created and no nightly run has happened, so nothing runs and nothing is owed.
@@ -35,6 +39,7 @@ from . import __main__ as monitor_main
 from .catalogue import load_catalogue_file, load_today
 from .journey import (JourneyStore, Sends, SetupFail, _ledger, _run_engine_find, _write_catalogue,
                       accounts_from_list, neutralise)
+from . import recap as recap_mod
 from .phases import email_phase, push_phase
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -79,6 +84,17 @@ def check_day(exp: dict, obs: dict) -> list:
             problems.append(f"expected exactly 1 catchup batch in total, got {obs['total_catchup_batches']}")
         if obs["catchup_rows"] < exp.get("min_films", 1):
             problems.append(f"expected at least {exp.get('min_films', 1)} catch-up film(s), got {obs['catchup_rows']}")
+    elif obs.get("recap_due"):
+        # CAS-1567: the day-7 recap - exactly one recap batch and one email, no push, and no ordinary alert
+        # (the catalogue is unchanged, so every new row can only be a row the recap itself names).
+        if obs["new_recap_batches"] != 1:
+            problems.append(f"expected exactly 1 new recap batch, got {obs['new_recap_batches']}")
+        if obs["new_rows"] != obs["recap_rows"]:
+            problems.append(f"expected only recap rows, got {obs['new_rows']} new row(s) / {obs['recap_rows']} recap")
+        if obs["pushes"]:
+            problems.append(f"expected no push for the recap, got push={obs['pushes']}")
+        if obs["mails"] < 1 and (obs["recap_rows"] or not obs.get("send")):
+            problems.append("expected the recap email, none was sent")
     else:
         if obs["new_batches"] or obs["new_rows"]:
             problems.append(f"expected no new alerts, got {obs['new_batches']} batch(es) / {obs['new_rows']} row(s)")
@@ -163,7 +179,11 @@ def run_firstdays(store, accounts: dict, catalogue: list, set_created_at, send: 
                     else:
                         pushes = len([p for p in sends.pushes if p[0] == uid])
                         mails = len([m for m in sends.mails if emails.get(m[0]) == uid])
-                    obs = {"banner": bool(banner),
+                    recap_due = exp.get("run", True) and (
+                        recap_mod._sydney_day(now) - recap_mod._sydney_day(created)).days == recap_mod.RECAP_DAY
+                    obs = {"banner": bool(banner), "send": send, "recap_due": bool(recap_due),
+                           "new_recap_batches": len(_kinds(batches, "recap")) - len(_kinds(batches_before, "recap")),
+                           "recap_rows": sum(1 for r in new_rows if r.get("moment") == recap_mod.RECAP_MOMENT),
                            "new_rows": len(new_rows),
                            "catchup_rows": sum(1 for r in new_rows if r.get("moment") == "catchup"),
                            "new_batches": len(batches) - len(batches_before),

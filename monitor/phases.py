@@ -26,6 +26,7 @@ from .catchup import STAGE_ORDER
 from .emailer import format_invite_reply, render_digest, send_via_resend
 from .matching import Hit, agent_channels, compute_scores, delivery_plan, prefs_for
 from .pusher import send_via_apns
+from . import recap as recap_mod
 from .transitions import Transition
 
 PUSH_LOOKBACK_H = 12    # the push covers last night's 03:00 run, with slack for a late or re-dispatched run
@@ -232,6 +233,15 @@ def _hits_from_rows(rows, today_by_id: dict, cascades_by_id: dict) -> list:
     return hits
 
 
+def _recap_due(store, now) -> list:
+    """CAS-1567: members owed the day-7 recap this run; a failing read owes nobody (never guesses)."""
+    try:
+        return recap_mod.due_users(store, now)
+    except Exception as err:   # noqa: BLE001
+        print(f"[monitor] could not work out who is due a day-7 recap: {err} - none this run.")
+        return []
+
+
 def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, scores_fn=compute_scores,
                 dry_run: bool = False, target_user: str = None) -> dict:
     """The 17:00 phase. Returns {'users', 'attempted', 'sent', 'failed'}."""
@@ -250,7 +260,11 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
     for r in replies_rows:
         replies_by_user.setdefault(str(r.get("sender_id")), []).append(r)
 
-    for user_id in sorted(set(by_user) | set(replies_by_user)):
+    # CAS-1567: members whose day 7 is today (Sydney) and who have not had their recap. They join the loop even
+    # with nothing new found - the recap is sent regardless - and merge into the same email as any alerts.
+    recap_users = set(_recap_due(store, now))
+
+    for user_id in sorted(set(by_user) | set(replies_by_user) | recap_users):
         if target_user and user_id != str(target_user):
             continue
         pref = prefs_for(prefs, user_id)
@@ -259,10 +273,11 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
             continue    # email off, or no address: nothing to send (and the rows stay unstamped)
         # Only what the member has NOT seen in the app, not already emailed, and the agent allows email.
         mine = [r for r in by_user.get(user_id, [])
-                if not r.get("read_at") and not r.get("emailed_at")
+                if not r.get("read_at") and not r.get("emailed_at") and r.get("moment") != recap_mod.RECAP_MOMENT
                 and _wants(_channels_of(r, cascades_by_id), "email")]
         replies = replies_by_user.get(user_id, [])
-        if not mine and not replies:
+        recap_due = user_id in recap_users
+        if not mine and not replies and not recap_due:
             print(f"[monitor] email: {user_id} has nothing unseen - no email.")
             continue
         batch_id = None
@@ -276,19 +291,35 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
                 print(f"[monitor] email: {user_id}: could not write the alert batch: {err} - not sending.")
                 continue
         hits = _hits_from_rows(_catchup_first(mine), today_by_id, cascades_by_id)
-        scores = scores_fn({h.transition.movie_id for h in hits}) if hits else {}
+        # CAS-1567: the day-7 recap rides this same email. Its ledger rows (recap batch) are written BEFORE the
+        # send, like every alert; if that fails the recap is left out (a same-day re-run retries it) and the
+        # rest still goes.
+        recap = recap_rows = recap_batch_id = None
+        if recap_due:
+            try:
+                recap, recap_rows, recap_batch_id = recap_mod.prepare(
+                    store, user_id, agent_name_for(cascades_by_id.values(), user_id), today_by_id, cascades_by_id,
+                    now, skip_movie_ids={h.transition.movie_id for h in hits}, write=not dry_run)
+            except Exception as err:   # noqa: BLE001
+                stats["failed"] += 1
+                print(f"[monitor] email: {user_id}: could not prepare the day-7 recap: {err} - leaving it out.")
+                if not mine and not replies:
+                    continue
+        recap_hits = recap["hits"] if recap else []
+        scores = scores_fn({h.transition.movie_id for h in hits + recap_hits}) if (hits or recap_hits) else {}
         catchup = any(h.transition.moment == "catchup" for h in hits)
         # CAS-1537: sign each film's buttons for this member against its ledger row (secret from the env).
-        answers = AnswerContext(secret_from_env(), user_id,
-                                {str(r.get("movie_id")): r.get("id") for r in reversed(mine) if r.get("id")},
-                                now=now.timestamp())
+        row_ids = {str(r.get("movie_id")): r.get("id") for r in reversed(mine) if r.get("id")}
+        row_ids.update({str(m): i for m, i in (recap_rows or {}).items() if str(m) not in row_ids})
+        answers = AnswerContext(secret_from_env(), user_id, row_ids, now=now.timestamp())
         digest = render_digest(
             hits, replies=[format_invite_reply(r, today_by_id.get(str(r.get("tmdb_id"))), now=now)
                            for r in replies],
             scores=scores, watch_windows=(user_prefs.get(user_id) or {}).get("watch_windows"), today=now.date(),
-            kind="catchup_alert" if catchup else "unseen_alert", batch_id=batch_id, answers=answers)
+            kind="catchup_alert" if catchup else "unseen_alert", batch_id=batch_id, answers=answers,
+            recap=recap)
         print(f"[monitor] email: {user_id} ({email}): {len(hits)} unseen alert(s), {len(replies)} "
-              f"invite reply(s) - subject: {digest['subject']!r}")
+              f"invite reply(s){', day-7 recap' if recap else ''} - subject: {digest['subject']!r}")
         if dry_run:
             continue
         stats["users"] += 1
@@ -306,6 +337,12 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
         except Exception as err:   # noqa: BLE001 - the batch id is already on every row, so the link stays right
             print(f"[monitor] could not stamp emailed_at for {user_id}: {err}")
         _stamp_batch(store, batch_id, "emailed_at", now)
+        if recap and recap_batch_id:
+            try:
+                store.mark_notifications(list((recap_rows or {}).values()), "emailed_at", stamp)
+            except Exception as err:   # noqa: BLE001 - the send already landed; the recap batch stamp below de-dupes
+                print(f"[monitor] could not stamp emailed_at on the recap rows for {user_id}: {err}")
+            _stamp_batch(store, recap_batch_id, "emailed_at", now)
         if replies:
             try:
                 store.mark_invite_replies_digested([r.get("id") for r in replies], stamp)

@@ -661,6 +661,67 @@ def _replies_block_html(replies, esc) -> str:
     )
 
 
+# ---- the day-7 recap block (CAS-1567) -----------------------------------------------------------------
+
+def _recap_reminder(agent) -> str:
+    return (f"The more you rate, the better {agent} gets. "
+            "After you watch a film, tap Watched and say how you felt.")
+
+
+def _recap_block(recap, site_url, kind, esc, scores, watch_windows, answers):
+    """(html rows, text lines) for "Your first week with <agent>": heading, three stat tiles, the still-to-decide
+    films (compact cards carrying the app's own Watch On / Watched buttons, CAS-1537), "See all N in Cascade",
+    and the one-line text reminder. No rating section and no button for it (Lee, 25 Nov 2026)."""
+    agent = recap["agent"]
+    bid = recap.get("batch_id")
+    n = recap["to_decide"]
+    title = f"Your first week with {agent}"
+    tiles = [(recap["alerted"], "films alerted"), (n, "to decide"), (recap["ratings"], "ratings")]
+    see_all = _see_all_link(site_url, bid, kind, "see_all")
+    link_style = "font-size:14px;color:#6b48f2;font-weight:700;text-decoration:none;"
+
+    text = [title, f"Here's what {agent} did for you this week, and the films still waiting for your call.", ""]
+    text += [f"{num} {label}" for num, label in tiles] + [""]
+    html = (
+        '<tr><td style="padding-bottom:4px;">'
+        f'<div style="font-size:22px;font-weight:800;color:#141A2A;">{esc(title)}</div>'
+        '<div style="font-size:15px;color:#4b5563;margin-top:6px;">'
+        f'{esc(f"Here is what {agent} did for you this week, and the films still waiting for your call.")}</div>'
+        '</td></tr>'
+        '<tr><td style="padding:14px 0 4px 0;"><table role="presentation" width="100%" cellpadding="0" '
+        'cellspacing="0"><tr>'
+        + "".join(
+            '<td align="center" style="background:#f1eefe;border-radius:12px;padding:12px 6px;">'
+            f'<div style="font-size:26px;font-weight:800;color:#6b48f2;">{num}</div>'
+            f'<div style="font-size:13px;color:#4b5563;">{esc(label)}</div></td>'
+            + ('<td width="8"></td>' if i < 2 else "") for i, (num, label) in enumerate(tiles))
+        + '</tr></table></td></tr>')
+    if not n:
+        text += ["You're all caught up.", ""]
+        html += ('<tr><td style="padding-top:14px;font-size:15px;font-weight:700;color:#141A2A;">'
+                 "You&rsquo;re all caught up.</td></tr>")
+    else:
+        text += [f"STILL TO DECIDE ({n})"]
+        for h in recap["hits"]:
+            t = h.transition
+            text += [f"- {t.title}", f"  {_film_link(site_url, bid, t.movie_id, kind)}"]
+        text += [f"See all {n} in Cascade: {see_all}", ""]
+        html += (
+            '<tr><td style="padding-top:16px;">'
+            '<div style="font-size:12px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;'
+            f'color:#141A2A;">Still to decide <span style="color:#8b95a5;">{n}</span></div>'
+            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+            + "".join(_compact_card_html(h, esc, site_url, _score_of(scores, h.transition.movie_id), kind, bid,
+                                         watch_windows, answers) for h in recap["hits"])
+            + '</table></td></tr>'
+            '<tr><td style="padding-top:14px;">'
+            f'<a href="{esc(see_all)}" style="{link_style}">See all {n} in Cascade &rsaquo;</a></td></tr>')
+    reminder = _recap_reminder(agent)
+    text += [reminder, ""]
+    html += f'<tr><td style="padding-top:16px;font-size:14px;color:#4b5563;">{esc(reminder)}</td></tr>'
+    return html, text
+
+
 # ---- the digest itself --------------------------------------------------------------------------
 
 def _wrap_html(body_rows, site_url, kind, esc) -> str:
@@ -690,7 +751,7 @@ def _wrap_html(body_rows, site_url, kind, esc) -> str:
 
 
 def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_windows=None,
-                  today=None, kind: str = "daily_alert", batch_id=None, answers=None) -> dict:
+                  today=None, kind: str = "daily_alert", batch_id=None, answers=None, recap=None) -> dict:
     """Return {'subject', 'html', 'text'} for one user's consolidated digest (CAS-1196: one card
     per film, no status/agent section headings — see the per-film helpers above).
 
@@ -705,6 +766,9 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
     answers       : CAS-1537 - an answer_links.AnswerContext (secret, member, {film: ledger row id}). With it
                     every button is a signed one-tap link to the confirmation page; without it (no secret
                     set, or no ledger row for the film) a button opens the film in Cascade instead.
+    recap         : CAS-1567 - the day-7 recap (monitor.recap.prepare's dict): its heading, stat tiles,
+                    still-to-decide films and reminder line lead the email and become its subject; any ordinary
+                    alert cards follow in the same email (never a second one). Not rendered into a catch-up.
     today         : the date "in N days"/subject phrasing is relative to; defaults to today (UTC).
     batch_id      : CAS-1535 - the night's alert batch (monitor.batches). When given, every film link and
                     the "See all in Cascade" link open that batch's own view in Alerts
@@ -720,6 +784,8 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
         return _render_catchup(hits, site_url, replies, scores, kind, batch_id, _html.escape, watch_windows, answers)
     ordered = _ordered_by_score(hits, scores)
     subject = digest_subject(ordered, replies, scores=scores, today=today)
+    if recap:
+        subject = f"Your first week with {recap['agent']}"
     shown = ordered[:MAX_CARDS]
     overflow = len(ordered) - len(shown)
     esc = _html.escape
@@ -728,6 +794,10 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
     text_lines = []
     if replies:
         text_lines.extend(_replies_block_text(replies))
+    recap_html = ""
+    if recap:
+        recap_html, recap_text = _recap_block(recap, site_url, kind, esc, scores, watch_windows, answers)
+        text_lines.extend(recap_text)
     if shown:
         text_lines.append(f"{len(ordered)} film{'' if len(ordered) == 1 else 's'} for you today")
         text_lines.append("")
@@ -750,6 +820,7 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
     body_rows = ""
     if replies:
         body_rows += _replies_block_html(replies, esc)
+    body_rows += recap_html
     if shown:
         header_text = "1 film for you today" if len(ordered) == 1 else f"{len(ordered)} films for you today"
         body_rows += (

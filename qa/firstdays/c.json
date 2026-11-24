@@ -42,7 +42,7 @@
     "7": {
       "catchup": "none",
       "banner": true,
-      "note": "none (no day +7 behaviour yet); the catch-up must not arrive again"
+      "note": "none from the catch-up (it must not arrive again); the day-7 recap (CAS-1567) is checked on whichever run is 7 Sydney days after sign-up"
     },
     "8": {
       "catchup": "none",
