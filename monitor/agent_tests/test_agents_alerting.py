@@ -126,7 +126,8 @@ class G4_CAS1558_AnAnnouncedUnreleasedTitleFires(unittest.TestCase):
     def test_a_new_unreleased_title_absent_yesterday_announces(self):
         today = [{"tmdb_id": 611, "title": "Future Tentpole", "status": ["upcoming"],
                  "genres": ["Sci-Fi"], "cinema_date": "2027-03-01", "offers": [],
-                 "language": "en", "rt_critic": 70}]
+                 "language": "en", "rt_critic": 70, "wm_critic_score": 70, "popularity": 50, "wm_user_rating": 7.5,
+                 "wm_popularity_percentile": 80}]
         transitions = compute_transitions([], today, RUN_DATE)
         self.assertEqual({(t.movie_id, t.moment) for t in transitions}, {("611", "announced")})
 
@@ -345,10 +346,10 @@ class J4_CAS1558_NeitherAnUnrequestedMomentNorAGlobalMuteFires(unittest.TestCase
 
     def _fixture(self):
         prev = [{"tmdb_id": 671, "title": "Quiet Riser", "genres": ["Drama"], "cinema_date": "2026-01-01",
-                "status": ["pvod"], "offers": [], "language": "en", "rt_critic": 70}]
+                "status": ["pvod"], "offers": [], "language": "en", "rt_critic": 70, "wm_critic_score": 70, "popularity": 50, "wm_user_rating": 7.5}]
         today = [{"tmdb_id": 671, "title": "Quiet Riser", "genres": ["Drama"], "cinema_date": "2026-01-01",
                  "status": ["pvod", "rental"], "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}],
-                 "language": "en", "rt_critic": 70}]
+                 "language": "en", "rt_critic": 70, "wm_critic_score": 70, "popularity": 50, "wm_user_rating": 7.5}]
         return prev, today
 
     def _match(self, cascade, **kw):
@@ -416,7 +417,7 @@ class J5_CAS1558_AllFourNotifyPrefCombinationsChooseTheirChannels(unittest.TestC
 
         pushes = []
 
-        def _fake_apns(token, title, body, badge=None, payload=None):
+        def _fake_apns(token, title, body, badge=None, payload=None, on_invalid_token=None):
             pushes.append({"token": token, "badge": badge})
             return True
 
@@ -424,7 +425,7 @@ class J5_CAS1558_AllFourNotifyPrefCombinationsChooseTheirChannels(unittest.TestC
                                return_value={"j5-user": ["device-1"]}), \
             mock.patch.object(InMemoryStore, "fetch_unread_counts",
                               return_value={"j5-user": 3}), \
-            mock.patch("monitor.__main__.send_via_apns", side_effect=_fake_apns), \
+            mock.patch("monitor.__main__.send_via_apns", side_effect=_fake_apns),             mock.patch("monitor.__main__.USER_HELD_IDS_FILE", os.path.join(self._tmp.name, "held.json")), \
             mock.patch("monitor.__main__.send_via_resend", return_value={"id": "test"}) as resend:
             buf = io.StringIO()
             with redirect_stdout(buf):
@@ -468,10 +469,10 @@ class J6_CAS1558_RerunningTheSameDayTwiceIsSilent(unittest.TestCase):
 
     def _setup(self):
         prev = [{"tmdb_id": 691, "title": "Once Only", "genres": ["Drama"], "cinema_date": "2026-01-01",
-                "status": ["pvod"], "offers": [], "language": "en", "rt_critic": 70}]
+                "status": ["pvod"], "offers": [], "language": "en", "rt_critic": 70, "wm_critic_score": 70, "popularity": 50, "wm_user_rating": 7.5}]
         today = [{"tmdb_id": 691, "title": "Once Only", "genres": ["Drama"], "cinema_date": "2026-01-01",
                  "status": ["pvod", "rental"], "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}],
-                 "language": "en", "rt_critic": 70}]
+                 "language": "en", "rt_critic": 70, "wm_critic_score": 70, "popularity": 50, "wm_user_rating": 7.5}]
         transitions = compute_transitions(prev, today, RUN_DATE)
         cascade = [{"id": "c1", "user_id": "u1", "name": "Drama radar", "active": True,
                    "alert_moments": ["hits_rent"], "criteria": _criteria(genre=["Drama"])}]
