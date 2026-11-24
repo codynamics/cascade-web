@@ -1,0 +1,21 @@
+# Lists (moods): created from setup answers, edited, saved from Find.
+- id: LISTS-001
+  part: A
+  title: Moods and lists round-trip and keep their sort
+  how: unit
+  expect:
+    - a mood saved then reloaded is identical; its sort survives opening a cascade
+  refs:
+    - tests/js/cas1333-mood-roundtrip.test.mjs
+    - tests/js/cas1323-mood-sort-survives-opencascade.test.mjs
+    - tests/js/cas1322-mood-agent-delete.test.mjs
+- id: LISTS-002
+  part: A
+  title: A list can be created from a Find search
+  how: unit
+  expect:
+    - Save as list from Find builds a mood with that search's people or genre
+  refs:
+    - tests/js/cas1395-mood-from-find.test.mjs
+    - "#findSaveAsMoodBtn"
+    - "#moodAddBtn"

@@ -1,0 +1,58 @@
+# First-run: onboarding wizard (#oafScreen), guest onboarding, deep links, account-not-device idempotence.
+- id: FIRSTRUN-001
+  part: A
+  title: First-run flow never leaves a painted step hidden behind the app
+  how: browser
+  expect:
+    - ?oneagent=setup opens #oafScreen and every step stays visible and tappable
+    - handing control back mid-flow keeps the open class on #oafScreen
+  refs:
+    - tests/e2e/CAS-1350.spec.mjs
+    - "#oafScreen"
+    - oafOpen()
+- id: FIRSTRUN-002
+  part: A
+  title: Onboarding is idempotent against the account, not the device
+  how: browser
+  expect:
+    - signing into an account that already has agents does not overwrite them with the device's draft
+  refs:
+    - tests/e2e/CAS-959.spec.mjs
+- id: FIRSTRUN-003
+  part: A
+  title: Landing on Watch after membership starts at the top
+  how: browser
+  expect:
+    - the Watch listing opens at scroll position 0 whatever the page scroll was before
+  refs:
+    - tests/e2e/CAS-915.spec.mjs
+- id: FIRSTRUN-004
+  part: A
+  title: Deep links for custom product pages open the right place on a cold boot
+  how: browser
+  expect:
+    - the bundled index.html opened with a deep-link query lands on the linked screen
+  refs:
+    - tests/e2e/CAS-962.spec.mjs
+- id: FIRSTRUN-005
+  part: A
+  title: Critical path - build, boot and the fixed smoke checks
+  how: browser
+  expect:
+    - the app boots, a guest can complete onboarding and reach the Watch listing, with no console error
+  refs:
+    - tests/e2e/smoke.spec.mjs
+    - tests/e2e/helpers.mjs
+- id: FIRSTRUN-006
+  part: A
+  title: Account-integrity, device-storage and server-first suites pass against local Supabase
+  how: sql
+  expect:
+    - the integrity job passes (account data is server-first, device storage never leaks between accounts)
+  refs:
+    - tests/e2e-integrity/account-integrity.spec.mjs
+    - tests/e2e-integrity/device-storage.spec.mjs
+    - tests/e2e-integrity/server-first.spec.mjs
+    - tests/e2e-integrity/reconcile-on-return.spec.mjs
+    - tests/e2e-integrity/view-state-sync.spec.mjs
+    - tests/e2e-integrity/settled-watch-list.spec.mjs

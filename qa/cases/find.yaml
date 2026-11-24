@@ -1,0 +1,20 @@
+# Find: every film searchable by name or person.
+- id: FIND-001
+  part: A
+  title: Find lists any film by name regardless of agents, services or watched
+  how: browser
+  expect:
+    - no agent/tab/service/watched/style narrowing applies in Find
+  refs:
+    - tests/e2e/CAS-1186.spec.mjs
+    - "#findScreen"
+    - "#findSearchInput"
+- id: FIND-002
+  part: A
+  title: Find by person and by title behave as specified
+  how: unit
+  expect:
+    - a person search returns that person's films; a title search ranks exact matches first
+  refs:
+    - tests/js/cas1379-find-person-search.test.mjs
+    - tests/js/cas1387-find-search.test.mjs

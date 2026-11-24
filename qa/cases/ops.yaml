@@ -1,0 +1,30 @@
+# Operations: lint guards, data quality, health, uptime.
+- id: OPS-001
+  part: A
+  title: Static lint guards pass
+  how: unit
+  expect:
+    - device parity, XSS sinks, review-prompt copy, device-key allowlist, password sign-in guard and QA drift all pass
+  refs:
+    - tests/lint/device-parity.mjs
+    - tests/lint/xss-sinks.mjs
+    - tests/lint/device-key-allowlist.mjs
+    - tests/lint/qa-drift.mjs
+- id: OPS-002
+  part: A
+  title: Data-quality checks block app-breaking catalogue defects
+  how: unit
+  expect:
+    - python -m tests.run_data_quality exits 0 (report-only checks do not block)
+  refs:
+    - tests/run_data_quality.py
+    - tests/test_data_quality.py
+- id: OPS-003
+  part: A
+  title: Client health events and uptime probe record faithfully
+  how: unit
+  expect:
+    - failures are recorded, nothing is double-counted
+  refs:
+    - tests/js/client-health-events.test.mjs
+    - tests/js/uptime-probe.test.mjs

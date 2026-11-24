@@ -1,0 +1,49 @@
+# Account, menu, About, Privacy, Help, contact and feedback.
+- id: ACCT-001
+  part: A
+  title: Privacy policy and support are reachable inside the app
+  how: browser
+  expect:
+    - About links to the in-app #privacyScreen and a support contact
+  refs:
+    - tests/e2e/CAS-1070.spec.mjs
+    - "#aboutScreen"
+    - "#privacyScreen"
+- id: ACCT-002
+  part: A
+  title: Contact us sheet validates and sends, with an optional image
+  how: browser
+  expect:
+    - message and a valid email are required; category defaults to other; an attached image uploads then inserts
+  refs:
+    - tests/e2e/CAS-838.spec.mjs
+    - tests/e2e/CAS-864.spec.mjs
+    - tests/e2e/CAS-927.spec.mjs
+- id: ACCT-003
+  part: A
+  title: Feedback form from Account and Help reaches contact_messages
+  how: browser
+  expect:
+    - the Account row and the Help footer both open the feedback form and insert one row
+  refs:
+    - tests/e2e/CAS-978.spec.mjs
+    - "#accountScreen"
+    - "#helpScreen"
+- id: ACCT-004
+  part: A
+  title: Account data is namespaced per account on a shared device
+  how: unit
+  expect:
+    - signing out and into another account never shows the first account's data
+  refs:
+    - tests/js/acct-namespacing.test.mjs
+    - tests/js/acct-read.test.mjs
+- id: ACCT-005
+  part: A
+  title: Row-level security matrix holds
+  how: sql
+  expect:
+    - each role can read and write only the rows the matrix allows
+  refs:
+    - tests/rls/matrix.mjs
+    - tests/rls/matrix.test.mjs

@@ -1,0 +1,25 @@
+# First ten days: the simulated new-member journey.
+- id: FIRSTDAYS-001
+  part: B
+  title: First-ten-days simulator expectations hold for accounts a-d
+  how: firstdays
+  expect:
+    - each of the four first-days accounts gets exactly the alerts its expectation file lists, on the day it lists
+  refs:
+    - qa/firstdays/a.json
+    - qa/firstdays/b.json
+    - qa/firstdays/c.json
+    - qa/firstdays/d.json
+    - qa/sim/age_account.py
+    - qa/sim/accounts.py
+- id: FIRSTDAYS-002
+  part: B
+  title: Catch-up alert is sent once for a new account, then daily alerts follow
+  how: unit
+  expect:
+    - the catch-up digest uses kind catchup_alert and is not repeated the next day
+  refs:
+    - monitor/tests/test_cas1537_answers.py
+    - digest:catchup_alert
+    - moment:new_to_agent
+    - moment:newly_qualifies

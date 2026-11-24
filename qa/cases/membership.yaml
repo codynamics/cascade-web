@@ -1,0 +1,54 @@
+# Membership: purchase is iOS-only, web is invite-only, App Review sign-in, rating prompt.
+- id: MEMB-001
+  part: A
+  title: Membership screen shows price and free-month copy, no Prototype disclaimer
+  how: browser
+  expect:
+    - "#membScreen carries the price and free-month copy on both the onboarding recap and the standalone preview"
+  refs:
+    - tests/e2e/CAS-1069.spec.mjs
+    - "#membScreen"
+- id: MEMB-002
+  part: A
+  title: Web membership screen has no purchase button
+  how: browser
+  expect:
+    - cascademovies.com shows the iPhone-app message, no purchase button and no console error
+  refs:
+    - tests/e2e/CAS-971.spec.mjs
+    - tests/js/cas971-membership.test.mjs
+- id: MEMB-003
+  part: A
+  title: Non-approved web accounts are held on the invite-only screen
+  how: browser
+  expect:
+    - a signed-in account not in public.web_access sees the invite-only screen with a Sign out button
+    - an approved account gets the app
+  refs:
+    - tests/e2e/web-access.spec.mjs
+    - tests/js/cas1531-web-access.test.mjs
+- id: MEMB-004
+  part: A
+  title: App Review sign-in uses the fixed password only for the review address
+  how: browser
+  expect:
+    - appreview@codynamics.com.au signs in with the reviewer code; every other email still gets an emailed code
+  refs:
+    - tests/e2e/CAS-1073.spec.mjs
+    - tests/lint/password-signin-guard.mjs
+- id: MEMB-005
+  part: A
+  title: App Store rating prompt triggers on the web surface as specified
+  how: browser
+  expect:
+    - the trigger conditions fire the prompt hook once and never twice
+  refs:
+    - tests/e2e/CAS-969.spec.mjs
+    - tests/js/review-prompt.test.mjs
+    - tests/lint/review-prompt-copy.mjs
+- id: MEMB-006
+  part: C
+  title: A real purchase in the TestFlight build unlocks membership
+  how: lee-phone
+  expect:
+    - buying in the iOS build marks the account a member and the web build then admits the same account

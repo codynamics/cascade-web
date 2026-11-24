@@ -1,0 +1,62 @@
+# Alerts: the in-app Alerts screen (opens on Today), its settings, and the monitor's moments.
+- id: ALERTS-001
+  part: A
+  title: Alerts opens on Today first, then remembers the period for the session
+  how: browser
+  expect:
+    - first open of a session is Today; after picking a period it stays; reload or sign-out returns to Today
+  refs:
+    - tests/e2e/CAS-1465.spec.mjs
+- id: ALERTS-002
+  part: A
+  title: Alerts jump-to lands flush and re-render never flashes
+  how: browser
+  expect:
+    - Jump to lands under the sticky chrome and is one-shot; the subtitle says agent for a one-agent account
+  refs:
+    - tests/e2e/CAS-1475.spec.mjs
+    - "#movingScreen"
+- id: ALERTS-003
+  part: A
+  title: Alert moments and switches sync to the account
+  how: unit
+  expect:
+    - turning a moment off on one device is off on the others
+  refs:
+    - tests/js/cas1193-alert-moments-sync.test.mjs
+    - tests/js/cas1198-alerts-switch.test.mjs
+    - tests/js/cas1237-alerts-reminders.test.mjs
+- id: ALERTS-004
+  part: B
+  title: Every moment fires for forward progress only, once per film
+  how: unit
+  expect:
+    - each moment fires exactly when the film enters it and never on backward progress
+  refs:
+    - monitor/transitions.py
+    - moment:hits_cinema
+    - moment:hits_pvod
+    - moment:hits_rent
+    - moment:hits_stream
+    - moment:past_opening_weekend
+    - moment:announced
+    - moment:opens_soon
+- id: ALERTS-005
+  part: B
+  title: Film journeys behave - 12 scripted journeys
+  how: journey
+  expect:
+    - each journey's expected alerts (and non-alerts) match what the monitor produces day by day
+  refs:
+    - qa/journeys/age-rating.json
+    - qa/journeys/alerts-off-genre.json
+    - qa/journeys/backwards.json
+    - qa/journeys/below-bar.json
+    - qa/journeys/catchup-overlap.json
+    - qa/journeys/full-run.json
+    - qa/journeys/genre-off.json
+    - qa/journeys/not-for-me.json
+    - qa/journeys/not-my-service.json
+    - qa/journeys/repeat-day.json
+    - qa/journeys/watched-before-rent.json
+    - qa/journeys/window-not-followed.json
