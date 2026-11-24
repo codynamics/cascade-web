@@ -4787,6 +4787,14 @@
   .tutbans{font-size:12px;color:#aab3c5;margin-top:1px}
   .tutbango{flex:none;background:#7C5CFF;color:#fff;border:0;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:800}
   .tutbanx{flex:none;background:none;border:0;color:#8b95a5;font-size:18px;padding:2px 4px}
+  /* CAS-1566: Watch reminder / Taste card (verbatim from the ticket) */
+  .rnudge{display:flex;align-items:center;gap:10px;margin:10px 12px;padding:12px;border-radius:14px;background:rgba(124,92,255,.14);border:1px solid rgba(124,92,255,.55)}
+  .rnudge .ic{flex:none;width:34px;height:34px;border-radius:50%;background:#7C5CFF;display:flex;align-items:center;justify-content:center;font-size:17px}
+  .rnudge .tx{flex:1;min-width:0}
+  .rnudge .t{font-size:14px;font-weight:800;color:#fff}
+  .rnudge .s{font-size:12px;color:#aab3c5;margin-top:1px}
+  .rnudge .go{flex:none;background:#7C5CFF;color:#fff;border:0;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:800}
+  .rnudge .x{flex:none;background:none;border:0;color:#8b95a5;font-size:18px}
 </style>
 </head>
 <body>
@@ -5006,6 +5014,7 @@
        mean something, and the order is visible in the list itself. -->
   <div>
     <div id="listChrome"></div>
+    <div id="rnudgeSlot"></div>
     <div id="groups"></div>
   </div>
 
@@ -26221,9 +26230,93 @@ document.addEventListener("click", e=>{
     t.remove();
   }
 });
+// ---- WATCH REMINDER / TASTE CARD (CAS-1566) ------------------------------------------------------------
+// One slot above the Watch list. Never a rating exercise: the reminder only says rating teaches the agent
+// and has no action button; the Taste card reports a real adjustment read off the taste model (youScore's
+// own pair arithmetic). Counts live per account in user_prefs.view.rnudge = {rem:<times shown>, taste:<retired>}.
+let rnudgeMap={rem:0, taste:false};
+let rnudgeVisit=null, rnudgeVisitGone=false;   // the card this visit holds, and whether it was dismissed
+const RNUDGE_MAX_SHOWN=3, RNUDGE_MIN_PTS=5;
+// The decision, pure.  o: {signedIn, now, createdAt, ratings, adj:{pts,text}|null, seen:{rem,taste},
+//   tutorialShownThisVisit, cardShownThisVisit, blocked}  -> "reminder" | "taste" | null
+function rnudgeDecide(o){
+  if(!o || !o.signedIn || o.blocked || o.tutorialShownThisVisit || o.cardShownThisVisit) return null;
+  const seen=o.seen||{};
+  if((o.ratings||0)>=10){
+    if(seen.taste) return null;
+    return (o.adj && Math.abs(o.adj.pts)>=RNUDGE_MIN_PTS) ? "taste" : null;
+  }
+  if((o.ratings||0)>=5) return null;
+  if(tutAccountAgeDays(o.createdAt, o.now)<2) return null;
+  if((seen.rem||0)>=RNUDGE_MAX_SHOWN) return null;
+  return "reminder";
+}
+function rnudgeRatingsCount(){
+  let n=0; watched.forEach(id=>{ if(WATCH_STEPS.some(s=>s.key===opinionOf(id))) n++; }); return n;
+}
+// The strongest genre-pair adjustment, in points, as the You score applies it (youScore's own adj for a
+// film of just that pair). Null when none exists.
+function rnudgeBestAdjustment(){
+  const T=tasteProfile(); let best=null;
+  Object.values(T.pairs||{}).forEach(pr=>{
+    if(!(pr.n>0) || !(pr.primary<pr.other)) return;
+    const pts=Math.round(youScore({pub:50, pairs:[{sum:pr.sum, n:pr.n}], b:T.pairBaseline}).adj);
+    if(!best || Math.abs(pts)>Math.abs(best.pts)) best={pts, pr};
+  });
+  if(!best || !best.pts) return null;
+  const nm=g=>(typeof tasteShortName==="function" ? tasteShortName(g) : g);
+  return {pts:best.pts, text:`${nm(best.pr.primary)} with ${nm(best.pr.other)} is ${best.pts>0?"up":"down"} ${Math.abs(best.pts)} from your ratings`};
+}
+function rnudgeCardHTML(kind, agentName, adjText){
+  const rem=kind==="reminder";
+  return `<div class="rnudge" role="note" data-k="${kind}">
+  <span class="ic" aria-hidden="true">${rem?"⭐":"🎯"}</span>
+  <div class="tx"><div class="t">${rem?`The more you rate, the better ${esc(agentName)} gets`:`${esc(agentName)} has learned something`}</div><div class="s">${rem?"After you watch a film, tap <b>Watched</b> and say how you felt":esc(adjText)}</div></div>
+  ${rem?"":'<button type="button" class="go">See Taste</button>'}
+  <button type="button" class="x" aria-label="Dismiss">✕</button>
+</div>`;
+}
+function rnudgeSync(){
+  const slot=$("rnudgeSlot"); if(!slot) return;
+  const a=window.CascadeAuth;
+  const signedIn=!!(a && a.enabled && a.status==="signed-in" && a.user);
+  if(!signedIn){ slot.innerHTML=""; return; }
+  const blocked=tutBannerBlocked("watch") || !!document.querySelector("#movingScreen.open,#agentsScreen.open,#findScreen.open");
+  if(rnudgeVisit && !rnudgeVisitGone){
+    // Same visit, same card: keep it drawn across re-renders (the slot sits outside the list), unless a
+    // sheet/modal/tutorial now covers the screen.
+    if(blocked){ slot.innerHTML=""; return; }
+    if(!slot.firstElementChild) slot.innerHTML=rnudgeCardHTML(rnudgeVisit.kind, rnudgeVisit.name, rnudgeVisit.text).trim();
+    return;
+  }
+  slot.innerHTML="";
+  if(rnudgeVisitGone) return;
+  const ratings=rnudgeRatingsCount();
+  const adj=ratings>=10 ? rnudgeBestAdjustment() : null;
+  const kind=rnudgeDecide({signedIn, now:Date.now(), createdAt:a.user.created_at, ratings, adj,
+    seen:rnudgeMap, tutorialShownThisVisit:tutVisitShown, cardShownThisVisit:false, blocked});
+  if(!kind) return;
+  const c=oneAgentCriteria();
+  const name=((c&&c.name)||"").trim() || "Your agent";
+  rnudgeVisit={kind, name, text:adj?adj.text:""};
+  slot.innerHTML=rnudgeCardHTML(kind, name, rnudgeVisit.text).trim();
+  if(kind==="reminder"){ rnudgeMap.rem=(rnudgeMap.rem||0)+1; pushViewField("rnudge", rnudgeMap); logEvent("taste_reminder_shown",{n:rnudgeMap.rem}); }
+  else logEvent("taste_card_shown",{pts:adj.pts});
+}
+function rnudgeAdopt(v){
+  if(!v || typeof v!=="object") return;
+  rnudgeMap={rem:Math.max(rnudgeMap.rem||0, +v.rem||0), taste:!!(rnudgeMap.taste||v.taste)};
+}
+document.addEventListener("click", e=>{
+  const t=e.target && e.target.closest ? e.target.closest(".rnudge") : null; if(!t) return;
+  const kind=t.dataset.k;
+  const retire=()=>{ if(kind==="taste"){ rnudgeMap.taste=true; pushViewField("rnudge", rnudgeMap); } rnudgeVisitGone=true; t.remove(); };
+  if(e.target.closest(".go")){ logEvent("taste_card_open",{}); retire(); window.openAgentsScreen(); }
+  else if(e.target.closest(".x")){ logEvent(kind==="taste"?"taste_card_dismiss":"taste_reminder_dismiss",{}); retire(); }
+});
 document.addEventListener("visibilitychange", ()=>{
   if(document.visibilityState==="hidden"){ tutHiddenAt=Date.now(); return; }
-  if(tutHiddenAt && Date.now()-tutHiddenAt>=TUT_VISIT_GAP_MS) tutVisitShown=false;
+  if(tutHiddenAt && Date.now()-tutHiddenAt>=TUT_VISIT_GAP_MS){ tutVisitShown=false; rnudgeVisit=null; rnudgeVisitGone=false; }
   tutHiddenAt=0;
 });
 // Card text for this script is set via innerHTML (the ticket's own "¶ = <br><br>" rule, spec verbatim) —
@@ -27341,6 +27434,7 @@ function render(){
   renderCallCount++;
   renderGen++;   // CAS-129: supersede any card-fill still streaming from a previous render
   const myGen=renderGen;   // CAS-421: only THIS render may lift the blur it didn't set
+  if(accountFanoutSettled()) rnudgeSync();   // CAS-1566
   if(!accountFanoutSettled()){
     $("groups").innerHTML = accountLoadingHTML();
     renderJumpBar();
@@ -28993,6 +29087,7 @@ function acctFetchKeepalive(init){
     tutorialSeenFlag=false;
     tourV2SeenFlag=false;
     tutSeenMap={};   // CAS-1534
+    rnudgeMap={rem:0, taste:false}; rnudgeVisit=null; rnudgeVisitGone=false;   // CAS-1566
     reviewPromptSessionsCount=0; reviewSessionBumpPending=false; reviewSessionsPushPending=false; reviewPromptAskedVer=null;
     Object.assign(agentState, loadAgentState());
     Object.keys(admitDrift).forEach(k=>delete admitDrift[k]); admitDriftSaved=null;
@@ -30249,6 +30344,7 @@ function acctFetchKeepalive(init){
       if(typeof v.tutorialSeen==="boolean") tutorialSeenFlag = v.tutorialSeen;
       if(typeof v.tourV2Seen==="boolean") tourV2SeenFlag = v.tourV2Seen;
       tutAdoptSeen(v.tutSeen);   // CAS-1534
+      rnudgeAdopt(v.rnudge);     // CAS-1566
       // CAS-1222: a bump queued before this load resolved is replayed ON TOP of the account's real count,
       // never trusting this session's bare local default — see bumpReviewPromptSessionCount's own comment.
       // CAS-1243 round 2: computed here, but the write itself rides piggyback on the next real view-field

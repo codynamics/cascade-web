@@ -476,7 +476,7 @@ if(typeof window.CascadeAuth === "undefined"){
   // and friends below.
   agentState, tutorialSeen, markTutorialSeen,
   // CAS-1534: the tutorial banner's decision, its seen-map writers, and the map itself.
-  tutBannerDecide, tutMarkPlayed, tutAdoptSeen, TOURS, get tutSeenMap(){ return tutSeenMap; },
+  tutBannerDecide, tutMarkPlayed, tutAdoptSeen, rnudgeDecide, rnudgeCardHTML, TOURS, get tutSeenMap(){ return tutSeenMap; },
   // CAS-667: movingData is wire-adjacent (it reads window.CascadePersistence.accountActive()) but its
   // row-selection arithmetic is exactly the kind of decision this harness exists to test. realAlerts and
   // firstFound are exposed by reference (mutated via push, never reassigned, in test use) so a test can seed
