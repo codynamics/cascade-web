@@ -451,6 +451,11 @@ if(typeof window.CascadeAuth === "undefined"){
   // the CURRENT binding even across a reassignment, not a snapshot frozen at load time.
   get tasteBase(){ return tasteBase; },
   cascades,
+  // CAS-1549: the first run's own draft + commit, driven by qa/sim/build_account.mjs. oafState is reassigned
+  // wholesale by oafOpen, so it is set through a setter; oneAgentBuildDraft/oneAgentCommit are the app's own.
+  oneAgentBuildDraft, oneAgentCommit, ONE_AGENT_SETUP_STYLES,
+  setOafState(v){ oafState = v; },
+  cascadeToRow: c => window.CascadeShape.cascadeToRow(c),
   get onbFlow(){ return onbFlow; },
   get flowKind(){ return flowKind; },
   setFlowKind(k){ flowKind = k; },
