@@ -211,6 +211,12 @@ test("S1: a new member's onboarded roster exists on the server", async ({ page }
   await finishFlow(page);
 
   await page.locator("#membEmail").fill(email);
+  // CAS-1568: the web has no approved list since CAS-1565; a brand-new account gets in with the CASCADEFRIENDS
+  // promo code, checked here and redeemed against the real local stack at sign-in.
+  await page.locator("#membPromoLink").click();
+  await page.locator("#membPromoCode").fill("CASCADEFRIENDS");
+  await page.locator("#membPromoApply").click();
+  await expect(page.locator("#membPromo .membpromook")).toBeVisible({ timeout: 30_000 });
   await page.locator(".membcta").click();
   // CAS-1169: the code is confirmed on #membScreen itself (State B), never on #authModal.
   await expect(page.locator("#membCode")).toBeVisible({ timeout: 30_000 });

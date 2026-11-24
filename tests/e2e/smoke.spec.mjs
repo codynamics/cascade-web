@@ -11,7 +11,7 @@ import { test, expect } from "@playwright/test";
 import {
   freshApp, gotoFresh, toShortlist, walkToServices, shortlistCards, finishFlow, toListing, settleListing, ctaLocator, sectionCounts,
   openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen, openNotifyScreen,
-  dumpSignedInDiagnostics, openAgentsScreenFromNav,
+  dumpSignedInDiagnostics, openAgentsScreenFromNav, withActiveMember,
 } from "./helpers.mjs";
 
 // CAS-1136 decision 2: on a failed or timed-out test, show the in-flight requests and buffered console
@@ -1009,7 +1009,7 @@ async function cas913GotoConfigured(page){
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS913_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS913_FAKE_SUPABASE_GLOBAL),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
@@ -1183,7 +1183,7 @@ async function cas1169GotoConfigured(page){
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS1169_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS1169_FAKE_SUPABASE_GLOBAL),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
@@ -1482,7 +1482,7 @@ test("CAS-1035 AC3: a Watch On tick survives being closed and reopened before it
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS1035_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS1035_FAKE_SUPABASE_GLOBAL),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
