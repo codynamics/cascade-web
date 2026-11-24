@@ -29,6 +29,14 @@ both projects' anon keys and picks one at load:
 The result is `window.CASCADE_CONFIG.ENV`, shown in the footer build stamp and the diagnostics panel.
 `tests/js/env-config.test.mjs` pins the mapping. Only anon keys ever go in `config.js`.
 
+### Staging is migrated automatically (CAS-1546)
+
+`.github/workflows/migrate-staging.yml` runs on every push to `staging` that touches
+`supabase/migrations/**` (and on manual dispatch). It applies each migration not yet recorded in
+staging's `public.schema_migrations`, in filename order, via `ci/migrate_staging.py` using the
+`SUPABASE_DB_URL` secret of the `staging` GitHub Environment. It refuses to run against the
+production ref. **Production is migrated only by the gated release step — never by this workflow.**
+
 ## How to apply a change (Lee — one time per migration)
 
 1. Open the Supabase project → **SQL Editor** → **New query**.
