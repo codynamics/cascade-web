@@ -5,7 +5,7 @@
 // resolveFilmInvite in app_template.html), which only a real boot sequence — not a hand-set CascadeAuth
 // object — actually dispatches.
 import { test, expect } from "@playwright/test";
-import { freshApp } from "./helpers.mjs";
+import { freshApp, withActiveMember } from "./helpers.mjs";
 
 // A page.route registered later always wins over one registered earlier (helpers.mjs), so gotoInvite can
 // freely override freshApp's own config.js block once it needs a configured, invite-resolving boot.
@@ -51,7 +51,7 @@ async function gotoInvite(page, { token, id, invitesByToken }){
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: fakeSupabaseScript(invitesByToken),
+    body: withActiveMember(fakeSupabaseScript(invitesByToken)),
   }));
   const url = `/index.html?inv=${encodeURIComponent(token)}#/film/${id}`;
   await page.goto(url);

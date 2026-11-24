@@ -7,6 +7,7 @@
 // build, rather than walking full onboarding just to click that row. No network: window.supabase is a
 // local fake (no esm.sh import, no live project), matching every other auth spec in this suite
 // (CAS-1070.spec.mjs, smoke.spec.mjs).
+import { withActiveMember } from "./helpers.mjs";
 import { test, expect } from "@playwright/test";
 
 const REVIEW_EMAIL = "appreview@codynamics.com.au";
@@ -63,7 +64,7 @@ async function bootSignedOut(page){
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS1073_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS1073_FAKE_SUPABASE_GLOBAL),
   }));
   await page.goto("/index.html");
   await page.evaluate(() => { try{ localStorage.clear(); }catch(e){} });

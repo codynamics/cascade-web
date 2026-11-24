@@ -5,7 +5,7 @@
 // session is signed-out-but-configured throughout — CascadeAuth's client exists once Supabase is
 // configured regardless of session state, and contact_messages' own RLS policy grants insert to anon.
 import { test, expect } from "@playwright/test";
-import { gotoFresh, toShortlist, finishFlow, toListing } from "./helpers.mjs";
+import { gotoFresh, toShortlist, finishFlow, toListing, withActiveMember } from "./helpers.mjs";
 
 const CAS838_FAKE_SUPABASE_GLOBAL = `
   window.__contactInserts = [];
@@ -44,7 +44,7 @@ async function configuredApp(page){
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS838_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS838_FAKE_SUPABASE_GLOBAL),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.enabled === true, null, { timeout: 5000 });

@@ -4,7 +4,7 @@
 // account sign-up email step on #membScreen (shown when membNeedsEmail() is true — a configured,
 // signed-out build).
 import { test, expect } from "@playwright/test";
-import { toShortlist, finishFlow, toListing } from "./helpers.mjs";
+import { toShortlist, finishFlow, toListing, withActiveMember } from "./helpers.mjs";
 
 const SUPPORT_URL = "https://www.codynamics.com.au/support";
 
@@ -80,7 +80,7 @@ test.fixme("membScreen email step: Privacy policy opens #privacyScreen in-app an
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS1070_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS1070_FAKE_SUPABASE_GLOBAL),
   }));
   await page.goto("/index.html?step=membership");
   await page.evaluate(() => { try{ localStorage.clear(); }catch(e){} });

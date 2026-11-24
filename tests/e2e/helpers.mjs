@@ -15,6 +15,36 @@ export const PRESET_NAMES = {
   stream: ["Loved & Acclaimed", "Date Night", "Everyday Favourites", "Nominees & Awards", "Totally Custom"],
 };
 
+/** CAS-1563: the app reads public.memberships (CAS-971/CAS-1531) and holds a signed-in account with no active
+ * membership on the membership screen. A spec's fake supabase-js that answers every table with `{data: []}` (or
+ * has no `select` on it) therefore gates the app. Append this to a fake client script, AFTER it assigns
+ * window.supabase: it wraps createClient so `from("memberships")` answers one active member row (any chained
+ * select/eq/maybeSingle) and rpc("is_web_access_approved") answers true, leaving every other table/rpc to the
+ * spec's own fake. */
+export function withActiveMember(script){
+  return script + `
+;(function(){
+  const sb = window.supabase;
+  if(!sb || typeof sb.createClient !== "function" || sb.__casMemberWrapped) return;
+  const orig = sb.createClient.bind(sb);
+  const ROW = { status: "active", expires_at: "2099-12-31T00:00:00Z", is_trial: false, source: "e2e" };
+  const memberChain = () => new Proxy(() => {}, {
+    get: (_t, prop) => prop === "then" ? (resolve) => resolve({ data: ROW, error: null }) : () => memberChain(),
+    apply: () => memberChain(),
+  });
+  sb.createClient = function(){
+    const client = orig.apply(sb, arguments);
+    const origFrom = client.from && client.from.bind(client);
+    client.from = (table) => table === "memberships" ? memberChain() : origFrom(table);
+    const origRpc = client.rpc && client.rpc.bind(client);
+    client.rpc = (fn, args) => fn === "is_web_access_approved" ? Promise.resolve({ data: true, error: null }) : (origRpc ? origRpc(fn, args) : Promise.resolve({ data: null, error: null }));
+    return client;
+  };
+  sb.__casMemberWrapped = true;
+})();
+`;
+}
+
 /** The raw navigation freshApp does, with no opinion on config.js — cas317.spec.mjs needs this bare, since
  * it registers its own config.js/esm.sh routes and a route added later always wins over one added earlier. */
 export async function gotoFresh(page){
@@ -392,7 +422,7 @@ export async function bootAlreadySignedIn(page, { supabaseScript, resolveFnName,
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: supabaseScript,
+    body: withActiveMember(supabaseScript),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);

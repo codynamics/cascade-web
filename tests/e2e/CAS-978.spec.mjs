@@ -4,7 +4,7 @@
 // without touching a live project — signed-out-but-configured throughout, since contact_messages' own
 // RLS policy grants insert to anon.
 import { test, expect } from "@playwright/test";
-import { freshApp, gotoFresh, toShortlist, walkToServices, finishFlow, toListing } from "./helpers.mjs";
+import { freshApp, gotoFresh, toShortlist, walkToServices, finishFlow, toListing, withActiveMember } from "./helpers.mjs";
 
 // CAS-1150 requeue: this fake client predates CAS-1056 (email OTP replaced the derived-password scheme)
 // — signInWithPassword/signUp are no longer called by the app at all, and onAuthStateChange never stored
@@ -72,7 +72,7 @@ async function configuredApp(page){
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS978_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS978_FAKE_SUPABASE_GLOBAL),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.enabled === true, null, { timeout: 5000 });
