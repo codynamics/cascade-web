@@ -28407,13 +28407,33 @@ const openedShared = openSharedFromURL();
                          source:arrivalSource(arr), ...(arr.cmp?{campaign:arr.cmp}:{}), ...(arr.cta?{cta:arr.cta}:{}) });
   bumpReviewPromptSessionCount();   // CAS-969: "a few sessions" counts page loads, same cadence as app_open
 }
+// CAS-1577: Cascade has no signed-out mode, so when an account service is configured, a device with no
+// stored Supabase session goes straight to the splash at boot. Before this, an onboarded device with no
+// session painted the main app and nav first, then the auth module's async no-session result
+// (setSignedOut -> showSplash) replaced it: a visible flash. Synchronous by design: it reads the SDK's own
+// sb-<ref>-auth-token key. A stored refresh token means restore may still succeed, so the app is kept.
+// No config.js (guest/e2e runs) is unaffected: CascadeAuth is disabled there and routing stays as before.
+function hasStoredAuthSession(){
+  const cfg = window.CASCADE_CONFIG;
+  if(!cfg || !cfg.SUPABASE_URL) return true;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith('sb-') && k.endsWith('-auth-token')){
+        const v = JSON.parse(localStorage.getItem(k) || 'null');
+        if(v && (v.refresh_token || (v.currentSession && v.currentSession.refresh_token))) return true;
+      }
+    }
+  }catch(e){}
+  return false;
+}
 // First run only — the "seen" flag is set by finishing OR skipping, so returning visitors go straight to the app.
 // ?setup replays it on demand: the flag stays set, and the rest of your state is untouched — this is a way to
 // SEE the first run again, not to fake being a new user (that's ?reset, which really does clear the slate).
 // ?step=<name> previews one north-star sharpening step (CAS-115+) in isolation; it wins over the splash
 // so the screen can be reviewed on its own before Lee wires the sequence.
 if(!openedShared && previewStep && openPreviewStep(previewStep, previewAgent)){/* previewing a single step */}
-else if(!openedShared && (forceSetup || !onboardingSeen())) showSplash();
+else if(!openedShared && (forceSetup || !onboardingSeen() || !hasStoredAuthSession())) showSplash();
 // CAS-933: reverses CAS-644 — Watch, not Moving, is where the app opens once onboarding has been seen.
 // Cinema if it would actually show something for this account right now, Streaming otherwise (pickLandingWatchTab,
 // shared with the end of onboarding below). A shared link and a film link still win (see below): they say

@@ -56,3 +56,13 @@
     - tests/e2e-integrity/reconcile-on-return.spec.mjs
     - tests/e2e-integrity/view-state-sync.spec.mjs
     - tests/e2e-integrity/settled-watch-list.spec.mjs
+- id: FIRSTRUN-007
+  part: A
+  title: Signed-out cold load opens on the splash with no flash of the main nav
+  how: browser
+  expect:
+    - an onboarded device with no stored session opens #splash at boot, with no frame of the app first
+    - an onboarded device with a stored session opens the app, not the splash
+  refs:
+    - tests/e2e/CAS-1577.spec.mjs
+    - hasStoredAuthSession()

@@ -4,7 +4,7 @@
      then run `python qa/build_checklist.py`. The push gate (tests/lint/qa-drift.mjs) fails if this
      file is stale. -->
 
-69 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
+70 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
 
 ## Part A
 
@@ -43,6 +43,9 @@
   - the app boots, a guest can complete onboarding and reach the Watch listing, with no console error
 - [ ] **FIRSTRUN-006** Account-integrity, device-storage and server-first suites pass against local Supabase _(sql, auto)_
   - the integrity job passes (account data is server-first, device storage never leaks between accounts)
+- [ ] **FIRSTRUN-007** Signed-out cold load opens on the splash with no flash of the main nav _(browser, auto)_
+  - an onboarded device with no stored session opens #splash at boot, with no frame of the app first
+  - an onboarded device with a stored session opens the app, not the splash
 - [ ] **INV-001** Invite arrival is recorded and a recipient sees the film and one question _(browser, auto)_
   - a ?inv=<token>#/film/<id> link shows the film and one Yes/No question on one screen
 - [ ] **INV-002** Sending an invite creates a real invites record, to one or several friends _(browser, auto)_
