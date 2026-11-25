@@ -1418,10 +1418,18 @@ test("CAS-1585 settings foot shows version and build from BUILD_INFO", async ({ 
   const line = page.locator("#settingsScreen #settingsBuild");
   await expect(line).toHaveText(want);
   await expect(line).not.toContainText("Production");
-  expect(await page.evaluate(() => {
+  // CAS-1589: on failure the message names every descendant whose right edge passes the screen's right edge.
+  const fit = await page.evaluate(() => {
     const s = document.getElementById("settingsScreen");
-    return s.scrollWidth <= s.clientWidth;
-  })).toBe(true);
+    const right = s.getBoundingClientRect().right;
+    const wide = [...s.querySelectorAll("*")]
+      .filter(el => el.getBoundingClientRect().right > right + 0.5)
+      .map(el => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "")
+        + (typeof el.className === "string" && el.className ? "." + el.className.trim().split(/\s+/).join(".") : "")
+        + " w=" + Math.round(el.getBoundingClientRect().width));
+    return { ok: s.scrollWidth <= s.clientWidth, sw: s.scrollWidth, cw: s.clientWidth, wide };
+  });
+  expect(fit.ok, "settings overflow sw=" + fit.sw + " cw=" + fit.cw + " wide: " + fit.wide.join(" | ")).toBe(true);
 });
 
 // CAS-1035 AC3: a Watch On tick made just before the tab closes must survive a reload even though it never
