@@ -24125,7 +24125,10 @@ function batchControlsHTML(row){
 function batchItemHTML(row, whyHTML){
   const id=row.m.tmdb_id;
   const tag = watched.has(id) ? `<div class="mvwhy"><span class="mvchip watched">Watched</span></div>` : "";
-  return `<div class="mvitem${blocked.has(id)?" mvnever":""}">${whyHTML}${tag}${movingCardHTML(row)}${batchControlsHTML(row)}</div>`;
+  // Lee, 2026-11-25: no Watch On / Watched panels opened out under every film — "it's horrible". The card's own
+  // Alert, list and Watched buttons answer the email (toggleFilmOpt / pickNever / setOpinion still call
+  // noteBatchAnswer), exactly as on Watch. batchControlsHTML stays (tests read the selected state through it).
+  return `<div class="mvitem${blocked.has(id)?" mvnever":""}">${whyHTML}${tag}${movingCardHTML(row)}</div>`;
 }
 function batchBandHTML(){
   const d=batchDateLabel(movingBatch.ymd), h=movingBatch.headline;
