@@ -1406,6 +1406,24 @@ test("CAS-1176 AC3-AC6: Settings' How you're told has no onboarding chrome, emai
   await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
 });
 
+// CAS-1585: Settings ends with one muted line "Cascade <version> (build <n>)", plus " · Staging" off production.
+test("CAS-1585 settings foot shows version and build from BUILD_INFO", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => typeof openSettings === "function");
+  const want = await page.evaluate(() => {
+    openSettings();
+    return "Cascade " + BUILD_INFO.version + " (build " + BUILD_INFO.build + ")"
+      + (RUNTIME_ENV === "production" ? "" : " · Staging");
+  });
+  const line = page.locator("#settingsScreen #settingsBuild");
+  await expect(line).toHaveText(want);
+  await expect(line).not.toContainText("Production");
+  expect(await page.evaluate(() => {
+    const s = document.getElementById("settingsScreen");
+    return s.scrollWidth <= s.clientWidth;
+  })).toBe(true);
+});
+
 // CAS-1035 AC3: a Watch On tick made just before the tab closes must survive a reload even though it never
 // reached the account — the observed bug (Lee, iPhone: two Stream ticks reverted after a swipe-close and
 // reopen). Same session-persists-across-a-real-reload technique as CAS913_FAKE_SUPABASE_GLOBAL above (a

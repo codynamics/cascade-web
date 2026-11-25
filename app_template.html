@@ -2111,6 +2111,7 @@
 
   .osh{font-family:var(--font-display);font-size:20px;font-weight:700;margin:0 0 6px;color:var(--ink)}
   .ossub{color:var(--dim);font-size:13px;line-height:1.5;margin:0 0 12px}   /* CAS-130 size / CAS-138 tighten */
+  .setbuild{color:var(--dim);font-size:12px;line-height:1.4;text-align:center;margin:24px 0 8px;overflow-wrap:anywhere;pointer-events:none;user-select:none}   /* CAS-1585 */
   /* CAS-264: the trail. A quiet ledger, not a control — no card chrome, no tap affordance, just the rows
      you have already answered with a hairline between them. The row for the step you are ON is lifted to
      full ink so the newest answer reads as the live one and the ones above it read as settled. */
@@ -24664,7 +24665,15 @@ function renderSettings(){
       ${acctRow("🔔","Notification Settings", esc(notif) + (notifyPrefs.emailOn && notifyPrefs.email
                 ? ` · ${esc(notifyPrefs.email)}` : ""), "settingsOpenNotify()")}
       ${acctRow("🌐","Languages", null, "settingsOpenLanguages()")}
-    </div>`;
+    </div>
+    <p class="setbuild" id="settingsBuild">${esc(settingsBuildLine())}</p>`;
+}
+// CAS-1585: one discreet line at the foot of Settings — which build is this. Numbers from BUILD_INFO (same
+// source as buildCore()); the environment word only on staging, never "Production" for members.
+function settingsBuildLine(){
+  const b = BUILD_INFO || {};
+  return "Cascade " + (b.version || "0.0.0") + " (build " + (b.build != null ? b.build : "?") + ")"
+       + (RUNTIME_ENV === "production" ? "" : " · Staging");
 }
 window.openSettings=()=>{
   renderSettings();
