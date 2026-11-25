@@ -26481,7 +26481,7 @@ const TOURS = {
     {html:TUT_P("<b>Latest and Best</b> is your main list: the top 20% of every genre your agent follows."),
       before(){ tutMoodRowTo(null); }, sel:[`.moodrow .moodchip[data-mood="releases"]`], trail:TUT_W},
     {html:TUT_P("Some lists have been created from the questions you answered."),
-      before(){ tutMoodRowTo(`.moodrow .moodchip[data-mood="me"]`); },
+      before(){ tutMoodRowTo([`.moodrow .moodchip[data-mood="me"]`,`.moodrow .moodchip[data-mood="date"]`,`.moodrow .moodchip[data-mood="family"]`]); },
       sel:[`.moodrow .moodchip[data-mood="me"]`,`.moodrow .moodchip[data-mood="date"]`,`.moodrow .moodchip[data-mood="family"]`], trail:TUT_W},
     // Lee, 14 Nov: point at the moods setup made from the first-run answers. Skipped (CAS-976 rule) when the
     // account has neither.
@@ -26677,9 +26677,14 @@ function tutMoodRowTo(sel){
   const row=document.querySelector(".moodrow"); if(!row) return;
   const scroller = row.scrollWidth>row.clientWidth ? row : (row.querySelector(".moodscroll")||row);
   if(!sel){ scroller.scrollLeft=0; return; }
-  const el=row.querySelector(sel)||document.querySelector(sel); if(!el) return;
-  const rr=scroller.getBoundingClientRect(), er=el.getBoundingClientRect();
-  scroller.scrollLeft += (er.left+er.width/2) - (rr.left+rr.width/2);
+  // CAS-1581: `sel` may be a list — the row is then scrolled so those chips are on screen together where they
+  // fit (centred as a group); when the group is wider than the row, the first chip is brought to the start.
+  const els=(Array.isArray(sel)?sel:[sel]).map(q=>row.querySelector(q)||document.querySelector(q)).filter(Boolean);
+  if(!els.length) return;
+  const rr=scroller.getBoundingClientRect(), rects=els.map(e=>e.getBoundingClientRect());
+  const left=Math.min(...rects.map(r=>r.left)), right=Math.max(...rects.map(r=>r.right));
+  if(right-left <= rr.width) scroller.scrollLeft += (left+right)/2 - (rr.left+rr.width/2);
+  else scroller.scrollLeft += rects[0].left - rr.left - 8;
 }
 // The made moods sit at the end of the mood row — scroll it so they're on screen for the step.
 function tutRevealMadeMoods(){
@@ -26770,9 +26775,15 @@ function tutorialAdvance(dir){
   let idx=tutIdx+dir;
   while(idx>=0 && idx<tutSteps.length){
     const step=tutSteps[idx];
+    // CAS-1581: did before() expand/collapse (or swap) the film card? Then the card is still moving and the
+    // tour card is held back until the settle pass has placed it.
+    const sig0 = tourCardId+":"+(tourCardId!=null && expandedSet.has(tourCardId));
     if(step.before) step.before();
     const resolved=tutResolveStep(step);
-    if(resolved){ tutIdx=idx; tutCurrent=resolved; showTutorialCard(); return true; }
+    if(resolved){
+      tutHoldCard = (step.scope==="card" || step.wholeCard) && sig0 !== tourCardId+":"+(tourCardId!=null && expandedSet.has(tourCardId));
+      tutIdx=idx; tutCurrent=resolved; showTutorialCard(); return true;
+    }
     idx+=dir;
   }
   return false;
@@ -26818,7 +26829,7 @@ function tutScrollIntoPlace(step){
   // Scrolled directly (not scrollIntoView + scroll-margin), since the margin can be negative.
   window.scrollBy(0, anchor.getBoundingClientRect().top - margin);
 }
-let tutNarrowTimers=[], tutShut=new Set(), tutShutDrawn=new Set();
+let tutNarrowTimers=[], tutShut=new Set(), tutShutDrawn=new Set(), tutHoldCard=false;
 function tutClearNarrow(){ tutNarrowTimers.forEach(clearTimeout); tutNarrowTimers=[]; tutShut=new Set(); tutShutDrawn=new Set(); }
 // step.narrow: selectors (of the step's own targets) that fade out one by one, ~0.9s apart, after a beat.
 function tutRunNarrow(step){
@@ -26840,12 +26851,24 @@ function showTutorialCard(){
   $("tutBackBtn").style.display = tutIdx===0 ? "none" : "";
   $("tutSkipBtn").style.visibility = (tutIdx===tutSteps.length-1) ? "hidden" : "";
   const card=$("tutCard"); card.style.animation="none"; void card.offsetWidth; card.style.animation="";
+  // CAS-1581: while the film card is still expanding/collapsing, keep the tour card invisible until the settle pass.
+  const hold=tutHoldCard; tutHoldCard=false;
+  if(hold){ card.style.opacity="0"; card.style.pointerEvents="none"; card.style.transition="none"; }
+  else { card.style.opacity=""; card.style.pointerEvents=""; card.style.transition=""; }
   tutScrollIntoPlace(step);
   requestAnimationFrame(()=>requestAnimationFrame(tutorialReposition));
   // A card that has just expanded or collapsed is still settling — place it again once it has.
   if(step.scope==="card" || step.wholeCard){
     const idx=tutIdx;
-    tutNarrowTimers.push(setTimeout(()=>{ if(tutIdx===idx){ tutScrollIntoPlace(step); tutorialReposition(); } }, 380));
+    tutNarrowTimers.push(setTimeout(()=>{
+      if(tutIdx!==idx) return;
+      tutScrollIntoPlace(step); tutorialReposition();
+      if(hold){
+        void card.offsetWidth;
+        card.style.opacity=""; card.style.pointerEvents=""; card.style.transition="";
+        card.style.animation="none"; void card.offsetWidth; card.style.animation="";
+      }
+    }, 380));
   }
   tutRunNarrow(step);
 }
@@ -26859,6 +26882,30 @@ function tutZoomFactor(){
   const w=probe.getBoundingClientRect().width;
   probe.remove();
   return w>0 ? w/100 : 1;
+}
+// CAS-1581: a target counts as visible when its rect meets the viewport and the visible rect of its nearest
+// horizontally scrolling ancestor (the mood row's chips scrolled off its edge are not).
+function tutIsVisible(el){
+  const r=el.getBoundingClientRect();
+  if(r.right<=0 || r.left>=innerWidth || r.bottom<=0 || r.top>=innerHeight) return false;
+  for(let p=el.parentElement; p && p!==document.body; p=p.parentElement){
+    if(p.scrollWidth>p.clientWidth+1 && /(auto|scroll)/.test(getComputedStyle(p).overflowX)){
+      const pr=p.getBoundingClientRect();
+      return r.right>pr.left && r.left<pr.right;
+    }
+  }
+  return true;
+}
+// The elements the card and arrow point at: for a `narrow` step the targets that are NOT fading out (so the
+// card never moves as they go); otherwise the targets currently still lit. Only visible ones; else the first.
+function tutAnchorEls(step, allEls, els){
+  let pool=els;
+  if(step.narrow && step.narrow.length){
+    const keep=allEls.filter(el=>!step.narrow.some(sel=>el.matches(sel)));
+    if(keep.length) pool=keep;
+  }
+  const vis=pool.filter(tutIsVisible);
+  return vis.length ? vis : pool.slice(0,1);
 }
 function tutUnionRect(els){
   let left=Infinity, top=Infinity, right=-Infinity, bottom=-Infinity;
@@ -26907,9 +26954,10 @@ function tutorialReposition(){
     const shut=tutShut.has(el); if(shut) tutShutDrawn.add(el);
     return `<div class="tutring${shut?" shut":""}" style="${pos(box(el.getBoundingClientRect()))}"></div>`;
   }).join("");
-  let r;
+  let r, ra;
   if(els.length){
     r=tutUnionRect(els);
+    ra=tutUnionRect(tutAnchorEls(step, allEls, els));
     hole.className = "tuthole"+(allEls.length>1?" multi":"");
     hole.style.left=(r.left-pad)/z+"px"; hole.style.top=(r.top-pad)/z+"px";
     hole.style.width=(r.width+pad*2)/z+"px"; hole.style.height=(r.height+pad*2)/z+"px";
@@ -26918,7 +26966,7 @@ function tutorialReposition(){
       marks += `<div class="tuttap" style="left:${t.x/z}px;top:${t.y/z}px"></div>`;
     }
   } else {
-    r={left:vw/2, top:vh/2, bottom:vh/2, right:vw/2, width:0, height:0};
+    r={left:vw/2, top:vh/2, bottom:vh/2, right:vw/2, width:0, height:0}; ra=r;
     hole.className="tuthole none";
     hole.style.left=r.left/z+"px"; hole.style.top=r.top/z+"px";
     hole.style.width="0px"; hole.style.height="0px";
@@ -26929,10 +26977,10 @@ function tutorialReposition(){
   const cardH=(card.offsetHeight||160)*z, cardW=(card.offsetWidth||340)*z, gap=pad+14;
   let top, left, dir="";
   // Card steps dock clear of the whole film card, not just the button being explained.
-  let avoid=r;
+  let avoid=ra;
   if(els.length && step.scope==="card" && tourCardEl){
     const fr=tourCardEl.getBoundingClientRect();
-    if(fr.bottom + 14 + cardH + 8 <= vh) avoid={...r, top:Math.min(r.top, fr.top), bottom:Math.max(r.bottom, fr.bottom)};
+    if(fr.bottom + 14 + cardH + 8 <= vh) avoid={...ra, top:Math.min(ra.top, fr.top), bottom:Math.max(ra.bottom, fr.bottom)};
   }
   if(!els.length){
     top=(vh-cardH)/2; left=(vw-cardW)/2;
@@ -26943,7 +26991,7 @@ function tutorialReposition(){
     else if(below>=above){ top=Math.min(avoid.bottom+gap, vh-cardH-12); dir="up"; }
     else { top=Math.max(12, avoid.top-gap-cardH); dir="down"; }
     top=Math.max(12, top);
-    const cx=r.left+r.width/2;
+    const cx=ra.left+ra.width/2;
     left=Math.min(Math.max(12, cx-cardW/2), vw-cardW-12);
     const ax=Math.min(Math.max(18, cx-left-8), cardW-34);
     arrow.style.left=ax/z+"px";
