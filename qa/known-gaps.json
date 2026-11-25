@@ -1,0 +1,189 @@
+{
+ "signup": [
+  "production",
+  "real",
+  "review"
+ ],
+ "onboarding": [
+  "production",
+  "real",
+  "review"
+ ],
+ "login": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "watch-tut": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "firstdays": [
+  "phone",
+  "real",
+  "review"
+ ],
+ "tracking": [
+  "real"
+ ],
+ "alerts-email": [
+  "real",
+  "review"
+ ],
+ "alerts-push": [
+  "real"
+ ],
+ "alerts-inapp": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "tut-lists": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "tut-alerts": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "tut-database": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "tut-agent": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "tut-invite": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "watch": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "database": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "taste": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "invites": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "m-account": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "m-friends": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "m-invites": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "m-services": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "m-settings": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "m-analysis": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "m-tutorials": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "m-recommend": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "m-help": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "m-about": [
+  "phone",
+  "production",
+  "real",
+  "review"
+ ],
+ "ad-signin": [
+  "production",
+  "real",
+  "review"
+ ],
+ "ad-dashboard": [
+  "production",
+  "real",
+  "review"
+ ],
+ "ad-members": [
+  "bench",
+  "production",
+  "real",
+  "review"
+ ],
+ "ad-moviedata": [
+  "bench",
+  "production",
+  "real",
+  "review"
+ ],
+ "ad-health": [
+  "real",
+  "review"
+ ],
+ "ad-compat": [
+  "production",
+  "real"
+ ]
+}

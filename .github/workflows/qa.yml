@@ -594,3 +594,25 @@ jobs:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       CASCADE_EMAIL_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}
       CASCADE_ALERT_TO: ${{ secrets.CASCADE_ALERT_TO }}
+
+  # CAS-1588: record this run's results per QA area in the cascade-qa database. Not a gate: nothing needs it,
+  # and it never fails the run.
+  qa-report:
+    needs: [build-check, engine, data, monitor, lint, scheduler, integrity]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Record results in cascade-qa (CAS-1588)
+        continue-on-error: true
+        env:
+          QA_DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+        run: |
+          python -m pip install --quiet "psycopg[binary]" || true
+          python ci/qa_report.py --workflow qa --source-job qa-report             --job engine=${{ needs.engine.result }} --job data=${{ needs.data.result }}             --job monitor=${{ needs.monitor.result }} --job lint=${{ needs.lint.result }}             --job scheduler=${{ needs.scheduler.result }} --job integrity=${{ needs.integrity.result }}

@@ -3,6 +3,14 @@
   part: A
   title: Every tour walks end to end with no step skipped
   how: browser
+  area:
+    - watch-tut
+    - tut-lists
+    - tut-alerts
+    - tut-database
+    - tut-agent
+    - tut-invite
+    - m-tutorials
   expect:
     - from Menu -> Tutorials each tour's step index advances through every step (tutorialAdvance skips a step whose target is missing, which is the failure this case catches)
   refs:
@@ -20,6 +28,9 @@
   part: A
   title: Tour spotlight and card are positioned correctly under UI zoom
   how: browser
+  area:
+    - watch-tut
+    - m-tutorials
   expect:
     - "#tutHole and #tutCard geometry matches the target under Chromium zoom:var(--ui-scale)"
   refs:
@@ -29,6 +40,8 @@
   part: A
   title: Replaying the tour from Account while Moving is open skips covered steps
   how: browser
+  area:
+    - m-tutorials
   expect:
     - the score row and notify control steps are skipped, not pointed at an off-screen anchor
   refs:
@@ -38,6 +51,8 @@
   part: A
   title: Tutorial banner shows once and does not reappear after dismissal
   how: unit
+  area:
+    - watch-tut
   expect:
     - the banner follows the seen map and the visit flag
   refs:
@@ -46,6 +61,14 @@
   part: A
   title: Every tour step lands on its target and holds still (390x844)
   how: browser
+  area:
+    - watch-tut
+    - tut-lists
+    - tut-alerts
+    - tut-database
+    - tut-agent
+    - tut-invite
+    - m-tutorials
   expect:
     - ring on the target, arrow tip on the target, bubble on screen and clear of it, nothing moves 500 ms after the bubble shows, no step skipped. Any ticket that adds, removes or changes a tour step updates tests/e2e/tutorial-geometry.spec.mjs in the same commit
   refs:

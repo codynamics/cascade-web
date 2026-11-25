@@ -3,6 +3,9 @@
   part: A
   title: Tapping a notification lands on Alerts, not the film page
   how: browser
+  area:
+    - alerts-push
+    - alerts-inapp
   expect:
     - pushNotificationActionPerformed opens Alerts (Today)
   refs:
@@ -12,6 +15,8 @@
   part: B
   title: Daily and unseen alert digests render one card per film with tracked links
   how: unit
+  area:
+    - alerts-email
   expect:
     - every link carries src=email and cmp=<kind>; Watch On / Watched buttons are signed answer links
   refs:
@@ -24,6 +29,8 @@
   part: B
   title: Badge clears and push re-registers on sign-in
   how: unit
+  area:
+    - alerts-push
   expect:
     - opening Alerts clears the badge; signing in re-registers the push token
   refs:
@@ -34,5 +41,8 @@
   part: C
   title: A real alert arrives on the phone as push and as email
   how: lee-phone
+  area:
+    - alerts-push
+    - alerts-email
   expect:
     - the QA account receives the push and the email for one test alert, and the email buttons open the confirmation page

@@ -208,3 +208,13 @@ jobs:
           python -m qa.nightly_tickets --logs logs --failed "${FAILED#,}" \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --commit "${{ github.sha }}"
+
+      # CAS-1588: record this run's results per QA area in the cascade-qa database. Never turns the run red.
+      - name: Record results in cascade-qa (CAS-1588)
+        if: always()
+        continue-on-error: true
+        env:
+          QA_DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+        run: |
+          python -m pip install --quiet "psycopg[binary]" || true
+          python ci/qa_report.py --workflow nightly-qa --source-job report             --job e2e=${{ needs.e2e.result }} --job agents=${{ needs.agents.result }}             --job integrity=${{ needs.integrity.result }} --job simulate=${{ needs.simulate.result }}

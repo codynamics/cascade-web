@@ -3,6 +3,8 @@
   part: A
   title: Moods and lists round-trip and keep their sort
   how: unit
+  area:
+    - watch
   expect:
     - a mood saved then reloaded is identical; its sort survives opening a cascade
   refs:
@@ -13,6 +15,9 @@
   part: A
   title: A list can be created from a Find search
   how: unit
+  area:
+    - database
+    - watch
   expect:
     - Save as list from Find builds a mood with that search's people or genre
   refs:

@@ -3,6 +3,8 @@
   part: A
   title: Header carries Watch, Alerts, Find and Agents in one row at every phone width
   how: browser
+  area:
+    - watch
   expect:
     - four nav items share one row at 390 and 430 px, menu on the far right, one shared selected style
   refs:
@@ -16,6 +18,8 @@
   part: A
   title: Watch top has two stage groups and moods, collapses only on a tap
   how: browser
+  area:
+    - watch
   expect:
     - Cinema/Home groups and moods replace the sort switch; the bar collapses to the one-row #wtMini on a tap, never on scroll
   refs:
@@ -25,6 +29,9 @@
   part: A
   title: Watch list tracks live state changes without a stale list
   how: browser
+  area:
+    - watch
+    - tracking
   expect:
     - switching a service chip, a Where and when window or renaming the selected mood rebuilds the list
     - switching Cinema stage between In Cinema and Upcoming rebuilds the list
@@ -36,6 +43,8 @@
   part: A
   title: Collapsed card is calm and an outline means tappable
   how: browser
+  area:
+    - watch
   expect:
     - the poster fills the collapsed card, nothing glows, outlined controls are the tappable ones
   refs:
@@ -44,6 +53,8 @@
   part: A
   title: Empty-state Drop buttons are priced off what Watch actually lists
   how: browser
+  area:
+    - watch
   expect:
     - each Drop button named in the empty state actually empties the tab when tapped
   refs:
@@ -52,6 +63,8 @@
   part: A
   title: Per-card Watch On control - click-away close and manual claim
   how: browser
+  area:
+    - watch
   expect:
     - clicking away closes the panel; re-tapping an agent-armed level claims it as manual (gold)
   refs:
@@ -61,6 +74,9 @@
   part: A
   title: A verdict folds the card to its stub in place
   how: browser
+  area:
+    - watch
+    - tracking
   expect:
     - the list does not jump; the film is gone only when the listing next rebuilds
   refs:
@@ -69,6 +85,8 @@
   part: A
   title: Show only available on my services defaults on
   how: browser
+  area:
+    - watch
   expect:
     - Streaming lists only films on the viewer's own services unless the filter is turned off
   refs:
@@ -77,6 +95,9 @@
   part: A
   title: Sections follow journey order
   how: browser
+  area:
+    - watch
+    - tracking
   expect:
     - Upcoming leads where it appears, then the rest in journey order
   refs:
@@ -86,6 +107,8 @@
   part: A
   title: Usage events and card expansion are logged once per action
   how: browser
+  area:
+    - watch
   expect:
     - one app_open per load, one event per toggleExpand or setWatchTab, batched to usage_events
   refs:
@@ -97,6 +120,9 @@
   part: A
   title: Engine invariants - scoring, windows and placement hold on the real catalogue
   how: unit
+  area:
+    - watch
+    - agent
   expect:
     - npm run test:engine exits 0
   refs:
@@ -107,6 +133,10 @@
   part: A
   title: Accessibility scan of the five highest-traffic surfaces
   how: browser
+  area:
+    - watch
+    - database
+    - alerts-inapp
   expect:
     - axe finds no violations on onboarding, Watch, Agents, Moving and the film card at 390x844
   refs:

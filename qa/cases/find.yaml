@@ -3,6 +3,8 @@
   part: A
   title: Find lists any film by name regardless of agents, services or watched
   how: browser
+  area:
+    - database
   expect:
     - no agent/tab/service/watched/style narrowing applies in Find
   refs:
@@ -13,6 +15,8 @@
   part: A
   title: Find by person and by title behave as specified
   how: unit
+  area:
+    - database
   expect:
     - a person search returns that person's films; a title search ranks exact matches first
   refs:

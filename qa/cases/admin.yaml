@@ -3,6 +3,9 @@
   part: A
   title: Admin views render for an admin and are hidden from everyone else
   how: unit
+  area:
+    - ad-signin
+    - ad-dashboard
   expect:
     - admin-only views are not reachable for a normal account
   refs:

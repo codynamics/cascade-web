@@ -3,6 +3,8 @@
   part: A
   title: First-run flow never leaves a painted step hidden behind the app
   how: browser
+  area:
+    - onboarding
   expect:
     - ?oneagent=setup opens #oafScreen and every step stays visible and tappable
     - handing control back mid-flow keeps the open class on #oafScreen
@@ -14,6 +16,8 @@
   part: A
   title: Onboarding is idempotent against the account, not the device
   how: browser
+  area:
+    - onboarding
   expect:
     - signing into an account that already has agents does not overwrite them with the device's draft
   refs:
@@ -22,6 +26,8 @@
   part: A
   title: Landing on Watch after membership starts at the top
   how: browser
+  area:
+    - watch
   expect:
     - the Watch listing opens at scroll position 0 whatever the page scroll was before
   refs:
@@ -30,6 +36,8 @@
   part: A
   title: Deep links for custom product pages open the right place on a cold boot
   how: browser
+  area:
+    - login
   expect:
     - the bundled index.html opened with a deep-link query lands on the linked screen
   refs:
@@ -38,6 +46,9 @@
   part: A
   title: Critical path - build, boot and the fixed smoke checks
   how: browser
+  area:
+    - login
+    - watch
   expect:
     - the app boots, a guest can complete onboarding and reach the Watch listing, with no console error
   refs:
@@ -47,6 +58,9 @@
   part: A
   title: Account-integrity, device-storage and server-first suites pass against local Supabase
   how: sql
+  area:
+    - login
+    - signup
   expect:
     - the integrity job passes (account data is server-first, device storage never leaks between accounts)
   refs:
@@ -60,6 +74,8 @@
   part: A
   title: Signed-out cold load opens on the splash with no flash of the main nav
   how: browser
+  area:
+    - login
   expect:
     - an onboarded device with no stored session opens #splash at boot, with no frame of the app first
     - an onboarded device with a stored session opens the app, not the splash

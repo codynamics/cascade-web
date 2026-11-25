@@ -3,6 +3,8 @@
   part: A
   title: Promote only moves the tested commit to main
   how: unit
+  area:
+    - ad-compat
   expect:
     - promote.yml merges exactly the commit QA passed
   refs:
@@ -11,6 +13,8 @@
   part: A
   title: Workflow files parse
   how: unit
+  area:
+    - ad-compat
   expect:
     - every .github/workflows file is valid YAML with the triggers the standard expects
   refs:
@@ -19,6 +23,8 @@
   part: D
   title: Previous release still works on the new schema, and rollback loses no data
   how: claude
+  area:
+    - ad-compat
   expect:
     - run release-rehearsal.yml (when it exists) and see every step PASS
     - until then run the integrity suite against main's build after the new migrations
@@ -28,12 +34,16 @@
   part: D
   title: Migrations for the release are applied to production by Lee
   how: sql
+  area:
+    - ad-compat
   expect:
     - production public.schema_migrations equals the file list of supabase/migrations/ at the release commit
 - id: REL-005
   part: PROD
   title: Production serves the release commit
   how: claude
+  area:
+    - ad-health
   expect:
     - https://cascademovies.com/version.json commit equals the release commit
     - the published catalogue is under 30 hours old
@@ -41,12 +51,18 @@
   part: PROD
   title: One test alert reaches the production QA account only
   how: lee-phone
+  area:
+    - alerts-push
+    - alerts-email
   expect:
     - the QA account (never lee+c1 or a real member) receives one hits_stream alert as push and email within 10 minutes
 - id: REL-007
   part: D
   title: "Production migrations 0016 then 0017 are applied before the promote"
   how: sql
+  area:
+    - signup
+    - ad-compat
   expect:
     - "production public.schema_migrations lists 0016 then 0017, or the approved production accounts lose web access"
   refs:

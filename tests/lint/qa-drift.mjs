@@ -6,7 +6,9 @@
 //   R3  a TOURS key (tour:<key>), a monitor/transitions.py MOMENTS value (moment:<m>), a digest kind passed to
 //       render_digest (digest:<kind>) or a top-level *Screen element id (#xScreen) is named by no case;
 //   R4  a tests/e2e/*.spec.mjs file is named by no case;
-//   R5  qa/RELEASE-CHECKLIST.md differs from a fresh `python qa/build_checklist.py` build.
+//   R5  qa/RELEASE-CHECKLIST.md differs from a fresh `python qa/build_checklist.py` build;
+//   R6  (CAS-1588) a case's `area:` is missing or names an id not in qa/areas.json, or an area has no case of a
+//       kind it `applies` to and that gap is not listed in qa/known-gaps.json (or a listed gap is now covered).
 // Ref forms: `#id`, `fn()`, `tour:x`, `moment:x`, `digest:x`, or a repo-relative file path (contains `/`).
 // Exports runChecks() for tests/js/qa-drift.test.mjs; run directly: `node tests/lint/qa-drift.mjs`.
 
@@ -138,6 +140,17 @@ export function screenIds(app) {
   return [...new Set([...app.matchAll(/\bid="(\w+Screen)"/g)].map(m => m[1]))];
 }
 
+// The kind of test a case is (mirrors case_kind in ci/qa_report.py): an explicit `kind:`, else from part and how.
+export function caseKind(c) {
+  if (c.kind) return c.kind;
+  if (c.part === "PROD") return "production";
+  if (["unit", "browser", "agent-suite", "journey", "firstdays"].includes(c.how)) return "bench";
+  if (c.how === "sql" && (c.refs || []).some(r => /^(tests|scripts)\//.test(r))) return "bench";
+  if (c.how === "lee-phone" || c.how === "device") return "phone";
+  if (c.how === "claude") return "review";
+  return null;
+}
+
 // ---- the checks ------------------------------------------------------------------------------------------
 // inputs: { cases, app, transitionsPy, monitorSources[], e2eFiles[], fileExists(rel) }
 export function runChecks(inp) {
@@ -173,6 +186,25 @@ export function runChecks(inp) {
   for (const k of digestKinds(inp.monitorSources)) if (!named.has(`digest:${k}`)) v.push(`[QA-DRIFT:UNCOVERED] digest kind "${k}" has no case (add ref digest:${k})`);
   for (const s of screenIds(app)) if (!named.has(`#${s}`)) v.push(`[QA-DRIFT:UNCOVERED] screen #${s} has no case (add ref #${s})`);
   for (const f of inp.e2eFiles) if (!named.has(`tests/e2e/${f}`)) v.push(`[QA-DRIFT:UNLISTED] tests/e2e/${f} is named by no case`);
+  // R6: areas (CAS-1588). inp.areas = qa/areas.json; inp.knownGaps = {areaId: [kind, ...]}.
+  if (inp.areas) {
+    const ids = new Set(inp.areas.map(a => a.id)), covered = new Set(), gaps = inp.knownGaps || {};
+    for (const c of cases) {
+      const at = `${c._file || "?"} ${c.id || "(no id)"}`;
+      const list = Array.isArray(c.area) ? c.area : [];
+      if (!list.length) v.push(`[QA-DRIFT:AREA] ${at}: missing area (name one or more ids from qa/areas.json)`);
+      for (const a of list) {
+        if (!ids.has(a)) v.push(`[QA-DRIFT:AREA] ${at}: area "${a}" is not in qa/areas.json`);
+        const k = caseKind(c); if (k) covered.add(`${a}/${k}`);
+      }
+    }
+    for (const a of inp.areas) for (const k of a.applies) {
+      const has = covered.has(`${a.id}/${k}`), listed = (gaps[a.id] || []).includes(k);
+      if (!has && !listed) v.push(`[QA-DRIFT:AREA] area "${a.id}" applies to kind "${k}" but no case covers it (add a case or list it in qa/known-gaps.json)`);
+      if (has && listed) v.push(`[QA-DRIFT:AREA] area "${a.id}" / kind "${k}" is listed in qa/known-gaps.json but a case now covers it (remove it)`);
+    }
+    for (const id of Object.keys(gaps)) if (!ids.has(id)) v.push(`[QA-DRIFT:AREA] qa/known-gaps.json names unknown area "${id}"`);
+  }
   return v;
 }
 
@@ -181,6 +213,8 @@ export function loadInputs(root = ROOT) {
   const monDir = path.join(root, "monitor");
   return {
     cases: loadCases(root),
+    areas: JSON.parse(read("qa/areas.json")),
+    knownGaps: existsSync(path.join(root, "qa", "known-gaps.json")) ? JSON.parse(read("qa/known-gaps.json")) : {},
     app: read("app_template.html"),
     transitionsPy: read("monitor/transitions.py"),
     monitorSources: readdirSync(monDir).filter(f => f.endsWith(".py")).map(f => read(`monitor/${f}`)),

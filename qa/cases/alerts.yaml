@@ -3,6 +3,8 @@
   part: A
   title: Alerts opens on Today first, then remembers the period for the session
   how: browser
+  area:
+    - alerts-inapp
   expect:
     - first open of a session is Today; after picking a period it stays; reload or sign-out returns to Today
   refs:
@@ -11,6 +13,8 @@
   part: A
   title: Alerts jump-to lands flush and re-render never flashes
   how: browser
+  area:
+    - alerts-inapp
   expect:
     - Jump to lands under the sticky chrome and is one-shot; the subtitle says agent for a one-agent account
   refs:
@@ -20,6 +24,10 @@
   part: A
   title: Alert moments and switches sync to the account
   how: unit
+  area:
+    - alerts-email
+    - alerts-push
+    - alerts-inapp
   expect:
     - turning a moment off on one device is off on the others
   refs:
@@ -30,6 +38,10 @@
   part: B
   title: Every moment fires for forward progress only, once per film
   how: unit
+  area:
+    - alerts-email
+    - alerts-push
+    - alerts-inapp
   expect:
     - each moment fires exactly when the film enters it and never on backward progress
   refs:
@@ -45,6 +57,9 @@
   part: B
   title: Film journeys behave - 12 scripted journeys
   how: journey
+  area:
+    - alerts-inapp
+    - tracking
   expect:
     - each journey's expected alerts (and non-alerts) match what the monitor produces day by day
   refs:

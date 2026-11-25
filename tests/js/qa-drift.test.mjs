@@ -85,3 +85,18 @@ test("the YAML subset parses scalars, quoted strings and lists", () => {
   assert.deepEqual(c, [{ _file: "t.yaml", id: "A-1", part: "A", title: "q: #x", expect: ["one", "two"], refs: ["#id"] }]);
   assert.throws(() => parseCases("garbage line", "t.yaml"));
 });
+
+test("R6 (CAS-1588): a case with no area, an unknown area, or an uncovered kind fails; a stale known gap fails", () => {
+  const inp = real();
+  inp.cases.push({ _file: "x.yaml", id: "X-2", part: "A", title: "t", how: "unit", expect: ["e"], refs: [] });
+  inp.cases.push({ _file: "x.yaml", id: "X-3", part: "A", title: "t", how: "unit", expect: ["e"], area: ["no-such-area"], refs: [] });
+  const v = runChecks(inp).filter(x => x.includes("QA-DRIFT:AREA"));
+  assert.ok(v.some(x => x.includes("X-2") && x.includes("missing area")), v.join("\n"));
+  assert.ok(v.some(x => x.includes("X-3") && x.includes("no-such-area")), v.join("\n"));
+  const gap = real();
+  gap.knownGaps = {};
+  assert.ok(runChecks(gap).some(x => x.includes('area "ad-members"') && x.includes("no case covers it")));
+  const stale = real();
+  stale.knownGaps = { ...stale.knownGaps, signup: ["bench"] };
+  assert.ok(runChecks(stale).some(x => x.includes('area "signup"') && x.includes("now covers it")));
+});

@@ -3,6 +3,9 @@
   part: B
   title: First-ten-days simulator expectations hold for accounts a-d
   how: firstdays
+  area:
+    - firstdays
+    - alerts-email
   expect:
     - each of the four first-days accounts gets exactly the alerts its expectation file lists, on the day it lists
   refs:
@@ -16,6 +19,9 @@
   part: B
   title: Catch-up alert is sent once for a new account, then daily alerts follow
   how: unit
+  area:
+    - firstdays
+    - alerts-email
   expect:
     - the catch-up digest uses kind catchup_alert and is not repeated the next day
   refs:
@@ -27,6 +33,9 @@
   part: B
   title: "Day 0: the Watch tutorial starts by itself; Alerts is empty (planned: CAS-1583 follow-up check)"
   how: planned
+  area:
+    - firstdays
+    - watch-tut
   expect:
     - "a new account's first Watch visit starts the Watch tutorial without a tap"
     - "Alerts is empty and says \"<agent> reports every morning\""
@@ -37,6 +46,9 @@
   part: B
   title: "Day +1 catch-up: top 3 in cinemas, 5 coming, 10 streaming on the member's services"
   how: firstdays
+  area:
+    - firstdays
+    - alerts-email
   expect:
     - "top 3 in cinemas, top 5 coming to cinemas, top 10 streaming on the member's own services"
     - "watched films and empty groups are skipped"
@@ -53,6 +65,8 @@
   part: B
   title: "Tutorial banner from day +1: hidden for good after a second ✕"
   how: browser
+  area:
+    - firstdays
   expect:
     - "the banner shows only on a screen whose tutorial has not been played"
     - "at most one banner per visit (a new visit is an app open or a return after 30+ minutes)"
@@ -64,6 +78,9 @@
   part: B
   title: "Rating reminder card from day +2 while fewer than 5 Watched ratings (planned: CAS-1583 follow-up check)"
   how: planned
+  area:
+    - firstdays
+    - taste
   expect:
     - "the card is never a rating sheet and has a ✕"
     - "shown at most 3 times in total, counted in user_prefs.view.rnudge.rem"
@@ -76,6 +93,9 @@
   part: B
   title: "Taste card after 10+ ratings and a real adjustment of 5+ points (planned: CAS-1583 follow-up check)"
   how: planned
+  area:
+    - firstdays
+    - taste
   expect:
     - "the card says \"<agent> has learned something\" and names the strongest adjustment"
     - "See Taste opens Taste"
@@ -88,6 +108,9 @@
   part: B
   title: "Day +7 first-week recap email \"Your first week with <agent>\""
   how: unit
+  area:
+    - firstdays
+    - alerts-email
   expect:
     - "merged into the 17:00 email with no push"
     - "lists films alerted and up to 5 still to decide (newest first, with the Watch On / Watched buttons), rating count as one text line"
@@ -103,6 +126,10 @@
   part: B
   title: "Across all ten days: at most one email and one push a day; one card or banner per visit (planned: CAS-1583 follow-up check)"
   how: planned
+  area:
+    - firstdays
+    - alerts-email
+    - alerts-push
   expect:
     - "no account gets more than one email or one push on any day"
     - "at most one card or banner per visit, never a pop-up"
@@ -113,6 +140,9 @@
   part: B
   title: "A push or email link opens its own \"From your email\" view in Alerts"
   how: browser
+  area:
+    - firstdays
+    - alerts-inapp
   expect:
     - "the view has the band, an All alerts button and a To decide row until every film is answered"
     - "an emailed film stays in its view, tagged Watched, after it is watched"
@@ -123,6 +153,9 @@
   part: B
   title: "Never: any one-off rating exercise (planned: CAS-1583 follow-up check)"
   how: planned
+  area:
+    - firstdays
+    - taste
   expect:
     - "no \"Seen any of these?\" sheet, no rating push and no rating email prompt on any day"
     - "finding one fails the run"
@@ -132,6 +165,9 @@
   part: B
   title: "Buttons: wording in emails and Alerts is exactly the app's"
   how: unit
+  area:
+    - firstdays
+    - alerts-email
   expect:
     - "Watch On: Cinema, Premium, Rent, Stream, Never (Premium, Rent and Cinema only when switched on for that member)"
     - "Watched: Wow!, Watch Again, Enjoyed, So-so, Disliked"

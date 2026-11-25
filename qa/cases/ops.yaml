@@ -3,6 +3,8 @@
   part: A
   title: Static lint guards pass
   how: unit
+  area:
+    - ad-health
   expect:
     - device parity, XSS sinks, review-prompt copy, device-key allowlist, password sign-in guard and QA drift all pass
   refs:
@@ -14,6 +16,8 @@
   part: A
   title: Data-quality checks block app-breaking catalogue defects
   how: unit
+  area:
+    - database
   expect:
     - python -m tests.run_data_quality exits 0 (report-only checks do not block)
   refs:
@@ -23,6 +27,8 @@
   part: A
   title: Client health events and uptime probe record faithfully
   how: unit
+  area:
+    - ad-health
   expect:
     - failures are recorded, nothing is double-counted
   refs:
