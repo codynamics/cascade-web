@@ -96,8 +96,11 @@ class ProdCheck(unittest.TestCase):
             self.assertEqual(f.sent, [])
 
     def test_run_exit_codes(self):
-        self.assertEqual(pc.run(Fake(), "abc123", QA), 0)
-        self.assertEqual(pc.run(Fake(), "zzz", QA), 1)
+        # run() checks the catalogue age against the real clock, so the fake catalogue must be fresh NOW,
+        # not relative to the fixed NOW above (that made this test fail for good from 25 Nov 2026).
+        fresh = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=3)).isoformat()
+        self.assertEqual(pc.run(Fake(published=fresh), "abc123", QA), 0)
+        self.assertEqual(pc.run(Fake(published=fresh), "zzz", QA), 1)
 
     def test_workflow_only_dispatch(self):
         path = os.path.join(ROOT, ".github", "workflows", "prod-check.yml")
