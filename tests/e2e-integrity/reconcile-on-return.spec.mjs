@@ -209,7 +209,13 @@ test("AC4/AC5: a delayed boot shows the loading state (never this device's stale
     await new Promise(r => setTimeout(r, 3000));
     await route.continue();
   });
-  const requests = recordRestRequests(page);
+  const allRequests = recordRestRequests(page);
+  // CAS-1586: a keepalive/unload flush from the FIRST (already-settled) boot can start after reload() is
+  // called but before the new document commits, and would be counted against the reloaded page. Only
+  // requests that started at or after the reloaded document committed belong to this boot.
+  let committedAt = Infinity;
+  page.on("framenavigated", f => { if(f === page.mainFrame() && committedAt === Infinity) committedAt = Date.now(); });
+  const requests = { filter: fn => allRequests.filter(r => r.startedAt >= committedAt).filter(fn) };
   await page.reload();
   await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
 

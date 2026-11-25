@@ -115,7 +115,19 @@ for(const key of TOUR_KEYS){
       }
       await expect.poll(async () => (await snapshot(page)).cardOpacity, { message: `${who}: bubble shows` }).toBeGreaterThan(0.99);
 
-      const a = await snapshot(page);                  // first shown
+      // CAS-1586: wait for the layout to come to rest (two consecutive samples 120 ms apart that agree), so
+      // slow CI WebKit's settling is not read as drift. A bubble that never rests within 4 s still fails: `a`
+      // is then the last unsettled sample and the +500 ms check below reports it as moved.
+      let a = await snapshot(page);
+      for(let t = 0; t < 33; t++){
+        await page.waitForTimeout(120);
+        const n2 = await snapshot(page);
+        const same = !boxMoved(a.card, n2.card) && !boxMoved(a.arrow, n2.arrow) && a.dir === n2.dir
+          && a.targets.length === n2.targets.length && a.targets.every((x, j) => !boxMoved(x, n2.targets[j]))
+          && JSON.stringify(a.scrolls) === JSON.stringify(n2.scrolls);
+        a = n2;
+        if(same) break;
+      }
       await page.waitForTimeout(500);
       const b = await snapshot(page);                  // +500 ms: the settled state the geometry checks use
       await page.screenshot({ path: `${OUT}/${key}-${n}.png` });

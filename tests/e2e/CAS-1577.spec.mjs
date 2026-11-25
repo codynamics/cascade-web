@@ -69,9 +69,10 @@ test("CAS-1577: onboarded device with config but no stored session opens on the 
   await page.setViewportSize({ width: 390, height: 844 });
   await load(page, { session: false });
   await expect(page.locator("#splash")).toHaveClass(/open/);
+  // CAS-1586: rAF can lag on slow CI, so wait for at least one counted frame rather than reading it at once.
+  await expect.poll(() => page.evaluate(() => window.__cas1577.frames), { timeout: 10_000 }).toBeGreaterThan(0);
   const r = await page.evaluate(() => window.__cas1577);
   expect(r.atDomReady, "splash already open when DOMContentLoaded fires").toBe(true);
-  expect(r.frames).toBeGreaterThan(0);
   expect(r.framesWithoutSplash, "no frame where the splash was absent (the main nav showing)").toBe(0);
 });
 
