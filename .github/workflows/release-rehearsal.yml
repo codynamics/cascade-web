@@ -27,6 +27,24 @@ permissions:
   contents: read
 
 jobs:
+  # CAS-1576 (workflow edit authorised by that ticket, staging only): staging and production sign-in / email settings,
+  # edge functions and schema_migrations must agree before a release. Read-only Management API calls.
+  env-parity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compare staging and production settings
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 -I ci/env_parity.py | tee -a "$GITHUB_STEP_SUMMARY"; exit "${PIPESTATUS[0]}"
+
   rehearse:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
