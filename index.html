@@ -2237,6 +2237,9 @@
   .membpromoapply{flex:none;background:none;border:1px solid var(--line,#3a4256);color:var(--text,#e8ecf3);border-radius:10px;padding:10px 12px;font-weight:700;font-size:14px}
   .membpromook{margin:6px 0 0;font-size:13px;color:#22c55e;font-weight:700;text-align:left}
   .membpromo .fielderr{text-align:left}
+  .membpromoerr{display:flex;gap:10px;align-items:baseline}
+  .membpromoerr .fielderr{margin-right:0}
+  .membpromoerr .linkbtn{font-size:13px;flex:none}
   .membenefits{display:flex;flex-direction:column;gap:15px;margin:0 0 20px}
   .mbrow{display:flex;align-items:center;gap:13px}
   .mbic{flex:0 0 auto;width:38px;height:38px;display:grid;place-items:center;font-size:20px;
@@ -25564,8 +25567,8 @@ window.membResendCode=()=>{
   const msg=$("membCodeMsg");
   window.CascadeAuth.continueWithEmail(membCodeEmail).then(result=>{
     if(result.rateLimited) membCodeErrorShow("A code was sent less than a minute ago. Use the newest email, or wait a moment and resend.");
-    else if(!result.ok) membCodeErrorShow("Could not resend: "+(result.error||""));
-  });
+    else if(!result.ok) membCodeErrorShow(membIsNetErr(result.error) ? MEMB_OFFLINE_MSG : "Could not resend the code — try again.");
+  }).catch(()=>membCodeErrorShow(MEMB_OFFLINE_MSG));
   if(msg) msg.innerHTML=esc(membCodeMsgText(membCodeEmail))+
     ' <button type="button" class="linkbtn" id="membChangeEmail" onclick="membBackToEmail()" style="vertical-align:baseline">Change email</button>';
 };
@@ -25601,10 +25604,10 @@ function membSubmitCode(){
     } else {
       // Not cleared here: onbMembershipInFlight stays true across a wrong-code retry (only Change email
       // or a confirmed code end this attempt) — see membBackToEmail's own comment.
-      membCodeErrorShow("Wrong or expired code — check it and try again, or resend.");
+      membCodeErrorShow(membIsNetErr(result.error) ? MEMB_OFFLINE_MSG : "Wrong or expired code — check it and try again, or resend.");
       idle();
     }
-  });
+  }).catch(()=>{ membCodeErrorShow(MEMB_OFFLINE_MSG); idle(); });
 }
 // CAS-1099: discards the whole onboarding draft in memory — shared by membSignInFromAcctExists below and
 // membCompleteNewMembership's own 'account_exists' outcome. An existing account is never merged with a
@@ -25639,7 +25642,7 @@ window.membStart=()=>{
   if(needsEmail){
     email=($("membEmail").value||"").trim();
     if(!emailValid(email)){
-      membEmailError("That doesn't look like an email address — check it and try again.");
+      membEmailError("Enter a valid email address.");   // CAS-1571 rule 4
       $("membEmail").focus();
       return;
     }
@@ -25675,11 +25678,31 @@ window.membStart=()=>{
     // listener's own comment). Cleared by membCompleteNewMembership() once that RPC actually resolves.
     onbMembershipInFlight=true;
     const client=window.CascadeAuth.client;
-    // CAS-1099 change 2: before requesting a code at all, ask whether this email already has an account —
-    // if so, send no code; show the message and Sign in button instead.
-    const checkExisting = client ? client.rpc("email_has_account", {p_email:email}) : Promise.resolve({data:false, error:null});
-    checkExisting.then(({data, error})=>{
-      if(error) console.warn("email_has_account", error);
+    const fail=(msg)=>{ onbMembershipInFlight=false; membEmailError(msg); idle(); };
+    // CAS-1571 rule 5: email (above) first, then the code if one is typed, then the account check, then send
+    // the email code. Only the first problem shows. An empty promo box is ignored entirely.
+    (async()=>{
+      const typed=membPromoTyped();
+      if(typed){
+        const st=await membPromoCheck(typed);
+        if(st==="valid"){ membPromoHeld=typed.toUpperCase(); membPromoPaint(); membPromoApplied(); }
+        else{
+          membPromoErr(st==="offline" ? MEMB_OFFLINE_MSG : "That code isn't valid.", st!=="offline");
+          onbMembershipInFlight=false; idle();
+          return;
+        }
+      }
+      // CAS-1099 change 2: before requesting a code at all, ask whether this email already has an account —
+      // if so, send no code; show the message and Sign in button instead.
+      let data=null;
+      try{
+        const r = client ? await client.rpc("email_has_account", {p_email:email}) : {data:false, error:null};
+        data=r && r.data;
+        if(r && r.error){
+          if(membIsNetErr(r.error)){ fail(MEMB_OFFLINE_MSG); return; }
+          console.warn("email_has_account", r.error);
+        }
+      }catch(e){ fail(MEMB_OFFLINE_MSG); return; }
       if(data===true){
         onbMembershipInFlight=false;
         membAcctExistsShow(email);
@@ -25688,11 +25711,12 @@ window.membStart=()=>{
       }
       // CAS-1169: continueWithEmail only requests a code — the code is confirmed right here on
       // #membScreen (State B, membSubmitCode), never on #authModal's own verify step.
-      window.CascadeAuth.continueWithEmail(email, { createUser: true }).then(result=>{
-        if(result.ok || result.rateLimited){ membShowCodeState(email); idle(); }
-        else{ onbMembershipInFlight=false; membEmailError(result.error||"Could not send a sign-in code — try again."); idle(); }
-      });
-    });
+      let result;
+      try{ result=await window.CascadeAuth.continueWithEmail(email, { createUser: true }); }
+      catch(e){ fail(MEMB_OFFLINE_MSG); return; }
+      if(result && (result.ok || result.rateLimited)){ membShowCodeState(email); idle(); }
+      else fail(membIsNetErr(result && result.error) ? MEMB_OFFLINE_MSG : "Could not send a sign-in code — try again.");
+    })();
   } else proceed(false);
 };
 // ---- CAS-971: the membership is real — Apple in-app purchase, entitlement read from the server -----------
@@ -25903,15 +25927,23 @@ function membShowInviteOnly(promoErr){
 // The code lives in memory only and is never logged. `membPromoMode` is where the box is: the sign-up screen
 // (check_promo_code, anon-safe, holds the code) or the invite-only screen (redeem_promo_code straight away).
 let membPromoHeld=null, membPromoOpen=false, membPromoMode="signup", membPromoBusy=false;
-const MEMB_PROMO_MSG={used_up:"That code has been used up.", already_used:"That code has already been used on this account."};
+// CAS-1571 rule 1: a network/fetch failure anywhere on #membScreen says this, never the raw exception text.
+const MEMB_OFFLINE_MSG="Couldn't reach Cascade. Check your connection and try again.";
+const MEMB_PROMO_MSG={used_up:"That code has been used up.", already_used:"That code has already been used on this account.", already_member:"You're already a member, so that code isn't needed.", offline:MEMB_OFFLINE_MSG};
 function membPromoMsg(err){ return MEMB_PROMO_MSG[err] || "That code isn't valid."; }
+// A transport failure (rejected fetch, or an rpc error whose text is the fetch's) as opposed to a server answer.
+function membIsNetErr(e){
+  if(!e) return false;
+  const m=String((e && (e.message||e.error||e.details)) || e);
+  return /failed to fetch|networkerror|network request failed|load failed|fetch failed|offline|timed? ?out/i.test(m);
+}
 function membPromoInner(){
   if(membPromoHeld) return `<div class="flabel">Promo code</div>
       <div class="membpromobox"><input class="namein" id="membPromoCode" disabled></div>
       <p class="membpromook">✓ Code applied: your first year is free.</p>`;
   if(membPromoOpen) return `<div class="flabel">Promo code</div>
       <div class="membpromobox"><input class="namein" id="membPromoCode" autocapitalize="characters" autocomplete="off" spellcheck="false"><button type="button" class="membpromoapply" id="membPromoApply">Apply</button></div>
-      <p class="fielderr" id="membPromoErr" role="alert" hidden></p>`;
+      <div class="membpromoerr"><p class="fielderr" id="membPromoErr" role="alert" hidden></p><button type="button" class="linkbtn" id="membPromoClear" hidden>Clear</button></div>`;
   return `<button type="button" class="linkbtn" id="membPromoLink">Have a promo code?</button>`;
 }
 function membPromoHTML(){
@@ -25919,12 +25951,42 @@ function membPromoHTML(){
   return `<div id="membPromo" class="membpromo">${membPromoInner()}</div>`;
 }
 function membPromoReset(mode){ membPromoMode=mode; membPromoHeld=null; membPromoOpen=false; membPromoBusy=false; membPromoWire(); }
-function membPromoErr(msg){ const e=$("membPromoErr"); if(e){ e.textContent=msg||""; e.hidden=!msg; } }
+// `clearable`: an invalid / used-up code gets a small Clear link that empties the box and removes the error
+// (the box itself stays open). An offline message never offers it: nothing is cleared, the code isn't wrong.
+function membPromoErr(msg, clearable){
+  const e=$("membPromoErr"); if(e){ e.textContent=msg||""; e.hidden=!msg; }
+  const c=$("membPromoClear"); if(c) c.hidden=!(msg && clearable);
+}
+function membPromoClear(){
+  const i=$("membPromoCode"); if(i){ i.value=""; if(i.focus) i.focus(); }
+  membPromoErr(null);
+}
+// What's typed in the open, un-applied box ("" when empty, closed, or already applied).
+function membPromoTyped(){
+  if(membPromoHeld || membPromoMode!=="signup") return "";
+  const i=$("membPromoCode");
+  return ((i && i.value)||"").trim();
+}
+// "valid" | "invalid" | "offline" — offline is never reported as invalid.
+async function membPromoCheck(code){
+  let out;
+  try{
+    const c=window.CascadeAuth && window.CascadeAuth.client;
+    if(!c) return "offline";
+    const r=await c.rpc("check_promo_code",{p_code:code});
+    if(r && r.error) out="offline";
+    else out=(r && r.data===true) ? "valid" : "invalid";
+  }catch(e){ out="offline"; }
+  if(out!=="offline") logEvent("promo_check",{valid:out==="valid"});
+  return out;
+}
 function membPromoWire(){
   const link=$("membPromoLink");
   if(link) link.addEventListener("click",()=>{ membPromoOpen=true; membPromoPaint(); const i=$("membPromoCode"); if(i && i.focus) i.focus(); });
   const apply=$("membPromoApply");
   if(apply) apply.addEventListener("click",()=>membPromoApply());
+  const clr=$("membPromoClear");
+  if(clr) clr.addEventListener("click",()=>membPromoClear());
   const input=$("membPromoCode");
   if(input && !membPromoHeld) input.addEventListener("keydown",ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); membPromoApply(); } });
 }
@@ -25952,8 +26014,8 @@ async function membRedeemPromo(code){
     const c=window.CascadeAuth && window.CascadeAuth.client;
     const r=c ? await c.rpc("redeem_promo_code",{p_code:code}) : {error:true};
     const d=r && r.data;
-    out = (!r.error && d && d.ok===true) ? {ok:true} : {ok:false, error:(d && d.error) || "invalid"};
-  }catch(e){ out={ok:false, error:"invalid"}; }
+    out = (!r.error && d && d.ok===true) ? {ok:true} : {ok:false, error:(r.error ? "offline" : ((d && d.error) || "invalid"))};
+  }catch(e){ out={ok:false, error:"offline"}; }
   logEvent("promo_redeem",{ok:out.ok, error:out.error||null});
   return out;
 }
@@ -25967,17 +26029,12 @@ async function membPromoApply(){
     if(membPromoMode==="invite"){
       const r=await membRedeemPromo(code);
       if(r.ok){ await membLoadEntitlement(); closeMembership(); membGateDone(); maybeStartTutorial(); }
-      else membPromoErr(membPromoMsg(r.error));
+      else membPromoErr(membPromoMsg(r.error), r.error!=="offline");
     } else {
-      let valid=false;
-      try{
-        const c=window.CascadeAuth && window.CascadeAuth.client;
-        const r=c ? await c.rpc("check_promo_code",{p_code:code}) : {error:true};
-        valid=!r.error && r.data===true;
-      }catch(e){ valid=false; }
-      logEvent("promo_check",{valid});
-      if(valid){ membPromoHeld=code.toUpperCase(); membPromoPaint(); membPromoApplied(); }
-      else membPromoErr("That code isn't valid.");
+      const st=await membPromoCheck(code);
+      if(st==="valid"){ membPromoHeld=code.toUpperCase(); membPromoPaint(); membPromoApplied(); }
+      else if(st==="offline") membPromoErr(MEMB_OFFLINE_MSG, false);
+      else membPromoErr("That code isn't valid.", true);
     }
   } finally { membPromoBusy=false; }
 }

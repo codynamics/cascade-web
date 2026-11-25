@@ -1272,6 +1272,20 @@ test("CAS-1169 AC5: an invalid email's error clears on correction without pressi
   await expect(page.locator("#membResend")).toHaveText(/^Resend code in 0:\d\d$/);
 });
 
+test("CAS-1571 AC3: opening the promo box and leaving it empty never blocks Continue", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await cas1169GotoConfigured(page);
+  await cas913WalkToShortlist(page);
+  await finishFlow(page);
+
+  await page.locator("#membPromoLink").click();
+  await expect(page.locator("#membPromoCode")).toBeVisible();
+  await page.locator("#membEmail").fill("cas1571-ac3@example.com");
+  await page.locator(".membcta").click();
+  await expect(page.locator("#membCode")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("#membScreen")).not.toContainText("Failed to fetch");
+});
+
 // CAS-1076: v1.0.0 ships free (Lee, 24-26 Sep 2026) — paid membership returns after launch via In-App
 // Purchase (CAS-970/971/972). Every price/free-month/subscription-management/cancellation mention is
 // gated behind the one MEMBERSHIP_ENABLED flag (app_template.html) rather than deleted outright, so it can

@@ -150,7 +150,7 @@ test("CAS-1565: invite-only Apply redeems directly", async () => {
 
 test("CAS-1565: the code is never logged; the code step hides the promo block", () => {
   const src = read("../../app_template.html");
-  assert.match(src, /logEvent\("promo_check",\{valid\}\)/);
+  assert.match(src, /logEvent\("promo_check",\{valid:out==="valid"\}\)/);
   assert.match(src, /logEvent\("promo_redeem",\{ok:out\.ok, error:out\.error\|\|null\}\)/);
   assert.match(src, /\$\("membEmailField"\), \$\("membPromo"\)/);
 });
