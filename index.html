@@ -1868,7 +1868,8 @@
      ticket. Only once the column genuinely can't fit (enlarged text, CAS-960 AC6) does the cap engage:
      .splashscroll absorbs the overflow as an internal scroll, and .splashfoot (the CTA/Sign in doors)
      stays pinned below it, inside the viewport, rather than being pushed off the bottom of the page. */
-  .splashscroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}
+  .splashscroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+  .splashscroll::-webkit-scrollbar{display:none}
   .splashfoot{flex:0 0 auto}
   /* ---- the poster wall (CAS-200) ----
      A perspective grid of real posters, blurred and dimmed, with a dark radial fade over it. Three
