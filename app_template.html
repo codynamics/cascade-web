@@ -7389,6 +7389,46 @@ function lockBodyScroll(on){
 }
 window.lockBodyScroll = lockBodyScroll;   // CAS-733: the auth module is a separate <script type="module">
 
+// ---- CAS-1579: keep a focused input visible above the iOS keyboard on the fixed full-screen layers.
+// iOS shrinks the VISUAL viewport only, and never scrolls a fixed layer's own scroller to the focused field.
+// While an input inside #membScreen / #oafScreen has focus, fit that layer to the visual viewport, then
+// (debounced ~100ms, iOS fires several resizes) centre the field in the layer's own scroll area. Harmless
+// where visualViewport is missing or its height equals innerHeight (Android/desktop): nothing is changed.
+const KB_FIT_LAYERS = ["membScreen","oafScreen"];
+let _kbFitTimer = null, _kbFitLayer = null;
+function kbFitClear(layer){
+  if(!layer) return;
+  layer.style.top=""; layer.style.height=""; layer.style.bottom="";
+}
+function kbFitActiveInput(){
+  const a=document.activeElement;
+  if(!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return null;
+  for(const id of KB_FIT_LAYERS){ const l=document.getElementById(id); if(l && l.contains(a)) return {layer:l, input:a}; }
+  return null;
+}
+function kbFitApply(center){
+  const vv=window.visualViewport, hit=kbFitActiveInput();
+  if(!hit){ if(_kbFitLayer){ kbFitClear(_kbFitLayer); _kbFitLayer=null; } return; }
+  if(!vv || Math.round(vv.height)>=Math.round(window.innerHeight)){ kbFitClear(hit.layer); return; }
+  _kbFitLayer=hit.layer;
+  hit.layer.style.top=vv.offsetTop+"px"; hit.layer.style.bottom="auto"; hit.layer.style.height=vv.height+"px";
+  if(center){
+    clearTimeout(_kbFitTimer);
+    _kbFitTimer=setTimeout(()=>{
+      const h=kbFitActiveInput(); if(!h) return;
+      const lr=h.layer.getBoundingClientRect(), ir=h.input.getBoundingClientRect();
+      const target=h.layer.scrollTop + (ir.top-lr.top) - (lr.height-ir.height)/2;
+      h.layer.scrollTop=Math.max(0,target);   // only the layer scrolls; the page behind stays put
+    },100);
+  }
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener("resize",()=>kbFitApply(true));
+  window.visualViewport.addEventListener("scroll",()=>kbFitApply(false));
+}
+document.addEventListener("focusin",()=>{ if(kbFitActiveInput()) kbFitApply(true); });
+document.addEventListener("focusout",()=>{ setTimeout(()=>{ if(!kbFitActiveInput() && _kbFitLayer){ kbFitClear(_kbFitLayer); _kbFitLayer=null; } },0); });
+
 function openModal(el){ el.classList.add("open"); lockBodyScroll(true); }
 // Modals stack now — the provenance sheet opens on top of the Found list. So the scroll lock is released only
 // when the LAST one closes; releasing it on the first would let the page scroll away underneath a modal that
