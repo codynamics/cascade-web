@@ -24,7 +24,7 @@
 // as B on the same context — nothing of A visible, A's server rows unchanged) are new, and must pass.
 import { test, expect } from "@playwright/test";
 import {
-  admin, createTestUser, seedCascades, liveCascades, liveCascadeCriteria, liveNotifyPrefs, testEmail,
+  admin, createTestUser, seedCascades, liveCascades, liveCascadeCriteria, liveNotifyPrefs, liveUserPrefs, testEmail,
   gotoIntegrityFresh, signInFromSplash, signOutFromAccount, signInDirect, fetchOtp, emailHasAccount,
 } from "./helpers.mjs";
 import { settleListing, finishFlow, walkToServices, openAgentsScreenFromNav } from "../e2e/helpers.mjs";
@@ -232,6 +232,28 @@ test("S1: a new member's onboarded roster exists on the server", async ({ page }
 
   const live = await liveCascades(userId);
   expect(idsOf(live)).toEqual(onScreenIds);
+
+  // CAS-1578: the agent ids alone passed while the onboarding answers were lost (a view-only user_prefs stub
+  // written before complete_membership() made it answer 'account_exists'). The real user_prefs row must carry
+  // every onboarding answer, and be the row complete_membership() stamped.
+  const local = await page.evaluate(() => {
+    const r = window.CascadePersistence.userPrefsRow();
+    return { sub_services:r.sub_services, store_services:r.store_services, taste:r.taste, watch_windows:r.watch_windows };
+  });
+  expect(Object.keys(local.watch_windows || {}).length, "onboarding chose cinema + rent, so windows exist on screen").toBeGreaterThan(0);
+  const prefsRow = await liveUserPrefs(userId);
+  expect(prefsRow, "a user_prefs row exists").not.toBeNull();
+  expect(prefsRow.membership_completed_at, "complete_membership stamped the row").not.toBeNull();
+  expect([...(prefsRow.sub_services||[])].sort()).toEqual([...(local.sub_services||[])].sort());
+  expect([...(prefsRow.store_services||[])].sort()).toEqual([...(local.store_services||[])].sort());
+  expect(prefsRow.watch_windows).toEqual(local.watch_windows);
+  expect(prefsRow.taste).toEqual(local.taste);
+
+  // And it survives a reload — the account, not the device, holds the roster.
+  await page.reload();
+  await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
+  await settleListing(page);
+  expect(await page.evaluate(() => cascades.map(c => c.id).sort())).toEqual(onScreenIds);
 });
 
 test("S4 (second half): editing the same agent on both contexts gets a conflict toast, no data lost", async ({ page }) => {

@@ -25358,7 +25358,7 @@ function openOnbMembership(){
   $("membBody").innerHTML = `
     <span class="cascpill" id="membPill">CASCADE</span>
     <h2 class="membh" id="membHead">Create your account</h2>
-    <p class="membsub">Start your free month of Cascade.</p>
+    <p class="membsub" id="membSub">Start your free month of Cascade.</p>
     <div class="membenefits">
       ${OB_MEMB_BENEFITS.map(b=>`<div class="mbrow">${b.art}
         <span class="mbtx"><span class="mbt">${b.html}</span></span></div>`).join("")}
@@ -26002,6 +26002,7 @@ function membPromoPaint(){
 function membPromoApplied(){
   const offer=$("membOffer");
   if(offer) offer.innerHTML=`<span class="moterms">Your first year is free with your code.</span>`;
+  const sub=$("membSub"); if(sub) sub.textContent="Start your free year of Cascade.";   // CAS-1578: the line under the heading agrees with the offer
   const ok=document.querySelector("#membPromo .membpromook"), cta=document.querySelector(".membcta"), scr=$("membScreen");
   if(ok && cta && scr && ok.getBoundingClientRect && cta.getBoundingClientRect){
     const over=ok.getBoundingClientRect().bottom-(cta.getBoundingClientRect().top-12);
@@ -30112,8 +30113,12 @@ function acctFetchKeepalive(init){
   // of its own, so the first real settings change a person makes is what creates the row, in the same one
   // request that sets the column(s) that change touched (merge-duplicates: existing columns this op
   // doesn't name are left alone, same as update's behaviour on a row that already exists).
+  // CAS-1578: between a new member's code being confirmed and complete_membership() resolving, NOTHING may write
+  // user_prefs. Any row there (even a view-only stub) makes complete_membership() answer 'account_exists' and
+  // discard the whole onboarding draft. The promo redeem + entitlement reads in membEnsureMember widen that window.
+  const membershipHold = () => (typeof onbMembershipInFlight!=="undefined" && onbMembershipInFlight);
   function pushUserPrefsCols(cols){
-    if(!accountActive()) return;
+    if(!accountActive() || membershipHold()) return;
     const owner=uid(); if(!owner) return;
     const row = userPrefsRow();
     const fields = {};
@@ -30173,7 +30178,7 @@ function acctFetchKeepalive(init){
     moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
   }
   function pushViewField(key, value){
-    if(!accountActive()) return;
+    if(!accountActive() || membershipHold()) return;
     const owner=uid(); if(!owner) return;
     return window.CascadeAccountStore.acctOp({ table:"merge_user_prefs_view", kind:"rpc",
       fields:{ p_patch:riderReviewSessionsOnto({ [key]:value }) }, onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
@@ -30186,13 +30191,13 @@ function acctFetchKeepalive(init){
   let VIEW_DEBOUNCE_MS = 500;
   function flushViewPatch(){
     const patch = pendingViewPatch; pendingViewPatch = {};
-    if(!Object.keys(patch).length || !accountActive()) return;
+    if(!Object.keys(patch).length || !accountActive() || membershipHold()) return;
     const owner=uid(); if(!owner) return;
     return window.CascadeAccountStore.acctOp({ table:"merge_user_prefs_view", kind:"rpc",
       fields:{ p_patch:riderReviewSessionsOnto(patch) }, onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
   }
   function pushViewFieldDebounced(key, value){
-    if(!accountActive()) return;
+    if(!accountActive() || membershipHold()) return;
     pendingViewPatch[key] = value;
     clearTimeout(viewPushTimer);
     viewPushTimer = setTimeout(flushViewPatch, VIEW_DEBOUNCE_MS);
