@@ -4104,7 +4104,7 @@ def build_csp() -> str:
 
     Origins below were verified against what app_template.html actually loads/fetches/embeds, not
     guessed: fonts.googleapis.com (stylesheet + preconnect), fonts.gstatic.com (the fonts it serves),
-    image.tmdb.org (posters) and img.youtube.com (trailer thumbnails) for img-src, the Supabase project
+    image.tmdb.org (posters) and img.youtube.com (trailer thumbnails) for img-src, both Supabase projects (production and staging, CAS-1521)
     and cascademovies.com (the native-app catalogue fetch, CATALOGUE_URL) for connect-src, and
     youtube-nocookie.com (the trailer <iframe>) for frame-src. Plain <a target="_blank"> links (TMDB,
     Watchmode, JustWatch, wa.me, YouTube watch pages) are navigations, not fetches, so they need no
@@ -4115,7 +4115,7 @@ def build_csp() -> str:
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: https://image.tmdb.org https://img.youtube.com",
-        "connect-src 'self' https://ypccfyatejejslzlfrbf.supabase.co https://cascademovies.com",
+        "connect-src 'self' https://ypccfyatejejslzlfrbf.supabase.co https://oenvezqluwqdwlzfhisc.supabase.co https://cascademovies.com",
         "frame-src https://www.youtube-nocookie.com",
         "frame-ancestors 'none'",
         "base-uri 'none'",
