@@ -42,3 +42,12 @@
     - the banner follows the seen map and the visit flag
   refs:
     - tests/js/cas1534-tutorial-banner.test.mjs
+- id: TUT-GEO
+  part: A
+  title: Every tour step lands on its target and holds still (390x844)
+  how: browser
+  expect:
+    - ring on the target, arrow tip on the target, bubble on screen and clear of it, nothing moves 500 ms after the bubble shows, no step skipped. Any ticket that adds, removes or changes a tour step updates tests/e2e/tutorial-geometry.spec.mjs in the same commit
+  refs:
+    - tests/e2e/tutorial-geometry.spec.mjs
+    - tutorialReposition()

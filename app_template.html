@@ -16026,7 +16026,8 @@ window.navMenuGo=key=>{
 };
 document.addEventListener("click", e=>{
   if(!$("navMenu").classList.contains("open")) return;
-  if(e.target.closest("#navMenu, #navMenuBtn")) return;
+  // CAS-1582: a tutorial step opens this menu from inside the click on Next; that same click must not close it again.
+  if(e.target.closest("#navMenu, #navMenuBtn, #tutScrim")) return;
   closeNavMenu();
 });
 
@@ -26526,7 +26527,7 @@ const TOURS = {
       before(){ tutOpenMoodsTourSheet(); }, after(){ closeWatchSheetQuiet(); }, sel:["#oamMoodName"]},
     {html:TUT_P("A list starts with your agent's genre preferences, so you get the films that matter most to you.",
       "Switch genres on or off to make a special list. For example, to create a list with only drama movies, switch everything else off."),
-      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .mgenre .oalist"]},
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .mgenre .oalist .oamstylerow"]},
     // Lee, 2026-11-17: the Agent settings / Agent override switch sits under the genre rows.
     {html:TUT_P("Want only the very best? Under the genres, choose <b>Override</b> to set one level for every genre in this list."),
       before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .oamlvlseg"]},
@@ -26576,7 +26577,7 @@ const TOURS = {
       "Your Cascade agent studies those combinations in what you watch and rate, and works out which ones you're most and least likely to enjoy."),
       center:true},
     {html:TUT_P("So your agent tracks each genre together with its sub-genres. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here. Each sub-genre has its own slider; drag one to set it yourself."),
-      before(){ v2OpenFirstOnStyle(); }, sel:["#oaAdjustSection"], trail:["#agentsBtn"]},
+      before(){ v2OpenFirstOnStyle(); }, sel:["#oaAdjustSection .oasechdr"], trail:["#agentsBtn"]},
     {html:TUT_P("That's it. Your agent checks the whole catalogue overnight and reports every morning."),
       before(){ oaOpenStyle=null; oaOrderSnapshot=null; closeSettings(); showAgentsHome(); }, center:true},
   ]},
@@ -26688,8 +26689,8 @@ function tutMoodRowTo(sel){
 }
 // The made moods sit at the end of the mood row — scroll it so they're on screen for the step.
 function tutRevealMadeMoods(){
-  const chip=document.querySelector(`.moodrow .moodchip[data-mood="topsvc"],.moodrow .moodchip[data-mood="fav-person"]`);
-  if(chip) chip.scrollIntoView({block:"nearest", inline:"center"});
+  // CAS-1582: both made chips together (the step points at both), not just the first one centred.
+  tutMoodRowTo([`.moodrow .moodchip[data-mood="topsvc"]`,`.moodrow .moodchip[data-mood="fav-person"]`]);
 }
 // Kept for anything that still reads the v2 script by name — it is the Watch tour.
 const V2_TOUR_STEPS = TOURS.watch.steps;
@@ -26851,26 +26852,49 @@ function showTutorialCard(){
   $("tutBackBtn").style.display = tutIdx===0 ? "none" : "";
   $("tutSkipBtn").style.visibility = (tutIdx===tutSteps.length-1) ? "hidden" : "";
   const card=$("tutCard"); card.style.animation="none"; void card.offsetWidth; card.style.animation="";
-  // CAS-1581: while the film card is still expanding/collapsing, keep the tour card invisible until the settle pass.
-  const hold=tutHoldCard; tutHoldCard=false;
-  if(hold){ card.style.opacity="0"; card.style.pointerEvents="none"; card.style.transition="none"; }
-  else { card.style.opacity=""; card.style.pointerEvents=""; card.style.transition=""; }
+  // CAS-1581/CAS-1582: the tour card stays invisible until the page under it has stopped moving (a film card
+  // expanding, a sheet opening, a row or the page scrolling), then it is placed from the settled boxes and
+  // shown in place with no glide: a card drawn from a stale box pointed at nothing (Watch step 5's arrow).
+  tutHoldCard=false;
+  card.style.opacity="0"; card.style.pointerEvents="none"; card.style.transition="none";
   tutScrollIntoPlace(step);
   requestAnimationFrame(()=>requestAnimationFrame(tutorialReposition));
-  // A card that has just expanded or collapsed is still settling — place it again once it has.
-  if(step.scope==="card" || step.wholeCard){
-    const idx=tutIdx;
-    tutNarrowTimers.push(setTimeout(()=>{
-      if(tutIdx!==idx) return;
-      tutScrollIntoPlace(step); tutorialReposition();
-      if(hold){
-        void card.offsetWidth;
-        card.style.opacity=""; card.style.pointerEvents=""; card.style.transition="";
-        card.style.animation="none"; void card.offsetWidth; card.style.animation="";
-      }
-    }, 380));
-  }
-  tutRunNarrow(step);
+  tutSettle(tutIdx, step);
+}
+// Everything that can still be moving under the card: the page, every scrolling ancestor of a target, and the
+// targets' own boxes (a sheet or film card animating in moves them without any scroll).
+function tutMotionSig(){
+  const els=tutCurrent && tutCurrent.els ? tutCurrent.els : [], out=[scrollX, scrollY];
+  els.forEach(el=>{
+    const r=el.getBoundingClientRect(); out.push(r.left, r.top, r.width, r.height);
+    for(let p=el.parentElement; p && p!==document.body; p=p.parentElement)
+      if(p.scrollWidth>p.clientWidth+1 || p.scrollHeight>p.clientHeight+1) out.push(p.scrollLeft, p.scrollTop);
+  });
+  if(tourCardEl){ const r=tourCardEl.getBoundingClientRect(); out.push(r.top, r.height); }
+  return out.map(n=>Math.round(n)).join(",");
+}
+function tutSettle(idx, step){
+  const t0=performance.now(); let last="", same=0;
+  const place=()=>{
+    if(tutIdx!==idx) return;
+    if(step.scope==="card" || step.wholeCard) tutScrollIntoPlace(step);
+    const card=$("tutCard"), hole=$("tutHole");
+    hole.style.transition="none";
+    tutorialReposition();
+    void card.offsetWidth; void hole.offsetWidth;
+    card.style.opacity=""; card.style.pointerEvents=""; card.style.transition="none";
+    card.style.animation="none"; void card.offsetWidth; card.style.animation="";
+    tutRunNarrow(step);   // the fade-outs start from the placed card
+    // Later repositions (a target fading out) may glide again.
+    setTimeout(()=>{ if(tutIdx===idx){ card.style.transition=""; hole.style.transition=""; } }, 400);
+  };
+  const tick=()=>{
+    if(tutIdx!==idx || !$("tutScrim").classList.contains("open")) return;
+    const sig=tutMotionSig(); same = sig===last ? same+1 : 0; last=sig;
+    const minMs = (step.scope==="card" || step.wholeCard) ? 500 : 0;   // a film card's expand/collapse runs ~260ms+
+    if((same>=8 && performance.now()-t0>=minMs) || performance.now()-t0>2500) place(); else requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 // CAS-1152: `zoom:var(--ui-scale)` (CAS-157) makes a position:fixed element's *written* style length
 // land pre-zoom while every *read-back* geometry query reports the post-zoom visual pixel — so a value

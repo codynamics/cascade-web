@@ -138,6 +138,11 @@ Cascade's workflow transition IDs are 4 = In Progress and 5 = In Review, but **p
 read `/rest/api/3/issue/CAS-NN/transitions` and match on the target status name, so a workflow edit cannot
 silently send tickets to the wrong place.
 
+## Test upkeep
+- Any ticket that adds, removes or changes a tour step (`TOURS` in `app_template.html`) updates
+  `tests/e2e/tutorial-geometry.spec.mjs` in the same commit (CAS-1582): it checks every step's ring, arrow,
+  bubble position and stability at 390x844, and fails on a silently skipped step.
+
 ## Finish
 Print exactly one outcome marker on the final line:
 `DONE <sha>` | `ALREADY-DONE` | `BLOCKED <reason>` | `NO_WORK`

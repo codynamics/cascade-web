@@ -4,7 +4,7 @@
      then run `python qa/build_checklist.py`. The push gate (tests/lint/qa-drift.mjs) fails if this
      file is stale. -->
 
-70 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
+71 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
 
 ## Part A
 
@@ -101,6 +101,8 @@
   - the score row and notify control steps are skipped, not pointed at an off-screen anchor
 - [ ] **TUT-004** Tutorial banner shows once and does not reappear after dismissal _(unit, auto)_
   - the banner follows the seen map and the visit flag
+- [ ] **TUT-GEO** Every tour step lands on its target and holds still (390x844) _(browser, auto)_
+  - ring on the target, arrow tip on the target, bubble on screen and clear of it, nothing moves 500 ms after the bubble shows, no step skipped. Any ticket that adds, removes or changes a tour step updates tests/e2e/tutorial-geometry.spec.mjs in the same commit
 - [ ] **WATCH-001** Header carries Watch, Alerts, Find and Agents in one row at every phone width _(browser, auto)_
   - four nav items share one row at 390 and 430 px, menu on the far right, one shared selected style
 - [ ] **WATCH-002** Watch top has two stage groups and moods, collapses only on a tap _(browser, auto)_
