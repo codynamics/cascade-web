@@ -8,7 +8,9 @@ product changes: every first-days rule reads the account's creation time, so mov
 
 Columns a first-days rule reads (keep this list current when a new day +N rule is built):
   * auth.users.created_at - the day +1 catch-up (monitor/catchup.py due_users, via fetch_auth_users) and the
-    tutorial banner (app_template.html tutAccountAgeDays(a.user.created_at, now)). Nothing else exists today.
+    tutorial banner (app_template.html tutAccountAgeDays(a.user.created_at, now)).
+  * the rating reminder card (day +2) and the day +7 first-week recap also read created_at (CAS-1583), so aging
+    an account moves them too.
 
 Staging only: the connection string is checked FIRST and the command exits non-zero before any write or
 subprocess if it names production (ypccfyatejejslzlfrbf) or is missing.

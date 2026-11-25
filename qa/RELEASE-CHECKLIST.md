@@ -4,7 +4,7 @@
      then run `python qa/build_checklist.py`. The push gate (tests/lint/qa-drift.mjs) fails if this
      file is stale. -->
 
-71 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
+95 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
 
 ## Part A
 
@@ -71,6 +71,33 @@
   - appreview@codynamics.com.au signs in with the reviewer code; every other email still gets an emailed code
 - [ ] **MEMB-005** App Store rating prompt triggers on the web surface as specified _(browser, auto)_
   - the trigger conditions fire the prompt hook once and never twice
+- [ ] **MEMB-007** Sign-up: promo box closed _(unit, auto)_
+  - the code box is closed by default and sign-up works without it
+- [ ] **MEMB-008** Sign-up: promo box open but empty is fine _(unit, auto)_
+  - an open, empty code box does not block sign-up
+- [ ] **MEMB-009** Sign-up: wrong code _(unit, auto)_
+  - "That code isn't valid." plus a Clear button
+- [ ] **MEMB-010** Sign-up: code used up _(unit, auto)_
+  - the used-up message from MEMB_PROMO_MSG
+- [ ] **MEMB-011** Sign-up: code already used on this account _(unit, auto)_
+  - the already-used message from MEMB_PROMO_MSG
+- [ ] **MEMB-012** Sign-up: already a member _(unit, auto)_
+  - the already-a-member message from MEMB_PROMO_MSG
+- [ ] **MEMB-013** Sign-up: right code gives a free year (planned: CAS-1583 follow-up check) _(planned, manual)_
+  - the account gets a free year
+  - the code screen must not say "Start your free month"
+- [ ] **MEMB-014** Sign-up: invalid email _(unit, auto)_
+  - an invalid email is refused with a clear message
+- [ ] **MEMB-015** Sign-up: existing account _(unit, auto)_
+  - an email that already has an account is handled without a duplicate
+- [ ] **MEMB-016** Sign-up: network failure shows the offline message _(unit, auto)_
+  - the offline message shows, never "Failed to fetch"
+- [ ] **MEMB-017** Onboarding answers survive code confirmation and complete_membership (CAS-1578) (planned: CAS-1583 follow-up check) _(planned, manual)_
+  - services, windows, taste, agent and lists are in user_prefs and in the app, before and after reload
+- [ ] **MEMB-018** Signed-out cold load goes straight to the splash (CAS-1577) _(browser, auto)_
+  - no flash of the main nav on a signed-out cold load
+- [ ] **MEMB-019** The focused field stays above the keyboard on sign-up and agent-name screens (CAS-1579) _(device, manual)_
+  - on iPhone the focused input is not covered by the keyboard on #membScreen and #oafScreen
 - [ ] **NOTIF-001** Tapping a notification lands on Alerts, not the film page _(browser, auto)_
   - pushNotificationActionPerformed opens Alerts (Today)
 - [ ] **OPS-001** Static lint guards pass _(unit, auto)_
@@ -139,6 +166,48 @@
   - each of the four first-days accounts gets exactly the alerts its expectation file lists, on the day it lists
 - [ ] **FIRSTDAYS-002** Catch-up alert is sent once for a new account, then daily alerts follow _(unit, auto)_
   - the catch-up digest uses kind catchup_alert and is not repeated the next day
+- [ ] **FIRSTDAYS-003** Day 0: the Watch tutorial starts by itself; Alerts is empty (planned: CAS-1583 follow-up check) _(planned, manual)_
+  - a new account's first Watch visit starts the Watch tutorial without a tap
+  - Alerts is empty and says "<agent> reports every morning"
+- [ ] **FIRSTDAYS-004** Day +1 catch-up: top 3 in cinemas, 5 coming, 10 streaming on the member's services _(firstdays, auto)_
+  - top 3 in cinemas, top 5 coming to cinemas, top 10 streaming on the member's own services
+  - watched films and empty groups are skipped
+  - one push at 7:30 names the top two films
+  - the 17:00 email lists only catch-up films not yet seen
+  - the same stage is never announced twice
+- [ ] **FIRSTDAYS-005** Tutorial banner from day +1: hidden for good after a second ✕ _(browser, auto)_
+  - the banner shows only on a screen whose tutorial has not been played
+  - at most one banner per visit (a new visit is an app open or a return after 30+ minutes)
+  - after a second ✕ it never returns
+- [ ] **FIRSTDAYS-006** Rating reminder card from day +2 while fewer than 5 Watched ratings (planned: CAS-1583 follow-up check) _(planned, manual)_
+  - the card is never a rating sheet and has a ✕
+  - shown at most 3 times in total, counted in user_prefs.view.rnudge.rem
+  - never in a visit that already showed a tutorial or banner
+  - events taste_reminder_shown and taste_reminder_dismiss are recorded
+- [ ] **FIRSTDAYS-007** Taste card after 10+ ratings and a real adjustment of 5+ points (planned: CAS-1583 follow-up check) _(planned, manual)_
+  - the card says "<agent> has learned something" and names the strongest adjustment
+  - See Taste opens Taste
+  - shown once
+  - events taste_card_shown, taste_card_open and taste_card_dismiss are recorded
+- [ ] **FIRSTDAYS-008** Day +7 first-week recap email "Your first week with <agent>" _(unit, auto)_
+  - merged into the 17:00 email with no push
+  - lists films alerted and up to 5 still to decide (newest first, with the Watch On / Watched buttons), rating count as one text line
+  - batch kind recap; each named film has a ledger row and the recap has its own view in Alerts
+  - sent even with nothing left ("You're all caught up.")
+  - sent once: a failed send retries the same day, days 6 and 8 never send it
+- [ ] **FIRSTDAYS-009** Across all ten days: at most one email and one push a day; one card or banner per visit (planned: CAS-1583 follow-up check) _(planned, manual)_
+  - no account gets more than one email or one push on any day
+  - at most one card or banner per visit, never a pop-up
+- [ ] **FIRSTDAYS-010** A push or email link opens its own "From your email" view in Alerts _(browser, auto)_
+  - the view has the band, an All alerts button and a To decide row until every film is answered
+  - an emailed film stays in its view, tagged Watched, after it is watched
+- [ ] **FIRSTDAYS-011** Never: any one-off rating exercise (planned: CAS-1583 follow-up check) _(planned, manual)_
+  - no "Seen any of these?" sheet, no rating push and no rating email prompt on any day
+  - finding one fails the run
+- [ ] **FIRSTDAYS-012** Buttons: wording in emails and Alerts is exactly the app's _(unit, auto)_
+  - Watch On: Cinema, Premium, Rent, Stream, Never (Premium, Rent and Cinema only when switched on for that member)
+  - Watched: Wow!, Watch Again, Enjoyed, So-so, Disliked
+  - an email button is a signed one-tap link to alert-answer that records the answer, shows a confirmation page with "Open in Cascade", and removes the film from To decide in the app
 - [ ] **NOTIF-002** Daily and unseen alert digests render one card per film with tracked links _(unit, auto)_
   - every link carries src=email and cmp=<kind>; Watch On / Watched buttons are signed answer links
 - [ ] **NOTIF-003** Badge clears and push re-registers on sign-in _(unit, auto)_
@@ -160,6 +229,8 @@
   - until then run the integrity suite against main's build after the new migrations
 - [ ] **REL-004** Migrations for the release are applied to production by Lee _(sql, auto)_
   - production public.schema_migrations equals the file list of supabase/migrations/ at the release commit
+- [ ] **REL-007** Production migrations 0016 then 0017 are applied before the promote _(sql, auto)_
+  - production public.schema_migrations lists 0016 then 0017, or the approved production accounts lose web access
 
 ## Post-production check
 

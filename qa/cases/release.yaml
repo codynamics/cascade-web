@@ -43,3 +43,12 @@
   how: lee-phone
   expect:
     - the QA account (never lee+c1 or a real member) receives one hits_stream alert as push and email within 10 minutes
+- id: REL-007
+  part: D
+  title: "Production migrations 0016 then 0017 are applied before the promote"
+  how: sql
+  expect:
+    - "production public.schema_migrations lists 0016 then 0017, or the approved production accounts lose web access"
+  refs:
+    - "supabase/migrations/0016_promo_codes.sql"
+    - "supabase/migrations/0017_alert_batch_recap_kind.sql"
