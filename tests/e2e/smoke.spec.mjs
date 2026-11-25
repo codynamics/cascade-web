@@ -1427,7 +1427,9 @@ test("CAS-1585 settings foot shows version and build from BUILD_INFO", async ({ 
       .map(el => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "")
         + (typeof el.className === "string" && el.className ? "." + el.className.trim().split(/\s+/).join(".") : "")
         + " w=" + Math.round(el.getBoundingClientRect().width));
-    return { ok: s.scrollWidth <= s.clientWidth, sw: s.scrollWidth, cw: s.clientWidth, wide };
+    // 1px allowance: scrollWidth/clientWidth are rounded integers of a fractional layout width, so a screen
+    // that fits can read 349 vs 348 (run 1415). Real overflow (2px+, or a named element in `wide`) still fails.
+    return { ok: s.scrollWidth <= s.clientWidth + 1, sw: s.scrollWidth, cw: s.clientWidth, wide };
   });
   expect(fit.ok, "settings overflow sw=" + fit.sw + " cw=" + fit.cw + " wide: " + fit.wide.join(" | ")).toBe(true);
 });
