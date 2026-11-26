@@ -34,3 +34,17 @@
   refs:
     - "#languagesScreen"
     - "#settingsScreen"
+- id: SVC-004
+  part: A
+  title: "Settings foot shows the version line (CAS-1585, CAS-1600, CAS-1602) and never overflows sideways"
+  how: browser
+  area:
+    - m-settings
+  expect:
+    - "a muted centred line at the foot of Settings, for example \"Cascade 1.0.0 (build N) · Staging\"; production shows nothing after the build number"
+    - "the numbers match the running build's BUILD_INFO on the web and in the iOS app (iOS half is checked by Lee on the device)"
+    - "no sideways scroll at 390px"
+  refs:
+    - tests/e2e/smoke.spec.mjs
+    - "#settingsBuild"
+    - "#settingsScreen"

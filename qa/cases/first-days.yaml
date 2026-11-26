@@ -98,7 +98,7 @@
     - taste
   expect:
     - "the card says \"<agent> has learned something\" and names the strongest adjustment"
-    - "See Taste opens Taste"
+    - "See Taste opens the current Taste screen (alerts and learning only, CAS-1594): the adjustment it names is visible there as a sub-genre step"
     - "shown once"
     - "events taste_card_shown, taste_card_open and taste_card_dismiss are recorded"
   refs:
@@ -176,3 +176,58 @@
     - "monitor/answer_links.py"
     - "monitor/tests/test_cas1537_answers.py"
     - "tests/js/cas1537-alert-answer.test.mjs"
+- id: FIRSTDAYS-013
+  part: B
+  title: "Taste line in an alert email (CAS-1592): once, with See Taste, never an extra email or push"
+  how: unit
+  area:
+    - firstdays
+    - alerts-email
+    - taste
+  expect:
+    - "with 10 or more Watched ratings AND a strongest genre-pair adjustment of 5 points or more, the next alert email already going out (recap included) carries once \"<agent> has learned something\", the app's own line (for example \"Sci-fi with Thriller is up 6 from your ratings\") and a \"See Taste\" link (cmp=taste_line)"
+    - "it never causes an extra email or a push, and the following day's email does not repeat it"
+    - "no rating prompts"
+  refs:
+    - "monitor/tests/test_cas1592_tasteline.py"
+    - "tests/js/cas1592-taste-line-shim.test.mjs"
+    - "monitor/tasteline.py"
+- id: FIRSTDAYS-014
+  part: B
+  title: "Negative: with 9 ratings, or a best adjustment of 4, no taste line appears"
+  how: unit
+  area:
+    - firstdays
+    - alerts-email
+    - taste
+  expect:
+    - "with 9 Watched ratings no taste line is in the email and the shim is not asked"
+    - "with 10 ratings but a best adjustment under 5 points no taste line is in the email"
+  refs:
+    - "monitor/tests/test_cas1592_tasteline.py"
+    - "tests/js/cas1592-taste-line-shim.test.mjs"
+- id: FIRSTDAYS-015
+  part: B
+  title: "A failed send does not count as sent: the taste line goes in the next successful email"
+  how: unit
+  area:
+    - firstdays
+    - alerts-email
+  expect:
+    - "a failed send does not record the line as sent; the next successful email carries it once"
+  refs:
+    - "monitor/tests/test_cas1592_tasteline.py"
+- id: FIRSTDAYS-016
+  part: B
+  title: "Condensed first-days run: account a reaches 10 skewed ratings by day 6 and its email carries the taste line once (planned: CAS-1604)"
+  how: planned
+  area:
+    - firstdays
+    - alerts-email
+    - taste
+  expect:
+    - "account a reaches 10 skewed Watched ratings by day 6, so its day-6 or day-7 17:00 email carries the taste line once"
+    - "day 8's email does not carry it"
+  refs:
+    - "monitor/firstdays.py"
+    - "qa/firstdays/a.json"

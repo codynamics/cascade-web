@@ -74,3 +74,48 @@
   refs:
     - tests/e2e/tutorial-geometry.spec.mjs
     - tutorialReposition()
+- id: TUT-005
+  part: A
+  title: "Watch tutorial pointing (CAS-1581): arrow under Watch from the first frame, Me chip on step 5, card steady on steps 12-14"
+  how: browser
+  area:
+    - watch-tut
+  expect:
+    - "step 2: the arrow is under Watch from the first frame and the card does not move while the other buttons fade"
+    - "step 5: the arrow points at the Me chip, never the screen edge (run with a member who has at least five lists)"
+    - "steps 12 to 14: the card appears once, below the film card, with no jump"
+  refs:
+    - tests/e2e/tutorial-geometry.spec.mjs
+    - tutorialReposition()
+- id: TUT-006
+  part: A
+  title: "Bubble holds still after landing on every step of every tour (CAS-1590, CAS-1597, CAS-1599)"
+  how: browser
+  area:
+    - watch-tut
+    - tut-lists
+    - tut-alerts
+    - tut-database
+    - tut-agent
+    - tut-invite
+  expect:
+    - "nothing moves 500 ms after the bubble shows, on every step of every tour; Invite step 1's bubble appears once, after the card has settled"
+    - "no step is skipped"
+  refs:
+    - tests/e2e/tutorial-geometry.spec.mjs
+- id: TUT-007
+  part: C
+  title: "iPhone: Watch tutorial step 5 points at the Me chip and the bubble holds still"
+  how: device
+  area:
+    - watch-tut
+  expect:
+    - "on the iPhone, play the Watch tutorial with a member who has at least five lists; on step 5 the arrow is on the Me chip and the bubble does not move after it appears (scroll timing is not visible on a desktop browser)"
+- id: TUT-008
+  part: C
+  title: "iPhone: Invite tutorial step 1 bubble appears once and holds still"
+  how: device
+  area:
+    - tut-invite
+  expect:
+    - "on the iPhone, play the Invite tutorial; step 1's bubble appears once, after the card has settled, and does not glide or jump afterwards"

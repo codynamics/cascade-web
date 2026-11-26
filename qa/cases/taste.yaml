@@ -39,3 +39,17 @@
     - monitor/agent_tests/test_agents_pipeline.py
     - monitor/agent_tests/test_agents_alerting.py
     - monitor/agent_tests/test_agents_scaffold.py
+- id: TASTE-004
+  part: A
+  title: "Taste is alerts and learning only (CAS-1594): no level sliders, one row per genre, stepped sub-genres"
+  how: unit
+  area:
+    - taste
+  expect:
+    - "no level sliders and no MOVIE MINIMUM SCORE on Taste"
+    - "each genre has exactly one row showing Alerts on or No alerts plus a verdict count"
+    - "sub-genre steps: -10 sets -10 and Never marks it never"
+    - "applying a recommendation never changes a genre's level"
+  refs:
+    - tests/js/taste-alerts-only.test.mjs
+    - tests/e2e/taste.spec.mjs

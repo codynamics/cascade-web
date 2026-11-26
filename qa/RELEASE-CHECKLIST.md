@@ -4,7 +4,7 @@
      then run `python qa/build_checklist.py`. The push gate (tests/lint/qa-drift.mjs) fails if this
      file is stale. -->
 
-98 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
+110 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
 
 ## Part A
 
@@ -26,6 +26,10 @@
   - Jump to lands under the sticky chrome and is one-shot; the subtitle says agent for a one-agent account
 - [ ] **ALERTS-003** Alert moments and switches sync to the account _(unit, auto)_
   - turning a moment off on one device is off on the others
+- [ ] **ALERTS-006** From your email (CAS-1584): films are ordinary cards, no Watch On / Watched panels opened out _(unit, auto)_
+  - films in a From your email view show as ordinary cards with no Watch On / Watched panel opened under each
+  - each card's own buttons still answer the email
+  - the To decide row still clears when every film is answered
 - [ ] **FIND-001** Find lists any film by name regardless of agents, services or watched _(browser, auto)_
   - no agent/tab/service/watched/style narrowing applies in Find
 - [ ] **FIND-002** Find by person and by title behave as specified _(unit, auto)_
@@ -63,6 +67,11 @@
 - [ ] **LISTS-003** A list sets its own genre levels (five stops) and Set all genres _(browser, auto)_
   - the list sheet shows a five-stop level row per genre and a Set all genres box, with no Override switch or Taste link
   - tapping the junction between boxes 2 and 3 picks Top 10%; only the checkbox toggles a genre; Set all genres at 50% puts every ticked genre at Top 50%
+- [ ] **LISTS-005** Lists own their genre levels (CAS-1593): no Override, Taste link or thumbs; row name never toggles; 2/3 boundary is Top 10% _(browser, auto)_
+  - the My taste/Override segment, the Taste link and the read-only thumbs are gone from the list sheet
+  - tapping a row's name does not change its checkbox
+  - tapping the track at the 2/3 boundary gives Top 10%
+  - Set all genres at 50% sets every ticked row and no unticked one
 - [ ] **MEMB-001** Membership screen shows price and free-month copy, no Prototype disclaimer _(browser, auto)_
   - #membScreen carries the price and free-month copy on both the onboarding recap and the standalone preview
 - [ ] **MEMB-002** Web membership screen has no purchase button _(browser, auto)_
@@ -119,10 +128,19 @@
   - the streaming total never double-counts a film on two services
 - [ ] **SVC-003** Language settings screen opens and saves _(browser, auto)_
   - #languagesScreen opens from Settings and the choice applies to the listing
+- [ ] **SVC-004** Settings foot shows the version line (CAS-1585, CAS-1600, CAS-1602) and never overflows sideways _(browser, auto)_
+  - a muted centred line at the foot of Settings, for example "Cascade 1.0.0 (build N) · Staging"; production shows nothing after the build number
+  - the numbers match the running build's BUILD_INFO on the web and in the iOS app (iOS half is checked by Lee on the device)
+  - no sideways scroll at 390px
 - [ ] **TASTE-001** Taste screen edits survive a reload _(browser, auto)_
   - changing taste on #agentsScreen persists in the account and is still there after reload
 - [ ] **TASTE-002** One-agent model - single owner, single score, taste profile _(unit, auto)_
   - there is one agent per account, one score box per film and a taste profile built from the answers
+- [ ] **TASTE-004** Taste is alerts and learning only (CAS-1594): no level sliders, one row per genre, stepped sub-genres _(unit, auto)_
+  - no level sliders and no MOVIE MINIMUM SCORE on Taste
+  - each genre has exactly one row showing Alerts on or No alerts plus a verdict count
+  - sub-genre steps: -10 sets -10 and Never marks it never
+  - applying a recommendation never changes a genre's level
 - [ ] **TUT-001** Every tour walks end to end with no step skipped _(browser, auto)_
   - from Menu -> Tutorials each tour's step index advances through every step (tutorialAdvance skips a step whose target is missing, which is the failure this case catches)
 - [ ] **TUT-002** Tour spotlight and card are positioned correctly under UI zoom _(browser, auto)_
@@ -131,6 +149,13 @@
   - the score row and notify control steps are skipped, not pointed at an off-screen anchor
 - [ ] **TUT-004** Tutorial banner shows once and does not reappear after dismissal _(unit, auto)_
   - the banner follows the seen map and the visit flag
+- [ ] **TUT-005** Watch tutorial pointing (CAS-1581): arrow under Watch from the first frame, Me chip on step 5, card steady on steps 12-14 _(browser, auto)_
+  - step 2: the arrow is under Watch from the first frame and the card does not move while the other buttons fade
+  - step 5: the arrow points at the Me chip, never the screen edge (run with a member who has at least five lists)
+  - steps 12 to 14: the card appears once, below the film card, with no jump
+- [ ] **TUT-006** Bubble holds still after landing on every step of every tour (CAS-1590, CAS-1597, CAS-1599) _(browser, auto)_
+  - nothing moves 500 ms after the bubble shows, on every step of every tour; Invite step 1's bubble appears once, after the card has settled
+  - no step is skipped
 - [ ] **TUT-GEO** Every tour step lands on its target and holds still (390x844) _(browser, auto)_
   - ring on the target, arrow tip on the target, bubble on screen and clear of it, nothing moves 500 ms after the bubble shows, no step skipped. Any ticket that adds, removes or changes a tour step updates tests/e2e/tutorial-geometry.spec.mjs in the same commit
 - [ ] **WATCH-001** Header carries Watch, Alerts, Find and Agents in one row at every phone width _(browser, auto)_
@@ -189,7 +214,7 @@
   - events taste_reminder_shown and taste_reminder_dismiss are recorded
 - [ ] **FIRSTDAYS-007** Taste card after 10+ ratings and a real adjustment of 5+ points (planned: CAS-1583 follow-up check) _(planned, manual)_
   - the card says "<agent> has learned something" and names the strongest adjustment
-  - See Taste opens Taste
+  - See Taste opens the current Taste screen (alerts and learning only, CAS-1594): the adjustment it names is visible there as a sub-genre step
   - shown once
   - events taste_card_shown, taste_card_open and taste_card_dismiss are recorded
 - [ ] **FIRSTDAYS-008** Day +7 first-week recap email "Your first week with <agent>" _(unit, auto)_
@@ -211,6 +236,18 @@
   - Watch On: Cinema, Premium, Rent, Stream, Never (Premium, Rent and Cinema only when switched on for that member)
   - Watched: Wow!, Watch Again, Enjoyed, So-so, Disliked
   - an email button is a signed one-tap link to alert-answer that records the answer, shows a confirmation page with "Open in Cascade", and removes the film from To decide in the app
+- [ ] **FIRSTDAYS-013** Taste line in an alert email (CAS-1592): once, with See Taste, never an extra email or push _(unit, auto)_
+  - with 10 or more Watched ratings AND a strongest genre-pair adjustment of 5 points or more, the next alert email already going out (recap included) carries once "<agent> has learned something", the app's own line (for example "Sci-fi with Thriller is up 6 from your ratings") and a "See Taste" link (cmp=taste_line)
+  - it never causes an extra email or a push, and the following day's email does not repeat it
+  - no rating prompts
+- [ ] **FIRSTDAYS-014** Negative: with 9 ratings, or a best adjustment of 4, no taste line appears _(unit, auto)_
+  - with 9 Watched ratings no taste line is in the email and the shim is not asked
+  - with 10 ratings but a best adjustment under 5 points no taste line is in the email
+- [ ] **FIRSTDAYS-015** A failed send does not count as sent: the taste line goes in the next successful email _(unit, auto)_
+  - a failed send does not record the line as sent; the next successful email carries it once
+- [ ] **FIRSTDAYS-016** Condensed first-days run: account a reaches 10 skewed ratings by day 6 and its email carries the taste line once (planned: CAS-1604) _(planned, manual)_
+  - account a reaches 10 skewed Watched ratings by day 6, so its day-6 or day-7 17:00 email carries the taste line once
+  - day 8's email does not carry it
 - [ ] **NOTIF-002** Daily and unseen alert digests render one card per film with tracked links _(unit, auto)_
   - every link carries src=email and cmp=<kind>; Watch On / Watched buttons are signed answer links
 - [ ] **NOTIF-003** Badge clears and push re-registers on sign-in _(unit, auto)_
@@ -226,6 +263,10 @@
   - buying in the iOS build marks the account a member and the web build then admits the same account
 - [ ] **NOTIF-004** A real alert arrives on the phone as push and as email _(lee-phone, manual)_
   - the QA account receives the push and the email for one test alert, and the email buttons open the confirmation page
+- [ ] **TUT-007** iPhone: Watch tutorial step 5 points at the Me chip and the bubble holds still _(device, manual)_
+  - on the iPhone, play the Watch tutorial with a member who has at least five lists; on step 5 the arrow is on the Me chip and the bubble does not move after it appears (scroll timing is not visible on a desktop browser)
+- [ ] **TUT-008** iPhone: Invite tutorial step 1 bubble appears once and holds still _(device, manual)_
+  - on the iPhone, play the Invite tutorial; step 1's bubble appears once, after the card has settled, and does not glide or jump afterwards
 
 ## Part D
 

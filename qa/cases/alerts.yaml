@@ -75,3 +75,16 @@
     - qa/journeys/repeat-day.json
     - qa/journeys/watched-before-rent.json
     - qa/journeys/window-not-followed.json
+- id: ALERTS-006
+  part: A
+  title: "From your email (CAS-1584): films are ordinary cards, no Watch On / Watched panels opened out"
+  how: unit
+  area:
+    - alerts-inapp
+  expect:
+    - "films in a From your email view show as ordinary cards with no Watch On / Watched panel opened under each"
+    - "each card's own buttons still answer the email"
+    - "the To decide row still clears when every film is answered"
+  refs:
+    - tests/js/cas1536-batch-view.test.mjs
+    - tests/js/cas1537-alert-answer.test.mjs

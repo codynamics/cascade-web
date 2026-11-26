@@ -44,3 +44,17 @@
     - watch
   expect:
     - press and hold a genre name or level track in the list sheet on iPhone; no magnifier or selection appears, and dragging a level still works
+- id: LISTS-005
+  part: A
+  title: "Lists own their genre levels (CAS-1593): no Override, Taste link or thumbs; row name never toggles; 2/3 boundary is Top 10%"
+  how: browser
+  area:
+    - watch
+  expect:
+    - "the My taste/Override segment, the Taste link and the read-only thumbs are gone from the list sheet"
+    - "tapping a row's name does not change its checkbox"
+    - "tapping the track at the 2/3 boundary gives Top 10%"
+    - "Set all genres at 50% sets every ticked row and no unticked one"
+  refs:
+    - tests/e2e/list-levels.spec.mjs
+    - tests/js/list-levels.test.mjs
