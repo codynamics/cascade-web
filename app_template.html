@@ -26762,7 +26762,9 @@ function showTutorialCard(){
   $("tutNextBtn").textContent = (tutIdx===tutSteps.length-1) ? "Done" : "Next";
   $("tutBackBtn").style.display = tutIdx===0 ? "none" : "";
   $("tutSkipBtn").style.visibility = (tutIdx===tutSteps.length-1) ? "hidden" : "";
-  const card=$("tutCard"); card.style.animation="none"; void card.offsetWidth; card.style.animation="";
+  // CAS-1599: the animation stays OFF here (place() restarts it): a running CSS animation overrides the inline
+  // opacity:0 below, so restoring it now showed the bubble at once, then it jumped when the page settled.
+  const card=$("tutCard"); card.style.animation="none"; void card.offsetWidth;
   // CAS-1581/CAS-1582: the tour card stays invisible until the page under it has stopped moving (a film card
   // expanding, a sheet opening, a row or the page scrolling), then it is placed from the settled boxes and
   // shown in place with no glide: a card drawn from a stale box pointed at nothing (Watch step 5's arrow).
