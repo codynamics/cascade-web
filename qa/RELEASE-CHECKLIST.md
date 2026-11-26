@@ -4,7 +4,7 @@
      then run `python qa/build_checklist.py`. The push gate (tests/lint/qa-drift.mjs) fails if this
      file is stale. -->
 
-95 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
+96 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
 
 ## Part A
 
@@ -224,6 +224,12 @@
 
 ## Part D
 
+- [ ] **REAL-001** A new person signs up on the deployed staging site and uses the core features _(browser, auto)_
+  - the deployed site serves this commit and reports CASCADE_CONFIG.ENV staging
+  - sign-up with promo code CASCADEFRIENDS sends the real six-digit code email from the staging sender with no confirmation link
+  - first-run setup reaches Watch with films showing
+  - a film opens, a watched answer is saved, an alert setting is changed, and all three survive signing out and back in
+  - no console error or failed request to the site's own hosts, and the test account is deleted before and after
 - [ ] **REL-003** Previous release still works on the new schema, and rollback loses no data _(claude, manual)_
   - run release-rehearsal.yml (when it exists) and see every step PASS
   - until then run the integrity suite against main's build after the new migrations

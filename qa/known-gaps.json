@@ -1,18 +1,15 @@
 {
  "signup": [
   "production",
-  "real",
   "review"
  ],
  "onboarding": [
   "production",
-  "real",
   "review"
  ],
  "login": [
   "phone",
   "production",
-  "real",
   "review"
  ],
  "watch-tut": [
@@ -26,9 +23,6 @@
   "real",
   "review"
  ],
- "tracking": [
-  "real"
- ],
  "alerts-email": [
   "real",
   "review"
@@ -39,7 +33,6 @@
  "alerts-inapp": [
   "phone",
   "production",
-  "real",
   "review"
  ],
  "tut-lists": [

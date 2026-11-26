@@ -41,6 +41,9 @@ PROFILES = {
                  "how": {"journey": ["simulate"], "firstdays": ["simulate"]}},
     "release-rehearsal": {"point": 5, "env": "local", "kind": "bench", "source": "release-rehearsal.yml",
                           "cases": {"REL-003": ["rehearse"]}},
+    # CAS-1574: the real-user check on the deployed staging site (point 3, kind real, env staging).
+    "deployed-smoke": {"point": 3, "env": "staging", "kind": "real", "source": "deployed-smoke.yml",
+                       "cases": {"REAL-001": ["deployed-smoke"]}},
     "prod-check": {"point": 9, "env": "production", "kind": "production", "source": "prod-check.yml",
                    "cases": {"REL-005": ["prod-check"]}},
 }

@@ -1,0 +1,114 @@
+# CAS-1574: the real-user check on the DEPLOYED site. Signs up as a new person (real email, real database),
+# does first-run setup, uses the core features, signs out and back in, then deletes its account.
+# STAGING only here; the production run is a separate follow-up ticket - 'production' is refused below.
+# Called by qa.yml after the gate is green; can also be run by hand (workflow_dispatch).
+# Secrets come from the GitHub `staging` environment: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (clean-up),
+# MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET (read the real email; see tests/e2e-deployed/README.md).
+# Missing MS_* secrets make the email checks Blocked, not Fail.
+name: deployed-smoke
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        default: staging
+      sha:
+        type: string
+        default: ""
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [staging]
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  # one account, one address: two runs at once would delete each other's account
+  group: deployed-smoke-${{ inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+jobs:
+  deployed-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - name: Staging only
+        run: |
+          if [ "${{ inputs.environment || 'staging' }}" != "staging" ]; then
+            echo "::error::deployed-smoke only runs against staging (the production run is a separate ticket)"; exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - run: npx playwright install --with-deps webkit
+
+      # The build stamp in a commit records its PARENT, so the site's stamp is whatever this commit's own
+      # version.json says, not the commit's own sha.
+      - name: Work out the commit the deployed site should serve
+        run: |
+          EXP=$(python -c "import json;print(json.load(open('version.json')).get('commit') or '')")
+          echo "EXPECTED_COMMIT=${EXP:-${{ inputs.sha || github.sha }}}" >> "$GITHUB_ENV"
+
+      - name: Real-user check on the deployed staging site
+        id: smoke
+        env:
+          DEPLOYED_ENV: staging
+          DEPLOYED_URL: https://cascade-web-3x1.pages.dev/
+          QA_EMAIL: lee+CascadeQA@codynamics.com.au
+          PROMO_CODE: CASCADEFRIENDS
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MS_TENANT_ID: ${{ secrets.MS_TENANT_ID }}
+          MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID }}
+          MS_CLIENT_SECRET: ${{ secrets.MS_CLIENT_SECRET }}
+        run: |
+          set -o pipefail
+          npx playwright test -c tests/e2e-deployed/playwright.config.mjs 2>&1 | tee smoke.log
+
+      - name: Missing secrets summary
+        if: always()
+        run: |
+          if [ -f smoke-result.json ] && grep -q '"emailBlocked": true' smoke-result.json; then
+            echo "::warning::Email checks BLOCKED - missing GitHub staging secrets: $(python -c "import json;print(', '.join(json.load(open('smoke-result.json'))['missingSecrets']))")"
+          fi
+
+      - name: Capture failure detail
+        if: failure()
+        run: |
+          mkdir -p qa-failures
+          (grep -m1 -E 'Error:|DEPLOY:|ENV:|DATABASE:|SIGNUP:|EMAIL:|PERSIST:|ERRORS' smoke.log || tail -5 smoke.log) > qa-failures/deployed-smoke.txt
+
+      - name: Upload failure detail
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-failure-deployed-smoke
+          path: qa-failures/deployed-smoke.txt
+          retention-days: 7
+
+      # Record the result per QA area (point 3, kind real, env staging). Never turns the run red. A pass with the
+      # email checks blocked is reported Blocked, since the real-email half was not proven.
+      - name: Record results in cascade-qa
+        if: always()
+        continue-on-error: true
+        env:
+          QA_DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+        run: |
+          python -m pip install --quiet "psycopg[binary]" || true
+          STATUS="${{ job.status }}"; EXTRA=""
+          if [ "$STATUS" = "success" ] && [ -f smoke-result.json ] && grep -q '"emailBlocked": true' smoke-result.json; then
+            STATUS="skipped"; EXTRA="--blocked"
+          fi
+          python ci/qa_report.py --workflow deployed-smoke --source-job deployed-smoke --job deployed-smoke=$STATUS $EXTRA
