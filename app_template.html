@@ -4224,7 +4224,8 @@
   .tutcard{position:fixed;z-index:2;width:330px;box-sizing:border-box;background:#f4f2ff;color:#17152b;
     border:none;border-radius:16px;padding:16px 16px 14px;box-shadow:0 14px 40px rgba(0,0,0,.6),0 0 0 1px rgba(124,92,255,.5);
     transition:top .35s ease,left .35s ease;animation:tutin .3s ease}
-  @keyframes tutin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  /* CAS-1590: fade only. The old 6px slide-in (6.7px under --ui-scale) read as the bubble jumping after it landed. */
+  @keyframes tutin{from{opacity:0}to{opacity:1}}
   .tutarrow{position:absolute;width:16px;height:16px;background:#f4f2ff;transform:rotate(45deg);display:none}
   .tutarrow.up{display:block;top:-7px}
   .tutarrow.down{display:block;bottom:-7px}
