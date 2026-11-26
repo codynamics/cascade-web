@@ -82,6 +82,24 @@ jobs:
           git fetch origin "$sha"
           git merge --no-ff -X theirs FETCH_HEAD -m "promote: staging@$sha"
 
+      # CAS-1601: the production build stamp. Pages serves main as committed, so without this the site
+      # shows the stamp committed on staging. Stamp version.json + build-info.js (only) with the
+      # promoted merge commit and a build number counted from it, then commit just those two files on
+      # top. A plain commit on top keeps main a descendant of the QA'd staging commit; the next promote's
+      # merge takes staging's copy of these files (-X theirs), so they never conflict.
+      - name: Stamp the production build (promoted commit + build number)
+        if: ${{ inputs.rollback_to == '' }}
+        run: |
+          set -euo pipefail
+          promoted=$(git rev-parse HEAD)
+          CF_PAGES_COMMIT_SHA="$promoted" python poc_pipeline.py --stamp-deploy
+          git add version.json build-info.js
+          if git diff --cached --quiet; then
+            echo "production stamp already current"
+          else
+            git commit -m "stamp: production build for $promoted"
+          fi
+
       - name: Read the shipped release version
         id: ver
         run: |
