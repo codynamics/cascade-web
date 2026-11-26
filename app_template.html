@@ -26784,6 +26784,24 @@ function tutMotionSig(){
   if(tourCardEl){ const r=tourCardEl.getBoundingClientRect(); out.push(r.top, r.height); }
   return out.map(n=>Math.round(n)).join(",");
 }
+// CAS-1597: after the bubble is shown, keep checking for ~3s that nothing under it has shifted (a late image,
+// a sheet, an async render). If the layout moves, re-place the bubble at once (no glide) from the new boxes,
+// so it rests on the final layout, not the one it was first drawn from. Shared by every step of every tour.
+function tutWatchAfterPlace(idx, step){
+  const t0=performance.now(); let last=tutMotionSig(), same=0;
+  const tick=()=>{
+    if(tutIdx!==idx || !$("tutScrim").classList.contains("open")) return;
+    const sig=tutMotionSig();
+    if(sig!==last){
+      last=sig; same=0;
+      const card=$("tutCard"), hole=$("tutHole");
+      if(!(step.narrow && step.narrow.length)){ card.style.transition="none"; hole.style.transition="none"; }
+      tutorialReposition();
+    } else same++;
+    if(performance.now()-t0<3000) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
 function tutSettle(idx, step){
   const t0=performance.now(); let last="", same=0;
   const place=()=>{
@@ -26796,8 +26814,10 @@ function tutSettle(idx, step){
     card.style.opacity=""; card.style.pointerEvents=""; card.style.transition="none";
     card.style.animation="none"; void card.offsetWidth; card.style.animation="";
     tutRunNarrow(step);   // the fade-outs start from the placed card
-    // Later repositions (a target fading out) may glide again.
-    setTimeout(()=>{ if(tutIdx===idx){ card.style.transition=""; hole.style.transition=""; } }, 400);
+    // Later repositions may glide only on a step whose targets fade out one by one (CAS-1597: any other late
+    // reposition must jump, never glide, so the bubble is never seen moving after it landed).
+    if(step.narrow && step.narrow.length) setTimeout(()=>{ if(tutIdx===idx){ card.style.transition=""; hole.style.transition=""; } }, 400);
+    tutWatchAfterPlace(idx, step);
   };
   const tick=()=>{
     if(tutIdx!==idx || !$("tutScrim").classList.contains("open")) return;
