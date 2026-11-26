@@ -2443,26 +2443,25 @@ async function openStyleGrid(page){
   await expect(page.locator(".tmap")).toBeVisible();
 }
 
-test("CAS-1269 AC1: the agent recommends a minimum-score change on a genre, and Apply sets it", async ({ page }) => {
-  // CAS-1480: the in-genre AGENT SUGGESTION moved to the Taste screen's recommendations card (tasteRecs
-  // from CAS-1479). tasteRecs' own maths is covered by the engine tests; this drives the card's
-  // review -> Apply path with one stubbed Drama recommendation carrying a minimum-score change.
+test("CAS-1269 AC1: the agent recommends a sub-genre score adjustment, and Apply sets it", async ({ page }) => {
+  // CAS-1594 retired the minimum-score (bar) recommendation: recommendations are sub-genre only. This keeps
+  // the card's review -> Apply path with one stubbed Drama recommendation carrying a sub-genre adjustment.
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await makeAgentWideOpen(page);
   await page.evaluate(() => {
-    cascades[0].styles.Drama.bar = 70;
-    window.tasteRecs = () => [{ style: "Drama", keys: [], bar: { from: 70, to: 80 } }];
+    window.tasteRecs = () => [{ style: "Drama", keys: [{ key: "Drama|Comedy", other: "Comedy", from: 0, to: -10 }] }];
   });
   await openAgentsScreenFromNav(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
 
   await expect(page.locator(".tkrec")).toHaveCount(1);
   await page.locator(".tkrechd").click();
-  await expect(page.locator(".tkrec .tkstyle")).toContainText("Minimum score");
+  await expect(page.locator(".tkrec .tkstyle")).toContainText("With Comedy");
+  await expect(page.locator(".tkrec .tkstyle")).not.toContainText("Minimum score");
   await page.locator(".tkstyle .ap").click();
-  expect(await page.evaluate(() => oneAgentCriteria().styles.Drama.bar)).toBe(80);
+  expect(await page.evaluate(() => oneAgentCriteria().applied["Drama|Comedy"])).toBe(-10);
 });
 
 // CAS-1400 AC2/AC3/AC4: the v2 mood sheet's Genre | Keyword tabs. Genre rows are one line each under a
@@ -2495,6 +2494,7 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
     return {
       rowCount: rows.length,
       rowHeights: rows.map(r => r.getBoundingClientRect().height),
+      nameHeights: rows.map(r => r.querySelector(".oamstylename").getBoundingClientRect().height),
       allBox: document.querySelectorAll("#watchSheetBody .oamlvlall").length,
       seg: document.querySelectorAll("#watchSheetBody .oamlvlseg").length,
       rangeInRow: document.querySelectorAll("#watchSheetBody .oamlvlrow input[type=range]").length,
@@ -2502,7 +2502,10 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
     };
   });
   expect(m.rowCount).toBeGreaterThan(0);
-  m.rowHeights.forEach(h => expect(h).toBeLessThan(80));
+  // CAS-1593 put a five-stop track under each genre name (row ~82px, was a single line under 80): the name
+  // itself must still sit on one line and the row stay compact.
+  m.nameHeights.forEach(h => expect(h).toBeLessThan(24));
+  m.rowHeights.forEach(h => expect(h).toBeLessThan(90));
   expect(m.allBox).toBe(1);
   expect(m.seg).toBe(0);
   expect(m.rangeInRow).toBe(0);
