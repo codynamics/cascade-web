@@ -6,13 +6,13 @@
 // half (app_template.html's appUrlOpen listener) has no browser-testable counterpart and is out of
 // scope for this suite, same as every other native-only path here.
 //
-// Four named destinations only, exactly as the ticket's own "do not re-raise" list requires:
-//   dl=cinema    -> Watch, Cinema tab
-//   dl=streaming -> Watch, Streaming tab
-//   dl=moving    -> Moving
-//   dl=family    -> the Family Movies agent's own setup (Edit Agent), if this account has one
+// Destinations still covered: dl=cinema (Watch, Cinema tab), dl=streaming (Watch, Streaming tab),
+// dl=moving (Moving). CAS-1548: dl=family is gone from here — it opened the Family Movies agent's setup, an
+// agent a current account (one v2 agent since CAS-1344) never has, so applyDeepLink()'s family branch is
+// unreachable for them. Every test now reaches the app through the CURRENT first run (#oafScreen, via the
+// shared helpers), not the retired v2_* wizard.
 import { test, expect } from "@playwright/test";
-import { freshApp, ctaLocator, finishFlow, toListing } from "./helpers.mjs";
+import { freshApp, walkToServices, finishFlow, toListing } from "./helpers.mjs";
 
 /** Base64url-encode a plain object the same way the (now receive-only) share-link format expects —
  * see app_template.html's unb64url/sanitiseShared. An empty-ish object is a valid share: every field
@@ -22,59 +22,22 @@ function b64urlShare(obj){
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-/** Walks the splash through the v2 sequence to v2_services — same steps toShortlist (helpers.mjs)
- * walks, but with `kids` exposed so a "family" test can answer yes and get the Family agent built.
- * Assumes the page has already navigated (with whatever ?dl= is under test already in the URL). */
-async function walkOnboarding(page, { kids = "no" } = {}){
+/** The current first run: splash -> #oafScreen (welcome, where, services, ...) -> membership -> Watch.
+ * Assumes the page has already navigated (with whatever ?dl= is under test already in the URL). Stops at the
+ * services step; finishFlow/toListing take it from there. */
+async function walkOnboarding(page){
   await page.locator("#splashCta").click();
-  // CAS-1018: scoped to #onbStepInner, not a bare ".obhd" — gotoStep's dual-pane slide leaves the
-  // outgoing step's .obhd in the DOM alongside the incoming one for the length of the transition, so a
-  // bare ".obhd" is a strict-mode violation (resolves to 2 elements) for as long as that overlap lasts.
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Let's get you set up.");   // v2_about
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#onbStepInner .obhd")).toContainText("Cinema Releases");                       // v2_intro (CAS-1312)
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#obCinemaOpts")).toBeVisible();                                 // v2_cinema
-  await page.locator('#obCinemaOpts .obopt[data-val="yes"]').click();
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#obCinemaAgesChips")).toBeVisible();                             // v2_cinema_ages (CAS-1270)
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#obRentOpts")).toBeVisible();                                   // v2_rent
-  await page.locator('#obRentOpts .obopt[data-val="yes"]').click();
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  for(const marker of ["v2_massive", "v2_handoff", "v2_styles", "v2_ages", "v2_favs"]){
-    await ctaLocator(page).click();
-    await page.waitForTimeout(120);
-  }
-  await expect(page.locator("#obPartnerOpts")).toBeVisible();                                // v2_partner
-  await page.locator('#obPartnerOpts .obopt[data-val="no"]').click();
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  await expect(page.locator("#obKidsOpts")).toBeVisible();                                   // v2_kids
-  await page.locator(`#obKidsOpts .obopt[data-val="${kids}"]`).click();
-  await ctaLocator(page).click();
-  await page.waitForTimeout(120);
-  if(kids === "yes"){
-    await expect(page.locator(".agname")).toContainText("Family Movies");                    // v2_family reveal
-    await ctaLocator(page).click();
-    await page.waitForTimeout(120);
-  }
-  await expect(page.locator("#obSvcStores")).toBeVisible();                                  // v2_services
+  await walkToServices(page, "cinema");
 }
 
-/** A device that has already onboarded (kids=no unless overridden) — the fixture the four AC1/AC2
- * per-destination cases reload against with their own ?dl=, so each is a genuine cold load (a fresh
- * navigation, re-running the whole boot script) rather than an in-page state change. */
-async function onboardedDevice(page, opts){
+/** A device that has already onboarded — the fixture the per-destination cases reload against with their own
+ * ?dl=, so each is a genuine cold load (a fresh navigation, re-running the whole boot script) rather than an
+ * in-page state change. */
+async function onboardedDevice(page){
   await freshApp(page);
   await page.goto("/index.html");
   await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
-  await walkOnboarding(page, opts);
+  await walkOnboarding(page);
   await finishFlow(page);
   await toListing(page);
 }
@@ -98,28 +61,6 @@ test("CAS-962 AC1/AC2: ?dl=moving opens the Moving screen for a returning user",
   await expect(page.locator("#movingScreen")).toHaveClass(/open/);
 });
 
-test("CAS-962 AC1/AC2: ?dl=family opens the Family agent's own setup for a returning user", async ({ page }) => {
-  await onboardedDevice(page, { kids: "yes" });
-  await page.goto("/index.html?dl=family");
-  await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
-  await expect(page.locator("#onbStep")).toHaveClass(/open/);
-  await expect(page.locator(".osh.eahn")).toContainText("Family Movies");
-});
-
-// CAS-1159: confirmed app defect, not a stale assertion. applyDeepLink() (app_template.html) fires
-// `logEvent("deeplink_applied", {dest})` unconditionally after its if/else-if chain, including the
-// `dest==="family"` branch when `cascades.find(c=>c.template==="onb_family")` finds no agent and the
-// branch body is a no-op — contradicting the function's own header comment ("a destination whose target
-// doesn't exist for this account ... is silently ignored"). Reproduced locally: the event is always logged.
-test.fixme("CAS-962 AC1: ?dl=family is silently inert for an account with no Family agent", async ({ page }) => {
-  await onboardedDevice(page);   // kids=no — no Family agent was ever built
-  await page.goto("/index.html?dl=family");
-  await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
-  await expect(page.locator("#onbStep")).not.toHaveClass(/open/);
-  const log = await page.evaluate(() => JSON.parse(localStorage.getItem("cascade_log") || "[]"));
-  expect(log.some(e => e.type === "deeplink_applied")).toBe(false);
-});
-
 test("CAS-962 AC3: ?dl=cinema on a device that has never onboarded still runs first run to completion", async ({ page }) => {
   await freshApp(page);
   await page.goto("/index.html?dl=cinema");
@@ -130,10 +71,8 @@ test("CAS-962 AC3: ?dl=cinema on a device that has never onboarded still runs fi
   const reveal = await finishFlow(page);
   expect(reveal).toBeGreaterThan(0);
   await toListing(page);
-  const templates = await page.evaluate(() => cascades.map(c => c.template));
-  expect(templates).toContain("onb_massive");
-  expect(templates).toContain("onb_favs");
-  expect(templates).not.toContain("onb_family");   // kids=no here — no agent skipped or corrupted, just none built
+  // The current first run builds exactly one v2 agent (CAS-1344).
+  expect(await page.evaluate(() => cascades.map(c => c.v))).toEqual([2]);
   expect(await page.evaluate(() => watchTab)).toBe("in_cinema");
 });
 

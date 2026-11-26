@@ -91,6 +91,16 @@ export async function liveCascadeCriteria(id){
   return data ? data.criteria : null;
 }
 
+/** CAS-1578: the user_prefs row currently on the server for this account, or null if none exists. */
+export async function liveUserPrefs(userId){
+  const { data, error } = await admin.from("user_prefs")
+    .select("sub_services,store_services,taste,watch_windows,membership_completed_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if(error) throw new Error(`liveUserPrefs failed: ${error.message}`);
+  return data;
+}
+
 /** The notify_prefs row currently on the server for this account, or null if none exists yet. */
 export async function liveNotifyPrefs(userId){
   const { data, error } = await admin.from("notify_prefs")

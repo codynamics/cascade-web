@@ -11,7 +11,7 @@ import { test, expect } from "@playwright/test";
 import {
   freshApp, gotoFresh, toShortlist, walkToServices, shortlistCards, finishFlow, toListing, settleListing, ctaLocator, sectionCounts,
   openWhereWhenScreen, closeWhereWhenScreen, openMyServicesScreen, closeMyServicesScreen, openNotifyScreen,
-  dumpSignedInDiagnostics, openAgentsScreenFromNav,
+  dumpSignedInDiagnostics, openAgentsScreenFromNav, withActiveMember,
 } from "./helpers.mjs";
 
 // CAS-1136 decision 2: on a failed or timed-out test, show the in-flight requests and buffered console
@@ -922,6 +922,13 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
       apply: () => chain(),
     });
   }
+  // CAS-1569: the approved list is retired (CAS-1565); web access is an active memberships row.
+  function memberChain(){
+    return new Proxy(() => {}, {
+      get: (_t, prop) => prop === "then" ? (resolve) => resolve({ data: { status: "active", expires_at: "2099-12-31T00:00:00Z", is_trial: false, source: "promo" }, error: null }) : () => memberChain(),
+      apply: () => memberChain(),
+    });
+  }
   // CAS-1109/CAS-1142: this test's own onboarding walk creates an agent in guest mode, then signs in —
   // syncCascadesToAccount() uploads that agent via an acctOp "insert" (c.from("cascades").upsert(fields,
   // {onConflict:"id", ignoreDuplicates:true})), and toListing()'s settleListing() wait needs that same agent
@@ -966,7 +973,7 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
           return { error: null };
         },
       },
-      from: (table) => table === "cascades" ? cascadesTable() : chain(),
+      from: (table) => table === "memberships" ? memberChain() : table === "cascades" ? cascadesTable() : chain(),
       // CAS-1099: membStart() now calls rpc("email_has_account") before requesting a code, and
       // rpc("complete_membership") once the code verifies — neither existed when this fixture was written,
       // so an un-stubbed client.rpc(...) threw synchronously (client.rpc is not a function) the instant the
@@ -980,9 +987,6 @@ const CAS913_FAKE_SUPABASE_GLOBAL = `
       // sees a group.
       rpc: async (fn, params) => {
         if(fn === "email_has_account") return { data: false, error: null };
-        // CAS-1540: CAS-1531 made membEnsureMember() ask is_web_access_approved on the web; an unstubbed
-        // answer ("created") is not true, so the invite-only screen kept #membScreen open. Approved here.
-        if(fn === "is_web_access_approved") return { data: true, error: null };
         if(fn === "complete_membership"){
           // CAS-1176 AC7: recorded so a test can inspect what membCompleteNewMembership actually sent,
           // without this fixture needing its own notify_prefs table (every other table here falls through
@@ -1009,7 +1013,7 @@ async function cas913GotoConfigured(page){
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS913_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS913_FAKE_SUPABASE_GLOBAL),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
@@ -1123,6 +1127,13 @@ const CAS1169_FAKE_SUPABASE_GLOBAL = `
       apply: () => chain(),
     });
   }
+  // CAS-1569: the approved list is retired (CAS-1565); web access is an active memberships row.
+  function memberChain(){
+    return new Proxy(() => {}, {
+      get: (_t, prop) => prop === "then" ? (resolve) => resolve({ data: { status: "active", expires_at: "2099-12-31T00:00:00Z", is_trial: false, source: "promo" }, error: null }) : () => memberChain(),
+      apply: () => memberChain(),
+    });
+  }
   // Same fixture-vs-acctLoad gap CAS913_FAKE_SUPABASE_GLOBAL's own comment explains above.
   let cascadeRows = [];
   function cascadesTable(){
@@ -1157,12 +1168,9 @@ const CAS1169_FAKE_SUPABASE_GLOBAL = `
         },
         signOut: async () => { writeSession(null); return { error: null }; },
       },
-      from: (table) => table === "cascades" ? cascadesTable() : chain(),
+      from: (table) => table === "memberships" ? memberChain() : table === "cascades" ? cascadesTable() : chain(),
       rpc: async (fn, params) => {
         if(fn === "email_has_account") return { data: false, error: null };
-        // CAS-1540: CAS-1531 made membEnsureMember() ask is_web_access_approved on the web; an unstubbed
-        // answer ("created") is not true, so the invite-only screen kept #membScreen open. Approved here.
-        if(fn === "is_web_access_approved") return { data: true, error: null };
         if(fn === "complete_membership"){
           const agents = (params && params.p && params.p.agents) || [];
           agents.forEach(a => {
@@ -1183,7 +1191,7 @@ async function cas1169GotoConfigured(page){
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS1169_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS1169_FAKE_SUPABASE_GLOBAL),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
@@ -1262,6 +1270,20 @@ test("CAS-1169 AC5: an invalid email's error clears on correction without pressi
   await expect(page.locator("#membResend")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("#membResend")).toBeDisabled();
   await expect(page.locator("#membResend")).toHaveText(/^Resend code in 0:\d\d$/);
+});
+
+test("CAS-1571 AC3: opening the promo box and leaving it empty never blocks Continue", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await cas1169GotoConfigured(page);
+  await cas913WalkToShortlist(page);
+  await finishFlow(page);
+
+  await page.locator("#membPromoLink").click();
+  await expect(page.locator("#membPromoCode")).toBeVisible();
+  await page.locator("#membEmail").fill("cas1571-ac3@example.com");
+  await page.locator(".membcta").click();
+  await expect(page.locator("#membCode")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator("#membScreen")).not.toContainText("Failed to fetch");
 });
 
 // CAS-1076: v1.0.0 ships free (Lee, 24-26 Sep 2026) — paid membership returns after launch via In-App
@@ -1384,6 +1406,34 @@ test("CAS-1176 AC3-AC6: Settings' How you're told has no onboarding chrome, emai
   await expect(page.locator("#settingsScreen")).not.toHaveClass(/open/);
 });
 
+// CAS-1585: Settings ends with one muted line "Cascade <version> (build <n>)", plus " · Staging" off production.
+test("CAS-1585 settings foot shows version and build from BUILD_INFO", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => typeof openSettings === "function");
+  const want = await page.evaluate(() => {
+    openSettings();
+    return "Cascade " + BUILD_INFO.version + " (build " + BUILD_INFO.build + ")"
+      + (RUNTIME_ENV === "production" ? "" : " · Staging");
+  });
+  const line = page.locator("#settingsScreen #settingsBuild");
+  await expect(line).toHaveText(want);
+  await expect(line).not.toContainText("Production");
+  // CAS-1589: on failure the message names every descendant whose right edge passes the screen's right edge.
+  const fit = await page.evaluate(() => {
+    const s = document.getElementById("settingsScreen");
+    const right = s.getBoundingClientRect().right;
+    const wide = [...s.querySelectorAll("*")]
+      .filter(el => el.getBoundingClientRect().right > right + 0.5)
+      .map(el => el.tagName.toLowerCase() + (el.id ? "#" + el.id : "")
+        + (typeof el.className === "string" && el.className ? "." + el.className.trim().split(/\s+/).join(".") : "")
+        + " w=" + Math.round(el.getBoundingClientRect().width));
+    // 1px allowance: scrollWidth/clientWidth are rounded integers of a fractional layout width, so a screen
+    // that fits can read 349 vs 348 (run 1415). Real overflow (2px+, or a named element in `wide`) still fails.
+    return { ok: s.scrollWidth <= s.clientWidth + 1, sw: s.scrollWidth, cw: s.clientWidth, wide };
+  });
+  expect(fit.ok, "settings overflow sw=" + fit.sw + " cw=" + fit.cw + " wide: " + fit.wide.join(" | ")).toBe(true);
+});
+
 // CAS-1035 AC3: a Watch On tick made just before the tab closes must survive a reload even though it never
 // reached the account — the observed bug (Lee, iPhone: two Stream ticks reverted after a swipe-close and
 // reopen). Same session-persists-across-a-real-reload technique as CAS913_FAKE_SUPABASE_GLOBAL above (a
@@ -1406,6 +1456,13 @@ const CAS1035_FAKE_SUPABASE_GLOBAL = `
     return new Proxy(() => {}, {
       get: (_t, prop) => prop === "then" ? (resolve) => resolve({ data: [], error: null }) : () => chain(),
       apply: () => chain(),
+    });
+  }
+  // CAS-1569: the approved list is retired (CAS-1565); web access is an active memberships row.
+  function memberChain(){
+    return new Proxy(() => {}, {
+      get: (_t, prop) => prop === "then" ? (resolve) => resolve({ data: { status: "active", expires_at: "2099-12-31T00:00:00Z", is_trial: false, source: "promo" }, error: null }) : () => memberChain(),
+      apply: () => memberChain(),
     });
   }
   function filmWatchTable(){
@@ -1452,16 +1509,13 @@ const CAS1035_FAKE_SUPABASE_GLOBAL = `
         },
         signOut: async () => { writeSession(null); return { error: null }; },
       },
-      from: (table) => table === "film_watch" ? filmWatchTable() : table === "cascades" ? cascadesTable() : chain(),
+      from: (table) => table === "memberships" ? memberChain() : table === "film_watch" ? filmWatchTable() : table === "cascades" ? cascadesTable() : chain(),
       // CAS-1099: see CAS913_FAKE_SUPABASE_GLOBAL's identical stub above — this test also walks finishFlow
       // + toListing() through membStart(), which now needs both RPCs to resolve rather than throw.
       // CAS-1109: see CAS913_FAKE_SUPABASE_GLOBAL's identical complete_membership handling above — this
       // test's onboarding-built agent only exists once this mock creates it from p.agents.
       rpc: async (fn, params) => {
         if(fn === "email_has_account") return { data: false, error: null };
-        // CAS-1540: CAS-1531 made membEnsureMember() ask is_web_access_approved on the web; an unstubbed
-        // answer ("created") is not true, so the invite-only screen kept #membScreen open. Approved here.
-        if(fn === "is_web_access_approved") return { data: true, error: null };
         if(fn === "complete_membership"){
           const agents = (params && params.p && params.p.agents) || [];
           agents.forEach(a => {
@@ -1482,7 +1536,7 @@ test("CAS-1035 AC3: a Watch On tick survives being closed and reopened before it
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS1035_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS1035_FAKE_SUPABASE_GLOBAL),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);
@@ -1970,16 +2024,19 @@ test(`CAS-1296 AC3: "+ Mood" opens on the agent's genres with every style includ
   await page.evaluate(() => { if (!oamSecOpen.has("primary")) window.oamToggleSec("primary"); });   // Lee, 2026-11-22: sheet sections open closed
   await expect(page.locator("#oamKwInput")).toBeVisible();
   await expect(page.locator("#oamKwInput")).toHaveValue("");
-  const draft = await page.evaluate(() => ({ stylesAll: oamDraft.stylesAll, mode: oamDraft.mode, watched: oamDraft.watched }));
-  expect(draft).toEqual({ stylesAll: true, mode: "genre", watched: true });
-  // Nothing the agent has ON sits under "Not in this mood" — only genres the agent has off (oaBar null) do,
-  // so the expander appears only when the agent has some off.
+  // CAS-1593: a new list starts with Latest and Best's ticks — the genres the agent has on — so every genre is
+  // ticked (stylesAll) only when the agent has none off.
+  const draft = await page.evaluate(() => ({ stylesAll: oamDraft.stylesAll, mode: oamDraft.mode, watched: oamDraft.watched,
+    agentAllOn: ALL_GENRES.every(g => oaBar(oneAgentCriteria(), g) != null) }));
+  expect(draft).toEqual({ stylesAll: draft.agentAllOn, mode: "genre", watched: true, agentAllOn: draft.agentAllOn });
+  // Nothing the agent has ON sits under "Not in this list" — only genres the agent has off (oaBar null) do,
+  // so the sub-heading appears only when the agent has some off.
   const notIn = await page.evaluate(() => {
     const c = oneAgentCriteria();
     return { names: oamDraft.rowOrder.notInMood, allOff: oamDraft.rowOrder.notInMood.every(g => oaBar(c, g) == null) };
   });
   expect(notIn.allOff, `genres under "Not in this mood": ${notIn.names}`).toBe(true);
-  await expect(page.locator("#watchSheetBody .oalist .oamexpand")).toHaveCount(notIn.names.length ? 1 : 0);
+  await expect(page.locator("#watchSheetBody .oalist .oamnotinhd")).toHaveCount(notIn.names.length ? 1 : 0);
   await page.evaluate(() => window.closeWatchSheet());
 });
 
@@ -2345,11 +2402,11 @@ test("CAS-1274: the agent screen opens as plain genre rows, and a row's details 
   expect(gone.el).toBeNull();
   expect(gone.fn).toBe("undefined");
 
-  // One tap on a row opens its details: the minimum score, the three alert windows, the adjustments.
-  // CAS-1480: a closed row carries a slider over its strip; tap the name side of the head.
+  // One tap on a row opens its details: the three alert windows and the adjustments (CAS-1594: levels live in lists).
   await page.locator('.oarow[data-style="Drama"] .oarowhead').click({ position: { x: 12, y: 12 } });
   await expect(page.locator(".oaopen")).toHaveCount(1);
-  await expect(page.locator(".oaopen .oasechdr", { hasText: "MOVIE MINIMUM SCORE" })).toBeVisible();
+  await expect(page.locator(".oaopen .oasechdr", { hasText: "SCORE ADJUSTMENTS" })).toBeVisible();
+  await expect(page.locator(".oaopen .oasechdr", { hasText: "MOVIE MINIMUM SCORE" })).toHaveCount(0);
   await expect(page.locator(".oaopen .oasechdr", { hasText: "FILM ALERTS" })).toBeVisible();
   await expect(page.locator(".oaopen .oachip")).toHaveCount(3);
 
@@ -2386,26 +2443,25 @@ async function openStyleGrid(page){
   await expect(page.locator(".tmap")).toBeVisible();
 }
 
-test("CAS-1269 AC1: the agent recommends a minimum-score change on a genre, and Apply sets it", async ({ page }) => {
-  // CAS-1480: the in-genre AGENT SUGGESTION moved to the Taste screen's recommendations card (tasteRecs
-  // from CAS-1479). tasteRecs' own maths is covered by the engine tests; this drives the card's
-  // review -> Apply path with one stubbed Drama recommendation carrying a minimum-score change.
+test("CAS-1269 AC1: the agent recommends a sub-genre score adjustment, and Apply sets it", async ({ page }) => {
+  // CAS-1594 retired the minimum-score (bar) recommendation: recommendations are sub-genre only. This keeps
+  // the card's review -> Apply path with one stubbed Drama recommendation carrying a sub-genre adjustment.
   await toShortlist(page, "cinema");
   await finishFlow(page);
   await toListing(page);
   await makeAgentWideOpen(page);
   await page.evaluate(() => {
-    cascades[0].styles.Drama.bar = 70;
-    window.tasteRecs = () => [{ style: "Drama", keys: [], bar: { from: 70, to: 80 } }];
+    window.tasteRecs = () => [{ style: "Drama", keys: [{ key: "Drama|Comedy", other: "Comedy", from: 0, to: -10 }] }];
   });
   await openAgentsScreenFromNav(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
 
   await expect(page.locator(".tkrec")).toHaveCount(1);
   await page.locator(".tkrechd").click();
-  await expect(page.locator(".tkrec .tkstyle")).toContainText("Minimum score");
+  await expect(page.locator(".tkrec .tkstyle")).toContainText("With Comedy");
+  await expect(page.locator(".tkrec .tkstyle")).not.toContainText("Minimum score");
   await page.locator(".tkstyle .ap").click();
-  expect(await page.evaluate(() => oneAgentCriteria().styles.Drama.bar)).toBe(80);
+  expect(await page.evaluate(() => oneAgentCriteria().applied["Drama|Comedy"])).toBe(-10);
 });
 
 // CAS-1400 AC2/AC3/AC4: the v2 mood sheet's Genre | Keyword tabs. Genre rows are one line each under a
@@ -2431,29 +2487,27 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
-  // CAS-1467: the levels always show; the Agent override switch sits under the genre rows.
+  // CAS-1593: the five-stop level rows and the Set all genres box show; the Override switch is gone.
   await page.evaluate(() => { if (!oamSecOpen.has("primary")) window.oamToggleSec("primary"); });   // Lee, 2026-11-22: sheet sections open closed
-  await page.evaluate(() => { if (!oamAdvancedOn(oamDraft)) window.toggleOamAdvanced(); window.setOamAgentOverride(true); });
   const m = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll("#watchSheetBody .oamstylerow")];
-    const hd = document.querySelector("#watchSheetBody .oamlvlhd");
-    const rowStrip = rows[0].querySelector(".oastrip").getBoundingClientRect();
-    const fStrip = document.querySelector("#watchSheetBody .mfrowgrid .oastrip").getBoundingClientRect();
+    const rows = [...document.querySelectorAll("#watchSheetBody .oamlvlrow")];
     return {
       rowCount: rows.length,
       rowHeights: rows.map(r => r.getBoundingClientRect().height),
-      hdHeight: hd.getBoundingClientRect().height,
-      stripLeftDiff: Math.abs(rowStrip.left - fStrip.left),
-      stripWidthDiff: Math.abs(rowStrip.width - fStrip.width),
-      rangeInRow: document.querySelectorAll("#watchSheetBody .oamstylerow input[type=range]").length,
+      nameHeights: rows.map(r => r.querySelector(".oamstylename").getBoundingClientRect().height),
+      allBox: document.querySelectorAll("#watchSheetBody .oamlvlall").length,
+      seg: document.querySelectorAll("#watchSheetBody .oamlvlseg").length,
+      rangeInRow: document.querySelectorAll("#watchSheetBody .oamlvlrow input[type=range]").length,
       headingsInTrack: document.querySelectorAll("#watchSheetBody .mpanel .wsheethd").length,
     };
   });
   expect(m.rowCount).toBeGreaterThan(0);
-  m.rowHeights.forEach(h => expect(h).toBeLessThan(52));
-  expect(m.hdHeight).toBeLessThan(36);   // CAS-1467: the "Genre levels" heading sits under the rows (the old .gcolhd header is gone)
-  expect(m.stripLeftDiff).toBeLessThanOrEqual(1);
-  expect(m.stripWidthDiff).toBeLessThanOrEqual(1);
+  // CAS-1593 put a five-stop track under each genre name (row ~82px, was a single line under 80): the name
+  // itself must still sit on one line and the row stay compact.
+  m.nameHeights.forEach(h => expect(h).toBeLessThan(24));
+  m.rowHeights.forEach(h => expect(h).toBeLessThan(90));
+  expect(m.allBox).toBe(1);
+  expect(m.seg).toBe(0);
   expect(m.rangeInRow).toBe(0);
   expect(m.headingsInTrack).toBe(0);
 

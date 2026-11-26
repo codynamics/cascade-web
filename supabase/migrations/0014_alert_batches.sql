@@ -40,3 +40,5 @@ create index if not exists alert_batches_user_idx on public.alert_batches (user_
 -- The client's writes to the ledger: stamping a row read, and answering it from the email view.
 revoke update on public.notifications from authenticated;
 grant update (read_at, answer, answered_at) on public.notifications to authenticated;
+
+insert into public.schema_migrations (version) values ('0014') on conflict do nothing;

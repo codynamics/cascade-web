@@ -4,7 +4,7 @@
 // to a "configured" (non-placeholder) Supabase config and supabase-js.js to a fake global whose client's
 // `.from("usage_events").insert()` captures rows instead of hitting a network.
 import { test, expect } from "@playwright/test";
-import { freshApp, gotoFresh } from "./helpers.mjs";
+import { freshApp, gotoFresh, withActiveMember } from "./helpers.mjs";
 
 const CAS835_FAKE_SUPABASE_GLOBAL = `
   window.__cas835Inserts = [];
@@ -40,7 +40,7 @@ test("CAS-835 AC4: a hidden tab flushes exactly one batch insert into usage_even
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS835_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS835_FAKE_SUPABASE_GLOBAL),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.client);

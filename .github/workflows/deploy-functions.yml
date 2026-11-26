@@ -41,5 +41,5 @@ jobs:
             exit 1
           fi
           for fn in membership-verify membership-notifications alert-answer; do
-            supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF"
+            supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" --yes
           done

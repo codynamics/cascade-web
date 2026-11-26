@@ -8,7 +8,8 @@ import { loadEngine } from "./engine.mjs";
 function fakeClient({ row = null, approved = false, rpcError = null } = {}) {
   return {
     from() { return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: row, error: null }) }) }) }; },
-    rpc: async (name) => { assert.equal(name, "is_web_access_approved"); return { data: approved, error: rpcError }; },
+    // CAS-1565: the approved list is retired — the app no longer asks is_web_access_approved at all.
+    rpc: async (name) => { assert.notEqual(name, "is_web_access_approved"); return { data: approved, error: rpcError }; },
   };
 }
 function setup({ client, native = false, plugin } = {}) {
@@ -19,20 +20,23 @@ function setup({ client, native = false, plugin } = {}) {
   return E;
 }
 
-test("CAS-1531 AC2: web — approved email is a member (source web_access) and goes through", async () => {
+test("CAS-1531 AC2 (CAS-1565): web — an approved-list email alone no longer makes a member; a membership row does", async () => {
   const E = setup({ client: fakeClient({ approved: true }) });
+  await E.membLoadEntitlement();
+  assert.equal(E.membEnt.state, "none");
+  const row = { status: "active", expires_at: "2099-01-01T00:00:00Z", is_trial: false, source: "promo" };
+  const E2 = setup({ client: fakeClient({ row }) });
   let went = false;
-  await E.membEnsureMember(async () => { went = true; });
+  await E2.membEnsureMember(async () => { went = true; });
   assert.equal(went, true);
-  assert.equal(E.membEnt.state, "active");
-  assert.equal(E.membEnt.row.source, "web_access");
+  assert.equal(E2.membEnt.row.source, "promo");
 });
 
 test("CAS-1531 AC2: web — any other email sees the invite-only screen; go() never runs", async () => {
   const E = setup({ client: fakeClient({ approved: false }) });
   const body = { innerHTML: "" };
   const scr = { scrollTop: 0, classList: { add() {}, remove() {}, contains: () => false } };
-  E.window.document.getElementById = (id) => (id === "membBody" ? body : scr);
+  E.window.document.getElementById = (id) => (id === "membBody" ? body : id === "membScreen" ? scr : null);
   let went = false;
   await E.membEnsureMember(async () => { went = true; });
   assert.equal(went, false);

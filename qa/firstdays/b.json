@@ -1,0 +1,63 @@
+{
+  "account": "b",
+  "tutorial_banner_key": "moods",
+  "days": {
+    "0": {
+      "run": false,
+      "catchup": "none",
+      "banner": false,
+      "note": "created now; no nightly run has happened yet, so nothing is run or expected"
+    },
+    "1": {
+      "catchup": "arrives",
+      "min_films": 1,
+      "banner": true,
+      "note": "the first nightly run: the day +1 catch-up batch (CAS-1535); banner eligible (account age 1 Sydney day)"
+    },
+    "2": {
+      "catchup": "none",
+      "banner": true,
+      "note": "none (no day +2 behaviour yet); the catch-up must not arrive again"
+    },
+    "3": {
+      "catchup": "none",
+      "banner": true,
+      "note": "none (no day +3 behaviour yet); the catch-up must not arrive again"
+    },
+    "4": {
+      "catchup": "none",
+      "banner": true,
+      "note": "none (no day +4 behaviour yet); the catch-up must not arrive again"
+    },
+    "5": {
+      "catchup": "none",
+      "banner": true,
+      "note": "none (no day +5 behaviour yet); the catch-up must not arrive again"
+    },
+    "6": {
+      "catchup": "none",
+      "banner": true,
+      "note": "none (no day +6 behaviour yet); the catch-up must not arrive again"
+    },
+    "7": {
+      "catchup": "none",
+      "banner": true,
+      "note": "none from the catch-up (it must not arrive again); the day-7 recap (CAS-1567) is checked on whichever run is 7 Sydney days after sign-up"
+    },
+    "8": {
+      "catchup": "none",
+      "banner": true,
+      "note": "none (no day +8 behaviour yet); the catch-up must not arrive again"
+    },
+    "9": {
+      "catchup": "none",
+      "banner": true,
+      "note": "none (no day +9 behaviour yet); the catch-up must not arrive again"
+    },
+    "10": {
+      "catchup": "none",
+      "banner": true,
+      "note": "none (no day +10 behaviour yet); the catch-up must not arrive again"
+    }
+  }
+}

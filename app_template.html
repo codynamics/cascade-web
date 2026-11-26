@@ -1868,7 +1868,8 @@
      ticket. Only once the column genuinely can't fit (enlarged text, CAS-960 AC6) does the cap engage:
      .splashscroll absorbs the overflow as an internal scroll, and .splashfoot (the CTA/Sign in doors)
      stays pinned below it, inside the viewport, rather than being pushed off the bottom of the page. */
-  .splashscroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden}
+  .splashscroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+  .splashscroll::-webkit-scrollbar{display:none}
   .splashfoot{flex:0 0 auto}
   /* ---- the poster wall (CAS-200) ----
      A perspective grid of real posters, blurred and dimmed, with a dark radial fade over it. Three
@@ -2110,6 +2111,10 @@
 
   .osh{font-family:var(--font-display);font-size:20px;font-weight:700;margin:0 0 6px;color:var(--ink)}
   .ossub{color:var(--dim);font-size:13px;line-height:1.5;margin:0 0 12px}   /* CAS-130 size / CAS-138 tighten */
+  /* CAS-1589: Settings must never scroll sideways (WebKit let a flex-column child grow past the screen). */
+  #settingsScreen .uwrap{min-width:0;max-width:min(482px,100%)}
+  #settingsScreen .ucard,#settingsScreen .urow,#settingsScreen .setbuild{max-width:100%;min-width:0}
+  .setbuild{color:var(--dim);font-size:12px;line-height:1.4;text-align:center;margin:24px 0 8px;overflow-wrap:anywhere;pointer-events:none;user-select:none}   /* CAS-1585 */
   /* CAS-264: the trail. A quiet ledger, not a control — no card chrome, no tap affordance, just the rows
      you have already answered with a hairline between them. The row for the step you are ON is lifted to
      full ink so the newest answer reads as the live one and the ones above it read as settled. */
@@ -2228,6 +2233,17 @@
   .memboffer .moprice{font-family:Poppins,system-ui,sans-serif;font-weight:700;font-size:24px;line-height:1.2;color:#fff}
   .memboffer .moterms{font-size:13px;font-weight:500;line-height:1.45;color:#cfd6e6;max-width:300px}
   .memfine b{color:var(--accenttext)}
+  .membpromo{margin:6px 0 2px;text-align:right}
+  .membpromo .linkbtn{font-size:13px;color:var(--muted,#8b95a5);text-decoration:underline;text-underline-offset:2px}
+  .membpromo .flabel{text-align:left}
+  .membpromobox{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .membpromobox .namein{flex:1;min-width:0;text-transform:uppercase;letter-spacing:.06em}
+  .membpromoapply{flex:none;background:none;border:1px solid var(--line,#3a4256);color:var(--text,#e8ecf3);border-radius:10px;padding:10px 12px;font-weight:700;font-size:14px}
+  .membpromook{margin:6px 0 0;font-size:13px;color:#22c55e;font-weight:700;text-align:left}
+  .membpromo .fielderr{text-align:left}
+  .membpromoerr{display:flex;gap:10px;align-items:baseline}
+  .membpromoerr .fielderr{margin-right:0}
+  .membpromoerr .linkbtn{font-size:13px;flex:none}
   .membenefits{display:flex;flex-direction:column;gap:15px;margin:0 0 20px}
   .mbrow{display:flex;align-items:center;gap:13px}
   .mbic{flex:0 0 auto;width:38px;height:38px;display:grid;place-items:center;font-size:20px;
@@ -3435,7 +3451,7 @@
     padding:0;margin-right:2px;border:0;background:none;font-size:15px;line-height:1;color:var(--faint);cursor:pointer}
   .oarowfav.on{color:#e0567a}
   .oarow.off .oarowhead{opacity:.55}
-  .oarowhead{display:grid;grid-template-columns:104px 1fr 64px 28px;align-items:center;gap:8px;
+  .oarowhead{display:grid;grid-template-columns:1fr auto 28px;align-items:center;gap:8px;
     padding:11px 4px;cursor:pointer;background:none;border:0;flex:1;min-width:0;text-align:left;font:inherit;color:inherit}
   .oarowhead:hover{background:rgba(255,255,255,.03)}
   .oarowhead button:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
@@ -3449,6 +3465,7 @@
   .oadot{display:inline-block;width:7px;height:7px;border-radius:50%}
   .oarowstrip{display:flex;gap:3px;position:relative}
   .oarowval{font-size:12.5px;font-weight:800;text-align:right;color:var(--ink);white-space:nowrap}
+  .oarowalerts{font-weight:600;font-size:12px;color:var(--faint)}
   .oarowval i{display:block;font-style:normal;font-weight:600;font-size:10px;color:var(--faint);margin-top:1px}
   .oachev{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.07);display:grid;place-items:center;font-size:0}
   .oachev::before{content:"";display:inline-block;width:6px;height:6px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:translateY(0) rotate(45deg);transition:transform .15s}
@@ -3620,9 +3637,15 @@
   .oacrange:focus-visible{outline:none}
   .oacrange:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
   .oacrange:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
-  .oacval{flex:0 0 64px;width:64px;font-size:12.5px;font-weight:800;color:var(--ink);text-align:right}
+  .oaadjintro{font-size:12.5px;line-height:1.45;color:var(--faint);margin:2px 0 6px}
+  .oacsteps{flex:1;display:flex;gap:3px;min-width:0}
+  .oacstep{flex:1 1 0;min-width:0;padding:7px 0;border-radius:6px;border:0;background:rgba(255,255,255,.07);color:var(--faint);font:inherit;font-size:11.5px;font-weight:700;cursor:pointer}
+  .oacstep:first-child{flex:1.7 1 0}
+  .oacstep.on{background:#8b6cff;color:#fff}
+  .oacstep:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+  .oacval{flex:0 0 40px;width:40px;font-size:12.5px;font-weight:800;color:var(--ink);text-align:right}
   .oacval-empty{color:var(--faint);font-weight:600}
-  .oacval.up{color:#5eead4} .oacval.down{color:#f0a060} .oacval-over{color:var(--gold);text-decoration:underline}
+  .oacval.up{color:#5eead4} .oacval.down{color:#f0a060}
   .oacchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
   .oacchip{font-size:11px;font-weight:700;padding:4px 9px;border-radius:12px;background:var(--panel2);
     border:1px solid var(--line)}
@@ -3735,15 +3758,25 @@
   .oamlvlnote{margin:8px 2px 0}
   .oamlvl .mfbox{margin:8px 0 0;border-top:0;padding:4px 4px 0;overflow:hidden;max-height:260px;opacity:1;
     transition:max-height .34s cubic-bezier(.4,0,.2,1),opacity .26s ease,margin .34s cubic-bezier(.4,0,.2,1),padding .34s cubic-bezier(.4,0,.2,1)}
-  /* Lee, 2026-11-22: Taste sits left of Watch in the nav — "to Taste" points left, "back to list" points right */
-  .oamtastelink{display:flex;align-items:center;justify-content:flex-start;gap:12px;width:100%;margin:12px 0 4px;
-    padding:11px 14px;border-radius:12px;border:1px solid rgba(124,92,255,.55);background:rgba(124,92,255,.14);
-    color:var(--ink);font:700 14px var(--font-body);cursor:pointer}
-  .oamtastelink span[aria-hidden]{font-size:20px;line-height:1;color:var(--accent)}
-  .oamtasteback{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin:0 0 14px;padding:12px 14px;border-radius:12px;
-    border:1px solid rgba(124,92,255,.55);background:rgba(124,92,255,.16);color:var(--ink);font:600 15px var(--font-body);
-    text-align:left;cursor:pointer}
-  .oamtasteback span[aria-hidden]{font-size:22px;line-height:1;color:var(--accent)}
+  /* CAS-1593: a list's own genre levels — five-stop rows and the Set all box */
+  .oamlvlintro{margin:2px 12px 10px}
+  .oamlvlrow,.oamlvlall{touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;padding:10px 4px 12px;border-bottom:1px solid var(--line)}
+  .oamlvlall{margin:0 12px 10px;padding:12px 14px 8px;border:1px solid rgba(124,92,255,.5);border-radius:12px;background:rgba(124,92,255,.10)}
+  .oamlvlline{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .oamlvlleft{display:flex;align-items:center;gap:10px;min-width:0}
+  .oamlvlrow input[type=checkbox]{width:20px;height:20px;flex:0 0 auto;margin:0}
+  .oamlvlrow .oamstylename,.oamlvlall .oamstylename{font-weight:700;font-size:15px}
+  .oamlvlval{display:flex;align-items:baseline;gap:6px;white-space:nowrap}
+  .oamlvlval b{font-size:14px;color:var(--ink);transition:font-size .1s}
+  .oamlvlval i{font-style:normal;font-size:11.5px;color:var(--faint)}
+  .oamlvlrow.dragging .oamlvlval b,.oamlvlall.dragging .oamlvlval b{font-size:18px;color:#fff}
+  .oamlvltrack{position:relative;display:flex;gap:3px;height:22px;align-items:center}
+  .oamlvlbox{flex:1;height:16px;border-radius:4px;background:rgba(255,255,255,.08)}
+  .oamlvlbox.fill{background:var(--bc)}
+  .oamlvlhandle{position:absolute;top:0;width:12px;height:22px;border-radius:6px;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.5);pointer-events:none}
+  .oamlvlrow.off .oamlvltrack,.oamlvlrow.off .oamlvlval{opacity:.3}
+  .oamlvlscale{display:grid;grid-template-columns:repeat(5,1fr);margin-top:6px;font-size:11px;font-weight:700;color:var(--faint);text-align:right}
+  .oamnotinhd{margin:14px 4px 0}
   .oamlvl .mfbox.shut{max-height:0;opacity:0;margin-top:0;padding-top:0;padding-bottom:0}
   @media (prefers-reduced-motion: reduce){ .oamlvl .mfbox{transition:none} }
   .mfrowgrid{align-items:center}
@@ -4208,7 +4241,8 @@
   .tutcard{position:fixed;z-index:2;width:330px;box-sizing:border-box;background:#f4f2ff;color:#17152b;
     border:none;border-radius:16px;padding:16px 16px 14px;box-shadow:0 14px 40px rgba(0,0,0,.6),0 0 0 1px rgba(124,92,255,.5);
     transition:top .35s ease,left .35s ease;animation:tutin .3s ease}
-  @keyframes tutin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  /* CAS-1590: fade only. The old 6px slide-in (6.7px under --ui-scale) read as the bubble jumping after it landed. */
+  @keyframes tutin{from{opacity:0}to{opacity:1}}
   .tutarrow{position:absolute;width:16px;height:16px;background:#f4f2ff;transform:rotate(45deg);display:none}
   .tutarrow.up{display:block;top:-7px}
   .tutarrow.down{display:block;bottom:-7px}
@@ -4779,6 +4813,14 @@
   .tutbans{font-size:12px;color:#aab3c5;margin-top:1px}
   .tutbango{flex:none;background:#7C5CFF;color:#fff;border:0;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:800}
   .tutbanx{flex:none;background:none;border:0;color:#8b95a5;font-size:18px;padding:2px 4px}
+  /* CAS-1566: Watch reminder / Taste card (verbatim from the ticket) */
+  .rnudge{display:flex;align-items:center;gap:10px;margin:10px 12px;padding:12px;border-radius:14px;background:rgba(124,92,255,.14);border:1px solid rgba(124,92,255,.55)}
+  .rnudge .ic{flex:none;width:34px;height:34px;border-radius:50%;background:#7C5CFF;display:flex;align-items:center;justify-content:center;font-size:17px}
+  .rnudge .tx{flex:1;min-width:0}
+  .rnudge .t{font-size:14px;font-weight:800;color:#fff}
+  .rnudge .s{font-size:12px;color:#aab3c5;margin-top:1px}
+  .rnudge .go{flex:none;background:#7C5CFF;color:#fff;border:0;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:800}
+  .rnudge .x{flex:none;background:none;border:0;color:#8b95a5;font-size:18px}
 </style>
 </head>
 <body>
@@ -4998,6 +5040,7 @@
        mean something, and the order is visible in the list itself. -->
   <div>
     <div id="listChrome"></div>
+    <div id="rnudgeSlot"></div>
     <div id="groups"></div>
   </div>
 
@@ -6181,7 +6224,7 @@ const didReset = URLQ.has("reset");
 // APPLIED yet — applyDeepLink() (below) is the one place that happens, called once it's actually safe
 // to: a returning user's boot, or the moment first-run onboarding genuinely finishes. A device that has
 // never onboarded must still run the whole flow; this only decides where to land afterwards.
-const DEEPLINK_DESTINATIONS = new Set(["cinema","streaming","moving","family"]);
+const DEEPLINK_DESTINATIONS = new Set(["cinema","streaming","moving","family","taste"]);
 const dlParam = URLQ.get("dl");
 let pendingDeepLink = DEEPLINK_DESTINATIONS.has(dlParam) ? dlParam : null;
 // CAS-1536: an alert email's own batch link — `?dl=alerts:batch:<uuid>` (optionally `&film=<movie_id>`), the
@@ -7367,6 +7410,46 @@ function lockBodyScroll(on){
   }
 }
 window.lockBodyScroll = lockBodyScroll;   // CAS-733: the auth module is a separate <script type="module">
+
+// ---- CAS-1579: keep a focused input visible above the iOS keyboard on the fixed full-screen layers.
+// iOS shrinks the VISUAL viewport only, and never scrolls a fixed layer's own scroller to the focused field.
+// While an input inside #membScreen / #oafScreen has focus, fit that layer to the visual viewport, then
+// (debounced ~100ms, iOS fires several resizes) centre the field in the layer's own scroll area. Harmless
+// where visualViewport is missing or its height equals innerHeight (Android/desktop): nothing is changed.
+const KB_FIT_LAYERS = ["membScreen","oafScreen"];
+let _kbFitTimer = null, _kbFitLayer = null;
+function kbFitClear(layer){
+  if(!layer) return;
+  layer.style.top=""; layer.style.height=""; layer.style.bottom="";
+}
+function kbFitActiveInput(){
+  const a=document.activeElement;
+  if(!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return null;
+  for(const id of KB_FIT_LAYERS){ const l=document.getElementById(id); if(l && l.contains(a)) return {layer:l, input:a}; }
+  return null;
+}
+function kbFitApply(center){
+  const vv=window.visualViewport, hit=kbFitActiveInput();
+  if(!hit){ if(_kbFitLayer){ kbFitClear(_kbFitLayer); _kbFitLayer=null; } return; }
+  if(!vv || Math.round(vv.height)>=Math.round(window.innerHeight)){ kbFitClear(hit.layer); return; }
+  _kbFitLayer=hit.layer;
+  hit.layer.style.top=vv.offsetTop+"px"; hit.layer.style.bottom="auto"; hit.layer.style.height=vv.height+"px";
+  if(center){
+    clearTimeout(_kbFitTimer);
+    _kbFitTimer=setTimeout(()=>{
+      const h=kbFitActiveInput(); if(!h) return;
+      const lr=h.layer.getBoundingClientRect(), ir=h.input.getBoundingClientRect();
+      const target=h.layer.scrollTop + (ir.top-lr.top) - (lr.height-ir.height)/2;
+      h.layer.scrollTop=Math.max(0,target);   // only the layer scrolls; the page behind stays put
+    },100);
+  }
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener("resize",()=>kbFitApply(true));
+  window.visualViewport.addEventListener("scroll",()=>kbFitApply(false));
+}
+document.addEventListener("focusin",()=>{ if(kbFitActiveInput()) kbFitApply(true); });
+document.addEventListener("focusout",()=>{ setTimeout(()=>{ if(!kbFitActiveInput() && _kbFitLayer){ kbFitClear(_kbFitLayer); _kbFitLayer=null; } },0); });
 
 function openModal(el){ el.classList.add("open"); lockBodyScroll(true); }
 // Modals stack now — the provenance sheet opens on top of the Found list. So the scroll lock is released only
@@ -12246,6 +12329,8 @@ function applyDeepLink(){
     render();
   } else if(dest==="moving"){
     openMovingScreen();
+  } else if(dest==="taste"){
+    window.openTasteScreen();   // CAS-1592: the alert email's "See Taste" link
   } else if(dest==="family"){
     const agent = cascades.find(c=>c.template==="onb_family");
     if(agent) briefOpen(agent.id, "agents");
@@ -13086,9 +13171,8 @@ function tasteRecs(){
     const pr = P.pairs[key];
     (byStyle[pr.primary] = byStyle[pr.primary] || []).push({key, other: pr.other, from, to: learned});
   });
-  // A genre with only minimum-score advice (no pending combo) is not a recommendation on its own: the
-  // advice belongs to the genre's recommendation, which exists when a combo is pending.
-  const out = Object.keys(byStyle).map(style => ({style, keys: byStyle[style], bar: barAdvice(style)}));
+  // CAS-1594: recommendations are for sub-genres only; a genre whose only advice was a bar change has none.
+  const out = Object.keys(byStyle).map(style => ({style, keys: byStyle[style]}));
   const mag = r => r.keys.reduce((a,k) => a + Math.abs(k.to - k.from), 0);
   out.sort((a,b) => mag(b) - mag(a));
   return out;
@@ -13104,11 +13188,6 @@ function tasteApplyNoSave(style){
   const rec = tasteRecs().find(r => r.style === style); if(!rec) return false;
   c.applied = c.applied || {};
   rec.keys.forEach(k => { c.applied[k.key] = k.to; });
-  if(rec.bar){
-    c.styles = c.styles || {};
-    const st = c.styles[style] || (c.styles[style] = {al:{cinema:false,rent:false,stream:false}});
-    st.bar = rec.bar.to;
-  }
   return true;
 }
 function tasteSkipNoSave(style){
@@ -13116,10 +13195,6 @@ function tasteSkipNoSave(style){
   const rec = tasteRecs().find(r => r.style === style); if(!rec) return false;
   c.skipped = c.skipped || {};
   rec.keys.forEach(k => { c.skipped[k.key] = k.to; });
-  if(rec.bar){
-    c.dismissed = c.dismissed || [];
-    if(!c.dismissed.includes("bar:"+style)) c.dismissed.push("bar:"+style);
-  }
   return true;
 }
 function tasteApply(style){ if(tasteApplyNoSave(style)) tasteAfterChange(); }
@@ -15965,7 +16040,8 @@ window.navMenuGo=key=>{
 };
 document.addEventListener("click", e=>{
   if(!$("navMenu").classList.contains("open")) return;
-  if(e.target.closest("#navMenu, #navMenuBtn")) return;
+  // CAS-1582: a tutorial step opens this menu from inside the click on Next; that same click must not close it again.
+  if(e.target.closest("#navMenu, #navMenuBtn, #tutScrim")) return;
   closeNavMenu();
 });
 
@@ -20687,13 +20763,30 @@ function oaShareBoxesHTML(style, bar, opts){
     `<span class="oabox" style="--bc:${b.color}">${labels?`<i class="oalbl">${oaShareLabel(b.pct)}</i>`:""}<i class="oafill oafleft" style="width:${oaShareBoxPct(share,b)}%"></i></span>`
   ).join("");
 }
-// Row order: on styles (a bar set) by bar ascending then name, then off styles (never listed) A-Z.
+// CAS-1594: whether any of a genre's three alert windows is on (Taste is alerts and learning only).
+function oaAlertsOn(c, style){
+  const al=((c.styles||{})[style]||{}).al || {};
+  return !!(al.cinema || al.rent || al.stream);
+}
+// Row order (CAS-1594): genres with alerts on first, then A-Z inside each group.
 function oaComputeOrder(c){
   const on=[], off=[];
-  ALL_GENRES.forEach(g=>{ (oaBar(c,g)!=null ? on : off).push(g); });
-  on.sort((a,b)=> oaBar(c,a)-oaBar(c,b) || a.localeCompare(b));
+  ALL_GENRES.forEach(g=>{ (oaAlertsOn(c,g) ? on : off).push(g); });
+  on.sort((a,b)=> a.localeCompare(b));
   off.sort((a,b)=> a.localeCompare(b));
   return [...on, ...off];
+}
+// CAS-1594: the account's verdicts (films with an opinion in watched or blocked) per main genre.
+function oaVerdictCounts(){
+  const ids = new Set(watched); blocked.forEach(id=>ids.add(id));
+  const counts = {};
+  const byId = new Map(); MOVIES.forEach(m=>{ if(ids.has(m.tmdb_id)) byId.set(m.tmdb_id, m); });
+  ids.forEach(id=>{
+    if(!opinionOf(id)) return;
+    const m = byId.get(id); if(!m || !(m.genres && m.genres.length)) return;
+    counts[m.genres[0]] = (counts[m.genres[0]]||0) + 1;
+  });
+  return counts;
 }
 // Frozen while a style is open (the ticket's own "does NOT re-sort" rule — Lee hit a score edit re-sorting
 // the list under his finger in the prototype); recomputed fresh every time nothing is open.
@@ -20719,7 +20812,6 @@ function oaFilmCounts(c){
 // The small 🔔 + one 7px dot per alerting window, shown after the style name when any window alert is on.
 // CAS-1367: an off style shows no dots — there is nothing to alert on while it is off.
 function oaAlertDotsHTML(c, style){
-  if(oaBar(c, style)==null) return "";
   const al=((c.styles||{})[style]||{}).al || {};
   const active=ONE_AGENT_WINDOWS.filter(w=>al[w.key]);
   if(!active.length) return "";
@@ -20772,75 +20864,38 @@ function oaAlertNoteHTML(c, style){
   const list = on.length===1 ? on[0] : on.slice(0,-1).join(", ")+" or "+on[on.length-1];
   return `<p class="oaalertnote">You'll be alerted when ${esc(name)} films ${list}.</p>`;
 }
-// Section 1 (MOVIE MINIMUM SCORE) + section 2 (FILM ALERTS) for the one open style, then CAS-1340's own
-// section 3 (SCORE ADJUSTMENTS, oaAdjustSectionHTML further down this file).
-// CAS-1367: a style with no bar is off (the row's own tick is the only way there, not this slider), so this
-// body has no "drag to Never" branch any more — just a short message in the slider's place.
+// CAS-1594: the open genre — FILM ALERTS (chips + note) then SCORE ADJUSTMENTS. The minimum-score slider and
+// the agent suggestion are gone: levels live in each list.
 function oaOpenBodyHTML(c, style){
-  const bar=oaBar(c, style);
   const name=oneAgentShortName(style);
-  const sectionHTML = bar==null
-    ? `<p class="oaslidedesc" id="oaSliderDesc">${esc(name)} is off. Tick it on, above, to set a minimum score.</p>`
-    : (()=>{
-        const top = oneTopPct(style, bar);
-        return `<div class="oaslider">
-            <div class="oaslidewrap">
-              <div class="oastrip oastripfull">${oaShareBoxesHTML(style, bar, {labels:true})}</div>
-              <input type="range" class="oarange" min="0" max="100" step="1" value="${top}"
-                data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
-                aria-label="${escA(name)} minimum score">
-            </div>
-            <span class="oaslideval" id="oaSliderVal">Score ${bar}+<i>top ${top}%</i></span>
-          </div>
-          <p class="oaslidedesc" id="oaSliderDesc">${esc(name)} films scoring ${bar} or more are listed: the top ${top}% of ${esc(name)}.</p>`;
-      })();
+  const followNote = oaBar(c, style)==null
+    ? `<p class="oaalertnote">Alerts follow Latest and Best, where ${esc(name)} is off. Tick it there to get alerts.</p>` : "";
   return `<div class="oaopen">
-      <div class="oatop"><div class="oasechdr">MOVIE MINIMUM SCORE</div>
-      ${sectionHTML}
-      </div>
       <div class="oasechdr">FILM ALERTS</div>
       ${oaAlertsHTML(c, style)}
       ${oaAlertNoteHTML(c, style)}
+      ${followNote}
       ${oaAdjustSectionHTML(c, style)}
     </div>`;
 }
-// CAS-1367: the tick before the name is the row's own on/off switch — a genre with bar null is off, and the
-// tick is now the only way there (the open slider below runs Top 20%..All only, never down to off).
-function oaRowHTML(c, style, filmCount, changed){
+// CAS-1594: every genre has a row; no on/off state here. Left: name, "<n> verdicts" + alert dots. Right: "Alerts on" /
+// "No alerts" + chevron. Genre levels are set in each list.
+function oaRowHTML(c, style, verdictCount, changed){
   const open = oaOpenStyle===style;
-  const bar=oaBar(c, style);
-  const on = bar!=null;
+  const alertsOn = oaAlertsOn(c, style);
   const name=oneAgentShortName(style);
-  const filmsLine = on ? `${filmCount} film${filmCount===1?"":"s"}` : "off";
-  const rowTop = on ? oneTopPct(style,bar) : 0;
-  // CAS-1481: the closed row's slider lives inside the strip and is placed by CSS alone (no measuring).
-  const dragInp = on && !open ? `<input type="range" class="tkdrag" min="0" max="100" step="1" value="${rowTop}"
-        data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
-        onpointerup="oaDragEnd(this)" ontouchend="oaDragEnd(this)" onblur="oaDragEnd(this)"
-        aria-label="${escA(name)} minimum score">` : "";
-  const strip = open ? `<span class="oarowstrip"></span><span class="oarowval"></span>`
-    : `<span class="oarowstrip">${oaShareBoxesHTML(style, bar)}${dragInp}</span>
-       <span class="oarowval">${on?`Score ${bar}+<i>top ${rowTop}%</i>`:"Off"}</span>`;
-  const tick=`<label class="oarowtick">
-      <input type="checkbox" ${on?"checked":""} onchange="oaToggleStyleOn('${escA(style)}')" aria-label="Turn ${escA(name)} on or off">
-    </label>`;
-  // Lee, 2026-11-15: the ♥ toggle is gone from the agent's rows — after setup it did nothing but a hidden sort
-  // lift, and that is retired (OAM_FAV_LIFT 0). The slider sets each genre's level.
-  const favBtn = "";
   const head=`
     <div class="oarowwrap">
-      ${tick}
-      ${favBtn}
       <div class="oarowhead">
         <button type="button" class="oarowleft" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
           <span class="oastyname">${esc(name)}</span>
-          <span class="oarowfilms">${filmsLine}${oaAlertDotsHTML(c, style)}</span>
+          <span class="oarowfilms">${verdictCount} verdict${verdictCount===1?"":"s"}${oaAlertDotsHTML(c, style)}</span>
         </button>
-        ${strip}
+        <span class="oarowval oarowalerts">${alertsOn?"Alerts on":"No alerts"}</span>
         <button type="button" class="oachev" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}" aria-label="${open?"Close":"Open"} ${escA(name)}"></button>
       </div>
     </div>`;
-  return `<div class="oarow${on?"":" off"}${changed?" oa-changed":""}${open?" oa-open":""}" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
+  return `<div class="oarow${changed?" oa-changed":""}${open?" oa-open":""}" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
 }
 // CAS-1480: the Agent recommendations card (from CAS-1479's tasteRecs). Open state survives re-renders.
 let tasteRecsOpen=false;
@@ -20863,10 +20918,6 @@ function tasteRecsCardHTML(){
   };
   const blocks=recs.map(r=>{
     const lines=[];
-    if(r.bar){
-      const to=oneTopPct(r.style, r.bar.to), from=oneTopPct(r.style, r.bar.from);
-      lines.push(`<div class="ln"><span>Minimum score</span> Top ${to}% <b class="${r.bar.to>r.bar.from?"down":"up"}">(from ${from}%)</b></div>`);
-    }
     r.keys.slice().sort((a,b)=>Math.abs(b.to-b.from)-Math.abs(a.to-a.from)).forEach(k=>lines.push(subLine(k)));
     return `<div class="tkstyle"><div class="hd"><span class="nm">${esc(oneAgentShortName(r.style))}</span><button type="button" class="sk" onclick="tasteSkip('${escA(r.style)}')">Skip</button><button type="button" class="ap" onclick="tasteApply('${escA(r.style)}')">Apply</button></div>${lines.join("")}</div>`;
   }).join("");
@@ -20876,7 +20927,7 @@ window.tasteToggleRecs=()=>{ tasteRecsOpen=!tasteRecsOpen; renderAgentsScreen();
 window.tasteCloseRecs=()=>{ tasteRecsOpen=false; renderAgentsScreen(); };
 window.tasteApply=tasteApply; window.tasteSkip=tasteSkip; window.tasteApplyAll=tasteApplyAll;
 function renderOneAgentScreen(c){
-  const counts=oaFilmCounts(c);
+  const counts=oaVerdictCounts();
   const order=oaOrder(c);
   const n=tasteProfile().n;
   const changedMain=new Set(tasteRecs().map(r=>r.style));
@@ -20884,12 +20935,11 @@ function renderOneAgentScreen(c){
   const title = "Your taste";   // CAS-1480: the screen heading (was the agent's own name, CAS-1352)
   const agentName = (c.name||"").trim() || "your agent";
   $("agentsBody").innerHTML=`
-    ${oamTasteBackHTML()}
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">Built from your ${n} verdict${n===1?"":"s"}</p>
-    <div class="oaintro"><p>This is your space. Slide any genre to see more or fewer of its films. Nothing changes unless you change it.</p><p>Your agent, ${esc(agentName)}, studies your verdicts and suggests tweaks. You decide what to apply.</p><p>A <b>gold edge</b> marks a genre with an agent recommendation. Tap a genre to open it.</p></div>
+    <div class="oaintro"><p>What your agent, ${esc(agentName)}, has learned from your verdicts, and the alerts you want for each genre.</p><p>How many films of each genre you see is set in each list.</p></div>
     ${tasteRecsCardHTML()}
-    <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
+    <div class="oacolhdr"><span>GENRE</span><span>ALERTS</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
 }
 // CAS-1461: open/close morph. The open genre's .oastripfull animates from/to the closed row's own bar
@@ -21140,38 +21190,25 @@ function oaComboFilms(key){
   });
   return out;
 }
-// The bar: five faint outline boxes (same brackets/colours as oaBoxesHTML, so the row lines up with section
-// 1's own strip), the style's own bar as a white 2px line, a fill from that line to bar+points (teal right /
-// orange left), and — for an override or an adjusted combo — a dashed mark at the learned or "was" position.
-// A zero-verdict, non-overridden combo draws only the faint boxes (greyed out by its row's own CSS class).
-function oaComboBarHTML(c, style, r){
-  const bar = oaBar(c, style);
-  const boxesHTML = ONE_AGENT_SCORE_BRACKETS.map(b=>`<i class="oacbox" style="--bc:${b.color}"></i>`).join("");
-  if(bar==null || (r.n===0 && !r.overridden && !r.never)){
-    return `<span class="oacombowrap oacombo-empty"><span class="oacombobar">${boxesHTML}</span></span>`;
-  }
-  const barPct = oaTrackPct(oneTopPct(style, bar));
-  const valuePct = r.never ? 0 : oaTrackPct(oaComboMarkShare(style, bar, r.points));
-  const lo = Math.min(barPct,valuePct), hi = Math.max(barPct,valuePct);
-  const fillHTML = r.never
-    ? `<i class="oacfill down never" style="left:0%;width:${barPct}%"></i>`
-    : `<i class="oacfill ${r.points>=0?"up":"down"}" style="left:${lo}%;width:${hi-lo}%"></i>`;
-  let marks = `<i class="oacbarline" style="left:${barPct}%"></i>`;
-  if(r.overridden || r.never) marks += `<i class="oacdash" style="left:${oaTrackPct(oaComboMarkShare(style, bar, r.learned))}%"></i>`;
-  const inputVal = r.never ? 0 : Math.max(0, Math.min(100, Math.round(oaComboMarkShare(style, bar, r.points))));
-  const rangeHTML = `<input type="range" class="oacrange" min="0" max="100" step="1" value="${inputVal}"
-      data-style="${escA(style)}" data-key="${escA(r.key)}"
-      oninput="oaComboOnDrag(this)" onchange="oaComboOnRelease(this)"
-      aria-label="${escA(style)}, ${escA(r.other)} score adjustment">`;
-  return `<span class="oacombowrap${r.overridden||r.never?" oacoverridden":""}">
-      <span class="oacombobar">${boxesHTML}${fillHTML}${marks}</span>
-      ${rangeHTML}
-    </span>`;
+// CAS-1594: the step buttons that replaced the slider. "never" is kept: it was the slider's far-left stop and
+// the only way to mark a combo never.
+const OA_COMBO_STEPS=[-20,-10,-5,0,5,10];
+// The step nearest a row's current value (ties go to the smaller step); "never" when the combo is never.
+function oaComboNearestStep(r){
+  if(r.never) return "never";
+  let best=OA_COMBO_STEPS[0];
+  OA_COMBO_STEPS.forEach(v=>{ if(Math.abs(v-r.points) < Math.abs(best-r.points)) best=v; });
+  return best;
+}
+function oaComboStepsHTML(style, r){
+  const cur = (r.n===0 && !r.overridden && !r.never) ? null : oaComboNearestStep(r);
+  const btn=(val,label)=>`<button type="button" class="oacstep${cur===val?" on":""}" data-style="${escA(style)}" data-key="${escA(r.key)}" data-step="${val}" onclick="oaComboStep(this)" aria-pressed="${cur===val}" aria-label="${escA(style)}, ${escA(r.other)}: ${val==="never"?"never list":val>0?"plus "+val:val<0?"minus "+(-val):"no change"}">${label}</button>`;
+  return `<span class="oacsteps" role="group" aria-label="${escA(style)}, ${escA(r.other)} score adjustment">${btn("never","Never")}${OA_COMBO_STEPS.map(v=>btn(v, v>0?"+"+v:v<0?"−"+(-v):"0")).join("")}</span>`;
 }
 function oaComboValueHTML(r){
-  if(r.n===0 && !r.overridden && !r.never) return `<span class="oacval oacval-empty">—</span>`;
-  const text = r.never ? "Never" : oaFmtPoints(r.points);
-  return `<span class="oacval${r.overridden||r.never?" oacval-over":(r.points>0?" up":r.points<0?" down":"")}">${text}</span>`;
+  // CAS-1594: always the actual value (a learned value need not be a step, e.g. -30); green up, amber down.
+  const text = r.never ? "Never" : r.points>0 ? `+${r.points}` : r.points<0 ? `−${-r.points}` : "0";
+  return `<span class="oacval${r.never?" down":(r.points>0?" up":r.points<0?" down":"")}">${text}</span>`;
 }
 // Left column (104px) of an overridden (or "never") row — replaces the liked/not link entirely.
 function oaOverrideLeftHTML(r){
@@ -21193,9 +21230,9 @@ function oaComboRowHTML(c, style, r){
   const chipsHTML = chipsOpen ? `<div class="oacchips">${films.map(f=>
       `<span class="oacchip ${f.good?"up":"down"}">${esc(f.title)} · ${esc((OPINIONS.find(o=>o.key===f.kind)||{}).lbl||f.kind)}</span>`).join("")}</div>` : "";
   return `<div class="oacrow${rowEmpty?" oacrow-empty":""}" data-key="${escA(r.key)}">
-      <div class="oactitle">${esc(style)} with ${esc(r.other)}${leftHTML}</div>
+      <div class="oactitle">With ${esc(r.other)}${leftHTML}</div>
       <div class="oacline2">
-        <span class="oacright">${oaComboBarHTML(c, style, r)}${oaComboValueHTML(r)}</span>
+        <span class="oacright">${oaComboStepsHTML(style, r)}${oaComboValueHTML(r)}</span>
       </div>
       ${chipsHTML}
     </div>`;
@@ -21265,11 +21302,6 @@ window.oaLogToggled=(el)=>{ oaLogOpen=el.open; };
 window.oaLogMore=()=>{ oaLogShown+=10; oaLogOpen=true; renderAgentsScreen(); };
 function oaAdjustSectionHTML(c, style){
   const name = oneAgentShortName(style);
-  const bar = oaBar(c, style);
-  if(bar==null){
-    return `<div class="oaadjust" id="oaAdjustSection"><div class="oasechdr">SCORE ADJUSTMENTS</div>
-      <p class="oaslidedesc">Turn ${esc(name)} on (set a minimum score, above) to see its score adjustments.</p></div>`;
-  }
   const rows = oaComboStats(c, style).sort(oaComboSort);
   const shown = oaShowAllAdj ? rows : rows.slice(0,8);
   const showAllHTML = (!oaShowAllAdj && rows.length>8)
@@ -21277,10 +21309,10 @@ function oaAdjustSectionHTML(c, style){
   // CAS-1349: wrapped in one #oaAdjustSection container (heading through rows) so the v2 guided tour can
   // spotlight the whole section as a single anchor, same as tutUnionRect does for a multi-element step.
   return `<div class="oaadjust" id="oaAdjustSection"><div class="oasechdr">SCORE ADJUSTMENTS</div>
+    <p class="oaadjintro">Learned from your verdicts. Points added to or taken off ${/^[AEIOU]/i.test(name)?"an":"a"} ${esc(name)} film's score when it also has this sub-genre. Tap a step to set it yourself.</p>
     ${oaChangeLogHTML(c, style)}
     <div class="oaclist">${shown.map(r=>oaComboRowHTML(c, style, r)).join("")}</div>
-    ${showAllHTML}
-    <p class="oacfoot">The white line is ${esc(name)}'s ${bar}+. Drag a row to set it yourself; all the way left means never list it. Sub-genres only change when you set them or apply a recommendation.</p></div>`;
+    ${showAllHTML}</div>`;
 }
 // CAS-1457: the Agent nav chip's gold count badge — pure DOM sync, called from both the full render() and
 // the lean verdict-repaint path (repaintAfterOpinion's fastPatchFindRow branch skips a full render()).
@@ -21313,35 +21345,13 @@ window.oaUseLearned=(key)=>{
   if(typeof render==="function") render();
   renderAgentsScreen();
 };
-// Live drag feedback (oninput) — redraws just this row's fill in place, the same convention oaOnDrag (section
-// 1) uses for its own boxes. CAS-1351: the range is now a SHARE (0 never .. 100), the same axis section 1's
-// own slider runs.
-window.oaComboOnDrag=(input)=>{
+// CAS-1594: tapping a step sets a user override to exactly that value (or "never"), through the same storage
+// the slider wrote (c.combo[key]).
+window.oaComboStep=(btn)=>{
   const c=oneAgentCriteria(); if(!c) return;
-  const style=input.dataset.style;
-  const bar=oaBar(c, style); if(bar==null) return;
-  const v=Math.max(0, Math.min(100, parseInt(input.value,10)));
-  const wrap=input.closest(".oacombowrap");
-  const barEl=wrap && wrap.querySelector(".oacombobar");
-  const fill=barEl && barEl.querySelector(".oacfill");
-  if(!fill) return;
-  const barShare=oneTopPct(style, bar);
-  const barPct=oaTrackPct(barShare);
-  if(v<=0){ fill.className="oacfill down never"; fill.style.left="0%"; fill.style.width=barPct+"%"; return; }
-  const valuePct=oaTrackPct(v);
-  const lo=Math.min(barPct,valuePct), hi=Math.max(barPct,valuePct);
-  fill.className="oacfill "+(v>=barShare?"up":"down");
-  fill.style.left=lo+"%"; fill.style.width=(hi-lo)+"%";
-};
-// Release (onchange) — the ticket's own rule verbatim: points = bar - oneBarForTopPct(style, pct); at the
-// far left (0), combo[k] = "never".
-window.oaComboOnRelease=(input)=>{
-  const c=oneAgentCriteria(); if(!c) return;
-  const style=input.dataset.style, key=input.dataset.key;
-  const bar=oaBar(c, style); if(bar==null) return;
-  const v=Math.max(0, Math.min(100, parseInt(input.value,10)));
+  const key=btn.dataset.key, v=btn.dataset.step;
   c.combo=c.combo||{};
-  c.combo[key] = v<=0 ? "never" : bar - oneBarForTopPct(style, v);
+  c.combo[key] = v==="never" ? "never" : parseInt(v,10);
   saveCascades();
   if(typeof render==="function") render();
   renderAgentsScreen();
@@ -21385,32 +21395,44 @@ function currentOamMood(){
 }
 // Every style the mood's agent actually has on (CAS-1339's oaBar), narrowed by the mood's own ticked styles —
 // an empty mood.styles means every on style, per the ticket.
+// CAS-1593: a list's genre ticks. Latest and Best's ticks ARE the agent's on/off (oaBar != null); every other
+// list owns its ticks (mood.styles, empty = every genre) whatever the agent has on.
+function oamMoodIsReleases(mood){ return !!mood && mood.id==="releases"; }
 function oamMoodStyles(mood, c){
-  const onStyles=ALL_GENRES.filter(g=>oaBar(c,g)!=null);
-  if(!mood.styles || !mood.styles.length) return onStyles;
-  return onStyles.filter(g=>mood.styles.includes(g));
+  if(oamMoodIsReleases(mood)) return ALL_GENRES.filter(g=>oaBar(c,g)!=null);
+  if(!mood.styles || !mood.styles.length) return ALL_GENRES.slice();
+  return ALL_GENRES.filter(g=>mood.styles.includes(g));
 }
-// The share stored by the Mood Override Filter — mood.topShare if the mood carries one, else (CAS-1391) a
-// one-time legacy fallback for a pre-CAS-1391 `best` mood that still only has CAS-1365's minScore: it reads
-// as topShare:20, the same floor the built-in's own default now ships with (ONE_AGENT_MOOD_BUILTINS, below).
-// Never written back — only oamSaveMoodFromSheet writes topShare, same no-write-until-save discipline as
-// every other mood field.
-function oamMoodEffectiveTopShare(mood){
-  if(mood.topShare!=null) return mood.topShare;
-  if(mood.id==="best" && mood.minScore!=null) return 20;
-  return null;
+// CAS-1593: the five level stops a list offers, stored as 5/10/25/50/100.
+const OAM_LEVEL_STOPS=[5,10,25,50,100];
+const OAM_LEVEL_COLORS=["#138c7d","#3f8f62","#7f8540","#a0732e","#b65a1c"];
+// snapPct(p): the nearest stop by absolute difference; on a tie, the smaller.
+function snapPct(p){
+  let best=OAM_LEVEL_STOPS[0];
+  OAM_LEVEL_STOPS.forEach(s=>{ if(Math.abs(s-p) < Math.abs(best-p)) best=s; });
+  return best;
 }
-// The bar actually applied to a style inside this mood — the mood's own Mood Override Filter only ever
-// RAISES the agent's bar, never lowers it. CAS-1358 removed the old slider, CAS-1363's topShare replaced it,
-// CAS-1365 reinstated a score-scale minScore in its place, and CAS-1391 replaces that with topShare again —
-// per genre, on the same share scale the agent's own strip uses, via oneBarForTopPct.
+// A list's level for a genre (CAS-1593). Latest and Best reads the agent's bar when it has one (its levels ARE
+// the agent bars); every other list reads its own levels, falling back — in memory only, never written — to its
+// retired topShare, then the agent's bar, then 25. Nothing needs rewriting on load.
+function oamMoodLevel(mood, c, g){
+  const bar=c ? oaBar(c, g) : null;
+  const lv=(mood && mood.levels) ? mood.levels[g] : undefined;
+  if(oamMoodIsReleases(mood)){
+    if(bar!=null) return snapPct(oneTopPct(g, bar));
+    return lv!=null ? lv : 25;
+  }
+  if(lv!=null) return lv;
+  if(mood && mood.topShare!=null) return snapPct(mood.topShare);
+  if(bar!=null) return snapPct(oneTopPct(g, bar));
+  return 25;
+}
+// The bar actually applied to a style inside this mood: the score the list's level for that genre means,
+// through oneBarForTopPct so admission, display and the agent bar can never disagree. Latest and Best has no bar
+// for a genre the agent has off.
 function oamMoodBarFor(mood, c, style){
-  const agentBar=oaBar(c, style);
-  if(agentBar==null) return null;
-  const topShare=oamMoodEffectiveTopShare(mood);
-  // Lee, 2026-11-09: a TRUE override — every on genre in the mood is set to the same top share, raised or
-  // lowered from the agent's own bar. Off (null) leaves each genre at the agent's setting.
-  return topShare==null ? agentBar : oneBarForTopPct(style, topShare);
+  if(oamMoodIsReleases(mood) && oaBar(c, style)==null) return null;
+  return oneBarForTopPct(style, oamMoodLevel(mood, c, style));
 }
 function oamFilmAge(m){ return AGE_RATING_CANON[m.age_rating] || m.age_rating; }
 // CAS-1384: a saved svc that's no longer one of the account's own services (prefs.sub) reads as null —
@@ -21466,9 +21488,12 @@ function oamFilmMeetsMoodRules(m, mood, c){
   // Lee, 2026-11-09: with the Mood Override On, the override's own bar (oamMoodBarFor, below) is the only
   // score gate — the agent's bar must not still hold back a genre the override RAISES. Every other agent
   // gate (blocked, watched, services, combos marked never, unscored films) still applies.
-  const ovrOn = oamMoodEffectiveTopShare(mood)!=null;
-  const gateC = ovrOn ? {...admitC, styles:Object.fromEntries(Object.entries(admitC.styles||{})
-    .map(([g,s])=>[g, (s && s.bar!=null) ? {...s, bar:0} : s]))} : admitC;
+  // CAS-1593: every list except Latest and Best owns its genres and levels, so the agent's own bar (and its
+  // genre on/off) no longer gates — build the gate with every genre's bar at 0. Latest and Best keeps the agent gate.
+  const gateC = oamMoodIsReleases(mood) ? admitC : {...admitC, styles:Object.fromEntries(ALL_GENRES.map(g=>{
+    const s=(admitC.styles||{})[g];
+    return [g, {...(s||{al:{}}), bar:0}];
+  }))};
   if(!matchesCriteriaOneAgent(m, oamMoodSkipsMyServices(mood) ? {...gateC, myServices:false} : gateC, false)) return false;
   const {main}=mainOtherCombos(m);
   if(main===undefined) return false;
@@ -21607,13 +21632,20 @@ function oamMoodDraftFrom(mood){
     // CAS-1412: a brand-new mood starts with Include watched on; editing keeps the mood's own stored value.
     watched: mood ? !!mood.watched : true,
     cinemaOnly: mood ? !!mood.cinemaOnly : false,
-    stylesAll: mood ? !(mood.styles && mood.styles.length) : true,
-    styles: new Set(mood && mood.styles ? mood.styles : []),
+    // CAS-1593: ticks and levels per genre. A new list starts with Latest and Best's; Latest and Best's own ticks
+    // are the agent's on/off. stylesAll = every genre ticked.
+    ...(()=>{
+      const c=oneAgentCriteria();
+      const src = mood || oamMoodsListReal().find(m=>m.id==="releases") || {id:"releases"};
+      const ticked = c ? oamMoodStyles(src, c) : ALL_GENRES.slice();
+      const levels={}; ALL_GENRES.forEach(g=>{ levels[g]=oamMoodLevel(src, c, g); });
+      const all = ALL_GENRES.every(g=>ticked.includes(g));
+      return {stylesAll: all, styles: new Set(all ? [] : ticked), levels};
+    })(),
     // CAS-1400: genre | keyword — which way this mood finds films. Nothing stored before Save.
     // Lee, 2026-11-21: keyword only when there's actually a name in the box — a stored mode:"keyword" with no
     // name (Max) is a genre list, and the sheet must not grey out Genres for it.
     mode: (mood && oamKeywordOn(mood)) ? "keyword" : "genre",
-    topShare: mood ? oamMoodEffectiveTopShare(mood) : null,   // CAS-1391: the Mood Override Filter's own share
     rowOrder: null,   // frozen IN THIS MOOD / NOT IN THIS MOOD section membership — see oamFreezeMoodRowOrder
     ages: new Set(mood ? (mood.ages||[]) : []),
     awards: mood ? (mood.awards||"any") : "any",
@@ -21637,9 +21669,9 @@ function oamMoodDraftFrom(mood){
   };
 }
 // CAS-1400: the bar a style shows in the sheet is always the agent's own — a mood never changes the agent.
-function oamDraftBar(d, c, style){
-  return oaBar(c, style);
-}
+function oamDraftTicked(d, g){ return d.stylesAll || d.styles.has(g); }
+// CAS-1593: the draft's level for a genre (5/10/25/50/100) and the score it means.
+function oamDraftLevel(d, g){ return d.levels[g]!=null ? d.levels[g] : 25; }
 // IN THIS MOOD / NOT IN THIS MOOD section membership, frozen the moment the sheet opens (behaviour 1: rows
 // don't move while the sheet is open — ticking or dragging a strip only changes a row's own tick/dimming,
 // never its section or position; the sections re-sort on the next open). Keeps the agent's own row order
@@ -21649,7 +21681,7 @@ function oamFreezeMoodRowOrder(){
   const c=oneAgentCriteria();
   if(!c){ d.rowOrder={inMood:[], notInMood:[]}; return; }
   const order=oaComputeOrder(c);
-  const inMood=order.filter(g=>oaBar(c,g)!=null && (d.stylesAll || d.styles.has(g)));
+  const inMood=order.filter(g=>oamDraftTicked(d, g));
   const notInMood=order.filter(g=>!inMood.includes(g));
   d.rowOrder={inMood, notInMood};
 }
@@ -21726,9 +21758,7 @@ window.toggleOamDraftCinemaOnly=()=>{ if(!oamDraft) return; oamDraft.cinemaOnly=
 window.toggleOamDraftWatched=()=>{ if(!oamDraft) return; oamDraft.watched=!oamDraft.watched; renderOamMoodSheetBody(); };
 window.toggleOamDraftStyle=style=>{
   const d=oamDraft; if(!d) return;
-  const c=oneAgentCriteria(); if(!c) return;
-  if(oamDraftBar(d,c,style)==null) return;   // disabled for never genres (behaviour 2)
-  const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
+  const onStyles=ALL_GENRES;
   if(d.stylesAll){
     d.stylesAll=false;
     d.styles=new Set(onStyles.filter(g=>g!==style));
@@ -21738,7 +21768,7 @@ window.toggleOamDraftStyle=style=>{
     d.styles.add(style);
     if(onStyles.every(g=>d.styles.has(g))){ d.stylesAll=true; d.styles=new Set(); }
   }
-  renderOamMoodSheetBody();
+  oamRefreshGenreRows([style]);   // CAS-1593: rows only — the row keeps its place (frozen order), never a sheet rebuild
 };
 window.toggleOamDraftAge=a=>{ if(!oamDraft) return; oamDraft.ages.has(a)?oamDraft.ages.delete(a):oamDraft.ages.add(a); renderOamMoodSheetBody(); };
 window.setOamDraftAwards=v=>{ if(!oamDraft) return; oamDraft.awards=v; renderOamMoodSheetBody(); };
@@ -21777,217 +21807,149 @@ function oamStylesAlsoIn(style, excludeId){
     && !oamKeywordOn(m)
     && (!m.styles || !m.styles.length || m.styles.includes(style))).map(m=>m.name);
 }
-// CAS-1400: one line per genre — tick + name (+ "also in …"), the agent's own five-box share strip (read-only:
-// a mood never changes the agent) and the value. filterShare is the Mood Override Filter's share when it
-// narrows this row (else null): the value then reads "Top 40%" over "~~100%~~ · 79+".
-function oamStyleValHTML(style, bar, filterShare){
-  if(bar==null) return "Never";
-  const agentShare=oneTopPct(style, bar);
-  if(filterShare!=null && agentShare!==filterShare){
-    // Lee, 2026-11-22: shorter second line so it fits beside the strip on a phone
-    return `${filterShare>=100?"All":`Score ${oneBarForTopPct(style, filterShare)}+`}<i><s class="was">${agentShare}%</s> top ${filterShare}%</i>`;
-  }
-  return `Score ${bar}+<i>top ${agentShare}%</i>`;   // Lee, 2026-11-22: same order as the Taste screen
+// ---- CAS-1593: a list owns its genre levels. One row per genre: tick, name, "Top N%" + "score S+", and a track of
+// five boxes (5/10/25/50/All) the person taps or drags. The draft (d.levels, d.styles) is the only thing changed
+// until Save; rows are patched in place so a drag never rebuilds the sheet.
+function oamLevelValHTML(g, level){
+  if(level>=100) return `<b>All</b><i>every film</i>`;
+  return `<b>Top ${level}%</b><i>score ${oneBarForTopPct(g, level)}+</i>`;
 }
-// Lee, 2026-11-22: a read-only copy of the Taste screen's white thumb, sat at the genre's level so the list's rows
-// read like the Taste rows. Same box geometry as the fill: box floor(p/20), (p mod 20)/20 of the way across it;
-// 5 boxes with 3px gaps.
-function oamThumbHTML(share){
-  const p=Math.max(0, Math.min(100, share));
-  const idx = p>=100 ? 4 : Math.floor(p/20);
-  const frac = p>=100 ? 1 : (p%20)/20;
-  return `<i class="oamthumb" aria-hidden="true" style="left:calc((100% - 12px) * ${(idx+frac)/5} + ${idx*3}px)"></i>`;
+function oamLevelTrackHTML(idx){
+  // idx = the current stop (0-4) or -1 for none (Set all when Mixed). Handle: right end of the stop's box.
+  const boxes=OAM_LEVEL_COLORS.map((col,i)=>`<span class="oamlvlbox${i<=idx?" fill":""}" style="--bc:${col}"></span>`).join("");
+  const hx = idx<0 ? "" : idx>=4 ? `<i class="oamlvlhandle" style="left:calc(100% - 12px)"></i>`
+    : `<i class="oamlvlhandle" style="left:calc((100% - 12px) * ${(idx+1)/5} + ${idx*3}px - 6px)"></i>`;
+  return `<div class="oamlvltrack">${boxes}${hx}</div>`;
 }
 function oamStyleRowHTML(c, d, style){
-  const bar=oamDraftBar(d, c, style);
-  const never = bar==null;
-  const on = !never && (d.stylesAll || d.styles.has(style));
+  const on=oamDraftTicked(d, style);
+  const level=oamDraftLevel(d, style);
   const name=oneAgentShortName(style);
-  const alsoIn=oamStylesAlsoIn(style, d.editingId).filter(n=>n!==d.name);
-  const subText = never ? "off in your agent" : (alsoIn.length ? `also in ${alsoIn.join(", ")}` : "");
-  return `<div class="oamstylerow${on?"":" off"}${never?" never":""}" data-style="${escA(style)}">
-      <label class="oamstyleleftwrap">
-        <input type="checkbox" ${on?"checked":""} ${never?"disabled":""}
-          onchange="toggleOamDraftStyle('${escA(style)}')" aria-label="${escA(name)}">
-        <span class="oamstyleleft">
+  return `<div class="oamlvlrow${on?"":" off"}" data-style="${escA(style)}">
+      <div class="oamlvlline">
+        <span class="oamlvlleft">
+          <input type="checkbox" ${on?"checked":""} onchange="toggleOamDraftStyle('${escA(style)}')" aria-label="${escA(name)}">
           <span class="oamstylename">${esc(name)}</span>
-          ${subText?`<span class="oamalso">${esc(subText)}</span>`:""}
         </span>
-      </label>
-      <div class="oaslidewrap"><div class="oastrip">${oaShareBoxesHTML(style, bar)}</div>${(!never && d.topShare==null) ? oamThumbHTML(oneTopPct(style, bar)) : ""}</div>
-      <span class="oarowval">${oamStyleValHTML(style, bar, null)}</span>
-    </div>`;
-}
-// ---- CAS-1391: the Mood Override Filter — replaces CAS-1365's cross-genre minScore slider with a per-genre
-// top-share filter, on the same share scale the agent's own strip uses (ONE_AGENT_SHARE_BRACKETS). Stored as
-// mood.topShare (1-99, null=off); 100 on the slider itself always means off. oamFilterOnDrag redraws its own
-// boxes/value/description live (the oamOnDrag pattern) AND every ticked IN THIS MOOD row's line/mask
-// (oamDrawFilterLines) so the preview the ticket asks for never waits for a full re-render.
-function oamFilterBoxesHTML(share){
-  return ONE_AGENT_SHARE_BRACKETS.map(b=>
-    `<span class="oabox" style="--bc:${b.color}"><i class="oafill oafleft" style="width:${oaShareBoxPct(share,b)}%"></i></span>`
-  ).join("");
-}
-// Lee, 2026-11-09: a true override with its own Off switch. On, every ticked genre in this mood is set to the
-// same top share — lowered (greyed) or raised (striped) from your agent's own setting; 100 is All. Off, each
-// genre keeps the agent's setting and the strip is greyed out.
-function oamOverrideValHTML(share, on){
-  if(!on) return `Off<i>using Taste</i>`;
-  return share>=100 ? `All<i>every genre</i>` : `Top ${share}%<i>every genre</i>`;
-}
-function oamOverrideFilterDesc(share, on){
-  // Lee, 2026-11-20: the slider always shows (greyed under My taste) so switching never moves the genre rows.
-  if(!on) return `Switch to Override to give every ticked genre one level instead of its Taste level.`;
-  return `Every ticked genre shows its ${share>=100?"whole catalog":`top ${share}%`} here, instead of its Taste level.`;
-}
-// Lee, 2026-11-22: under My taste the override slider is hidden ("shut"); switching animates it open or closed.
-// toggleOamOverride renders it in its OLD state (oamOvAnimFrom), then flips "shut" two frames later so the CSS
-// transition actually plays on the freshly rendered element.
-let oamOvAnimFrom=null;
-function oamOverrideFilterHTML(d){
-  const on = d.topShare!=null;
-  const share = on ? d.topShare : (d.lastTopShare || 40);
-  const shut = oamOvAnimFrom!=null ? !oamOvAnimFrom : !on;
-  return `<div class="mfbox${on?"":" off"}${shut?" shut":""}" id="oamOvBox">
-      <div class="mfscale"><span>${ONE_AGENT_SHARE_BRACKETS.map(b=>`<i>${esc(oaShareLabel(b.pct))}</i>`).join("")}</span></div>
-      <div class="mfrowgrid">
-        <div class="mflbl"><b>Every genre</b><span class="mfsub">same level</span></div>
-        <div class="oaslidewrap">
-          <div class="oastrip oastripfull">${oamFilterBoxesHTML(share)}</div>
-          <input type="range" class="oarange" min="1" max="100" step="1" value="${share}" ${on?"":"disabled"}
-            oninput="oamFilterOnDrag(this)" onchange="oamFilterOnRelease(this)" aria-label="Override share">
-        </div>
-        <span class="oarowval">${oamOverrideValHTML(share, on)}</span>
+        <span class="oamlvlval">${oamLevelValHTML(style, level)}</span>
       </div>
-      <p class="mfdesc">${oamOverrideFilterDesc(share, on)}</p>
+      ${oamLevelTrackHTML(OAM_LEVEL_STOPS.indexOf(level))}
     </div>`;
 }
-window.toggleOamOverride=()=>{
+// Set all genres: one stop when every ticked genre shares it, else Mixed.
+function oamAllStopIdx(d){
+  const ticked=ALL_GENRES.filter(g=>oamDraftTicked(d, g));
+  if(!ticked.length) return -1;
+  const first=oamDraftLevel(d, ticked[0]);
+  return ticked.every(g=>oamDraftLevel(d, g)===first) ? OAM_LEVEL_STOPS.indexOf(first) : -1;
+}
+function oamAllBoxHTML(d){
+  const idx=oamAllStopIdx(d);
+  return `<div class="oamlvlall" data-all="1">
+      <div class="oamlvlline">
+        <span class="oamlvlleft"><span class="oamstylename">Set all genres</span></span>
+        <span class="oamlvlval">${idx<0 ? `<b>Mixed</b><i>drag to set all</i>` : (OAM_LEVEL_STOPS[idx]>=100 ? `<b>All</b><i>every genre</i>` : `<b>Top ${OAM_LEVEL_STOPS[idx]}%</b><i>every genre</i>`)}</span>
+      </div>
+      ${oamLevelTrackHTML(idx)}
+      <div class="oamlvlscale"><span>5%</span><span>10%</span><span>25%</span><span>50%</span><span>All</span></div>
+    </div>`;
+}
+// Patch rows in place (never replace the element: a live drag holds pointer capture on it).
+function oamPatchTrack(el, idx){
+  const track=el.querySelector(".oamlvltrack"); if(!track) return;
+  track.querySelectorAll(".oamlvlbox").forEach((b,i)=>b.classList.toggle("fill", i<=idx));
+  let h=track.querySelector(".oamlvlhandle");
+  if(idx<0){ if(h) h.remove(); return; }
+  if(!h){ h=document.createElement("i"); h.className="oamlvlhandle"; track.appendChild(h); }
+  h.style.left = idx>=4 ? "calc(100% - 12px)" : `calc((100% - 12px) * ${(idx+1)/5} + ${idx*3}px - 6px)`;
+}
+function oamRefreshGenreRows(genres){
+  const d=oamDraft, body=$("watchSheetBody"); if(!d || !body) return;
+  genres.forEach(g=>{
+    const row=body.querySelector(`.oamlvlrow[data-style="${CSS.escape(g)}"]`); if(!row) return;
+    const on=oamDraftTicked(d, g), level=oamDraftLevel(d, g);
+    row.classList.toggle("off", !on);
+    const cb=row.querySelector("input[type=checkbox]"); if(cb) cb.checked=on;
+    const val=row.querySelector(".oamlvlval"); if(val) val.innerHTML=oamLevelValHTML(g, level);
+    oamPatchTrack(row, OAM_LEVEL_STOPS.indexOf(level));
+  });
+  const all=body.querySelector(".oamlvlall");
+  if(all){
+    const idx=oamAllStopIdx(d);
+    const val=all.querySelector(".oamlvlval");
+    if(val) val.innerHTML = idx<0 ? `<b>Mixed</b><i>drag to set all</i>` : (OAM_LEVEL_STOPS[idx]>=100 ? `<b>All</b><i>every genre</i>` : `<b>Top ${OAM_LEVEL_STOPS[idx]}%</b><i>every genre</i>`);
+    oamPatchTrack(all, idx);
+  }
+  oamRefreshSecSummaries();
+}
+// Which stop an x position picks: the nearest junction, per the ticket — i = clamp(round((x-left)/width*5)-1, 0, 4).
+function oamLevelStopFromX(row, x){
+  const r=row.querySelector(".oamlvltrack").getBoundingClientRect();
+  if(!r.width) return 0;
+  return Math.max(0, Math.min(4, Math.round((x - r.left)/r.width*5) - 1));
+}
+function oamApplyLevelStop(row, i){
   const d=oamDraft; if(!d) return;
-  const was = d.topShare!=null;
-  if(was){ d.lastTopShare=d.topShare; d.topShare=null; }
-  else d.topShare=d.lastTopShare || 60;
-  oamOvAnimFrom=was;
-  try{ renderOamMoodSheetBody(); } finally { oamOvAnimFrom=null; }
-  const nowOn = d.topShare!=null;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    const box=document.getElementById("oamOvBox"); if(box) box.classList.toggle("shut", !nowOn);
-  }));
-};
-// Lee, 2026-11-17: Agent settings (off) / Agent override (on, starting at 60% the first time).
+  const level=OAM_LEVEL_STOPS[i];
+  if(row.dataset.all){
+    const ticked=ALL_GENRES.filter(g=>oamDraftTicked(d, g));
+    ticked.forEach(g=>{ d.levels[g]=level; });
+    oamRefreshGenreRows(ALL_GENRES);
+  } else {
+    d.levels[row.dataset.style]=level;
+    oamRefreshGenreRows([row.dataset.style]);
+  }
+}
+// Pointer handling, delegated once on the sheet body. A press on the track starts at once; a press elsewhere on the
+// row starts only after 8px of mostly horizontal travel (vertical travel is the page's scroll), and a still tap
+// anywhere on the row picks the nearest stop. Only the checkbox ever toggles the tick.
+let oamLvlGesture=null, oamLvlBound=false;
+function oamLvlEnd(){
+  if(oamLvlGesture){ oamLvlGesture.row.classList.remove("dragging"); }
+  oamLvlGesture=null;
+}
+function oamBindLevelEvents(){
+  const body=$("watchSheetBody"); if(!body || oamLvlBound) return;
+  oamLvlBound=true;
+  body.addEventListener("contextmenu", e=>{ if(e.target.closest && e.target.closest(".oamlvlrow,.oamlvlall")) e.preventDefault(); });
+  body.addEventListener("pointerdown", e=>{
+    const row=e.target.closest && e.target.closest(".oamlvlrow,.oamlvlall");
+    if(!row || e.target.closest("input")) return;
+    if(e.button!==undefined && e.button>0) return;
+    const onTrack=!!e.target.closest(".oamlvltrack");
+    oamLvlGesture={row, id:e.pointerId, x0:e.clientX, y0:e.clientY, live:false};
+    if(onTrack) oamLvlStart(e);
+  });
+  body.addEventListener("pointermove", e=>{
+    const g=oamLvlGesture; if(!g || e.pointerId!==g.id) return;
+    if(!g.live){
+      const dx=e.clientX-g.x0, dy=e.clientY-g.y0;
+      if(Math.abs(dx)>=8 && Math.abs(dx)>Math.abs(dy)) oamLvlStart(e);
+      else if(Math.abs(dy)>=8) oamLvlEnd();   // mostly vertical: leave it to page scroll
+      return;
+    }
+    e.preventDefault();
+    oamApplyLevelStop(g.row, oamLevelStopFromX(g.row, e.clientX));
+  });
+  body.addEventListener("pointerup", e=>{
+    const g=oamLvlGesture; if(!g || e.pointerId!==g.id) return;
+    const moved=Math.hypot(e.clientX-g.x0, e.clientY-g.y0);
+    if(g.live || moved<8) oamApplyLevelStop(g.row, oamLevelStopFromX(g.row, e.clientX));
+    oamLvlEnd();
+  });
+  body.addEventListener("pointercancel", oamLvlEnd);
+}
+function oamLvlStart(e){
+  const g=oamLvlGesture; if(!g) return;
+  g.live=true;
+  g.row.classList.add("dragging");
+  try{ g.row.setPointerCapture(e.pointerId); }catch(_){}
+  oamApplyLevelStop(g.row, oamLevelStopFromX(g.row, e.clientX));
+}
 // Lee, 2026-11-17 (later): no hidden/simple view — the agent's levels always show, so nothing filters out of sight.
 // Kept as always-on so existing callers (tutorial, e2e) still work.
 function oamAdvancedOn(d){ return true; }
 window.toggleOamAdvanced=()=>{};
-// Lee, 2026-11-22: List sheet → Taste and back. The open draft (unsaved edits included) is parked while Taste is
-// open; "Back to list" reopens the sheet with it, re-reading every genre's level from Taste, and rebuilds the
-// listing so a Taste change shows at once. Leaving Taste any other way drops the way back.
-let oamTasteReturn=null;
-window.oamOpenTasteFromList=()=>{
-  const d=oamDraft; if(!d) return;
-  const body=$("watchSheetBody");
-  const parked={draft:d, scroll: body ? body.scrollTop : 0, secs:new Set(oamSecOpen), notIn:oamNotInMoodOpen};
-  closeWatchSheet();
-  openAgentsScreen();
-  oamTasteReturn=parked;
-  renderAgentsScreen();
-};
-window.oamBackToListFromTaste=()=>{
-  const r=oamTasteReturn; if(!r) return;
-  closeAgentsScreen();
-  watchSettledNavKey=null;   // a Taste change re-ranks the listing — rebuild it, don't patch it
-  render();
-  oamDraft=r.draft;
-  oamFreezeMoodRowOrder();   // Taste may have switched a genre on or off
-  oamSecOpen=new Set(r.secs||[]); oamNotInMoodOpen=!!r.notIn;   // Lee, 2026-11-22: same sections open as when you left
-  oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  openWatchSheet();
-  const body=$("watchSheetBody"); if(body) body.scrollTop=r.scroll;
-};
-function oamTasteBackHTML(){
-  if(!oamTasteReturn) return "";
-  const nm=(oamTasteReturn.draft.name||"").trim() || "your list";
-  return `<button type="button" class="oamtasteback" onclick="oamBackToListFromTaste()"><span>Back to list <b>${esc(nm)}</b></span><span aria-hidden="true">&rsaquo;</span></button>`;
-}
-window.setOamAgentOverride=(on)=>{
-  const d=oamDraft; if(!d) return;
-  if(!!on === (d.topShare!=null)) return;
-  window.toggleOamOverride();
-};
-// The box-geometry rule the ticket gives verbatim: share p falls in box floor(p/20) at fraction (p mod 20)/20
-// of that box's own rendered width, and 100 is the right edge of the last box — reading real DOM geometry
-// (not a flat percentage of the track) so the line lines up with the box gaps exactly like the fill does.
-function oamMfBoxPos(boxes, pct){
-  if(!boxes.length) return 0;
-  const p=Math.max(0, Math.min(100, pct));
-  if(p>=100){ const last=boxes[boxes.length-1]; return last.offsetLeft+last.offsetWidth; }
-  const idx=Math.min(boxes.length-1, Math.floor(p/20));
-  const box=boxes[idx];
-  return box.offsetLeft + ((p%20)/20)*box.offsetWidth;
-}
-// Draws (or clears) the live preview line/mask on every ticked, non-Never IN THIS MOOD row — filterShare is
-// null when the filter is off (no lines at all, per the ticket).
-function oamDrawFilterLines(d, c, filterShare){
-  const body=$("watchSheetBody"); if(!body) return;
-  const order=d.rowOrder || {inMood:[], notInMood:[]};
-  order.inMood.forEach(style=>{
-    const row=body.querySelector(`.oamstylerow[data-style="${CSS.escape(style)}"]`);
-    if(!row) return;
-    const wrap=row.querySelector(".oaslidewrap");
-    if(!wrap) return;
-    wrap.querySelectorAll(".mfline,.mfmask").forEach(n=>n.remove());
-    const bar=oamDraftBar(d, c, style);
-    const never=bar==null;
-    const on=!never && (d.stylesAll || d.styles.has(style));
-    const valEl=row.querySelector(".oarowval");
-    if(valEl) valEl.innerHTML=oamStyleValHTML(style, bar, null);
-    if(filterShare==null || !on) return;
-    const boxes=wrap.querySelectorAll(".oabox");
-    const lineLeft=oamMfBoxPos(boxes, filterShare);
-    const line=document.createElement("div");
-    line.className="mfline";
-    line.style.left=lineLeft+"px";
-    wrap.appendChild(line);
-    const agentShare=oneTopPct(style, bar);
-    if(agentShare!==filterShare){
-      const agentPos=oamMfBoxPos(boxes, agentShare);
-      const lo=Math.min(lineLeft, agentPos), hi=Math.max(lineLeft, agentPos);
-      const mask=document.createElement("div");
-      mask.className = agentShare>filterShare ? "mfmask" : "mfgain";
-      mask.style.left=lo+"px";
-      mask.style.width=Math.max(0, hi-lo)+"px";
-      wrap.appendChild(mask);
-      if(valEl) valEl.innerHTML=oamStyleValHTML(style, bar, filterShare);
-    }
-  });
-}
-window.oamFilterOnDrag=(input)=>{
-  const d=oamDraft; if(!d) return;
-  const c=oneAgentCriteria(); if(!c) return;
-  const share=Math.max(1, Math.min(100, parseInt(input.value,10)));
-  const on=true;
-  const wrap=input.closest(".oaslidewrap");
-  const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
-  ONE_AGENT_SHARE_BRACKETS.forEach((b,i)=>{
-    const fill=boxes[i] && boxes[i].querySelector(".oafill");
-    if(fill) fill.style.width=oaShareBoxPct(share,b)+"%";
-  });
-  const box=input.closest(".mfbox");
-  const sub=box && box.querySelector(".mfsub");
-  if(sub) sub.textContent = "On";
-  const valEl=box && box.querySelector(".oarowval");
-  if(valEl) valEl.innerHTML = oamOverrideValHTML(share, true);
-  const descEl=box && box.querySelector(".mfdesc");
-  if(descEl) descEl.textContent = oamOverrideFilterDesc(share, on);
-  oamDrawFilterLines(d, c, on ? share : null);
-  oamSizeMoodPanel(true);   // the description's wording (and so its height) changes with the filter
-};
-window.oamFilterOnRelease=(input)=>{
-  const d=oamDraft; if(!d) return;
-  const share=Math.max(1, Math.min(100, parseInt(input.value,10)));
-  d.topShare = share;
-  renderOamMoodSheetBody();
-};
 const OAM_AGE_OPTS=TASTE_AGE_ORDER;
 const OAM_AWARDS_OPTS=[["any","Any"],["nominated","Nominated or won"],["won","Won"]];
 const OAM_YEARS_OPTS=[[0,"Any"],[10,"10 yrs"],[5,"5 yrs"],[3,"3 yrs"],[2,"2 yrs"],[1,"1 yr"]];
@@ -22005,21 +21967,15 @@ window.oamToggleSec=key=>{
   const el=document.querySelector(`#watchSheetBody .oamsec[data-sec="${key}"]`);
   if(el){ const open=oamSecOpen.has(key); el.classList.toggle("open", open);
     const hd=el.querySelector(".oamsechd"); if(hd) hd.setAttribute("aria-expanded", String(open)); }
-  // Lee, 2026-11-22: the Override lines are placed in pixels from the boxes (oamMfBoxPos), so drawn while
-  // PRIMARY SEARCH was closed they all landed at 0 — redraw them once the section is open and measurable.
-  if(key==="primary" && oamSecOpen.has(key) && oamDraft && oamDraft.topShare!=null){
-    const c=oneAgentCriteria(); if(c) oamDrawFilterLines(oamDraft, c, oamDraft.topShare);
-  }
 };
 // One line per section header saying what is set; `set` = changed from a new list's default (purple dot).
 function oamSecSummaries(d, c, posList, posIdx){
   const lbl=(opts,k)=>{ const o=opts.find(([kk])=>kk===k); return o?o[1]:String(k); };
   const kw = d.mode==="keyword" && (d.people||"").trim();
-  const nGen = ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null && (d.stylesAll || d.styles.has(g))).length;
+  const nGen = ALL_GENRES.filter(g=>oamDraftTicked(d, g)).length;
   const primary = kw
     ? {text:`Finding by name: ${d.people.trim()}`, set:true}
-    : {text:`${nGen} genre${nGen===1?"":"s"} · ${d.topShare==null?"My taste":`Override, top ${d.topShare}%`}`,
-       set: d.topShare!=null || !d.stylesAll};
+    : {text:`${nGen} genre${nGen===1?"":"s"}`, set: !d.stylesAll};
   const svc = d.svc ? {text:`${oamSvcChipLabel(d.svc)} only`, set:true}
     : d.anySvc ? {text:"Any service", set:true}
     : {text: prefs.on ? "My services" : "All services", set:false};
@@ -22068,7 +22024,6 @@ function renderOamMoodSheetBody(){
   const posList = oamMoodsListReal().filter(m=>m.id!=="releases");
   const posIdx = d.editingId ? posList.findIndex(m=>m.id===d.editingId) : -1;
   const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "List" : "New list";
-  const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
   const kwMode = d.mode==="keyword";
   const order = d.rowOrder || {inMood:[], notInMood:[]};
   const seg=(opts, cur, setter, label)=>`<div class="mfseg" role="group" aria-label="${escA(label)}">
@@ -22099,30 +22054,18 @@ function renderOamMoodSheetBody(){
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
     ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
-    ${sec("primary", "oamGenreSec", "PRIMARY SEARCH", `
+    ${sec("primary", "oamGenreSec", "GENRES IN THIS LIST", `
       <div class="oamprimbox">
       <div class="mpanel">
         <section class="mgenre">
-          <!-- Lee, 2026-11-20: the My taste / Override switch is back at the top, above the override slider and the
-               genre rows (it sat under the rows from 2026-11-17). The agent's levels always show. -->
-          <div class="oamlvl">
-            <div class="subhd oamlvlhd">Genre levels</div>
-            <div class="mfseg oamlvlseg" role="radiogroup" aria-label="Genre levels">
-              <button type="button" role="radio" class="${d.topShare==null?"on":""}" aria-checked="${d.topShare==null}" onclick="setOamAgentOverride(false)">My taste</button>
-              <button type="button" role="radio" class="${d.topShare!=null?"on":""}" aria-checked="${d.topShare!=null}" onclick="setOamAgentOverride(true)">Override</button>
-            </div>
-            ${oamOverrideFilterHTML(d)}
-          </div>
-          <!-- Lee, 2026-11-22: straight to Taste to change a genre's own level; Taste shows a way back here. -->
-          <button type="button" class="oamtastelink" onclick="oamOpenTasteFromList()"><span aria-hidden="true">&lsaquo;</span><span>Change your Taste levels</span></button>
+          <p class="oamgenreintro oamlvlintro">How much of each genre this list shows. Slide left for only the best, right for more.</p>
+          ${oamAllBoxHTML(d)}
           <div class="oalist">
             ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
           </div>
           ${order.notInMood.length ? `<div class="oalist">
-              <button type="button" class="oamexpand${oamNotInMoodOpen?" open":""}" onclick="toggleOamNotInMood()" aria-expanded="${oamNotInMoodOpen}">
-                <span>Not in this list <b>${order.notInMood.length}</b></span><span class="chev" aria-hidden="true">&rsaquo;</span>
-              </button>
-              ${oamNotInMoodOpen ? order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("") : ""}
+              <div class="subhd oamnotinhd">NOT IN THIS LIST</div>
+              ${order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
             </div>` : ""}
         </section>
       </div>
@@ -22191,7 +22134,7 @@ function renderOamMoodSheetBody(){
           <button type="button" ${posIdx<=0?"disabled":""} onclick="oamMoveMood(-1)">&lsaquo; Move left</button>
           <button type="button" ${posIdx>=posList.length-1?"disabled":""} onclick="oamMoveMood(1)">Move right &rsaquo;</button>
         </div>`) : ""}`;
-  if(d.topShare!=null) oamDrawFilterLines(d, c, d.topShare);
+  oamBindLevelEvents();
   oamApplyModeToDOM();   // Lee, 2026-11-20: a keyword list opens with Genres greyed and the name box open
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
@@ -22215,7 +22158,8 @@ function oamMoodFromDraft(d){
     watched: !!d.watched,
     cinemaOnly: !!d.cinemaOnly,
     styles: d.stylesAll ? [] : [...d.styles],
-    topShare: d.topShare,
+    levels: Object.fromEntries(ALL_GENRES.map(g=>[g, oamDraftLevel(d, g)])),   // CAS-1593
+    topShare: null,   // CAS-1593: retired — levels replace it
     ages: [...d.ages],
     awards: d.awards,
     years: d.years,
@@ -22225,6 +22169,25 @@ function oamMoodFromDraft(d){
     people: (d.people||"").trim(),
     mode: (d.people||"").trim() ? "keyword" : "genre",   // Lee, 2026-11-20: a name in the box IS keyword mode
   };
+}
+// CAS-1593: Latest and Best's ticks and levels ARE the agent's genre on/off and bars (alerts follow it), so saving
+// it writes the agent in the same save. Ticked: bar = the score the level means, alerts restored from lastAl if the
+// genre was off. Unticked: the same switch-off oaToggleStyleOn does (lastBar/lastAl kept, bar null).
+function oamWriteAgentFromMood(mood, d){
+  const c=oneAgentCriteria(); if(!c) return;
+  c.styles=c.styles||{};
+  const ticked=new Set(ALL_GENRES.filter(g=>oamDraftTicked(d, g)));
+  ALL_GENRES.forEach(g=>{
+    const st=c.styles[g]||(c.styles[g]={al:{cinema:false,rent:false,stream:false}});
+    if(ticked.has(g)){
+      const wasOff = st.bar==null;
+      st.bar=oneBarForTopPct(g, mood.levels[g]);
+      if(wasOff) st.al = st.lastAl ? {...st.lastAl} : {cinema:true, rent:true, stream:true};
+    } else if(st.bar!=null){
+      st.lastBar=st.bar; st.lastAl={...(st.al||{})}; st.bar=null;
+    }
+  });
+  saveCascades();
 }
 window.oamSaveMoodFromSheet=()=>{
   const d=oamDraft; if(!d) return;
@@ -22242,7 +22205,7 @@ window.oamSaveMoodFromSheet=()=>{
   // one-time load repair below (loadUserPrefs) never reverts a deliberate choice of Score back to release.
   // 13 Nov: moodSort() only honours Releases' saved sort once sortChosen is stamped — the v1 sheet's
   // save did that (CAS-1331/1333), this v2 save never did, so Score / A–Z on Releases silently reverted.
-  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=4; mood.sortChosen=true; }
+  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=4; mood.sortChosen=true; oamWriteAgentFromMood(mood, d); }
   const list=oamMoodsListReal();
   const idx=list.findIndex(m=>m.id===mood.id);
   watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
@@ -23984,7 +23947,6 @@ window.openAgentsScreen=()=>{
   tutBannerAfterFirst("agent", $("agentsBody"));   // CAS-1534
 };
 window.closeAgentsScreen=()=>{
-  oamTasteReturn=null;   // Lee, 2026-11-22: the way back to a list lasts only while Taste is open
   oaScreenOrder=null;    // Lee, 2026-11-22: rows re-sort on the next visit, never mid-visit
   if(oaListingDirty){ oaListingDirty=false; watchSettledNavKey=null; if(typeof render==="function") render(); }
   $("agentsScreen").classList.remove("open"); lockBodyScroll(false);
@@ -24063,7 +24025,10 @@ function batchControlsHTML(row){
 function batchItemHTML(row, whyHTML){
   const id=row.m.tmdb_id;
   const tag = watched.has(id) ? `<div class="mvwhy"><span class="mvchip watched">Watched</span></div>` : "";
-  return `<div class="mvitem${blocked.has(id)?" mvnever":""}">${whyHTML}${tag}${movingCardHTML(row)}${batchControlsHTML(row)}</div>`;
+  // Lee, 2026-11-25: no Watch On / Watched panels opened out under every film — "it's horrible". The card's own
+  // Alert, list and Watched buttons answer the email (toggleFilmOpt / pickNever / setOpinion still call
+  // noteBatchAnswer), exactly as on Watch. batchControlsHTML stays (tests read the selected state through it).
+  return `<div class="mvitem${blocked.has(id)?" mvnever":""}">${whyHTML}${tag}${movingCardHTML(row)}</div>`;
 }
 function batchBandHTML(){
   const d=batchDateLabel(movingBatch.ymd), h=movingBatch.headline;
@@ -24599,7 +24564,15 @@ function renderSettings(){
       ${acctRow("🔔","Notification Settings", esc(notif) + (notifyPrefs.emailOn && notifyPrefs.email
                 ? ` · ${esc(notifyPrefs.email)}` : ""), "settingsOpenNotify()")}
       ${acctRow("🌐","Languages", null, "settingsOpenLanguages()")}
-    </div>`;
+    </div>
+    <p class="setbuild" id="settingsBuild">${esc(settingsBuildLine())}</p>`;
+}
+// CAS-1585: one discreet line at the foot of Settings — which build is this. Numbers from BUILD_INFO (same
+// source as buildCore()); the environment word only on staging, never "Production" for members.
+function settingsBuildLine(){
+  const b = BUILD_INFO || {};
+  return "Cascade " + (b.version || "0.0.0") + " (build " + (b.build != null ? b.build : "?") + ")"
+       + (RUNTIME_ENV === "production" ? "" : " · Staging");
 }
 window.openSettings=()=>{
   renderSettings();
@@ -25260,6 +25233,7 @@ function openMembership(agentKey, nameOverride, cascade){
         <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
                 style="vertical-align:baseline">Sign in</button></p>
     </div>
+    ${membPromoHTML()}
     <div id="membCodeState" hidden>
       <p class="pnote" id="membCodeMsg"></p>
       <div class="flabel">Code</div>
@@ -25278,6 +25252,7 @@ function openMembership(agentKey, nameOverride, cascade){
     ${membIsNativeApp() ? `<button type="button" class="linkbtn" id="membRestoreBtn" onclick="membRestoreTap()">Restore Purchases</button>` : ""}
     ${posters?`<div class="rvgrid membgrid" id="membPosterGrid">${posters}</div>`:""}`;
   membResetCodeState();   // B10: always opens in State A
+  membPromoReset("signup");   // CAS-1565
   membLoadProduct();      // CAS-971: StoreKit's localized price/trial text, native only
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
@@ -25335,7 +25310,7 @@ function openOnbMembership(){
   $("membBody").innerHTML = `
     <span class="cascpill" id="membPill">CASCADE</span>
     <h2 class="membh" id="membHead">Create your account</h2>
-    <p class="membsub">Start your free month of Cascade.</p>
+    <p class="membsub" id="membSub">Start your free month of Cascade.</p>
     <div class="membenefits">
       ${OB_MEMB_BENEFITS.map(b=>`<div class="mbrow">${b.art}
         <span class="mbtx"><span class="mbt">${b.html}</span></span></div>`).join("")}
@@ -25352,6 +25327,7 @@ function openOnbMembership(){
         <button type="button" class="linkbtn" id="membSigninBtn" onclick="membSignInFromAcctExists()"
                 style="vertical-align:baseline">Sign in</button></p>
     </div>
+    ${membPromoHTML()}
     <div id="membCodeState" hidden>
       <p class="pnote" id="membCodeMsg"></p>
       <div class="flabel">Code</div>
@@ -25370,6 +25346,7 @@ function openOnbMembership(){
     ${membIsNativeApp() ? `<button type="button" class="linkbtn" id="membRestoreBtn" onclick="membRestoreTap()">Restore Purchases</button>` : ""}
     ${posters?`<div class="rvgrid membgrid" id="membPosterGrid">${posters}</div>`:""}`;
   membResetCodeState();   // B10: always opens in State A
+  membPromoReset("signup");   // CAS-1565
   membLoadProduct();      // CAS-971: StoreKit's localized price/trial text, native only
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
@@ -25489,7 +25466,7 @@ function membSetStateAVisible(visible){
   // Lee, 14 Nov: the privacy consent line shows once, with the email it applies to, not again on the code step.
   // Lee, 16 Nov: the First month free box is the email step's only; the code step just asks for the code.
   [$("membPill"), $("membOffer"), body.querySelector(".membhaul"), body.querySelector(".membenefits"),
-   body.querySelector(".memfine"), $("membEmailField"), $("membPosterGrid"),
+   body.querySelector(".memfine"), $("membEmailField"), $("membPromo"), $("membPosterGrid"),
    // The privacy line specifically — the first .pnote is #membCodeMsg, which holds Change email (CAS-1445).
    body.querySelector('.pnote button[onclick^="openPrivacy"]')?.closest(".pnote")]
     .forEach(el=>{ if(el) el.style.display=d; });
@@ -25542,8 +25519,8 @@ window.membResendCode=()=>{
   const msg=$("membCodeMsg");
   window.CascadeAuth.continueWithEmail(membCodeEmail).then(result=>{
     if(result.rateLimited) membCodeErrorShow("A code was sent less than a minute ago. Use the newest email, or wait a moment and resend.");
-    else if(!result.ok) membCodeErrorShow("Could not resend: "+(result.error||""));
-  });
+    else if(!result.ok) membCodeErrorShow(membIsNetErr(result.error) ? MEMB_OFFLINE_MSG : "Could not resend the code — try again.");
+  }).catch(()=>membCodeErrorShow(MEMB_OFFLINE_MSG));
   if(msg) msg.innerHTML=esc(membCodeMsgText(membCodeEmail))+
     ' <button type="button" class="linkbtn" id="membChangeEmail" onclick="membBackToEmail()" style="vertical-align:baseline">Change email</button>';
 };
@@ -25579,10 +25556,10 @@ function membSubmitCode(){
     } else {
       // Not cleared here: onbMembershipInFlight stays true across a wrong-code retry (only Change email
       // or a confirmed code end this attempt) — see membBackToEmail's own comment.
-      membCodeErrorShow("Wrong or expired code — check it and try again, or resend.");
+      membCodeErrorShow(membIsNetErr(result.error) ? MEMB_OFFLINE_MSG : "Wrong or expired code — check it and try again, or resend.");
       idle();
     }
-  });
+  }).catch(()=>{ membCodeErrorShow(MEMB_OFFLINE_MSG); idle(); });
 }
 // CAS-1099: discards the whole onboarding draft in memory — shared by membSignInFromAcctExists below and
 // membCompleteNewMembership's own 'account_exists' outcome. An existing account is never merged with a
@@ -25617,7 +25594,7 @@ window.membStart=()=>{
   if(needsEmail){
     email=($("membEmail").value||"").trim();
     if(!emailValid(email)){
-      membEmailError("That doesn't look like an email address — check it and try again.");
+      membEmailError("Enter a valid email address.");   // CAS-1571 rule 4
       $("membEmail").focus();
       return;
     }
@@ -25653,11 +25630,31 @@ window.membStart=()=>{
     // listener's own comment). Cleared by membCompleteNewMembership() once that RPC actually resolves.
     onbMembershipInFlight=true;
     const client=window.CascadeAuth.client;
-    // CAS-1099 change 2: before requesting a code at all, ask whether this email already has an account —
-    // if so, send no code; show the message and Sign in button instead.
-    const checkExisting = client ? client.rpc("email_has_account", {p_email:email}) : Promise.resolve({data:false, error:null});
-    checkExisting.then(({data, error})=>{
-      if(error) console.warn("email_has_account", error);
+    const fail=(msg)=>{ onbMembershipInFlight=false; membEmailError(msg); idle(); };
+    // CAS-1571 rule 5: email (above) first, then the code if one is typed, then the account check, then send
+    // the email code. Only the first problem shows. An empty promo box is ignored entirely.
+    (async()=>{
+      const typed=membPromoTyped();
+      if(typed){
+        const st=await membPromoCheck(typed);
+        if(st==="valid"){ membPromoHeld=typed.toUpperCase(); membPromoPaint(); membPromoApplied(); }
+        else{
+          membPromoErr(st==="offline" ? MEMB_OFFLINE_MSG : "That code isn't valid.", st!=="offline");
+          onbMembershipInFlight=false; idle();
+          return;
+        }
+      }
+      // CAS-1099 change 2: before requesting a code at all, ask whether this email already has an account —
+      // if so, send no code; show the message and Sign in button instead.
+      let data=null;
+      try{
+        const r = client ? await client.rpc("email_has_account", {p_email:email}) : {data:false, error:null};
+        data=r && r.data;
+        if(r && r.error){
+          if(membIsNetErr(r.error)){ fail(MEMB_OFFLINE_MSG); return; }
+          console.warn("email_has_account", r.error);
+        }
+      }catch(e){ fail(MEMB_OFFLINE_MSG); return; }
       if(data===true){
         onbMembershipInFlight=false;
         membAcctExistsShow(email);
@@ -25666,11 +25663,12 @@ window.membStart=()=>{
       }
       // CAS-1169: continueWithEmail only requests a code — the code is confirmed right here on
       // #membScreen (State B, membSubmitCode), never on #authModal's own verify step.
-      window.CascadeAuth.continueWithEmail(email, { createUser: true }).then(result=>{
-        if(result.ok || result.rateLimited){ membShowCodeState(email); idle(); }
-        else{ onbMembershipInFlight=false; membEmailError(result.error||"Could not send a sign-in code — try again."); idle(); }
-      });
-    });
+      let result;
+      try{ result=await window.CascadeAuth.continueWithEmail(email, { createUser: true }); }
+      catch(e){ fail(MEMB_OFFLINE_MSG); return; }
+      if(result && (result.ok || result.rateLimited)){ membShowCodeState(email); idle(); }
+      else fail(membIsNetErr(result && result.error) ? MEMB_OFFLINE_MSG : "Could not send a sign-in code — try again.");
+    })();
   } else proceed(false);
 };
 // ---- CAS-971: the membership is real — Apple in-app purchase, entitlement read from the server -----------
@@ -25702,16 +25700,6 @@ async function membLoadEntitlement(){
     const {data, error}=await a.client.from("memberships").select("status,expires_at,is_trial,source").eq("user_id", a.user.id).maybeSingle();
     if(error){ console.warn("Cascade: memberships read failed", error); membEnt={state:"unknown", row:null}; return membEnt; }
     membEnt={state: membRowActive(data) ? "active" : "none", row:data||null};
-    // CAS-1531: an email on the server's approved list (public.web_access, no client read policy — only this
-    // yes/no function can see it) counts as a member, source "web_access". An unreachable function (migration
-    // 0012 not applied yet) leaves the answer as it was: it never locks anyone out.
-    if(membEnt.state==="none" && typeof a.client.rpc==="function"){
-      try{
-        const r=await a.client.rpc("is_web_access_approved");
-        if(!r.error && r.data===true) membEnt={state:"active", row:{status:"active", expires_at:"2099-12-31T00:00:00Z", is_trial:false, source:"web_access"}};
-        else if(r.error) console.warn("Cascade: web_access check failed", r.error);
-      }catch(e){ console.warn("Cascade: web_access check failed", e); }
-    }
   }catch(e){ console.warn("Cascade: memberships read failed", e); membEnt={state:"unknown", row:null}; }
   return membEnt;
 }
@@ -25740,7 +25728,7 @@ function membAccountPlanText(){
   if(membEnt.state==="active" && r){
     const d=new Date(r.expires_at).toLocaleDateString(undefined,{day:"numeric",month:"long",year:"numeric"});
     if(r.source==="comp") return "Complimentary membership";
-    if(r.source==="web_access") return "Invited access";
+    if(r.source==="promo") return "Complimentary membership until " + d;   // CAS-1565
     return (r.is_trial ? "Free trial until " : "Active · renews ") + d;
   }
   return membEnt.state==="none" ? "No active membership" : "Membership is started in the Cascade iPhone app.";
@@ -25854,9 +25842,17 @@ async function membRestore(){
 async function membEnsureMember(go){
   if(!window.CascadeAuth || window.CascadeAuth.status!=="signed-in") return go();
   if(!membIsNativeApp()){
+    // CAS-1565: a code applied on the sign-up screen is redeemed once, now that there is an account, before
+    // the gate decides. A failure leaves the account where it is and names the reason on the invite-only screen.
+    let promoErr=null;
+    if(membPromoHeld){
+      const code=membPromoHeld; membPromoHeld=null;
+      const r=await membRedeemPromo(code);
+      if(!r.ok) promoErr=r.error;
+    }
     await membLoadEntitlement();
     if(membEnt.state!=="none") return go();
-    membShowInviteOnly();
+    membShowInviteOnly(promoErr);
     return;
   }
   await membLoadEntitlement();
@@ -25866,15 +25862,134 @@ async function membEnsureMember(go){
 }
 // CAS-1531: the web's only screen for a signed-in non-member. Painted into #membBody, so closeMembership()
 // and the screen's chrome are the same as every other membership page.
-function membShowInviteOnly(){
+function membShowInviteOnly(promoErr){
   $("membBody").innerHTML = `
     <span class="cascpill" id="membPill">CASCADE</span>
     <h2 class="membh" id="membHead">Cascade on the web is invite-only</h2>
-    <p class="pnote" id="membInviteMsg">Cascade on the web is invite-only. Membership starts in the Cascade iPhone app; once you're a member, sign in here with the same account.</p>
+    <p class="pnote" id="membInviteMsg">Cascade on the web is invite-only. If a friend gave you a promo code, enter it below. Otherwise membership starts in the Cascade iPhone app.</p>
+    ${promoErr ? `<p class="fielderr" id="membInviteReason" role="alert">${esc(membPromoMsg(promoErr))}</p>` : ""}
+    ${membPromoHTML()}
     <button class="membcta" type="button" id="membSignOutBtn" onclick="membInviteSignOut()">Sign out</button>`;
   membResetCodeState();
+  membPromoReset("invite");
   $("membScreen").scrollTop=0;
   $("membScreen").classList.add("open"); lockBodyScroll(true);
+}
+// ---- CAS-1565: promo code (web only — App Store 3.1.1 forbids a code that unlocks a subscription in-app) ----
+// The code lives in memory only and is never logged. `membPromoMode` is where the box is: the sign-up screen
+// (check_promo_code, anon-safe, holds the code) or the invite-only screen (redeem_promo_code straight away).
+let membPromoHeld=null, membPromoOpen=false, membPromoMode="signup", membPromoBusy=false;
+// CAS-1571 rule 1: a network/fetch failure anywhere on #membScreen says this, never the raw exception text.
+const MEMB_OFFLINE_MSG="Couldn't reach Cascade. Check your connection and try again.";
+const MEMB_PROMO_MSG={used_up:"That code has been used up.", already_used:"That code has already been used on this account.", already_member:"You're already a member, so that code isn't needed.", offline:MEMB_OFFLINE_MSG};
+function membPromoMsg(err){ return MEMB_PROMO_MSG[err] || "That code isn't valid."; }
+// A transport failure (rejected fetch, or an rpc error whose text is the fetch's) as opposed to a server answer.
+function membIsNetErr(e){
+  if(!e) return false;
+  const m=String((e && (e.message||e.error||e.details)) || e);
+  return /failed to fetch|networkerror|network request failed|load failed|fetch failed|offline|timed? ?out/i.test(m);
+}
+function membPromoInner(){
+  if(membPromoHeld) return `<div class="flabel">Promo code</div>
+      <div class="membpromobox"><input class="namein" id="membPromoCode" disabled></div>
+      <p class="membpromook">✓ Code applied: your first year is free.</p>`;
+  if(membPromoOpen) return `<div class="flabel">Promo code</div>
+      <div class="membpromobox"><input class="namein" id="membPromoCode" autocapitalize="characters" autocomplete="off" spellcheck="false"><button type="button" class="membpromoapply" id="membPromoApply">Apply</button></div>
+      <div class="membpromoerr"><p class="fielderr" id="membPromoErr" role="alert" hidden></p><button type="button" class="linkbtn" id="membPromoClear" hidden>Clear</button></div>`;
+  return `<button type="button" class="linkbtn" id="membPromoLink">Have a promo code?</button>`;
+}
+function membPromoHTML(){
+  if(membIsNativeApp()) return "";
+  return `<div id="membPromo" class="membpromo">${membPromoInner()}</div>`;
+}
+function membPromoReset(mode){ membPromoMode=mode; membPromoHeld=null; membPromoOpen=false; membPromoBusy=false; membPromoWire(); }
+// `clearable`: an invalid / used-up code gets a small Clear link that empties the box and removes the error
+// (the box itself stays open). An offline message never offers it: nothing is cleared, the code isn't wrong.
+function membPromoErr(msg, clearable){
+  const e=$("membPromoErr"); if(e){ e.textContent=msg||""; e.hidden=!msg; }
+  const c=$("membPromoClear"); if(c) c.hidden=!(msg && clearable);
+}
+function membPromoClear(){
+  const i=$("membPromoCode"); if(i){ i.value=""; if(i.focus) i.focus(); }
+  membPromoErr(null);
+}
+// What's typed in the open, un-applied box ("" when empty, closed, or already applied).
+function membPromoTyped(){
+  if(membPromoHeld || membPromoMode!=="signup") return "";
+  const i=$("membPromoCode");
+  return ((i && i.value)||"").trim();
+}
+// "valid" | "invalid" | "offline" — offline is never reported as invalid.
+async function membPromoCheck(code){
+  let out;
+  try{
+    const c=window.CascadeAuth && window.CascadeAuth.client;
+    if(!c) return "offline";
+    const r=await c.rpc("check_promo_code",{p_code:code});
+    if(r && r.error) out="offline";
+    else out=(r && r.data===true) ? "valid" : "invalid";
+  }catch(e){ out="offline"; }
+  if(out!=="offline") logEvent("promo_check",{valid:out==="valid"});
+  return out;
+}
+function membPromoWire(){
+  const link=$("membPromoLink");
+  if(link) link.addEventListener("click",()=>{ membPromoOpen=true; membPromoPaint(); const i=$("membPromoCode"); if(i && i.focus) i.focus(); });
+  const apply=$("membPromoApply");
+  if(apply) apply.addEventListener("click",()=>membPromoApply());
+  const clr=$("membPromoClear");
+  if(clr) clr.addEventListener("click",()=>membPromoClear());
+  const input=$("membPromoCode");
+  if(input && !membPromoHeld) input.addEventListener("keydown",ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); membPromoApply(); } });
+}
+function membPromoPaint(){
+  const el=$("membPromo"); if(!el || membIsNativeApp()) return;
+  el.innerHTML=membPromoInner();
+  const input=$("membPromoCode");
+  if(input && membPromoHeld) input.value=membPromoHeld;
+  membPromoWire();
+}
+// Valid on the sign-up screen: the price box becomes the single free-year line, and the confirmation line is
+// scrolled clear of the fixed Continue button.
+function membPromoApplied(){
+  const offer=$("membOffer");
+  if(offer) offer.innerHTML=`<span class="moterms">Your first year is free with your code.</span>`;
+  const sub=$("membSub"); if(sub) sub.textContent="Start your free year of Cascade.";   // CAS-1578: the line under the heading agrees with the offer
+  const ok=document.querySelector("#membPromo .membpromook"), cta=document.querySelector(".membcta"), scr=$("membScreen");
+  if(ok && cta && scr && ok.getBoundingClientRect && cta.getBoundingClientRect){
+    const over=ok.getBoundingClientRect().bottom-(cta.getBoundingClientRect().top-12);
+    if(over>0) scr.scrollTop+=over;
+  }
+}
+async function membRedeemPromo(code){
+  let out;
+  try{
+    const c=window.CascadeAuth && window.CascadeAuth.client;
+    const r=c ? await c.rpc("redeem_promo_code",{p_code:code}) : {error:true};
+    const d=r && r.data;
+    out = (!r.error && d && d.ok===true) ? {ok:true} : {ok:false, error:(r.error ? "offline" : ((d && d.error) || "invalid"))};
+  }catch(e){ out={ok:false, error:"offline"}; }
+  logEvent("promo_redeem",{ok:out.ok, error:out.error||null});
+  return out;
+}
+async function membPromoApply(){
+  if(membPromoBusy || membIsNativeApp()) return;
+  const input=$("membPromoCode");
+  const code=((input && input.value)||"").trim();
+  if(!code){ membPromoErr("Enter the code first."); return; }
+  membPromoBusy=true; membPromoErr(null);
+  try{
+    if(membPromoMode==="invite"){
+      const r=await membRedeemPromo(code);
+      if(r.ok){ await membLoadEntitlement(); closeMembership(); membGateDone(); maybeStartTutorial(); }
+      else membPromoErr(membPromoMsg(r.error), r.error!=="offline");
+    } else {
+      const st=await membPromoCheck(code);
+      if(st==="valid"){ membPromoHeld=code.toUpperCase(); membPromoPaint(); membPromoApplied(); }
+      else if(st==="offline") membPromoErr(MEMB_OFFLINE_MSG, false);
+      else membPromoErr("That code isn't valid.", true);
+    }
+  } finally { membPromoBusy=false; }
 }
 window.membInviteSignOut=async()=>{
   const a=window.CascadeAuth;
@@ -26126,9 +26241,93 @@ document.addEventListener("click", e=>{
     t.remove();
   }
 });
+// ---- WATCH REMINDER / TASTE CARD (CAS-1566) ------------------------------------------------------------
+// One slot above the Watch list. Never a rating exercise: the reminder only says rating teaches the agent
+// and has no action button; the Taste card reports a real adjustment read off the taste model (youScore's
+// own pair arithmetic). Counts live per account in user_prefs.view.rnudge = {rem:<times shown>, taste:<retired>}.
+let rnudgeMap={rem:0, taste:false};
+let rnudgeVisit=null, rnudgeVisitGone=false;   // the card this visit holds, and whether it was dismissed
+const RNUDGE_MAX_SHOWN=3, RNUDGE_MIN_PTS=5;
+// The decision, pure.  o: {signedIn, now, createdAt, ratings, adj:{pts,text}|null, seen:{rem,taste},
+//   tutorialShownThisVisit, cardShownThisVisit, blocked}  -> "reminder" | "taste" | null
+function rnudgeDecide(o){
+  if(!o || !o.signedIn || o.blocked || o.tutorialShownThisVisit || o.cardShownThisVisit) return null;
+  const seen=o.seen||{};
+  if((o.ratings||0)>=10){
+    if(seen.taste) return null;
+    return (o.adj && Math.abs(o.adj.pts)>=RNUDGE_MIN_PTS) ? "taste" : null;
+  }
+  if((o.ratings||0)>=5) return null;
+  if(tutAccountAgeDays(o.createdAt, o.now)<2) return null;
+  if((seen.rem||0)>=RNUDGE_MAX_SHOWN) return null;
+  return "reminder";
+}
+function rnudgeRatingsCount(){
+  let n=0; watched.forEach(id=>{ if(WATCH_STEPS.some(s=>s.key===opinionOf(id))) n++; }); return n;
+}
+// The strongest genre-pair adjustment, in points, as the You score applies it (youScore's own adj for a
+// film of just that pair). Null when none exists.
+function rnudgeBestAdjustment(){
+  const T=tasteProfile(); let best=null;
+  Object.values(T.pairs||{}).forEach(pr=>{
+    if(!(pr.n>0) || !(pr.primary<pr.other)) return;
+    const pts=Math.round(youScore({pub:50, pairs:[{sum:pr.sum, n:pr.n}], b:T.pairBaseline}).adj);
+    if(!best || Math.abs(pts)>Math.abs(best.pts)) best={pts, pr};
+  });
+  if(!best || !best.pts) return null;
+  const nm=g=>(typeof tasteShortName==="function" ? tasteShortName(g) : g);
+  return {pts:best.pts, text:`${nm(best.pr.primary)} with ${nm(best.pr.other)} is ${best.pts>0?"up":"down"} ${Math.abs(best.pts)} from your ratings`};
+}
+function rnudgeCardHTML(kind, agentName, adjText){
+  const rem=kind==="reminder";
+  return `<div class="rnudge" role="note" data-k="${kind}">
+  <span class="ic" aria-hidden="true">${rem?"⭐":"🎯"}</span>
+  <div class="tx"><div class="t">${rem?`The more you rate, the better ${esc(agentName)} gets`:`${esc(agentName)} has learned something`}</div><div class="s">${rem?"After you watch a film, tap <b>Watched</b> and say how you felt":esc(adjText)}</div></div>
+  ${rem?"":'<button type="button" class="go">See Taste</button>'}
+  <button type="button" class="x" aria-label="Dismiss">✕</button>
+</div>`;
+}
+function rnudgeSync(){
+  const slot=$("rnudgeSlot"); if(!slot) return;
+  const a=window.CascadeAuth;
+  const signedIn=!!(a && a.enabled && a.status==="signed-in" && a.user);
+  if(!signedIn){ slot.innerHTML=""; return; }
+  const blocked=tutBannerBlocked("watch") || !!document.querySelector("#movingScreen.open,#agentsScreen.open,#findScreen.open");
+  if(rnudgeVisit && !rnudgeVisitGone){
+    // Same visit, same card: keep it drawn across re-renders (the slot sits outside the list), unless a
+    // sheet/modal/tutorial now covers the screen.
+    if(blocked){ slot.innerHTML=""; return; }
+    if(!slot.firstElementChild) slot.innerHTML=rnudgeCardHTML(rnudgeVisit.kind, rnudgeVisit.name, rnudgeVisit.text).trim();
+    return;
+  }
+  slot.innerHTML="";
+  if(rnudgeVisitGone) return;
+  const ratings=rnudgeRatingsCount();
+  const adj=ratings>=10 ? rnudgeBestAdjustment() : null;
+  const kind=rnudgeDecide({signedIn, now:Date.now(), createdAt:a.user.created_at, ratings, adj,
+    seen:rnudgeMap, tutorialShownThisVisit:tutVisitShown, cardShownThisVisit:false, blocked});
+  if(!kind) return;
+  const c=oneAgentCriteria();
+  const name=((c&&c.name)||"").trim() || "Your agent";
+  rnudgeVisit={kind, name, text:adj?adj.text:""};
+  slot.innerHTML=rnudgeCardHTML(kind, name, rnudgeVisit.text).trim();
+  if(kind==="reminder"){ rnudgeMap.rem=(rnudgeMap.rem||0)+1; pushViewField("rnudge", rnudgeMap); logEvent("taste_reminder_shown",{n:rnudgeMap.rem}); }
+  else logEvent("taste_card_shown",{pts:adj.pts});
+}
+function rnudgeAdopt(v){
+  if(!v || typeof v!=="object") return;
+  rnudgeMap={rem:Math.max(rnudgeMap.rem||0, +v.rem||0), taste:!!(rnudgeMap.taste||v.taste)};
+}
+document.addEventListener("click", e=>{
+  const t=e.target && e.target.closest ? e.target.closest(".rnudge") : null; if(!t) return;
+  const kind=t.dataset.k;
+  const retire=()=>{ if(kind==="taste"){ rnudgeMap.taste=true; pushViewField("rnudge", rnudgeMap); } rnudgeVisitGone=true; t.remove(); };
+  if(e.target.closest(".go")){ logEvent("taste_card_open",{}); retire(); window.openAgentsScreen(); }
+  else if(e.target.closest(".x")){ logEvent(kind==="taste"?"taste_card_dismiss":"taste_reminder_dismiss",{}); retire(); }
+});
 document.addEventListener("visibilitychange", ()=>{
   if(document.visibilityState==="hidden"){ tutHiddenAt=Date.now(); return; }
-  if(tutHiddenAt && Date.now()-tutHiddenAt>=TUT_VISIT_GAP_MS) tutVisitShown=false;
+  if(tutHiddenAt && Date.now()-tutHiddenAt>=TUT_VISIT_GAP_MS){ tutVisitShown=false; rnudgeVisit=null; rnudgeVisitGone=false; }
   tutHiddenAt=0;
 });
 // Card text for this script is set via innerHTML (the ticket's own "¶ = <br><br>" rule, spec verbatim) —
@@ -26161,7 +26360,7 @@ function v2CaptureCard(){
 function v2OpenFirstOnStyle(){
   const c=oneAgentCriteria(); if(!c) return;
   const order=oaComputeOrder(c);
-  const style=order.find(s=>oaBar(c,s)!=null);
+  const style=order[0];   // CAS-1594: every genre has a row; open the first
   if(!style) return;
   oaOrderSnapshot=order; oaOpenStyle=style;
   oaShowAllAdj=false; oaComboFilmsOpen.clear(); oaSuggestionOpen=false;
@@ -26194,7 +26393,7 @@ const TOURS = {
     {html:TUT_P("<b>Latest and Best</b> is your main list: the top 20% of every genre your agent follows."),
       before(){ tutMoodRowTo(null); }, sel:[`.moodrow .moodchip[data-mood="releases"]`], trail:TUT_W},
     {html:TUT_P("Some lists have been created from the questions you answered."),
-      before(){ tutMoodRowTo(`.moodrow .moodchip[data-mood="me"]`); },
+      before(){ tutMoodRowTo([`.moodrow .moodchip[data-mood="me"]`,`.moodrow .moodchip[data-mood="date"]`,`.moodrow .moodchip[data-mood="family"]`]); },
       sel:[`.moodrow .moodchip[data-mood="me"]`,`.moodrow .moodchip[data-mood="date"]`,`.moodrow .moodchip[data-mood="family"]`], trail:TUT_W},
     // Lee, 14 Nov: point at the moods setup made from the first-run answers. Skipped (CAS-976 rule) when the
     // account has neither.
@@ -26239,10 +26438,10 @@ const TOURS = {
       before(){ tutOpenMoodsTourSheet(); }, after(){ closeWatchSheetQuiet(); }, sel:["#oamMoodName"]},
     {html:TUT_P("A list starts with your agent's genre preferences, so you get the films that matter most to you.",
       "Switch genres on or off to make a special list. For example, to create a list with only drama movies, switch everything else off."),
-      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .mgenre .oalist"]},
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .mgenre .oalist .oamlvlrow"]},
     // Lee, 2026-11-17: the Agent settings / Agent override switch sits under the genre rows.
-    {html:TUT_P("Want only the very best? Under the genres, choose <b>Override</b> to set one level for every genre in this list."),
-      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .oamlvlseg"]},
+    {html:TUT_P("Want only the very best? Slide a genre left for fewer, better films, or use <b>Set all genres</b> to give every genre the same level."),
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .oamlvlall"]},
     // The "during account setup" lines only appear when that setup mood exists (Lee, 16 Nov).
     {get html(){ return TUT_P("<b>Or find films by name</b>: type an actor, director or title instead. A name here switches the genres off.",
       ...(watchMoods.some(m=>m.id==="fav-person") ? ["During account setup, we set up a list with your favourite actor or director to show you how this is done."] : [])); },
@@ -26278,7 +26477,7 @@ const TOURS = {
       before(){ tutFindSearch("Nolan"); }, sel:["#findSaveAsMoodBtn"], trail:["#findBtn"]},
   ]},
   agent:{ title:"Taste tutorial", steps:[
-    {html:TUT_P("<b>Taste</b>: how much of each genre you want. Slide a genre to see more or fewer of its films; untick it to switch it off."),
+    {html:TUT_P("<b>Taste</b>: what your agent has learned from your verdicts, and the alerts you want for each genre. How many films of each genre you see is set in each list."),
       before(){ closeSettings(); oaOpenStyle=null; oaOrderSnapshot=null; openAgentsScreen(); },
       after(){ oaOpenStyle=null; oaOrderSnapshot=null; showAgentsHome(); }, sel:["#oaList .oarow"], trail:["#agentsBtn"]},
     // Lee, 21 Nov: the Agent recommendations card (CAS-1479/1480/1498).
@@ -26288,8 +26487,8 @@ const TOURS = {
     {html:TUT_P("Most movies have a main genre, listed first, and sub-genres after it: a Sci-fi that is also a Thriller, a Comedy that is also a Romance.",
       "Your Cascade agent studies those combinations in what you watch and rate, and works out which ones you're most and least likely to enjoy."),
       center:true},
-    {html:TUT_P("So your agent tracks each genre together with its sub-genres. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here. Each sub-genre has its own slider; drag one to set it yourself."),
-      before(){ v2OpenFirstOnStyle(); }, sel:["#oaAdjustSection"], trail:["#agentsBtn"]},
+    {html:TUT_P("So your agent tracks each genre together with its sub-genres. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here. Each sub-genre has a row of steps; tap one to set it yourself."),
+      before(){ v2OpenFirstOnStyle(); }, sel:["#oaAdjustSection .oasechdr"], trail:["#agentsBtn"]},
     {html:TUT_P("That's it. Your agent checks the whole catalogue overnight and reports every morning."),
       before(){ oaOpenStyle=null; oaOrderSnapshot=null; closeSettings(); showAgentsHome(); }, center:true},
   ]},
@@ -26390,14 +26589,19 @@ function tutMoodRowTo(sel){
   const row=document.querySelector(".moodrow"); if(!row) return;
   const scroller = row.scrollWidth>row.clientWidth ? row : (row.querySelector(".moodscroll")||row);
   if(!sel){ scroller.scrollLeft=0; return; }
-  const el=row.querySelector(sel)||document.querySelector(sel); if(!el) return;
-  const rr=scroller.getBoundingClientRect(), er=el.getBoundingClientRect();
-  scroller.scrollLeft += (er.left+er.width/2) - (rr.left+rr.width/2);
+  // CAS-1581: `sel` may be a list — the row is then scrolled so those chips are on screen together where they
+  // fit (centred as a group); when the group is wider than the row, the first chip is brought to the start.
+  const els=(Array.isArray(sel)?sel:[sel]).map(q=>row.querySelector(q)||document.querySelector(q)).filter(Boolean);
+  if(!els.length) return;
+  const rr=scroller.getBoundingClientRect(), rects=els.map(e=>e.getBoundingClientRect());
+  const left=Math.min(...rects.map(r=>r.left)), right=Math.max(...rects.map(r=>r.right));
+  if(right-left <= rr.width) scroller.scrollLeft += (left+right)/2 - (rr.left+rr.width/2);
+  else scroller.scrollLeft += rects[0].left - rr.left - 8;
 }
 // The made moods sit at the end of the mood row — scroll it so they're on screen for the step.
 function tutRevealMadeMoods(){
-  const chip=document.querySelector(`.moodrow .moodchip[data-mood="topsvc"],.moodrow .moodchip[data-mood="fav-person"]`);
-  if(chip) chip.scrollIntoView({block:"nearest", inline:"center"});
+  // CAS-1582: both made chips together (the step points at both), not just the first one centred.
+  tutMoodRowTo([`.moodrow .moodchip[data-mood="topsvc"]`,`.moodrow .moodchip[data-mood="fav-person"]`]);
 }
 // Kept for anything that still reads the v2 script by name — it is the Watch tour.
 const V2_TOUR_STEPS = TOURS.watch.steps;
@@ -26483,9 +26687,15 @@ function tutorialAdvance(dir){
   let idx=tutIdx+dir;
   while(idx>=0 && idx<tutSteps.length){
     const step=tutSteps[idx];
+    // CAS-1581: did before() expand/collapse (or swap) the film card? Then the card is still moving and the
+    // tour card is held back until the settle pass has placed it.
+    const sig0 = tourCardId+":"+(tourCardId!=null && expandedSet.has(tourCardId));
     if(step.before) step.before();
     const resolved=tutResolveStep(step);
-    if(resolved){ tutIdx=idx; tutCurrent=resolved; showTutorialCard(); return true; }
+    if(resolved){
+      tutHoldCard = (step.scope==="card" || step.wholeCard) && sig0 !== tourCardId+":"+(tourCardId!=null && expandedSet.has(tourCardId));
+      tutIdx=idx; tutCurrent=resolved; showTutorialCard(); return true;
+    }
     idx+=dir;
   }
   return false;
@@ -26531,7 +26741,7 @@ function tutScrollIntoPlace(step){
   // Scrolled directly (not scrollIntoView + scroll-margin), since the margin can be negative.
   window.scrollBy(0, anchor.getBoundingClientRect().top - margin);
 }
-let tutNarrowTimers=[], tutShut=new Set(), tutShutDrawn=new Set();
+let tutNarrowTimers=[], tutShut=new Set(), tutShutDrawn=new Set(), tutHoldCard=false;
 function tutClearNarrow(){ tutNarrowTimers.forEach(clearTimeout); tutNarrowTimers=[]; tutShut=new Set(); tutShutDrawn=new Set(); }
 // step.narrow: selectors (of the step's own targets) that fade out one by one, ~0.9s apart, after a beat.
 function tutRunNarrow(step){
@@ -26552,15 +26762,72 @@ function showTutorialCard(){
   $("tutNextBtn").textContent = (tutIdx===tutSteps.length-1) ? "Done" : "Next";
   $("tutBackBtn").style.display = tutIdx===0 ? "none" : "";
   $("tutSkipBtn").style.visibility = (tutIdx===tutSteps.length-1) ? "hidden" : "";
-  const card=$("tutCard"); card.style.animation="none"; void card.offsetWidth; card.style.animation="";
+  // CAS-1599: the animation stays OFF here (place() restarts it): a running CSS animation overrides the inline
+  // opacity:0 below, so restoring it now showed the bubble at once, then it jumped when the page settled.
+  const card=$("tutCard"); card.style.animation="none"; void card.offsetWidth;
+  // CAS-1581/CAS-1582: the tour card stays invisible until the page under it has stopped moving (a film card
+  // expanding, a sheet opening, a row or the page scrolling), then it is placed from the settled boxes and
+  // shown in place with no glide: a card drawn from a stale box pointed at nothing (Watch step 5's arrow).
+  tutHoldCard=false;
+  card.style.opacity="0"; card.style.pointerEvents="none"; card.style.transition="none";
   tutScrollIntoPlace(step);
   requestAnimationFrame(()=>requestAnimationFrame(tutorialReposition));
-  // A card that has just expanded or collapsed is still settling — place it again once it has.
-  if(step.scope==="card" || step.wholeCard){
-    const idx=tutIdx;
-    tutNarrowTimers.push(setTimeout(()=>{ if(tutIdx===idx){ tutScrollIntoPlace(step); tutorialReposition(); } }, 380));
-  }
-  tutRunNarrow(step);
+  tutSettle(tutIdx, step);
+}
+// Everything that can still be moving under the card: the page, every scrolling ancestor of a target, and the
+// targets' own boxes (a sheet or film card animating in moves them without any scroll).
+function tutMotionSig(){
+  const els=tutCurrent && tutCurrent.els ? tutCurrent.els : [], out=[scrollX, scrollY];
+  els.forEach(el=>{
+    const r=el.getBoundingClientRect(); out.push(r.left, r.top, r.width, r.height);
+    for(let p=el.parentElement; p && p!==document.body; p=p.parentElement)
+      if(p.scrollWidth>p.clientWidth+1 || p.scrollHeight>p.clientHeight+1) out.push(p.scrollLeft, p.scrollTop);
+  });
+  if(tourCardEl){ const r=tourCardEl.getBoundingClientRect(); out.push(r.top, r.height); }
+  return out.map(n=>Math.round(n)).join(",");
+}
+// CAS-1597: after the bubble is shown, keep checking for ~3s that nothing under it has shifted (a late image,
+// a sheet, an async render). If the layout moves, re-place the bubble at once (no glide) from the new boxes,
+// so it rests on the final layout, not the one it was first drawn from. Shared by every step of every tour.
+function tutWatchAfterPlace(idx, step){
+  const t0=performance.now(); let last=tutMotionSig(), same=0;
+  const tick=()=>{
+    if(tutIdx!==idx || !$("tutScrim").classList.contains("open")) return;
+    const sig=tutMotionSig();
+    if(sig!==last){
+      last=sig; same=0;
+      const card=$("tutCard"), hole=$("tutHole");
+      if(!(step.narrow && step.narrow.length)){ card.style.transition="none"; hole.style.transition="none"; }
+      tutorialReposition();
+    } else same++;
+    if(performance.now()-t0<3000) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+function tutSettle(idx, step){
+  const t0=performance.now(); let last="", same=0;
+  const place=()=>{
+    if(tutIdx!==idx) return;
+    if(step.scope==="card" || step.wholeCard) tutScrollIntoPlace(step);
+    const card=$("tutCard"), hole=$("tutHole");
+    hole.style.transition="none";
+    tutorialReposition();
+    void card.offsetWidth; void hole.offsetWidth;
+    card.style.opacity=""; card.style.pointerEvents=""; card.style.transition="none";
+    card.style.animation="none"; void card.offsetWidth; card.style.animation="";
+    tutRunNarrow(step);   // the fade-outs start from the placed card
+    // Later repositions may glide only on a step whose targets fade out one by one (CAS-1597: any other late
+    // reposition must jump, never glide, so the bubble is never seen moving after it landed).
+    if(step.narrow && step.narrow.length) setTimeout(()=>{ if(tutIdx===idx){ card.style.transition=""; hole.style.transition=""; } }, 400);
+    tutWatchAfterPlace(idx, step);
+  };
+  const tick=()=>{
+    if(tutIdx!==idx || !$("tutScrim").classList.contains("open")) return;
+    const sig=tutMotionSig(); same = sig===last ? same+1 : 0; last=sig;
+    const minMs = (step.scope==="card" || step.wholeCard) ? 500 : 0;   // a film card's expand/collapse runs ~260ms+
+    if((same>=8 && performance.now()-t0>=minMs) || performance.now()-t0>2500) place(); else requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 // CAS-1152: `zoom:var(--ui-scale)` (CAS-157) makes a position:fixed element's *written* style length
 // land pre-zoom while every *read-back* geometry query reports the post-zoom visual pixel — so a value
@@ -26572,6 +26839,30 @@ function tutZoomFactor(){
   const w=probe.getBoundingClientRect().width;
   probe.remove();
   return w>0 ? w/100 : 1;
+}
+// CAS-1581: a target counts as visible when its rect meets the viewport and the visible rect of its nearest
+// horizontally scrolling ancestor (the mood row's chips scrolled off its edge are not).
+function tutIsVisible(el){
+  const r=el.getBoundingClientRect();
+  if(r.right<=0 || r.left>=innerWidth || r.bottom<=0 || r.top>=innerHeight) return false;
+  for(let p=el.parentElement; p && p!==document.body; p=p.parentElement){
+    if(p.scrollWidth>p.clientWidth+1 && /(auto|scroll)/.test(getComputedStyle(p).overflowX)){
+      const pr=p.getBoundingClientRect();
+      return r.right>pr.left && r.left<pr.right;
+    }
+  }
+  return true;
+}
+// The elements the card and arrow point at: for a `narrow` step the targets that are NOT fading out (so the
+// card never moves as they go); otherwise the targets currently still lit. Only visible ones; else the first.
+function tutAnchorEls(step, allEls, els){
+  let pool=els;
+  if(step.narrow && step.narrow.length){
+    const keep=allEls.filter(el=>!step.narrow.some(sel=>el.matches(sel)));
+    if(keep.length) pool=keep;
+  }
+  const vis=pool.filter(tutIsVisible);
+  return vis.length ? vis : pool.slice(0,1);
 }
 function tutUnionRect(els){
   let left=Infinity, top=Infinity, right=-Infinity, bottom=-Infinity;
@@ -26620,9 +26911,10 @@ function tutorialReposition(){
     const shut=tutShut.has(el); if(shut) tutShutDrawn.add(el);
     return `<div class="tutring${shut?" shut":""}" style="${pos(box(el.getBoundingClientRect()))}"></div>`;
   }).join("");
-  let r;
+  let r, ra;
   if(els.length){
     r=tutUnionRect(els);
+    ra=tutUnionRect(tutAnchorEls(step, allEls, els));
     hole.className = "tuthole"+(allEls.length>1?" multi":"");
     hole.style.left=(r.left-pad)/z+"px"; hole.style.top=(r.top-pad)/z+"px";
     hole.style.width=(r.width+pad*2)/z+"px"; hole.style.height=(r.height+pad*2)/z+"px";
@@ -26631,7 +26923,7 @@ function tutorialReposition(){
       marks += `<div class="tuttap" style="left:${t.x/z}px;top:${t.y/z}px"></div>`;
     }
   } else {
-    r={left:vw/2, top:vh/2, bottom:vh/2, right:vw/2, width:0, height:0};
+    r={left:vw/2, top:vh/2, bottom:vh/2, right:vw/2, width:0, height:0}; ra=r;
     hole.className="tuthole none";
     hole.style.left=r.left/z+"px"; hole.style.top=r.top/z+"px";
     hole.style.width="0px"; hole.style.height="0px";
@@ -26642,10 +26934,10 @@ function tutorialReposition(){
   const cardH=(card.offsetHeight||160)*z, cardW=(card.offsetWidth||340)*z, gap=pad+14;
   let top, left, dir="";
   // Card steps dock clear of the whole film card, not just the button being explained.
-  let avoid=r;
+  let avoid=ra;
   if(els.length && step.scope==="card" && tourCardEl){
     const fr=tourCardEl.getBoundingClientRect();
-    if(fr.bottom + 14 + cardH + 8 <= vh) avoid={...r, top:Math.min(r.top, fr.top), bottom:Math.max(r.bottom, fr.bottom)};
+    if(fr.bottom + 14 + cardH + 8 <= vh) avoid={...ra, top:Math.min(ra.top, fr.top), bottom:Math.max(ra.bottom, fr.bottom)};
   }
   if(!els.length){
     top=(vh-cardH)/2; left=(vw-cardW)/2;
@@ -26656,7 +26948,7 @@ function tutorialReposition(){
     else if(below>=above){ top=Math.min(avoid.bottom+gap, vh-cardH-12); dir="up"; }
     else { top=Math.max(12, avoid.top-gap-cardH); dir="down"; }
     top=Math.max(12, top);
-    const cx=r.left+r.width/2;
+    const cx=ra.left+ra.width/2;
     left=Math.min(Math.max(12, cx-cardW/2), vw-cardW-12);
     const ax=Math.min(Math.max(18, cx-left-8), cardW-34);
     arrow.style.left=ax/z+"px";
@@ -27199,7 +27491,7 @@ function watchNavKey(){
       const c=oneAgentCriteria(); if(!c) return null;
       const mood=currentOamMood();
       return [
-        mood && [mood.styles, mood.show, mood.sort, mood.topShare, mood.ages, mood.awards, mood.years,
+        mood && [mood.styles, mood.show, mood.sort, mood.levels, mood.ages, mood.awards, mood.years,
                  mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out, mood.people, mood.cinemaOnly, mood.anySvc],
         ALL_GENRES.map(g=>oaBar(c,g)),
         c.combo,
@@ -27246,6 +27538,7 @@ function render(){
   renderCallCount++;
   renderGen++;   // CAS-129: supersede any card-fill still streaming from a previous render
   const myGen=renderGen;   // CAS-421: only THIS render may lift the blur it didn't set
+  if(accountFanoutSettled()) rnudgeSync();   // CAS-1566
   if(!accountFanoutSettled()){
     $("groups").innerHTML = accountLoadingHTML();
     renderJumpBar();
@@ -28160,13 +28453,33 @@ const openedShared = openSharedFromURL();
                          source:arrivalSource(arr), ...(arr.cmp?{campaign:arr.cmp}:{}), ...(arr.cta?{cta:arr.cta}:{}) });
   bumpReviewPromptSessionCount();   // CAS-969: "a few sessions" counts page loads, same cadence as app_open
 }
+// CAS-1577: Cascade has no signed-out mode, so when an account service is configured, a device with no
+// stored Supabase session goes straight to the splash at boot. Before this, an onboarded device with no
+// session painted the main app and nav first, then the auth module's async no-session result
+// (setSignedOut -> showSplash) replaced it: a visible flash. Synchronous by design: it reads the SDK's own
+// sb-<ref>-auth-token key. A stored refresh token means restore may still succeed, so the app is kept.
+// No config.js (guest/e2e runs) is unaffected: CascadeAuth is disabled there and routing stays as before.
+function hasStoredAuthSession(){
+  const cfg = window.CASCADE_CONFIG;
+  if(!cfg || !cfg.SUPABASE_URL) return true;
+  try{
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith('sb-') && k.endsWith('-auth-token')){
+        const v = JSON.parse(localStorage.getItem(k) || 'null');
+        if(v && (v.refresh_token || (v.currentSession && v.currentSession.refresh_token))) return true;
+      }
+    }
+  }catch(e){}
+  return false;
+}
 // First run only — the "seen" flag is set by finishing OR skipping, so returning visitors go straight to the app.
 // ?setup replays it on demand: the flag stays set, and the rest of your state is untouched — this is a way to
 // SEE the first run again, not to fake being a new user (that's ?reset, which really does clear the slate).
 // ?step=<name> previews one north-star sharpening step (CAS-115+) in isolation; it wins over the splash
 // so the screen can be reviewed on its own before Lee wires the sequence.
 if(!openedShared && previewStep && openPreviewStep(previewStep, previewAgent)){/* previewing a single step */}
-else if(!openedShared && (forceSetup || !onboardingSeen())) showSplash();
+else if(!openedShared && (forceSetup || !onboardingSeen() || !hasStoredAuthSession())) showSplash();
 // CAS-933: reverses CAS-644 — Watch, not Moving, is where the app opens once onboarding has been seen.
 // Cinema if it would actually show something for this account right now, Streaming otherwise (pickLandingWatchTab,
 // shared with the end of onboarding below). A shared link and a film link still win (see below): they say
@@ -28898,6 +29211,7 @@ function acctFetchKeepalive(init){
     tutorialSeenFlag=false;
     tourV2SeenFlag=false;
     tutSeenMap={};   // CAS-1534
+    rnudgeMap={rem:0, taste:false}; rnudgeVisit=null; rnudgeVisitGone=false;   // CAS-1566
     reviewPromptSessionsCount=0; reviewSessionBumpPending=false; reviewSessionsPushPending=false; reviewPromptAskedVer=null;
     Object.assign(agentState, loadAgentState());
     Object.keys(admitDrift).forEach(k=>delete admitDrift[k]); admitDriftSaved=null;
@@ -29844,8 +30158,12 @@ function acctFetchKeepalive(init){
   // of its own, so the first real settings change a person makes is what creates the row, in the same one
   // request that sets the column(s) that change touched (merge-duplicates: existing columns this op
   // doesn't name are left alone, same as update's behaviour on a row that already exists).
+  // CAS-1578: between a new member's code being confirmed and complete_membership() resolving, NOTHING may write
+  // user_prefs. Any row there (even a view-only stub) makes complete_membership() answer 'account_exists' and
+  // discard the whole onboarding draft. The promo redeem + entitlement reads in membEnsureMember widen that window.
+  const membershipHold = () => (typeof onbMembershipInFlight!=="undefined" && onbMembershipInFlight);
   function pushUserPrefsCols(cols){
-    if(!accountActive()) return;
+    if(!accountActive() || membershipHold()) return;
     const owner=uid(); if(!owner) return;
     const row = userPrefsRow();
     const fields = {};
@@ -29905,7 +30223,7 @@ function acctFetchKeepalive(init){
     moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
   }
   function pushViewField(key, value){
-    if(!accountActive()) return;
+    if(!accountActive() || membershipHold()) return;
     const owner=uid(); if(!owner) return;
     return window.CascadeAccountStore.acctOp({ table:"merge_user_prefs_view", kind:"rpc",
       fields:{ p_patch:riderReviewSessionsOnto({ [key]:value }) }, onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
@@ -29918,13 +30236,13 @@ function acctFetchKeepalive(init){
   let VIEW_DEBOUNCE_MS = 500;
   function flushViewPatch(){
     const patch = pendingViewPatch; pendingViewPatch = {};
-    if(!Object.keys(patch).length || !accountActive()) return;
+    if(!Object.keys(patch).length || !accountActive() || membershipHold()) return;
     const owner=uid(); if(!owner) return;
     return window.CascadeAccountStore.acctOp({ table:"merge_user_prefs_view", kind:"rpc",
       fields:{ p_patch:riderReviewSessionsOnto(patch) }, onDone:(ok, err) => recordSyncOutcome("user_prefs", ok, err) });
   }
   function pushViewFieldDebounced(key, value){
-    if(!accountActive()) return;
+    if(!accountActive() || membershipHold()) return;
     pendingViewPatch[key] = value;
     clearTimeout(viewPushTimer);
     viewPushTimer = setTimeout(flushViewPatch, VIEW_DEBOUNCE_MS);
@@ -30154,6 +30472,7 @@ function acctFetchKeepalive(init){
       if(typeof v.tutorialSeen==="boolean") tutorialSeenFlag = v.tutorialSeen;
       if(typeof v.tourV2Seen==="boolean") tourV2SeenFlag = v.tourV2Seen;
       tutAdoptSeen(v.tutSeen);   // CAS-1534
+      rnudgeAdopt(v.rnudge);     // CAS-1566
       // CAS-1222: a bump queued before this load resolved is replayed ON TOP of the account's real count,
       // never trusting this session's bare local default — see bumpReviewPromptSessionCount's own comment.
       // CAS-1243 round 2: computed here, but the write itself rides piggyback on the next real view-field

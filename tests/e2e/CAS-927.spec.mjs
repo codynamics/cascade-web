@@ -4,7 +4,7 @@
 // for shape only. Mirrors the fake-config/fake-supabase-js technique CAS-838's own spec uses to capture
 // the contact_messages insert without touching a live project.
 import { test, expect } from "@playwright/test";
-import { gotoFresh } from "./helpers.mjs";
+import { gotoFresh, withActiveMember } from "./helpers.mjs";
 
 const CAS927_FAKE_SUPABASE_GLOBAL = `
   window.__contactInserts = [];
@@ -41,7 +41,7 @@ async function configuredApp(page){
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS927_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS927_FAKE_SUPABASE_GLOBAL),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.enabled === true, null, { timeout: 5000 });

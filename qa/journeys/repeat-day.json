@@ -1,0 +1,56 @@
+{
+ "name": "repeat-day",
+ "start": {
+  "date": "2026-12-13",
+  "status": [
+   "upcoming"
+  ],
+  "release_date": "2026-12-20",
+  "offers": []
+ },
+ "description": "The same step run twice: the second run gives no duplicate alert, push or email.",
+ "criteria": {
+  "genres": [
+   "Drama",
+   "Thriller",
+   "Crime"
+  ],
+  "qualifies": [
+   "a"
+  ]
+ },
+ "steps": [
+  {
+   "name": "in cinemas",
+   "date": "2026-12-20",
+   "status": [
+    "in_cinema"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [],
+   "expect": {
+    "a": [
+     {
+      "moment": "hits_cinema",
+      "channels": [
+       "in_app",
+       "push",
+       "email"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "same step again",
+   "date": "2026-12-20",
+   "status": [
+    "in_cinema"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [],
+   "expect": {},
+   "repeat_of": 1
+  }
+ ]
+}

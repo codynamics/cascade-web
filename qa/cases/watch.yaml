@@ -1,0 +1,143 @@
+# Watch: the main listing, its top bar, per-card controls and sections.
+- id: WATCH-001
+  part: A
+  title: Header carries Watch, Alerts, Find and Agents in one row at every phone width
+  how: browser
+  area:
+    - watch
+  expect:
+    - four nav items share one row at 390 and 430 px, menu on the far right, one shared selected style
+  refs:
+    - tests/e2e/CAS-1246.spec.mjs
+    - tests/e2e/CAS-1190.spec.mjs
+    - "#moviesBtn"
+    - "#movingBtn"
+    - "#findBtn"
+    - "#agentsBtn"
+- id: WATCH-002
+  part: A
+  title: Watch top has two stage groups and moods, collapses only on a tap
+  how: browser
+  area:
+    - watch
+  expect:
+    - Cinema/Home groups and moods replace the sort switch; the bar collapses to the one-row #wtMini on a tap, never on scroll
+  refs:
+    - tests/e2e/cas1247-watch-top-moods.spec.mjs
+    - "#wtMini"
+- id: WATCH-003
+  part: A
+  title: Watch list tracks live state changes without a stale list
+  how: browser
+  area:
+    - watch
+    - tracking
+  expect:
+    - switching a service chip, a Where and when window or renaming the selected mood rebuilds the list
+    - switching Cinema stage between In Cinema and Upcoming rebuilds the list
+  refs:
+    - tests/e2e/cas1248-watch-live-state.spec.mjs
+    - tests/e2e/CAS-1244.spec.mjs
+    - watchNavKey()
+- id: WATCH-004
+  part: A
+  title: Collapsed card is calm and an outline means tappable
+  how: browser
+  area:
+    - watch
+  expect:
+    - the poster fills the collapsed card, nothing glows, outlined controls are the tappable ones
+  refs:
+    - tests/e2e/CAS-1245.spec.mjs
+- id: WATCH-005
+  part: A
+  title: Empty-state Drop buttons are priced off what Watch actually lists
+  how: browser
+  area:
+    - watch
+  expect:
+    - each Drop button named in the empty state actually empties the tab when tapped
+  refs:
+    - tests/e2e/CAS-1144.spec.mjs
+- id: WATCH-006
+  part: A
+  title: Per-card Watch On control - click-away close and manual claim
+  how: browser
+  area:
+    - watch
+  expect:
+    - clicking away closes the panel; re-tapping an agent-armed level claims it as manual (gold)
+  refs:
+    - tests/e2e/cas751.spec.mjs
+    - closeWatchPanel()
+- id: WATCH-007
+  part: A
+  title: A verdict folds the card to its stub in place
+  how: browser
+  area:
+    - watch
+    - tracking
+  expect:
+    - the list does not jump; the film is gone only when the listing next rebuilds
+  refs:
+    - tests/e2e/cas752.spec.mjs
+- id: WATCH-008
+  part: A
+  title: Show only available on my services defaults on
+  how: browser
+  area:
+    - watch
+  expect:
+    - Streaming lists only films on the viewer's own services unless the filter is turned off
+  refs:
+    - tests/e2e/cas753.spec.mjs
+- id: WATCH-009
+  part: A
+  title: Sections follow journey order
+  how: browser
+  area:
+    - watch
+    - tracking
+  expect:
+    - Upcoming leads where it appears, then the rest in journey order
+  refs:
+    - tests/e2e/cas754.spec.mjs
+    - tests/js/watch-section-headings.test.mjs
+- id: WATCH-010
+  part: A
+  title: Usage events and card expansion are logged once per action
+  how: browser
+  area:
+    - watch
+  expect:
+    - one app_open per load, one event per toggleExpand or setWatchTab, batched to usage_events
+  refs:
+    - tests/e2e/analytics.spec.mjs
+    - tests/e2e/CAS-835.spec.mjs
+    - toggleExpand()
+    - setWatchTab()
+- id: WATCH-011
+  part: A
+  title: Engine invariants - scoring, windows and placement hold on the real catalogue
+  how: unit
+  area:
+    - watch
+    - agent
+  expect:
+    - npm run test:engine exits 0
+  refs:
+    - tests/js/invariants.test.mjs
+    - tests/js/data-integrity.test.mjs
+    - tests/js/engine.mjs
+- id: WATCH-012
+  part: A
+  title: Accessibility scan of the five highest-traffic surfaces
+  how: browser
+  area:
+    - watch
+    - database
+    - alerts-inapp
+  expect:
+    - axe finds no violations on onboarding, Watch, Agents, Moving and the film card at 390x844
+  refs:
+    - tests/e2e/CAS-960.spec.mjs

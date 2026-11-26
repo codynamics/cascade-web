@@ -1,0 +1,74 @@
+{
+ "name": "genre-off",
+ "description": "A film whose main genre is switched off for lee+qa-a (no style entry): none at every step.",
+ "criteria": {
+  "genres": [
+   "TV Movie"
+  ],
+  "genre_state": {
+   "a": "off"
+  }
+ },
+ "steps": [
+  {
+   "name": "announced",
+   "date": "2026-12-01",
+   "status": [
+    "upcoming"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [],
+   "expect": {}
+  },
+  {
+   "name": "in cinemas",
+   "date": "2026-12-20",
+   "status": [
+    "in_cinema"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [],
+   "expect": {}
+  },
+  {
+   "name": "rent",
+   "date": "2027-01-24",
+   "status": [
+    "rental"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [
+    {
+     "service": "Apple TV Store",
+     "type": "buy",
+     "price": 24.99,
+     "format": null
+    },
+    {
+     "service": "Apple TV Store",
+     "type": "rent",
+     "price": 6.99,
+     "format": null
+    }
+   ],
+   "expect": {}
+  },
+  {
+   "name": "streaming on Netflix",
+   "date": "2027-03-01",
+   "status": [
+    "included_streaming"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [
+    {
+     "service": "Netflix",
+     "type": "sub",
+     "price": null,
+     "format": null
+    }
+   ],
+   "expect": {}
+  }
+ ]
+}

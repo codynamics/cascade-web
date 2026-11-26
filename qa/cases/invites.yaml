@@ -1,0 +1,65 @@
+# Invites, friends, Recommend Cascade.
+- id: INV-001
+  part: A
+  title: Invite arrival is recorded and a recipient sees the film and one question
+  how: browser
+  area:
+    - invites
+  expect:
+    - a ?inv=<token>#/film/<id> link shows the film and one Yes/No question on one screen
+  refs:
+    - tests/e2e/CAS-837.spec.mjs
+    - tests/e2e/CAS-885.spec.mjs
+- id: INV-002
+  part: A
+  title: Sending an invite creates a real invites record, to one or several friends
+  how: browser
+  area:
+    - invites
+    - m-invites
+  expect:
+    - one invites row per recipient with a per-send token; email recipients queue into invite_emails
+  refs:
+    - tests/e2e/CAS-883.spec.mjs
+    - tests/e2e/CAS-930.spec.mjs
+    - "#filmInvite"
+    - tour:invite
+- id: INV-003
+  part: A
+  title: Invites screen, menu badge and in-app reply alert
+  how: browser
+  area:
+    - m-invites
+    - alerts-inapp
+  expect:
+    - the sender sees replies on #invitesScreen, the menu badge and a Moving alert
+  refs:
+    - tests/e2e/CAS-886.spec.mjs
+    - "#invitesScreen"
+    - loadInvites()
+    - tests/js/invite-unread-badge.test.mjs
+- id: INV-004
+  part: A
+  title: Friends table and shared recipient picker
+  how: browser
+  area:
+    - m-friends
+    - invites
+  expect:
+    - friends load from loadFriends(); the picker adds a person by name and email
+  refs:
+    - tests/e2e/CAS-928.spec.mjs
+    - tests/e2e/CAS-932.spec.mjs
+    - "#friendsScreen"
+    - loadFriends()
+- id: INV-005
+  part: A
+  title: Recommend Cascade sends one recommendation per selected person
+  how: browser
+  area:
+    - m-recommend
+  expect:
+    - signed-in only; one recommendations row per recipient with an email; WhatsApp/SMS hand-off for the rest
+  refs:
+    - tests/e2e/CAS-884.spec.mjs
+    - tests/e2e/CAS-931.spec.mjs

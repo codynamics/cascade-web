@@ -57,11 +57,13 @@ test("CAS-1364: an unwatched film is unaffected by the switch either way", () =>
 });
 
 test("CAS-1364: watched:true still fails every other rule normally — it only lifts the excludeWatched gate", () => {
+  // CAS-1593: a list's score gate is its own level now (not the agent's bar), so the "other rule" is its ages.
   const m = film("Action");
-  const score = E.oneScore(m, criteriaWith("Action", 1));
-  const c = criteriaWith("Action", score + 1);   // a bar one point above what this fixture actually scores
+  m.age_rating = "PG";
+  const c = criteriaWith("Action", 1);
   withWatched(m.tmdb_id, () => {
-    assert.equal(E.oamFilmMeetsMoodRules(m, moodWith({ watched:true }), c), false);
+    assert.equal(E.oamFilmMeetsMoodRules(m, moodWith({ watched:true, ages:["M"] }), c), false);
+    assert.equal(E.oamFilmMeetsMoodRules(m, moodWith({ watched:true, ages:["PG"] }), c), true, "sanity: the ages rule alone decided it");
   });
 });
 

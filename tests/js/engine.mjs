@@ -136,6 +136,7 @@ if(typeof window.CascadeAuth === "undefined"){
 }
 ;globalThis.__ENGINE__ = {
   membClassifyPurchase, membBuy, membRestore, membRowActive, membLoadEntitlement, membGateCheck, membEnsureMember, membPriceLine, membFineText, membCtaLabel,
+  membAccountPlanText, openOnbMembership, openMembership, membShowInviteOnly, membPromoHTML, get membPromoHeld(){ return membPromoHeld; },
   get membEnt(){ return membEnt; }, get membGated(){ return membGated; }, get membLastMessage(){ return membLastMessage; },
   MOVIES, CASCADE, STATUS_LABEL, SHOWABLE_N,
   // CAS-1327: TRACK_MIN is the agent score track's own floor — exported so scripts/scoreable_shim.mjs
@@ -364,7 +365,7 @@ if(typeof window.CascadeAuth === "undefined"){
   // the watched Set uses) so a fixture can seed deterministic "verdict newer than seenAdjAt" timestamps
   // without waiting on real wall-clock gaps between two Date.now() calls.
   oaComboStats, oaComboSort, oaComboMag, oaComboFilms, oaChangeHistory, oaChangedGenres, oaChangeLogHTML, oaAlertNoteHTML,
-  oaFmtPoints, oaTrackPct, oaComboMarkShare, oaComboBarHTML, oaComboValueHTML, oaOverrideLeftHTML,
+  oaFmtPoints, oaTrackPct, oaComboMarkShare, oaComboStepsHTML, oaComboNearestStep, oaAlertsOn, oaVerdictCounts, ALL_GENRES, oaComboValueHTML, oaOverrideLeftHTML,
   oaComboRowHTML, oaAdjustSectionHTML, updateAgentNavDot,
   verdictAt,
   get oaShowAllAdj(){ return oaShowAllAdj; },
@@ -373,8 +374,7 @@ if(typeof window.CascadeAuth === "undefined"){
   oaToggleShowAllAdj: () => window.oaToggleShowAllAdj(),
   oaUseLearned: (key) => window.oaUseLearned(key),
   oaMarkSeenAdjusted: (style) => window.oaMarkSeenAdjusted(style),
-  oaComboOnDrag: (input) => window.oaComboOnDrag(input),
-  oaComboOnRelease: (input) => window.oaComboOnRelease(input),
+  oaComboStep: (btn) => window.oaComboStep(btn),
   // CAS-1289: renderStyleMapSection is the Style map card's own render, and tasteSelPrimary/tasteSelOther
   // (module-level lets, same reassignment pattern as watchTab above) are the cell it's currently showing
   // detail for -- exported through getters/setters so a test can seed a stale selection (left over from a
@@ -451,6 +451,11 @@ if(typeof window.CascadeAuth === "undefined"){
   // the CURRENT binding even across a reassignment, not a snapshot frozen at load time.
   get tasteBase(){ return tasteBase; },
   cascades,
+  // CAS-1549: the first run's own draft + commit, driven by qa/sim/build_account.mjs. oafState is reassigned
+  // wholesale by oafOpen, so it is set through a setter; oneAgentBuildDraft/oneAgentCommit are the app's own.
+  oneAgentBuildDraft, oneAgentCommit, ONE_AGENT_SETUP_STYLES,
+  setOafState(v){ oafState = v; },
+  cascadeToRow: c => window.CascadeShape.cascadeToRow(c),
   get onbFlow(){ return onbFlow; },
   get flowKind(){ return flowKind; },
   setFlowKind(k){ flowKind = k; },
@@ -470,7 +475,7 @@ if(typeof window.CascadeAuth === "undefined"){
   // and friends below.
   agentState, tutorialSeen, markTutorialSeen,
   // CAS-1534: the tutorial banner's decision, its seen-map writers, and the map itself.
-  tutBannerDecide, tutMarkPlayed, tutAdoptSeen, TOURS, get tutSeenMap(){ return tutSeenMap; },
+  tutBannerDecide, tutMarkPlayed, tutAdoptSeen, rnudgeDecide, rnudgeCardHTML, rnudgeRatingsCount, rnudgeBestAdjustment, RNUDGE_MIN_PTS, TOURS, get tutSeenMap(){ return tutSeenMap; },
   // CAS-667: movingData is wire-adjacent (it reads window.CascadePersistence.accountActive()) but its
   // row-selection arithmetic is exactly the kind of decision this harness exists to test. realAlerts and
   // firstFound are exposed by reference (mutated via push, never reassigned, in test use) so a test can seed
@@ -859,6 +864,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // MOOD_MAX is the mood-row cap the visibility helper below also gates on; oamSvcChipLabel is the mood
   // sheet's/Find's own short service-chip label (the prefill's own name fallback reads it too) — exported
   // directly so a test can assert each against a fixture rather than re-deriving them.
+  // CAS-1593: a list's own genre levels — the five-stop snap, the level reader, the draft (for tick/level edits)
+  // and the sheet's row/Set-all renderers, exported so list-levels.test.mjs can assert them directly.
+  snapPct, oamMoodLevel, oamStyleRowHTML, oamAllBoxHTML, oamDraftTicked, oamApplyLevelStop, OAM_LEVEL_STOPS,
+  get oamDraft(){ return oamDraft; },
   oamMoodFromDraft, MOOD_MAX, oamSvcChipLabel,
   // CAS-1400: the genre|keyword mode resolver.
   oamMoodMode, oamKeywordOn,

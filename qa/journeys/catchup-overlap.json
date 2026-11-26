@@ -1,0 +1,75 @@
+{
+ "name": "catchup-overlap",
+ "start": {
+  "date": "2026-12-13",
+  "status": [
+   "upcoming"
+  ],
+  "release_date": "2026-12-20",
+  "offers": []
+ },
+ "description": "A film already announced for the cinema stage in lee+qa-a's day +1 catch-up is not alerted again for that stage (CAS-1535); a later stage still is.",
+ "criteria": {
+  "genres": [
+   "Drama",
+   "Thriller",
+   "Crime"
+  ],
+  "qualifies": [
+   "a"
+  ]
+ },
+ "steps": [
+  {
+   "name": "in cinemas",
+   "date": "2026-12-20",
+   "status": [
+    "in_cinema"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [],
+   "expect": {},
+   "before": [
+    {
+     "account": "a",
+     "action": "catchup",
+     "stage": "cinema"
+    }
+   ]
+  },
+  {
+   "name": "rent",
+   "date": "2027-01-24",
+   "status": [
+    "rental"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [
+    {
+     "service": "Apple TV Store",
+     "type": "buy",
+     "price": 24.99,
+     "format": null
+    },
+    {
+     "service": "Apple TV Store",
+     "type": "rent",
+     "price": 6.99,
+     "format": null
+    }
+   ],
+   "expect": {
+    "a": [
+     {
+      "moment": "hits_rent",
+      "channels": [
+       "in_app",
+       "push",
+       "email"
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}

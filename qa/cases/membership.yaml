@@ -1,0 +1,201 @@
+# Membership: purchase is iOS-only, web is invite-only, App Review sign-in, rating prompt.
+- id: MEMB-001
+  part: A
+  title: Membership screen shows price and free-month copy, no Prototype disclaimer
+  how: browser
+  area:
+    - signup
+  expect:
+    - "#membScreen carries the price and free-month copy on both the onboarding recap and the standalone preview"
+  refs:
+    - tests/e2e/CAS-1069.spec.mjs
+    - "#membScreen"
+- id: MEMB-002
+  part: A
+  title: Web membership screen has no purchase button
+  how: browser
+  area:
+    - signup
+  expect:
+    - cascademovies.com shows the iPhone-app message, no purchase button and no console error
+  refs:
+    - tests/e2e/CAS-971.spec.mjs
+    - tests/js/cas971-membership.test.mjs
+- id: MEMB-003
+  part: A
+  title: Non-approved web accounts are held on the invite-only screen
+  how: browser
+  area:
+    - signup
+  expect:
+    - a signed-in account not in public.web_access sees the invite-only screen with a Sign out button
+    - an approved account gets the app
+  refs:
+    - tests/e2e/web-access.spec.mjs
+    - tests/js/cas1531-web-access.test.mjs
+- id: MEMB-004
+  part: A
+  title: App Review sign-in uses the fixed password only for the review address
+  how: browser
+  area:
+    - login
+    - signup
+  expect:
+    - appreview@codynamics.com.au signs in with the reviewer code; every other email still gets an emailed code
+  refs:
+    - tests/e2e/CAS-1073.spec.mjs
+    - tests/lint/password-signin-guard.mjs
+- id: MEMB-005
+  part: A
+  title: App Store rating prompt triggers on the web surface as specified
+  how: browser
+  area:
+    - taste
+  expect:
+    - the trigger conditions fire the prompt hook once and never twice
+  refs:
+    - tests/e2e/CAS-969.spec.mjs
+    - tests/js/review-prompt.test.mjs
+    - tests/lint/review-prompt-copy.mjs
+- id: MEMB-006
+  part: C
+  title: A real purchase in the TestFlight build unlocks membership
+  how: lee-phone
+  area:
+    - signup
+  expect:
+    - buying in the iOS build marks the account a member and the web build then admits the same account
+- id: MEMB-007
+  part: A
+  title: "Sign-up: promo box closed"
+  how: unit
+  area:
+    - signup
+  expect:
+    - "the code box is closed by default and sign-up works without it"
+  refs:
+    - "tests/js/cas1571-signup-promo-states.test.mjs"
+- id: MEMB-008
+  part: A
+  title: "Sign-up: promo box open but empty is fine"
+  how: unit
+  area:
+    - signup
+  expect:
+    - "an open, empty code box does not block sign-up"
+  refs:
+    - "tests/js/cas1571-signup-promo-states.test.mjs"
+- id: MEMB-009
+  part: A
+  title: "Sign-up: wrong code"
+  how: unit
+  area:
+    - signup
+  expect:
+    - "\"That code isn't valid.\" plus a Clear button"
+  refs:
+    - "tests/js/cas1565-promo-code.test.mjs"
+- id: MEMB-010
+  part: A
+  title: "Sign-up: code used up"
+  how: unit
+  area:
+    - signup
+  expect:
+    - "the used-up message from MEMB_PROMO_MSG"
+  refs:
+    - "tests/js/cas1565-promo-code.test.mjs"
+- id: MEMB-011
+  part: A
+  title: "Sign-up: code already used on this account"
+  how: unit
+  area:
+    - signup
+  expect:
+    - "the already-used message from MEMB_PROMO_MSG"
+  refs:
+    - "tests/js/cas1565-promo-code.test.mjs"
+- id: MEMB-012
+  part: A
+  title: "Sign-up: already a member"
+  how: unit
+  area:
+    - signup
+  expect:
+    - "the already-a-member message from MEMB_PROMO_MSG"
+  refs:
+    - "tests/js/cas1565-promo-code.test.mjs"
+- id: MEMB-013
+  part: A
+  title: "Sign-up: right code gives a free year (planned: CAS-1583 follow-up check)"
+  how: planned
+  area:
+    - signup
+  expect:
+    - "the account gets a free year"
+    - "the code screen must not say \"Start your free month\""
+  refs:
+    - "tests/js/cas1565-promo-code.test.mjs"
+- id: MEMB-014
+  part: A
+  title: "Sign-up: invalid email"
+  how: unit
+  area:
+    - signup
+  expect:
+    - "an invalid email is refused with a clear message"
+  refs:
+    - "tests/js/cas1571-signup-promo-states.test.mjs"
+- id: MEMB-015
+  part: A
+  title: "Sign-up: existing account"
+  how: unit
+  area:
+    - signup
+  expect:
+    - "an email that already has an account is handled without a duplicate"
+  refs:
+    - "tests/js/cas1571-signup-promo-states.test.mjs"
+- id: MEMB-016
+  part: A
+  title: "Sign-up: network failure shows the offline message"
+  how: unit
+  area:
+    - signup
+  expect:
+    - "the offline message shows, never \"Failed to fetch\""
+  refs:
+    - "tests/js/cas1565-promo-code.test.mjs"
+- id: MEMB-017
+  part: A
+  title: "Onboarding answers survive code confirmation and complete_membership (CAS-1578) (planned: CAS-1583 follow-up check)"
+  how: planned
+  area:
+    - onboarding
+    - signup
+  expect:
+    - "services, windows, taste, agent and lists are in user_prefs and in the app, before and after reload"
+  refs:
+    - "tests/e2e-integrity/account-integrity.spec.mjs"
+- id: MEMB-018
+  part: A
+  title: "Signed-out cold load goes straight to the splash (CAS-1577)"
+  how: browser
+  area:
+    - login
+  expect:
+    - "no flash of the main nav on a signed-out cold load"
+  refs:
+    - "tests/e2e/CAS-1577.spec.mjs"
+- id: MEMB-019
+  part: A
+  title: "The focused field stays above the keyboard on sign-up and agent-name screens (CAS-1579)"
+  how: device
+  area:
+    - signup
+    - onboarding
+  expect:
+    - "on iPhone the focused input is not covered by the keyboard on #membScreen and #oafScreen"
+  refs:
+    - "#membScreen"
+    - "#oafScreen"

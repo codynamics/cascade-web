@@ -3,7 +3,7 @@
 // storage.from() alongside the existing fake from(), so the upload-then-insert flow can be exercised
 // without touching a live project or a live bucket.
 import { test, expect } from "@playwright/test";
-import { gotoFresh } from "./helpers.mjs";
+import { gotoFresh, withActiveMember } from "./helpers.mjs";
 
 // A minimal valid 1x1 transparent PNG.
 const TINY_PNG_BASE64 =
@@ -55,7 +55,7 @@ async function configuredApp(page){
   }));
   await page.route("**/supabase-js.js", route => route.fulfill({
     contentType: "application/javascript",
-    body: CAS864_FAKE_SUPABASE_GLOBAL,
+    body: withActiveMember(CAS864_FAKE_SUPABASE_GLOBAL),
   }));
   await gotoFresh(page);
   await page.waitForFunction(() => window.CascadeAuth && window.CascadeAuth.enabled === true, null, { timeout: 5000 });

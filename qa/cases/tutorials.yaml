@@ -1,0 +1,76 @@
+# Tutorials: the six tours (TOURS), the Tutorials screen and the tutorial banner.
+- id: TUT-001
+  part: A
+  title: Every tour walks end to end with no step skipped
+  how: browser
+  area:
+    - watch-tut
+    - tut-lists
+    - tut-alerts
+    - tut-database
+    - tut-agent
+    - tut-invite
+    - m-tutorials
+  expect:
+    - from Menu -> Tutorials each tour's step index advances through every step (tutorialAdvance skips a step whose target is missing, which is the failure this case catches)
+  refs:
+    - tests/e2e/tutorials.spec.mjs
+    - "#tutorialsScreen"
+    - "#tutHole"
+    - "#tutCard"
+    - tour:watch
+    - tour:moods
+    - tour:alerts
+    - tour:database
+    - tour:agent
+    - tour:invite
+- id: TUT-002
+  part: A
+  title: Tour spotlight and card are positioned correctly under UI zoom
+  how: browser
+  area:
+    - watch-tut
+    - m-tutorials
+  expect:
+    - "#tutHole and #tutCard geometry matches the target under Chromium zoom:var(--ui-scale)"
+  refs:
+    - tests/e2e/CAS-1152.spec.mjs
+    - tutorialReposition()
+- id: TUT-003
+  part: A
+  title: Replaying the tour from Account while Moving is open skips covered steps
+  how: browser
+  area:
+    - m-tutorials
+  expect:
+    - the score row and notify control steps are skipped, not pointed at an off-screen anchor
+  refs:
+    - tests/e2e/CAS-1079.spec.mjs
+    - replayTutorial()
+- id: TUT-004
+  part: A
+  title: Tutorial banner shows once and does not reappear after dismissal
+  how: unit
+  area:
+    - watch-tut
+  expect:
+    - the banner follows the seen map and the visit flag
+  refs:
+    - tests/js/cas1534-tutorial-banner.test.mjs
+- id: TUT-GEO
+  part: A
+  title: Every tour step lands on its target and holds still (390x844)
+  how: browser
+  area:
+    - watch-tut
+    - tut-lists
+    - tut-alerts
+    - tut-database
+    - tut-agent
+    - tut-invite
+    - m-tutorials
+  expect:
+    - ring on the target, arrow tip on the target, bubble on screen and clear of it, nothing moves 500 ms after the bubble shows, no step skipped. Any ticket that adds, removes or changes a tour step updates tests/e2e/tutorial-geometry.spec.mjs in the same commit
+  refs:
+    - tests/e2e/tutorial-geometry.spec.mjs
+    - tutorialReposition()

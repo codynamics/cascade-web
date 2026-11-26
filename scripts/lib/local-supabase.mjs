@@ -72,11 +72,23 @@ export function readEnvField(map, candidateNames, label){
 export function loadSchema(dbUrl){
   console.log("[local-supabase] loading supabase/schema.sql into the fresh local database...");
   run("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-f", "supabase/schema.sql"]);
-  // CAS-1540: the web is invite-only (CAS-1531) and schema.sql leaves public.web_access empty, so every
-  // test account would stop at the invite-only screen. A leading '@' approves a whole domain (CAS-1533).
-  // Harness only — never put these rows in schema.sql or a migration.
-  run("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-c",
-    "insert into public.web_access (email, note) values ('@integrity.test','integrity suite'), ('@e2e.test','e2e suite') on conflict (email) do nothing"]);
+  // CAS-1569: web access is an active memberships row (CAS-1565 retired the approved list). Harness only —
+  // a trigger on auth.users grants every @integrity.test / @e2e.test account a promo membership on sign-up.
+  // Never put this in schema.sql or a migration.
+  run("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-c", `
+    create or replace function public.harness_grant_test_membership() returns trigger
+    language plpgsql security definer set search_path = public as $$
+    begin
+      if new.email ilike '%@integrity.test' or new.email ilike '%@e2e.test' then
+        insert into public.memberships (user_id, product_id, status, expires_at, is_trial, source)
+        values (new.id, 'promo', 'active', '2099-12-31', false, 'promo')
+        on conflict (user_id) do update set status = 'active', expires_at = '2099-12-31', is_trial = false, source = 'promo';
+      end if;
+      return new;
+    end $$;
+    drop trigger if exists harness_grant_test_membership on auth.users;
+    create trigger harness_grant_test_membership after insert on auth.users
+      for each row execute function public.harness_grant_test_membership();`]);
 }
 
 /** Runs `fn({ startedFresh })` against a running local Supabase stack: starts one and loads schema.sql

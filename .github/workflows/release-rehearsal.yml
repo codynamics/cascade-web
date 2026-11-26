@@ -1,0 +1,176 @@
+name: Release rehearsal (CAS-1547)
+
+# workflow_dispatch ONLY. Created under CAS-1547's explicit authorisation of exactly this one new workflow file,
+# on `staging` only. Local Supabase only: nothing here touches staging or production data.
+#
+# Proves, before production migrations run, that (a) the release people already have (origin/main) keeps working on
+# the NEW schema and (b) rolling back to it afterwards loses no account data (Cascade QA design, Part D).
+#   1  start a local stack from main's own supabase/schema.sql (the bootstrap equal to main's migrations), seed the
+#      four QA accounts
+#   2  main's build: gate smoke specs + integrity            -> baseline
+#   3  apply the migrations in the candidate but not in main (ci/rehearsal.py split: from the two commits' file lists)
+#   4  main's build again, on the new schema                 -> previous release must still pass
+#   5  candidate's build                                     -> must pass
+#   6  main's build again, after 5                           -> rollback must pass, and the QA accounts' row counts
+#      in every account table must equal those taken after step 5
+#   7  summary, one line per step
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: "Commit on staging to rehearse (default: the head of staging)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  # CAS-1576 (workflow edit authorised by that ticket, staging only): staging and production sign-in / email settings,
+  # edge functions and schema_migrations must agree before a release. Read-only Management API calls.
+  env-parity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compare staging and production settings
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python3 -I ci/env_parity.py | tee -a "$GITHUB_STEP_SUMMARY"; exit "${PIPESTATUS[0]}"
+
+  rehearse:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CASCADE_SHARE_STACK: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+          path: cand
+
+      - name: Resolve the candidate and check out origin/main beside it
+        working-directory: cand
+        run: |
+          CAND="${{ inputs.candidate }}"
+          [ -n "$CAND" ] || CAND="$(git rev-parse origin/staging)"
+          git merge-base --is-ancestor "$CAND" origin/staging || { echo "::error::candidate $CAND is not on staging"; exit 1; }
+          git checkout --detach "$CAND"
+          echo "CAND_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          git worktree add ../main origin/main --detach
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install both trees and the browser
+        run: |
+          (cd cand && npm ci)
+          (cd main && npm ci)
+          (cd cand && npx playwright install --with-deps webkit)
+          command -v psql || (sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client)
+
+      - name: "1. Local stack on main's schema, seed the four QA accounts"
+        id: s1
+        run: |
+          # main's e2e run starts the stack (shared, left running) from main's schema.sql; the seed follows it.
+          cd main
+          npm run test:e2e -- --retries=1 --list > /dev/null
+          echo "main's migrations:"; ls supabase/migrations
+          cd ../cand && python3 -I ci/rehearsal.py split origin/main HEAD > ../extra.txt; echo "extra in candidate:"; cat ../extra.txt
+
+      - name: "2. Baseline: main's build, smoke + integrity"
+        id: s2
+        continue-on-error: true
+        working-directory: main
+        run: |
+          set -o pipefail
+          npm run test:e2e -- --retries=1
+          npm run test:integrity
+
+      - name: Seed the four QA accounts (candidate's engine, local stack)
+        id: seed
+        working-directory: cand
+        run: |
+          npm run build
+          eval "$(cd ../main && npx supabase status -o env | sed 's/^/export /')"
+          export SUPABASE_URL="$API_URL" SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY:-$SECRET_KEY}" SUPABASE_ANON_KEY="${ANON_KEY:-$PUBLISHABLE_KEY}"
+          python3 -I -m qa.sim.accounts create
+
+      - name: "3. Apply the candidate's extra migrations"
+        id: s3
+        working-directory: main
+        run: |
+          DB_URL="$(npx supabase status -o env | sed -n 's/^DB_URL="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p')"
+          echo "DB_URL_SET=${DB_URL:+yes}"
+          echo "$DB_URL" > ../dburl.txt
+          while read -r f; do
+            [ -n "$f" ] || continue
+            echo "applying $f"
+            psql "$DB_URL" -X -v ON_ERROR_STOP=1 --single-transaction -f "../cand/supabase/migrations/$f"
+            v="${f%%_*}"
+            psql "$DB_URL" -X -c "insert into public.schema_migrations (version) values ('$v') on conflict do nothing"
+          done < ../extra.txt
+
+      - name: "4. Previous release (main) on the new schema"
+        id: s4
+        continue-on-error: true
+        working-directory: main
+        run: |
+          npm run test:e2e -- --retries=1
+          npm run test:integrity
+
+      - name: "5. Candidate on the new schema"
+        id: s5
+        continue-on-error: true
+        working-directory: cand
+        run: |
+          npm run test:e2e -- --retries=1
+          npm run test:integrity
+          python3 -I ci/rehearsal.py counts "$(cat ../dburl.txt)" > ../counts5.json
+
+      - name: "6. Rollback: main again after the candidate"
+        id: s6
+        continue-on-error: true
+        working-directory: main
+        run: |
+          npm run test:e2e -- --retries=1
+          npm run test:integrity
+          python3 -I ../cand/ci/rehearsal.py counts "$(cat ../dburl.txt)" > ../counts6.json
+          python3 -I ../cand/ci/rehearsal.py compare ../counts5.json ../counts6.json
+
+      - name: "7. Summary"
+        if: always()
+        run: |
+          line() { echo "$1: $2" | tee -a "$GITHUB_STEP_SUMMARY"; }
+          r() { [ "$1" = success ] && echo PASS || echo FAIL; }
+          line "1 stack + seed"                       "$(r '${{ steps.s1.outcome }}')/$(r '${{ steps.seed.outcome }}')"
+          line "2 main baseline"                      "$(r '${{ steps.s2.outcome }}')"
+          line "3 apply candidate-only migrations"    "$(r '${{ steps.s3.outcome }}')"
+          line "4 main on the new schema"             "$(r '${{ steps.s4.outcome }}')"
+          line "5 candidate on the new schema"        "$(r '${{ steps.s5.outcome }}')"
+          line "6 rollback + row counts unchanged"    "$(r '${{ steps.s6.outcome }}')"
+          for o in '${{ steps.s2.outcome }}' '${{ steps.s4.outcome }}' '${{ steps.s5.outcome }}' '${{ steps.s6.outcome }}' '${{ steps.s3.outcome }}'; do
+            [ "$o" = success ] || exit 1
+          done
+
+      # CAS-1588: record this run's results per QA area in the cascade-qa database. Never turns the run red.
+      - name: Record results in cascade-qa (CAS-1588)
+        if: always()
+        continue-on-error: true
+        env:
+          QA_DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+        run: |
+          python -m pip install --quiet "psycopg[binary]" || true
+          python ci/qa_report.py --workflow release-rehearsal --job rehearse=${{ job.status }} --source-job rehearse

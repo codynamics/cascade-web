@@ -1,0 +1,406 @@
+[
+ {
+  "id": "signup",
+  "group": "Cascade app",
+  "name": "Sign-up and membership (web, promo code)",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "onboarding",
+  "group": "Cascade app",
+  "name": "Onboarding questions",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "login",
+  "group": "Cascade app",
+  "name": "Sign in and sign out (returning member)",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "watch-tut",
+  "group": "Cascade app",
+  "name": "Watch tutorial",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "firstdays",
+  "group": "Cascade app",
+  "name": "Early account days (day 0 to +10)",
+  "applies": [
+   "bench",
+   "phone",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "tracking",
+  "group": "Cascade app",
+  "name": "Film tracking (status moves)",
+  "applies": [
+   "bench",
+   "real"
+  ]
+ },
+ {
+  "id": "alerts-email",
+  "group": "Cascade app",
+  "name": "Alerts: email (5pm, catch-up, recap)",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "alerts-push",
+  "group": "Cascade app",
+  "name": "Alerts: push (7:30am)",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real"
+  ]
+ },
+ {
+  "id": "alerts-inapp",
+  "group": "Cascade app",
+  "name": "Alerts: in-app and the Alerts screen",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "tut-lists",
+  "group": "Cascade app",
+  "name": "Lists tutorial",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "tut-alerts",
+  "group": "Cascade app",
+  "name": "Alerts tutorial",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "tut-database",
+  "group": "Cascade app",
+  "name": "Database tutorial",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "tut-agent",
+  "group": "Cascade app",
+  "name": "Agent tutorial",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "tut-invite",
+  "group": "Cascade app",
+  "name": "Invite tutorial",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "watch",
+  "group": "Cascade app",
+  "name": "Watch: lists, tabs, film card, Watch On, Watched",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "database",
+  "group": "Cascade app",
+  "name": "Database (search and browse)",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "taste",
+  "group": "Cascade app",
+  "name": "Taste (ratings, reminder card, Taste card)",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "agent",
+  "group": "Cascade app",
+  "name": "Agent (who gets which films)",
+  "applies": [
+   "bench"
+  ]
+ },
+ {
+  "id": "invites",
+  "group": "Cascade app",
+  "name": "Invite a friend, friends, acceptance",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "m-account",
+  "group": "Cascade app",
+  "name": "Menu: Account",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "m-friends",
+  "group": "Cascade app",
+  "name": "Menu: Friends",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "m-invites",
+  "group": "Cascade app",
+  "name": "Menu: Movie Invites",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "m-services",
+  "group": "Cascade app",
+  "name": "Menu: My Streaming Services",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "m-settings",
+  "group": "Cascade app",
+  "name": "Menu: Settings",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "m-analysis",
+  "group": "Cascade app",
+  "name": "Menu: Streaming Analysis",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "m-tutorials",
+  "group": "Cascade app",
+  "name": "Menu: Tutorials",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "m-recommend",
+  "group": "Cascade app",
+  "name": "Menu: Recommend Cascade",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "m-help",
+  "group": "Cascade app",
+  "name": "Menu: Help",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "m-about",
+  "group": "Cascade app",
+  "name": "Menu: About",
+  "applies": [
+   "bench",
+   "phone",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "ad-signin",
+  "group": "Admin website",
+  "name": "Sign-in and admin-only access",
+  "applies": [
+   "bench",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "ad-dashboard",
+  "group": "Admin website",
+  "name": "Dashboard tab (cards, onboarding, activation, retention)",
+  "applies": [
+   "bench",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "ad-members",
+  "group": "Admin website",
+  "name": "Members and member page",
+  "applies": [
+   "bench",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "ad-moviedata",
+  "group": "Admin website",
+  "name": "Movie data tab",
+  "applies": [
+   "bench",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "ad-health",
+  "group": "Admin website",
+  "name": "System health tab",
+  "applies": [
+   "bench",
+   "production",
+   "real",
+   "review"
+  ]
+ },
+ {
+  "id": "ad-compat",
+  "group": "Admin website",
+  "name": "Works with this release's database",
+  "applies": [
+   "bench",
+   "production",
+   "real"
+  ]
+ }
+]

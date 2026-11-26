@@ -1,0 +1,36 @@
+# Services, languages and Where and when.
+- id: SVC-001
+  part: A
+  title: Where and when windows persist when switched off
+  how: unit
+  area:
+    - m-settings
+  expect:
+    - a window turned off stays off after reload and sign-in
+  refs:
+    - tests/js/where-when-off-persists.test.mjs
+    - tests/js/onb-where-when.test.mjs
+    - "#wwScreen"
+- id: SVC-002
+  part: A
+  title: Service analysis counts streaming totals honestly
+  how: unit
+  area:
+    - m-analysis
+    - m-services
+  expect:
+    - the streaming total never double-counts a film on two services
+  refs:
+    - tests/js/cas1124-svc-analysis-streaming-total.test.mjs
+    - tests/js/cas1250-svc-analysis-lists.test.mjs
+- id: SVC-003
+  part: A
+  title: Language settings screen opens and saves
+  how: browser
+  area:
+    - m-settings
+  expect:
+    - "#languagesScreen opens from Settings and the choice applies to the listing"
+  refs:
+    - "#languagesScreen"
+    - "#settingsScreen"

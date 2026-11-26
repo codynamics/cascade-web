@@ -1,0 +1,21 @@
+# Real-user checks: what a person does, on the deployed site, against its real database and real email (CAS-1574).
+- id: REAL-001
+  part: D
+  title: A new person signs up on the deployed staging site and uses the core features
+  how: browser
+  kind: real
+  area:
+    - signup
+    - onboarding
+    - login
+    - alerts-inapp
+    - tracking
+  expect:
+    - the deployed site serves this commit and reports CASCADE_CONFIG.ENV staging
+    - sign-up with promo code CASCADEFRIENDS sends the real six-digit code email from the staging sender with no confirmation link
+    - first-run setup reaches Watch with films showing
+    - a film opens, a watched answer is saved, an alert setting is changed, and all three survive signing out and back in
+    - no console error or failed request to the site's own hosts, and the test account is deleted before and after
+  refs:
+    - tests/e2e-deployed/deployed-smoke.spec.mjs
+    - .github/workflows/deployed-smoke.yml

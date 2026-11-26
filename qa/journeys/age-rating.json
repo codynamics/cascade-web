@@ -1,0 +1,113 @@
+{
+ "name": "age-rating",
+ "start": {
+  "date": "2026-12-13",
+  "status": [
+   "upcoming"
+  ],
+  "release_date": "2026-12-20",
+  "offers": []
+ },
+ "description": "An R 18+ film: none for lee+qa-d (under 18); the adult lee+qa-a, who otherwise qualifies, is alerted.",
+ "criteria": {
+  "genres": [
+   "Drama",
+   "Thriller",
+   "Crime"
+  ],
+  "age_rating": [
+   "R 18+"
+  ],
+  "qualifies": [
+   "a"
+  ],
+  "not_qualifies": [
+   "d"
+  ]
+ },
+ "steps": [
+  {
+   "name": "in cinemas",
+   "date": "2026-12-20",
+   "status": [
+    "in_cinema"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [],
+   "expect": {
+    "a": [
+     {
+      "moment": "hits_cinema",
+      "channels": [
+       "in_app",
+       "push",
+       "email"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "rent",
+   "date": "2027-01-24",
+   "status": [
+    "rental"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [
+    {
+     "service": "Apple TV Store",
+     "type": "buy",
+     "price": 24.99,
+     "format": null
+    },
+    {
+     "service": "Apple TV Store",
+     "type": "rent",
+     "price": 6.99,
+     "format": null
+    }
+   ],
+   "expect": {
+    "a": [
+     {
+      "moment": "hits_rent",
+      "channels": [
+       "in_app",
+       "push",
+       "email"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "streaming on Netflix",
+   "date": "2027-03-01",
+   "status": [
+    "included_streaming"
+   ],
+   "release_date": "2026-12-20",
+   "offers": [
+    {
+     "service": "Netflix",
+     "type": "sub",
+     "price": null,
+     "format": null
+    }
+   ],
+   "expect": {
+    "a": [
+     {
+      "moment": "hits_stream",
+      "channels": [
+       "in_app",
+       "push",
+       "email"
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}

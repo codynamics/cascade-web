@@ -1,0 +1,42 @@
+name: Migrate staging DB (CAS-1546)
+
+# Applies unrecorded supabase/migrations/NNNN_*.sql to the STAGING Supabase project only.
+# SUPABASE_DB_URL is a secret of the `staging` GitHub Environment. Production (ypccfyatejejslzlfrbf)
+# is migrated only by the gated release; ci/migrate_staging.py hard-refuses a production URL.
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - "supabase/migrations/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migrate-staging
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+
+      - name: Refuse production
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then echo "::error::SUPABASE_DB_URL is not set on the staging environment."; exit 1; fi
+          case "$SUPABASE_DB_URL" in
+            *ypccfyatejejslzlfrbf*) echo "::error::SUPABASE_DB_URL points at PRODUCTION (ypccfyatejejslzlfrbf). Refusing."; exit 1;;
+          esac
+
+      - name: Apply pending migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: python3 -I ci/migrate_staging.py

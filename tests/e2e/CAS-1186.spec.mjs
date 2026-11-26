@@ -12,6 +12,13 @@ async function buildListing(page){
   await expect(page.locator("#groups .card, #groups .stub").first()).toBeVisible();
 }
 
+// CAS-1548: since CAS-1387 typing only updates the box; the search runs on Enter (or the Search button), and only
+// a RUN search is remembered (CAS-1472) — so every search here is filled and then submitted.
+async function runSearch(page, text){
+  await page.locator("#findSearchInput").fill(text);
+  await page.locator("#findSearchInput").press("Enter");
+}
+
 const findRows = page => page.locator("#findList > [id^='card-']");
 const findCount = page => page.locator("#findCount").textContent().then(numberIn);
 
@@ -54,7 +61,7 @@ test("CAS-1186 AC5: typing filters by title with a matching count, an unmatched 
   const total = await page.evaluate(() => MOVIES.length);
 
   const sample = await page.evaluate(() => MOVIES.find(m => m.title.length >= 6).title.slice(0, 4));
-  await page.locator("#findSearchInput").fill(sample);
+  await runSearch(page, sample);
   const expectedCount = await page.evaluate(
     q => MOVIES.filter(m => m.title.toLowerCase().includes(q.toLowerCase())).length, sample);
   expect(await findCount(page)).toBe(expectedCount);
@@ -64,7 +71,7 @@ test("CAS-1186 AC5: typing filters by title with a matching count, an unmatched 
     sample);
   expect(allMatch).toBe(true);
 
-  await page.locator("#findSearchInput").fill("zzzzqq");
+  await runSearch(page, "zzzzqq");
   await expect(page.locator("#findListWrap")).toContainText('No movies match "zzzzqq"');
 
   await page.locator("#findSearchClear").click();
@@ -81,21 +88,23 @@ test("CAS-1186 AC6: a film no agent lists still appears in Find when searched", 
   expect(unlistedTitle).toBeTruthy();
 
   await page.locator("#findBtn").click();
-  await page.locator("#findSearchInput").fill(unlistedTitle);
+  await runSearch(page, unlistedTitle);
   await expect(page.locator("#findListWrap")).toContainText(unlistedTitle);
 });
 
-test("CAS-1186 AC7: Watch and Moving both close Find in either direction, and reopening Find clears the search", async ({ page }) => {
+// CAS-1548: CAS-1472 made the Database search remembered (findSearchSaved, per login), so reopening Find
+// brings the last search back instead of opening empty — this used to assert it cleared.
+test("CAS-1186 AC7: Watch and Moving both close Find in either direction, and reopening Find restores the remembered search (CAS-1472)", async ({ page }) => {
   await buildListing(page);
   await page.locator("#findBtn").click();
-  await page.locator("#findSearchInput").fill("abc");
+  await runSearch(page, "abc");
 
   await page.locator("#moviesBtn").click();
   await expect(page.locator("#findScreen")).not.toHaveClass(/open/);
   await expect(page.locator("#moviesBtn")).toHaveClass(/active/);
 
   await page.locator("#findBtn").click();
-  await expect(page.locator("#findSearchInput")).toHaveValue("");
+  await expect(page.locator("#findSearchInput")).toHaveValue("abc");
 
   await page.locator("#movingBtn").click();
   await expect(page.locator("#findScreen")).not.toHaveClass(/open/);
@@ -114,7 +123,7 @@ test("CAS-1186 AC8: no console errors across open, page, search and close", asyn
   await expect(findRows(page).first()).toBeVisible();
   await page.locator("#findScreen").evaluate(el => { el.scrollTop = el.scrollHeight; });
   await page.waitForTimeout(300);
-  await page.locator("#findSearchInput").fill("the");
+  await runSearch(page, "the");
   await page.waitForTimeout(200);
   await page.locator("#findSearchClear").click();
   await page.locator("#moviesBtn").click();

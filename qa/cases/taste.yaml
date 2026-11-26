@@ -1,0 +1,41 @@
+# Taste: the one-agent app's taste screen (#agentsScreen) and what it drives.
+- id: TASTE-001
+  part: A
+  title: Taste screen edits survive a reload
+  how: browser
+  area:
+    - taste
+  expect:
+    - changing taste on #agentsScreen persists in the account and is still there after reload
+  refs:
+    - tests/e2e/taste.spec.mjs
+    - "#agentsScreen"
+    - "#tasteScreen"
+- id: TASTE-002
+  part: A
+  title: One-agent model - single owner, single score, taste profile
+  how: unit
+  area:
+    - taste
+    - agent
+  expect:
+    - there is one agent per account, one score box per film and a taste profile built from the answers
+  refs:
+    - tests/js/cas1337-one-agent.test.mjs
+    - tests/js/cas1338-one-score-box.test.mjs
+    - tests/js/cas1251-taste-profile.test.mjs
+    - tests/js/cas1479-taste-applied.test.mjs
+- id: TASTE-003
+  part: B
+  title: Agent behaviour suite passes (node and python halves)
+  how: agent-suite
+  area:
+    - agent
+  expect:
+    - npm run test:agents exits 0 - every PASS/FAIL line in qa-agents-report.txt is PASS or an agreed SKIP
+  refs:
+    - tests/js/run-agent-suite.mjs
+    - tests/js/agents.test.mjs
+    - monitor/agent_tests/test_agents_pipeline.py
+    - monitor/agent_tests/test_agents_alerting.py
+    - monitor/agent_tests/test_agents_scaffold.py

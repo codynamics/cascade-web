@@ -51,7 +51,7 @@ test("CAS-1372 AC1: watchNavKey() changes when the selected v2 mood's Show is ch
   });
 });
 
-test("CAS-1372 AC2: watchNavKey() changes after changing the mood's ages, awards, years, topShare and watched, and saving", () => {
+test("CAS-1372 AC2: watchNavKey() changes after changing the mood's ages, awards, years, genres and watched, and saving", () => {
   const E = loadEngine();
   withV2Agent(E, () => {
     E.window.openOamMoodSheetFor("releases");
@@ -63,7 +63,7 @@ test("CAS-1372 AC2: watchNavKey() changes after changing the mood's ages, awards
     E.window.toggleOamDraftAge("PG");
     E.window.setOamDraftAwards("won");
     E.window.setOamDraftYears(5);
-    E.window.oamFilterOnRelease({ value: "70" });
+    E.window.toggleOamDraftStyle("Action");   // CAS-1593: the genre ticks/levels replace the retired topShare
     E.window.toggleOamDraftWatched();
     E.window.oamSaveMoodFromSheet();
 
@@ -72,9 +72,11 @@ test("CAS-1372 AC2: watchNavKey() changes after changing the mood's ages, awards
     assert.deepEqual([...saved.ages], ["PG"], "sanity: ages must have saved");
     assert.equal(saved.awards, "won", "sanity: awards must have saved");
     assert.equal(saved.years, 5, "sanity: years must have saved");
-    assert.equal(saved.topShare, 70, "sanity: topShare must have saved");
+    assert.deepEqual([...saved.styles], ["Action"], "sanity: the genre tick must have saved");
+    assert.equal(saved.topShare, null, "sanity: topShare is retired — Save writes null");
+    assert.equal(saved.levels.Action, 25, "sanity: levels must have saved for every genre");
     assert.equal(saved.watched, false, "sanity: watched must have saved (Latest and Best starts with it on, so the toggle turns it off)");
-    assert.notEqual(after, before, "AC2: changing ages/awards/years/topShare/watched and saving must change the nav key");
+    assert.notEqual(after, before, "AC2: changing ages/awards/years/genres/watched and saving must change the nav key");
   });
 });
 

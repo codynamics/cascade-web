@@ -1,0 +1,48 @@
+# Notifications: push, email digests, signed answer links.
+- id: NOTIF-001
+  part: A
+  title: Tapping a notification lands on Alerts, not the film page
+  how: browser
+  area:
+    - alerts-push
+    - alerts-inapp
+  expect:
+    - pushNotificationActionPerformed opens Alerts (Today)
+  refs:
+    - tests/e2e/CAS-1206.spec.mjs
+    - "#notifyScreen"
+- id: NOTIF-002
+  part: B
+  title: Daily and unseen alert digests render one card per film with tracked links
+  how: unit
+  area:
+    - alerts-email
+  expect:
+    - every link carries src=email and cmp=<kind>; Watch On / Watched buttons are signed answer links
+  refs:
+    - monitor/tests/test_cas1513_click_tracking.py
+    - monitor/tests/test_cas1537_answers.py
+    - digest:daily_alert
+    - digest:unseen_alert
+    - tests/js/cas1537-alert-answer.test.mjs
+- id: NOTIF-003
+  part: B
+  title: Badge clears and push re-registers on sign-in
+  how: unit
+  area:
+    - alerts-push
+  expect:
+    - opening Alerts clears the badge; signing in re-registers the push token
+  refs:
+    - tests/js/cas1208-badge-clear.test.mjs
+    - tests/js/cas1194-push-rereg.test.mjs
+    - tests/js/cas1474-push-signin.test.mjs
+- id: NOTIF-004
+  part: C
+  title: A real alert arrives on the phone as push and as email
+  how: lee-phone
+  area:
+    - alerts-push
+    - alerts-email
+  expect:
+    - the QA account receives the push and the email for one test alert, and the email buttons open the confirmation page

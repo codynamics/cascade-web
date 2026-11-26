@@ -119,14 +119,15 @@ class D4AFilmWatchWithNoMatchingCascade(unittest.TestCase):
         self.assertIsNone(row["cascade_id"], "D4: the ledger row's cascade_id must be null")
 
 
-class G4AnAnnouncedUnreleasedTitleFires(unittest.TestCase):
+class G4_CAS1558_AnAnnouncedUnreleasedTitleFires(unittest.TestCase):
     """G4: a title absent from yesterday's catalogue, present today, still unreleased ->
     `announced` fires (CAS-242's one first-sighting-is-the-news exception)."""
 
     def test_a_new_unreleased_title_absent_yesterday_announces(self):
         today = [{"tmdb_id": 611, "title": "Future Tentpole", "status": ["upcoming"],
                  "genres": ["Sci-Fi"], "cinema_date": "2027-03-01", "offers": [],
-                 "language": "en", "rt_critic": 70}]
+                 "language": "en", "rt_critic": 70, "wm_critic_score": 70, "popularity": 50, "wm_user_rating": 7.5,
+                 "wm_popularity_percentile": 80}]
         transitions = compute_transitions([], today, RUN_DATE)
         self.assertEqual({(t.movie_id, t.moment) for t in transitions}, {("611", "announced")})
 
@@ -339,16 +340,16 @@ class J3AFirstSightingAlreadyInsideAWindowFiresNoStatusMoment(unittest.TestCase)
         self.assertEqual(transitions, [])
 
 
-class J4NeitherAnUnrequestedMomentNorAGlobalMuteFires(unittest.TestCase):
+class J4_CAS1558_NeitherAnUnrequestedMomentNorAGlobalMuteFires(unittest.TestCase):
     """J4: a moment absent from the agent's alert_moments, and separately a global mute, each
     independently silence the same real transition."""
 
     def _fixture(self):
         prev = [{"tmdb_id": 671, "title": "Quiet Riser", "genres": ["Drama"], "cinema_date": "2026-01-01",
-                "status": ["pvod"], "offers": [], "language": "en", "rt_critic": 70}]
+                "status": ["pvod"], "offers": [], "language": "en", "rt_critic": 70, "wm_critic_score": 70, "popularity": 50, "wm_user_rating": 7.5}]
         today = [{"tmdb_id": 671, "title": "Quiet Riser", "genres": ["Drama"], "cinema_date": "2026-01-01",
                  "status": ["pvod", "rental"], "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}],
-                 "language": "en", "rt_critic": 70}]
+                 "language": "en", "rt_critic": 70, "wm_critic_score": 70, "popularity": 50, "wm_user_rating": 7.5}]
         return prev, today
 
     def _match(self, cascade, **kw):
@@ -375,7 +376,7 @@ class J4NeitherAnUnrequestedMomentNorAGlobalMuteFires(unittest.TestCase):
         self.assertEqual(len(self._match(cascade).get("u1", [])), 1)
 
 
-class J5AllFourNotifyPrefCombinationsChooseTheirChannels(unittest.TestCase):
+class J5_CAS1558_AllFourNotifyPrefCombinationsChooseTheirChannels(unittest.TestCase):
     """J5: {email_on, in_app} x {True, False} - only the chosen channels deliver, and CAS-465's
     push (which rides the same "in_app" gate, not a fourth independent switch) carries the
     existing unread badge count plus what this run delivers. Driven through the real CLI
@@ -416,7 +417,7 @@ class J5AllFourNotifyPrefCombinationsChooseTheirChannels(unittest.TestCase):
 
         pushes = []
 
-        def _fake_apns(token, title, body, badge=None, payload=None):
+        def _fake_apns(token, title, body, badge=None, payload=None, on_invalid_token=None):
             pushes.append({"token": token, "badge": badge})
             return True
 
@@ -424,7 +425,7 @@ class J5AllFourNotifyPrefCombinationsChooseTheirChannels(unittest.TestCase):
                                return_value={"j5-user": ["device-1"]}), \
             mock.patch.object(InMemoryStore, "fetch_unread_counts",
                               return_value={"j5-user": 3}), \
-            mock.patch("monitor.__main__.send_via_apns", side_effect=_fake_apns), \
+            mock.patch("monitor.__main__.send_via_apns", side_effect=_fake_apns),             mock.patch("monitor.__main__.USER_HELD_IDS_FILE", os.path.join(self._tmp.name, "held.json")), \
             mock.patch("monitor.__main__.send_via_resend", return_value={"id": "test"}) as resend:
             buf = io.StringIO()
             with redirect_stdout(buf):
@@ -462,16 +463,16 @@ class J5AllFourNotifyPrefCombinationsChooseTheirChannels(unittest.TestCase):
         self.assertIn("both channels off", out)
 
 
-class J6RerunningTheSameDayTwiceIsSilent(unittest.TestCase):
+class J6_CAS1558_RerunningTheSameDayTwiceIsSilent(unittest.TestCase):
     """J6: a second run against the same transitions and the ledger the first run wrote must
     send nothing - de-dupe holds."""
 
     def _setup(self):
         prev = [{"tmdb_id": 691, "title": "Once Only", "genres": ["Drama"], "cinema_date": "2026-01-01",
-                "status": ["pvod"], "offers": [], "language": "en", "rt_critic": 70}]
+                "status": ["pvod"], "offers": [], "language": "en", "rt_critic": 70, "wm_critic_score": 70, "popularity": 50, "wm_user_rating": 7.5}]
         today = [{"tmdb_id": 691, "title": "Once Only", "genres": ["Drama"], "cinema_date": "2026-01-01",
                  "status": ["pvod", "rental"], "offers": [{"service": "AppleTV", "type": "rent", "price": 6.99}],
-                 "language": "en", "rt_critic": 70}]
+                 "language": "en", "rt_critic": 70, "wm_critic_score": 70, "popularity": 50, "wm_user_rating": 7.5}]
         transitions = compute_transitions(prev, today, RUN_DATE)
         cascade = [{"id": "c1", "user_id": "u1", "name": "Drama radar", "active": True,
                    "alert_moments": ["hits_rent"], "criteria": _criteria(genre=["Drama"])}]

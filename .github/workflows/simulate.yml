@@ -1,0 +1,111 @@
+name: Simulate (QA journeys, CAS-1554)
+
+# workflow_dispatch ONLY - never a schedule/push/pull_request trigger, and never folded into daily.yml. Created under
+# CAS-1554's explicit authorisation of exactly this one new workflow file, on `staging` only.
+#
+# Runs the film journey simulator (python -m monitor.journey) against the four lee+qa-* accounts on STAGING. It
+# runs in the `staging` GitHub environment only and refuses to start if SUPABASE_URL is the live project's. Nothing real
+# is changed: the film's moves exist only in temporary catalogue files; what a run writes is confined to the QA
+# accounts and is deleted before and after the run, whatever the outcome.
+
+on:
+  workflow_dispatch:
+    inputs:
+      journey:
+        description: "A journey file name from qa/journeys (e.g. full-run) or `all`"
+        required: true
+        default: all
+      send:
+        description: "Really deliver push and email (default false: they are rendered and recorded, not delivered)"
+        required: false
+        type: boolean
+        default: false
+      firstdays:
+        description: "Run the first-ten-days simulator (CAS-1555) instead of the journeys: ages the QA accounts day 0 to 10 and checks each day"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read   # read-only - this workflow never commits or pushes anything
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      CASCADE_ENV: staging   # CAS-1523: staging only ever emails lee+*@codynamics.com.au and never pushes
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+
+      - name: Refuse to run against the live project
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "Supabase secrets absent from the staging environment - aborting."
+            exit 1
+          fi
+          case "$SUPABASE_URL" in
+            *ypccfyatejejslzlfrbf*) echo "SUPABASE_URL is the LIVE project - this workflow is staging only. Aborting."; exit 1 ;;
+          esac
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Account ids (the four QA accounts)
+        run: python -m qa.sim.accounts list | tee "$RUNNER_TEMP/accounts.txt"
+
+      - name: Run the journey(s)
+        if: ${{ !inputs.firstdays }}
+        env:
+          JOURNEY: ${{ inputs.journey }}
+          SEND: ${{ inputs.send }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          CASCADE_EMAIL_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}
+          CASCADE_SITE_URL: ${{ secrets.SITE_URL }}
+          APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          APNS_AUTH_KEY: ${{ secrets.APNS_AUTH_KEY }}
+          APNS_BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+        run: |
+          SEND_FLAG=""
+          if [ "$SEND" = "true" ]; then SEND_FLAG="--send"; fi
+          python -m monitor.journey --journey "$JOURNEY" --accounts a,b,c,d \
+            --accounts-file "$RUNNER_TEMP/accounts.txt" $SEND_FLAG
+
+      - name: Run the first ten days (CAS-1555)
+        if: ${{ inputs.firstdays }}
+        env:
+          SEND: ${{ inputs.send }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}   # moves auth.users.created_at on STAGING; qa.sim.age_account refuses any non-staging project
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          CASCADE_EMAIL_FROM: ${{ secrets.CASCADE_EMAIL_FROM }}
+          CASCADE_SITE_URL: ${{ secrets.SITE_URL }}
+          APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
+          APNS_TEAM_ID: ${{ secrets.APNS_TEAM_ID }}
+          APNS_AUTH_KEY: ${{ secrets.APNS_AUTH_KEY }}
+          APNS_BUNDLE_ID: ${{ secrets.APNS_BUNDLE_ID }}
+        run: |
+          SEND_FLAG=""
+          if [ "$SEND" = "true" ]; then SEND_FLAG="--send"; fi
+          python -m monitor.firstdays --accounts a,b,c,d --accounts-file "$RUNNER_TEMP/accounts.txt" $SEND_FLAG
+
+      # CAS-1588: record this run's results per QA area in the cascade-qa database. Never turns the run red.
+      - name: Record results in cascade-qa (CAS-1588)
+        if: always()
+        continue-on-error: true
+        env:
+          QA_DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+        run: |
+          python -m pip install --quiet "psycopg[binary]" || true
+          python ci/qa_report.py --workflow simulate --job simulate=${{ job.status }} --source-job simulate

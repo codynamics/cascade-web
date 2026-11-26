@@ -42,3 +42,4 @@ supabase/.branches/
 
 # CAS-1093: Playwright's own report for the integrity suite, mirroring playwright-report/ above.
 playwright-report-integrity/
+qa-artifacts/

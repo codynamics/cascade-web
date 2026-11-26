@@ -24,7 +24,7 @@
 // as B on the same context — nothing of A visible, A's server rows unchanged) are new, and must pass.
 import { test, expect } from "@playwright/test";
 import {
-  admin, createTestUser, seedCascades, liveCascades, liveCascadeCriteria, liveNotifyPrefs, testEmail,
+  admin, createTestUser, seedCascades, liveCascades, liveCascadeCriteria, liveNotifyPrefs, liveUserPrefs, testEmail,
   gotoIntegrityFresh, signInFromSplash, signOutFromAccount, signInDirect, fetchOtp, emailHasAccount,
 } from "./helpers.mjs";
 import { settleListing, finishFlow, walkToServices, openAgentsScreenFromNav } from "../e2e/helpers.mjs";
@@ -152,18 +152,19 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
     await settleListing(pageB);
 
     // CAS-1425: the CAS-1344 one-agent cutover removed the rename flow (Agents-screen Edit -> hub pencil). The
-    // edit is now made on the Agent screen: switching the Drama genre off with its row tick (oaToggleStyleOn
-    // -> saveCascades()), which must reach the server and then context B.
+    // edit is now made on the Taste screen. CAS-1594: Taste no longer has a row tick, so the edit is Drama's
+    // Cinema alert chip (oaToggleAlert -> saveCascades()), which must reach the server and then context B.
     await openAgentsScreenFromNav(pageA);
     await expect(pageA.locator("#agentsScreen")).toHaveClass(/open/);
-    await pageA.locator('.oarow[data-style="Drama"] .oarowtick').click();
+    const readCinema = (pg, id) => pg.evaluate((agentId) => { const c = cascades.find(x => x.id === agentId); return !!(c && c.styles && c.styles.Drama && c.styles.Drama.al && c.styles.Drama.al.cinema); }, id);
+    const before = await readCinema(pageA, seededAgent.id);
+    const want = !before;
+    await pageA.locator('.oarow[data-style="Drama"] .oarowleft').click();
+    await pageA.locator('.oarow[data-style="Drama"] .oachip', { hasText: "Cinema" }).click();
 
     // CAS-1132: bisect "the UI never committed the edit locally" from "the commit landed but the push to
     // the server failed/never fired" before ever asking the (real) network.
-    await expect.poll(
-      () => pageA.evaluate((id) => { const c = cascades.find(x => x.id === id); return c && c.styles.Drama && c.styles.Drama.bar; }, seededAgent.id),
-      { timeout: 5_000 },
-    ).toBeNull();
+    await expect.poll(() => readCinema(pageA, seededAgent.id), { timeout: 5_000 }).toBe(want);
 
     // CAS-1109: saveCascades() pushes through acctOp immediately now, no debounce to wait out — this just
     // makes sure the queue is drained rather than racing the network.
@@ -171,8 +172,8 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
 
     await expect.poll(async () => {
       const criteria = await liveCascadeCriteria(seededAgent.id);
-      return criteria && criteria.styles && criteria.styles.Drama ? criteria.styles.Drama.bar : "missing";
-    }, { timeout: 15_000 }).toBeNull();
+      return !!(criteria && criteria.styles && criteria.styles.Drama && criteria.styles.Drama.al && criteria.styles.Drama.al.cinema);
+    }, { timeout: 15_000 }).toBe(want);
 
     await pageB.reload();
     await pageB.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
@@ -181,13 +182,7 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
     // always ran with id===undefined, so this always read cascades.find(x => x.id === undefined) (undefined),
     // never seededAgent.id, however long it polled. Captured via closure instead, like every other poll in
     // this file (see S7's identical fix, 25503c7).
-    await expect.poll(
-      () => pageB.evaluate((agentId) => {
-        const c = cascades.find(x => x.id === agentId);
-        return c && c.styles.Drama ? c.styles.Drama.bar : "missing";
-      }, seededAgent.id),
-      { timeout: 15_000 },
-    ).toBeNull();
+    await expect.poll(() => readCinema(pageB, seededAgent.id), { timeout: 15_000 }).toBe(want);
   } finally {
     await ctxA.close();
     await ctxB.close();
@@ -211,6 +206,12 @@ test("S1: a new member's onboarded roster exists on the server", async ({ page }
   await finishFlow(page);
 
   await page.locator("#membEmail").fill(email);
+  // CAS-1568: the web has no approved list since CAS-1565; a brand-new account gets in with the CASCADEFRIENDS
+  // promo code, checked here and redeemed against the real local stack at sign-in.
+  await page.locator("#membPromoLink").click();
+  await page.locator("#membPromoCode").fill("CASCADEFRIENDS");
+  await page.locator("#membPromoApply").click();
+  await expect(page.locator("#membPromo .membpromook")).toBeVisible({ timeout: 30_000 });
   await page.locator(".membcta").click();
   // CAS-1169: the code is confirmed on #membScreen itself (State B), never on #authModal.
   await expect(page.locator("#membCode")).toBeVisible({ timeout: 30_000 });
@@ -226,6 +227,28 @@ test("S1: a new member's onboarded roster exists on the server", async ({ page }
 
   const live = await liveCascades(userId);
   expect(idsOf(live)).toEqual(onScreenIds);
+
+  // CAS-1578: the agent ids alone passed while the onboarding answers were lost (a view-only user_prefs stub
+  // written before complete_membership() made it answer 'account_exists'). The real user_prefs row must carry
+  // every onboarding answer, and be the row complete_membership() stamped.
+  const local = await page.evaluate(() => {
+    const r = window.CascadePersistence.userPrefsRow();
+    return { sub_services:r.sub_services, store_services:r.store_services, taste:r.taste, watch_windows:r.watch_windows };
+  });
+  expect(Object.keys(local.watch_windows || {}).length, "onboarding chose cinema + rent, so windows exist on screen").toBeGreaterThan(0);
+  const prefsRow = await liveUserPrefs(userId);
+  expect(prefsRow, "a user_prefs row exists").not.toBeNull();
+  expect(prefsRow.membership_completed_at, "complete_membership stamped the row").not.toBeNull();
+  expect([...(prefsRow.sub_services||[])].sort()).toEqual([...(local.sub_services||[])].sort());
+  expect([...(prefsRow.store_services||[])].sort()).toEqual([...(local.store_services||[])].sort());
+  expect(prefsRow.watch_windows).toEqual(local.watch_windows);
+  expect(prefsRow.taste).toEqual(local.taste);
+
+  // And it survives a reload — the account, not the device, holds the roster.
+  await page.reload();
+  await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
+  await settleListing(page);
+  expect(await page.evaluate(() => cascades.map(c => c.id).sort())).toEqual(onScreenIds);
 });
 
 test("S4 (second half): editing the same agent on both contexts gets a conflict toast, no data lost", async ({ page }) => {
