@@ -27,6 +27,7 @@ from .emailer import format_invite_reply, render_digest, send_via_resend
 from .matching import Hit, agent_channels, compute_scores, delivery_plan, prefs_for
 from .pusher import send_via_apns
 from . import recap as recap_mod
+from . import tasteline
 from .transitions import Transition
 
 PUSH_LOOKBACK_H = 12    # the push covers last night's 03:00 run, with slack for a late or re-dispatched run
@@ -242,6 +243,14 @@ def _recap_due(store, now) -> list:
         return []
 
 
+def _films_by_user(store) -> dict:
+    """{user_id: [user_films rows]} for the taste line; an unreadable table owes nobody the line."""
+    out: dict = {}
+    for r in _store_get(store, "fetch_user_films", []):
+        out.setdefault(str(r.get("user_id")), []).append(r)
+    return out
+
+
 def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, scores_fn=compute_scores,
                 dry_run: bool = False, target_user: str = None) -> dict:
     """The 17:00 phase. Returns {'users', 'attempted', 'sent', 'failed'}."""
@@ -263,6 +272,7 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
     # CAS-1567: members whose day 7 is today (Sydney) and who have not had their recap. They join the loop even
     # with nothing new found - the recap is sent regardless - and merge into the same email as any alerts.
     recap_users = set(_recap_due(store, now))
+    films_by_user = None   # CAS-1592: read lazily, once, only if someone is actually getting an email
 
     for user_id in sorted(set(by_user) | set(replies_by_user) | recap_users):
         if target_user and user_id != str(target_user):
@@ -305,6 +315,18 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
                 print(f"[monitor] email: {user_id}: could not prepare the day-7 recap: {err} - leaving it out.")
                 if not mine and not replies:
                     continue
+        # CAS-1592: the one-time "<agent> has learned something" line rides this email (never a catch-up, never an
+        # email of its own - this member is already getting one). Recorded only after the send lands.
+        taste_text = None
+        if not any(h.transition.moment == "catchup" for h in hits):
+            try:
+                if films_by_user is None:
+                    films_by_user = _films_by_user(store)
+                taste_text = tasteline.line_for(store, user_id, films_by_user)
+            except Exception as err:   # noqa: BLE001 - the line is a bonus; it must never cost the member their email
+                print(f"[monitor] email: {user_id}: could not work out the taste line: {err} - leaving it out.")
+        taste_line = ({"agent": agent_name_for(cascades_by_id.values(), user_id), "text": taste_text}
+                      if taste_text else None)
         recap_hits = recap["hits"] if recap else []
         scores = scores_fn({h.transition.movie_id for h in hits + recap_hits}) if (hits or recap_hits) else {}
         catchup = any(h.transition.moment == "catchup" for h in hits)
@@ -317,9 +339,9 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
                            for r in replies],
             scores=scores, watch_windows=(user_prefs.get(user_id) or {}).get("watch_windows"), today=now.date(),
             kind="catchup_alert" if catchup else "unseen_alert", batch_id=batch_id, answers=answers,
-            recap=recap)
+            recap=recap, taste_line=taste_line)
         print(f"[monitor] email: {user_id} ({email}): {len(hits)} unseen alert(s), {len(replies)} "
-              f"invite reply(s){', day-7 recap' if recap else ''} - subject: {digest['subject']!r}")
+              f"invite reply(s){', day-7 recap' if recap else ''}{', taste line' if taste_line else ''} - subject: {digest['subject']!r}")
         if dry_run:
             continue
         stats["users"] += 1
@@ -332,6 +354,8 @@ def email_phase(store, today_movies, now: _dt.datetime, send=send_via_resend, sc
             continue
         stats["sent"] += 1
         stamp = now.isoformat()
+        if taste_line:
+            tasteline.record_sent(store, user_id, stamp)
         try:
             store.mark_notifications([r.get("id") for r in mine], "emailed_at", stamp)
         except Exception as err:   # noqa: BLE001 - the batch id is already on every row, so the link stays right

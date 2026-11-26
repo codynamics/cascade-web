@@ -188,3 +188,23 @@ class AgeAccountGuard(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TasteLineDay(unittest.TestCase):
+    """CAS-1592: the simulator expects no taste line unless a day's expectation says `"taste_line": true`."""
+    OBS = {"new_rows": 0, "new_batches": 0, "new_catchup_batches": 0, "total_catchup_batches": 0, "catchup_rows": 0,
+           "pushes": 0, "mails": 0, "banner": True, "taste_lines": 0}
+
+    def test_no_line_expected_no_line_seen_passes(self):
+        self.assertEqual(firstdays.check_day({"catchup": "none", "banner": True}, self.OBS), [])
+
+    def test_an_unexpected_line_is_a_fail(self):
+        self.assertTrue(firstdays.check_day({"catchup": "none", "banner": True}, dict(self.OBS, taste_lines=1)))
+
+    def test_an_expected_line_that_is_missing_is_a_fail_and_present_passes(self):
+        exp = {"catchup": "none", "banner": True, "taste_line": True}
+        self.assertTrue(firstdays.check_day(exp, self.OBS))
+        self.assertEqual(firstdays.check_day(exp, dict(self.OBS, taste_lines=1)), [])
+
+    def test_send_mode_does_not_check_it(self):
+        self.assertEqual(firstdays.check_day({"catchup": "none", "banner": True}, dict(self.OBS, taste_lines=None)), [])

@@ -2097,3 +2097,15 @@ create policy monitor_state_select_admin on public.monitor_state
 
 revoke all on public.monitor_state from anon, authenticated;
 grant select on public.monitor_state to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- email_lines_sent (CAS-1592) — "once per account" for one-time email lines (migration 0018).
+-- Read before / written after an alert email by the monitor (service_role, bypasses RLS); no policy.
+-- ---------------------------------------------------------------------------
+create table if not exists public.email_lines_sent (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  line    text not null,
+  sent_at timestamptz not null default now(),
+  primary key (user_id, line)
+);
+alter table public.email_lines_sent enable row level security;

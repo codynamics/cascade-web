@@ -312,6 +312,7 @@ class Sends:
         self.by_uid = {uid: k for k, uid in accounts.items()}
         self.emails = emails
         self.pushes, self.mails = [], []
+        self.taste_lines = []   # CAS-1592: recipients of an email that carried the "has learned something" line
 
     def push(self, token, title, body, **kw):
         uid = token.replace("journey-token-", "")
@@ -320,10 +321,12 @@ class Sends:
 
     def mail(self, to, subject, html, text, **kw):
         self.mails.append((to, subject))
+        if "has learned something" in (html or ""):
+            self.taste_lines.append(to)
         return {"fake": True}
 
     def reset(self):
-        self.pushes, self.mails = [], []
+        self.pushes, self.mails, self.taste_lines = [], [], []
 
 
 # --------------------------------------------------------------------------------------------------------------

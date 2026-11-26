@@ -11,6 +11,11 @@ Columns a first-days rule reads (keep this list current when a new day +N rule i
     tutorial banner (app_template.html tutAccountAgeDays(a.user.created_at, now)).
   * the rating reminder card (day +2) and the day +7 first-week recap also read created_at (CAS-1583), so aging
     an account moves them too.
+  * CAS-1566 - the watch reminder card (app_template.html rnudgeDecide, tutAccountAgeDays(createdAt, now) < 2 stays
+    silent); its Taste card does NOT read created_at (10 ratings and a 5+ point adjustment).
+  * CAS-1567 - the day +7 recap (monitor/recap.py due_users: sign-up Sydney date, via fetch_user_created_at).
+  * CAS-1592 - the email taste line reads no created_at (10 Watched ratings and a 5+ point adjustment); it only rides
+    an email that is going out anyway.
 
 Staging only: the connection string is checked FIRST and the command exits non-zero before any write or
 subprocess if it names production (ypccfyatejejslzlfrbf) or is missing.

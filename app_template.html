@@ -6207,7 +6207,7 @@ const didReset = URLQ.has("reset");
 // APPLIED yet — applyDeepLink() (below) is the one place that happens, called once it's actually safe
 // to: a returning user's boot, or the moment first-run onboarding genuinely finishes. A device that has
 // never onboarded must still run the whole flow; this only decides where to land afterwards.
-const DEEPLINK_DESTINATIONS = new Set(["cinema","streaming","moving","family"]);
+const DEEPLINK_DESTINATIONS = new Set(["cinema","streaming","moving","family","taste"]);
 const dlParam = URLQ.get("dl");
 let pendingDeepLink = DEEPLINK_DESTINATIONS.has(dlParam) ? dlParam : null;
 // CAS-1536: an alert email's own batch link — `?dl=alerts:batch:<uuid>` (optionally `&film=<movie_id>`), the
@@ -12312,6 +12312,8 @@ function applyDeepLink(){
     render();
   } else if(dest==="moving"){
     openMovingScreen();
+  } else if(dest==="taste"){
+    window.openTasteScreen();   // CAS-1592: the alert email's "See Taste" link
   } else if(dest==="family"){
     const agent = cascades.find(c=>c.template==="onb_family");
     if(agent) briefOpen(agent.id, "agents");

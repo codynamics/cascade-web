@@ -722,6 +722,26 @@ def _recap_block(recap, site_url, kind, esc, scores, watch_windows, answers):
     return html, text
 
 
+# ---- the one-time taste line (CAS-1592) ---------------------------------------------------------------
+
+def _taste_line_block(taste_line, site_url, esc):
+    """(html row, text lines) for "<agent> has learned something" + the app's own adjustment text + "See Taste".
+    One short block; no rating prompt of any kind (Lee, 25 Nov 2026)."""
+    heading = f"{taste_line['agent']} has learned something"
+    href = track_url(f"{site_url}?dl=taste", "taste_line", "see_taste")
+    text = [heading, taste_line["text"], f"See Taste: {href}", ""]
+    html = (
+        '<tr><td style="padding-bottom:14px;">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+        '<td style="background:#f1eefe;border-radius:12px;padding:12px 14px;">'
+        f'<div style="font-size:15px;font-weight:800;color:#141A2A;">{esc(heading)}</div>'
+        f'<div style="font-size:14px;color:#4b5563;margin-top:2px;">{esc(taste_line["text"])}</div>'
+        f'<div style="margin-top:8px;"><a href="{esc(href)}" style="font-size:14px;color:#6b48f2;font-weight:700;'
+        'text-decoration:none;">See Taste &rsaquo;</a></div>'
+        '</td></tr></table></td></tr>')
+    return html, text
+
+
 # ---- the digest itself --------------------------------------------------------------------------
 
 def _wrap_html(body_rows, site_url, kind, esc) -> str:
@@ -751,7 +771,8 @@ def _wrap_html(body_rows, site_url, kind, esc) -> str:
 
 
 def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_windows=None,
-                  today=None, kind: str = "daily_alert", batch_id=None, answers=None, recap=None) -> dict:
+                  today=None, kind: str = "daily_alert", batch_id=None, answers=None, recap=None,
+                  taste_line=None) -> dict:
     """Return {'subject', 'html', 'text'} for one user's consolidated digest (CAS-1196: one card
     per film, no status/agent section headings — see the per-film helpers above).
 
@@ -769,6 +790,8 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
     recap         : CAS-1567 - the day-7 recap (monitor.recap.prepare's dict): its heading, stat tiles,
                     still-to-decide films and reminder line lead the email and become its subject; any ordinary
                     alert cards follow in the same email (never a second one). Not rendered into a catch-up.
+    taste_line    : CAS-1592 - {"agent", "text"}: the one-time "<agent> has learned something" block (monitor.tasteline),
+                    first in the body, with a "See Taste" link. Not rendered into a catch-up.
     today         : the date "in N days"/subject phrasing is relative to; defaults to today (UTC).
     batch_id      : CAS-1535 - the night's alert batch (monitor.batches). When given, every film link and
                     the "See all in Cascade" link open that batch's own view in Alerts
@@ -792,6 +815,10 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
 
     # ---- plain-text part ----
     text_lines = []
+    taste_html = ""
+    if taste_line:
+        taste_html, taste_text = _taste_line_block(taste_line, site_url, esc)
+        text_lines.extend(taste_text)
     if replies:
         text_lines.extend(_replies_block_text(replies))
     recap_html = ""
@@ -817,7 +844,7 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
     text = "\n".join(text_lines)
 
     # ---- HTML part (inline styles; email-client safe — no <style>, no class=, no display:flex/grid) ----
-    body_rows = ""
+    body_rows = taste_html
     if replies:
         body_rows += _replies_block_html(replies, esc)
     body_rows += recap_html

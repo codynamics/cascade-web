@@ -17,6 +17,11 @@ Day N's created_at is `now - (N - 0.5) days` (day 0: now): at day 1 the account 
 window (CATCHUP_WINDOW_H), so day 1 is the first nightly run after sign-up; from day 2 it is outside it. Day 0 has
 `"run": false`: the account was just created and no nightly run has happened, so nothing runs and nothing is owed.
 
+CAS-1592: a day's expectation may carry `"taste_line": true` - the one-time "<agent> has learned something" email line
+(an account seeded with 10 Watched ratings and a 5+ point genre pair). Absent means NO line that day, so an unexpected
+line is a FAIL too; none of the shipped accounts a-d is seeded with ratings, so none expects it. (Not checked with --send:
+the delivered email is not read back.)
+
 One line per account per day, PASS or FAIL; exit 1 on any FAIL. The accounts' real created_at is restored at the end
 (also after a FAIL or an error), and their ledger rows and alert batches are removed before and after the run.
 """
@@ -100,6 +105,10 @@ def check_day(exp: dict, obs: dict) -> list:
             problems.append(f"expected no new alerts, got {obs['new_batches']} batch(es) / {obs['new_rows']} row(s)")
         if obs["pushes"] or obs["mails"]:
             problems.append(f"expected no push or email, got push={obs['pushes']} email={obs['mails']}")
+    # CAS-1592: the one-time "<agent> has learned something" line. A day's expectation says `"taste_line": true`
+    # only for an account seeded with 10 Watched ratings and a 5+ point pair; every other day expects none.
+    if obs.get("taste_lines") is not None and obs["taste_lines"] != (1 if exp.get("taste_line") else 0):
+        problems.append(f"expected {1 if exp.get('taste_line') else 0} taste line(s) in the email, got {obs['taste_lines']}")
     if obs["banner"] != bool(exp.get("banner")):
         problems.append(f"expected banner eligible={bool(exp.get('banner'))}, the app says {obs['banner']}")
     return problems
@@ -189,7 +198,8 @@ def run_firstdays(store, accounts: dict, catalogue: list, set_created_at, send: 
                            "new_batches": len(batches) - len(batches_before),
                            "new_catchup_batches": len(_kinds(batches, "catchup")) - len(_kinds(batches_before, "catchup")),
                            "total_catchup_batches": len(_kinds(batches, "catchup")),
-                           "pushes": pushes, "mails": mails}
+                           "pushes": pushes, "mails": mails,
+                           "taste_lines": None if send else len([e for e in sends.taste_lines if emails.get(e) == uid])}
                     problems = check_day(exp, obs)
                     fails += bool(problems)
                     out(f"{'FAIL' if problems else 'PASS'} firstdays account={k} day={day} "

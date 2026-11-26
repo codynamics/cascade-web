@@ -113,6 +113,7 @@ class InMemoryStore:
         self._push_tokens = list(push_tokens or [])
         self._watches = list(watches or [])
         self._user_prefs = dict(user_prefs or {})
+        self._email_lines = set()   # CAS-1592: {(user_id, line)} sent
         self._user_films = list(user_films or [])
         self._contact_messages = [dict(r) for r in (contact_messages or [])]
         self._recommendations = [dict(r) for r in (recommendations or [])]
@@ -204,6 +205,13 @@ class InMemoryStore:
         """{(user_id, movie_id, stage)} for every catch-up row - the stages already announced."""
         return {(str(r.get("user_id")), str(r.get("movie_id")), (r.get("detail") or {}).get("stage"))
                 for r in self._notifications if r.get("moment") == "catchup"}
+
+    def fetch_email_line_sent(self, user_id, line) -> bool:
+        """CAS-1592: has this one-time email line already gone to the member?"""
+        return (str(user_id), str(line)) in self._email_lines
+
+    def mark_email_line_sent(self, user_id, line, sent_at) -> None:
+        self._email_lines.add((str(user_id), str(line)))
 
     def fetch_user_created_at(self) -> dict:
         return dict(self._user_created)
@@ -326,6 +334,7 @@ class InMemoryStore:
         before = len(self._alert_batches)
         self._alert_batches = [b for b in self._alert_batches if str(b.get("user_id")) not in uids]
         out["alert_batches"] = before - len(self._alert_batches)
+        self._email_lines = {(u, l) for (u, l) in self._email_lines if u not in uids}   # CAS-1592
         mid = None if movie_id is None else str(movie_id)
         before = len(self._watches)
         self._watches = [w for w in self._watches
@@ -963,6 +972,17 @@ class SupabaseStore:
         return {(str(r.get("user_id")), str(r.get("movie_id")), (r.get("detail") or {}).get("stage"))
                 for r in rows}
 
+    def fetch_email_line_sent(self, user_id, line) -> bool:
+        """CAS-1592: raises if the table is missing (migration 0018 not applied) - the caller then owes nobody."""
+        rows = self._get(f"/email_lines_sent?select=user_id&user_id=eq.{urllib.parse.quote(str(user_id))}"
+                         f"&line=eq.{urllib.parse.quote(str(line))}&order=user_id.asc")
+        return bool(rows)
+
+    def mark_email_line_sent(self, user_id, line, sent_at) -> None:
+        self._write_json("POST", "/email_lines_sent?on_conflict=user_id,line",
+                         [{"user_id": str(user_id), "line": str(line), "sent_at": sent_at}],
+                         prefer="resolution=ignore-duplicates,return=minimal")
+
     def fetch_user_created_at(self) -> dict:
         return {str(u.get("id")): u.get("created_at") for u in self.fetch_auth_users() if u.get("id")}
 
@@ -1137,6 +1157,10 @@ class SupabaseStore:
         who = "user_id=in.(" + ",".join(ids) + ")"
         out = {"notifications": self._delete_where("notifications", who),
                "alert_batches": self._delete_where("alert_batches", who)}
+        try:
+            out["email_lines_sent"] = self._delete_where("email_lines_sent", who)   # CAS-1592
+        except Exception:   # noqa: BLE001 - migration 0018 not applied: nothing to clean
+            out["email_lines_sent"] = 0
         if movie_id is not None:
             film = "&movie_id=eq." + urllib.parse.quote(str(movie_id))
             out["film_watch"] = self._delete_where("film_watch", who + film)
