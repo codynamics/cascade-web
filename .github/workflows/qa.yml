@@ -448,23 +448,14 @@ jobs:
         if: steps.e2e_run.outcome == 'failure' || steps.integrity_run.outcome == 'failure'
         run: exit 1
 
-  # CAS-1574: the real-user check on the DEPLOYED staging site (real email, real database), once the gate
-  # above is green. Push runs only: a daily-refresh dispatch ships no code and must not touch the QA account.
-  # A failure here reds the run, so mark-on-staging does not mark the push's tickets On Staging and
-  # on-failure requeues them, the same path as any other job.
-  deployed-smoke:
-    needs: [build-check, engine, data, monitor, lint, scheduler, integrity]
-    if: github.event_name == 'push'
-    uses: ./.github/workflows/deployed-smoke.yml
-    with:
-      environment: staging
-      sha: ${{ github.sha }}
-    secrets: inherit
+  # CAS-1600: the real-user check on the deployed staging site (CAS-1574) is no longer a job here. It tests the
+  # already-deployed site, not this push's gate, so it runs as its own workflow (deployed-smoke.yml, triggered by
+  # the same push) and cannot red this run or hold tickets back from On Staging.
 
   # CAS-462: Jira checkpoint only — no build artefact depends on this, so it runs after the
   # other jobs (not in parallel with them) and only on green, via `needs:`.
   mark-on-staging:
-    needs: [build-check, engine, data, monitor, lint, scheduler, integrity, deployed-smoke]
+    needs: [build-check, engine, data, monitor, lint, scheduler, integrity]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     # CAS-1562: reads earlier qa runs through the API to find the last green head.
     permissions:
@@ -523,7 +514,7 @@ jobs:
   # default failure propagation. Each QA job already uploaded a qa-failure-<job> artifact with its
   # first failing line (see the "Capture failure detail" steps above) if it failed.
   on-failure:
-    needs: [build-check, engine, data, monitor, lint, scheduler, integrity, deployed-smoke]
+    needs: [build-check, engine, data, monitor, lint, scheduler, integrity]
     if: failure()
     # download-artifact's `pattern` option lists this run's artifacts via the Actions API, which
     # needs actions:read — the top-level `permissions:` block above restricts every other scope to
@@ -558,11 +549,10 @@ jobs:
           LINT:        ${{ needs.lint.result }}
           SCHEDULER:   ${{ needs.scheduler.result }}
           INTEGRITY:   ${{ needs.integrity.result }}
-          DEPLOYED_SMOKE: ${{ needs.deployed-smoke.result }}
         run: |
           FAILED=""
           DETAIL=""
-          for pair in "build-check:$BUILD_CHECK" "engine:$ENGINE" "data:$DATA" "monitor:$MONITOR" "lint:$LINT" "scheduler:$SCHEDULER" "integrity:$INTEGRITY" "deployed-smoke:$DEPLOYED_SMOKE"; do
+          for pair in "build-check:$BUILD_CHECK" "engine:$ENGINE" "data:$DATA" "monitor:$MONITOR" "lint:$LINT" "scheduler:$SCHEDULER" "integrity:$INTEGRITY"; do
             name="${pair%%:*}"; result="${pair##*:}"
             if [ "$result" = "failure" ]; then
               FAILED="${FAILED:+$FAILED, }$name"
@@ -595,7 +585,7 @@ jobs:
   # noticed by whoever next opens the Actions tab. Separate concern from on-failure above
   # (which requeues the Jira ticket) — needs every other job so it fires whichever one broke.
   alert:
-    needs: [build-check, engine, data, monitor, lint, scheduler, integrity, deployed-smoke, mark-on-staging, dispatch-promote, on-failure]
+    needs: [build-check, engine, data, monitor, lint, scheduler, integrity, mark-on-staging, dispatch-promote, on-failure]
     if: failure()
     permissions:
       contents: read

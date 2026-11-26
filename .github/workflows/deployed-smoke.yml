@@ -1,13 +1,17 @@
 # CAS-1574: the real-user check on the DEPLOYED site. Signs up as a new person (real email, real database),
 # does first-run setup, uses the core features, signs out and back in, then deletes its account.
 # STAGING only here; the production run is a separate follow-up ticket - 'production' is refused below.
-# Called by qa.yml after the gate is green; can also be run by hand (workflow_dispatch).
+# CAS-1600: its own workflow, started by every push to staging, NOT a qa.yml job - it tests the already-deployed
+# site, so its result must not red the push's qa run or hold tickets back from On Staging. Result still goes
+# to the QA database (testing point 3). Can also be run by hand (workflow_dispatch).
 # Secrets come from the GitHub `staging` environment: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (clean-up),
 # MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET (read the real email; see tests/e2e-deployed/README.md).
 # Missing MS_* secrets make the email checks Blocked, not Fail.
 name: deployed-smoke
 
 on:
+  push:
+    branches: [staging]
   workflow_call:
     inputs:
       environment:
