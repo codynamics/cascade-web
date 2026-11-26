@@ -106,7 +106,8 @@ jobs:
           npm run build
           eval "$(cd ../main && npx supabase status -o env | sed 's/^/export /')"
           export SUPABASE_URL="$API_URL" SUPABASE_SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY:-$SECRET_KEY}" SUPABASE_ANON_KEY="${ANON_KEY:-$PUBLISHABLE_KEY}"
-          python3 -I -m qa.sim.accounts create
+          # -I drops the cwd from sys.path, so put the candidate checkout on it explicitly (keeps isolation from PYTHON* env vars / user site)
+          python3 -I -c 'import sys, runpy; sys.path.insert(0, "."); sys.argv = ["accounts", "create"]; runpy.run_module("qa.sim.accounts", run_name="__main__")'
 
       - name: "3. Apply the candidate's extra migrations"
         id: s3
