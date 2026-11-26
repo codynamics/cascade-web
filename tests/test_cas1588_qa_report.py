@@ -71,3 +71,33 @@ class NeverRed(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Cas1595Secrecy(unittest.TestCase):
+    DSN = "postgresql://postgres.abc:p@ss#w:rd/x?y@aws-0-ap.pooler.supabase.com:5432/postgres"
+
+    def test_parse_reserved_password(self):
+        kw = qa_report.parse_dsn(self.DSN)
+        self.assertEqual(kw["password"], "p@ss#w:rd/x?y")
+        self.assertEqual(kw["user"], "postgres.abc")
+        self.assertEqual(kw["host"], "aws-0-ap.pooler.supabase.com")
+        self.assertEqual(kw["port"], 5432)
+        self.assertEqual(kw["dbname"], "postgres")
+
+    def test_parse_encoded_password(self):
+        kw = qa_report.parse_dsn("postgresql://u:p%40s%23w@h.example:6543/db")
+        self.assertEqual((kw["password"], kw["host"], kw["dbname"]), ("p@s#w", "h.example", "db"))
+
+    def test_failure_prints_no_secret_and_stays_green(self):
+        import io
+        from contextlib import redirect_stdout
+        boom = RuntimeError("failed to resolve host 'ss#w:rd' p@ss#w")
+        buf = io.StringIO()
+        with mock.patch.dict(os.environ, {"QA_DATABASE_URL": self.DSN}), \
+                mock.patch.object(qa_report, "write_rows", side_effect=boom), redirect_stdout(buf):
+            rc = qa_report.main(["--workflow", "qa", "--job", "engine=success"])
+        out = buf.getvalue()
+        self.assertEqual(rc, 0)
+        self.assertIn("::warning::qa_report: results NOT recorded (RuntimeError)", out)
+        for secret in ("ss#w", "p@ss", "supabase", "postgres.abc"):
+            self.assertNotIn(secret, out)

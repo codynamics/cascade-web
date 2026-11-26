@@ -142,9 +142,39 @@ def make_rows(args, outcomes, cases, round_id, build, commit, url):
 COLS = ("round_id", "build", "commit", "env", "point", "kind", "area_id", "result", "source", "detail", "run_url")
 
 
+def parse_dsn(dsn):
+    """CAS-1595: split a postgres URL into driver keyword args without a strict URL parser, so a password holding
+    reserved characters (@ : / # ?) works whether or not it is percent-encoded. The LAST '@' ends the userinfo."""
+    from urllib.parse import unquote
+    rest = dsn.split("://", 1)[1] if "://" in dsn else dsn
+    userinfo, _, hostpart = rest.rpartition("@")
+    user, _, password = userinfo.partition(":")
+    hostpart, _, query = hostpart.partition("?")
+    hostport, _, dbname = hostpart.partition("/")
+    host, _, port = hostport.partition(":")
+    kw = {"host": host, "user": unquote(user), "password": unquote(password), "dbname": unquote(dbname) or "postgres"}
+    if port:
+        kw["port"] = int(port)
+    for pair in filter(None, query.split("&")):
+        k, _, v = pair.partition("=")
+        if k == "sslmode":
+            kw["sslmode"] = v
+    return kw
+
+
+NOT_RECORDED = "qa_report: results NOT recorded ({}). Check the QA_DATABASE_URL secret."
+
+
+def warn_not_recorded(exc):
+    """Fixed message only: the error class, never the driver's text (it can echo the connection string)."""
+    msg = NOT_RECORDED.format(type(exc).__name__)
+    print(msg)
+    print("::warning::" + msg)
+
+
 def write_rows(dsn, rows):
     import psycopg  # installed by the workflow step; imported late so a missing driver only warns
-    with psycopg.connect(dsn, connect_timeout=15) as conn:
+    with psycopg.connect(connect_timeout=15, **parse_dsn(dsn)) as conn:
         cur = conn.cursor()
         cur.execute("select id from qa_rounds where closed_at is null order by started_at desc limit 1")
         r = cur.fetchone()
@@ -181,7 +211,7 @@ def main(argv=None):
         rid = write_rows(dsn, rows)
         print(f"qa_report: wrote {len(rows)} rows (round {rid}) for {args.workflow}")
     except Exception as e:  # reporting must never turn a check red
-        print(f"qa_report: WARNING - not recorded: {type(e).__name__}: {str(e)[:200]}")
+        warn_not_recorded(e)
     return 0
 
 
