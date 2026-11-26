@@ -4,7 +4,7 @@
      then run `python qa/build_checklist.py`. The push gate (tests/lint/qa-drift.mjs) fails if this
      file is stale. -->
 
-96 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
+98 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
 
 ## Part A
 
@@ -60,6 +60,9 @@
   - a mood saved then reloaded is identical; its sort survives opening a cascade
 - [ ] **LISTS-002** A list can be created from a Find search _(unit, auto)_
   - Save as list from Find builds a mood with that search's people or genre
+- [ ] **LISTS-003** A list sets its own genre levels (five stops) and Set all genres _(browser, auto)_
+  - the list sheet shows a five-stop level row per genre and a Set all genres box, with no Override switch or Taste link
+  - tapping the junction between boxes 2 and 3 picks Top 10%; only the checkbox toggles a genre; Set all genres at 50% puts every ticked genre at Top 50%
 - [ ] **MEMB-001** Membership screen shows price and free-month copy, no Prototype disclaimer _(browser, auto)_
   - #membScreen carries the price and free-month copy on both the onboarding recap and the standalone preview
 - [ ] **MEMB-002** Web membership screen has no purchase button _(browser, auto)_
@@ -217,6 +220,8 @@
 
 ## Part C
 
+- [ ] **LISTS-004** Long-pressing a genre row on iPhone never brings up the text magnifier _(lee-phone, manual)_
+  - press and hold a genre name or level track in the list sheet on iPhone; no magnifier or selection appears, and dragging a level still works
 - [ ] **MEMB-006** A real purchase in the TestFlight build unlocks membership _(lee-phone, manual)_
   - buying in the iOS build marks the account a member and the web build then admits the same account
 - [ ] **NOTIF-004** A real alert arrives on the phone as push and as email _(lee-phone, manual)_

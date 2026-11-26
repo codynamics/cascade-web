@@ -2024,16 +2024,19 @@ test(`CAS-1296 AC3: "+ Mood" opens on the agent's genres with every style includ
   await page.evaluate(() => { if (!oamSecOpen.has("primary")) window.oamToggleSec("primary"); });   // Lee, 2026-11-22: sheet sections open closed
   await expect(page.locator("#oamKwInput")).toBeVisible();
   await expect(page.locator("#oamKwInput")).toHaveValue("");
-  const draft = await page.evaluate(() => ({ stylesAll: oamDraft.stylesAll, mode: oamDraft.mode, watched: oamDraft.watched }));
-  expect(draft).toEqual({ stylesAll: true, mode: "genre", watched: true });
-  // Nothing the agent has ON sits under "Not in this mood" — only genres the agent has off (oaBar null) do,
-  // so the expander appears only when the agent has some off.
+  // CAS-1593: a new list starts with Latest and Best's ticks — the genres the agent has on — so every genre is
+  // ticked (stylesAll) only when the agent has none off.
+  const draft = await page.evaluate(() => ({ stylesAll: oamDraft.stylesAll, mode: oamDraft.mode, watched: oamDraft.watched,
+    agentAllOn: ALL_GENRES.every(g => oaBar(oneAgentCriteria(), g) != null) }));
+  expect(draft).toEqual({ stylesAll: draft.agentAllOn, mode: "genre", watched: true, agentAllOn: draft.agentAllOn });
+  // Nothing the agent has ON sits under "Not in this list" — only genres the agent has off (oaBar null) do,
+  // so the sub-heading appears only when the agent has some off.
   const notIn = await page.evaluate(() => {
     const c = oneAgentCriteria();
     return { names: oamDraft.rowOrder.notInMood, allOff: oamDraft.rowOrder.notInMood.every(g => oaBar(c, g) == null) };
   });
   expect(notIn.allOff, `genres under "Not in this mood": ${notIn.names}`).toBe(true);
-  await expect(page.locator("#watchSheetBody .oalist .oamexpand")).toHaveCount(notIn.names.length ? 1 : 0);
+  await expect(page.locator("#watchSheetBody .oalist .oamnotinhd")).toHaveCount(notIn.names.length ? 1 : 0);
   await page.evaluate(() => window.closeWatchSheet());
 });
 
@@ -2485,29 +2488,23 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
-  // CAS-1467: the levels always show; the Agent override switch sits under the genre rows.
+  // CAS-1593: the five-stop level rows and the Set all genres box show; the Override switch is gone.
   await page.evaluate(() => { if (!oamSecOpen.has("primary")) window.oamToggleSec("primary"); });   // Lee, 2026-11-22: sheet sections open closed
-  await page.evaluate(() => { if (!oamAdvancedOn(oamDraft)) window.toggleOamAdvanced(); window.setOamAgentOverride(true); });
   const m = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll("#watchSheetBody .oamstylerow")];
-    const hd = document.querySelector("#watchSheetBody .oamlvlhd");
-    const rowStrip = rows[0].querySelector(".oastrip").getBoundingClientRect();
-    const fStrip = document.querySelector("#watchSheetBody .mfrowgrid .oastrip").getBoundingClientRect();
+    const rows = [...document.querySelectorAll("#watchSheetBody .oamlvlrow")];
     return {
       rowCount: rows.length,
       rowHeights: rows.map(r => r.getBoundingClientRect().height),
-      hdHeight: hd.getBoundingClientRect().height,
-      stripLeftDiff: Math.abs(rowStrip.left - fStrip.left),
-      stripWidthDiff: Math.abs(rowStrip.width - fStrip.width),
-      rangeInRow: document.querySelectorAll("#watchSheetBody .oamstylerow input[type=range]").length,
+      allBox: document.querySelectorAll("#watchSheetBody .oamlvlall").length,
+      seg: document.querySelectorAll("#watchSheetBody .oamlvlseg").length,
+      rangeInRow: document.querySelectorAll("#watchSheetBody .oamlvlrow input[type=range]").length,
       headingsInTrack: document.querySelectorAll("#watchSheetBody .mpanel .wsheethd").length,
     };
   });
   expect(m.rowCount).toBeGreaterThan(0);
-  m.rowHeights.forEach(h => expect(h).toBeLessThan(52));
-  expect(m.hdHeight).toBeLessThan(36);   // CAS-1467: the "Genre levels" heading sits under the rows (the old .gcolhd header is gone)
-  expect(m.stripLeftDiff).toBeLessThanOrEqual(1);
-  expect(m.stripWidthDiff).toBeLessThanOrEqual(1);
+  m.rowHeights.forEach(h => expect(h).toBeLessThan(80));
+  expect(m.allBox).toBe(1);
+  expect(m.seg).toBe(0);
   expect(m.rangeInRow).toBe(0);
   expect(m.headingsInTrack).toBe(0);
 

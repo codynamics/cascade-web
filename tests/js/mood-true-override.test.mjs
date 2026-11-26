@@ -28,8 +28,9 @@ test("CAS-1409: topShare 50 overrides a genre whose agent bar sits at an 80% sha
   assert.notEqual(got, bar, "sanity: the override must differ from the agent's own bar");
 });
 
-test("CAS-1409: topShare null (Off) keeps the agent's own bar", () => {
+test("CAS-1409 (CAS-1593): topShare null reads the level of the agent's own bar (snapped to a stop) — the retired Off", () => {
   const style = "Action";
   const bar = E.oneBarForTopPct(style, 20);
-  assert.equal(E.oamMoodBarFor({ id:"m1", topShare:null }, criteriaWith(style, bar), style), bar);
+  assert.equal(E.oamMoodBarFor({ id:"m1", topShare:null }, criteriaWith(style, bar), style),
+    E.oneBarForTopPct(style, E.snapPct(E.oneTopPct(style, bar))));
 });

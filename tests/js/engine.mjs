@@ -865,6 +865,10 @@ if(typeof window.CascadeAuth === "undefined"){
   // MOOD_MAX is the mood-row cap the visibility helper below also gates on; oamSvcChipLabel is the mood
   // sheet's/Find's own short service-chip label (the prefill's own name fallback reads it too) — exported
   // directly so a test can assert each against a fixture rather than re-deriving them.
+  // CAS-1593: a list's own genre levels — the five-stop snap, the level reader, the draft (for tick/level edits)
+  // and the sheet's row/Set-all renderers, exported so list-levels.test.mjs can assert them directly.
+  snapPct, oamMoodLevel, oamStyleRowHTML, oamAllBoxHTML, oamDraftTicked, oamApplyLevelStop, OAM_LEVEL_STOPS,
+  get oamDraft(){ return oamDraft; },
   oamMoodFromDraft, MOOD_MAX, oamSvcChipLabel,
   // CAS-1400: the genre|keyword mode resolver.
   oamMoodMode, oamKeywordOn,

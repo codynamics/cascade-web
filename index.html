@@ -3751,15 +3751,25 @@
   .oamlvlnote{margin:8px 2px 0}
   .oamlvl .mfbox{margin:8px 0 0;border-top:0;padding:4px 4px 0;overflow:hidden;max-height:260px;opacity:1;
     transition:max-height .34s cubic-bezier(.4,0,.2,1),opacity .26s ease,margin .34s cubic-bezier(.4,0,.2,1),padding .34s cubic-bezier(.4,0,.2,1)}
-  /* Lee, 2026-11-22: Taste sits left of Watch in the nav — "to Taste" points left, "back to list" points right */
-  .oamtastelink{display:flex;align-items:center;justify-content:flex-start;gap:12px;width:100%;margin:12px 0 4px;
-    padding:11px 14px;border-radius:12px;border:1px solid rgba(124,92,255,.55);background:rgba(124,92,255,.14);
-    color:var(--ink);font:700 14px var(--font-body);cursor:pointer}
-  .oamtastelink span[aria-hidden]{font-size:20px;line-height:1;color:var(--accent)}
-  .oamtasteback{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin:0 0 14px;padding:12px 14px;border-radius:12px;
-    border:1px solid rgba(124,92,255,.55);background:rgba(124,92,255,.16);color:var(--ink);font:600 15px var(--font-body);
-    text-align:left;cursor:pointer}
-  .oamtasteback span[aria-hidden]{font-size:22px;line-height:1;color:var(--accent)}
+  /* CAS-1593: a list's own genre levels — five-stop rows and the Set all box */
+  .oamlvlintro{margin:2px 12px 10px}
+  .oamlvlrow,.oamlvlall{touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;padding:10px 4px 12px;border-bottom:1px solid var(--line)}
+  .oamlvlall{margin:0 12px 10px;padding:12px 14px 8px;border:1px solid rgba(124,92,255,.5);border-radius:12px;background:rgba(124,92,255,.10)}
+  .oamlvlline{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .oamlvlleft{display:flex;align-items:center;gap:10px;min-width:0}
+  .oamlvlrow input[type=checkbox]{width:20px;height:20px;flex:0 0 auto;margin:0}
+  .oamlvlrow .oamstylename,.oamlvlall .oamstylename{font-weight:700;font-size:15px}
+  .oamlvlval{display:flex;align-items:baseline;gap:6px;white-space:nowrap}
+  .oamlvlval b{font-size:14px;color:var(--ink);transition:font-size .1s}
+  .oamlvlval i{font-style:normal;font-size:11.5px;color:var(--faint)}
+  .oamlvlrow.dragging .oamlvlval b,.oamlvlall.dragging .oamlvlval b{font-size:18px;color:#fff}
+  .oamlvltrack{position:relative;display:flex;gap:3px;height:22px;align-items:center}
+  .oamlvlbox{flex:1;height:16px;border-radius:4px;background:rgba(255,255,255,.08)}
+  .oamlvlbox.fill{background:var(--bc)}
+  .oamlvlhandle{position:absolute;top:0;width:12px;height:22px;border-radius:6px;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.5);pointer-events:none}
+  .oamlvlrow.off .oamlvltrack,.oamlvlrow.off .oamlvlval{opacity:.3}
+  .oamlvlscale{display:grid;grid-template-columns:repeat(5,1fr);margin-top:6px;font-size:11px;font-weight:700;color:var(--faint);text-align:right}
+  .oamnotinhd{margin:14px 4px 0}
   .oamlvl .mfbox.shut{max-height:0;opacity:0;margin-top:0;padding-top:0;padding-bottom:0}
   @media (prefers-reduced-motion: reduce){ .oamlvl .mfbox{transition:none} }
   .mfrowgrid{align-items:center}
@@ -20953,7 +20963,6 @@ function renderOneAgentScreen(c){
   const title = "Your taste";   // CAS-1480: the screen heading (was the agent's own name, CAS-1352)
   const agentName = (c.name||"").trim() || "your agent";
   $("agentsBody").innerHTML=`
-    ${oamTasteBackHTML()}
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">Built from your ${n} verdict${n===1?"":"s"}</p>
     <div class="oaintro"><p>This is your space. Slide any genre to see more or fewer of its films. Nothing changes unless you change it.</p><p>Your agent, ${esc(agentName)}, studies your verdicts and suggests tweaks. You decide what to apply.</p><p>A <b>gold edge</b> marks a genre with an agent recommendation. Tap a genre to open it.</p></div>
@@ -21454,32 +21463,44 @@ function currentOamMood(){
 }
 // Every style the mood's agent actually has on (CAS-1339's oaBar), narrowed by the mood's own ticked styles —
 // an empty mood.styles means every on style, per the ticket.
+// CAS-1593: a list's genre ticks. Latest and Best's ticks ARE the agent's on/off (oaBar != null); every other
+// list owns its ticks (mood.styles, empty = every genre) whatever the agent has on.
+function oamMoodIsReleases(mood){ return !!mood && mood.id==="releases"; }
 function oamMoodStyles(mood, c){
-  const onStyles=ALL_GENRES.filter(g=>oaBar(c,g)!=null);
-  if(!mood.styles || !mood.styles.length) return onStyles;
-  return onStyles.filter(g=>mood.styles.includes(g));
+  if(oamMoodIsReleases(mood)) return ALL_GENRES.filter(g=>oaBar(c,g)!=null);
+  if(!mood.styles || !mood.styles.length) return ALL_GENRES.slice();
+  return ALL_GENRES.filter(g=>mood.styles.includes(g));
 }
-// The share stored by the Mood Override Filter — mood.topShare if the mood carries one, else (CAS-1391) a
-// one-time legacy fallback for a pre-CAS-1391 `best` mood that still only has CAS-1365's minScore: it reads
-// as topShare:20, the same floor the built-in's own default now ships with (ONE_AGENT_MOOD_BUILTINS, below).
-// Never written back — only oamSaveMoodFromSheet writes topShare, same no-write-until-save discipline as
-// every other mood field.
-function oamMoodEffectiveTopShare(mood){
-  if(mood.topShare!=null) return mood.topShare;
-  if(mood.id==="best" && mood.minScore!=null) return 20;
-  return null;
+// CAS-1593: the five level stops a list offers, stored as 5/10/25/50/100.
+const OAM_LEVEL_STOPS=[5,10,25,50,100];
+const OAM_LEVEL_COLORS=["#138c7d","#3f8f62","#7f8540","#a0732e","#b65a1c"];
+// snapPct(p): the nearest stop by absolute difference; on a tie, the smaller.
+function snapPct(p){
+  let best=OAM_LEVEL_STOPS[0];
+  OAM_LEVEL_STOPS.forEach(s=>{ if(Math.abs(s-p) < Math.abs(best-p)) best=s; });
+  return best;
 }
-// The bar actually applied to a style inside this mood — the mood's own Mood Override Filter only ever
-// RAISES the agent's bar, never lowers it. CAS-1358 removed the old slider, CAS-1363's topShare replaced it,
-// CAS-1365 reinstated a score-scale minScore in its place, and CAS-1391 replaces that with topShare again —
-// per genre, on the same share scale the agent's own strip uses, via oneBarForTopPct.
+// A list's level for a genre (CAS-1593). Latest and Best reads the agent's bar when it has one (its levels ARE
+// the agent bars); every other list reads its own levels, falling back — in memory only, never written — to its
+// retired topShare, then the agent's bar, then 25. Nothing needs rewriting on load.
+function oamMoodLevel(mood, c, g){
+  const bar=c ? oaBar(c, g) : null;
+  const lv=(mood && mood.levels) ? mood.levels[g] : undefined;
+  if(oamMoodIsReleases(mood)){
+    if(bar!=null) return snapPct(oneTopPct(g, bar));
+    return lv!=null ? lv : 25;
+  }
+  if(lv!=null) return lv;
+  if(mood && mood.topShare!=null) return snapPct(mood.topShare);
+  if(bar!=null) return snapPct(oneTopPct(g, bar));
+  return 25;
+}
+// The bar actually applied to a style inside this mood: the score the list's level for that genre means,
+// through oneBarForTopPct so admission, display and the agent bar can never disagree. Latest and Best has no bar
+// for a genre the agent has off.
 function oamMoodBarFor(mood, c, style){
-  const agentBar=oaBar(c, style);
-  if(agentBar==null) return null;
-  const topShare=oamMoodEffectiveTopShare(mood);
-  // Lee, 2026-11-09: a TRUE override — every on genre in the mood is set to the same top share, raised or
-  // lowered from the agent's own bar. Off (null) leaves each genre at the agent's setting.
-  return topShare==null ? agentBar : oneBarForTopPct(style, topShare);
+  if(oamMoodIsReleases(mood) && oaBar(c, style)==null) return null;
+  return oneBarForTopPct(style, oamMoodLevel(mood, c, style));
 }
 function oamFilmAge(m){ return AGE_RATING_CANON[m.age_rating] || m.age_rating; }
 // CAS-1384: a saved svc that's no longer one of the account's own services (prefs.sub) reads as null —
@@ -21535,9 +21556,12 @@ function oamFilmMeetsMoodRules(m, mood, c){
   // Lee, 2026-11-09: with the Mood Override On, the override's own bar (oamMoodBarFor, below) is the only
   // score gate — the agent's bar must not still hold back a genre the override RAISES. Every other agent
   // gate (blocked, watched, services, combos marked never, unscored films) still applies.
-  const ovrOn = oamMoodEffectiveTopShare(mood)!=null;
-  const gateC = ovrOn ? {...admitC, styles:Object.fromEntries(Object.entries(admitC.styles||{})
-    .map(([g,s])=>[g, (s && s.bar!=null) ? {...s, bar:0} : s]))} : admitC;
+  // CAS-1593: every list except Latest and Best owns its genres and levels, so the agent's own bar (and its
+  // genre on/off) no longer gates — build the gate with every genre's bar at 0. Latest and Best keeps the agent gate.
+  const gateC = oamMoodIsReleases(mood) ? admitC : {...admitC, styles:Object.fromEntries(ALL_GENRES.map(g=>{
+    const s=(admitC.styles||{})[g];
+    return [g, {...(s||{al:{}}), bar:0}];
+  }))};
   if(!matchesCriteriaOneAgent(m, oamMoodSkipsMyServices(mood) ? {...gateC, myServices:false} : gateC, false)) return false;
   const {main}=mainOtherCombos(m);
   if(main===undefined) return false;
@@ -21676,13 +21700,20 @@ function oamMoodDraftFrom(mood){
     // CAS-1412: a brand-new mood starts with Include watched on; editing keeps the mood's own stored value.
     watched: mood ? !!mood.watched : true,
     cinemaOnly: mood ? !!mood.cinemaOnly : false,
-    stylesAll: mood ? !(mood.styles && mood.styles.length) : true,
-    styles: new Set(mood && mood.styles ? mood.styles : []),
+    // CAS-1593: ticks and levels per genre. A new list starts with Latest and Best's; Latest and Best's own ticks
+    // are the agent's on/off. stylesAll = every genre ticked.
+    ...(()=>{
+      const c=oneAgentCriteria();
+      const src = mood || oamMoodsListReal().find(m=>m.id==="releases") || {id:"releases"};
+      const ticked = c ? oamMoodStyles(src, c) : ALL_GENRES.slice();
+      const levels={}; ALL_GENRES.forEach(g=>{ levels[g]=oamMoodLevel(src, c, g); });
+      const all = ALL_GENRES.every(g=>ticked.includes(g));
+      return {stylesAll: all, styles: new Set(all ? [] : ticked), levels};
+    })(),
     // CAS-1400: genre | keyword — which way this mood finds films. Nothing stored before Save.
     // Lee, 2026-11-21: keyword only when there's actually a name in the box — a stored mode:"keyword" with no
     // name (Max) is a genre list, and the sheet must not grey out Genres for it.
     mode: (mood && oamKeywordOn(mood)) ? "keyword" : "genre",
-    topShare: mood ? oamMoodEffectiveTopShare(mood) : null,   // CAS-1391: the Mood Override Filter's own share
     rowOrder: null,   // frozen IN THIS MOOD / NOT IN THIS MOOD section membership — see oamFreezeMoodRowOrder
     ages: new Set(mood ? (mood.ages||[]) : []),
     awards: mood ? (mood.awards||"any") : "any",
@@ -21706,9 +21737,9 @@ function oamMoodDraftFrom(mood){
   };
 }
 // CAS-1400: the bar a style shows in the sheet is always the agent's own — a mood never changes the agent.
-function oamDraftBar(d, c, style){
-  return oaBar(c, style);
-}
+function oamDraftTicked(d, g){ return d.stylesAll || d.styles.has(g); }
+// CAS-1593: the draft's level for a genre (5/10/25/50/100) and the score it means.
+function oamDraftLevel(d, g){ return d.levels[g]!=null ? d.levels[g] : 25; }
 // IN THIS MOOD / NOT IN THIS MOOD section membership, frozen the moment the sheet opens (behaviour 1: rows
 // don't move while the sheet is open — ticking or dragging a strip only changes a row's own tick/dimming,
 // never its section or position; the sections re-sort on the next open). Keeps the agent's own row order
@@ -21718,7 +21749,7 @@ function oamFreezeMoodRowOrder(){
   const c=oneAgentCriteria();
   if(!c){ d.rowOrder={inMood:[], notInMood:[]}; return; }
   const order=oaComputeOrder(c);
-  const inMood=order.filter(g=>oaBar(c,g)!=null && (d.stylesAll || d.styles.has(g)));
+  const inMood=order.filter(g=>oamDraftTicked(d, g));
   const notInMood=order.filter(g=>!inMood.includes(g));
   d.rowOrder={inMood, notInMood};
 }
@@ -21795,9 +21826,7 @@ window.toggleOamDraftCinemaOnly=()=>{ if(!oamDraft) return; oamDraft.cinemaOnly=
 window.toggleOamDraftWatched=()=>{ if(!oamDraft) return; oamDraft.watched=!oamDraft.watched; renderOamMoodSheetBody(); };
 window.toggleOamDraftStyle=style=>{
   const d=oamDraft; if(!d) return;
-  const c=oneAgentCriteria(); if(!c) return;
-  if(oamDraftBar(d,c,style)==null) return;   // disabled for never genres (behaviour 2)
-  const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
+  const onStyles=ALL_GENRES;
   if(d.stylesAll){
     d.stylesAll=false;
     d.styles=new Set(onStyles.filter(g=>g!==style));
@@ -21807,7 +21836,7 @@ window.toggleOamDraftStyle=style=>{
     d.styles.add(style);
     if(onStyles.every(g=>d.styles.has(g))){ d.stylesAll=true; d.styles=new Set(); }
   }
-  renderOamMoodSheetBody();
+  oamRefreshGenreRows([style]);   // CAS-1593: rows only — the row keeps its place (frozen order), never a sheet rebuild
 };
 window.toggleOamDraftAge=a=>{ if(!oamDraft) return; oamDraft.ages.has(a)?oamDraft.ages.delete(a):oamDraft.ages.add(a); renderOamMoodSheetBody(); };
 window.setOamDraftAwards=v=>{ if(!oamDraft) return; oamDraft.awards=v; renderOamMoodSheetBody(); };
@@ -21846,217 +21875,149 @@ function oamStylesAlsoIn(style, excludeId){
     && !oamKeywordOn(m)
     && (!m.styles || !m.styles.length || m.styles.includes(style))).map(m=>m.name);
 }
-// CAS-1400: one line per genre — tick + name (+ "also in …"), the agent's own five-box share strip (read-only:
-// a mood never changes the agent) and the value. filterShare is the Mood Override Filter's share when it
-// narrows this row (else null): the value then reads "Top 40%" over "~~100%~~ · 79+".
-function oamStyleValHTML(style, bar, filterShare){
-  if(bar==null) return "Never";
-  const agentShare=oneTopPct(style, bar);
-  if(filterShare!=null && agentShare!==filterShare){
-    // Lee, 2026-11-22: shorter second line so it fits beside the strip on a phone
-    return `${filterShare>=100?"All":`Score ${oneBarForTopPct(style, filterShare)}+`}<i><s class="was">${agentShare}%</s> top ${filterShare}%</i>`;
-  }
-  return `Score ${bar}+<i>top ${agentShare}%</i>`;   // Lee, 2026-11-22: same order as the Taste screen
+// ---- CAS-1593: a list owns its genre levels. One row per genre: tick, name, "Top N%" + "score S+", and a track of
+// five boxes (5/10/25/50/All) the person taps or drags. The draft (d.levels, d.styles) is the only thing changed
+// until Save; rows are patched in place so a drag never rebuilds the sheet.
+function oamLevelValHTML(g, level){
+  if(level>=100) return `<b>All</b><i>every film</i>`;
+  return `<b>Top ${level}%</b><i>score ${oneBarForTopPct(g, level)}+</i>`;
 }
-// Lee, 2026-11-22: a read-only copy of the Taste screen's white thumb, sat at the genre's level so the list's rows
-// read like the Taste rows. Same box geometry as the fill: box floor(p/20), (p mod 20)/20 of the way across it;
-// 5 boxes with 3px gaps.
-function oamThumbHTML(share){
-  const p=Math.max(0, Math.min(100, share));
-  const idx = p>=100 ? 4 : Math.floor(p/20);
-  const frac = p>=100 ? 1 : (p%20)/20;
-  return `<i class="oamthumb" aria-hidden="true" style="left:calc((100% - 12px) * ${(idx+frac)/5} + ${idx*3}px)"></i>`;
+function oamLevelTrackHTML(idx){
+  // idx = the current stop (0-4) or -1 for none (Set all when Mixed). Handle: right end of the stop's box.
+  const boxes=OAM_LEVEL_COLORS.map((col,i)=>`<span class="oamlvlbox${i<=idx?" fill":""}" style="--bc:${col}"></span>`).join("");
+  const hx = idx<0 ? "" : idx>=4 ? `<i class="oamlvlhandle" style="left:calc(100% - 12px)"></i>`
+    : `<i class="oamlvlhandle" style="left:calc((100% - 12px) * ${(idx+1)/5} + ${idx*3}px - 6px)"></i>`;
+  return `<div class="oamlvltrack">${boxes}${hx}</div>`;
 }
 function oamStyleRowHTML(c, d, style){
-  const bar=oamDraftBar(d, c, style);
-  const never = bar==null;
-  const on = !never && (d.stylesAll || d.styles.has(style));
+  const on=oamDraftTicked(d, style);
+  const level=oamDraftLevel(d, style);
   const name=oneAgentShortName(style);
-  const alsoIn=oamStylesAlsoIn(style, d.editingId).filter(n=>n!==d.name);
-  const subText = never ? "off in your agent" : (alsoIn.length ? `also in ${alsoIn.join(", ")}` : "");
-  return `<div class="oamstylerow${on?"":" off"}${never?" never":""}" data-style="${escA(style)}">
-      <label class="oamstyleleftwrap">
-        <input type="checkbox" ${on?"checked":""} ${never?"disabled":""}
-          onchange="toggleOamDraftStyle('${escA(style)}')" aria-label="${escA(name)}">
-        <span class="oamstyleleft">
+  return `<div class="oamlvlrow${on?"":" off"}" data-style="${escA(style)}">
+      <div class="oamlvlline">
+        <span class="oamlvlleft">
+          <input type="checkbox" ${on?"checked":""} onchange="toggleOamDraftStyle('${escA(style)}')" aria-label="${escA(name)}">
           <span class="oamstylename">${esc(name)}</span>
-          ${subText?`<span class="oamalso">${esc(subText)}</span>`:""}
         </span>
-      </label>
-      <div class="oaslidewrap"><div class="oastrip">${oaShareBoxesHTML(style, bar)}</div>${(!never && d.topShare==null) ? oamThumbHTML(oneTopPct(style, bar)) : ""}</div>
-      <span class="oarowval">${oamStyleValHTML(style, bar, null)}</span>
-    </div>`;
-}
-// ---- CAS-1391: the Mood Override Filter — replaces CAS-1365's cross-genre minScore slider with a per-genre
-// top-share filter, on the same share scale the agent's own strip uses (ONE_AGENT_SHARE_BRACKETS). Stored as
-// mood.topShare (1-99, null=off); 100 on the slider itself always means off. oamFilterOnDrag redraws its own
-// boxes/value/description live (the oamOnDrag pattern) AND every ticked IN THIS MOOD row's line/mask
-// (oamDrawFilterLines) so the preview the ticket asks for never waits for a full re-render.
-function oamFilterBoxesHTML(share){
-  return ONE_AGENT_SHARE_BRACKETS.map(b=>
-    `<span class="oabox" style="--bc:${b.color}"><i class="oafill oafleft" style="width:${oaShareBoxPct(share,b)}%"></i></span>`
-  ).join("");
-}
-// Lee, 2026-11-09: a true override with its own Off switch. On, every ticked genre in this mood is set to the
-// same top share — lowered (greyed) or raised (striped) from your agent's own setting; 100 is All. Off, each
-// genre keeps the agent's setting and the strip is greyed out.
-function oamOverrideValHTML(share, on){
-  if(!on) return `Off<i>using Taste</i>`;
-  return share>=100 ? `All<i>every genre</i>` : `Top ${share}%<i>every genre</i>`;
-}
-function oamOverrideFilterDesc(share, on){
-  // Lee, 2026-11-20: the slider always shows (greyed under My taste) so switching never moves the genre rows.
-  if(!on) return `Switch to Override to give every ticked genre one level instead of its Taste level.`;
-  return `Every ticked genre shows its ${share>=100?"whole catalog":`top ${share}%`} here, instead of its Taste level.`;
-}
-// Lee, 2026-11-22: under My taste the override slider is hidden ("shut"); switching animates it open or closed.
-// toggleOamOverride renders it in its OLD state (oamOvAnimFrom), then flips "shut" two frames later so the CSS
-// transition actually plays on the freshly rendered element.
-let oamOvAnimFrom=null;
-function oamOverrideFilterHTML(d){
-  const on = d.topShare!=null;
-  const share = on ? d.topShare : (d.lastTopShare || 40);
-  const shut = oamOvAnimFrom!=null ? !oamOvAnimFrom : !on;
-  return `<div class="mfbox${on?"":" off"}${shut?" shut":""}" id="oamOvBox">
-      <div class="mfscale"><span>${ONE_AGENT_SHARE_BRACKETS.map(b=>`<i>${esc(oaShareLabel(b.pct))}</i>`).join("")}</span></div>
-      <div class="mfrowgrid">
-        <div class="mflbl"><b>Every genre</b><span class="mfsub">same level</span></div>
-        <div class="oaslidewrap">
-          <div class="oastrip oastripfull">${oamFilterBoxesHTML(share)}</div>
-          <input type="range" class="oarange" min="1" max="100" step="1" value="${share}" ${on?"":"disabled"}
-            oninput="oamFilterOnDrag(this)" onchange="oamFilterOnRelease(this)" aria-label="Override share">
-        </div>
-        <span class="oarowval">${oamOverrideValHTML(share, on)}</span>
+        <span class="oamlvlval">${oamLevelValHTML(style, level)}</span>
       </div>
-      <p class="mfdesc">${oamOverrideFilterDesc(share, on)}</p>
+      ${oamLevelTrackHTML(OAM_LEVEL_STOPS.indexOf(level))}
     </div>`;
 }
-window.toggleOamOverride=()=>{
+// Set all genres: one stop when every ticked genre shares it, else Mixed.
+function oamAllStopIdx(d){
+  const ticked=ALL_GENRES.filter(g=>oamDraftTicked(d, g));
+  if(!ticked.length) return -1;
+  const first=oamDraftLevel(d, ticked[0]);
+  return ticked.every(g=>oamDraftLevel(d, g)===first) ? OAM_LEVEL_STOPS.indexOf(first) : -1;
+}
+function oamAllBoxHTML(d){
+  const idx=oamAllStopIdx(d);
+  return `<div class="oamlvlall" data-all="1">
+      <div class="oamlvlline">
+        <span class="oamlvlleft"><span class="oamstylename">Set all genres</span></span>
+        <span class="oamlvlval">${idx<0 ? `<b>Mixed</b><i>drag to set all</i>` : (OAM_LEVEL_STOPS[idx]>=100 ? `<b>All</b><i>every genre</i>` : `<b>Top ${OAM_LEVEL_STOPS[idx]}%</b><i>every genre</i>`)}</span>
+      </div>
+      ${oamLevelTrackHTML(idx)}
+      <div class="oamlvlscale"><span>5%</span><span>10%</span><span>25%</span><span>50%</span><span>All</span></div>
+    </div>`;
+}
+// Patch rows in place (never replace the element: a live drag holds pointer capture on it).
+function oamPatchTrack(el, idx){
+  const track=el.querySelector(".oamlvltrack"); if(!track) return;
+  track.querySelectorAll(".oamlvlbox").forEach((b,i)=>b.classList.toggle("fill", i<=idx));
+  let h=track.querySelector(".oamlvlhandle");
+  if(idx<0){ if(h) h.remove(); return; }
+  if(!h){ h=document.createElement("i"); h.className="oamlvlhandle"; track.appendChild(h); }
+  h.style.left = idx>=4 ? "calc(100% - 12px)" : `calc((100% - 12px) * ${(idx+1)/5} + ${idx*3}px - 6px)`;
+}
+function oamRefreshGenreRows(genres){
+  const d=oamDraft, body=$("watchSheetBody"); if(!d || !body) return;
+  genres.forEach(g=>{
+    const row=body.querySelector(`.oamlvlrow[data-style="${CSS.escape(g)}"]`); if(!row) return;
+    const on=oamDraftTicked(d, g), level=oamDraftLevel(d, g);
+    row.classList.toggle("off", !on);
+    const cb=row.querySelector("input[type=checkbox]"); if(cb) cb.checked=on;
+    const val=row.querySelector(".oamlvlval"); if(val) val.innerHTML=oamLevelValHTML(g, level);
+    oamPatchTrack(row, OAM_LEVEL_STOPS.indexOf(level));
+  });
+  const all=body.querySelector(".oamlvlall");
+  if(all){
+    const idx=oamAllStopIdx(d);
+    const val=all.querySelector(".oamlvlval");
+    if(val) val.innerHTML = idx<0 ? `<b>Mixed</b><i>drag to set all</i>` : (OAM_LEVEL_STOPS[idx]>=100 ? `<b>All</b><i>every genre</i>` : `<b>Top ${OAM_LEVEL_STOPS[idx]}%</b><i>every genre</i>`);
+    oamPatchTrack(all, idx);
+  }
+  oamRefreshSecSummaries();
+}
+// Which stop an x position picks: the nearest junction, per the ticket — i = clamp(round((x-left)/width*5)-1, 0, 4).
+function oamLevelStopFromX(row, x){
+  const r=row.querySelector(".oamlvltrack").getBoundingClientRect();
+  if(!r.width) return 0;
+  return Math.max(0, Math.min(4, Math.round((x - r.left)/r.width*5) - 1));
+}
+function oamApplyLevelStop(row, i){
   const d=oamDraft; if(!d) return;
-  const was = d.topShare!=null;
-  if(was){ d.lastTopShare=d.topShare; d.topShare=null; }
-  else d.topShare=d.lastTopShare || 60;
-  oamOvAnimFrom=was;
-  try{ renderOamMoodSheetBody(); } finally { oamOvAnimFrom=null; }
-  const nowOn = d.topShare!=null;
-  requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    const box=document.getElementById("oamOvBox"); if(box) box.classList.toggle("shut", !nowOn);
-  }));
-};
-// Lee, 2026-11-17: Agent settings (off) / Agent override (on, starting at 60% the first time).
+  const level=OAM_LEVEL_STOPS[i];
+  if(row.dataset.all){
+    const ticked=ALL_GENRES.filter(g=>oamDraftTicked(d, g));
+    ticked.forEach(g=>{ d.levels[g]=level; });
+    oamRefreshGenreRows(ALL_GENRES);
+  } else {
+    d.levels[row.dataset.style]=level;
+    oamRefreshGenreRows([row.dataset.style]);
+  }
+}
+// Pointer handling, delegated once on the sheet body. A press on the track starts at once; a press elsewhere on the
+// row starts only after 8px of mostly horizontal travel (vertical travel is the page's scroll), and a still tap
+// anywhere on the row picks the nearest stop. Only the checkbox ever toggles the tick.
+let oamLvlGesture=null, oamLvlBound=false;
+function oamLvlEnd(){
+  if(oamLvlGesture){ oamLvlGesture.row.classList.remove("dragging"); }
+  oamLvlGesture=null;
+}
+function oamBindLevelEvents(){
+  const body=$("watchSheetBody"); if(!body || oamLvlBound) return;
+  oamLvlBound=true;
+  body.addEventListener("contextmenu", e=>{ if(e.target.closest && e.target.closest(".oamlvlrow,.oamlvlall")) e.preventDefault(); });
+  body.addEventListener("pointerdown", e=>{
+    const row=e.target.closest && e.target.closest(".oamlvlrow,.oamlvlall");
+    if(!row || e.target.closest("input")) return;
+    if(e.button!==undefined && e.button>0) return;
+    const onTrack=!!e.target.closest(".oamlvltrack");
+    oamLvlGesture={row, id:e.pointerId, x0:e.clientX, y0:e.clientY, live:false};
+    if(onTrack) oamLvlStart(e);
+  });
+  body.addEventListener("pointermove", e=>{
+    const g=oamLvlGesture; if(!g || e.pointerId!==g.id) return;
+    if(!g.live){
+      const dx=e.clientX-g.x0, dy=e.clientY-g.y0;
+      if(Math.abs(dx)>=8 && Math.abs(dx)>Math.abs(dy)) oamLvlStart(e);
+      else if(Math.abs(dy)>=8) oamLvlEnd();   // mostly vertical: leave it to page scroll
+      return;
+    }
+    e.preventDefault();
+    oamApplyLevelStop(g.row, oamLevelStopFromX(g.row, e.clientX));
+  });
+  body.addEventListener("pointerup", e=>{
+    const g=oamLvlGesture; if(!g || e.pointerId!==g.id) return;
+    const moved=Math.hypot(e.clientX-g.x0, e.clientY-g.y0);
+    if(g.live || moved<8) oamApplyLevelStop(g.row, oamLevelStopFromX(g.row, e.clientX));
+    oamLvlEnd();
+  });
+  body.addEventListener("pointercancel", oamLvlEnd);
+}
+function oamLvlStart(e){
+  const g=oamLvlGesture; if(!g) return;
+  g.live=true;
+  g.row.classList.add("dragging");
+  try{ g.row.setPointerCapture(e.pointerId); }catch(_){}
+  oamApplyLevelStop(g.row, oamLevelStopFromX(g.row, e.clientX));
+}
 // Lee, 2026-11-17 (later): no hidden/simple view — the agent's levels always show, so nothing filters out of sight.
 // Kept as always-on so existing callers (tutorial, e2e) still work.
 function oamAdvancedOn(d){ return true; }
 window.toggleOamAdvanced=()=>{};
-// Lee, 2026-11-22: List sheet → Taste and back. The open draft (unsaved edits included) is parked while Taste is
-// open; "Back to list" reopens the sheet with it, re-reading every genre's level from Taste, and rebuilds the
-// listing so a Taste change shows at once. Leaving Taste any other way drops the way back.
-let oamTasteReturn=null;
-window.oamOpenTasteFromList=()=>{
-  const d=oamDraft; if(!d) return;
-  const body=$("watchSheetBody");
-  const parked={draft:d, scroll: body ? body.scrollTop : 0, secs:new Set(oamSecOpen), notIn:oamNotInMoodOpen};
-  closeWatchSheet();
-  openAgentsScreen();
-  oamTasteReturn=parked;
-  renderAgentsScreen();
-};
-window.oamBackToListFromTaste=()=>{
-  const r=oamTasteReturn; if(!r) return;
-  closeAgentsScreen();
-  watchSettledNavKey=null;   // a Taste change re-ranks the listing — rebuild it, don't patch it
-  render();
-  oamDraft=r.draft;
-  oamFreezeMoodRowOrder();   // Taste may have switched a genre on or off
-  oamSecOpen=new Set(r.secs||[]); oamNotInMoodOpen=!!r.notIn;   // Lee, 2026-11-22: same sections open as when you left
-  oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
-  openWatchSheet();
-  const body=$("watchSheetBody"); if(body) body.scrollTop=r.scroll;
-};
-function oamTasteBackHTML(){
-  if(!oamTasteReturn) return "";
-  const nm=(oamTasteReturn.draft.name||"").trim() || "your list";
-  return `<button type="button" class="oamtasteback" onclick="oamBackToListFromTaste()"><span>Back to list <b>${esc(nm)}</b></span><span aria-hidden="true">&rsaquo;</span></button>`;
-}
-window.setOamAgentOverride=(on)=>{
-  const d=oamDraft; if(!d) return;
-  if(!!on === (d.topShare!=null)) return;
-  window.toggleOamOverride();
-};
-// The box-geometry rule the ticket gives verbatim: share p falls in box floor(p/20) at fraction (p mod 20)/20
-// of that box's own rendered width, and 100 is the right edge of the last box — reading real DOM geometry
-// (not a flat percentage of the track) so the line lines up with the box gaps exactly like the fill does.
-function oamMfBoxPos(boxes, pct){
-  if(!boxes.length) return 0;
-  const p=Math.max(0, Math.min(100, pct));
-  if(p>=100){ const last=boxes[boxes.length-1]; return last.offsetLeft+last.offsetWidth; }
-  const idx=Math.min(boxes.length-1, Math.floor(p/20));
-  const box=boxes[idx];
-  return box.offsetLeft + ((p%20)/20)*box.offsetWidth;
-}
-// Draws (or clears) the live preview line/mask on every ticked, non-Never IN THIS MOOD row — filterShare is
-// null when the filter is off (no lines at all, per the ticket).
-function oamDrawFilterLines(d, c, filterShare){
-  const body=$("watchSheetBody"); if(!body) return;
-  const order=d.rowOrder || {inMood:[], notInMood:[]};
-  order.inMood.forEach(style=>{
-    const row=body.querySelector(`.oamstylerow[data-style="${CSS.escape(style)}"]`);
-    if(!row) return;
-    const wrap=row.querySelector(".oaslidewrap");
-    if(!wrap) return;
-    wrap.querySelectorAll(".mfline,.mfmask").forEach(n=>n.remove());
-    const bar=oamDraftBar(d, c, style);
-    const never=bar==null;
-    const on=!never && (d.stylesAll || d.styles.has(style));
-    const valEl=row.querySelector(".oarowval");
-    if(valEl) valEl.innerHTML=oamStyleValHTML(style, bar, null);
-    if(filterShare==null || !on) return;
-    const boxes=wrap.querySelectorAll(".oabox");
-    const lineLeft=oamMfBoxPos(boxes, filterShare);
-    const line=document.createElement("div");
-    line.className="mfline";
-    line.style.left=lineLeft+"px";
-    wrap.appendChild(line);
-    const agentShare=oneTopPct(style, bar);
-    if(agentShare!==filterShare){
-      const agentPos=oamMfBoxPos(boxes, agentShare);
-      const lo=Math.min(lineLeft, agentPos), hi=Math.max(lineLeft, agentPos);
-      const mask=document.createElement("div");
-      mask.className = agentShare>filterShare ? "mfmask" : "mfgain";
-      mask.style.left=lo+"px";
-      mask.style.width=Math.max(0, hi-lo)+"px";
-      wrap.appendChild(mask);
-      if(valEl) valEl.innerHTML=oamStyleValHTML(style, bar, filterShare);
-    }
-  });
-}
-window.oamFilterOnDrag=(input)=>{
-  const d=oamDraft; if(!d) return;
-  const c=oneAgentCriteria(); if(!c) return;
-  const share=Math.max(1, Math.min(100, parseInt(input.value,10)));
-  const on=true;
-  const wrap=input.closest(".oaslidewrap");
-  const boxes=wrap ? wrap.querySelectorAll(".oabox") : [];
-  ONE_AGENT_SHARE_BRACKETS.forEach((b,i)=>{
-    const fill=boxes[i] && boxes[i].querySelector(".oafill");
-    if(fill) fill.style.width=oaShareBoxPct(share,b)+"%";
-  });
-  const box=input.closest(".mfbox");
-  const sub=box && box.querySelector(".mfsub");
-  if(sub) sub.textContent = "On";
-  const valEl=box && box.querySelector(".oarowval");
-  if(valEl) valEl.innerHTML = oamOverrideValHTML(share, true);
-  const descEl=box && box.querySelector(".mfdesc");
-  if(descEl) descEl.textContent = oamOverrideFilterDesc(share, on);
-  oamDrawFilterLines(d, c, on ? share : null);
-  oamSizeMoodPanel(true);   // the description's wording (and so its height) changes with the filter
-};
-window.oamFilterOnRelease=(input)=>{
-  const d=oamDraft; if(!d) return;
-  const share=Math.max(1, Math.min(100, parseInt(input.value,10)));
-  d.topShare = share;
-  renderOamMoodSheetBody();
-};
 const OAM_AGE_OPTS=TASTE_AGE_ORDER;
 const OAM_AWARDS_OPTS=[["any","Any"],["nominated","Nominated or won"],["won","Won"]];
 const OAM_YEARS_OPTS=[[0,"Any"],[10,"10 yrs"],[5,"5 yrs"],[3,"3 yrs"],[2,"2 yrs"],[1,"1 yr"]];
@@ -22074,21 +22035,15 @@ window.oamToggleSec=key=>{
   const el=document.querySelector(`#watchSheetBody .oamsec[data-sec="${key}"]`);
   if(el){ const open=oamSecOpen.has(key); el.classList.toggle("open", open);
     const hd=el.querySelector(".oamsechd"); if(hd) hd.setAttribute("aria-expanded", String(open)); }
-  // Lee, 2026-11-22: the Override lines are placed in pixels from the boxes (oamMfBoxPos), so drawn while
-  // PRIMARY SEARCH was closed they all landed at 0 — redraw them once the section is open and measurable.
-  if(key==="primary" && oamSecOpen.has(key) && oamDraft && oamDraft.topShare!=null){
-    const c=oneAgentCriteria(); if(c) oamDrawFilterLines(oamDraft, c, oamDraft.topShare);
-  }
 };
 // One line per section header saying what is set; `set` = changed from a new list's default (purple dot).
 function oamSecSummaries(d, c, posList, posIdx){
   const lbl=(opts,k)=>{ const o=opts.find(([kk])=>kk===k); return o?o[1]:String(k); };
   const kw = d.mode==="keyword" && (d.people||"").trim();
-  const nGen = ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null && (d.stylesAll || d.styles.has(g))).length;
+  const nGen = ALL_GENRES.filter(g=>oamDraftTicked(d, g)).length;
   const primary = kw
     ? {text:`Finding by name: ${d.people.trim()}`, set:true}
-    : {text:`${nGen} genre${nGen===1?"":"s"} · ${d.topShare==null?"My taste":`Override, top ${d.topShare}%`}`,
-       set: d.topShare!=null || !d.stylesAll};
+    : {text:`${nGen} genre${nGen===1?"":"s"}`, set: !d.stylesAll};
   const svc = d.svc ? {text:`${oamSvcChipLabel(d.svc)} only`, set:true}
     : d.anySvc ? {text:"Any service", set:true}
     : {text: prefs.on ? "My services" : "All services", set:false};
@@ -22137,7 +22092,6 @@ function renderOamMoodSheetBody(){
   const posList = oamMoodsListReal().filter(m=>m.id!=="releases");
   const posIdx = d.editingId ? posList.findIndex(m=>m.id===d.editingId) : -1;
   const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "List" : "New list";
-  const onStyles=ALL_GENRES.filter(g=>oamDraftBar(d,c,g)!=null);
   const kwMode = d.mode==="keyword";
   const order = d.rowOrder || {inMood:[], notInMood:[]};
   const seg=(opts, cur, setter, label)=>`<div class="mfseg" role="group" aria-label="${escA(label)}">
@@ -22168,30 +22122,18 @@ function renderOamMoodSheetBody(){
       <button type="button" class="donebtn" onclick="oamSaveMoodFromSheet()">Save</button>
     </div>
     ${d.fromFind ? `<p class="oamgenreintro fromfindline">${oamFromFindLineText(d, c)}</p>` : ""}
-    ${sec("primary", "oamGenreSec", "PRIMARY SEARCH", `
+    ${sec("primary", "oamGenreSec", "GENRES IN THIS LIST", `
       <div class="oamprimbox">
       <div class="mpanel">
         <section class="mgenre">
-          <!-- Lee, 2026-11-20: the My taste / Override switch is back at the top, above the override slider and the
-               genre rows (it sat under the rows from 2026-11-17). The agent's levels always show. -->
-          <div class="oamlvl">
-            <div class="subhd oamlvlhd">Genre levels</div>
-            <div class="mfseg oamlvlseg" role="radiogroup" aria-label="Genre levels">
-              <button type="button" role="radio" class="${d.topShare==null?"on":""}" aria-checked="${d.topShare==null}" onclick="setOamAgentOverride(false)">My taste</button>
-              <button type="button" role="radio" class="${d.topShare!=null?"on":""}" aria-checked="${d.topShare!=null}" onclick="setOamAgentOverride(true)">Override</button>
-            </div>
-            ${oamOverrideFilterHTML(d)}
-          </div>
-          <!-- Lee, 2026-11-22: straight to Taste to change a genre's own level; Taste shows a way back here. -->
-          <button type="button" class="oamtastelink" onclick="oamOpenTasteFromList()"><span aria-hidden="true">&lsaquo;</span><span>Change your Taste levels</span></button>
+          <p class="oamgenreintro oamlvlintro">How much of each genre this list shows. Slide left for only the best, right for more.</p>
+          ${oamAllBoxHTML(d)}
           <div class="oalist">
             ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
           </div>
           ${order.notInMood.length ? `<div class="oalist">
-              <button type="button" class="oamexpand${oamNotInMoodOpen?" open":""}" onclick="toggleOamNotInMood()" aria-expanded="${oamNotInMoodOpen}">
-                <span>Not in this list <b>${order.notInMood.length}</b></span><span class="chev" aria-hidden="true">&rsaquo;</span>
-              </button>
-              ${oamNotInMoodOpen ? order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("") : ""}
+              <div class="subhd oamnotinhd">NOT IN THIS LIST</div>
+              ${order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
             </div>` : ""}
         </section>
       </div>
@@ -22260,7 +22202,7 @@ function renderOamMoodSheetBody(){
           <button type="button" ${posIdx<=0?"disabled":""} onclick="oamMoveMood(-1)">&lsaquo; Move left</button>
           <button type="button" ${posIdx>=posList.length-1?"disabled":""} onclick="oamMoveMood(1)">Move right &rsaquo;</button>
         </div>`) : ""}`;
-  if(d.topShare!=null) oamDrawFilterLines(d, c, d.topShare);
+  oamBindLevelEvents();
   oamApplyModeToDOM();   // Lee, 2026-11-20: a keyword list opens with Genres greyed and the name box open
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
@@ -22284,7 +22226,8 @@ function oamMoodFromDraft(d){
     watched: !!d.watched,
     cinemaOnly: !!d.cinemaOnly,
     styles: d.stylesAll ? [] : [...d.styles],
-    topShare: d.topShare,
+    levels: Object.fromEntries(ALL_GENRES.map(g=>[g, oamDraftLevel(d, g)])),   // CAS-1593
+    topShare: null,   // CAS-1593: retired — levels replace it
     ages: [...d.ages],
     awards: d.awards,
     years: d.years,
@@ -22294,6 +22237,25 @@ function oamMoodFromDraft(d){
     people: (d.people||"").trim(),
     mode: (d.people||"").trim() ? "keyword" : "genre",   // Lee, 2026-11-20: a name in the box IS keyword mode
   };
+}
+// CAS-1593: Latest and Best's ticks and levels ARE the agent's genre on/off and bars (alerts follow it), so saving
+// it writes the agent in the same save. Ticked: bar = the score the level means, alerts restored from lastAl if the
+// genre was off. Unticked: the same switch-off oaToggleStyleOn does (lastBar/lastAl kept, bar null).
+function oamWriteAgentFromMood(mood, d){
+  const c=oneAgentCriteria(); if(!c) return;
+  c.styles=c.styles||{};
+  const ticked=new Set(ALL_GENRES.filter(g=>oamDraftTicked(d, g)));
+  ALL_GENRES.forEach(g=>{
+    const st=c.styles[g]||(c.styles[g]={al:{cinema:false,rent:false,stream:false}});
+    if(ticked.has(g)){
+      const wasOff = st.bar==null;
+      st.bar=oneBarForTopPct(g, mood.levels[g]);
+      if(wasOff) st.al = st.lastAl ? {...st.lastAl} : {cinema:true, rent:true, stream:true};
+    } else if(st.bar!=null){
+      st.lastBar=st.bar; st.lastAl={...(st.al||{})}; st.bar=null;
+    }
+  });
+  saveCascades();
 }
 window.oamSaveMoodFromSheet=()=>{
   const d=oamDraft; if(!d) return;
@@ -22311,7 +22273,7 @@ window.oamSaveMoodFromSheet=()=>{
   // one-time load repair below (loadUserPrefs) never reverts a deliberate choice of Score back to release.
   // 13 Nov: moodSort() only honours Releases' saved sort once sortChosen is stamped — the v1 sheet's
   // save did that (CAS-1331/1333), this v2 save never did, so Score / A–Z on Releases silently reverted.
-  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=4; mood.sortChosen=true; }
+  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=4; mood.sortChosen=true; oamWriteAgentFromMood(mood, d); }
   const list=oamMoodsListReal();
   const idx=list.findIndex(m=>m.id===mood.id);
   watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
@@ -24053,7 +24015,6 @@ window.openAgentsScreen=()=>{
   tutBannerAfterFirst("agent", $("agentsBody"));   // CAS-1534
 };
 window.closeAgentsScreen=()=>{
-  oamTasteReturn=null;   // Lee, 2026-11-22: the way back to a list lasts only while Taste is open
   oaScreenOrder=null;    // Lee, 2026-11-22: rows re-sort on the next visit, never mid-visit
   if(oaListingDirty){ oaListingDirty=false; watchSettledNavKey=null; if(typeof render==="function") render(); }
   $("agentsScreen").classList.remove("open"); lockBodyScroll(false);
@@ -26545,10 +26506,10 @@ const TOURS = {
       before(){ tutOpenMoodsTourSheet(); }, after(){ closeWatchSheetQuiet(); }, sel:["#oamMoodName"]},
     {html:TUT_P("A list starts with your agent's genre preferences, so you get the films that matter most to you.",
       "Switch genres on or off to make a special list. For example, to create a list with only drama movies, switch everything else off."),
-      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .mgenre .oalist .oamstylerow"]},
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .mgenre .oalist .oamlvlrow"]},
     // Lee, 2026-11-17: the Agent settings / Agent override switch sits under the genre rows.
-    {html:TUT_P("Want only the very best? Under the genres, choose <b>Override</b> to set one level for every genre in this list."),
-      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .oamlvlseg"]},
+    {html:TUT_P("Want only the very best? Slide a genre left for fewer, better films, or use <b>Set all genres</b> to give every genre the same level."),
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .oamlvlall"]},
     // The "during account setup" lines only appear when that setup mood exists (Lee, 16 Nov).
     {get html(){ return TUT_P("<b>Or find films by name</b>: type an actor, director or title instead. A name here switches the genres off.",
       ...(watchMoods.some(m=>m.id==="fav-person") ? ["During account setup, we set up a list with your favourite actor or director to show you how this is done."] : [])); },
@@ -27576,7 +27537,7 @@ function watchNavKey(){
       const c=oneAgentCriteria(); if(!c) return null;
       const mood=currentOamMood();
       return [
-        mood && [mood.styles, mood.show, mood.sort, mood.topShare, mood.ages, mood.awards, mood.years,
+        mood && [mood.styles, mood.show, mood.sort, mood.levels, mood.ages, mood.awards, mood.years,
                  mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out, mood.people, mood.cinemaOnly, mood.anySvc],
         ALL_GENRES.map(g=>oaBar(c,g)),
         c.combo,

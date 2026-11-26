@@ -26,7 +26,7 @@ test("CAS-1400 AC1: mode:\"genre\" with a non-empty people ignores people (a Dra
   const c = criteria();
   const dramaCruise = film("Drama");                       // Drama is off in the agent
   const actionOther = film("Action", { cast:["Someone Else"] });   // genre on, does not match the people text
-  const mood = moodWith({ mode:"genre", people:"Tom Cruise" });
+  const mood = moodWith({ mode:"genre", people:"Tom Cruise", styles:["Action"] });   // CAS-1593: Drama is not ticked in the list
   assert.equal(E.filmInOneAgentMood(dramaCruise, mood, c), false, "people is ignored: genre rules apply");
   assert.equal(E.filmInOneAgentMood(actionOther, mood, c), true, "people is ignored: a non-matching film in an on genre is listed");
 });
@@ -47,7 +47,7 @@ test("CAS-1400 AC1: mode absent defaults to keyword when people is set, else gen
   assert.equal(E.oamMoodMode(moodWith({ people:"  " })), "genre");
   assert.equal(E.oamMoodMode(moodWith({})), "genre");
   assert.equal(E.filmInOneAgentMood(dramaCruise, moodWith({ people:"Tom Cruise" }), c), true);
-  assert.equal(E.filmInOneAgentMood(dramaCruise, moodWith({ people:"" }), c), false);
+  assert.equal(E.filmInOneAgentMood(dramaCruise, moodWith({ people:"", styles:["Action"] }), c), false);
 });
 
 // Lee, 2026-11-20 (replaces "people survives a genre save"): the name box decides the mode. A draft with a name

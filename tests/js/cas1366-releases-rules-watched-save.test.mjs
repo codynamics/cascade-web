@@ -39,13 +39,14 @@ function withWatched(id, fn){
 }
 
 test("CAS-1366 AC1: Releases excludes a film whose main genre is unticked from the mood's own styles (the bug)", () => {
-  const c = criteriaWith("Documentary", 1);
+  // CAS-1593: Latest and Best's ticks ARE the agent's genre on/off, so "unticked" means the agent has it off.
   const m = releaseFilm("Documentary");
-  const unticked = moodWith({ styles:["Drama"] });   // Documentary is on in the agent, but not ticked here
-  assert.equal(E.oamFilmMeetsReleasesRules(m, unticked, c), false);
-  assert.equal(E.filmInOneAgentMood(m, unticked, c), false);
-  const reticked = moodWith({ styles:[] });          // every on-style, including Documentary
-  assert.equal(E.filmInOneAgentMood(m, reticked, c), true, "ticking it back must bring it back");
+  const unticked = criteriaWith("Documentary", null);   // switched off (in Latest and Best / the agent)
+  const mood = moodWith({ styles:["Drama"] });          // its own stored styles no longer matter
+  assert.equal(E.oamFilmMeetsReleasesRules(m, mood, unticked), false);
+  assert.equal(E.filmInOneAgentMood(m, mood, unticked), false);
+  const reticked = criteriaWith("Documentary", 1);      // ticked again
+  assert.equal(E.filmInOneAgentMood(m, mood, reticked), true, "ticking it back must bring it back");
 });
 
 test("CAS-1366 AC1: Releases honours the mood's own age-rating filter", () => {
@@ -56,16 +57,16 @@ test("CAS-1366 AC1: Releases honours the mood's own age-rating filter", () => {
   assert.equal(E.oamFilmMeetsReleasesRules(m, moodWith({ ages:[] }), c), true, "no ages ticked means every age");
 });
 
-test("CAS-1366 AC1: Releases still ignores score entirely, even once the genre/ages gates are applied", () => {
-  const m = releaseFilm("Action");
-  const score = E.oneScore(m, criteriaWith("Action", 1));
-  const c = criteriaWith("Action", score + 1);   // a bar one point above what this fixture actually scores
-  assert.equal(E.oamFilmMeetsMoodRules(m, { ...moodWith({}), id:"t-cas1366-ordinary" }, c), false,
-    "sanity: an ordinary mood's own bar excludes this film");
-  // Lee, 2026-11-09: All Latest is an ordinary mood now — it ignores the agent's score through its Mood
-  // Override at 100%, not through rules of its own.
-  assert.equal(E.oamFilmMeetsReleasesRules(m, moodWith({ topShare:100 }), c), true,
-    "All Latest at Override 100% must still admit it regardless of the agent's score");
+test("CAS-1366 AC1: a list's own level is its score gate — All admits regardless of score, Top 5% does not", () => {
+  // CAS-1593: the Override (topShare 100) is retired; an ordinary list's level for the genre does the same job.
+  const m = releaseFilm("Action", { cinema_release:false, cinema_date:null, wm_user_rating:5 });
+  const c = criteriaWith("Action", 1);
+  assert.ok(E.oneScore(m, c) < E.oneBarForTopPct("Action", 5), "sanity: the fixture scores below the Top 5% bar");
+  const ordinary = { ...moodWith({}), id:"t-cas1366-ordinary" };
+  assert.equal(E.oamFilmMeetsMoodRules(m, { ...ordinary, levels:{ Action:5 } }, c), false,
+    "sanity: Top 5% excludes this film");
+  assert.equal(E.oamFilmMeetsMoodRules(m, { ...ordinary, levels:{ Action:100 } }, c), true,
+    "All must admit it regardless of its score");
 });
 
 test("CAS-1366: Releases' own \"Include films I've watched\" switch now applies (previously had no effect)", () => {
