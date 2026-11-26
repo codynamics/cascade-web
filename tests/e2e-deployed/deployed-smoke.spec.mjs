@@ -124,7 +124,8 @@ test("real user on the deployed site", async ({ page }) => {
       const ok = () => seen && (EXPECTED_COMMIT.startsWith(seen) || seen.startsWith(EXPECTED_COMMIT));
       while(Date.now() < deadline){
         try{
-          const r = await fetch(`${URL_}build-info.js?t=${Date.now()}`, { cache: "no-store" });
+          // version.json is where deployed-smoke.yml takes EXPECTED_COMMIT from; build-info.js can carry a different stamp.
+          const r = await fetch(`${URL_}version.json?t=${Date.now()}`, { cache: "no-store" });
           const m = /commit["']?\s*:\s*["']([0-9a-f]{7,40})["']/.exec(await r.text());
           seen = m ? m[1] : "";
           if(ok()) break;
