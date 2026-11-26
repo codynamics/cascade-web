@@ -3451,7 +3451,7 @@
     padding:0;margin-right:2px;border:0;background:none;font-size:15px;line-height:1;color:var(--faint);cursor:pointer}
   .oarowfav.on{color:#e0567a}
   .oarow.off .oarowhead{opacity:.55}
-  .oarowhead{display:grid;grid-template-columns:104px 1fr 64px 28px;align-items:center;gap:8px;
+  .oarowhead{display:grid;grid-template-columns:1fr auto 28px;align-items:center;gap:8px;
     padding:11px 4px;cursor:pointer;background:none;border:0;flex:1;min-width:0;text-align:left;font:inherit;color:inherit}
   .oarowhead:hover{background:rgba(255,255,255,.03)}
   .oarowhead button:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
@@ -3465,6 +3465,7 @@
   .oadot{display:inline-block;width:7px;height:7px;border-radius:50%}
   .oarowstrip{display:flex;gap:3px;position:relative}
   .oarowval{font-size:12.5px;font-weight:800;text-align:right;color:var(--ink);white-space:nowrap}
+  .oarowalerts{font-weight:600;font-size:12px;color:var(--faint)}
   .oarowval i{display:block;font-style:normal;font-weight:600;font-size:10px;color:var(--faint);margin-top:1px}
   .oachev{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.07);display:grid;place-items:center;font-size:0}
   .oachev::before{content:"";display:inline-block;width:6px;height:6px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:translateY(0) rotate(45deg);transition:transform .15s}
@@ -3636,9 +3637,15 @@
   .oacrange:focus-visible{outline:none}
   .oacrange:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
   .oacrange:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(124,92,255,.5)}
-  .oacval{flex:0 0 64px;width:64px;font-size:12.5px;font-weight:800;color:var(--ink);text-align:right}
+  .oaadjintro{font-size:12.5px;line-height:1.45;color:var(--faint);margin:2px 0 6px}
+  .oacsteps{flex:1;display:flex;gap:3px;min-width:0}
+  .oacstep{flex:1 1 0;min-width:0;padding:7px 0;border-radius:6px;border:0;background:rgba(255,255,255,.07);color:var(--faint);font:inherit;font-size:11.5px;font-weight:700;cursor:pointer}
+  .oacstep:first-child{flex:1.7 1 0}
+  .oacstep.on{background:#8b6cff;color:#fff}
+  .oacstep:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+  .oacval{flex:0 0 40px;width:40px;font-size:12.5px;font-weight:800;color:var(--ink);text-align:right}
   .oacval-empty{color:var(--faint);font-weight:600}
-  .oacval.up{color:#5eead4} .oacval.down{color:#f0a060} .oacval-over{color:var(--gold);text-decoration:underline}
+  .oacval.up{color:#5eead4} .oacval.down{color:#f0a060}
   .oacchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
   .oacchip{font-size:11px;font-weight:700;padding:4px 9px;border-radius:12px;background:var(--panel2);
     border:1px solid var(--line)}
@@ -13164,9 +13171,8 @@ function tasteRecs(){
     const pr = P.pairs[key];
     (byStyle[pr.primary] = byStyle[pr.primary] || []).push({key, other: pr.other, from, to: learned});
   });
-  // A genre with only minimum-score advice (no pending combo) is not a recommendation on its own: the
-  // advice belongs to the genre's recommendation, which exists when a combo is pending.
-  const out = Object.keys(byStyle).map(style => ({style, keys: byStyle[style], bar: barAdvice(style)}));
+  // CAS-1594: recommendations are for sub-genres only; a genre whose only advice was a bar change has none.
+  const out = Object.keys(byStyle).map(style => ({style, keys: byStyle[style]}));
   const mag = r => r.keys.reduce((a,k) => a + Math.abs(k.to - k.from), 0);
   out.sort((a,b) => mag(b) - mag(a));
   return out;
@@ -13182,11 +13188,6 @@ function tasteApplyNoSave(style){
   const rec = tasteRecs().find(r => r.style === style); if(!rec) return false;
   c.applied = c.applied || {};
   rec.keys.forEach(k => { c.applied[k.key] = k.to; });
-  if(rec.bar){
-    c.styles = c.styles || {};
-    const st = c.styles[style] || (c.styles[style] = {al:{cinema:false,rent:false,stream:false}});
-    st.bar = rec.bar.to;
-  }
   return true;
 }
 function tasteSkipNoSave(style){
@@ -13194,10 +13195,6 @@ function tasteSkipNoSave(style){
   const rec = tasteRecs().find(r => r.style === style); if(!rec) return false;
   c.skipped = c.skipped || {};
   rec.keys.forEach(k => { c.skipped[k.key] = k.to; });
-  if(rec.bar){
-    c.dismissed = c.dismissed || [];
-    if(!c.dismissed.includes("bar:"+style)) c.dismissed.push("bar:"+style);
-  }
   return true;
 }
 function tasteApply(style){ if(tasteApplyNoSave(style)) tasteAfterChange(); }
@@ -20766,13 +20763,30 @@ function oaShareBoxesHTML(style, bar, opts){
     `<span class="oabox" style="--bc:${b.color}">${labels?`<i class="oalbl">${oaShareLabel(b.pct)}</i>`:""}<i class="oafill oafleft" style="width:${oaShareBoxPct(share,b)}%"></i></span>`
   ).join("");
 }
-// Row order: on styles (a bar set) by bar ascending then name, then off styles (never listed) A-Z.
+// CAS-1594: whether any of a genre's three alert windows is on (Taste is alerts and learning only).
+function oaAlertsOn(c, style){
+  const al=((c.styles||{})[style]||{}).al || {};
+  return !!(al.cinema || al.rent || al.stream);
+}
+// Row order (CAS-1594): genres with alerts on first, then A-Z inside each group.
 function oaComputeOrder(c){
   const on=[], off=[];
-  ALL_GENRES.forEach(g=>{ (oaBar(c,g)!=null ? on : off).push(g); });
-  on.sort((a,b)=> oaBar(c,a)-oaBar(c,b) || a.localeCompare(b));
+  ALL_GENRES.forEach(g=>{ (oaAlertsOn(c,g) ? on : off).push(g); });
+  on.sort((a,b)=> a.localeCompare(b));
   off.sort((a,b)=> a.localeCompare(b));
   return [...on, ...off];
+}
+// CAS-1594: the account's verdicts (films with an opinion in watched or blocked) per main genre.
+function oaVerdictCounts(){
+  const ids = new Set(watched); blocked.forEach(id=>ids.add(id));
+  const counts = {};
+  const byId = new Map(); MOVIES.forEach(m=>{ if(ids.has(m.tmdb_id)) byId.set(m.tmdb_id, m); });
+  ids.forEach(id=>{
+    if(!opinionOf(id)) return;
+    const m = byId.get(id); if(!m || !(m.genres && m.genres.length)) return;
+    counts[m.genres[0]] = (counts[m.genres[0]]||0) + 1;
+  });
+  return counts;
 }
 // Frozen while a style is open (the ticket's own "does NOT re-sort" rule — Lee hit a score edit re-sorting
 // the list under his finger in the prototype); recomputed fresh every time nothing is open.
@@ -20798,7 +20812,6 @@ function oaFilmCounts(c){
 // The small 🔔 + one 7px dot per alerting window, shown after the style name when any window alert is on.
 // CAS-1367: an off style shows no dots — there is nothing to alert on while it is off.
 function oaAlertDotsHTML(c, style){
-  if(oaBar(c, style)==null) return "";
   const al=((c.styles||{})[style]||{}).al || {};
   const active=ONE_AGENT_WINDOWS.filter(w=>al[w.key]);
   if(!active.length) return "";
@@ -20851,75 +20864,38 @@ function oaAlertNoteHTML(c, style){
   const list = on.length===1 ? on[0] : on.slice(0,-1).join(", ")+" or "+on[on.length-1];
   return `<p class="oaalertnote">You'll be alerted when ${esc(name)} films ${list}.</p>`;
 }
-// Section 1 (MOVIE MINIMUM SCORE) + section 2 (FILM ALERTS) for the one open style, then CAS-1340's own
-// section 3 (SCORE ADJUSTMENTS, oaAdjustSectionHTML further down this file).
-// CAS-1367: a style with no bar is off (the row's own tick is the only way there, not this slider), so this
-// body has no "drag to Never" branch any more — just a short message in the slider's place.
+// CAS-1594: the open genre — FILM ALERTS (chips + note) then SCORE ADJUSTMENTS. The minimum-score slider and
+// the agent suggestion are gone: levels live in each list.
 function oaOpenBodyHTML(c, style){
-  const bar=oaBar(c, style);
   const name=oneAgentShortName(style);
-  const sectionHTML = bar==null
-    ? `<p class="oaslidedesc" id="oaSliderDesc">${esc(name)} is off. Tick it on, above, to set a minimum score.</p>`
-    : (()=>{
-        const top = oneTopPct(style, bar);
-        return `<div class="oaslider">
-            <div class="oaslidewrap">
-              <div class="oastrip oastripfull">${oaShareBoxesHTML(style, bar, {labels:true})}</div>
-              <input type="range" class="oarange" min="0" max="100" step="1" value="${top}"
-                data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
-                aria-label="${escA(name)} minimum score">
-            </div>
-            <span class="oaslideval" id="oaSliderVal">Score ${bar}+<i>top ${top}%</i></span>
-          </div>
-          <p class="oaslidedesc" id="oaSliderDesc">${esc(name)} films scoring ${bar} or more are listed: the top ${top}% of ${esc(name)}.</p>`;
-      })();
+  const followNote = oaBar(c, style)==null
+    ? `<p class="oaalertnote">Alerts follow Latest and Best, where ${esc(name)} is off. Tick it there to get alerts.</p>` : "";
   return `<div class="oaopen">
-      <div class="oatop"><div class="oasechdr">MOVIE MINIMUM SCORE</div>
-      ${sectionHTML}
-      </div>
       <div class="oasechdr">FILM ALERTS</div>
       ${oaAlertsHTML(c, style)}
       ${oaAlertNoteHTML(c, style)}
+      ${followNote}
       ${oaAdjustSectionHTML(c, style)}
     </div>`;
 }
-// CAS-1367: the tick before the name is the row's own on/off switch — a genre with bar null is off, and the
-// tick is now the only way there (the open slider below runs Top 20%..All only, never down to off).
-function oaRowHTML(c, style, filmCount, changed){
+// CAS-1594: every genre has a row; no on/off state here. Left: name, "<n> verdicts" + alert dots. Right: "Alerts on" /
+// "No alerts" + chevron. Genre levels are set in each list.
+function oaRowHTML(c, style, verdictCount, changed){
   const open = oaOpenStyle===style;
-  const bar=oaBar(c, style);
-  const on = bar!=null;
+  const alertsOn = oaAlertsOn(c, style);
   const name=oneAgentShortName(style);
-  const filmsLine = on ? `${filmCount} film${filmCount===1?"":"s"}` : "off";
-  const rowTop = on ? oneTopPct(style,bar) : 0;
-  // CAS-1481: the closed row's slider lives inside the strip and is placed by CSS alone (no measuring).
-  const dragInp = on && !open ? `<input type="range" class="tkdrag" min="0" max="100" step="1" value="${rowTop}"
-        data-style="${escA(style)}" oninput="oaOnDrag(this)" onchange="oaOnRelease(this)"
-        onpointerup="oaDragEnd(this)" ontouchend="oaDragEnd(this)" onblur="oaDragEnd(this)"
-        aria-label="${escA(name)} minimum score">` : "";
-  const strip = open ? `<span class="oarowstrip"></span><span class="oarowval"></span>`
-    : `<span class="oarowstrip">${oaShareBoxesHTML(style, bar)}${dragInp}</span>
-       <span class="oarowval">${on?`Score ${bar}+<i>top ${rowTop}%</i>`:"Off"}</span>`;
-  const tick=`<label class="oarowtick">
-      <input type="checkbox" ${on?"checked":""} onchange="oaToggleStyleOn('${escA(style)}')" aria-label="Turn ${escA(name)} on or off">
-    </label>`;
-  // Lee, 2026-11-15: the ♥ toggle is gone from the agent's rows — after setup it did nothing but a hidden sort
-  // lift, and that is retired (OAM_FAV_LIFT 0). The slider sets each genre's level.
-  const favBtn = "";
   const head=`
     <div class="oarowwrap">
-      ${tick}
-      ${favBtn}
       <div class="oarowhead">
         <button type="button" class="oarowleft" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}">
           <span class="oastyname">${esc(name)}</span>
-          <span class="oarowfilms">${filmsLine}${oaAlertDotsHTML(c, style)}</span>
+          <span class="oarowfilms">${verdictCount} verdict${verdictCount===1?"":"s"}${oaAlertDotsHTML(c, style)}</span>
         </button>
-        ${strip}
+        <span class="oarowval oarowalerts">${alertsOn?"Alerts on":"No alerts"}</span>
         <button type="button" class="oachev" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}" aria-label="${open?"Close":"Open"} ${escA(name)}"></button>
       </div>
     </div>`;
-  return `<div class="oarow${on?"":" off"}${changed?" oa-changed":""}${open?" oa-open":""}" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
+  return `<div class="oarow${changed?" oa-changed":""}${open?" oa-open":""}" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
 }
 // CAS-1480: the Agent recommendations card (from CAS-1479's tasteRecs). Open state survives re-renders.
 let tasteRecsOpen=false;
@@ -20942,10 +20918,6 @@ function tasteRecsCardHTML(){
   };
   const blocks=recs.map(r=>{
     const lines=[];
-    if(r.bar){
-      const to=oneTopPct(r.style, r.bar.to), from=oneTopPct(r.style, r.bar.from);
-      lines.push(`<div class="ln"><span>Minimum score</span> Top ${to}% <b class="${r.bar.to>r.bar.from?"down":"up"}">(from ${from}%)</b></div>`);
-    }
     r.keys.slice().sort((a,b)=>Math.abs(b.to-b.from)-Math.abs(a.to-a.from)).forEach(k=>lines.push(subLine(k)));
     return `<div class="tkstyle"><div class="hd"><span class="nm">${esc(oneAgentShortName(r.style))}</span><button type="button" class="sk" onclick="tasteSkip('${escA(r.style)}')">Skip</button><button type="button" class="ap" onclick="tasteApply('${escA(r.style)}')">Apply</button></div>${lines.join("")}</div>`;
   }).join("");
@@ -20955,7 +20927,7 @@ window.tasteToggleRecs=()=>{ tasteRecsOpen=!tasteRecsOpen; renderAgentsScreen();
 window.tasteCloseRecs=()=>{ tasteRecsOpen=false; renderAgentsScreen(); };
 window.tasteApply=tasteApply; window.tasteSkip=tasteSkip; window.tasteApplyAll=tasteApplyAll;
 function renderOneAgentScreen(c){
-  const counts=oaFilmCounts(c);
+  const counts=oaVerdictCounts();
   const order=oaOrder(c);
   const n=tasteProfile().n;
   const changedMain=new Set(tasteRecs().map(r=>r.style));
@@ -20965,9 +20937,9 @@ function renderOneAgentScreen(c){
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">Built from your ${n} verdict${n===1?"":"s"}</p>
-    <div class="oaintro"><p>This is your space. Slide any genre to see more or fewer of its films. Nothing changes unless you change it.</p><p>Your agent, ${esc(agentName)}, studies your verdicts and suggests tweaks. You decide what to apply.</p><p>A <b>gold edge</b> marks a genre with an agent recommendation. Tap a genre to open it.</p></div>
+    <div class="oaintro"><p>What your agent, ${esc(agentName)}, has learned from your verdicts, and the alerts you want for each genre.</p><p>How many films of each genre you see is set in each list.</p></div>
     ${tasteRecsCardHTML()}
-    <div class="oacolhdr"><span>GENRE</span><span>SHARE OF CATALOGUE</span></div>
+    <div class="oacolhdr"><span>GENRE</span><span>ALERTS</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
 }
 // CAS-1461: open/close morph. The open genre's .oastripfull animates from/to the closed row's own bar
@@ -21218,38 +21190,25 @@ function oaComboFilms(key){
   });
   return out;
 }
-// The bar: five faint outline boxes (same brackets/colours as oaBoxesHTML, so the row lines up with section
-// 1's own strip), the style's own bar as a white 2px line, a fill from that line to bar+points (teal right /
-// orange left), and — for an override or an adjusted combo — a dashed mark at the learned or "was" position.
-// A zero-verdict, non-overridden combo draws only the faint boxes (greyed out by its row's own CSS class).
-function oaComboBarHTML(c, style, r){
-  const bar = oaBar(c, style);
-  const boxesHTML = ONE_AGENT_SCORE_BRACKETS.map(b=>`<i class="oacbox" style="--bc:${b.color}"></i>`).join("");
-  if(bar==null || (r.n===0 && !r.overridden && !r.never)){
-    return `<span class="oacombowrap oacombo-empty"><span class="oacombobar">${boxesHTML}</span></span>`;
-  }
-  const barPct = oaTrackPct(oneTopPct(style, bar));
-  const valuePct = r.never ? 0 : oaTrackPct(oaComboMarkShare(style, bar, r.points));
-  const lo = Math.min(barPct,valuePct), hi = Math.max(barPct,valuePct);
-  const fillHTML = r.never
-    ? `<i class="oacfill down never" style="left:0%;width:${barPct}%"></i>`
-    : `<i class="oacfill ${r.points>=0?"up":"down"}" style="left:${lo}%;width:${hi-lo}%"></i>`;
-  let marks = `<i class="oacbarline" style="left:${barPct}%"></i>`;
-  if(r.overridden || r.never) marks += `<i class="oacdash" style="left:${oaTrackPct(oaComboMarkShare(style, bar, r.learned))}%"></i>`;
-  const inputVal = r.never ? 0 : Math.max(0, Math.min(100, Math.round(oaComboMarkShare(style, bar, r.points))));
-  const rangeHTML = `<input type="range" class="oacrange" min="0" max="100" step="1" value="${inputVal}"
-      data-style="${escA(style)}" data-key="${escA(r.key)}"
-      oninput="oaComboOnDrag(this)" onchange="oaComboOnRelease(this)"
-      aria-label="${escA(style)}, ${escA(r.other)} score adjustment">`;
-  return `<span class="oacombowrap${r.overridden||r.never?" oacoverridden":""}">
-      <span class="oacombobar">${boxesHTML}${fillHTML}${marks}</span>
-      ${rangeHTML}
-    </span>`;
+// CAS-1594: the step buttons that replaced the slider. "never" is kept: it was the slider's far-left stop and
+// the only way to mark a combo never.
+const OA_COMBO_STEPS=[-20,-10,-5,0,5,10];
+// The step nearest a row's current value (ties go to the smaller step); "never" when the combo is never.
+function oaComboNearestStep(r){
+  if(r.never) return "never";
+  let best=OA_COMBO_STEPS[0];
+  OA_COMBO_STEPS.forEach(v=>{ if(Math.abs(v-r.points) < Math.abs(best-r.points)) best=v; });
+  return best;
+}
+function oaComboStepsHTML(style, r){
+  const cur = (r.n===0 && !r.overridden && !r.never) ? null : oaComboNearestStep(r);
+  const btn=(val,label)=>`<button type="button" class="oacstep${cur===val?" on":""}" data-style="${escA(style)}" data-key="${escA(r.key)}" data-step="${val}" onclick="oaComboStep(this)" aria-pressed="${cur===val}" aria-label="${escA(style)}, ${escA(r.other)}: ${val==="never"?"never list":val>0?"plus "+val:val<0?"minus "+(-val):"no change"}">${label}</button>`;
+  return `<span class="oacsteps" role="group" aria-label="${escA(style)}, ${escA(r.other)} score adjustment">${btn("never","Never")}${OA_COMBO_STEPS.map(v=>btn(v, v>0?"+"+v:v<0?"−"+(-v):"0")).join("")}</span>`;
 }
 function oaComboValueHTML(r){
-  if(r.n===0 && !r.overridden && !r.never) return `<span class="oacval oacval-empty">—</span>`;
-  const text = r.never ? "Never" : oaFmtPoints(r.points);
-  return `<span class="oacval${r.overridden||r.never?" oacval-over":(r.points>0?" up":r.points<0?" down":"")}">${text}</span>`;
+  // CAS-1594: always the actual value (a learned value need not be a step, e.g. -30); green up, amber down.
+  const text = r.never ? "Never" : r.points>0 ? `+${r.points}` : r.points<0 ? `−${-r.points}` : "0";
+  return `<span class="oacval${r.never?" down":(r.points>0?" up":r.points<0?" down":"")}">${text}</span>`;
 }
 // Left column (104px) of an overridden (or "never") row — replaces the liked/not link entirely.
 function oaOverrideLeftHTML(r){
@@ -21271,9 +21230,9 @@ function oaComboRowHTML(c, style, r){
   const chipsHTML = chipsOpen ? `<div class="oacchips">${films.map(f=>
       `<span class="oacchip ${f.good?"up":"down"}">${esc(f.title)} · ${esc((OPINIONS.find(o=>o.key===f.kind)||{}).lbl||f.kind)}</span>`).join("")}</div>` : "";
   return `<div class="oacrow${rowEmpty?" oacrow-empty":""}" data-key="${escA(r.key)}">
-      <div class="oactitle">${esc(style)} with ${esc(r.other)}${leftHTML}</div>
+      <div class="oactitle">With ${esc(r.other)}${leftHTML}</div>
       <div class="oacline2">
-        <span class="oacright">${oaComboBarHTML(c, style, r)}${oaComboValueHTML(r)}</span>
+        <span class="oacright">${oaComboStepsHTML(style, r)}${oaComboValueHTML(r)}</span>
       </div>
       ${chipsHTML}
     </div>`;
@@ -21343,11 +21302,6 @@ window.oaLogToggled=(el)=>{ oaLogOpen=el.open; };
 window.oaLogMore=()=>{ oaLogShown+=10; oaLogOpen=true; renderAgentsScreen(); };
 function oaAdjustSectionHTML(c, style){
   const name = oneAgentShortName(style);
-  const bar = oaBar(c, style);
-  if(bar==null){
-    return `<div class="oaadjust" id="oaAdjustSection"><div class="oasechdr">SCORE ADJUSTMENTS</div>
-      <p class="oaslidedesc">Turn ${esc(name)} on (set a minimum score, above) to see its score adjustments.</p></div>`;
-  }
   const rows = oaComboStats(c, style).sort(oaComboSort);
   const shown = oaShowAllAdj ? rows : rows.slice(0,8);
   const showAllHTML = (!oaShowAllAdj && rows.length>8)
@@ -21355,10 +21309,10 @@ function oaAdjustSectionHTML(c, style){
   // CAS-1349: wrapped in one #oaAdjustSection container (heading through rows) so the v2 guided tour can
   // spotlight the whole section as a single anchor, same as tutUnionRect does for a multi-element step.
   return `<div class="oaadjust" id="oaAdjustSection"><div class="oasechdr">SCORE ADJUSTMENTS</div>
+    <p class="oaadjintro">Learned from your verdicts. Points added to or taken off ${/^[AEIOU]/i.test(name)?"an":"a"} ${esc(name)} film's score when it also has this sub-genre. Tap a step to set it yourself.</p>
     ${oaChangeLogHTML(c, style)}
     <div class="oaclist">${shown.map(r=>oaComboRowHTML(c, style, r)).join("")}</div>
-    ${showAllHTML}
-    <p class="oacfoot">The white line is ${esc(name)}'s ${bar}+. Drag a row to set it yourself; all the way left means never list it. Sub-genres only change when you set them or apply a recommendation.</p></div>`;
+    ${showAllHTML}</div>`;
 }
 // CAS-1457: the Agent nav chip's gold count badge — pure DOM sync, called from both the full render() and
 // the lean verdict-repaint path (repaintAfterOpinion's fastPatchFindRow branch skips a full render()).
@@ -21391,35 +21345,13 @@ window.oaUseLearned=(key)=>{
   if(typeof render==="function") render();
   renderAgentsScreen();
 };
-// Live drag feedback (oninput) — redraws just this row's fill in place, the same convention oaOnDrag (section
-// 1) uses for its own boxes. CAS-1351: the range is now a SHARE (0 never .. 100), the same axis section 1's
-// own slider runs.
-window.oaComboOnDrag=(input)=>{
+// CAS-1594: tapping a step sets a user override to exactly that value (or "never"), through the same storage
+// the slider wrote (c.combo[key]).
+window.oaComboStep=(btn)=>{
   const c=oneAgentCriteria(); if(!c) return;
-  const style=input.dataset.style;
-  const bar=oaBar(c, style); if(bar==null) return;
-  const v=Math.max(0, Math.min(100, parseInt(input.value,10)));
-  const wrap=input.closest(".oacombowrap");
-  const barEl=wrap && wrap.querySelector(".oacombobar");
-  const fill=barEl && barEl.querySelector(".oacfill");
-  if(!fill) return;
-  const barShare=oneTopPct(style, bar);
-  const barPct=oaTrackPct(barShare);
-  if(v<=0){ fill.className="oacfill down never"; fill.style.left="0%"; fill.style.width=barPct+"%"; return; }
-  const valuePct=oaTrackPct(v);
-  const lo=Math.min(barPct,valuePct), hi=Math.max(barPct,valuePct);
-  fill.className="oacfill "+(v>=barShare?"up":"down");
-  fill.style.left=lo+"%"; fill.style.width=(hi-lo)+"%";
-};
-// Release (onchange) — the ticket's own rule verbatim: points = bar - oneBarForTopPct(style, pct); at the
-// far left (0), combo[k] = "never".
-window.oaComboOnRelease=(input)=>{
-  const c=oneAgentCriteria(); if(!c) return;
-  const style=input.dataset.style, key=input.dataset.key;
-  const bar=oaBar(c, style); if(bar==null) return;
-  const v=Math.max(0, Math.min(100, parseInt(input.value,10)));
+  const key=btn.dataset.key, v=btn.dataset.step;
   c.combo=c.combo||{};
-  c.combo[key] = v<=0 ? "never" : bar - oneBarForTopPct(style, v);
+  c.combo[key] = v==="never" ? "never" : parseInt(v,10);
   saveCascades();
   if(typeof render==="function") render();
   renderAgentsScreen();
@@ -26428,7 +26360,7 @@ function v2CaptureCard(){
 function v2OpenFirstOnStyle(){
   const c=oneAgentCriteria(); if(!c) return;
   const order=oaComputeOrder(c);
-  const style=order.find(s=>oaBar(c,s)!=null);
+  const style=order[0];   // CAS-1594: every genre has a row; open the first
   if(!style) return;
   oaOrderSnapshot=order; oaOpenStyle=style;
   oaShowAllAdj=false; oaComboFilmsOpen.clear(); oaSuggestionOpen=false;
@@ -26545,7 +26477,7 @@ const TOURS = {
       before(){ tutFindSearch("Nolan"); }, sel:["#findSaveAsMoodBtn"], trail:["#findBtn"]},
   ]},
   agent:{ title:"Taste tutorial", steps:[
-    {html:TUT_P("<b>Taste</b>: how much of each genre you want. Slide a genre to see more or fewer of its films; untick it to switch it off."),
+    {html:TUT_P("<b>Taste</b>: what your agent has learned from your verdicts, and the alerts you want for each genre. How many films of each genre you see is set in each list."),
       before(){ closeSettings(); oaOpenStyle=null; oaOrderSnapshot=null; openAgentsScreen(); },
       after(){ oaOpenStyle=null; oaOrderSnapshot=null; showAgentsHome(); }, sel:["#oaList .oarow"], trail:["#agentsBtn"]},
     // Lee, 21 Nov: the Agent recommendations card (CAS-1479/1480/1498).
@@ -26555,7 +26487,7 @@ const TOURS = {
     {html:TUT_P("Most movies have a main genre, listed first, and sub-genres after it: a Sci-fi that is also a Thriller, a Comedy that is also a Romance.",
       "Your Cascade agent studies those combinations in what you watch and rate, and works out which ones you're most and least likely to enjoy."),
       center:true},
-    {html:TUT_P("So your agent tracks each genre together with its sub-genres. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here. Each sub-genre has its own slider; drag one to set it yourself."),
+    {html:TUT_P("So your agent tracks each genre together with its sub-genres. As you rate films it adjusts scores for each combination, like Sci-fi with Thriller, up or down. Every adjustment shows here. Each sub-genre has a row of steps; tap one to set it yourself."),
       before(){ v2OpenFirstOnStyle(); }, sel:["#oaAdjustSection .oasechdr"], trail:["#agentsBtn"]},
     {html:TUT_P("That's it. Your agent checks the whole catalogue overnight and reports every morning."),
       before(){ oaOpenStyle=null; oaOrderSnapshot=null; closeSettings(); showAgentsHome(); }, center:true},

@@ -46,10 +46,11 @@ test("AC1: sign in, edit an agent, mark a film Watched, switch a service, open A
   await waitForAccountLoads(page);
 
   // Edit the agent through the real Agent screen (CAS-1425: the rename flow went with the CAS-1344 one-agent
-  // cutover) — switching a genre off with its row tick is an edit that commits through saveCascades().
+  // cutover) — CAS-1594: toggling a genre's Cinema alert chip is an edit that commits through saveCascades().
   await openAgentsScreenFromNav(page);
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
-  await page.locator('.oarow[data-style="Drama"] .oarowtick').click();
+  await page.locator('.oarow[data-style="Drama"] .oarowleft').click();
+  await page.locator('.oarow[data-style="Drama"] .oachip', { hasText: "Cinema" }).click();
 
   // Mark a film Watched, switch a service, same chokepoints every other integrity test in this suite drives.
   const filmId = await page.evaluate(() => MOVIES[0].tmdb_id);

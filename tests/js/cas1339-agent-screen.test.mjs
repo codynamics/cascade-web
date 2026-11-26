@@ -93,59 +93,53 @@ function closeAnyOpenStyle(){
 
 // ---- AC1: row order — on styles by bar ascending then name, then off styles A-Z ---------------------------
 
-test("CAS-1339 AC1: oaComputeOrder sorts on-styles by bar then name, off-styles A-Z after them", () => {
+test("CAS-1594 AC1: oaComputeOrder puts alerts-on genres first, then A-Z inside each group", () => {
   const c = oneAgent({ styles: {
-    "Thriller": styleOn(75), "Action": styleOn(65), "Adventure": styleOn(65),
+    "Thriller": styleOn(75, {stream:true}), "Action": styleOn(65, {cinema:true}), "Adventure": styleOn(65, {rent:true}),
     "Drama": styleOn(null), "Comedy": styleOn(null),
   }});
-  // "Off" in this fixture is modelled with bar:null directly, matching oaBar's own null check.
-  c.styles.Drama.bar = null; c.styles.Comedy.bar = null;
   const order = E.oaComputeOrder(c);
   // [...order] normalises out of the engine's own VM realm before deepEqual — the array itself still works
   // fine for indexOf/filter cross-realm, but deepStrictEqual also checks the constructor, which differs.
   const onPart = [...order].filter(g => ["Action","Adventure","Thriller"].includes(g));
-  assert.deepEqual(onPart, ["Action","Adventure","Thriller"], "65s A-Z before the 75");
-  assert.ok(order.indexOf("Comedy") < order.indexOf("Drama"), "off styles are A-Z");
-  assert.ok(order.indexOf("Thriller") < order.indexOf("Comedy"), "every on style sorts before every off style");
+  assert.deepEqual(onPart, ["Action","Adventure","Thriller"], "alerts-on genres A-Z");
+  assert.ok(order.indexOf("Comedy") < order.indexOf("Drama"), "no-alert genres are A-Z");
+  assert.ok(order.indexOf("Thriller") < order.indexOf("Comedy"), "every alerts-on genre sorts before every no-alert genre");
 });
 
 // ---- AC2: opening a style freezes the row order until it closes ---------------------------------------------
 
-test("CAS-1339/CAS-1351 AC2: opening Thriller freezes order; dragging to a selective share and releasing does not move the row until it closes", () => {
+test("CAS-1594 AC2: opening Thriller freezes order; turning an alert on for another genre does not move rows until it closes", () => {
   withCascades([oneAgent({ styles: {
-    "Thriller": styleOn(65), "Action": styleOn(60), "Crime": styleOn(70),
+    "Thriller": styleOn(65, {cinema:true}), "Action": styleOn(60, {cinema:true}), "Crime": styleOn(70),
   }})], () => {
     const c = E.cascades[0];
     const before = E.oaComputeOrder(c);
     assert.equal(before[0], "Action");
+    assert.ok(E.oaAlertsOn(c, "Thriller") && !E.oaAlertsOn(c, "Crime"));
     E.oaToggleStyle("Thriller");
     assert.equal(E.oaOpenStyle, "Thriller");
     const frozen = E.oaOrder(c);
     assert.deepEqual(frozen, before, "the snapshot taken on open matches the pre-open order");
-    // CAS-1351: the slider carries a SHARE now (0 Never .. 100 All) — Top 20% is the most selective end,
-    // which lands the highest bar of the three and so should sort Thriller last once the order re-derives.
-    const bar20 = E.oneBarForTopPct("Thriller", 20);
-    E.oaOnRelease({ dataset:{style:"Thriller"}, value:"20" });
-    assert.equal(c.styles.Thriller.bar, bar20, "the release commits oneBarForTopPct(style, share)");
+    E.oaToggleAlert("Crime", "stream");
     assert.deepEqual(E.oaOrder(c), frozen, "the row stays in its frozen position while still open");
     E.oaToggleStyle("Thriller");
     assert.equal(E.oaOpenStyle, null);
     const onStyles = [...E.oaOrder(c)].filter(g => ["Thriller","Action","Crime"].includes(g));
-    assert.deepEqual(onStyles, ["Action","Crime","Thriller"], "closing re-sorts, and Top 20% now sorts Thriller last of the three");
+    assert.deepEqual(onStyles, ["Action","Crime","Thriller"], "closing re-sorts; Crime now has alerts on and joins the A-Z alerts-on group");
   });
   closeAnyOpenStyle();
 });
 
-test("CAS-1339 AC2: oaRowHTML hides the collapsed strip/value while its own style is open", () => {
+test("CAS-1594 AC2: a closed row shows verdicts + Alerts state; the open row adds FILM ALERTS and no minimum-score section", () => {
   withCascades([oneAgent({ styles: { "Mystery": styleOn(65) } })], () => {
     const c = E.cascades[0];
     const closedHTML = E.oaRowHTML(c, "Mystery", 10);
-    assert.ok(closedHTML.includes("65+"), "closed row shows its bar value");
+    assert.ok(closedHTML.includes("10 verdicts") && closedHTML.includes("No alerts"), closedHTML);
     E.oaToggleStyle("Mystery");
     const openHTML = E.oaRowHTML(c, "Mystery", 10);
-    assert.ok(openHTML.includes('<span class="oarowstrip"></span><span class="oarowval"></span>'),
-      "the open row's own strip/value cells render empty");
-    assert.ok(openHTML.includes("MOVIE MINIMUM SCORE") && openHTML.includes("FILM ALERTS"));
+    assert.ok(openHTML.includes("FILM ALERTS") && openHTML.includes("SCORE ADJUSTMENTS"));
+    assert.ok(!openHTML.includes("MOVIE MINIMUM SCORE") && !openHTML.includes("AGENT SUGGESTION"));
     E.oaToggleStyle("Mystery");
   });
 });
@@ -189,25 +183,15 @@ test("CAS-1367 AC1: a style with no remembered bar turns on at score 80", () => 
   });
 });
 
-test("CAS-1367 AC2: the collapsed row shows Off (not Never) once a style is off, and dims", () => {
+test("CAS-1594: a genre off in Latest and Best says so under the alert note; no range input", () => {
   withCascades([oneAgent({ styles: { "War": styleOn(50) } })], () => {
     const c = E.cascades[0];
-    E.oaToggleStyleOn("War");
-    const html = E.oaRowHTML(c, "War", 0);
-    assert.ok(html.includes(">Off<"), "the value reads Off");
-    assert.ok(!html.includes("Never"), "no Never text remains on the row");
-    assert.ok(html.includes('class="oarow off"'), "the row carries the off modifier class");
-  });
-});
-
-test("CAS-1367 AC2: the open body has no slider (and no Never text) once a style is off", () => {
-  withCascades([oneAgent({ styles: { "War": styleOn(50) } })], () => {
-    const c = E.cascades[0];
+    const onHtml = E.oaOpenBodyHTML(c, "War");
+    assert.ok(!onHtml.includes("Alerts follow Latest and Best"), "no note while the genre is on");
     E.oaToggleStyleOn("War");
     const html = E.oaOpenBodyHTML(c, "War");
-    assert.ok(!html.includes("oarange"), "no range input renders while off");
-    assert.ok(!html.includes("Never"));
-    assert.ok(html.includes("is off"));
+    assert.ok(!html.includes("oarange"), "no range input renders");
+    assert.ok(html.includes("Alerts follow Latest and Best, where War is off. Tick it there to get alerts."), html);
   });
 });
 

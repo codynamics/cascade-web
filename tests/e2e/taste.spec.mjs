@@ -34,35 +34,28 @@ test("CAS-1551 taste: a fresh account sees the recommendations card, empty", asy
   await expect(card).toContainText("None right now");
 });
 
-test("CAS-1551 taste: dragging a closed row's minimum-score knob saves and survives a reload", async ({ page }) => {
+test("CAS-1594 taste: tapping a score-adjustment step saves that value and survives a reload", async ({ page }) => {
   await guestOnboarded(page);
   await openTaste(page);
   const row = firstOnRow(page);
   const style = await row.getAttribute("data-style");
-  const readBar = () => page.evaluate(s => oneAgentCriteria().styles[s].bar, style);
-  const before = await readBar();
-
-  const knob = row.locator(".tkdrag");
-  await expect(knob).toHaveCount(1);
-  const startShare = Number(await knob.inputValue());
-  const box = await knob.boundingBox();
-  const y = box.y + box.height / 2;
-  const target = startShare > 50 ? 0.2 : 0.8;
-  await page.mouse.move(box.x + box.width * (startShare / 100), y);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width * target, y, { steps: 8 });
-  await page.mouse.up();
-
-  await expect.poll(readBar).not.toBe(before);
-  const after = await readBar();
-  const afterShare = await page.evaluate(([s, b]) => oneTopPct(s, b), [style, after]);
-  expect(afterShare).not.toBe(startShare);
+  await expect(row.locator(".tkdrag, .oarange, .oarowtick")).toHaveCount(0);
+  await row.locator(".oarowleft").click();
+  const step = row.locator('.oacstep[data-step="-10"]').first();
+  await expect(step).toBeVisible();
+  const key = await step.getAttribute("data-key");
+  await step.click();
+  const read = () => page.evaluate(k => oneAgentCriteria().combo[k], key);
+  await expect.poll(read).toBe(-10);
+  await expect(page.locator(`#oaList .oarow[data-style="${style}"] .oacstep.on[data-key="${key}"]`)).toHaveAttribute("data-step", "-10");
 
   await reloadApp(page);
-  expect(await readBar()).toBe(after);
+  expect(await read()).toBe(-10);
+
   await openTaste(page);
-  const knob2 = page.locator(`#oaList .oarow[data-style="${style}"] .tkdrag`);
-  expect(Math.abs(Number(await knob2.inputValue()) - afterShare)).toBeLessThanOrEqual(1);
+  await page.locator(`#oaList .oarow[data-style="${style}"] .oarowleft`).click();
+  await page.locator(`#oaList .oarow[data-style="${style}"] .oacstep[data-key="${key}"][data-step="never"]`).click();
+  await expect.poll(read).toBe("never");
 });
 
 test("CAS-1551 taste: a genre's alert can be turned off and on, and each state saves", async ({ page }) => {

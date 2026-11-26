@@ -365,7 +365,7 @@ if(typeof window.CascadeAuth === "undefined"){
   // the watched Set uses) so a fixture can seed deterministic "verdict newer than seenAdjAt" timestamps
   // without waiting on real wall-clock gaps between two Date.now() calls.
   oaComboStats, oaComboSort, oaComboMag, oaComboFilms, oaChangeHistory, oaChangedGenres, oaChangeLogHTML, oaAlertNoteHTML,
-  oaFmtPoints, oaTrackPct, oaComboMarkShare, oaComboBarHTML, oaComboValueHTML, oaOverrideLeftHTML,
+  oaFmtPoints, oaTrackPct, oaComboMarkShare, oaComboStepsHTML, oaComboNearestStep, oaAlertsOn, oaVerdictCounts, ALL_GENRES, oaComboValueHTML, oaOverrideLeftHTML,
   oaComboRowHTML, oaAdjustSectionHTML, updateAgentNavDot,
   verdictAt,
   get oaShowAllAdj(){ return oaShowAllAdj; },
@@ -374,8 +374,7 @@ if(typeof window.CascadeAuth === "undefined"){
   oaToggleShowAllAdj: () => window.oaToggleShowAllAdj(),
   oaUseLearned: (key) => window.oaUseLearned(key),
   oaMarkSeenAdjusted: (style) => window.oaMarkSeenAdjusted(style),
-  oaComboOnDrag: (input) => window.oaComboOnDrag(input),
-  oaComboOnRelease: (input) => window.oaComboOnRelease(input),
+  oaComboStep: (btn) => window.oaComboStep(btn),
   // CAS-1289: renderStyleMapSection is the Style map card's own render, and tasteSelPrimary/tasteSelOther
   // (module-level lets, same reassignment pattern as watchTab above) are the cell it's currently showing
   // detail for -- exported through getters/setters so a test can seed a stale selection (left over from a

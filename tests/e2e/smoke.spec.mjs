@@ -2402,11 +2402,11 @@ test("CAS-1274: the agent screen opens as plain genre rows, and a row's details 
   expect(gone.el).toBeNull();
   expect(gone.fn).toBe("undefined");
 
-  // One tap on a row opens its details: the minimum score, the three alert windows, the adjustments.
-  // CAS-1480: a closed row carries a slider over its strip; tap the name side of the head.
+  // One tap on a row opens its details: the three alert windows and the adjustments (CAS-1594: levels live in lists).
   await page.locator('.oarow[data-style="Drama"] .oarowhead').click({ position: { x: 12, y: 12 } });
   await expect(page.locator(".oaopen")).toHaveCount(1);
-  await expect(page.locator(".oaopen .oasechdr", { hasText: "MOVIE MINIMUM SCORE" })).toBeVisible();
+  await expect(page.locator(".oaopen .oasechdr", { hasText: "SCORE ADJUSTMENTS" })).toBeVisible();
+  await expect(page.locator(".oaopen .oasechdr", { hasText: "MOVIE MINIMUM SCORE" })).toHaveCount(0);
   await expect(page.locator(".oaopen .oasechdr", { hasText: "FILM ALERTS" })).toBeVisible();
   await expect(page.locator(".oaopen .oachip")).toHaveCount(3);
 

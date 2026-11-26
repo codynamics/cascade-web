@@ -95,14 +95,13 @@ test("CAS-1340 AC1: an override >=5 from learned shows '±0' underlined and 'you
       assert.equal(row.overridden, true);
       assert.equal(row.learned, -7);
       const valueHTML = E.oaComboValueHTML(row);
-      assert.ok(valueHTML.includes("±0"), "override 0 renders as ±0");
-      assert.ok(valueHTML.includes("oacval-over"), "an overridden value is marked (underlined gold)");
+      assert.ok(valueHTML.includes(">0<"), "override 0 renders as 0 (CAS-1594)");
       const leftHTML = E.oaOverrideLeftHTML(row);
       assert.ok(leftHTML.includes("Set by you") && leftHTML.includes("your verdicts say −7")
         && leftHTML.includes("use −7"), `left text: ${leftHTML}`);
-      // The bar's own dashed mark sits at the learned position (bar + learned), not the override.
-      const barHTML = E.oaComboBarHTML(c, "Science Fiction", row);
-      assert.ok(barHTML.includes("oacdash"), "an overridden row draws the dashed learned-position mark");
+      // CAS-1594: the step buttons replace the bar; the override 0 is the highlighted step.
+      const stepsHTML = E.oaComboStepsHTML("Science Fiction", row);
+      assert.ok(/class="oacstep on"[^>]*data-step="0"/.test(stepsHTML), stepsHTML);
 
       E.oaUseLearned(key);
       assert.equal(c.combo[key], undefined, "use <learned> deletes the override");
@@ -120,23 +119,25 @@ test("CAS-1340 AC1b: an override within 5 of learned shows 'let the agent decide
 
 // ---- AC2 (CAS-1351): dragging a combo to the far left saves "never" and the admission gate drops its films ---
 
-test("CAS-1351 AC2: releasing a combo's range at share 0 (far left) saves \"never\" and matchesCriteria rejects its films", () => {
+test("CAS-1594 AC2: the Never step saves \"never\" and matchesCriteria rejects its films", () => {
   withCascades([oneAgent({ styles: { "Adventure": { bar:60, al:{cinema:false,rent:false,stream:false} } } })], () => {
     const c = E.cascades[0];
     const key = "Adventure|Animation";
-    E.oaComboOnRelease({ dataset:{ style:"Adventure", key } , value:"0" });
-    assert.equal(c.combo[key], "never", "the release handler writes the literal sentinel, not a number");
+    E.oaComboStep({ dataset:{ style:"Adventure", key, step:"never" } });
+    assert.equal(c.combo[key], "never", "the Never step writes the literal sentinel, not a number");
     const film = scoredFilm(["Adventure","Animation"], 90);
     assert.equal(E.matchesCriteria(film, c), false, "a 'never' combo's films are not admitted (CAS-1337's own gate)");
   });
 });
 
-test("CAS-1351 AC2b: releasing above 0 writes a numeric combo[k] = bar - oneBarForTopPct(style, pct)", () => {
+test("CAS-1594 AC2b: a numeric step writes exactly that value to combo[k]", () => {
   withCascades([oneAgent({ styles: { "Adventure": { bar:60, al:{cinema:false,rent:false,stream:false} } } })], () => {
     const c = E.cascades[0];
     const key = "Adventure|Fantasy";
-    E.oaComboOnRelease({ dataset:{ style:"Adventure", key }, value:"75" });
-    assert.equal(c.combo[key], 60 - E.oneBarForTopPct("Adventure", 75), "bar(60) - oneBarForTopPct(Adventure, 75)");
+    E.oaComboStep({ dataset:{ style:"Adventure", key, step:"-10" } });
+    assert.equal(c.combo[key], -10, "the -10 step stores exactly -10");
+    E.oaComboStep({ dataset:{ style:"Adventure", key, step:"5" } });
+    assert.equal(c.combo[key], 5);
   });
 });
 

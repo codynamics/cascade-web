@@ -152,18 +152,19 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
     await settleListing(pageB);
 
     // CAS-1425: the CAS-1344 one-agent cutover removed the rename flow (Agents-screen Edit -> hub pencil). The
-    // edit is now made on the Agent screen: switching the Drama genre off with its row tick (oaToggleStyleOn
-    // -> saveCascades()), which must reach the server and then context B.
+    // edit is now made on the Taste screen. CAS-1594: Taste no longer has a row tick, so the edit is Drama's
+    // Cinema alert chip (oaToggleAlert -> saveCascades()), which must reach the server and then context B.
     await openAgentsScreenFromNav(pageA);
     await expect(pageA.locator("#agentsScreen")).toHaveClass(/open/);
-    await pageA.locator('.oarow[data-style="Drama"] .oarowtick').click();
+    const readCinema = (pg, id) => pg.evaluate((agentId) => { const c = cascades.find(x => x.id === agentId); return !!(c && c.styles && c.styles.Drama && c.styles.Drama.al && c.styles.Drama.al.cinema); }, id);
+    const before = await readCinema(pageA, seededAgent.id);
+    const want = !before;
+    await pageA.locator('.oarow[data-style="Drama"] .oarowleft').click();
+    await pageA.locator('.oarow[data-style="Drama"] .oachip', { hasText: "Cinema" }).click();
 
     // CAS-1132: bisect "the UI never committed the edit locally" from "the commit landed but the push to
     // the server failed/never fired" before ever asking the (real) network.
-    await expect.poll(
-      () => pageA.evaluate((id) => { const c = cascades.find(x => x.id === id); return c && c.styles.Drama && c.styles.Drama.bar; }, seededAgent.id),
-      { timeout: 5_000 },
-    ).toBeNull();
+    await expect.poll(() => readCinema(pageA, seededAgent.id), { timeout: 5_000 }).toBe(want);
 
     // CAS-1109: saveCascades() pushes through acctOp immediately now, no debounce to wait out — this just
     // makes sure the queue is drained rather than racing the network.
@@ -171,8 +172,8 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
 
     await expect.poll(async () => {
       const criteria = await liveCascadeCriteria(seededAgent.id);
-      return criteria && criteria.styles && criteria.styles.Drama ? criteria.styles.Drama.bar : "missing";
-    }, { timeout: 15_000 }).toBeNull();
+      return !!(criteria && criteria.styles && criteria.styles.Drama && criteria.styles.Drama.al && criteria.styles.Drama.al.cinema);
+    }, { timeout: 15_000 }).toBe(want);
 
     await pageB.reload();
     await pageB.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
@@ -181,13 +182,7 @@ test("S4 (first half): an edit on context A reaches context B on reload", async 
     // always ran with id===undefined, so this always read cascades.find(x => x.id === undefined) (undefined),
     // never seededAgent.id, however long it polled. Captured via closure instead, like every other poll in
     // this file (see S7's identical fix, 25503c7).
-    await expect.poll(
-      () => pageB.evaluate((agentId) => {
-        const c = cascades.find(x => x.id === agentId);
-        return c && c.styles.Drama ? c.styles.Drama.bar : "missing";
-      }, seededAgent.id),
-      { timeout: 15_000 },
-    ).toBeNull();
+    await expect.poll(() => readCinema(pageB, seededAgent.id), { timeout: 15_000 }).toBe(want);
   } finally {
     await ctxA.close();
     await ctxB.close();
