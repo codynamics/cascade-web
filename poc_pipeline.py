@@ -3893,11 +3893,11 @@ def run(simulate_day: bool = False):
         print("   (none — run again with --simulate-day to see the alert path fire)")
 
 
-def _git(*args) -> str:
+def _git(*args, timeout: int = 10) -> str:
     """Best-effort git call from the repo dir; '' on any failure (no git, detached, etc.)."""
     try:
         r = subprocess.run(["git", *args], cwd=os.path.dirname(__file__),
-                           capture_output=True, text=True, timeout=10)
+                           capture_output=True, text=True, timeout=timeout)
         return r.stdout.strip() if r.returncode == 0 else ""
     except Exception:
         return ""
@@ -4170,6 +4170,30 @@ def run_build_html() -> int:
     return 0
 
 
+# CAS-1602: the build number may never go below the last one shown on staging (4160). A count below this
+# means the clone was shallow (Cloudflare Pages clones depth 1, so the count came out as 1).
+BUILD_FLOOR = 4160
+
+
+def _deployed_build_number(sha: str) -> int:
+    """Commit count of `sha`'s history, after making sure the clone is not shallow.
+    Raises RuntimeError rather than returning a small number it cannot trust (CAS-1602)."""
+    if _git("rev-parse", "--is-shallow-repository") == "true":
+        # `fetch --unshallow` over a full history needs far longer than _git's 10s default.
+        _git("fetch", "--unshallow", "--quiet", timeout=300)
+        if _git("rev-parse", "--is-shallow-repository") == "true":
+            _git("fetch", "--depth=2147483647", "--quiet", "origin", timeout=300)
+        if _git("rev-parse", "--is-shallow-repository") == "true":
+            raise RuntimeError("clone is still shallow after fetching full history; the commit count would be wrong")
+    count = _git("rev-list", "--count", sha)
+    if not count.isdigit():
+        raise RuntimeError(f"git rev-list --count {sha} returned {count!r}")
+    n = int(count)
+    if n <= BUILD_FLOOR:
+        raise RuntimeError(f"commit count {n} is not above the last shown build {BUILD_FLOOR}; history looks truncated")
+    return n
+
+
 def stamp_deploy() -> int:
     """`python poc_pipeline.py --stamp-deploy` (CAS-1600): rewrite ONLY version.json and build-info.js
     from the commit being deployed, so the served stamp always names the code actually served.
@@ -4177,10 +4201,8 @@ def stamp_deploy() -> int:
     names an older commit. Run at deploy time (Cloudflare Pages build command), never committed:
     it does not touch index.html, the catalogue or anything build-check compares.
     commit : CF_PAGES_COMMIT_SHA when the host exposes it, else git HEAD.
-    build  : commit count of the history (a shallow clone is unshallowed first), so two different
-             deployed commits never share a number."""
-    if _git("rev-parse", "--is-shallow-repository") == "true":
-        _git("fetch", "--unshallow", "--quiet")
+    build  : commit count of the full history (CAS-1602: unshallowed with a long timeout). If it cannot
+             be worked out the step exits non-zero — it never falls back to a small or stale number."""
     try:
         info = json.load(open(VERSION_JSON, encoding="utf-8"))
     except Exception:
@@ -4189,12 +4211,13 @@ def stamp_deploy() -> int:
     sha = (os.environ.get("CF_PAGES_COMMIT_SHA") or "").strip()
     if sha:
         cur["commit"] = sha[:7]
-        count = _git("rev-list", "--count", sha)
-        if count:
-            cur["build"] = int(count)
-    if cur["commit"] == "unknown" or not cur["build"]:
-        print("! cannot work out the deployed commit/build — leaving the committed stamp as is")
-        return 0
+    try:
+        if cur["commit"] == "unknown":
+            raise RuntimeError("cannot work out the deployed commit")
+        cur["build"] = _deployed_build_number(sha or "HEAD")
+    except RuntimeError as e:
+        print(f"::error::stamp-deploy failed: {e}", file=sys.stderr)
+        return 1
     if "providers" in info:
         cur["providers"] = info["providers"]
     with open(VERSION_JSON, "w", encoding="utf-8") as f:
