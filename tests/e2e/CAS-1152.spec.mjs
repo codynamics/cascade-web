@@ -73,25 +73,36 @@ test("CAS-1152: the spotlight hole matches its anchor's real rect (plus pad) on 
   expect(checked).toBeGreaterThanOrEqual(2);
 });
 
-test("CAS-1152: the closing, anchorless card stays centred", async ({ page }) => {
+test("CAS-1152: the closing card (v2 Watch tour, anchored on the menu button) hugs its anchor and stays on screen", async ({ page }) => {
   await buildFreshListing(page);
   await expect(page.locator("#tutScrim")).toHaveClass(/open/);
 
-  // Walk to the final (anchorless) card — same loop shape as CAS-976's own spec.
-  for(let i = 0; i < 10; i++){
+  // Walk to the final card — same loop shape as CAS-976's own spec. Since the v2 tour (CAS-1317) the closing
+  // step is anchored on #navMenuBtn (a 6px-padded ring), no longer an anchorless centred card, so the hole is
+  // checked against that anchor's real rect rather than against the viewport centre.
+  for(let i = 0; i < 30; i++){
     const label = await page.locator("#tutNextBtn").textContent();
     if(label.trim() === "Done") break;
     await page.locator("#tutNextBtn").click();
     await page.waitForTimeout(80);
   }
-  await expect(page.locator("#tutHole")).toHaveCSS("width", "0px");
-  await expect(page.locator("#tutHole")).toHaveCSS("height", "0px");
+  await expect(page.locator("#tutNextBtn")).toHaveText("Done");
+  await page.waitForTimeout(700);   // the card/hole is placed once the page under it has settled
+
+  const rects = await page.evaluate(() => (tutCurrent && tutCurrent.els ? tutCurrent.els : []).map(el => {
+    const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  }));
+  expect(rects.length).toBeGreaterThan(0);
+  const pad = rects.length > 1 ? 1 : 6;
+  const left = Math.min(...rects.map(r => r.left)), top = Math.min(...rects.map(r => r.top));
+  const right = Math.max(...rects.map(r => r.right)), bottom = Math.max(...rects.map(r => r.bottom));
+  const holeBox = await page.locator("#tutHole").boundingBox();
+  expect(Math.abs(holeBox.x - (left - pad))).toBeLessThanOrEqual(1);
+  expect(Math.abs(holeBox.y - (top - pad))).toBeLessThanOrEqual(1);
+  expect(Math.abs(holeBox.width - (right - left + pad * 2))).toBeLessThanOrEqual(1);
+  expect(Math.abs(holeBox.height - (bottom - top + pad * 2))).toBeLessThanOrEqual(1);
 
   const vp = page.viewportSize();
-  const holeBox = await page.locator("#tutHole").boundingBox();
-  expect(Math.abs(holeBox.x - vp.width / 2)).toBeLessThanOrEqual(1);
-  expect(Math.abs(holeBox.y - vp.height / 2)).toBeLessThanOrEqual(1);
-
   const cardBox = await page.locator("#tutCard").boundingBox();
   expect(cardBox.x).toBeGreaterThanOrEqual(0);
   expect(cardBox.y).toBeGreaterThanOrEqual(0);
