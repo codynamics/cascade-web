@@ -9,6 +9,8 @@ test.use({ viewport: { width: 390, height: 844 } });
 async function openSheet(page){
   await guestOnboarded(page);
   await page.evaluate(() => {
+    // v2 one-agent cards only draw for a signed-in account (cardTopHTML gates oneAgentC on accountActive()).
+    window.CascadePersistence.accountActive = () => true;
     const al = { cinema:false, rent:false, stream:false };
     cascades.length = 0;
     cascades.push({ id: cascadeNewId(), name: "Agent", v: 2, combo: {}, seenAdj: {}, seenAdjAt: {}, dismissed: [],
