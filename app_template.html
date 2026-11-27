@@ -2185,6 +2185,7 @@
   .membinner{width:100%;max-width:360px;margin:auto;display:flex;flex-direction:column;animation:splashIn .45s ease both}
   @media (prefers-reduced-motion:reduce){ .membinner{animation:none} }
 
+  .membtop{font-family:var(--font-display);font-size:18px;font-weight:700;color:var(--ink);margin:-8px 0 14px;padding-bottom:10px;border-bottom:3px solid transparent;border-image:var(--grad) 1}
   .membh{font-family:var(--font-display);font-size:23px;font-weight:700;margin:16px 0 4px;line-height:1.2;color:var(--ink)}
 
   .membhero .free{font-family:var(--font-display);font-size:22px;font-weight:700;color:#fff}
@@ -3073,7 +3074,7 @@
   .obopt.on{border-color:var(--accent);background:rgba(124,92,255,.12)}
   .obopt.on .obradio{border-color:var(--accent)}
   .obopt.on .obradio::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--accent)}
-  /* Multi-select cards (role="checkbox", the first run's "Where do you watch movies?") read as checkboxes, not radios. */
+  /* Multi-select cards (role="checkbox") read as checkboxes, not radios. */
   .obopt[role="checkbox"] .obradio{border-radius:6px}
   .obopt[role="checkbox"].on .obradio{background:var(--accent)}
   .obopt[role="checkbox"].on .obradio::after{inset:auto;left:6px;top:2px;width:6px;height:11px;border-radius:0;
@@ -3138,6 +3139,22 @@
   #oafScreen .oafdbot svg circle{animation:oafwBlink 3s ease-in-out 1s infinite}
   #oafScreen .oafdtitle{margin:16px 0 2px;text-align:center}
   #oafScreen .oafdsub{margin:0;color:var(--dim);font-size:14px}
+  /* CAS-1691: Who's watching? — three icon tiles (lit = gradient + glow, dim = dark, ~35%) over three question cards. */
+  #oafScreen .whoicons{display:flex;justify-content:center;gap:18px;margin:18px 0 20px}
+  #oafScreen .whoitem{display:flex;flex-direction:column;align-items:center;gap:6px}
+  #oafScreen .whoico{width:68px;height:68px;border-radius:18px;display:flex;align-items:center;justify-content:center;
+    background:#161c2e;border:1px solid #232b44;opacity:.35;transition:opacity .3s ease,box-shadow .3s ease,transform .3s ease,background .3s ease}
+  #oafScreen .whoico svg{width:34px;height:34px}
+  #oafScreen .whoico.lit{background:var(--grad);border-color:transparent;opacity:1;box-shadow:0 0 22px rgba(124,92,255,.55);transform:scale(1.04)}
+  #oafScreen .wholabel{font-size:13px;font-weight:700;color:var(--ink)}
+  #oafScreen .whorow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;margin-bottom:10px;border-radius:14px;background:#12182a;border:1px solid #232b44}
+  #oafScreen .whotxt{display:flex;flex-direction:column;gap:2px;min-width:0}
+  #oafScreen .whotxt b{font-size:15px;color:var(--ink)}
+  #oafScreen .whotxt small{font-size:12px;color:var(--dim)}
+  #oafScreen .whopills{display:flex;gap:8px;flex:0 0 auto}
+  #oafScreen .whopill{min-width:58px;padding:9px 14px;border-radius:999px;border:1px solid #2c3552;background:#161c2e;color:var(--ink);font-size:14px;font-weight:700;cursor:pointer}
+  #oafScreen .whopill.on{background:var(--grad);border-color:transparent;color:#fff}
+  @media (prefers-reduced-motion:reduce){ #oafScreen .whoico{transition:none} }
   #oafScreen .oafdcount{display:flex;flex-direction:column;align-items:center;margin:18px 0 10px;
     animation:oafwIn .6s ease .3s both}
   #oafScreen .oafdcount b{font-family:Poppins,system-ui,sans-serif;font-size:44px;line-height:1;font-weight:700;
@@ -19456,7 +19473,7 @@ const SHARP_STEPS = {
           whenever you like.</p>
         <input class="osfield" id="onbStepName" type="text" maxlength="40" autocomplete="off"
                placeholder="${escA(dflt)}" value="${escA(stripChannelPrefix(onbFlow.name))}"
-               aria-label="Name your agent">
+               aria-label="Agent name">
         <p class="osexplain" id="onbNameNote"></p>`;
     },
     wire(){
@@ -22685,25 +22702,20 @@ let oafStep = "welcome";
 // account with no v2 agent, switched on once at next open (cannot be skipped).
 let oafMode = "new";
 let oafPendingDraft = null;   // a signed-out first run's draft, held until the account exists (membStartWork)
-const ONE_AGENT_FLOW_WHERE = [
-  ["cinema", "At the cinema", "Often enough to plan around it"],
-  ["rent", "I rent them", "Apple, Prime Video, Google and the like"],
-  ["stream", "I watch on streaming", "Netflix, Disney+, Stan and the like"],
-];
 const ONE_AGENT_FAMILY_DEFAULT = ["Family","Animation","Adventure","Comedy"];
 // Lee, 11 Nov: Date night starts with exactly these on, whatever the person's own genre picks.
 const ONE_AGENT_TOGETHER_DEFAULT = ["Comedy","Documentary","Romance","Mystery","Drama"];
 // CAS-1344: a migrating account that already has any service set is not asked again.
 function oafHasServicesStep(){
   if(oafMode==="migrate" && (prefs.store.size || prefs.sub.size)) return false;
-  return oafState.where.has("rent") || oafState.where.has("stream");
+  return true;   // CAS-1691: the where step is gone; all three windows are always on, so services always show
 }
 function oafHasChildrenStep(){ return oafState.age==="18plus"; }
 // Lee, 14 Nov: "which streaming service do you use most?" — only when there's a choice (2+ picked). With one,
 // that one is the answer; with none, there's no service mood.
-function oafHasTopSvcStep(){ return oafHasServicesStep() && oafState.where.has("stream") && prefs.sub.size>=2; }
+function oafHasTopSvcStep(){ return oafHasServicesStep() && prefs.sub.size>=2; }
 function oafTopSvc(){
-  if(!oafState || !oafState.where.has("stream")) return null;
+  if(!oafState) return null;
   if(prefs.sub.size===1) return [...prefs.sub][0];
   return oafState.topSvc && prefs.sub.has(oafState.topSvc) ? oafState.topSvc : null;
 }
@@ -22717,14 +22729,14 @@ function oafActiveWindows(){
 // The counted sequence the progress rail reads its position from — grows as the partner/age answers reveal
 // more of the branch actually ahead, the same approximate-until-answered shape "services" already had.
 function oafCountedKeys(){
-  const keys=["welcome","where"];
+  // CAS-1691: welcome, who, services, topSvc, favourites, together, family, people, done.
+  const keys=["welcome","who"];
   if(oafHasServicesStep()) keys.push("services");
   if(oafHasTopSvcStep()) keys.push("topSvc");
-  keys.push("favourites","people","age","partner");
+  keys.push("favourites");
   if(oafState.partner==="yes") keys.push("together");
-  if(oafHasChildrenStep()) keys.push("children");
-  if(oafState.children==="yes") keys.push("family");
-  keys.push("nameAgent","done");
+  if(oafHasChildrenStep() && oafState.children==="yes") keys.push("family");
+  keys.push("people","done");
   return keys;
 }
 function oafProgressPct(key){
@@ -22732,23 +22744,8 @@ function oafProgressPct(key){
   const i=keys.indexOf(key);
   return Math.round(((i<0?0:i)+1)/keys.length*100);
 }
-// Multi-select cards — the same .obopt/.obradio skin obOptHTML uses for a single-select radio, over a Set
-// instead of one current value, with independent (not mutually-exclusive) toggling. Used by "where".
-function oafOptHTML(defs, set){
-  return defs.map(([val,label,sub])=>`<button type="button" class="obopt${set.has(val)?" on":""}" role="checkbox"
-      aria-checked="${set.has(val)}" data-val="${escA(val)}">
-    <span class="obradio" aria-hidden="true"></span>
-    <span class="obopttext"><span class="obopttitle">${esc(label)}</span>${sub?`<span class="oboptsub">${sub}</span>`:""}</span>
-  </button>`).join("");
-}
-function oafWireMultiOpt(containerId, set){
-  const el=$(containerId); if(!el) return;
-  el.querySelectorAll(".obopt[data-val]").forEach(b=>{
-    b.onclick=()=>{ const v=b.dataset.val; set.has(v) ? set.delete(v) : set.add(v); oafPaint(); };
-  });
-}
 // The Date night/Family tick grids — a two-column single-tick cell over a Set, the same toggle shape
-// oafWireMultiOpt above uses just rendered differently (the favourites grid's ♥/✓ pair, below, is its own thing).
+// the old multi-select cards used, just rendered differently (the favourites grid's ♥/✓ pair, below, is its own thing).
 function oafTickCellHTML(style, set){
   const on=set.has(style);
   return `<button type="button" class="tickcell${on?" on":""}" role="checkbox" aria-checked="${on}"
@@ -22843,7 +22840,7 @@ function oneAgentCommit(draft){
   // reads as "adjusted since you last looked" on day one (CAS-1340's own oaComboStats comparison).
   const seenAdj={};
   MOVIES.forEach(m=>{ mainOtherCombos(m).keys.forEach(({key})=>{ if(!(key in seenAdj)) seenAdj[key]=oneComboAdj(key); }); });
-  // CAS-1352: the agent's name is now whatever "Name your agent" collected, not a hard-coded default.
+  // CAS-1691: onboarding no longer asks for a name; the name stays empty-ish ("My agent") until CAS-1692 stops showing it.
   const agent={id:cascadeNewId(), name:draft.name||"My agent", v:2, styles:draft.styles, combo:{}, seenAdj, seenAdjAt:{}, dismissed:[], applied:{}, skipped:{}};
   tasteSeedApplied(agent);   // CAS-1479: existing verdicts seed applied = learned, so no score moves
   cascades.push(agent);
@@ -22880,20 +22877,13 @@ function oafWelcomeHTML(){
     </div>
     <p class="obintrotext oafwclose" style="--d:1.35s">Answer a few quick questions to set up your membership and get your agent started.</p>`;
 }
-function oafWhereHTML(){
-  return `<h2 class="osh">Where do you watch movies?</h2>
-    <p class="ossub">Pick all that apply. Your agent only tells you about films at selected stages.</p>
-    <div class="obopts" id="oafWhereOpts">${oafOptHTML(ONE_AGENT_FLOW_WHERE, oafState.where)}</div>`;
-}
 // Same lists, primary-first ordering, "+ n more" and prefs.store/prefs.sub writes as v2_services — see
 // oafWireServices below, a direct copy of that step's own draw() closures against these ids instead.
 function oafServicesHTML(){
-  const showRent = oafState.where.has("rent");
-  const showStream = oafState.where.has("stream");
   return `<h2 class="osh">Which services do you have?</h2>
     <p class="ossub">Your agent only offers movies that are available on your services.</p>
-    ${showRent ? `<div class="svcsec"><div class="svcsech">My Rental Services</div><div class="chips" id="oafSvcStores"></div></div>` : ""}
-    ${showStream ? `<div class="svcsec"><div class="svcsech">My Streaming Services</div><div class="chips" id="oafSvcSubs"></div></div>` : ""}`;
+    <div class="svcsec"><div class="svcsech">My Rental Services</div><div class="chips" id="oafSvcStores"></div></div>
+    <div class="svcsec"><div class="svcsech">My Streaming Services</div><div class="chips" id="oafSvcSubs"></div></div>`;
 }
 function oafWireServices(){
   const draw=(boxId, list, set, primary)=>{
@@ -23021,18 +23011,65 @@ function oafWirePeople(){
     sync();
   });
 }
-function oafAgeHTML(){
-  return `<h2 class="osh">How old are you?</h2>
-    <p class="ossub">So we show the right age ratings. You can change them on any list.</p>
-    <div class="obopts" id="oafAgeOpts">${obOptHTML([
-      ["18plus", "18 or over", "M, MA 15+ and R 18+"],
-      ["under18", "Under 18", "PG, M and MA 15+"],
-    ], oafState.age)}</div>`;
+// CAS-1691: one "Who's watching?" step replaces the old age, partner and children steps. It writes exactly the
+// fields they did (oafState.age / partner / children), so together, family, ratings and the lists are unchanged.
+const OAF_WHO_ICON_1 = `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.6-3.8 3.4-5.8 7-5.8s6.4 2 7 5.8"/></svg>`;
+const OAF_WHO_ICON_2 = `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="3"/><circle cx="16.5" cy="9.5" r="2.6"/><path d="M2.5 19.5c.5-3.2 2.8-5 6-5s5.5 1.8 6 5"/><path d="M15.5 14.6c3 0 5.3 1.5 6 4.6"/></svg>`;
+function oafWhoPillsHTML(field, left, right){
+  const cur = oafState[field];
+  return `<span class="whopills" role="group" aria-label="${escA(left[1])} or ${escA(right[1])}">${[left,right].map(([val,label])=>
+    `<button type="button" class="whopill${cur===val?" on":""}" data-field="${field}" data-val="${val}" aria-pressed="${cur===val}">${esc(label)}</button>`).join("")}</span>`;
 }
-function oafPartnerHTML(){
-  return `<h2 class="osh">Do you watch with a partner?</h2>
-    <p class="ossub">If you do, we'll make a <b>Partner</b> list: films for the two of you.</p>
-    <div class="obopts" id="oafPartnerOpts">${obOptHTML([["yes","Yes"],["no","No"]], oafState.partner)}</div>`;
+function oafWhoRowHTML(field, q, sub, left, right){
+  return `<div class="whorow" id="oafWho_${field}"><span class="whotxt"><b>${esc(q)}</b><small>${esc(sub)}</small></span>${oafWhoPillsHTML(field,left,right)}</div>`;
+}
+function oafWhoHTML(){
+  const ico = (key, label, lit, svg) => `<span class="whoitem"><span class="whoico${lit?" lit":""}" data-who="${key}">${svg}</span><span class="wholabel">${label}</span></span>`;
+  return `<h2 class="osh">Who's watching?</h2>
+    <p class="ossub">Tell us who's on the couch. We'll make a list for each of you.</p>
+    <div class="whoicons">${ico("you","You",true,OAF_WHO_ICON_1)}${ico("partner","Partner",oafState.partner==="yes",OAF_WHO_ICON_1)}${ico("family","Family",oafState.children==="yes" && oafHasChildrenStep(),OAF_WHO_ICON_2)}</div>
+    ${oafWhoRowHTML("age","How old are you?","Sets the age ratings you see",["under18","Under 18"],["18plus","18+"])}
+    ${oafWhoRowHTML("partner","Watch with a partner?","Adds a Partner list",["no","No"],["yes","Yes"])}
+    ${oafHasChildrenStep() ? oafWhoRowHTML("children","Watch with young kids?","Adds a Family list",["no","No"],["yes","Yes"]) : ""}`;
+}
+function oafWireWho(){
+  const root=$("oafInner"); if(!root) return;
+  root.querySelectorAll(".whopill[data-field]").forEach(b=>{
+    b.onclick=()=>{
+      const field=b.dataset.field, val=b.dataset.val;
+      const prevAge=oafState.age;
+      oafState[field]=val;
+      // Under 18 hides the kids row and answers it "no"; coming back to 18+ shows it unanswered.
+      if(field==="age" && val==="under18") oafState.children="no";
+      else if(field==="age" && val==="18plus" && prevAge!=="18plus") oafState.children=null;
+      if(field==="partner" && val==="yes" && !oafState.togetherInit){
+        // Pre-tick Date night with ONE_AGENT_TOGETHER_DEFAULT the first time Yes is picked — never again, so
+        // a later edit to the grid survives tapping Yes/No/Yes.
+        oafState.together=Object.fromEntries(ONE_AGENT_TOGETHER_DEFAULT.map(g=>[g,"incl"]));
+        oafState.togetherInit=true;
+      }
+      if(field==="children" && val==="yes" && !oafState.familyInit){
+        oafState.family=Object.fromEntries(ONE_AGENT_FAMILY_DEFAULT.map(g=>[g,"incl"]));
+        oafState.familyInit=true;
+      }
+      oafPaintWhoInPlace();
+    };
+  });
+}
+// Repaints only the rows/pills/CTA (not the icon tiles) so a lit tile animates instead of being rebuilt.
+function oafPaintWhoInPlace(){
+  const lit = {partner:oafState.partner==="yes", family:oafHasChildrenStep() && oafState.children==="yes"};
+  const root=$("oafInner"); if(!root) return;
+  root.querySelectorAll(".whoico[data-who]").forEach(el=>{ const k=el.dataset.who; el.classList.toggle("lit", k==="you" ? true : !!lit[k]); });
+  // Rebuild the rows (row 3 appears/disappears with the age answer).
+  const rows=root.querySelectorAll(".whorow"); rows.forEach(r=>r.remove());
+  root.insertAdjacentHTML("beforeend",
+    oafWhoRowHTML("age","How old are you?","Sets the age ratings you see",["under18","Under 18"],["18plus","18+"]) +
+    oafWhoRowHTML("partner","Watch with a partner?","Adds a Partner list",["no","No"],["yes","Yes"]) +
+    (oafHasChildrenStep() ? oafWhoRowHTML("children","Watch with young kids?","Adds a Family list",["no","No"],["yes","Yes"]) : ""));
+  oafWireWho();
+  const cta=$("oafCta"); if(cta){ const b=oafBlocked(); cta.disabled=b; cta.classList.toggle("blocked", b); }
+  $("oafFill").style.width = oafProgressPct(oafStep)+"%";
 }
 function oafTogetherHTML(){
   return `<h2 class="osh">What do you watch together?</h2>
@@ -23040,58 +23077,11 @@ function oafTogetherHTML(){
     ${oafFavLegendHTML()}
     <div class="favgrid" id="oafTogetherGrid">${oafFavGridCellsHTML(oafState.together)}</div>`;
 }
-function oafChildrenHTML(){
-  return `<h2 class="osh">Do you watch with a young family?</h2>
-    <p class="ossub">If you do, we'll make a <b>Family</b> list: films rated G, PG and M.</p>
-    <div class="obopts" id="oafChildrenOpts">${obOptHTML([["yes","Yes"],["no","No"]], oafState.children)}</div>`;
-}
 function oafFamilyHTML(){
   return `<h2 class="osh">What do you watch as a family?</h2>
     <p class="ossub">We've switched on the usual ones. Change them as you like, and ♥ the family favourites.</p>
     ${oafFavLegendHTML()}
     <div class="favgrid" id="oafFamilyGrid">${oafFavGridCellsHTML(oafState.family)}</div>`;
-}
-// New screen (CAS-1352): between family/partner and done. Continue stays disabled until a trimmed name exists (oafBlocked).
-// Typing and chip-picking both write oafState.name directly and patch just the CTA/chip DOM (deleteAcctGate's
-// pattern) rather than a full oafPaint() repaint, so the input never loses focus/cursor mid-keystroke.
-// Lee, 13 Nov: a robot that works for you — friendly robot / character names, invented or generic words only
-// (no film, TV or toy character names). Three lean masculine, three feminine, as CAS-1352 set.
-const ONE_AGENT_NAME_CHIPS = ["Sprocket","Rivet","Cosmo","Pixel","Nova","Juno"];
-const ONE_AGENT_NAME_MAXLEN = 24;
-function oafNameAgentHTML(){
-  const name = oafState.name || "";
-  return `<h2 class="osh">Name your agent</h2>
-    <p class="ossub">Type a name, or pick one.</p>
-    <input type="text" class="osfield" id="oafNameInput" placeholder="Type a name" maxlength="${ONE_AGENT_NAME_MAXLEN}"
-           autocomplete="off" value="${escA(name)}" aria-label="Name your agent">
-    <div class="chips" id="oafNameChips">${ONE_AGENT_NAME_CHIPS.map(n=>
-      `<button type="button" class="chip${name===n?" on":""}" data-name="${escA(n)}">${esc(n)}</button>`).join("")}</div>`;
-}
-function oafNameAgentSyncChips(name){
-  const chips=$("oafNameChips"); if(!chips) return;
-  chips.querySelectorAll(".chip[data-name]").forEach(c=>c.classList.toggle("on", c.dataset.name===name));
-}
-function oafNameAgentSyncCta(){
-  const cta=$("oafCta"); if(!cta) return;
-  const blocked=oafBlocked();
-  cta.disabled=blocked;
-  cta.classList.toggle("blocked", blocked);
-}
-function oafWireNameAgent(){
-  const input=$("oafNameInput"); if(!input) return;
-  input.oninput=()=>{
-    oafState.name=input.value;
-    oafNameAgentSyncChips(input.value.trim());
-    oafNameAgentSyncCta();
-  };
-  $("oafNameChips").querySelectorAll(".chip[data-name]").forEach(c=>{
-    c.onclick=()=>{
-      oafState.name=c.dataset.name;
-      input.value=c.dataset.name;
-      oafNameAgentSyncChips(c.dataset.name);
-      oafNameAgentSyncCta();
-    };
-  });
 }
 // "Alerts for your favourites" — one row per active window, naming every ♥ genre (the only genres that ever
 // get an alert — see oneAgentBuildDraft).
@@ -23132,7 +23122,6 @@ function oafDraftMatches(draft){
 }
 function oafDoneHTML(){
   const draft = oneAgentBuildDraft();
-  const name = esc(draft.name);
   const found = oafDraftMatches(draft);
   oafDoneFound = found.length;
   const favs = ONE_AGENT_SETUP_STYLES.filter(st=>oafState.favs[st]==="fav").map(oneAgentShortName);
@@ -23145,20 +23134,19 @@ function oafDoneHTML(){
   const tagRow = (cls, tags) => `<div class="oafdrow ${cls}" data-fit="2">${tags.join("")}<span class="oafdtag more" hidden></span></div>`;
   const told =
     tagRow("genres", [...favs.map(g=>`<span class="oafdtag fav">♥ ${esc(g)}</span>`), ...others.map(g=>`<span class="oafdtag">${esc(g)}</span>`)]) +
-    `<div class="oafdrow stages">${oafActiveWindows().map(w=>`<span class="oafdtag" style="--tc:${w.color}"><i></i>${esc(w.label)}</span>`).join("")}</div>` +
     (svcs.length ? tagRow("svcs", svcs.map(n=>`<span class="oafdtag">${esc(n)}</span>`)) : "");
   const posters = found.filter(m=>m.poster).slice(0,5)
     .map((m,i)=>`<div class="oafdposter" style="--i:${i};background-image:url(https://image.tmdb.org/t/p/w185${m.poster})"></div>`).join("");
   return `<div class="oafdhero">
       <div class="oafdbot" aria-hidden="true"><span class="ring"></span><span class="ring r2"></span>${OAF_DONE_ICONS.agent}</div>
-      <h2 class="osh oafdtitle">${name} is ready.</h2>
-      <p class="oafdsub">Your Cascade account is set up.</p>
+      <h2 class="osh oafdtitle">Your agent is ready.</h2>
+      <p class="oafdsub">Next: become a member and start watching.</p>
     </div>
     <div class="oafdcount"><b id="oafDoneCount">0</b><span>films already found for you</span></div>
     ${posters ? `<div class="oafdposters" aria-hidden="true">${posters}<span class="oafdmore">+ more</span></div>` : ""}
     <div class="oafdmoods"><div class="oafdtoldh">Sorted into your lists</div>
       ${draft.moods.map((m,i)=>`<span class="oafdmood" style="--i:${i}">${esc(m.name)}</span>`).join("")}</div>
-    <div class="oafdtold"><div class="oafdtoldh">${name} is working for you</div>${told}</div>`;
+    <div class="oafdtold"><div class="oafdtoldh">Your agent is working for you</div>${told}</div>`;
 }
 let oafDoneFound = 0;
 // Short, still-recognisable service names for the done screen's tags (Lee, 14 Nov: "Prime", "SBS").
@@ -23195,21 +23183,17 @@ function oafAnimateDone(){
   requestAnimationFrame(step);
 }
 function oafBlocked(){
-  if(oafStep==="where") return oafState.where.size===0;
+  if(oafStep==="who") return !oafState.age || !oafState.partner || (oafHasChildrenStep() && !oafState.children);
   if(oafStep==="favourites") return oafFavCount()===0;
-  if(oafStep==="age") return !oafState.age;
-  if(oafStep==="partner") return !oafState.partner;
-  if(oafStep==="children") return !oafState.children;
-  if(oafStep==="nameAgent") return !(oafState.name||"").trim();
   if(oafStep==="topSvc") return !oafState.topSvc;
   return false;
 }
 // Paints the current step into #oafInner plus the shared header/footer chrome — never touches scroll
-// position, so a chip toggle's own repaint (oafWireMultiOpt) doesn't jump the screen back to the top.
+// position, so a chip toggle's own repaint (a chip toggle) doesn't jump the screen back to the top.
 function oafPaint(){
-  const fns = {welcome:oafWelcomeHTML, where:oafWhereHTML, services:oafServicesHTML, favourites:oafFavouritesHTML,
-    topSvc:oafTopSvcHTML, people:oafPeopleHTML, age:oafAgeHTML, partner:oafPartnerHTML, together:oafTogetherHTML, children:oafChildrenHTML,
-    family:oafFamilyHTML, nameAgent:oafNameAgentHTML, done:oafDoneHTML};
+  const fns = {welcome:oafWelcomeHTML, who:oafWhoHTML, services:oafServicesHTML, favourites:oafFavouritesHTML,
+    topSvc:oafTopSvcHTML, people:oafPeopleHTML, together:oafTogetherHTML,
+    family:oafFamilyHTML, done:oafDoneHTML};
   const inner=$("oafInner"); if(!inner) return;
   inner.innerHTML = fns[oafStep]();
   // CAS-1344: a migration cannot be skipped. Lee, 13 Nov: done is a finished state — no way back from it.
@@ -23217,46 +23201,25 @@ function oafPaint(){
   $("oafFill").style.width = oafProgressPct(oafStep)+"%";
   const cta=$("oafCta");
   // Lee, 13 Nov (pm): the new-account done screen's CTA promises the payoff on the far side of sign-up.
-  const agentName = ((oafState && oafState.name) || "").trim();
   // Lee, 14 Nov: what follows is membership sign-up — a plain "Proceed", not a promise of the list.
   cta.textContent = oafStep!=="done" ? "Continue" : oafMode==="new" ? "Proceed" : "Start watching";
   cta.onclick = oafStep==="done" ? oafStartWatching : oafGoContinue;
   const blocked = oafBlocked();
   cta.disabled = blocked;
   cta.classList.toggle("blocked", blocked);
-  if(oafStep==="where") oafWireMultiOpt("oafWhereOpts", oafState.where);
+  if(oafStep==="who") oafWireWho();
   else if(oafStep==="services") oafWireServices();
   else if(oafStep==="favourites") oafWireFavourites();
   else if(oafStep==="topSvc") $("oafTopSvcOpts").querySelectorAll(".chip[data-val]").forEach(c=>{
       c.onclick=()=>{ oafState.topSvc=c.dataset.val; oafPaint(); };
     });
   else if(oafStep==="people") oafWirePeople();
-  else if(oafStep==="age") wireObOpt($("oafAgeOpts"), val=>{ oafState.age=val; oafPaint(); });
-  else if(oafStep==="partner") wireObOpt($("oafPartnerOpts"), val=>{
-      oafState.partner=val;
-      // Pre-tick Date night with ONE_AGENT_TOGETHER_DEFAULT the first time Yes is picked — never again, so
-      // a later edit to the grid survives tapping Yes/No/Yes.
-      if(val==="yes" && !oafState.togetherInit){
-        oafState.together=Object.fromEntries(ONE_AGENT_TOGETHER_DEFAULT.map(g=>[g,"incl"]));   // the middle setting
-        oafState.togetherInit=true;
-      }
-      oafPaint();
-    });
   else if(oafStep==="together") oafWireFavGrid("oafTogetherGrid", oafState.together);
-  else if(oafStep==="children") wireObOpt($("oafChildrenOpts"), val=>{
-      oafState.children=val;
-      if(val==="yes" && !oafState.familyInit){
-        oafState.family=Object.fromEntries(ONE_AGENT_FAMILY_DEFAULT.map(g=>[g,"incl"]));
-        oafState.familyInit=true;
-      }
-      oafPaint();
-    });
   else if(oafStep==="family") oafWireFavGrid("oafFamilyGrid", oafState.family);
-  else if(oafStep==="nameAgent") oafWireNameAgent();
   else if(oafStep==="done"){ oafFitTagRows(); oafAnimateDone(); }
 }
 // CAS-1513: first-run step events. data.step = "oaf_" + the step key; a migration (oafMode "migrate") logs none.
-const OAF_ORDER = ["welcome","where","services","topSvc","favourites","people","age","partner","together","children","family","nameAgent","done"];
+const OAF_ORDER = ["welcome","who","services","topSvc","favourites","together","family","people","done"];
 let oafForward = false;   // true only while oafGoContinue is moving the person on (vs Back / first paint)
 function oafLog(type, key){ if(oafMode!=="migrate") logEvent(type, {step:"oaf_"+key}); }
 function oafShow(key){
@@ -23276,19 +23239,17 @@ window.oafGoContinue=()=>{
   try{ oafGoContinueInner(); } finally { oafForward=false; }
 };
 function oafGoContinueInner(){
-  if(oafStep==="welcome") return oafShow("where");
-  if(oafStep==="where") return oafShow(oafHasServicesStep() ? "services" : "favourites");
+  if(oafStep==="welcome") return oafShow("who");
+  if(oafStep==="who") return oafShow(oafHasServicesStep() ? "services" : "favourites");
   if(oafStep==="services") return oafShow(oafHasTopSvcStep() ? "topSvc" : "favourites");
   if(oafStep==="topSvc") return oafShow("favourites");
-  if(oafStep==="favourites") return oafShow("people");
-  if(oafStep==="people") return oafShow("age");
-  if(oafStep==="age") return oafShow("partner");
-  if(oafStep==="partner") return oafShow(oafState.partner==="yes" ? "together" : (oafHasChildrenStep() ? "children" : "nameAgent"));
-  if(oafStep==="together") return oafShow(oafHasChildrenStep() ? "children" : "nameAgent");
-  if(oafStep==="children") return oafShow(oafState.children==="yes" ? "family" : "nameAgent");
-  if(oafStep==="family") return oafShow("nameAgent");
-  if(oafStep==="nameAgent") return oafShow("done");
+  if(oafStep==="favourites") return oafShow(oafNextAfterFavourites());
+  if(oafStep==="together") return oafShow(oafWantsFamily() ? "family" : "people");
+  if(oafStep==="family") return oafShow("people");
+  if(oafStep==="people") return oafShow("done");
 }
+const oafWantsFamily = () => oafHasChildrenStep() && oafState.children==="yes";
+function oafNextAfterFavourites(){ return oafState.partner==="yes" ? "together" : oafWantsFamily() ? "family" : "people"; }
 // Closes the overlay chrome without touching oafState/draft (shared by Start watching, Back-to-splash and the
 // hand-off to membership).
 function oafHide(){
@@ -23304,23 +23265,14 @@ window.oafGoBack=()=>{
     oafHide(); oafState=null; onbDraftModeOn=false;
     return showSplash();
   }
-  if(oafStep==="where") return oafShow("welcome");
-  if(oafStep==="services") return oafShow("where");
+  if(oafStep==="who") return oafShow("welcome");
+  if(oafStep==="services") return oafShow("who");
   if(oafStep==="topSvc") return oafShow("services");
-  if(oafStep==="favourites") return oafShow(oafHasTopSvcStep() ? "topSvc" : oafHasServicesStep() ? "services" : "where");
-  if(oafStep==="people") return oafShow("favourites");
-  if(oafStep==="age") return oafShow("people");
-  if(oafStep==="partner") return oafShow("age");
-  if(oafStep==="together") return oafShow("partner");
-  if(oafStep==="children") return oafShow(oafState.partner==="yes" ? "together" : "partner");
-  if(oafStep==="family") return oafShow("children");
-  if(oafStep==="nameAgent"){
-    if(oafState.children==="yes") return oafShow("family");
-    if(oafHasChildrenStep()) return oafShow("children");
-    if(oafState.partner==="yes") return oafShow("together");
-    return oafShow("partner");
-  }
-  if(oafStep==="done") return oafShow("nameAgent");
+  if(oafStep==="favourites") return oafShow(oafHasTopSvcStep() ? "topSvc" : oafHasServicesStep() ? "services" : "who");
+  if(oafStep==="together") return oafShow("favourites");
+  if(oafStep==="family") return oafShow(oafState.partner==="yes" ? "together" : "favourites");
+  if(oafStep==="people") return oafShow(oafWantsFamily() ? "family" : oafState.partner==="yes" ? "together" : "favourites");
+  if(oafStep==="done") return oafShow("people");
 };
 // Entry point — flowStart() opens it for a brand-new account ({mode:"new"}); afterSignIn() opens it for a
 // signed-in account with no v2 agent ({mode:"migrate"}). CAS-1344 retired the ?oneagent=setup entry and the
@@ -23334,7 +23286,7 @@ window.oafOpen=(opts)=>{
   oafPendingDraft=null;
   oafState = {
     // Lee, 13 Nov (pm): every genre starts on ✓ (the middle setting).
-    where: new Set(), favs: Object.fromEntries(ONE_AGENT_SETUP_STYLES.map(g=>[g,"incl"])), age: null, partner: null, children: null,
+    where: new Set(["cinema","rent","stream"]), favs: Object.fromEntries(ONE_AGENT_SETUP_STYLES.map(g=>[g,"incl"])), age: null, partner: null, children: null,
     together: {}, togetherInit: false, family: {}, familyInit: false,
     name: "", topSvc: null, person: "",
   };
@@ -25184,8 +25136,9 @@ function openOnbMembership(){
   const posters = onbMembershipFilms(agents).slice(0, MEMB_POSTERS).map(rvPosterHTML).join("");
   $("membBody").innerHTML = `
     <span class="cascpill" id="membPill">CASCADE</span>
-    <h2 class="membh" id="membHead">Create your account</h2>
-    <p class="membsub" id="membSub">Start your free month of Cascade.</p>
+    <div class="membtop">Membership</div>
+    <h2 class="membh" id="membHead">Become a Cascade member</h2>
+    <p class="membsub" id="membSub">Join to start watching. Your first month is free.</p>
     <div class="membenefits">
       ${OB_MEMB_BENEFITS.map(b=>`<div class="mbrow">${b.art}
         <span class="mbtx"><span class="mbt">${b.html}</span></span></div>`).join("")}
@@ -25641,7 +25594,7 @@ function membOfferHTML(){
 function membHasFreeTrial(p){ return !!(p && p.introductoryPrice && Number(p.introductoryPrice.price)===0); }
 function membCtaLabel(){
   // Lee, 23 Nov: on the email step this screen is plainly a sign-up — say so on the button.
-  if(membNeedsEmail()) return "Create account";
+  if(membNeedsEmail()) return "Become a member";
   if(!membIsNativeApp()) return "Continue";
   return (membProduct && !membHasFreeTrial(membProduct)) ? "Subscribe" : "Start free trial";
 }

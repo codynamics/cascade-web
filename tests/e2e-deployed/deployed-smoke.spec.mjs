@@ -154,9 +154,10 @@ test("real user on the deployed site", async ({ page }) => {
     const cta = page.locator("#oafCta");
     await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");
     await cta.click();
-    await expect(page.locator("#oafWhereOpts")).toBeVisible();
-    await page.locator('#oafWhereOpts .obopt[data-val="cinema"]').click();
-    await page.locator('#oafWhereOpts .obopt[data-val="rent"]').click();
+    await expect(page.locator("#oafInner .osh")).toHaveText("Who's watching?");
+    await page.locator('.whopill[data-field="age"][data-val="18plus"]').click();
+    await page.locator('.whopill[data-field="partner"][data-val="no"]').click();
+    await page.locator('.whopill[data-field="children"][data-val="no"]').click();
     await cta.click();
     await expect(page.locator("#oafSvcStores")).toBeVisible();
     for(let i = 0; i < 20; i++){
@@ -164,10 +165,6 @@ test("real user on the deployed site", async ({ page }) => {
       const st = await page.evaluate(() => oafStep).catch(() => null);
       if(st === "favourites" && await page.evaluate(() => oafFavCount() === 0)) await page.locator("#oafFavGrid .favcell .favtoggle").first().click();
       else if(st === "topSvc") await page.locator("#oafTopSvcOpts .chip").first().click();
-      else if(st === "age") await page.locator('#oafAgeOpts .obopt[data-val="18plus"]').click();
-      else if(st === "partner") await page.locator('#oafPartnerOpts .obopt[data-val="no"]').click();
-      else if(st === "children") await page.locator('#oafChildrenOpts .obopt[data-val="no"]').click();
-      else if(st === "nameAgent") await page.locator("#oafNameInput").fill("Archie");
       await cta.click();
       await page.waitForTimeout(150);
     }

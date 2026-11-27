@@ -68,12 +68,12 @@ test.describe("CAS-960 axe scan — zero serious/critical on the five named surf
     expect(unnamed).toEqual([]);
   });
 
-  test("onboarding — where step (#oafScreen options and buttons)", async ({ page }) => {
+  test("onboarding — who step (#oafScreen options and buttons)", async ({ page }) => {
     await freshApp(page);
     await page.locator("#splashCta").click();
     await page.locator("#oafCta").click();
-    await expect(page.locator("#oafWhereOpts")).toBeVisible();
-    const { serious } = await scanSurface(page, "onboarding — #oafScreen where", "#oafScreen");
+    await expect(page.locator("#oafInner .osh")).toHaveText("Who's watching?");
+    const { serious } = await scanSurface(page, "onboarding — #oafScreen who", "#oafScreen");
     expect(serious.map(v => v.id)).toEqual([]);
     const unnamed = await page.evaluate(() => [...document.querySelectorAll("#oafScreen button, #oafScreen .obopt")]
       .filter(b => b.offsetParent !== null && !(b.getAttribute("aria-label") || b.textContent || "").trim())

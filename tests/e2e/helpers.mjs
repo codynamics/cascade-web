@@ -255,16 +255,22 @@ export async function toShortlist(page, kind){
  * answer the flow's two gated opening questions (cinema, rent) instead of finishFlow()'s blind Continue loop
  * hanging on them for 90s (CAS-1099 requeue: that is exactly what S1/S6/S10 did before this split existed). */
 export async function walkToServices(page, kind){
-  // CAS-1344: the CAS-1347 one-agent flow — welcome, where, services. `kind` "stream" answers Renting only
-  // (no cinema), anything else answers cinema + renting, the same two answers the old walk gave.
+  // CAS-1691: welcome, who (age + partner answered; Under 18 / No keeps the walk short), services.
+  // `kind` is kept for callers' signatures; where-you-watch is no longer asked (all three windows are on).
   const cta = page.locator("#oafCta");
   await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");   // welcome
   await cta.click();
-  await expect(page.locator("#oafWhereOpts")).toBeVisible();             // where
-  if(kind !== "stream") await page.locator('#oafWhereOpts .obopt[data-val="cinema"]').click();
-  await page.locator('#oafWhereOpts .obopt[data-val="rent"]').click();
+  await answerWho(page);
   await cta.click();
   await expect(page.locator("#oafSvcStores")).toBeVisible();             // services
+}
+
+/** CAS-1691: answer every visible row of the "Who's watching?" step (18+, no partner, no kids by default). */
+export async function answerWho(page, { age = "18plus", partner = "no", children = "no" } = {}){
+  await expect(page.locator("#oafInner .osh")).toHaveText("Who's watching?");
+  await page.locator(`.whopill[data-field="age"][data-val="${age}"]`).click();
+  await page.locator(`.whopill[data-field="partner"][data-val="${partner}"]`).click();
+  if(age === "18plus") await page.locator(`.whopill[data-field="children"][data-val="${children}"]`).click();
 }
 
 /** Every card on the shortlist, as {name, countText, count}. */
@@ -297,7 +303,7 @@ export const ctaCount = page => ctaLocator(page).textContent().then(numberIn);
  * a roster-wide figure read off onbFlow.workingAgents, whichever generator committed it. */
 export async function finishFlow(page){
   // CAS-1344: from the services step (or wherever the caller left the one-agent flow) to membership:
-  // services -> favourites (one genre on) -> age -> partner (No) -> children (No) -> name -> done -> Start watching.
+  // CAS-1691: services -> favourites (one genre on) -> people -> done -> Start watching (who is answered by walkToServices).
   const cta = page.locator("#oafCta");
   const step = () => page.evaluate(() => oafStep);
   for(let i = 0; i < 20; i++){
@@ -308,14 +314,8 @@ export async function finishFlow(page){
     } else if(st === "topSvc"){
       // Lee, 14 Nov: "which streaming service do you use most?" — pick the first.
       await page.locator("#oafTopSvcOpts .chip").first().click();
-    } else if(st === "age"){
-      await page.locator('#oafAgeOpts .obopt[data-val="18plus"]').click();
-    } else if(st === "partner"){
-      await page.locator('#oafPartnerOpts .obopt[data-val="no"]').click();
-    } else if(st === "children"){
-      await page.locator('#oafChildrenOpts .obopt[data-val="no"]').click();
-    } else if(st === "nameAgent"){
-      await page.locator("#oafNameInput").fill("Archie");
+    } else if(st === "who"){
+      await answerWho(page);
     }
     await cta.click();
     await page.waitForTimeout(120);
