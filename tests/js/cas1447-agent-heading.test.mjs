@@ -5,7 +5,7 @@ import { loadEngine } from "./engine.mjs";
 
 const E = loadEngine();
 
-test("heading is "Your agent" alone when the agent has no icon", () => {
+test("heading is Your agent alone when the agent has no icon", () => {
   const h = E.agentHeadingHTML({ name: "Pixel" });
   assert.equal(h, "Your agent");   // CAS-1692: the stored name is never shown
   assert.ok(!/undefined/.test(h));
