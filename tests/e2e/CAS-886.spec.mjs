@@ -8,8 +8,10 @@
 import { test, expect } from "@playwright/test";
 import { bootAlreadySignedIn } from "./helpers.mjs";
 
+// CAS-1636: CAS-1344 switches on the one-agent setup flow (oafScreen) for any signed-in account with no v2
+// agent, so the seeded agent is a v2 one (criteria.v === 2) — otherwise the flow stays open (see CAS-1631).
 const SEEDED_CASCADE = { id: "886aaaa1-0000-4000-8000-000000000001", user_id: "cas886-user",
-  name: "Existing agent", criteria: {}, created_at: "2020-01-01T00:00:00.000Z" };
+  name: "Existing agent", criteria: { v: 2, styles: {}, combo: {} }, created_at: "2020-01-01T00:00:00.000Z" };
 
 // Two unread (Sam, and a null-to_name invite that must render "Someone"), one read ("Earlier"), one with
 // no reply at all ("Waiting") — one fixture row per AC's own named case.
