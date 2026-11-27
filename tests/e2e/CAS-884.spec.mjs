@@ -12,8 +12,10 @@
 import { test, expect } from "@playwright/test";
 import { bootAlreadySignedIn } from "./helpers.mjs";
 
+// CAS-1631: CAS-1344 switches on the one-agent setup flow (oafScreen) for any signed-in account with no v2
+// agent, so the seeded agent is a v2 one (criteria.v === 2) — otherwise the flow covers the nav menu.
 const SEEDED_CASCADE = { id: "884aaaa1-0000-4000-8000-000000000001", user_id: "cas884-user",
-  name: "Existing agent", criteria: {}, created_at: "2020-01-01T00:00:00.000Z" };
+  name: "Existing agent", criteria: { v: 2, styles: {}, combo: {} }, created_at: "2020-01-01T00:00:00.000Z" };
 
 const FIXTURE_FRIENDS = [
   { id: 1, name: "Priya", email: "priya@example.com", mobile: null, last_used_at: "2026-09-10T00:00:00.000Z" },
