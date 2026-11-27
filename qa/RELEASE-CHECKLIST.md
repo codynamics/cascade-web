@@ -4,7 +4,7 @@
      then run `python qa/build_checklist.py`. The push gate (tests/lint/qa-drift.mjs) fails if this
      file is stale. -->
 
-110 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
+111 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
 
 ## Part A
 
@@ -18,6 +18,8 @@
   - signing out and into another account never shows the first account's data
 - [ ] **ACCT-005** Row-level security matrix holds _(sql, auto)_
   - each role can read and write only the rows the matrix allows
+- [ ] **ACCT-006** Starred films never carry from one account to the next on the same device (CAS-1610) _(browser, auto)_
+  - sign-out clears the in-memory stars, no device copy of stars exists, and a new account shows none
 - [ ] **ADMIN-001** Admin views render for an admin and are hidden from everyone else _(unit, auto)_
   - admin-only views are not reachable for a normal account
 - [ ] **ALERTS-001** Alerts opens on Today first, then remembers the period for the session _(browser, auto)_

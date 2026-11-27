@@ -6363,7 +6363,7 @@ const DEVICE_KEY_ALLOWLIST = {
   "cascade_had_account": "whether this device was signed in as of its last boot (CAS-517 cold-start gate)",
   "cascade_onboarded": "whether this device has completed onboarding once",
   "cascade_wt_collapsed": "CAS-1283: whether the Watch top bar (stage groups + moods) is collapsed to #wtMini on this device",
-  "cascade_starred": "CAS-1295: the starred-film shortlist for a signed-out device — there is no account yet to put view.starred on",
+  "cascade_starred": "CAS-1295: legacy device copy of the starred shortlist (CAS-1610) — stars live only in view.starred now; this key is only ever removed",
   "cascade_push_token": "CAS-1474: this device's own APNs token — a property of the phone, not the account; kept so a sign-out can remove it from the leaving account's push_tokens row",
 };
 // CAS-1222 item 5: "the first boot of this build deletes every other cascade_ key" — rather than naming
@@ -6472,23 +6472,15 @@ const movingSeen={};
 function saveMovingSeen(){}
 // ---- Starred films (shortlist) — CAS-1295 -------------------------------------------------------------
 // A per-account set of tmdb_ids, independent of any one mood — "watch this next", not "this mood's pool".
-// Lives in view.starred (merge_user_prefs_view, with the other view fields) signed in; signed out there is
-// no account to put it on yet, so it falls back to localStorage cascade_starred (DEVICE_KEY_ALLOWLIST).
+// Lives in view.starred (merge_user_prefs_view, with the other view fields) only (CAS-1610: no
+// device copy; localStorage cascade_starred is only ever removed).
 const starredIds = new Set();
-function loadStarredLocal(){
-  try{
-    const v = JSON.parse(localStorage.getItem("cascade_starred")||"[]");
-    if(Array.isArray(v)) v.forEach(id=>starredIds.add(id));
-  }catch(e){}
-}
-function saveStarredLocal(){
-  try{ localStorage.setItem("cascade_starred", JSON.stringify([...starredIds])); }catch(e){}
-}
-loadStarredLocal();
+// Lee, 27 Nov 2026: stars are account data and live only in view.starred. The old device copy leaked one
+// account's stars into the next account made on the same device; drop any copy a device still holds.
+try{ localStorage.removeItem("cascade_starred"); }catch(e){}
 const isStarred = id => starredIds.has(id);
 function saveStarred(){
   if(window.CascadePersistence && window.CascadePersistence.accountActive()) pushViewField("starred", [...starredIds]);
-  else saveStarredLocal();
 }
 window.toggleStarred = id => {
   starredIds.has(id) ? starredIds.delete(id) : starredIds.add(id);
@@ -29237,6 +29229,7 @@ function acctFetchKeepalive(init){
     for(const k in watchMineOnly) watchMineOnly[k]=true;
     tutorialSeenFlag=false;
     tourV2SeenFlag=false;
+    starredIds.clear();   // Lee, 27 Nov 2026: the next account must not inherit this one's stars
     tutSeenMap={};   // CAS-1534
     rnudgeMap={rem:0, taste:false}; rnudgeVisit=null; rnudgeVisitGone=false;   // CAS-1566
     reviewPromptSessionsCount=0; reviewSessionBumpPending=false; reviewSessionsPushPending=false; reviewPromptAskedVer=null;

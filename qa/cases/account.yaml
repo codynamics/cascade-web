@@ -58,3 +58,13 @@
   refs:
     - tests/rls/matrix.mjs
     - tests/rls/matrix.test.mjs
+- id: ACCT-006
+  part: A
+  title: Starred films never carry from one account to the next on the same device (CAS-1610)
+  how: browser
+  area:
+    - m-account
+  expect:
+    - sign-out clears the in-memory stars, no device copy of stars exists, and a new account shows none
+  refs:
+    - tests/e2e/CAS-1610.spec.mjs
