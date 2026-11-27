@@ -8,8 +8,10 @@
 import { test, expect } from "@playwright/test";
 import { bootAlreadySignedIn } from "./helpers.mjs";
 
+// CAS-1641: CAS-1344 switches on the one-agent setup flow (oafScreen) for any signed-in account with no v2
+// agent, so the seeded agent is a v2 one (criteria.v === 2) — otherwise the flow stays open (see CAS-1631).
 const SEEDED_CASCADE = { id: "928aaaa1-0000-4000-8000-000000000001", user_id: "cas928-user",
-  name: "Existing agent", criteria: {}, created_at: "2020-01-01T00:00:00.000Z" };
+  name: "Existing agent", criteria: { v: 2, styles: {}, combo: {} }, created_at: "2020-01-01T00:00:00.000Z" };
 
 // Sam/Mum have both channels (for AC3f's channel-tap), Priya/Tom are email-only, Dex is mobile-only (for
 // AC3a's "no envelope" case) — one fixture row per AC's own named case.
