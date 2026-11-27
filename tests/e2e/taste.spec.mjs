@@ -140,10 +140,11 @@ test("CAS-1551 taste: Apply moves scores; nothing moves before it (CAS-1479)", a
   await openTaste(page);
   const card = page.locator(".tkrec");
   await expect(card).not.toHaveClass(/tkrec-empty/);
-  await card.locator(".tkrechd").click();
-  await expect(card).toHaveClass(/open/);
-  await expect(card.locator(".tkstyle").first()).toBeVisible();
-  await card.locator(`.tkstyle .ap[onclick*="tasteApply('${seed.main}')"]`).click();
+  await expect(card).toContainText("Open a gold genre to review them");
+  // CAS-1609: the proposal is reviewed inside its genre: open the row, then Apply from the legend.
+  await page.locator(`#oaList .oarow[data-style="${seed.main}"] .oarowleft`).click();
+  await expect(page.locator(`#oaAdjustSection .oacstep.prop[data-key="${seed.key}"]`)).toHaveCount(1);
+  await page.locator(`#oaAdjustSection .oaprop .ap[onclick*="tasteApply('${seed.main}')"]`).click();
 
   expect(await page.evaluate(key => oneAgentCriteria().applied[key], seed.key)).toBe(k.to);
   expect(await page.evaluate(m => tasteRecs().some(r => r.style === m), seed.main)).toBe(false);
@@ -159,9 +160,8 @@ test("CAS-1551 taste: Skip clears the recommendation without moving scores, and 
   const appliedBefore = await page.evaluate(key => (oneAgentCriteria().applied || {})[key], seed.key);
 
   await openTaste(page);
-  const card = page.locator(".tkrec");
-  await card.locator(".tkrechd").click();
-  await card.locator(`.tkstyle .sk[onclick*="tasteSkip('${seed.main}')"]`).click();
+  await page.locator(`#oaList .oarow[data-style="${seed.main}"] .oarowleft`).click();   // CAS-1609: Skip lives in the genre legend
+  await page.locator(`#oaAdjustSection .oaprop .sk[onclick*="tasteSkip('${seed.main}')"]`).click();
 
   expect(await page.evaluate(m => tasteRecs().some(r => r.style === m), seed.main)).toBe(false);
   expect(await page.evaluate(key => oneAgentCriteria().applied[key], seed.key)).toBe(appliedBefore);

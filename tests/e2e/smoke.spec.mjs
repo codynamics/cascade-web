@@ -2457,10 +2457,11 @@ test("CAS-1269 AC1: the agent recommends a sub-genre score adjustment, and Apply
   await expect(page.locator("#agentsScreen")).toHaveClass(/open/);
 
   await expect(page.locator(".tkrec")).toHaveCount(1);
-  await page.locator(".tkrechd").click();
-  await expect(page.locator(".tkrec .tkstyle")).toContainText("With Comedy");
-  await expect(page.locator(".tkrec .tkstyle")).not.toContainText("Minimum score");
-  await page.locator(".tkstyle .ap").click();
+  // CAS-1609: the proposal is reviewed inside the Drama genre row, then applied from its legend.
+  await page.locator('#oaList .oarow[data-style="Drama"] .oarowleft').click();
+  await expect(page.locator('#oaAdjustSection .oacstep.prop[data-step="-10"]')).toHaveCount(1);
+  await expect(page.locator("#oaAdjustSection")).not.toContainText("Minimum score");
+  await page.locator(".oaprop .ap").click();
   expect(await page.evaluate(() => oneAgentCriteria().applied["Drama|Comedy"])).toBe(-10);
 });
 
