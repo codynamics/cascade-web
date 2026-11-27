@@ -1,88 +1,91 @@
 {
-  "date": "2026-11-25",
+  "date": "2026-11-27",
   "tmdb": {
-    "calls": 10095,
+    "calls": 10123,
     "errors": 0,
     "not_found": 0,
     "status_counts": {}
   },
   "watchmode": {
     "quota": 2500,
-    "quota_used": 1126,
-    "remaining_monthly_credits": 1374,
-    "calls": 64,
+    "quota_used": 1190,
+    "remaining_monthly_credits": 1310,
+    "calls": 68,
     "errors": 0,
     "mismatch": 1,
     "mismatch_ids": [
-      1802674
+      1429520
     ],
     "quarantined": 29
   },
   "oscarbase": {
     "calls": 750,
-    "errors": 0
+    "errors": 1
   },
   "cinema_chains": {
     "chains": {
       "hoyts": {
-        "fetched": 42,
-        "matched": 26,
-        "unmatched": 16,
+        "fetched": 47,
+        "matched": 27,
+        "unmatched": 20,
         "unmatched_titles": [
           "Disney's Hexed",
+          "Spider-Man: (Brand New) Brand New Day",
           "Festive Fun with Peppa Cinema Experience",
           "Yeh Prem Mol Liya (Hindi, Eng Sub)",
           "Hadoota (Arabic, Eng Sub)",
           "Gunmaaster G9 (Hindi, Eng Sub)",
           "DOCTOR WHO: THE SATAN PIT",
-          "Hail Mary (Malayalam, Eng sub)",
-          "Dune - Re-issue",
           "Dune: Part Two - Re-issue",
+          "Dune - Re-issue",
+          "Hail Mary (Malayalam, Eng sub)",
+          "Maatrubhumi: May War Rest in Peace (Hindi, Eng Sub)",
+          "Eetha (Hindi, Eng Sub)",
           "Sanjog (Punjabi, Eng Sub)",
+          "MAYAN (Malayalam, Eng Sub)",
           "OM - Chapter 1: Udhiram - The Blood Wood (Tamil, Eng Sub)",
           "Andrew Lloyd Webber's Starlight Express - On Stage",
-          "Red Woman (Vietnamese, Eng Sub)",
+          "Vrushakarma (Telugu, Eng Sub)",
           "NMIXX 1ST WORLD TOUR  (EPISODE 1: ZERO FRONTIER) FINALE IN INCHEON LIVE VIEWING",
-          "Aakasamlo Oka Tara (Telugu, Eng Sub)",
-          "Scene (Tamil, Eng Sub)"
+          "2 Aile Arasinda (Turkish, Eng Sub)",
+          "Aakasamlo Oka Tara (Telugu, Eng Sub)"
         ],
         "ignored": false
       },
       "event": {
-        "fetched": 61,
-        "matched": 31,
-        "unmatched": 30,
+        "fetched": 59,
+        "matched": 30,
+        "unmatched": 29,
         "unmatched_titles": [
           "Disney's Hexed",
           "Festive Fun With Peppa",
           "Gunmaaster G9",
           "Cosmic Samson",
+          "Home Alone",
           "Yeh Prem Mol Liya",
+          "Dune - Double Feature",
           "Hail Mary",
           "ENE Repeat",
-          "Dune - Double Feature",
           "Om \u2013 Chapter 1: Udhiram \u2013 The Blood Wood",
+          "Love Actually",
           "Andrew Lloyd Webber's Starlight Express - Live on Stage",
           "Sanjog",
-          "Love Actually",
+          "The Holiday",
           "Doctor Who: The Satan Pit",
-          "Home Alone",
-          "3D Deep Sea",
-          "Bachelor Party D'eux",
           "Elf",
           "Made in the West",
           "The Polar Express",
+          "3D Deep Sea",
           "Arthur Christmas",
           "Home Alone 2 - Lost In New York",
-          "The Holiday",
-          "Aakasamlo Oka Tara (Telugu)",
           "George Michael - The Faith Tour",
+          "Aakasamlo Oka Tara (Telugu)",
+          "Bachelor Party D'eux",
           "Hakos Baelz 1st Concert \u201cREGALIA\u201d: Live Viewing in Cinemas",
           "Shrek (25th Anniversary)",
           "3D Under the Sea",
           "Dead Howling - Q&A",
-          "How The Grinch Stole Christmas",
-          "Aakasamlo Oka Tara (Malayalam)"
+          "How The Grinch Stole Christmas"
         ],
         "ignored": false
       }
