@@ -330,7 +330,7 @@ test("VRD-4: a pairing the person overrode is never recommended", () => {
 test("LST-1: Latest and Best is pinned first, and a new account's lists open on it", () => {
   const list = E.oneAgentStarterMoods({}, ["M"]);
   assert.equal(list[0].id, "releases");
-  assert.equal(list[0].name, "Latest and Best");
+  assert.equal(list[0].name, "Cinema releases");
   assert.equal(list[0].show, "40", "Best 40 per stage");
   assert.equal(E.ONE_AGENT_MOOD_BUILTINS[0].id, "releases");
 });

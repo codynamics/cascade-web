@@ -219,7 +219,8 @@ test("CAS-1366 AC3: \"Documentary\" is no longer shortened to \"Doco\"", () => {
 
 test("CAS-1410: starter Latest and Best is Override 20, not cinemaOnly (CAS-1491); cinemaOnly still excludes a film with no cinema release", () => {
   const s = E.oneAgentStarterMoods()[0];
-  assert.equal(s.cinemaOnly, false);
+  assert.equal(s.cinemaOnly, true);   // CAS-1693: Cinema releases has its only-cinema-releases setting on
+  assert.equal(s.name, "Cinema releases");
   assert.equal(s.topShare, 20);
   const c = criteriaWith("Action", 1);
   const noCinema = releaseFilm("Action", { cinema_release:false, cinema_date:null });
@@ -241,12 +242,12 @@ test("CAS-1491: a releasesV:3 All Latest + a best mood load as Latest and Best, 
     await E.CascadePersistence.loadUserPrefs();
     await settle();
     const r = E.watchMoods.find(m => m.id === "releases");
-    assert.equal(r.name, "Latest and Best");
+    assert.equal(r.name, "Cinema releases");   // CAS-1693: default name carried through the v5 repair
     assert.deepEqual([...r.styles], []);
     assert.equal(r.topShare, 20); assert.equal(r.show, "40"); assert.equal(r.sort, "score");
-    assert.equal(r.watched, true); assert.equal(r.cinemaOnly, false); assert.equal(r.handOnly, false);
+    assert.equal(r.watched, true); assert.equal(r.cinemaOnly, true); assert.equal(r.handOnly, false);
     assert.equal(r.awards, "any"); assert.equal(r.years, 0); assert.equal(r.svc, null);
-    assert.equal(r.releasesV, 4); assert.equal(r.releasesSortV, 1); assert.equal(r.sortChosen, true);
+    assert.equal(r.releasesV, 5); assert.equal(r.releasesSortV, 1); assert.equal(r.sortChosen, true);
     assert.deepEqual([...r.ages], ["PG","M"]);
     assert.deepEqual([...r.in], [123]);
     assert.equal(E.watchMoods.some(m => m.id === "best"), false);
@@ -257,8 +258,8 @@ test("CAS-1491: a releasesV:3 All Latest + a best mood load as Latest and Best, 
   }
 });
 
-test("CAS-1491: the repair is a no-op on a releases record already at releasesV:4", async () => {
-  const cur = { ...E.oamMoodDefaultFields(), id:"releases", name:"My own name", sort:"release", releasesSortV:1, releasesV:4,
+test("CAS-1491: the repair is a no-op on a releases record already at releasesV:5", async () => {
+  const cur = { ...E.oamMoodDefaultFields(), id:"releases", name:"My own name", sort:"release", releasesSortV:1, releasesV:5,
     topShare:50, show:"20", years:2 };
   const client = makeFakeClient({ user_id:"cas1491-test-user-2", view:{ moods:[cur], mood:"releases" } });
   const auth = E.CascadeAuth;
@@ -272,5 +273,24 @@ test("CAS-1491: the repair is a no-op on a releases record already at releasesV:
     assert.equal(client.rpcCalls.length, 0);
   } finally {
     auth.enabled = false; auth.client = null; auth.session = null;
+  }
+});
+
+// CAS-1693: Latest and Best -> Cinema releases (releasesV:5).
+test("CAS-1693: a v4 default-named list loads as Cinema releases with cinemaOnly on; a renamed one keeps its name, cinemaOnly on", async () => {
+  for(const [nm, want, uid] of [["Latest and Best","Cinema releases","cas1693-a"],["My picks","My picks","cas1693-b"]]){
+    const cur = { ...E.oamMoodDefaultFields(), id:"releases", name:nm, releasesSortV:1, releasesV:4, topShare:20, show:"40", cinemaOnly:false };
+    const client = makeFakeClient({ user_id:uid, view:{ moods:[cur], mood:"releases" } });
+    const auth = E.CascadeAuth;
+    auth.enabled = true; auth.client = client; auth.session = { user:{ id:uid } };
+    try{
+      await E.CascadePersistence.loadUserPrefs();
+      await settle();
+      const r = E.watchMoods.find(m => m.id === "releases");
+      assert.equal(r.name, want); assert.equal(r.cinemaOnly, true); assert.equal(r.releasesV, 5);
+      assert.equal(client.rpcCalls.length, 0, "a load must never write");
+    } finally {
+      auth.enabled = false; auth.client = null; auth.session = null;
+    }
   }
 });

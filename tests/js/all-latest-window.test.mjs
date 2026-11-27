@@ -19,7 +19,7 @@ test("18-month-old cinema release: out at 1 yr, in at 2 yrs and Any", () => {
 
 test("starter Releases mood is Latest and Best (CAS-1491), any age, watched on", () => {
   const m = E.oneAgentStarterMoods()[0];
-  assert.equal(m.name, "Latest and Best");
+  assert.equal(m.name, "Cinema releases");
   assert.equal(m.years, 0);
   assert.equal(m.watched, true);
 });

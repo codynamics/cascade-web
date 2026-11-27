@@ -20914,7 +20914,7 @@ function oaAlertNoteHTML(c, style){
 function oaOpenBodyHTML(c, style){
   const name=oneAgentShortName(style);
   const followNote = oaBar(c, style)==null
-    ? `<p class="oaalertnote">Alerts follow Latest and Best, where ${esc(name)} is off. Tick it there to get alerts.</p>` : "";
+    ? `<p class="oaalertnote">Alerts follow Cinema releases, where ${esc(name)} is off. Tick it there to get alerts.</p>` : "";
   return `<div class="oaopen">
       <div class="oasechdr">FILM ALERTS</div>
       ${oaAlertsHTML(c, style)}
@@ -21428,7 +21428,8 @@ const ONE_AGENT_MOOD_BUILTINS=[
   // CAS-1491 (Lee, 2026-11-20): All Latest and Best of the best merged into ONE list, Latest and Best — top 20%
   // of every genre the agent follows, Best 40, by score, watched in, any age of film. releasesV:4. Best of the
   // best is gone (new and existing accounts); the id stays "releases" (pinned first, Watch opens on it).
-  {id:"releases", name:"Latest and Best", styles:[], topShare:20, show:"40", sort:"score", watched:true, cinemaOnly:false, handOnly:false, awards:"any", years:0, svc:null, releasesV:4, releasesSortV:1},
+  {id:"releases", name:"Cinema releases", styles:[], topShare:20, show:"40", sort:"score", watched:true, cinemaOnly:true, handOnly:false, awards:"any", years:0, svc:null, releasesV:5, releasesSortV:1},
+  // CAS-1693 (Lee, 2026-11-27): Latest and Best is now "Cinema releases" — same list, its only-cinema-releases setting on. releasesV:5.
 ];
 function oamMoodDefaultFields(){
   return {v2:true, handOnly:false, watched:false, cinemaOnly:false, styles:[], topShare:null, ages:[], awards:"any", years:0, show:"all", sort:"score", in:[], out:[], svc:null, people:""};
@@ -22087,7 +22088,7 @@ window.oamSaveMoodFromSheet=()=>{
   // one-time load repair below (loadUserPrefs) never reverts a deliberate choice of Score back to release.
   // 13 Nov: moodSort() only honours Releases' saved sort once sortChosen is stamped — the v1 sheet's
   // save did that (CAS-1331/1333), this v2 save never did, so Score / A–Z on Releases silently reverted.
-  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=4; mood.sortChosen=true; oamWriteAgentFromMood(mood, d); }
+  if(mood.id==="releases"){ mood.releasesSortV=1; mood.releasesV=5; mood.sortChosen=true; oamWriteAgentFromMood(mood, d); }
   const list=oamMoodsListReal();
   const idx=list.findIndex(m=>m.id===mood.id);
   watchMoods = idx>=0 ? list.map((m,i)=>i===idx?mood:m) : [...list, mood];
@@ -26212,7 +26213,7 @@ const TOURS = {
     // the moods made from the setup answers, then how to edit and add moods.
     {html:TUT_P("Your Watch area is organised into <b>lists</b>.", "Lists are filtered collections of movies."),
       before(){ setWatchMood("releases"); tutMoodRowTo(null); }, sel:[".moodrow"], trail:TUT_W},
-    {html:TUT_P("<b>Latest and Best</b> is your main list: the top 20% of every genre your agent follows."),
+    {html:TUT_P("<b>Cinema releases</b> is your main list: the top 20% of every genre your agent follows."),
       before(){ tutMoodRowTo(null); }, sel:[`.moodrow .moodchip[data-mood="releases"]`], trail:TUT_W},
     {html:TUT_P("Some lists have been created from the questions you answered."),
       before(){ tutMoodRowTo([`.moodrow .moodchip[data-mood="me"]`,`.moodrow .moodchip[data-mood="date"]`,`.moodrow .moodchip[data-mood="family"]`]); },
@@ -30275,6 +30276,14 @@ function acctFetchKeepalive(init){
               releasesV:4, releasesSortV:1, sortChosen:true};
           });
           if(v.mood==="best") v.mood="releases";
+          moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
+        }
+        // CAS-1693: Latest and Best became "Cinema releases" (releasesV:5): cinemaOnly on, and the name changed
+        // only where it is still the default — a renamed list keeps its name. In memory, piggybacked onto the
+        // next real view write (a load must never write — CAS-1218/1243). Alerts/agent bars are untouched.
+        if(watchMoods.some(m=>m && m.v2 && m.id==="releases" && (m.releasesV||0)<5)){
+          watchMoods = watchMoods.map(m=>(m && m.v2 && m.id==="releases" && (m.releasesV||0)<5)
+            ? {...m, name: m.name==="Latest and Best" ? "Cinema releases" : m.name, cinemaOnly:true, releasesV:5} : m);
           moodsProvisionPending={moods:watchMoods.map(m=>({...m}))};
         }
         // CAS-1374: Best 10 is retired — a v2 mood still saved with show:"10" reads as "20" once, in

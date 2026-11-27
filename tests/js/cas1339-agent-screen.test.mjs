@@ -187,11 +187,11 @@ test("CAS-1594: a genre off in Latest and Best says so under the alert note; no 
   withCascades([oneAgent({ styles: { "War": styleOn(50) } })], () => {
     const c = E.cascades[0];
     const onHtml = E.oaOpenBodyHTML(c, "War");
-    assert.ok(!onHtml.includes("Alerts follow Latest and Best"), "no note while the genre is on");
+    assert.ok(!onHtml.includes("Alerts follow Cinema releases"), "no note while the genre is on");
     E.oaToggleStyleOn("War");
     const html = E.oaOpenBodyHTML(c, "War");
     assert.ok(!html.includes("oarange"), "no range input renders");
-    assert.ok(html.includes("Alerts follow Latest and Best, where War is off. Tick it there to get alerts."), html);
+    assert.ok(html.includes("Alerts follow Cinema releases, where War is off. Tick it there to get alerts."), html);
   });
 });
 
