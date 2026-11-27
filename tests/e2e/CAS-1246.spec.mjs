@@ -101,12 +101,15 @@ test("CAS-1246 AC6: tapping Agents opens the screen and lights the chip; Watch c
   await expect(page.locator("#agentsBtn")).not.toHaveAttribute("aria-pressed", "true");
 });
 
-test("CAS-1246 AC7: the tutorial's first card anchors to Agents, not a menu", async ({ page }) => {
+test("CAS-1246 AC7: the tutorial's Agents step anchors to the Agents chip, not a menu", async ({ page }) => {
   await buildOnboardedAccount(page);
 
-  const card0 = await page.evaluate(() => tutorialCardDefs()[0]);
-  expect(card0.sel).toBe("#agentsBtn");
-  expect(card0.text).not.toMatch(/\bmenu\b/);
+  // tutorialCardDefs() was replaced by the TOUR_STEPS script; its Agents step is the one that points at #agentsBtn.
+  const step = await page.evaluate(() => TOUR_STEPS.find(s => (s.sel || []).includes("#agentsBtn")));
+  expect(step).toBeTruthy();
+  expect(step.sel).toEqual(["#agentsBtn"]);
+  expect(step.text).toMatch(/^Agents/);
+  expect(step.text).not.toMatch(/\bmenu\b/);
 });
 
 test("CAS-1246 AC8: the saving dot sits inside the header, clear of every chip", async ({ page }) => {
