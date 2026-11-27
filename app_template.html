@@ -23478,6 +23478,9 @@ window.oafGoBack=()=>{
 // Agent screen's "Preview setup ›" link that used to be the only ways in.
 window.oafOpen=(opts)=>{
   opts=opts||{};
+  // CAS-1612: a second open of the flow that is already on screen (afterSignIn's empty-account auto-start racing
+  // the splash CTA / a repeat auth event) must not reset the person's answers or log `welcome` shown twice.
+  if(oafState && $("oafScreen").classList.contains("open") && oafMode===(opts.mode==="migrate" ? "migrate" : "new")) return;
   oafMode = opts.mode==="migrate" ? "migrate" : "new";
   oafPendingDraft=null;
   oafState = {
