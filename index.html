@@ -30094,7 +30094,8 @@ function acctFetchKeepalive(init){
         // already up (onboardingSeen()), open Alerts now; if boot/sign-in restore is still deciding,
         // hold it for applyPendingPushAlert() — the same membStartWork/afterSignIn/boot call sites that
         // already drive applyDeepLink() for ?dl=.
-        if(flowOn || briefOn) return;
+        // CAS-1622: the one-agent first-run flow (#oafScreen) is onboarding on screen too, though flowOn is false for it.
+        if(flowOn || briefOn || oafIsOpen()) return;
         if(onboardingSeen()){
           openAlertsFromPush(id || null);
           if(batchTap){ pendingBatch=batchTap; await applyPendingBatch(); }
