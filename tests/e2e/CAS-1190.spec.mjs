@@ -19,11 +19,16 @@ for(const width of [390, 430]){
     test(`chips share one row, brandrow fits, Find stays inside, no sideways scroll`, async ({ page }) => {
       await buildListing(page);
 
-      const moviesTop = await page.locator("#moviesBtn").evaluate(el => el.getBoundingClientRect().top);
-      const movingTop = await page.locator("#movingBtn").evaluate(el => el.getBoundingClientRect().top);
-      const findTop = await page.locator("#findBtn").evaluate(el => el.getBoundingClientRect().top);
-      expect(Math.abs(moviesTop - movingTop)).toBeLessThanOrEqual(1);
-      expect(Math.abs(moviesTop - findTop)).toBeLessThanOrEqual(1);
+      // Compare vertical centres, not tops: Watch is deliberately taller (48px vs 38px, 2026-11-20) and the
+      // row is align-items:center, so tops differ by design while the chips still share one row.
+      const midY = id => page.locator(id).evaluate(el => { const r = el.getBoundingClientRect(); return r.top + r.height / 2; });
+      const moviesMid = await midY("#moviesBtn");
+      const movingMid = await midY("#movingBtn");
+      const findMid = await midY("#findBtn");
+      const agentsMid = await midY("#agentsBtn");
+      expect(Math.abs(moviesMid - movingMid)).toBeLessThanOrEqual(1);
+      expect(Math.abs(moviesMid - findMid)).toBeLessThanOrEqual(1);
+      expect(Math.abs(moviesMid - agentsMid)).toBeLessThanOrEqual(1);
 
       const brandrowBox = await page.locator(".brandrow").evaluate(el => el.getBoundingClientRect());
       expect(brandrowBox.height).toBeLessThan(60);
