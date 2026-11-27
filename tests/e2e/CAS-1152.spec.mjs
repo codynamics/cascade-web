@@ -36,17 +36,27 @@ test("CAS-1152: the spotlight hole matches its anchor's real rect (plus pad) on 
   // comment at tutorialResolveAnchor) and always keeps at least 2 — so walk by "does the CURRENT card
   // have an anchor" rather than assuming card indices 1-4 all survived.
   let checked = 0;
-  while(await page.evaluate(() => !!(tutCards[tutIdx] && tutCards[tutIdx].el))){
-    const anchorHandle = await page.evaluateHandle(() => tutCards[tutIdx].el);
-    const anchorBox = await anchorHandle.asElement().boundingBox();
-    const want = padded(anchorBox);
-    const holeBox = await page.locator("#tutHole").boundingBox();
+  // The tour is now v2 (CAS-1317): steps live in tutSteps, the resolved anchors of the current one in
+  // tutCurrent.els (one or several; several => 1px pad, a single one => 6px pad, same as tutorialReposition).
+  // Steps with no anchors (els empty) have a zero-size hole and are not checked here.
+  for(let guard = 0; guard < 30; guard++){
+    await page.waitForTimeout(700);   // the tour card/hole is placed once the page under it has settled
+    const rects = await page.evaluate(() => (tutCurrent && tutCurrent.els ? tutCurrent.els : []).map(el => {
+      const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+    }));
+    if(rects.length){
+      const pad = rects.length > 1 ? 1 : 6;
+      const left = Math.min(...rects.map(r => r.left)), top = Math.min(...rects.map(r => r.top));
+      const right = Math.max(...rects.map(r => r.right)), bottom = Math.max(...rects.map(r => r.bottom));
+      const want = { left: left - pad, top: top - pad, width: right - left + pad * 2, height: bottom - top + pad * 2 };
+      const holeBox = await page.locator("#tutHole").boundingBox();
 
-    expect(Math.abs(holeBox.x - want.left)).toBeLessThanOrEqual(1);
-    expect(Math.abs(holeBox.y - want.top)).toBeLessThanOrEqual(1);
-    expect(Math.abs(holeBox.width - want.width)).toBeLessThanOrEqual(1);
-    expect(Math.abs(holeBox.height - want.height)).toBeLessThanOrEqual(1);
-
+      expect(Math.abs(holeBox.x - want.left)).toBeLessThanOrEqual(1);
+      expect(Math.abs(holeBox.y - want.top)).toBeLessThanOrEqual(1);
+      expect(Math.abs(holeBox.width - want.width)).toBeLessThanOrEqual(1);
+      expect(Math.abs(holeBox.height - want.height)).toBeLessThanOrEqual(1);
+      checked++;
+    }
     // #tutCard stays fully inside the viewport and beside its hole, in both engines.
     const vp = page.viewportSize();
     const cardBox = await page.locator("#tutCard").boundingBox();
@@ -55,13 +65,12 @@ test("CAS-1152: the spotlight hole matches its anchor's real rect (plus pad) on 
     expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(vp.width + 1);
     expect(cardBox.y + cardBox.height).toBeLessThanOrEqual(vp.height + 1);
 
-    checked++;
     const label = (await page.locator("#tutNextBtn").textContent()).trim();
     if(label === "Done") break;
     await page.locator("#tutNextBtn").click();
     await page.waitForTimeout(80);
   }
-  expect(checked).toBeGreaterThanOrEqual(2);   // the app's own floor — see tutorialResolveAnchor's comment
+  expect(checked).toBeGreaterThanOrEqual(2);
 });
 
 test("CAS-1152: the closing, anchorless card stays centred", async ({ page }) => {
