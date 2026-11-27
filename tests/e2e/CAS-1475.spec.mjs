@@ -15,7 +15,7 @@ async function openAlertsWithThreeStatuses(page){
     const seen = new Set();
     for(const g of ["cinema","rent","stream"]){
       const ms = MOVIES.filter(m => primaryStatus(m)===g && !watched.has(m.tmdb_id) && !seen.has(m.tmdb_id)).slice(0,3);
-      ms.forEach(m => { seen.add(m.tmdb_id); firstFound[String(m.tmdb_id)] = Date.now(); window.CascadePersistence?.getAgentFilm; });
+      ms.forEach(m => { seen.add(m.tmdb_id); firstFound[String(m.tmdb_id)] = TODAY; });
     }
     window.__cas1475Cid = cid;
   });
