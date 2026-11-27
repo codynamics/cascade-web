@@ -2009,7 +2009,7 @@ test("CAS-1303 AC2: Sort A-Z orders titles ascending; Sort Release date uses the
 
 // CAS-1296 Change 3: a new mood ("+ Mood") defaults to drawing from the agent, every style on.
 // CAS-1425: the From (My agents / Everything) switch and per-agent chips went with the multi-agent sheet; with
-// one agent the same default is the OAM draft's stylesAll (every style the agent lists, nothing excluded),
+// one agent the same default is the OAM draft's picks (every style the agent lists, nothing excluded),
 // on the Genre tab, with Include watched on (CAS-1412).
 test(`CAS-1296 AC3: "+ Mood" opens on the agent's genres with every style included`, async ({ page }) => {
   await toShortlist(page, "cinema");
@@ -2024,19 +2024,13 @@ test(`CAS-1296 AC3: "+ Mood" opens on the agent's genres with every style includ
   await page.evaluate(() => { if (!oamSecOpen.has("primary")) window.oamToggleSec("primary"); });   // Lee, 2026-11-22: sheet sections open closed
   await expect(page.locator("#oamKwInput")).toBeVisible();
   await expect(page.locator("#oamKwInput")).toHaveValue("");
-  // CAS-1593: a new list starts with Latest and Best's ticks — the genres the agent has on — so every genre is
-  // ticked (stylesAll) only when the agent has none off.
-  const draft = await page.evaluate(() => ({ stylesAll: oamDraft.stylesAll, mode: oamDraft.mode, watched: oamDraft.watched,
+  // CAS-1690: a new list starts with Latest and Best's ticks — the genres the agent has on — so every genre is
+  // ticked only when the agent has none off.
+  const draft = await page.evaluate(() => ({ stylesAll: ALL_GENRES.every(g => oamDraft.picks[g]), mode: oamDraft.mode, watched: oamDraft.watched,
     agentAllOn: ALL_GENRES.every(g => oaBar(oneAgentCriteria(), g) != null) }));
   expect(draft).toEqual({ stylesAll: draft.agentAllOn, mode: "genre", watched: true, agentAllOn: draft.agentAllOn });
-  // Nothing the agent has ON sits under "Not in this list" — only genres the agent has off (oaBar null) do,
-  // so the sub-heading appears only when the agent has some off.
-  const notIn = await page.evaluate(() => {
-    const c = oneAgentCriteria();
-    return { names: oamDraft.rowOrder.notInMood, allOff: oamDraft.rowOrder.notInMood.every(g => oaBar(c, g) == null) };
-  });
-  expect(notIn.allOff, `genres under "Not in this mood": ${notIn.names}`).toBe(true);
-  await expect(page.locator("#watchSheetBody .oalist .oamnotinhd")).toHaveCount(notIn.names.length ? 1 : 0);
+  // CAS-1690: one row per genre in a fixed order — no "Not in this list" section any more.
+  await expect(page.locator("#watchSheetBody .oalist .oamnotinhd")).toHaveCount(0);
   await page.evaluate(() => window.closeWatchSheet());
 });
 
@@ -2488,27 +2482,26 @@ test("CAS-1400: mood sheet Genre|Keyword tabs — one-line rows, aligned filter 
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
-  // CAS-1593: the five-stop level rows and the Set all genres box show; the Override switch is gone.
+  // CAS-1690: one Off / Include / Favourite row per setup genre (the onboarding control); no five-stop track, Set all
+  // box or Override switch.
   await page.evaluate(() => { if (!oamSecOpen.has("primary")) window.oamToggleSec("primary"); });   // Lee, 2026-11-22: sheet sections open closed
   const m = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll("#watchSheetBody .oamlvlrow")];
+    const rows = [...document.querySelectorAll("#watchSheetBody .favcell")];
     return {
       rowCount: rows.length,
+      want: ONE_AGENT_SETUP_STYLES.length,
       rowHeights: rows.map(r => r.getBoundingClientRect().height),
-      nameHeights: rows.map(r => r.querySelector(".oamstylename").getBoundingClientRect().height),
-      allBox: document.querySelectorAll("#watchSheetBody .oamlvlall").length,
-      seg: document.querySelectorAll("#watchSheetBody .oamlvlseg").length,
-      rangeInRow: document.querySelectorAll("#watchSheetBody .oamlvlrow input[type=range]").length,
+      nameHeights: rows.map(r => r.querySelector(".favname").getBoundingClientRect().height),
+      lvseg: document.querySelectorAll("#watchSheetBody .lvseg, #watchSheetBody .oamlvltrack, #watchSheetBody .oamlvlall").length,
+      rangeInRow: document.querySelectorAll("#watchSheetBody .favcell input[type=range]").length,
       headingsInTrack: document.querySelectorAll("#watchSheetBody .mpanel .wsheethd").length,
     };
   });
-  expect(m.rowCount).toBeGreaterThan(0);
-  // CAS-1593 put a five-stop track under each genre name (row ~82px, was a single line under 80): the name
-  // itself must still sit on one line and the row stay compact.
+  expect(m.rowCount).toBe(m.want);
+  // Each row stays one compact 40px line, its genre name on a single line.
   m.nameHeights.forEach(h => expect(h).toBeLessThan(24));
-  m.rowHeights.forEach(h => expect(h).toBeLessThan(90));
-  expect(m.allBox).toBe(1);
-  expect(m.seg).toBe(0);
+  m.rowHeights.forEach(h => expect(h).toBeLessThan(48));
+  expect(m.lvseg).toBe(0);
   expect(m.rangeInRow).toBe(0);
   expect(m.headingsInTrack).toBe(0);
 

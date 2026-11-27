@@ -80,8 +80,9 @@ function withMoviesAndMoods(c, movies, moods, fn){
 // ---- 1. oamOrderScore: the lift, and only the lift ------------------------------------------------------
 
 // Lee, 2026-11-15: the ♥ ordering lift is retired — a score-sorted mood follows the score the card shows.
-test("CAS-1369 (retired 2026-11-15): OAM_FAV_LIFT is 0", () => {
-  assert.equal(E.OAM_FAV_LIFT, 0);
+test("CAS-1369 (CAS-1690): the agent-level ♥ lift is retired — OAM_FAV_LIFT is gone; the +5 is the list's own Favourite", () => {
+  assert.equal(E.OAM_FAV_LIFT, undefined);
+  assert.equal(E.OAM_FAV_BOOST, 5);
 });
 
 test("oamOrderScore is the shown score, ♥ or not", () => {
@@ -146,7 +147,7 @@ test("Best N: oamWilRankInMood counts a watched film ahead of the target", () =>
   const target = scoredFilm(["Action"], 20);
   const watchedAhead = scoredFilm(["Action"], 50);
   const c = oneAgent({ styles: { Action: styleOn(1, { fav:false }) } });
-  const mood = moodWith({ show:"40", watched:true });
+  const mood = moodWith({ show:"40", watched:true, favs:["Action"] });   // CAS-1690: Favourite = every scored film (the retired "All")
   withMoviesAndMoods(c, [...decoys, target, watchedAhead], [mood], () => {
     withWatched([watchedAhead.tmdb_id], () => {
       assert.equal(E.filmInOneAgentMood(target, mood, c), true);
@@ -157,7 +158,7 @@ test("Best N: oamWilRankInMood counts a watched film ahead of the target", () =>
 
 test("All Latest honours its own Show setting: Best 20 shows at most 20 films in a stage", () => {
   const c = oneAgent({ styles: { Action: styleOn(1, { fav:false }) } });
-  const mood = moodWith({ id:"releases", name:"All Latest", sort:"release", show:"20", years:1, watched:true, cinemaOnly:true, topShare:100 });
+  const mood = moodWith({ id:"releases", name:"All Latest", sort:"release", show:"20", years:1, watched:true, cinemaOnly:true, topShare:100, favs:["Action"] });   // CAS-1690: Favourite = every scored film
   assert.equal(mood.id, "releases");
   const films = Array.from({ length:30 }, (_, i) => scoredFilm(["Action"], 99 - i));
   withMoviesAndMoods(c, films, [mood], () => {

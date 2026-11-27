@@ -14,33 +14,33 @@ function criteriaWith(style, bar){
     styles:{ [style]: { bar, al:{cinema:false,rent:false,stream:false} } }, combo:{} };
 }
 
-// CAS-1593: the Override filter (topShare) is retired — a list's own levels (mood.levels, falling back to its old
-// topShare, then the agent's bar, then 25) are the bar. These assertions keep CAS-1391's original coverage on the
-// new rules: the same oamMoodBarFor chokepoint, read through oneBarForTopPct.
-test("CAS-1391 (CAS-1593): with no levels and no topShare, an ordinary list reads the agent's own bar's level", () => {
+// CAS-1690: the Override filter (topShare) and the five-stop levels are retired — a list's own Off / Include / Favourite
+// per genre is the bar. oamMoodBarFor is still the one chokepoint: Include = the genre's top 25%, Favourite = no
+// floor (0), Off = null; nothing reads topShare, levels or the agent's own bar for an ordinary list.
+test("CAS-1391 (CAS-1690): an ordinary list's Include bar is the genre's top 25%, whatever the agent's own bar", () => {
   const c = criteriaWith("Action", 55);
-  const lvl = E.snapPct(E.oneTopPct("Action", 55));
-  assert.equal(E.oamMoodBarFor({ id:"m1", topShare:null }, c, "Action"), E.oneBarForTopPct("Action", lvl));
+  assert.equal(E.oamMoodBarFor({ id:"m1", topShare:null }, c, "Action"), E.oneBarForTopPct("Action", 25));
 });
 
-test("CAS-1391 (CAS-1593): a retired topShare 40 snaps to the Top 50% stop when the list has no levels", () => {
+test("CAS-1391 (CAS-1690): a retired topShare and levels are ignored", () => {
   const c = criteriaWith("Action", 55);
-  assert.equal(E.oamMoodBarFor({ id:"m1", topShare:40 }, c, "Action"), E.oneBarForTopPct("Action", 50));
+  assert.equal(E.oamMoodBarFor({ id:"m1", topShare:40, levels:{ Action:10 } }, c, "Action"), E.oneBarForTopPct("Action", 25));
 });
 
-test("CAS-1391 (CAS-1593): a genre the agent has off still gets a bar in an ordinary list (25 by default); Latest and Best stays off", () => {
+test("CAS-1391 (CAS-1690): a genre the agent has off still gets a bar in an ordinary list (Include); Latest and Best stays off", () => {
   const c = criteriaWith("Action", null);
   assert.equal(E.oamMoodBarFor({ id:"m1" }, c, "Action"), E.oneBarForTopPct("Action", 25));
-  assert.equal(E.oamMoodBarFor({ id:"releases" }, c, "Action"), null);
+  assert.equal(E.oamMoodBarFor({ id:"releases", favs:[] }, c, "Action"), null);
 });
 
-test("CAS-1391 (CAS-1593): a legacy {id:'best', minScore:85} with no topShare reads like any other list — the minScore is ignored", () => {
+test("CAS-1391 (CAS-1690): a legacy {id:'best', minScore:85} with no topShare reads like any other list — the minScore is ignored", () => {
   const c = criteriaWith("Action", 55);
   const legacy = E.oamMoodBarFor({ id:"best", minScore:85 }, c, "Action");
   assert.equal(legacy, E.oamMoodBarFor({ id:"m1" }, c, "Action"));
 });
 
-test("CAS-1391 (CAS-1593): a list's own level wins over its topShare and the agent's bar", () => {
+test("CAS-1391 (CAS-1690): a Favourite genre has no floor; an unticked genre has no bar", () => {
   const c = criteriaWith("Action", 55);
-  assert.equal(E.oamMoodBarFor({ id:"m1", topShare:40, levels:{ Action:10 } }, c, "Action"), E.oneBarForTopPct("Action", 10));
+  assert.equal(E.oamMoodBarFor({ id:"m1", favs:["Action"] }, c, "Action"), 0);
+  assert.equal(E.oamMoodBarFor({ id:"m1", styles:["Drama"] }, c, "Action"), null);
 });

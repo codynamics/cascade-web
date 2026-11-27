@@ -16,7 +16,8 @@ function criteriaWith(style, bar){
     styles:{ [style]: { bar, al:{cinema:false,rent:false,stream:false} } }, combo:{} };
 }
 function moodWith(overrides){
-  return { ...E.oamMoodDefaultFields(), id:"t-cas1374-mood", name:"Me", ...overrides };
+  // CAS-1690: Action is a Favourite here — every scored film, the retired "All" level these fixtures relied on.
+  return { ...E.oamMoodDefaultFields(), id:"t-cas1374-mood", name:"Me", favs:["Action"], ...overrides };
 }
 let _nextId = 91740001;
 function filmWith(overrides){

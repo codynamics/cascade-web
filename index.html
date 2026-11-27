@@ -3166,7 +3166,7 @@
   #oafScreen .oafdtoldh{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);margin:0 0 8px}
   #oafScreen .oafdtag{display:inline-flex;align-items:center;gap:5px;margin:0 6px 6px 0;padding:5px 10px;border-radius:999px;
     font-size:13px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid var(--line)}
-  #oafScreen .oafdtag.fav{color:#5fdc95;border-color:rgba(95,220,149,.5);background:rgba(47,191,113,.12)}
+  #oafScreen .oafdtag.fav{color:#f0a36b;border-color:rgba(217,119,47,.5);background:rgba(182,90,28,.14)}
   #oafScreen .oafdtag i{width:7px;height:7px;border-radius:50%;background:var(--tc)}
   #oafScreen .oafdrow{display:flex;flex-wrap:wrap;margin:0 0 4px}
   #oafScreen .oafdrow + .oafdrow{padding-top:6px;border-top:1px solid rgba(255,255,255,.06)}
@@ -3684,15 +3684,14 @@
   .favlegend span:first-child{text-align:left}
   .favleg.off{color:var(--dim)}
   .favleg.incl{color:#27b3a2}
-  .favleg.fav{color:#5fdc95}
+  .favleg.fav{color:#e07a35}
   .favgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
   .favcell{min-width:0}
   .favcell{display:flex;align-items:center;gap:8px;height:44px;padding:0 5px 0 0;border-radius:12px;
     border:1px dashed var(--line);background:transparent;transition:border-color .2s,box-shadow .2s,background .2s}
   .favcell:not(.on) .favname{color:var(--faint);font-weight:600}
   .favcell.incl{border:1px solid #138c7d;background:color-mix(in srgb, #138c7d 10%, transparent)}
-  .favcell.fav{border:1px solid #5fdc95;background:color-mix(in srgb, #2fbf71 16%, transparent);
-    box-shadow:0 0 0 1px #5fdc95 inset,0 0 14px rgba(95,220,149,.45)}
+  .favcell.fav{border:1px solid #d9772f;background:color-mix(in srgb,#b65a1c 18%,transparent);box-shadow:0 0 0 1px #d9772f inset,0 0 14px rgba(217,119,47,.40)}
   .favtoggle{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:0;padding:0 0 0 14px;border:0;
     background:none;font:inherit;color:inherit;cursor:pointer;text-align:left}
   .favtoggle:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px;border-radius:12px}
@@ -3710,8 +3709,14 @@
   /* Lee, 13 Nov: Off carries the same weight as ✓ and ♥ — a glyph, not a word, and a quiet fill when chosen. */
   .favseg.off.on{background:rgba(255,255,255,.07);color:var(--ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)}
   .favseg.check.on{background:#138c7d;color:#fff}
-  .favseg.heart.on{background:#2fbf71;color:#fff}   /* the row carries the glow; the segment stays crisp */
+  .favseg.heart.on{background:#b65a1c;color:#fff}   /* the row carries the glow; the segment stays crisp */
   .favseg svg{display:block}
+  /* CAS-1690: the list sheet's genre grid — 40px rows, 5px gap; the card's ♥ genre in the genre line. */
+  .oamfavgrid{gap:5px}
+  .oamfavgrid .favcell{height:40px}
+  .oamallbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 10px}
+  .oamallbtns button{height:36px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--ink);font:inherit;font-weight:700;font-size:13px;cursor:pointer}
+  .metaline .favgenre{color:#f0a36b;font-weight:800}
   .tickgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   /* Lee, 12 Nov: Date night / Family use the favourites grid's lozenge language, two-state — off is a dashed
      lozenge with a dimmed name, on is the teal Include colour, the box sits right like the ✓ box there. */
@@ -7952,11 +7957,12 @@ function sortMoviesBy(a,b,key){
       // CAS-1338 §8: on a v2 account the "you" sort becomes Score — oneScore(m), ties broken on Public —
       // the same oneAgentCriteria() gate oneScoreParts/oneScoreBoxHTML use, so a non-v2 account
       // (oneAgentCriteria() null) falls straight through to today's tasteMatch-based comparison, untouched.
-      // CAS-1369: oamOrderScore applies the ♥ ordering lift on top of oneScore for this comparison only —
-      // the score itself (oneScoreBoxHTML, alerts, membership) is never touched.
+      // CAS-1690: oamOrderScore applies the current list's Favourite +5 on top of oneScore for this comparison
+      // only — the score itself (oneScoreBoxHTML, alerts, membership) is never touched.
       const oneC = oneAgentCriteria();
       if(oneC){
-        const va=oamOrderScore(a,oneC), vb=oamOrderScore(b,oneC);
+        const om = currentOamMood();
+        const va=oamOrderScore(a,oneC,om), vb=oamOrderScore(b,oneC,om);
         if(va===-1 && vb===-1) return sortMoviesBy(a,b,"cascade");
         if(va===-1) return 1;
         if(vb===-1) return -1;
@@ -9629,6 +9635,14 @@ function observeLazyPosters(root){
 // age rating and Cascade score, genres/language and the full synopsis, Budget/Gross, People/Critics, badges,
 // Director/Cast. Shared verbatim between cardHTML (below) and the invite/film page (filmPageHTML) so the
 // invite page can never drift from what the card itself shows — one source, not two copies to keep in sync.
+// CAS-1690: the card's genre line. In a Watch list where the film's MAIN genre is a Favourite, that genre reads
+// "♥ <Genre>" (orange); the rest of the line is as it was. Outside a list view (c falsy) it is the plain line.
+function oamMetaGenresHTML(m, c){
+  const genres=m.genres||[];
+  const mood = c ? currentOamMood() : null;
+  const fav = !!(mood && genres.length && oamMoodGenreState(mood, c, genres[0])==="fav");
+  return genres.map((g,i)=> (i===0 && fav) ? `<span class="favgenre">♥ ${esc(g)}</span>` : esc(g)).join(", ");
+}
 function cardTopHTML(m, inWatch=false){
   const id=m.tmdb_id;
   const syn = m.synopsis ? `<p class="synopsis">${esc(m.synopsis)}</p>` : "";
@@ -9675,7 +9689,7 @@ function cardTopHTML(m, inWatch=false){
       <!-- CAS-373: the title text gets its own span so it (not the badge) is what truncates — the rating
            badge is flex:none and always shows, collapsed or expanded. -->
       <div class="title"><span class="titletext">${m.title}</span>${cert}${fixtureBadge}${titleScore}</div>
-      <div class="metaline">${(m.genres||[]).length ? esc((m.genres||[]).join(", "))+cult : cult.replace(/^ · /,"")}</div>
+      <div class="metaline">${(m.genres||[]).length ? oamMetaGenresHTML(m, inWatch && oneAgentC)+cult : cult.replace(/^ · /,"")}</div>
       ${syn}
       <div class="mrow r-money">${moneyRowHTML(m)}</div>
       <div class="mrow r-scores">${scoresRowHTML(m)}${rowScore}${oscMarkHTML(m)}${condensedBadgeHTML(m)}${attributionHTML(m, inWatch)}</div>
@@ -21421,41 +21435,37 @@ function currentOamMood(){
 // CAS-1593: a list's genre ticks. Latest and Best's ticks ARE the agent's on/off (oaBar != null); every other
 // list owns its ticks (mood.styles, empty = every genre) whatever the agent has on.
 function oamMoodIsReleases(mood){ return !!mood && mood.id==="releases"; }
-function oamMoodStyles(mood, c){
-  if(oamMoodIsReleases(mood)) return ALL_GENRES.filter(g=>oaBar(c,g)!=null);
-  if(!mood.styles || !mood.styles.length) return ALL_GENRES.slice();
-  return ALL_GENRES.filter(g=>mood.styles.includes(g));
+// CAS-1690: a list's favourite genres (♥). `favs` is stored on the list; Latest and Best with no `favs` yet reads
+// the onboarding ♥ picks (oaFav); any other list with none reads [].
+function oamMoodFavs(mood, c){
+  if(mood && Array.isArray(mood.favs)) return mood.favs;
+  if(oamMoodIsReleases(mood) && c) return ALL_GENRES.filter(g=>oaFav(c, g));
+  return [];
 }
-// CAS-1593: the five level stops a list offers, stored as 5/10/25/50/100.
-const OAM_LEVEL_STOPS=[5,10,25,50,100];
-const OAM_LEVEL_COLORS=["#138c7d","#3f8f62","#7f8540","#a0732e","#b65a1c"];
-// snapPct(p): the nearest stop by absolute difference; on a tie, the smaller.
-function snapPct(p){
-  let best=OAM_LEVEL_STOPS[0];
-  OAM_LEVEL_STOPS.forEach(s=>{ if(Math.abs(s-p) < Math.abs(best-p)) best=s; });
-  return best;
-}
-// A list's level for a genre (CAS-1593). Latest and Best reads the agent's bar when it has one (its levels ARE
-// the agent bars); every other list reads its own levels, falling back — in memory only, never written — to its
-// retired topShare, then the agent's bar, then 25. Nothing needs rewriting on load.
-function oamMoodLevel(mood, c, g){
-  const bar=c ? oaBar(c, g) : null;
-  const lv=(mood && mood.levels) ? mood.levels[g] : undefined;
+// CAS-1690: each genre in a list is "off", "incl" (Include: the genre's top 25%) or "fav" (Favourite: every scored
+// film of the genre, and +5 in list ordering). Latest and Best's on/off IS the agent's (oaBar != null).
+const OAM_INCLUDE_PCT=25;
+const OAM_FAV_BOOST=5;
+function oamMoodGenreState(mood, c, g){
+  const favs=oamMoodFavs(mood, c);
   if(oamMoodIsReleases(mood)){
-    if(bar!=null) return snapPct(oneTopPct(g, bar));
-    return lv!=null ? lv : 25;
+    if(favs.includes(g)) return "fav";
+    return (c && oaBar(c,g)!=null) ? "incl" : "off";
   }
-  if(lv!=null) return lv;
-  if(mood && mood.topShare!=null) return snapPct(mood.topShare);
-  if(bar!=null) return snapPct(oneTopPct(g, bar));
-  return 25;
+  if(favs.includes(g)) return "fav";
+  if(!mood || !mood.styles || !mood.styles.length) return "incl";
+  return mood.styles.includes(g) ? "incl" : "off";
 }
-// The bar actually applied to a style inside this mood: the score the list's level for that genre means,
-// through oneBarForTopPct so admission, display and the agent bar can never disagree. Latest and Best has no bar
-// for a genre the agent has off.
+function oamMoodStyles(mood, c){
+  return ALL_GENRES.filter(g=>oamMoodGenreState(mood, c, g)!=="off");
+}
+// The bar actually applied to a style inside this mood. Include = the genre's top 25% (oneBarForTopPct, so
+// admission and display can never disagree); Favourite = no floor (every scored film); Off = null.
 function oamMoodBarFor(mood, c, style){
-  if(oamMoodIsReleases(mood) && oaBar(c, style)==null) return null;
-  return oneBarForTopPct(style, oamMoodLevel(mood, c, style));
+  const st=oamMoodGenreState(mood, c, style);
+  if(st==="off") return null;
+  if(st==="fav") return 0;
+  return oneBarForTopPct(style, OAM_INCLUDE_PCT);
 }
 function oamFilmAge(m){ return AGE_RATING_CANON[m.age_rating] || m.age_rating; }
 // CAS-1384: a saved svc that's no longer one of the account's own services (prefs.sub) reads as null —
@@ -21566,18 +21576,14 @@ function filmInOneAgentMood(m, mood, c){
   if(mood.id==="starred" || mood.starredOnly) return starredIds.has(id);
   return oamFilmMeetsMoodRules(m, mood, c);
 }
-// CAS-1369: the ordering lift — in any mood sorted by score, a film whose MAIN genre is a ♥ favourite in
-// the agent (oaFav) ranks as if its score were OAM_FAV_LIFT higher. Ordering and the Best-N cut ONLY: the
-// score box, "score N+" text, membership and alerts all read oneScoreFor/oneScore untouched — nothing here
-// ever writes back through those.
-// Lee, 2026-11-15: "Surely it's all done through the slider" — a genre's score level is set by its slider, so
-// the ♥ no longer lifts a film's place in a score-sorted mood. Every mood now sorts by the score the card shows.
-const OAM_FAV_LIFT = 0;
-function oamOrderScore(m, c){
+// CAS-1690: the ordering score — the film's score, +5 when its MAIN genre is a Favourite in the list being shown.
+// Ordering and the Best-N cut ONLY: the score box, "score N+" text, membership and alerts all read oneScoreFor
+// untouched. With no list given (mood undefined) it is the plain score.
+function oamOrderScore(m, c, mood){
   const score=oneScoreFor(m, c);
-  if(score===-1) return score;
+  if(score===-1 || !mood) return score;
   const {main}=mainOtherCombos(m);
-  return (main!==undefined && oaFav(c, main)) ? score+OAM_FAV_LIFT : score;
+  return (main!==undefined && oamMoodGenreState(mood, c, main)==="fav") ? score+OAM_FAV_BOOST : score;
 }
 // Show cap — All/Best 20/40/60/80 by oamOrderScore, applied AFTER membership, once per stage.
 // Lee, 2026-11-20: Best N is a hard MAXIMUM of N films in each stage (Upcoming, In cinema, Rental,
@@ -21592,7 +21598,7 @@ function oamApplyShowCap(rows, mood, c, heldThisTab){
   if(n==null) return rows;
   const pinned=rows.filter(m=>oamShowCapPinned(m, mood));
   const rest=rows.filter(m=>!oamShowCapPinned(m, mood))
-    .sort((a,b)=>{ const d=oamOrderScore(b,c)-oamOrderScore(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
+    .sort((a,b)=>{ const d=oamOrderScore(b,c,mood)-oamOrderScore(a,c,mood); return d!==0 ? d : a.tmdb_id-b.tmdb_id; });
   const ranked=rest.slice(0, Math.max(0, n-pinned.length));
   const keep=new Set([...pinned, ...ranked].map(m=>m.tmdb_id));
   rows.forEach(m=>{ if(heldThisTab.has(m.tmdb_id)) keep.add(m.tmdb_id); });
@@ -21655,21 +21661,22 @@ function oamMoodDraftFrom(mood){
     // CAS-1412: a brand-new mood starts with Include watched on; editing keeps the mood's own stored value.
     watched: mood ? !!mood.watched : true,
     cinemaOnly: mood ? !!mood.cinemaOnly : false,
-    // CAS-1593: ticks and levels per genre. A new list starts with Latest and Best's; Latest and Best's own ticks
-    // are the agent's on/off. stylesAll = every genre ticked.
+    // CAS-1690: one pick per genre — "incl" or "fav"; absent = Off. A new list starts with Latest and Best's ticks and
+    // favourites; Latest and Best's own ticks are the agent's on/off.
     ...(()=>{
       const c=oneAgentCriteria();
       const src = mood || oamMoodsListReal().find(m=>m.id==="releases") || {id:"releases"};
-      const ticked = c ? oamMoodStyles(src, c) : ALL_GENRES.slice();
-      const levels={}; ALL_GENRES.forEach(g=>{ levels[g]=oamMoodLevel(src, c, g); });
-      const all = ALL_GENRES.every(g=>ticked.includes(g));
-      return {stylesAll: all, styles: new Set(all ? [] : ticked), levels};
+      const picks={};
+      ALL_GENRES.forEach(g=>{
+        const st = c ? oamMoodGenreState(src, c, g) : "incl";
+        if(st!=="off") picks[g]=st;
+      });
+      return {picks};
     })(),
     // CAS-1400: genre | keyword — which way this mood finds films. Nothing stored before Save.
     // Lee, 2026-11-21: keyword only when there's actually a name in the box — a stored mode:"keyword" with no
     // name (Max) is a genre list, and the sheet must not grey out Genres for it.
     mode: (mood && oamKeywordOn(mood)) ? "keyword" : "genre",
-    rowOrder: null,   // frozen IN THIS MOOD / NOT IN THIS MOOD section membership — see oamFreezeMoodRowOrder
     ages: new Set(mood ? (mood.ages||[]) : []),
     awards: mood ? (mood.awards||"any") : "any",
     years: mood ? (mood.years||0) : 0,
@@ -21691,27 +21698,11 @@ function oamMoodDraftFrom(mood){
     people: mood && oamMoodMode(mood)==="keyword" ? (mood.people||"") : "",
   };
 }
-// CAS-1400: the bar a style shows in the sheet is always the agent's own — a mood never changes the agent.
-function oamDraftTicked(d, g){ return d.stylesAll || d.styles.has(g); }
-// CAS-1593: the draft's level for a genre (5/10/25/50/100) and the score it means.
-function oamDraftLevel(d, g){ return d.levels[g]!=null ? d.levels[g] : 25; }
-// IN THIS MOOD / NOT IN THIS MOOD section membership, frozen the moment the sheet opens (behaviour 1: rows
-// don't move while the sheet is open — ticking or dragging a strip only changes a row's own tick/dimming,
-// never its section or position; the sections re-sort on the next open). Keeps the agent's own row order
-// (oaComputeOrder: on styles by bar ascending then name, then never styles A-Z) within each section.
-function oamFreezeMoodRowOrder(){
-  const d=oamDraft; if(!d) return;
-  const c=oneAgentCriteria();
-  if(!c){ d.rowOrder={inMood:[], notInMood:[]}; return; }
-  const order=oaComputeOrder(c);
-  const inMood=order.filter(g=>oamDraftTicked(d, g));
-  const notInMood=order.filter(g=>!inMood.includes(g));
-  d.rowOrder={inMood, notInMood};
-}
+// CAS-1690: a genre is ticked (Include or Favourite) when the draft holds a pick for it.
+function oamDraftTicked(d, g){ return !!d.picks[g]; }
 window.openOamMoodSheetFor=id=>{
   const mood=oamMoodsListReal().find(m=>m.id===id); if(!mood) return;
   oamDraft=oamMoodDraftFrom(mood);
-  oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
   oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set(); oamOtherSvcsOpen=false;
   openWatchSheet();
@@ -21720,7 +21711,6 @@ window.openOamMoodSheetFor=id=>{
 window.openOamMoodSheetForNew=()=>{
   if(oamMoodsListReal().length>=MOOD_MAX) return;
   oamDraft=oamMoodDraftFrom(null);
-  oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
   oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set(); oamOtherSvcsOpen=false;
   openWatchSheet();
@@ -21767,7 +21757,6 @@ window.openOamMoodSheetFromFind=()=>{
   oamDraft={...oamMoodDraftFrom(null), ...fields};
   oamDraft.mode = fields.people ? "keyword" : "genre";   // CAS-1400
   oamDraft.fromFind={total, label:fields.name};
-  oamFreezeMoodRowOrder();
   oamDeleteArmed=false; clearTimeout(oamDeleteArmTimer);
   oamNotInMoodOpen=false; oamMoreFiltersOpen=false; oamSecOpen=new Set(); oamOtherSvcsOpen=false;
   openWatchSheet();
@@ -21779,20 +21768,16 @@ window.setOamDraftName=v=>{ if(oamDraft) oamDraft.name=v; };
 window.toggleOamDraftHandOnly=()=>{ if(!oamDraft) return; oamDraft.handOnly=!oamDraft.handOnly; renderOamMoodSheetBody(); };
 window.toggleOamDraftCinemaOnly=()=>{ if(!oamDraft) return; oamDraft.cinemaOnly=!oamDraft.cinemaOnly; renderOamMoodSheetBody(); };
 window.toggleOamDraftWatched=()=>{ if(!oamDraft) return; oamDraft.watched=!oamDraft.watched; renderOamMoodSheetBody(); };
-window.toggleOamDraftStyle=style=>{
-  const d=oamDraft; if(!d) return;
-  const onStyles=ALL_GENRES;
-  if(d.stylesAll){
-    d.stylesAll=false;
-    d.styles=new Set(onStyles.filter(g=>g!==style));
-  } else if(d.styles.has(style)){
-    d.styles.delete(style);
-  } else {
-    d.styles.add(style);
-    if(onStyles.every(g=>d.styles.has(g))){ d.stylesAll=true; d.styles=new Set(); }
-  }
-  oamRefreshGenreRows([style]);   // CAS-1593: rows only — the row keeps its place (frozen order), never a sheet rebuild
-};
+// CAS-1690: the draft's per-genre picks are changed here (and by the grid's own wiring, which mutates d.picks
+// directly); the grid repaints in place — rows never move while the sheet is open.
+function oamOnPicksChanged(){
+  const d=oamDraft, grid=$("oamFavGrid"); if(!d || !grid) return;
+  grid.innerHTML=oafFavGridCellsHTML(d.picks);
+  oafWireFavGrid("oamFavGrid", d.picks, oamOnPicksChanged);
+  oamRefreshSecSummaries();
+}
+window.oamAllOn=()=>{ const d=oamDraft; if(!d) return; ALL_GENRES.forEach(g=>{ if(!d.picks[g]) d.picks[g]="incl"; }); oamOnPicksChanged(); };
+window.oamAllOff=()=>{ const d=oamDraft; if(!d) return; Object.keys(d.picks).forEach(g=>{ delete d.picks[g]; }); oamOnPicksChanged(); };
 window.toggleOamDraftAge=a=>{ if(!oamDraft) return; oamDraft.ages.has(a)?oamDraft.ages.delete(a):oamDraft.ages.add(a); renderOamMoodSheetBody(); };
 window.setOamDraftAwards=v=>{ if(!oamDraft) return; oamDraft.awards=v; renderOamMoodSheetBody(); };
 window.setOamDraftYears=v=>{ if(!oamDraft) return; oamDraft.years=v; renderOamMoodSheetBody(); };
@@ -21830,145 +21815,6 @@ function oamStylesAlsoIn(style, excludeId){
     && !oamKeywordOn(m)
     && (!m.styles || !m.styles.length || m.styles.includes(style))).map(m=>m.name);
 }
-// ---- CAS-1593: a list owns its genre levels. One row per genre: tick, name, "Top N%" + "score S+", and a track of
-// five boxes (5/10/25/50/All) the person taps or drags. The draft (d.levels, d.styles) is the only thing changed
-// until Save; rows are patched in place so a drag never rebuilds the sheet.
-function oamLevelValHTML(g, level){
-  if(level>=100) return `<b>All</b><i>every film</i>`;
-  return `<b>Top ${level}%</b><i>score ${oneBarForTopPct(g, level)}+</i>`;
-}
-function oamLevelTrackHTML(idx){
-  // idx = the current stop (0-4) or -1 for none (Set all when Mixed). Handle: right end of the stop's box.
-  const boxes=OAM_LEVEL_COLORS.map((col,i)=>`<span class="oamlvlbox${i<=idx?" fill":""}" style="--bc:${col}"></span>`).join("");
-  const hx = idx<0 ? "" : idx>=4 ? `<i class="oamlvlhandle" style="left:calc(100% - 12px)"></i>`
-    : `<i class="oamlvlhandle" style="left:calc((100% - 12px) * ${(idx+1)/5} + ${idx*3}px - 6px)"></i>`;
-  return `<div class="oamlvltrack">${boxes}${hx}</div>`;
-}
-function oamStyleRowHTML(c, d, style){
-  const on=oamDraftTicked(d, style);
-  const level=oamDraftLevel(d, style);
-  const name=oneAgentShortName(style);
-  return `<div class="oamlvlrow${on?"":" off"}" data-style="${escA(style)}">
-      <div class="oamlvlline">
-        <span class="oamlvlleft">
-          <input type="checkbox" ${on?"checked":""} onchange="toggleOamDraftStyle('${escA(style)}')" aria-label="${escA(name)}">
-          <span class="oamstylename">${esc(name)}</span>
-        </span>
-        <span class="oamlvlval">${oamLevelValHTML(style, level)}</span>
-      </div>
-      ${oamLevelTrackHTML(OAM_LEVEL_STOPS.indexOf(level))}
-    </div>`;
-}
-// Set all genres: one stop when every ticked genre shares it, else Mixed.
-function oamAllStopIdx(d){
-  const ticked=ALL_GENRES.filter(g=>oamDraftTicked(d, g));
-  if(!ticked.length) return -1;
-  const first=oamDraftLevel(d, ticked[0]);
-  return ticked.every(g=>oamDraftLevel(d, g)===first) ? OAM_LEVEL_STOPS.indexOf(first) : -1;
-}
-function oamAllBoxHTML(d){
-  const idx=oamAllStopIdx(d);
-  return `<div class="oamlvlall" data-all="1">
-      <div class="oamlvlline">
-        <span class="oamlvlleft"><span class="oamstylename">Set all genres</span></span>
-        <span class="oamlvlval">${idx<0 ? `<b>Mixed</b><i>drag to set all</i>` : (OAM_LEVEL_STOPS[idx]>=100 ? `<b>All</b><i>every genre</i>` : `<b>Top ${OAM_LEVEL_STOPS[idx]}%</b><i>every genre</i>`)}</span>
-      </div>
-      ${oamLevelTrackHTML(idx)}
-      <div class="oamlvlscale"><span>5%</span><span>10%</span><span>25%</span><span>50%</span><span>All</span></div>
-    </div>`;
-}
-// Patch rows in place (never replace the element: a live drag holds pointer capture on it).
-function oamPatchTrack(el, idx){
-  const track=el.querySelector(".oamlvltrack"); if(!track) return;
-  track.querySelectorAll(".oamlvlbox").forEach((b,i)=>b.classList.toggle("fill", i<=idx));
-  let h=track.querySelector(".oamlvlhandle");
-  if(idx<0){ if(h) h.remove(); return; }
-  if(!h){ h=document.createElement("i"); h.className="oamlvlhandle"; track.appendChild(h); }
-  h.style.left = idx>=4 ? "calc(100% - 12px)" : `calc((100% - 12px) * ${(idx+1)/5} + ${idx*3}px - 6px)`;
-}
-function oamRefreshGenreRows(genres){
-  const d=oamDraft, body=$("watchSheetBody"); if(!d || !body) return;
-  genres.forEach(g=>{
-    const row=body.querySelector(`.oamlvlrow[data-style="${CSS.escape(g)}"]`); if(!row) return;
-    const on=oamDraftTicked(d, g), level=oamDraftLevel(d, g);
-    row.classList.toggle("off", !on);
-    const cb=row.querySelector("input[type=checkbox]"); if(cb) cb.checked=on;
-    const val=row.querySelector(".oamlvlval"); if(val) val.innerHTML=oamLevelValHTML(g, level);
-    oamPatchTrack(row, OAM_LEVEL_STOPS.indexOf(level));
-  });
-  const all=body.querySelector(".oamlvlall");
-  if(all){
-    const idx=oamAllStopIdx(d);
-    const val=all.querySelector(".oamlvlval");
-    if(val) val.innerHTML = idx<0 ? `<b>Mixed</b><i>drag to set all</i>` : (OAM_LEVEL_STOPS[idx]>=100 ? `<b>All</b><i>every genre</i>` : `<b>Top ${OAM_LEVEL_STOPS[idx]}%</b><i>every genre</i>`);
-    oamPatchTrack(all, idx);
-  }
-  oamRefreshSecSummaries();
-}
-// Which stop an x position picks: the nearest junction, per the ticket — i = clamp(round((x-left)/width*5)-1, 0, 4).
-function oamLevelStopFromX(row, x){
-  const r=row.querySelector(".oamlvltrack").getBoundingClientRect();
-  if(!r.width) return 0;
-  return Math.max(0, Math.min(4, Math.round((x - r.left)/r.width*5) - 1));
-}
-function oamApplyLevelStop(row, i){
-  const d=oamDraft; if(!d) return;
-  const level=OAM_LEVEL_STOPS[i];
-  if(row.dataset.all){
-    const ticked=ALL_GENRES.filter(g=>oamDraftTicked(d, g));
-    ticked.forEach(g=>{ d.levels[g]=level; });
-    oamRefreshGenreRows(ALL_GENRES);
-  } else {
-    d.levels[row.dataset.style]=level;
-    oamRefreshGenreRows([row.dataset.style]);
-  }
-}
-// Pointer handling, delegated once on the sheet body. A press on the track starts at once; a press elsewhere on the
-// row starts only after 8px of mostly horizontal travel (vertical travel is the page's scroll), and a still tap
-// anywhere on the row picks the nearest stop. Only the checkbox ever toggles the tick.
-let oamLvlGesture=null, oamLvlBound=false;
-function oamLvlEnd(){
-  if(oamLvlGesture){ oamLvlGesture.row.classList.remove("dragging"); }
-  oamLvlGesture=null;
-}
-function oamBindLevelEvents(){
-  const body=$("watchSheetBody"); if(!body || oamLvlBound) return;
-  oamLvlBound=true;
-  body.addEventListener("contextmenu", e=>{ if(e.target.closest && e.target.closest(".oamlvlrow,.oamlvlall")) e.preventDefault(); });
-  body.addEventListener("pointerdown", e=>{
-    const row=e.target.closest && e.target.closest(".oamlvlrow,.oamlvlall");
-    if(!row || e.target.closest("input")) return;
-    if(e.button!==undefined && e.button>0) return;
-    const onTrack=!!e.target.closest(".oamlvltrack");
-    oamLvlGesture={row, id:e.pointerId, x0:e.clientX, y0:e.clientY, live:false};
-    if(onTrack) oamLvlStart(e);
-  });
-  body.addEventListener("pointermove", e=>{
-    const g=oamLvlGesture; if(!g || e.pointerId!==g.id) return;
-    if(!g.live){
-      const dx=e.clientX-g.x0, dy=e.clientY-g.y0;
-      if(Math.abs(dx)>=8 && Math.abs(dx)>Math.abs(dy)) oamLvlStart(e);
-      else if(Math.abs(dy)>=8) oamLvlEnd();   // mostly vertical: leave it to page scroll
-      return;
-    }
-    e.preventDefault();
-    oamApplyLevelStop(g.row, oamLevelStopFromX(g.row, e.clientX));
-  });
-  body.addEventListener("pointerup", e=>{
-    const g=oamLvlGesture; if(!g || e.pointerId!==g.id) return;
-    const moved=Math.hypot(e.clientX-g.x0, e.clientY-g.y0);
-    if(g.live || moved<8) oamApplyLevelStop(g.row, oamLevelStopFromX(g.row, e.clientX));
-    oamLvlEnd();
-  });
-  body.addEventListener("pointercancel", oamLvlEnd);
-}
-function oamLvlStart(e){
-  const g=oamLvlGesture; if(!g) return;
-  g.live=true;
-  g.row.classList.add("dragging");
-  try{ g.row.setPointerCapture(e.pointerId); }catch(_){}
-  oamApplyLevelStop(g.row, oamLevelStopFromX(g.row, e.clientX));
-}
 // Lee, 2026-11-17 (later): no hidden/simple view — the agent's levels always show, so nothing filters out of sight.
 // Kept as always-on so existing callers (tutorial, e2e) still work.
 function oamAdvancedOn(d){ return true; }
@@ -21995,10 +21841,11 @@ window.oamToggleSec=key=>{
 function oamSecSummaries(d, c, posList, posIdx){
   const lbl=(opts,k)=>{ const o=opts.find(([kk])=>kk===k); return o?o[1]:String(k); };
   const kw = d.mode==="keyword" && (d.people||"").trim();
-  const nGen = ALL_GENRES.filter(g=>oamDraftTicked(d, g)).length;
+  const nGen = ONE_AGENT_SETUP_STYLES.filter(g=>d.picks[g]).length;
+  const nFav = ONE_AGENT_SETUP_STYLES.filter(g=>d.picks[g]==="fav").length;
   const primary = kw
     ? {text:`Finding by name: ${d.people.trim()}`, set:true}
-    : {text:`${nGen} genre${nGen===1?"":"s"}`, set: !d.stylesAll};
+    : {text:`${nGen} on · ${nFav} favourite${nFav===1?"":"s"}`, set: nFav>0 || nGen<ONE_AGENT_SETUP_STYLES.length};
   const svc = d.svc ? {text:`${oamSvcChipLabel(d.svc)} only`, set:true}
     : d.anySvc ? {text:"Any service", set:true}
     : {text: prefs.on ? "My services" : "All services", set:false};
@@ -22048,7 +21895,6 @@ function renderOamMoodSheetBody(){
   const posIdx = d.editingId ? posList.findIndex(m=>m.id===d.editingId) : -1;
   const title=$("watchSheetTitle"); if(title) title.textContent = d.editingId ? "List" : "New list";
   const kwMode = d.mode==="keyword";
-  const order = d.rowOrder || {inMood:[], notInMood:[]};
   const seg=(opts, cur, setter, label)=>`<div class="mfseg" role="group" aria-label="${escA(label)}">
       ${opts.map(([k,l])=>{ const on=cur===k; return `<button type="button" aria-pressed="${on}" class="${on?"on":""}"
         onclick="${setter}(${typeof k==="number"?k:`'${k}'`})">${esc(l)}</button>`; }).join("")}
@@ -22081,15 +21927,10 @@ function renderOamMoodSheetBody(){
       <div class="oamprimbox">
       <div class="mpanel">
         <section class="mgenre">
-          <p class="oamgenreintro oamlvlintro">How much of each genre this list shows. Slide left for only the best, right for more.</p>
-          ${oamAllBoxHTML(d)}
-          <div class="oalist">
-            ${order.inMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
-          </div>
-          ${order.notInMood.length ? `<div class="oalist">
-              <div class="subhd oamnotinhd">NOT IN THIS LIST</div>
-              ${order.notInMood.map(g=>oamStyleRowHTML(c, d, g)).join("")}
-            </div>` : ""}
+          <p class="oamgenreintro oamlvlintro">Favourites come first in this list and include more of their films. Off leaves a genre out.</p>
+          <div class="oamallbtns"><button type="button" onclick="oamAllOn()">All on</button><button type="button" onclick="oamAllOff()">All off</button></div>
+          ${oafFavLegendHTML()}
+          <div class="favgrid oamfavgrid" id="oamFavGrid">${oafFavGridCellsHTML(d.picks)}</div>
         </section>
       </div>
       <div class="oamkwsec open" id="oamKwSec">
@@ -22157,7 +21998,7 @@ function renderOamMoodSheetBody(){
           <button type="button" ${posIdx<=0?"disabled":""} onclick="oamMoveMood(-1)">&lsaquo; Move left</button>
           <button type="button" ${posIdx>=posList.length-1?"disabled":""} onclick="oamMoveMood(1)">Move right &rsaquo;</button>
         </div>`) : ""}`;
-  oamBindLevelEvents();
+  oafWireFavGrid("oamFavGrid", d.picks, oamOnPicksChanged);
   oamApplyModeToDOM();   // Lee, 2026-11-20: a keyword list opens with Genres greyed and the name box open
   const delBtn=$("moodDeleteBtn");
   if(delBtn){
@@ -22180,9 +22021,11 @@ function oamMoodFromDraft(d){
     handOnly: !!d.handOnly,
     watched: !!d.watched,
     cinemaOnly: !!d.cinemaOnly,
-    styles: d.stylesAll ? [] : [...d.styles],
-    levels: Object.fromEntries(ALL_GENRES.map(g=>[g, oamDraftLevel(d, g)])),   // CAS-1593
-    topShare: null,   // CAS-1593: retired — levels replace it
+    // CAS-1690: styles = the ticked (Include or Favourite) genres, [] meaning all; favs = the Favourite genres.
+    styles: ALL_GENRES.every(g=>d.picks[g]) ? [] : ALL_GENRES.filter(g=>d.picks[g]),
+    favs: ALL_GENRES.filter(g=>d.picks[g]==="fav"),
+    levels: null,     // CAS-1690: retired — Off / Include / Favourite replace the five-stop levels
+    topShare: null,
     ages: [...d.ages],
     awards: d.awards,
     years: d.years,
@@ -22193,19 +22036,21 @@ function oamMoodFromDraft(d){
     mode: (d.people||"").trim() ? "keyword" : "genre",   // Lee, 2026-11-20: a name in the box IS keyword mode
   };
 }
-// CAS-1593: Latest and Best's ticks and levels ARE the agent's genre on/off and bars (alerts follow it), so saving
-// it writes the agent in the same save. Ticked: bar = the score the level means, alerts restored from lastAl if the
-// genre was off. Unticked: the same switch-off oaToggleStyleOn does (lastBar/lastAl kept, bar null).
+// CAS-1690: Latest and Best's ticks and favourites ARE the agent's genre on/off and bars (alerts follow it), so
+// saving it writes the agent in the same save. Off: the switch-off oaToggleStyleOn does (lastBar/lastAl kept, bar
+// null). Include: bar = the genre's top 25%. Favourite: bar = every scored film, all three alerts on. Include and
+// Off leave st.al alone.
 function oamWriteAgentFromMood(mood, d){
   const c=oneAgentCriteria(); if(!c) return;
   c.styles=c.styles||{};
-  const ticked=new Set(ALL_GENRES.filter(g=>oamDraftTicked(d, g)));
   ALL_GENRES.forEach(g=>{
     const st=c.styles[g]||(c.styles[g]={al:{cinema:false,rent:false,stream:false}});
-    if(ticked.has(g)){
-      const wasOff = st.bar==null;
-      st.bar=oneBarForTopPct(g, mood.levels[g]);
-      if(wasOff) st.al = st.lastAl ? {...st.lastAl} : {cinema:true, rent:true, stream:true};
+    const pick=d.picks[g];
+    if(pick==="fav"){
+      st.bar=oneBarForTopPct(g, 100);
+      st.al={cinema:true, rent:true, stream:true};
+    } else if(pick==="incl"){
+      st.bar=oneBarForTopPct(g, OAM_INCLUDE_PCT);
     } else if(st.bar!=null){
       st.lastBar=st.bar; st.lastAl={...(st.al||{})}; st.bar=null;
     }
@@ -22319,7 +22164,7 @@ function oamWilStageView(mood, stageKey, c){
         rankOf=new Map();
         const pinnedN=preSheetRows.filter(x=>oamShowCapPinned(x, mood)).length;
         preSheetRows.filter(x=>!oamShowCapPinned(x, mood))
-          .sort((a,b)=>{ const d=oamOrderScore(b,c)-oamOrderScore(a,c); return d!==0 ? d : a.tmdb_id-b.tmdb_id; })
+          .sort((a,b)=>{ const d=oamOrderScore(b,c,mood)-oamOrderScore(a,c,mood); return d!==0 ? d : a.tmdb_id-b.tmdb_id; })
           .forEach((x,i)=>rankOf.set(x.tmdb_id, pinnedN+i+1));
       }
       return rankOf.has(id) ? rankOf.get(id) : null;
@@ -23100,7 +22945,7 @@ const OAF_SEG_ICONS = {
   fav:`<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 20.3 4.6 13.1a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9a4.6 4.6 0 0 1 6.5 6.5Z"/></svg>`,
 };
 function oafFavCellHTML(style, picks){
-  const own = !picks || picks===oafState.favs;   // only the person's own ♥ genres carry alerts
+  const own = !picks || (!!oafState && picks===oafState.favs);   // only the person's own ♥ genres carry alerts (CAS-1690: the list sheet has no oafState)
   const pick = (picks || oafState.favs)[style] || null;
   const name = oneAgentShortName(style);
   // Lee, 13 Nov (pm): one row per genre; Off | ✓ | ♥ segments you tap (no draggable thumb). Tapping the name
@@ -23131,7 +22976,7 @@ function oafFavLegendHTML(){
 }
 // Lee, 13 Nov: Date night and Family use exactly this control too — one renderer and one wiring for all three grids.
 function oafFavGridCellsHTML(picks){ return ONE_AGENT_SETUP_STYLES.map(st=>oafFavCellHTML(st, picks)).join(""); }
-function oafWireFavGrid(gridId, picks){
+function oafWireFavGrid(gridId, picks, onChange){
   const grid=$(gridId); if(!grid) return;
   grid.querySelectorAll(".favcell[data-style]").forEach(cell=>{
     const style=cell.dataset.style;
@@ -23141,7 +22986,7 @@ function oafWireFavGrid(gridId, picks){
         // A segment sets its own level; the name toggles on (✓) / off.
         const next = pick==="toggle" ? (cur ? null : "incl") : pick==="off" ? null : pick;
         if(next) picks[style]=next; else delete picks[style];
-        oafPaint();
+        (onChange || oafPaint)();
       };
     });
   });
@@ -26468,10 +26313,10 @@ const TOURS = {
       before(){ tutOpenMoodsTourSheet(); }, after(){ closeWatchSheetQuiet(); }, sel:["#oamMoodName"]},
     {html:TUT_P("A list starts with your agent's genre preferences, so you get the films that matter most to you.",
       "Switch genres on or off to make a special list. For example, to create a list with only drama movies, switch everything else off."),
-      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .mgenre .oalist .oamlvlrow"]},
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(false); }, sel:["#watchSheet .oamfavgrid .favcell"]},
     // Lee, 2026-11-17: the Agent settings / Agent override switch sits under the genre rows.
-    {html:TUT_P("Want only the very best? Slide a genre left for fewer, better films, or use <b>Set all genres</b> to give every genre the same level."),
-      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .oamlvlall"]},
+    {html:TUT_P("Love a genre? Tap <b>♥</b> to make it a favourite: it comes first in this list and shows more of its films. Use <b>All on</b> or <b>All off</b> to start over."),
+      before(){ tutOpenMoodsTourSheet(); tutSheetMode("genre"); tutSheetAdvanced(true); }, sel:["#watchSheet .oamallbtns"]},
     // The "during account setup" lines only appear when that setup mood exists (Lee, 16 Nov).
     {get html(){ return TUT_P("<b>Or find films by name</b>: type an actor, director or title instead. A name here switches the genres off.",
       ...(watchMoods.some(m=>m.id==="fav-person") ? ["During account setup, we set up a list with your favourite actor or director to show you how this is done."] : [])); },
@@ -27521,7 +27366,7 @@ function watchNavKey(){
       const c=oneAgentCriteria(); if(!c) return null;
       const mood=currentOamMood();
       return [
-        mood && [mood.styles, mood.show, mood.sort, mood.levels, mood.ages, mood.awards, mood.years,
+        mood && [mood.styles, mood.favs, mood.show, mood.sort, mood.levels, mood.ages, mood.awards, mood.years,
                  mood.watched, mood.handOnly, mood.starredOnly, mood.in, mood.out, mood.people, mood.cinemaOnly, mood.anySvc],
         ALL_GENRES.map(g=>oaBar(c,g)),
         c.combo,

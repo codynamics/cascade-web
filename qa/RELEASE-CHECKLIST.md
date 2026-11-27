@@ -66,14 +66,13 @@
   - a mood saved then reloaded is identical; its sort survives opening a cascade
 - [ ] **LISTS-002** A list can be created from a Find search _(unit, auto)_
   - Save as list from Find builds a mood with that search's people or genre
-- [ ] **LISTS-003** A list sets its own genre levels (five stops) and Set all genres _(browser, auto)_
-  - the list sheet shows a five-stop level row per genre and a Set all genres box, with no Override switch or Taste link
-  - tapping the junction between boxes 2 and 3 picks Top 10%; only the checkbox toggles a genre; Set all genres at 50% puts every ticked genre at Top 50%
-- [ ] **LISTS-005** Lists own their genre levels (CAS-1593): no Override, Taste link or thumbs; row name never toggles; 2/3 boundary is Top 10% _(browser, auto)_
+- [ ] **LISTS-003** A list sets each genre Off / Include / Favourite, with All on and All off _(browser, auto)_
+  - the list sheet shows the onboarding Off / Include / ♥ Favourite row per genre and All on / All off buttons, with no five-stop track, Override switch or Taste link
+  - tapping a genre's name toggles Off and Include; ♥ makes it a Favourite (orange) and its cards show ♥ in the genre line
+- [ ] **LISTS-005** Lists own their genres (CAS-1593, CAS-1690): no Override, Taste link or thumbs; row name toggles Off/Include; All on / All off _(browser, auto)_
   - the My taste/Override segment, the Taste link and the read-only thumbs are gone from the list sheet
-  - tapping a row's name does not change its checkbox
-  - tapping the track at the 2/3 boundary gives Top 10%
-  - Set all genres at 50% sets every ticked row and no unticked one
+  - tapping a row's name toggles it Off and Include
+  - All on turns every Off genre to Include and keeps Favourites; All off turns every genre Off
 - [ ] **MEMB-001** Membership screen shows price and free-month copy, no Prototype disclaimer _(browser, auto)_
   - #membScreen carries the price and free-month copy on both the onboarding recap and the standalone preview
 - [ ] **MEMB-002** Web membership screen has no purchase button _(browser, auto)_
@@ -260,7 +259,7 @@
 ## Part C
 
 - [ ] **LISTS-004** Long-pressing a genre row on iPhone never brings up the text magnifier _(lee-phone, manual)_
-  - press and hold a genre name or level track in the list sheet on iPhone; no magnifier or selection appears, and dragging a level still works
+  - press and hold a genre name in the list sheet on iPhone; no magnifier or selection appears
 - [ ] **MEMB-006** A real purchase in the TestFlight build unlocks membership _(lee-phone, manual)_
   - buying in the iOS build marks the account a member and the web build then admits the same account
 - [ ] **NOTIF-004** A real alert arrives on the phone as push and as email _(lee-phone, manual)_

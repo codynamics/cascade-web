@@ -57,16 +57,16 @@ test("CAS-1366 AC1: Releases honours the mood's own age-rating filter", () => {
   assert.equal(E.oamFilmMeetsReleasesRules(m, moodWith({ ages:[] }), c), true, "no ages ticked means every age");
 });
 
-test("CAS-1366 AC1: a list's own level is its score gate — All admits regardless of score, Top 5% does not", () => {
-  // CAS-1593: the Override (topShare 100) is retired; an ordinary list's level for the genre does the same job.
+test("CAS-1366 AC1 (CAS-1690): a list's own genre state is its score gate — Favourite admits regardless of score, Include (top 25%) does not", () => {
+  // CAS-1690: the Override (topShare 100) and the five-stop levels are retired; Include / Favourite do the same job.
   const m = releaseFilm("Action", { cinema_release:false, cinema_date:null, wm_user_rating:5 });
   const c = criteriaWith("Action", 1);
-  assert.ok(E.oneScore(m, c) < E.oneBarForTopPct("Action", 5), "sanity: the fixture scores below the Top 5% bar");
+  assert.ok(E.oneScore(m, c) < E.oneBarForTopPct("Action", 25), "sanity: the fixture scores below the Top 25% bar");
   const ordinary = { ...moodWith({}), id:"t-cas1366-ordinary" };
-  assert.equal(E.oamFilmMeetsMoodRules(m, { ...ordinary, levels:{ Action:5 } }, c), false,
-    "sanity: Top 5% excludes this film");
-  assert.equal(E.oamFilmMeetsMoodRules(m, { ...ordinary, levels:{ Action:100 } }, c), true,
-    "All must admit it regardless of its score");
+  assert.equal(E.oamFilmMeetsMoodRules(m, { ...ordinary, styles:["Action"] }, c), false,
+    "sanity: Include (top 25%) excludes this film");
+  assert.equal(E.oamFilmMeetsMoodRules(m, { ...ordinary, styles:["Action"], favs:["Action"] }, c), true,
+    "a Favourite must admit it regardless of its score");
 });
 
 test("CAS-1366: Releases' own \"Include films I've watched\" switch now applies (previously had no effect)", () => {

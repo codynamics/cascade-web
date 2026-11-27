@@ -12,25 +12,19 @@ function criteriaWith(style, bar){
     styles:{ [style]: { bar, al:{cinema:false,rent:false,stream:false} } }, combo:{} };
 }
 
-test("CAS-1409: topShare 50 overrides a genre whose agent bar sits at a 20% share (raises the bar's reach)", () => {
+// CAS-1690: topShare is retired — every ordinary list's Include bar is the genre's top 25%, so the list's bar is the
+// same whether the agent's own bar sits above it, below it, or off. (The override is now the list's own state.)
+for (const [label, pct] of [["a 20% share", 20], ["an 80% share", 80]]) {
+  test(`CAS-1409 (CAS-1690): a list's Include bar ignores topShare and an agent bar at ${label}`, () => {
+    const style = "Action";
+    const bar = E.oneBarForTopPct(style, pct);
+    const got = E.oamMoodBarFor({ id:"m1", topShare:50 }, criteriaWith(style, bar), style);
+    assert.equal(got, E.oneBarForTopPct(style, 25));
+  });
+}
+
+test("CAS-1409 (CAS-1690): topShare null reads the same Include bar — the retired Off", () => {
   const style = "Action";
   const bar = E.oneBarForTopPct(style, 20);
-  const got = E.oamMoodBarFor({ id:"m1", topShare:50 }, criteriaWith(style, bar), style);
-  assert.equal(got, E.oneBarForTopPct(style, 50));
-  assert.notEqual(got, bar, "sanity: the override must differ from the agent's own bar");
-});
-
-test("CAS-1409: topShare 50 overrides a genre whose agent bar sits at an 80% share (lowers the reach)", () => {
-  const style = "Action";
-  const bar = E.oneBarForTopPct(style, 80);
-  const got = E.oamMoodBarFor({ id:"m1", topShare:50 }, criteriaWith(style, bar), style);
-  assert.equal(got, E.oneBarForTopPct(style, 50));
-  assert.notEqual(got, bar, "sanity: the override must differ from the agent's own bar");
-});
-
-test("CAS-1409 (CAS-1593): topShare null reads the level of the agent's own bar (snapped to a stop) — the retired Off", () => {
-  const style = "Action";
-  const bar = E.oneBarForTopPct(style, 20);
-  assert.equal(E.oamMoodBarFor({ id:"m1", topShare:null }, criteriaWith(style, bar), style),
-    E.oneBarForTopPct(style, E.snapPct(E.oneTopPct(style, bar))));
+  assert.equal(E.oamMoodBarFor({ id:"m1", topShare:null }, criteriaWith(style, bar), style), E.oneBarForTopPct(style, 25));
 });

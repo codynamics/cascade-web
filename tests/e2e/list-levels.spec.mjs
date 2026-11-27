@@ -1,7 +1,6 @@
-// CAS-1593: the list sheet's genre levels — five-stop rows and the Set all genres box, at the 390x844 frame.
-// Asserts: no Override segment / Taste link / thumb; the genre name never toggles the tick; a tap on the exact
-// junction between boxes 2 and 3 picks Top 10%; Set all genres at 50% makes every ticked row read Top 50%.
-// (The iPhone long-press magnifier is Lee's to judge on device — it cannot be checked here.)
+// CAS-1593 (rewritten by CAS-1690): the list sheet's genre rows at the 390x844 frame — the Off / Include / Favourite
+// control. Asserts: no Override segment / Taste link / thumb; tapping the genre name toggles Off <-> Include; the ♥
+// segment makes a Favourite; All on / All off set every genre.
 import { test, expect } from "@playwright/test";
 import { guestOnboarded } from "./helpers.mjs";
 
@@ -16,50 +15,46 @@ async function openSheet(page){
       styles: { Action:{ bar:60, al }, Drama:{ bar:65, al }, Comedy:{ bar:70, al } } });
     saveCascades();
     setActive(cascades[0].id);
-    watchMoods = [{ ...oamMoodDefaultFields(), id: "cas1593", name: "Levels", styles: [], levels: {} }];
+    watchMoods = [{ ...oamMoodDefaultFields(), id: "cas1593", name: "Levels", styles: [], favs: [] }];
     watchMoodSel = "cas1593";
     render();
     window.openOamMoodSheetFor("cas1593");
     if (!oamSecOpen.has("primary")) window.oamToggleSec("primary");
   });
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
-  await expect(page.locator("#watchSheetBody .oamlvlrow").first()).toBeVisible();
+  await expect(page.locator("#watchSheetBody .favcell").first()).toBeVisible();
 }
 
 test("CAS-1593 AC2a: the list sheet has no Override segment, Taste link or thumb", async ({ page }) => {
   await openSheet(page);
   await expect(page.locator("#watchSheetBody .oamlvlseg, #watchSheetBody .oamtastelink, #watchSheetBody .oamthumb")).toHaveCount(0);
-  await expect(page.locator("#watchSheetBody .oamlvlall")).toHaveCount(1);
+  await expect(page.locator("#watchSheetBody .oamallbtns button")).toHaveCount(2);
 });
 
-test("CAS-1593 AC2b: clicking a genre row's name leaves its checkbox unchanged", async ({ page }) => {
+test("CAS-1593 AC2b: tapping a genre's name toggles it Off <-> Include (as in onboarding)", async ({ page }) => {
   await openSheet(page);
-  const row = page.locator('#watchSheetBody .oamlvlrow[data-style="Action"]');
-  const box = row.locator("input[type=checkbox]");
-  const before = await box.isChecked();
-  await row.locator(".oamstylename").click();
-  expect(await box.isChecked()).toBe(before);
+  const cell = page.locator('#watchSheetBody .favcell[data-style="Action"]');
+  await cell.scrollIntoViewIfNeeded();
+  const before = await page.evaluate(() => oamDraftTicked(oamDraft, "Action"));
+  await cell.locator(".favtoggle").click();
+  expect(await page.evaluate(() => oamDraftTicked(oamDraft, "Action"))).toBe(!before);
+  await page.locator('#watchSheetBody .favcell[data-style="Action"] .favtoggle').click();
   expect(await page.evaluate(() => oamDraftTicked(oamDraft, "Action"))).toBe(before);
 });
 
-test("CAS-1593 AC2c: clicking the track exactly between boxes 2 and 3 sets the row to Top 10%", async ({ page }) => {
+test("CAS-1593 AC2c: the ♥ segment makes a Favourite, and the summary counts it", async ({ page }) => {
   await openSheet(page);
-  const row = page.locator('#watchSheetBody .oamlvlrow[data-style="Action"]');
-  await row.scrollIntoViewIfNeeded();
-  const r = await row.locator(".oamlvltrack").boundingBox();
-  await page.mouse.click(r.x + r.width * 0.4, r.y + r.height / 2);
-  await expect(row.locator(".oamlvlval b")).toHaveText("Top 10%");
-  expect(await page.evaluate(() => oamDraft.levels.Action)).toBe(10);
+  const cell = page.locator('#watchSheetBody .favcell[data-style="Action"]');
+  await cell.scrollIntoViewIfNeeded();
+  await cell.locator('[data-pick="fav"]').click();
+  expect(await page.evaluate(() => oamDraft.picks.Action)).toBe("fav");
+  await expect(page.locator("#watchSheetBody .oamsecsum").first()).toContainText("1 favourite");
 });
 
-test("CAS-1593 AC2d: Set all genres at 50% makes every ticked row read Top 50%", async ({ page }) => {
+test("CAS-1593 AC2d: All off clears every genre; All on turns them all to Include", async ({ page }) => {
   await openSheet(page);
-  const all = page.locator("#watchSheetBody .oamlvlall");
-  await all.scrollIntoViewIfNeeded();
-  const r = await all.locator(".oamlvltrack").boundingBox();
-  await page.mouse.click(r.x + r.width * 0.8, r.y + r.height / 2);   // the junction at the right end of box 4
-  await expect(all.locator(".oamlvlval b")).toHaveText("Top 50%");
-  const texts = await page.evaluate(() => [...document.querySelectorAll("#watchSheetBody .oamlvlrow:not(.off) .oamlvlval b")].map(b => b.textContent));
-  expect(texts.length).toBeGreaterThan(0);
-  texts.forEach(t => expect(t).toBe("Top 50%"));
+  await page.locator("#watchSheetBody .oamallbtns button", { hasText: "All off" }).click();
+  expect(await page.evaluate(() => Object.keys(oamDraft.picks).length)).toBe(0);
+  await page.locator("#watchSheetBody .oamallbtns button", { hasText: "All on" }).click();
+  expect(await page.evaluate(() => ALL_GENRES.every(g => oamDraft.picks[g] === "incl"))).toBe(true);
 });

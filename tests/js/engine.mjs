@@ -864,9 +864,9 @@ if(typeof window.CascadeAuth === "undefined"){
   // MOOD_MAX is the mood-row cap the visibility helper below also gates on; oamSvcChipLabel is the mood
   // sheet's/Find's own short service-chip label (the prefill's own name fallback reads it too) — exported
   // directly so a test can assert each against a fixture rather than re-deriving them.
-  // CAS-1593: a list's own genre levels — the five-stop snap, the level reader, the draft (for tick/level edits)
-  // and the sheet's row/Set-all renderers, exported so list-levels.test.mjs can assert them directly.
-  snapPct, oamMoodLevel, oamStyleRowHTML, oamAllBoxHTML, oamDraftTicked, oamApplyLevelStop, OAM_LEVEL_STOPS,
+  // CAS-1690: a list's genre state (Off / Include / Favourite), its favourites reader, the draft's tick reader and
+  // the onboarding grid renderer the list sheet reuses — exported so list-favourites.test.mjs can assert them.
+  oamMoodGenreState, oamMoodFavs, oamDraftTicked, OAM_INCLUDE_PCT, OAM_FAV_BOOST, oafFavGridCellsHTML,
   get oamDraft(){ return oamDraft; },
   oamMoodFromDraft, MOOD_MAX, oamSvcChipLabel,
   // CAS-1400: the genre|keyword mode resolver.
@@ -891,7 +891,7 @@ if(typeof window.CascadeAuth === "undefined"){
   // lift's own +5 — exported so a test can assert each directly, the same convention oaBar/oneScore above
   // use. oamWilRankInMood is "Where it lists"'s own per-film rank within a mood's Best-N cut, exported so a
   // test can assert it stays honest to oamApplyShowCap's watched-doesn't-count rule.
-  oaFav, oamOrderScore, OAM_FAV_LIFT, oamWilRankInMood,
+  oaFav, oamOrderScore, oamWilRankInMood,
   // CAS-1411: the cross-mood check and the shared Watched-selection helper it now swaps in.
   oamFilmShownInMood, moodWatchedSel, oamWilStageKeyFor, REVIEW_STEPS,
   // CAS-1379: filmMatchesSearch is the shared title/director/cast matcher Find's findSortedRows and the

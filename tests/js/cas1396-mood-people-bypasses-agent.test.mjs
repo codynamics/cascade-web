@@ -44,14 +44,14 @@ test("CAS-1396 AC1: a people mood includes a Tom Cruise film scoring below the a
   assert.equal(E.oamFilmMeetsMoodRules(dramaOff, mood, c), true, "Drama is off in the agent, but the people filter ignores genre on/off entirely");
 });
 
-test("CAS-1396 AC1: the same mood with people:\"\" includes neither film (genre rules: the list's own ticks and levels)", () => {
-  // CAS-1593: a list's genre rules are its own ticks and levels, not the agent's. Action is ticked but only at
-  // Top 5%, so a film scoring below that bar is out; Drama isn't ticked at all.
+test("CAS-1396 AC1: the same mood with people:\"\" includes neither film (genre rules: the list's own ticks)", () => {
+  // CAS-1690: a list's genre rules are its own ticks, not the agent's. Action is ticked (Include: top 25%), so a
+  // film scoring below that bar is out; Drama isn't ticked at all.
   const belowBar = film("Action", { wm_user_rating:5 });
   const c = criteriaWith({ Action:{ bar:1, al:{cinema:false,rent:false,stream:false} } });
-  assert.ok(E.oneScore(belowBar, c) < E.oneBarForTopPct("Action", 5), "sanity: the fixture scores below the Top 5% bar");
+  assert.ok(E.oneScore(belowBar, c) < E.oneBarForTopPct("Action", 25), "sanity: the fixture scores below the Top 25% bar");
   const dramaOff = film("Drama");
-  const mood = moodWith({ people:"", styles:["Action"], levels:{ Action:5 } });
+  const mood = moodWith({ people:"", styles:["Action"] });
   assert.equal(E.oamFilmMeetsMoodRules(belowBar, mood, c), false);
   assert.equal(E.oamFilmMeetsMoodRules(dramaOff, mood, c), false);
 });
