@@ -7141,8 +7141,12 @@ function flushUsageEvents(){
       e=>console.warn("Cascade: usage_events flush failed", e));
   }catch(e){ console.warn("Cascade: usage_events flush failed", e); }
 }
-document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushUsageEvents(); });
-window.addEventListener("pagehide", flushUsageEvents);
+// CAS-1630: deferred one microtask so screen tracking's scrHide (registered later, logs screen_leave and
+// flushes synchronously) sends the whole hide as ONE batch; this one then finds the queue empty. Without
+// the deferral a hide produced two inserts (this flush, then scrHide's).
+const flushUsageSoon = () => Promise.resolve().then(flushUsageEvents);
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="hidden") flushUsageSoon(); });
+window.addEventListener("pagehide", flushUsageSoon);
 
 function logEvent(type, data){
   const e={t:Date.now(), s:SESSION, type, ...(data||{})};
