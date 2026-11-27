@@ -33,11 +33,15 @@ test("CAS-1691 AC1/AC6/AC7/AC8/AC9: every yes, 18+, two services — exact step 
   expect(await shownKeys(page)).toEqual(["welcome", "who", "services", "topSvc", "favourites", "together", "family", "people", "done"]);
   expect(await page.evaluate(() => [...oafState.where].sort())).toEqual(["cinema", "rent", "stream"]);
   expect(await page.evaluate(() => oafActiveWindows().map(w => w.key).sort())).toEqual(["cinema", "rent", "stream"]);
+  // A brand-new signed-out visitor on a configured build sees the email-entry variant: membNeedsEmail() is true.
+  // freshApp runs with no Supabase config (CascadeAuth.enabled false), which renders the "Continue" variant instead.
+  await page.evaluate(() => { window.CascadeAuth = Object.assign(window.CascadeAuth || {}, { enabled: true, status: "signed-out" }); });
   await cta.click();                                           // Proceed -> membership
   await expect(page.locator("#membScreen.open")).toBeVisible();
   const memb = await page.locator("#membScreen").innerText();
   expect(memb).toContain("Become a Cascade member");
   expect(memb).toContain("Membership");
+  await expect(page.locator("#membEmail")).toBeVisible();
   await expect(page.locator(".membcta")).toHaveText("Become a member");
 });
 
