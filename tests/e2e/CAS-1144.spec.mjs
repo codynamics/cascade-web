@@ -27,7 +27,10 @@ test.afterEach(async ({ page }) => {
 test("CAS-1144 AC1/AC3: no agent tracking the tab names the real reason and offers Open Agents", async ({ page }) => {
   await toWatchScreen(page, "stream");
   await page.evaluate(() => {
-    cascades.forEach(c => { c.watchMarkers.stream = null; });   // CAS-1144: every agent — nothing tracks Streaming
+    // CAS-1144: every agent — nothing tracks Streaming. CAS-1613: a v2 agent (CAS-1425) can arrive with no
+    // watchMarkers object at all, which windowUsable() already reads as "tracks nothing", so create it empty
+    // rather than assuming the v1 shape.
+    cascades.forEach(c => { c.watchMarkers = c.watchMarkers || {}; c.watchMarkers.stream = null; });
     render();
   });
   await page.evaluate(() => setWatchTab("stream"));
