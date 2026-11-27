@@ -23670,7 +23670,11 @@ function movingData(){
       const owner=filmOwnerCascade(m);
       if(!owner){ dropped.push({date:firstFound[fid]}); return; }
       rows.push({filmId:fid, m, tag:"new", reason:"New to your "+movingAgentsWord(),
-        agentId:owner.id, date:firstFound[fid]});
+        agentId:owner.id,
+        // firstFound holds the device-local YYYY-MM-DD, which Date.parse reads as UTC midnight — for a device
+        // whose local date is not Sydney's that lands on the wrong Sydney day and drops a film found a
+        // moment ago out of Today. A film stamped with the device's own today was found today: use now.
+        date:firstFound[fid]===TODAY ? new Date().toISOString() : firstFound[fid]});
     });
   }else{
     // realAlerts is loaded newest-first (loadRealAlerts orders by found_at descending), so the first
