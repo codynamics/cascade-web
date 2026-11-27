@@ -11,7 +11,10 @@ import { toShortlist, finishFlow, toListing } from "./helpers.mjs";
 async function freshLoad(page, qs){
   await page.route("**/config.js", route => route.fulfill({ status: 404, body: "" }));
   await page.goto("/index.html");
-  await page.evaluate(() => { try{ localStorage.clear(); }catch(e){} });
+  // CAS-1513: on navigating away, pagehide logs a screen_leave, and logEvent rewrites the page's whole IN-MEMORY
+  // log to cascade_log — which would resurrect the first page's app_open right after the clear below (WebKit
+  // runs pagehide after the clear). Emptying the in-memory log too keeps the "first load" genuinely first.
+  await page.evaluate(() => { try{ usageLog = []; }catch(e){} try{ localStorage.clear(); }catch(e){} });
   await page.goto(`/index.html${qs || ""}`);
   await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
 }
