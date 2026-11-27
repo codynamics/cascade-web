@@ -55,7 +55,8 @@ for(const width of [360, 390, 430]){
       const navItemTexts = await page.locator("#navMenu .navitem").allTextContents();
       expect(navItemTexts.some(t => t.trim() === "Agents")).toBe(false);
       const firstItem = page.locator("#navMenu .navitem").first();
-      await expect(firstItem).toContainText("Invites");
+      // The menu now leads with Streaming Analysis (Lee, 2026-11-09/11); Movie Invites opens the next group.
+      await expect(firstItem).toContainText("Streaming Analysis");
       await expect(firstItem).not.toHaveClass(/navsep/);
       const navBox = await page.locator("#navMenu").evaluate(el => {
         const r = el.getBoundingClientRect();
