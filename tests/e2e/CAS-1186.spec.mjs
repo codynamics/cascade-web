@@ -128,6 +128,8 @@ test("CAS-1186 AC8: no console errors across open, page, search and close", asyn
   await page.waitForTimeout(300);
   await runSearch(page, "the");
   await page.waitForTimeout(200);
+  // The search box scrolls with the list, so after the scroll-to-bottom above it is covered by result cards.
+  await page.locator("#findScreen").evaluate(el => { el.scrollTop = 0; });
   await page.locator("#findSearchClear").click();
   await page.locator("#moviesBtn").click();
 
