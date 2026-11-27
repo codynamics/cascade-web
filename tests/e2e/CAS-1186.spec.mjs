@@ -63,11 +63,14 @@ test("CAS-1186 AC5: typing filters by title with a matching count, an unmatched 
   const sample = await page.evaluate(() => MOVIES.find(m => m.title.length >= 6).title.slice(0, 4));
   await runSearch(page, sample);
   const expectedCount = await page.evaluate(
-    q => MOVIES.filter(m => m.title.toLowerCase().includes(q.toLowerCase())).length, sample);
+    q => MOVIES.filter(m => filmMatchesSearch(m, q.trim().toLowerCase())).length, sample);
   expect(await findCount(page)).toBe(expectedCount);
+  // The search matches title, director and cast (filmMatchesSearch), so each shown row must satisfy that, not a title-only test.
   const allMatch = await findRows(page).evaluateAll(
-    (els, q) => els.every(el => (el.querySelector(".titletext, .stubname")?.textContent || "")
-      .toLowerCase().includes(q.toLowerCase())),
+    (els, q) => els.every(el => {
+      const m = MOVIES.find(x => x.tmdb_id === Number(el.id.replace("card-", "")));
+      return !!m && filmMatchesSearch(m, q.trim().toLowerCase());
+    }),
     sample);
   expect(allMatch).toBe(true);
 
