@@ -74,9 +74,18 @@ test("CAS-1245: collapsed Watch card — poster fills, no glow, outline only on 
 
   // AC5: Watched carries the same outline colour as the other two action buttons, and nothing on the
   // action row glows.
-  const watchBorderTopColor = await firstCard.evaluate(card =>
-    getComputedStyle(card.querySelector(".ctl.watch .cmini")).borderTopColor);
-  expect(watchBorderTopColor).toBe("rgb(76, 125, 255)");
+  // CAS-1263 made all three collapsed action buttons share one quiet outline, so compare Watched against its
+  // siblings rather than a hard-coded blue. An answered Watched is deliberately lit amber, so only compare
+  // while it is unanswered (its label is .dim).
+  const watchOutline = await firstCard.evaluate(card => {
+    const w = card.querySelector(".ctl.watch .cmini");
+    const sib = [...card.querySelectorAll(".ctl:not(.watch) .cmini")].map(el => getComputedStyle(el).borderTopColor);
+    return { watch: getComputedStyle(w).borderTopColor, unanswered: !!w.querySelector(".clab.dim"), sib };
+  });
+  if(watchOutline.unanswered){
+    expect(watchOutline.sib.length).toBeGreaterThanOrEqual(1);
+    watchOutline.sib.forEach(c => expect(watchOutline.watch).toBe(c));
+  }
   const actionBoxShadows = await firstCard.evaluate(card =>
     [...card.querySelectorAll(".ctl .cmini")].map(el => getComputedStyle(el).boxShadow));
   expect(actionBoxShadows.length).toBeGreaterThanOrEqual(1);
