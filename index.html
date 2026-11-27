@@ -20947,9 +20947,7 @@ let tasteRecsOpen=false;
 function tasteRecsCardHTML(){
   const recs=tasteRecs();
   if(!recs.length){
-    const c0 = oneAgentCriteria();
-    const nm0 = ((c0 && c0.name)||"").trim() || "Your agent";
-    return `<div class="tkrec tkrec-empty"><div class="tkrechd"><div class="tkrecic">✦</div><div class="tkrect">Agent recommendations<i>None right now. ${esc(nm0)} will suggest tweaks as you rate more films.</i></div></div></div>`;
+    return `<div class="tkrec tkrec-empty"><div class="tkrechd"><div class="tkrecic">✦</div><div class="tkrect">Agent recommendations<i>None right now. Your agent will suggest tweaks as you rate more films.</i></div></div></div>`;
   }
   // Lee, 27 Nov 2026: the proposals themselves are reviewed inside each genre (oaProposalLegendHTML). This card is a
   // one-line summary naming the genres in the same order as the genre list below, plus Apply all.
@@ -23614,8 +23612,9 @@ function movingAgeText(dateStr){
 const MOVING_REMINDER_CHIP = {opens_soon:"SOON", past_opening_weekend:"REMINDER"};
 // CAS-1447: an agent heading's label. One-agent (v2) agents carry no icon, so `${c.icon} ${name}` printed the
 // literal word "undefined" before the name — icon only when there is one, the name alone otherwise.
+// CAS-1692: agents have no names — the heading is always "Your agent" (the stored name is kept, never shown).
 function agentHeadingHTML(c){
-  return (c.icon ? `${esc(c.icon)} ` : "") + esc(c.name);
+  return (c.icon ? `${esc(c.icon)} ` : "") + "Your agent";
 }
 function movingChipLabel(row){
   return MOVING_REMINDER_CHIP[row.moment] || (row.tag==="new" ? "NEW" : "CHANGED");
