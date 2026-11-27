@@ -186,10 +186,12 @@ class CardRenderTests(unittest.TestCase):
         for d_ in (d, d2):
             self.assertNotIn('border-radius:8px;border:1px solid', d_["html"])
 
-    def test_context_line_starts_with_agent_name(self):
-        hit = _hit("Film", "past_opening_weekend", cascade="Cinema date night")
+    def test_context_line_starts_with_your_agent_never_the_stored_name(self):   # CAS-1692
+        hit = _hit("Film", "past_opening_weekend", cascade="Nova")
         d = render_digest([hit], site_url="https://x.test/")
-        self.assertIn("Cinema date night", d["html"])
+        self.assertIn("Your agent", d["html"])
+        self.assertNotIn("Nova", d["html"])
+        self.assertNotIn("Nova", d["text"])
 
     def test_html_escapes_user_content(self):
         hit = _hit("Bad <script>", "hits_cinema", cascade="My \"quoted\" & <b>Cascade</b>")
@@ -307,7 +309,7 @@ class ContextLineAttributionTests(unittest.TestCase):
     def test_agent_caught_hit_renders_agent_name(self):
         hit = _hit("Film", "hits_cinema", cascade="Massive Movies", cascade_id="agent-1")
         d = render_digest([hit], site_url="https://x.test/")
-        self.assertIn("Agent: Massive Movies", d["html"])
+        self.assertIn("Your agent", d["html"])
 
     def test_hand_set_hit_renders_your_pick_not_agent(self):
         hit = _hit("Film", "hits_cinema", cascade="Your picks", cascade_id=None)
@@ -320,7 +322,7 @@ class ContextLineAttributionTests(unittest.TestCase):
                          movie_id="1")
         pick_hit = _hit("Pick Film", "hits_rent", cascade="Your picks", cascade_id=None, movie_id="2")
         d = render_digest([agent_hit, pick_hit], site_url="https://x.test/")
-        self.assertIn("Agent: Massive Movies", d["text"])
+        self.assertIn("Your agent", d["text"])
         self.assertIn("Your pick", d["text"])
 
 

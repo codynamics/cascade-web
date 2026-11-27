@@ -14,7 +14,7 @@ import datetime as _dt
 from zoneinfo import ZoneInfo
 
 SYDNEY = ZoneInfo("Australia/Sydney")
-FALLBACK_AGENT_NAME = "Cascade"
+FALLBACK_AGENT_NAME = "Your agent"   # CAS-1692: agents have no names; every surface says "your agent"
 
 
 def sydney_date(ts) -> str:
@@ -32,7 +32,7 @@ def agent_name_for(cascades, user_id) -> str:
             and c.get("active", True) and not c.get("deleted_at")]
     v2 = [c for c in mine if (c.get("criteria") or {}).get("v") == 2 or c.get("v") == 2]
     pick = v2[0] if v2 else (mine[0] if len(mine) == 1 else None)
-    return ((pick or {}).get("name") or "").strip() or FALLBACK_AGENT_NAME
+    return FALLBACK_AGENT_NAME   # CAS-1692: the stored name is kept on the record but never shown
 
 
 def headline_for(agent_name: str, n: int) -> str:

@@ -309,10 +309,10 @@ class CatchUp(unittest.TestCase):
                 _row(2, "u1", 1, "Cinema One", moment="catchup", detail={"stage": "cinema"}),
                 _row(3, "u1", 2, "Coming One", moment="catchup", detail={"stage": "coming"})]
         copy = push_copy_for(rows, "Max")
-        self.assertEqual(copy["title"], "Max found 3 films for you")
+        self.assertEqual(copy["title"], "Your agent found 3 films for you")
         self.assertEqual(copy["body"], "Cinema One, Coming One and 1 more.")
         self.assertEqual(push_copy_for(rows[:2], "Max")["body"], "Cinema One and Streamer.")
-        self.assertEqual(push_copy_for(rows[:1], "Cascade")["title"], "Cascade found 1 film for you")
+        self.assertEqual(push_copy_for(rows[:1], "Cascade")["title"], "Your agent found 1 film for you")
 
     def test_the_catchup_email_has_the_groups_in_order_compact_cards_and_see_all_top_and_bottom(self):
         store = self._store()

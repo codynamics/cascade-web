@@ -20954,11 +20954,10 @@ function tasteRecsCardHTML(){
   // Lee, 27 Nov 2026: the proposals themselves are reviewed inside each genre (oaProposalLegendHTML). This card is a
   // one-line summary naming the genres in the same order as the genre list below, plus Apply all.
   const c=oneAgentCriteria();
-  const agentName=((c&&c.name)||"").trim() || "Your agent";
   const order=oaOrder(c), pos=s=>{ const i=order.indexOf(s); return i<0?order.length:i; };
   const names=recs.map(r=>r.style).sort((a,b)=>pos(a)-pos(b)).map(oneAgentShortName);
   const list=names.length<2 ? names[0] : names.slice(0,-1).join(", ")+" and "+names[names.length-1];
-  return `<div class="tkrec tkrec-sum"><div class="tkrechd"><div class="tkrecic">✦</div><div class="tkrect">Agent recommendations<i>${esc(agentName)} has proposals in ${esc(list)}. Open a gold genre to review them.</i></div><button type="button" class="tkbtn" onclick="tasteApplyAll()">Apply all</button></div></div>`;
+  return `<div class="tkrec tkrec-sum"><div class="tkrechd"><div class="tkrecic">✦</div><div class="tkrect">Agent recommendations<i>Your agent has proposals in ${esc(list)}. Open a gold genre to review them.</i></div><button type="button" class="tkbtn" onclick="tasteApplyAll()">Apply all</button></div></div>`;
 }
 window.tasteToggleRecs=()=>{ tasteRecsOpen=!tasteRecsOpen; renderAgentsScreen(); };
 window.tasteCloseRecs=()=>{ tasteRecsOpen=false; renderAgentsScreen(); };
@@ -20970,11 +20969,10 @@ function renderOneAgentScreen(c){
   const changedMain=new Set(tasteRecs().map(r=>r.style));
   const rows=order.map(style=>oaRowHTML(c, style, counts[style]||0, changedMain.has(style))).join("");
   const title = "Your taste";   // CAS-1480: the screen heading (was the agent's own name, CAS-1352)
-  const agentName = (c.name||"").trim() || "your agent";
   $("agentsBody").innerHTML=`
     <div class="agshdr"><h2 class="osh">${esc(title)}</h2></div>
     <p class="ossub">Built from your ${n} verdict${n===1?"":"s"}</p>
-    <div class="oaintro"><p>What your agent, ${esc(agentName)}, has learned from your verdicts, and the alerts you want for each genre.</p><p>How many films of each genre you see is set in each list.</p></div>
+    <div class="oaintro"><p>What your agent has learned from your verdicts, and the alerts you want for each genre.</p><p>How many films of each genre you see is set in each list.</p></div>
     ${tasteRecsCardHTML()}
     <div class="oacolhdr"><span>GENRE</span><span>ALERTS</span></div>
     <div class="oalist" id="oaList" role="list" aria-label="Your agent's genres">${rows}</div>`;
@@ -21350,8 +21348,7 @@ function oaProposalLegendHTML(c, style){
   const rec = tasteRecs().find(r=>r.style===style);
   if(!rec) return "";
   const n = rec.keys.length;
-  const nm = ((c&&c.name)||"").trim() || "Your agent";
-  return `<div class="oaprop"><div class="lg"><span><i class="cur" aria-hidden="true"></i>Current adjustment</span><span><i class="sw" aria-hidden="true"></i>${esc(nm)}'s proposal (${n} sub-genre${n===1?"":"s"})</span></div><button type="button" class="sk" onclick="tasteSkip('${escA(style)}')">Skip</button><button type="button" class="ap" onclick="tasteApply('${escA(style)}')">Apply</button></div>`;
+  return `<div class="oaprop"><div class="lg"><span><i class="cur" aria-hidden="true"></i>Current adjustment</span><span><i class="sw" aria-hidden="true"></i>Your agent's proposal (${n} sub-genre${n===1?"":"s"})</span></div><button type="button" class="sk" onclick="tasteSkip('${escA(style)}')">Skip</button><button type="button" class="ap" onclick="tasteApply('${escA(style)}')">Apply</button></div>`;
 }
 function oaAdjustSectionHTML(c, style){
   const name = oneAgentShortName(style);
@@ -22826,8 +22823,7 @@ function oneAgentBuildDraft(){
     person: oafPerson(),
   };
   const moods = oneAgentStarterMoods(who, ages);
-  const name = (oafState.name||"").trim();
-  return {styles, moods, name};
+  return {styles, moods, name:""};   // CAS-1692: agents carry no name
 }
 // ---- The one atomic account change (the ticket's own numbered steps 1-5), now fed by the draft above -------
 function oneAgentCommit(draft){
@@ -22840,8 +22836,8 @@ function oneAgentCommit(draft){
   // reads as "adjusted since you last looked" on day one (CAS-1340's own oaComboStats comparison).
   const seenAdj={};
   MOVIES.forEach(m=>{ mainOtherCombos(m).keys.forEach(({key})=>{ if(!(key in seenAdj)) seenAdj[key]=oneComboAdj(key); }); });
-  // CAS-1691: onboarding no longer asks for a name; the name stays empty-ish ("My agent") until CAS-1692 stops showing it.
-  const agent={id:cascadeNewId(), name:draft.name||"My agent", v:2, styles:draft.styles, combo:{}, seenAdj, seenAdjAt:{}, dismissed:[], applied:{}, skipped:{}};
+  // CAS-1691: onboarding no longer asks for a name; CAS-1692: new agents are created with an empty name.
+  const agent={id:cascadeNewId(), name:"", v:2, styles:draft.styles, combo:{}, seenAdj, seenAdjAt:{}, dismissed:[], applied:{}, skipped:{}};
   tasteSeedApplied(agent);   // CAS-1479: existing verdicts seed applied = learned, so no score moves
   cascades.push(agent);
   saveCascades();
@@ -26106,11 +26102,11 @@ function rnudgeBestAdjustment(){
   const nm=g=>(typeof tasteShortName==="function" ? tasteShortName(g) : g);
   return {pts:best.pts, text:`${nm(best.pr.primary)} with ${nm(best.pr.other)} is ${best.pts>0?"up":"down"} ${Math.abs(best.pts)} from your ratings`};
 }
-function rnudgeCardHTML(kind, agentName, adjText){
+function rnudgeCardHTML(kind, adjText){
   const rem=kind==="reminder";
   return `<div class="rnudge" role="note" data-k="${kind}">
   <span class="ic" aria-hidden="true">${rem?"⭐":"🎯"}</span>
-  <div class="tx"><div class="t">${rem?`The more you rate, the better ${esc(agentName)} gets`:`${esc(agentName)} has learned something`}</div><div class="s">${rem?"After you watch a film, tap <b>Watched</b> and say how you felt":esc(adjText)}</div></div>
+  <div class="tx"><div class="t">${rem?`The more you rate, the better your agent gets`:`Your agent has learned something`}</div><div class="s">${rem?"After you watch a film, tap <b>Watched</b> and say how you felt":esc(adjText)}</div></div>
   ${rem?"":'<button type="button" class="go">See Taste</button>'}
   <button type="button" class="x" aria-label="Dismiss">✕</button>
 </div>`;
@@ -26125,7 +26121,7 @@ function rnudgeSync(){
     // Same visit, same card: keep it drawn across re-renders (the slot sits outside the list), unless a
     // sheet/modal/tutorial now covers the screen.
     if(blocked){ slot.innerHTML=""; return; }
-    if(!slot.firstElementChild) slot.innerHTML=rnudgeCardHTML(rnudgeVisit.kind, rnudgeVisit.name, rnudgeVisit.text).trim();
+    if(!slot.firstElementChild) slot.innerHTML=rnudgeCardHTML(rnudgeVisit.kind, rnudgeVisit.text).trim();
     return;
   }
   slot.innerHTML="";
@@ -26135,10 +26131,8 @@ function rnudgeSync(){
   const kind=rnudgeDecide({signedIn, now:Date.now(), createdAt:a.user.created_at, ratings, adj,
     seen:rnudgeMap, tutorialShownThisVisit:tutVisitShown, cardShownThisVisit:false, blocked});
   if(!kind) return;
-  const c=oneAgentCriteria();
-  const name=((c&&c.name)||"").trim() || "Your agent";
-  rnudgeVisit={kind, name, text:adj?adj.text:""};
-  slot.innerHTML=rnudgeCardHTML(kind, name, rnudgeVisit.text).trim();
+  rnudgeVisit={kind, text:adj?adj.text:""};
+  slot.innerHTML=rnudgeCardHTML(kind, rnudgeVisit.text).trim();
   if(kind==="reminder"){ rnudgeMap.rem=(rnudgeMap.rem||0)+1; pushViewField("rnudge", rnudgeMap); logEvent("taste_reminder_shown",{n:rnudgeMap.rem}); }
   else logEvent("taste_card_shown",{pts:adj.pts});
 }
@@ -27056,7 +27050,7 @@ function renderInvite(){
     b.innerHTML=`
       <div class="invdone">
         <div class="dn-ic">${c?c.icon:"✅"}</div>
-        <div class="invh">${c?esc(c.name):"Your agent"} is on the job.</div>
+        <div class="invh">Your agent is on the job.</div>
         <p class="invp">It's watching for you now — you'll see everything it finds under 🔔 Found for you.</p>
       </div>
       <div class="invstatus">

@@ -41,12 +41,12 @@ test("one card per visit, none on a visit that showed a tutorial banner, none si
   assert.equal(E.rnudgeDecide(base({ blocked: true })), null);
 });
 test("the reminder card has no button but the dismiss cross; the Taste card adds See Taste", () => {
-  const rem = E.rnudgeCardHTML("reminder", "Max", "");
+  const rem = E.rnudgeCardHTML("reminder", "");
   assert.equal((rem.match(/<button/g) || []).length, 1);
   assert.match(rem, /class="x"/);
-  assert.match(rem, /The more you rate, the better Max gets/);
-  const t = E.rnudgeCardHTML("taste", "Max", ADJ.text);
+  assert.match(rem, /The more you rate, the better your agent gets/);
+  const t = E.rnudgeCardHTML("taste", ADJ.text);
   assert.equal((t.match(/<button/g) || []).length, 2);
   assert.match(t, /See Taste/);
-  assert.match(t, /Max has learned something/);
+  assert.match(t, /Your agent has learned something/);
 });

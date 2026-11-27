@@ -73,9 +73,9 @@ class TasteLine(unittest.TestCase):
         with _lines():
             sent = _run(_store(_rated(10), [_row()]))
         _, subject, html, text = sent[0]
-        self.assertIn("Max has learned something", html)
+        self.assertIn("Your agent has learned something", html)
         self.assertIn(APP_TEXT, html)
-        self.assertIn("Max has learned something\n" + APP_TEXT, text)
+        self.assertIn("Your agent has learned something\n" + APP_TEXT, text)
         self.assertIn("?dl=taste&src=email&cmp=taste_line&cta=see_taste", html.replace("&amp;", "&"))
         self.assertNotIn("rate", html.lower().split("has learned something")[1].split("</table>")[0])
 

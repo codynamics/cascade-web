@@ -62,7 +62,7 @@ class WhoGetsIt(unittest.TestCase):
     def test_day_7_gets_exactly_one_recap(self):
         stats, sent = _run(_store(rows=_week_rows()))
         self.assertEqual((stats["sent"], len(sent)), (1, 1))
-        self.assertEqual(sent[0][1], "Your first week with Max")
+        self.assertEqual(sent[0][1], "Your first week with your agent")
 
     def test_day_6_and_day_8_get_none(self):
         for signup in ("day6", "day8"):
@@ -120,7 +120,7 @@ class Content(unittest.TestCase):
         for body in (self.html, self.text):
             self.assertNotIn("Rate what you", body)
             self.assertNotIn("Help Max learn", body)
-        line = "The more you rate, the better Max gets. After you watch a film, tap Watched and say how you felt."
+        line = "The more you rate, the better your agent gets. After you watch a film, tap Watched and say how you felt."
         self.assertEqual(self.text.count(line), 1)
         self.assertEqual(self.html.count(line), 1)
 
@@ -143,7 +143,7 @@ class Content(unittest.TestCase):
         rows = [dict(r, answer="stream") for r in _week_rows()]
         _, sent = _run(_store(rows=rows))
         html, text = sent[0][2], sent[0][3]
-        self.assertIn("Your first week with Max", html)
+        self.assertIn("Your first week with your agent", html)
         self.assertRegex(html, r">7</div><div[^>]*>films alerted<")
         self.assertRegex(html, r">0</div><div[^>]*>to decide<")
         self.assertIn("You&rsquo;re all caught up.", html)
@@ -162,7 +162,7 @@ class MergeAndLedger(unittest.TestCase):
         stats, sent = _run(self._store_with_tonights_alert())
         self.assertEqual(len(sent), 1)
         html = sent[0][2]
-        self.assertIn("Your first week with Max", html)
+        self.assertIn("Your first week with your agent", html)
         self.assertEqual(len(re.findall(r"<div[^>]*>Film 11", html)), 1)   # tonight's alert, once, in the same email
         self.assertEqual(sent[0][3].count("The more you rate"), 1)
 

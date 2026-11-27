@@ -221,7 +221,7 @@ def _event_context(transition, movie, today):
 
 def _context_line(hit, today) -> str:
     phrase = _event_context(hit.transition, hit.transition.movie or {}, today)
-    who = f"Agent: {hit.cascade_name}" if hit.cascade_id else "Your pick"
+    who = "Your agent" if hit.cascade_id else "Your pick"   # CAS-1692: no agent names
     return f"{who} · {phrase}" if phrase else who
 
 
@@ -539,7 +539,7 @@ def _render_catchup(hits, site_url, replies, scores, kind, batch_id, esc, watch_
     other = _ordered_by_score([h for h in hits if h.transition.moment != "catchup"], scores)
     ordered = cu + other
     n = len({h.transition.movie_id for h in ordered})
-    agent = cu[0].cascade_name or "Cascade"
+    agent = "Your agent"   # CAS-1692
     subject = headline_for(agent, n)
     see_all = _see_all_link(site_url, batch_id, kind, "see_all")
     groups = _compact_groups(ordered)
@@ -664,7 +664,7 @@ def _replies_block_html(replies, esc) -> str:
 # ---- the day-7 recap block (CAS-1567) -----------------------------------------------------------------
 
 def _recap_reminder(agent) -> str:
-    return (f"The more you rate, the better {agent} gets. "
+    return (f"The more you rate, the better your agent gets. "
             "After you watch a film, tap Watched and say how you felt.")
 
 
@@ -675,18 +675,18 @@ def _recap_block(recap, site_url, kind, esc, scores, watch_windows, answers):
     agent = recap["agent"]
     bid = recap.get("batch_id")
     n = recap["to_decide"]
-    title = f"Your first week with {agent}"
+    title = "Your first week with your agent"
     tiles = [(recap["alerted"], "films alerted"), (n, "to decide"), (recap["ratings"], "ratings")]
     see_all = _see_all_link(site_url, bid, kind, "see_all")
     link_style = "font-size:14px;color:#6b48f2;font-weight:700;text-decoration:none;"
 
-    text = [title, f"Here's what {agent} did for you this week, and the films still waiting for your call.", ""]
+    text = [title, f"Here's what your agent did for you this week, and the films still waiting for your call.", ""]
     text += [f"{num} {label}" for num, label in tiles] + [""]
     html = (
         '<tr><td style="padding-bottom:4px;">'
         f'<div style="font-size:22px;font-weight:800;color:#141A2A;">{esc(title)}</div>'
         '<div style="font-size:15px;color:#4b5563;margin-top:6px;">'
-        f'{esc(f"Here is what {agent} did for you this week, and the films still waiting for your call.")}</div>'
+        f'{esc(f"Here is what your agent did for you this week, and the films still waiting for your call.")}</div>'
         '</td></tr>'
         '<tr><td style="padding:14px 0 4px 0;"><table role="presentation" width="100%" cellpadding="0" '
         'cellspacing="0"><tr>'
@@ -727,7 +727,7 @@ def _recap_block(recap, site_url, kind, esc, scores, watch_windows, answers):
 def _taste_line_block(taste_line, site_url, esc):
     """(html row, text lines) for "<agent> has learned something" + the app's own adjustment text + "See Taste".
     One short block; no rating prompt of any kind (Lee, 25 Nov 2026)."""
-    heading = f"{taste_line['agent']} has learned something"
+    heading = "Your agent has learned something"
     href = track_url(f"{site_url}?dl=taste", "taste_line", "see_taste")
     text = [heading, taste_line["text"], f"See Taste: {href}", ""]
     html = (
@@ -808,7 +808,7 @@ def render_digest(hits, site_url: str = None, replies=None, scores=None, watch_w
     ordered = _ordered_by_score(hits, scores)
     subject = digest_subject(ordered, replies, scores=scores, today=today)
     if recap:
-        subject = f"Your first week with {recap['agent']}"
+        subject = "Your first week with your agent"
     shown = ordered[:MAX_CARDS]
     overflow = len(ordered) - len(shown)
     esc = _html.escape

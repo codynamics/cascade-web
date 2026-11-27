@@ -264,9 +264,9 @@ class CopyTemplates(unittest.TestCase):
 
     def test_announced(self):
         copy = push_copy(_hit("Dune Three", "announced", cascade="Sci-fi epics"))
-        self.assertEqual(copy["title"], "New match for Sci-fi epics")
+        self.assertEqual(copy["title"], "New match for your agent")
         self.assertEqual(copy["body"],
-                          "Dune Three just joined Cascade — matches your Sci-fi epics agent.")
+                          "Dune Three just joined Cascade — matches your agent.")
 
     def test_status_moments_reuse_the_bells_own_phrasing(self):
         cases = {

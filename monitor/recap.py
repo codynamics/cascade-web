@@ -29,7 +29,7 @@ RATING_KEYS = frozenset(d["key"] for d in WATCHED)
 
 
 def agent_headline(agent_name: str) -> str:
-    return f"Your first week with {agent_name}"
+    return "Your first week with your agent"
 
 
 def _sydney_day(ts) -> _dt.date:

@@ -69,8 +69,8 @@ def push_copy(hit) -> dict:
     t = hit.transition
     if t.moment == "announced":
         return {
-            "title": f"New match for {hit.cascade_name}",
-            "body": f"{t.title} just joined Cascade — matches your {hit.cascade_name} agent.",
+            "title": "New match for your agent",
+            "body": f"{t.title} just joined Cascade — matches your agent.",
         }
     said = REAL_MOMENT_SAID.get(t.moment, t.moment)
     return {"title": t.title, "body": f"{t.title} {said}."}

@@ -116,7 +116,7 @@ class PushPhase(unittest.TestCase):
         self.assertEqual(self.send.call_count, 1)
         tok, title, body = self.send.call_args.args[:3]
         self.assertEqual(tok, "tok-1")
-        self.assertEqual(title, "Cascade found 3 films for you")
+        self.assertEqual(title, "Your agent found 3 films for you")
         self.assertEqual(body, "Alpha, Beta and 1 more.")
         self.assertEqual(stats["delivered"], 1)
 
@@ -153,9 +153,9 @@ class PushPhase(unittest.TestCase):
 
     def test_copy_names_the_top_titles_truthfully(self):
         self.assertEqual(push_copy_for([_row(1, "u", 1, "Solo")]),
-                         {"title": "Cascade found 1 film for you", "body": "Solo is in your Alerts."})
+                         {"title": "Your agent found 1 film for you", "body": "Solo is in your Alerts."})
         two = push_copy_for([_row(1, "u", 1, "A"), _row(2, "u", 2, "B")])
-        self.assertEqual(two["title"], "Cascade found 2 films for you")
+        self.assertEqual(two["title"], "Your agent found 2 films for you")
         self.assertEqual(two["body"], "A and B.")
 
 

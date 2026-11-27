@@ -84,7 +84,7 @@ def _catchup_first(rows) -> list:
     return sorted(rows, key=key)
 
 
-def push_copy_for(rows, agent_name: str = "Cascade") -> dict:
+def push_copy_for(rows, agent_name: str = "Your agent") -> dict:
     """{'title', 'body'} for ONE member's push covering `rows` (their unread alerts from last night).
     Built only from the real rows: the count of distinct films, and the first one or two titles.
     CAS-1535: the title leads with the member's own agent's name ("Max found 10 films for you")."""
@@ -96,7 +96,7 @@ def push_copy_for(rows, agent_name: str = "Cascade") -> dict:
         seen.add(mid)
         titles.append(r.get("title") or "A film")
     n = len(titles)
-    title = headline_for(agent_name or "Cascade", n)
+    title = headline_for("Your agent", n)   # CAS-1692: no agent names
     if n == 1:
         body = f"{titles[0]} is in your Alerts."
     elif n == 2:
