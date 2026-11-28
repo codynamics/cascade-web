@@ -30,7 +30,7 @@ def fake_picks(users):
 
 def stub_banner(cases):
     """Stand-in for the node shim in the tests that are not about the banner (it costs a node start per day)."""
-    return [(c["now"] - dt.datetime.fromisoformat(c["createdAt"]).timestamp() * 1000) >= 86400000 for c in cases]
+    return [True for _ in cases]  # CAS-1702: banners show from day one, so every day is eligible
 
 
 def run(keys=("a",), expectations_dir=firstdays.FIRSTDAYS_DIR, set_hook=None, banner_fn=stub_banner):
@@ -75,8 +75,8 @@ class FirstTenDays(unittest.TestCase):
     def test_banner_comes_from_the_apps_own_function(self):
         _, lines, *_ = run(banner_fn=firstdays.app_banner)
         banner = {int(ln.split("day=")[1].split()[0]): ln.endswith("banner=True") for ln in lines}
-        self.assertFalse(banner[0])
-        self.assertTrue(all(banner[d] for d in range(1, 11)), banner)
+        # CAS-1702: banners show from day one, so day 0 is eligible too
+        self.assertTrue(all(banner[d] for d in range(0, 11)), banner)
 
     def test_each_day_moves_created_at_back(self):
         _, _, _, accounts, _, seen = run()

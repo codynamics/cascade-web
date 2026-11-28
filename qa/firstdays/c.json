@@ -5,7 +5,7 @@
     "0": {
       "run": false,
       "catchup": "none",
-      "banner": false,
+      "banner": true,
       "note": "created now; no nightly run has happened yet, so nothing is run or expected"
     },
     "1": {
