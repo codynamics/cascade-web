@@ -56,6 +56,11 @@ for(const key of TOUR_KEYS){
     if(key === "invite") await fakeSignedIn(page, 10);   // the Invite tour (and its row) need an account
     await startFromMenu(page, key);
 
+    // A step the product documents as conditional (CAS-976's rule: skipped when its anchor doesn't resolve) is not
+    // a missing target: the Watch tour's "made moods" step points at the Top-service / Favourite-person moods the
+    // first-run answers can create, and a guest with a plain one-agent setup has neither. Everything else still
+    // may not be skipped.
+    const optional = new Set([`.moodrow .moodchip[data-mood="topsvc"] | .moodrow .moodchip[data-mood="fav-person"]`]);
     const total = await page.evaluate(() => tutSteps.length);
     const expected = await page.evaluate(([k, signedIn]) => TOURS[k].steps.filter(s => !s.needsAccount || signedIn).length,
       [key, key === "invite"]);
@@ -63,8 +68,14 @@ for(const key of TOUR_KEYS){
     expect(total).toBeGreaterThan(0);
 
     for(let i = 0; i < total; i++){
-      // No step was skipped by the engine: the index is exactly where the walk has got to.
-      expect(await page.evaluate(() => tutIdx), `${key}: step ${i + 1} shown, none skipped before it`).toBe(i);
+      // No step was skipped by the engine (bar the documented conditional ones): the index is exactly where the
+      // walk has got to.
+      const at = await page.evaluate(() => tutIdx);
+      for(; i < at; i++){
+        const sel = await page.evaluate(n => (tutSteps[n].sel || []).join(" | "), i);
+        expect(optional.has(sel), `${key}: step ${i + 1} shown, none skipped before it`).toBe(true);
+      }
+      expect(at, `${key}: step ${i + 1} shown, none skipped before it`).toBe(i);
       await expect(page.locator("#tutProg")).toHaveText(`${i + 1} of ${total}`);
       const info = await page.evaluate(() => {
         const s = tutSteps[tutIdx], els = (tutCurrent && tutCurrent.els) || [];
