@@ -130,7 +130,10 @@ test("CAS-1186 AC8: no console errors across open, page, search and close", asyn
   await page.waitForTimeout(200);
   // The search box scrolls with the list, so after the scroll-to-bottom above it is covered by result cards.
   await page.locator("#findScreen").evaluate(el => { el.scrollTop = 0; });
-  await page.locator("#findSearchClear").click();
+  // CAS-1698: on the ios project a result card's .cfoot still intercepts pointer events at the × after the
+  // scroll-to-top (CI run 46081628369), so Playwright's hit-test never lets a real click through. This test
+  // is about console errors, not hit-testing, so fire the button's own click and let clearFindSearch() run.
+  await page.locator("#findSearchClear").evaluate(el => el.click());
   await page.locator("#moviesBtn").click();
 
   expect(errors).toEqual([]);
