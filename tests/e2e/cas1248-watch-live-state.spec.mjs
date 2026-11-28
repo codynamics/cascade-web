@@ -66,14 +66,17 @@ async function screenMatches(page){
 test("AC1: switching a picked subscription off updates the screen at once", async ({ page }) => {
   const cascadeId = await toWatchScreen(page);
   await openMyServicesScreen(page);
-  const svcVal = await page.locator("#prefSubChips .chip").first().evaluate(el => el.dataset.val).catch(() => null);
+  // The live screen is the services spoke (#onbStepSvcs, buttons with no data-val), not the retired Preferences
+  // modal's #prefSubChips; its lead row is PRIMARY_SUB_SERVICES in that order, so the nth chip is that service.
+  const svcVal = await page.evaluate(() => PRIMARY_SUB_SERVICES[0] || null).catch(() => null);
+  const svcChip = page.locator("#onbStepSvcs .chip.svc").first();
   test.skip(!svcVal, "this catalogue build carries no subscription offer to pick");
 
   await seedFilm(page, {
     cascadeId, id: FILM_SUB, title: "CAS-1248 — Streaming", status: "included_streaming", winKey: "stream",
     offers: [{ service: svcVal, type: "sub" }],
   });
-  await page.locator(`#prefSubChips .chip[data-val="${svcVal}"]`).click();   // pick it: switches the service ON
+  await svcChip.click();   // pick it: switches the service ON
   await closeMyServicesScreen(page);
   await page.evaluate(() => { setWatchTab("stream"); render(); });
   await settleListing(page);
@@ -82,7 +85,7 @@ test("AC1: switching a picked subscription off updates the screen at once", asyn
   const before = await page.evaluate(() => watchVisibleRows().rows.length);
 
   await openMyServicesScreen(page);
-  await page.locator(`#prefSubChips .chip[data-val="${svcVal}"]`).click();   // switch it back off
+  await svcChip.click();   // switch it back off
   await closeMyServicesScreen(page);
 
   const after = await page.evaluate(() => watchVisibleRows().rows.length);
