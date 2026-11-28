@@ -61,10 +61,9 @@ test("CAS-1144 AC2/AC3: a Watch filter hiding everything prices an honest Edit t
   await settleListing(page);
   await expect(page.locator(`#card-${FILM_ID}`)).toBeVisible();
 
-  // CAS-1247: Watch's own search box is gone — narrow everything out with a mood-level filter instead (a
-  // Badges selection the synthetic film's own scaleTier never matches), same "hides everything" setup this
-  // test used search for before.
-  await page.evaluate(() => { watchBadgeSel[watchTab].add("landmark"); render(); });
+  // CAS-1697: a one-agent (v2) list ignores Badges (CAS-1281), so it can't be emptied that way; its listing
+  // still honours the tab's search state, so narrow everything out with a title that matches nothing.
+  await page.evaluate(() => { watchSearch[watchTab] = "zzz-no-such-title"; render(); });
   await settleListing(page);
 
   const empty = page.locator("#groups .empty");
@@ -73,12 +72,7 @@ test("CAS-1144 AC2/AC3: a Watch filter hiding everything prices an honest Edit t
   const btn = empty.locator(".ebtn");
   await expect(btn).toHaveCount(1);
   await expect(btn).toContainText("Edit this list");
-  const n = Number((await btn.locator("b").textContent()).replace(/\D+/g, ""));
-  expect(n).toBeGreaterThan(0);
-
-  // CAS-1247: the button opens the mood sheet for editing now, rather than clearing in place — confirm it
-  // opens on the draft that's actually narrowing the list (the Badges selection just set above).
+  // CAS-1697: the v2 empty state's button opens the list sheet for editing (no film-count price any more).
   await btn.click();
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
-  await expect(page.locator("#watchSheetBody .badgeopt.on")).toHaveCount(1);
 });
