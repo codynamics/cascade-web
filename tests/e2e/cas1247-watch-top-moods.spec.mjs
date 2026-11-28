@@ -55,6 +55,17 @@ test("AC1/AC2/AC3: stage groups, moods, and the removed controls", async ({ page
 test("AC5: no account write on boot; selecting a mood pushes exactly one mood field", async ({ page }) => {
   await toWatchScreen(page);
 
+  // CAS-1663: "releases" (the one built-in, CAS-1662) is already selected on open, and tapping the selected chip
+  // opens its edit sheet instead of selecting — so add a second list and select it first, then watch the
+  // switch BACK to releases. The spy goes in after, so these set-up writes are not counted.
+  await page.evaluate(() => {
+    const extra = { ...oamMoodDefaultFields(), id: "t-cas1663-extra", name: "Extra" };
+    watchMoods = [...oamMoodsListReal().map(m => ({ ...m })), extra];
+    window.setWatchMood(extra.id);
+  });
+  await settleListing(page);
+  await expect(page.locator('.moodchip[data-mood="t-cas1663-extra"]')).toHaveClass(/on/);
+
   const pushed = await page.evaluate(() => {
     const calls = [];
     const orig = window.CascadePersistence && window.CascadePersistence.pushViewField;
