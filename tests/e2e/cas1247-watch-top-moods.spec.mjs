@@ -87,23 +87,26 @@ test("AC5: no account write on boot; selecting a mood pushes exactly one mood fi
 test("AC7/AC8: creating and deleting a mood", async ({ page }) => {
   await toWatchScreen(page);
 
+  // CAS-1664: rewritten for the one-agent lists (CAS-1341/CAS-1491) — "+ List" opens the OAM sheet, whose name
+  // input is #oamMoodName and whose Save is .oamhead .donebtn (#moodSaveBtn is hidden there). One built-in
+  // list ships, so the chip count runs 1 -> 2 -> 1, not 2 -> 3 -> 2.
   await page.locator("#moodAddBtn").click();
   await expect(page.locator("#watchSheetTitle")).toHaveText("New list");
-  await page.locator("#moodSaveBtn").click();
-  await expect(page.locator(".moodchip")).toHaveCount(2);   // empty name saves nothing
-  await expect(page.locator("#moodName")).toBeFocused();
+  await page.locator("#watchSheetBody .oamhead .donebtn").click();
+  await expect(page.locator(".moodchip")).toHaveCount(1);   // empty name saves nothing
+  await expect(page.locator("#oamMoodName")).toBeFocused();
 
-  await page.locator("#moodName").fill("Friday");
-  await page.locator("#moodSaveBtn").click();
-  await expect(page.locator(".moodchip")).toHaveCount(3);
-  await expect(page.locator('.moodchip[data-mood]').last()).toHaveClass(/\bon\b/);
+  await page.locator("#oamMoodName").fill("Friday");
+  await page.locator("#watchSheetBody .oamhead .donebtn").click();
+  await expect(page.locator(".moodchip")).toHaveCount(2);
+  await expect(page.locator('.moodchip[data-mood]').last()).toHaveClass(/on/);
 
   // Delete it back off: first tap arms, second tap (within 4s) deletes.
   await page.locator('.moodchip.on').click();
   await page.locator("#moodDeleteBtn").click();
   await expect(page.locator("#moodDeleteBtn")).toHaveText("Tap again to delete");
   await page.locator("#moodDeleteBtn").click();
-  await expect(page.locator(".moodchip")).toHaveCount(2);
+  await expect(page.locator(".moodchip")).toHaveCount(1);
 });
 
 // Lee, 2026-11-17: the collapse control (CAS-1283 AC2/AC3) is removed — the bar is always open.
