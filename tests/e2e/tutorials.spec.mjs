@@ -61,7 +61,8 @@ for(const key of TOUR_KEYS){
     // first-run answers can create, and a guest with a plain one-agent setup has neither. Everything else still
     // may not be skipped.
     const optional = new Set([`.moodrow .moodchip[data-mood="topsvc"] | .moodrow .moodchip[data-mood="fav-person"]`,
-      "#oamSvcSec"]);   // the Lists tour's "STREAMING ON" section only renders when the account has services (prefs.sub)
+      "#oamSvcSec",   // the Lists tour's "STREAMING ON" section only renders when the account has services (prefs.sub)
+      "#findSvcFilt"]);   // the Database tour's service filter (findSvcFiltHTML) is empty when prefs.sub is empty
     const total = await page.evaluate(() => tutSteps.length);
     const expected = await page.evaluate(([k, signedIn]) => TOURS[k].steps.filter(s => !s.needsAccount || signedIn).length,
       [key, key === "invite"]);
