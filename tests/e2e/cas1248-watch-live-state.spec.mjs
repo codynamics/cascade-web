@@ -99,6 +99,14 @@ test("AC2: switching the Rental window off (and back on) updates the stage line 
   await seedFilm(page, {
     cascadeId, id: FILM_RENT, title: "CAS-1248 — Rental", status: "rental", winKey: "rent", offers: [],
   });
+  // The one-agent lists (CAS-1491/1693) ship one built-in, Cinema releases, which is cinema-only: a synthetic
+  // rental film with no cinema release is never in it, so the Rental tab would be empty and the stage line
+  // would fall back to another stop. Add the film to the selected list by hand (mood.in is always admitted).
+  await page.evaluate(id => {
+    if(!watchMoods.some(m => m && m.v2)) watchMoods = oamMoodDefaultsNow();
+    const mood = watchMoods.find(m => m && m.v2 && m.id === watchMoodSel) || watchMoods.find(m => m && m.v2);
+    if(mood) mood.in = [...(mood.in || []), id];
+  }, FILM_RENT);
   await page.evaluate(() => { setWatchTab("rent"); render(); });
   await settleListing(page);
 
