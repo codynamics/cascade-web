@@ -60,7 +60,8 @@ for(const key of TOUR_KEYS){
     // a missing target: the Watch tour's "made moods" step points at the Top-service / Favourite-person moods the
     // first-run answers can create, and a guest with a plain one-agent setup has neither. Everything else still
     // may not be skipped.
-    const optional = new Set([`.moodrow .moodchip[data-mood="topsvc"] | .moodrow .moodchip[data-mood="fav-person"]`]);
+    const optional = new Set([`.moodrow .moodchip[data-mood="topsvc"] | .moodrow .moodchip[data-mood="fav-person"]`,
+      "#oamSvcSec"]);   // the Lists tour's "STREAMING ON" section only renders when the account has services (prefs.sub)
     const total = await page.evaluate(() => tutSteps.length);
     const expected = await page.evaluate(([k, signedIn]) => TOURS[k].steps.filter(s => !s.needsAccount || signedIn).length,
       [key, key === "invite"]);
