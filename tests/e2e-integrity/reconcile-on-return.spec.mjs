@@ -190,7 +190,10 @@ test("AC4/AC5: a delayed boot shows the loading state (never this device's stale
   const user = await createTestUser(email);
   const [agent] = await seedCascades(user.id, [{ name: "AC45 Distinct Agent",
     criteria: { watchMarkers: { stream: 70 }, status: ["included_streaming"], kind: "stream" } }]);
-  await seedUserPrefs(user.id, { ref_code: testRefCode("CAS1219AC45") });
+  // CAS-1702: banners show from day one and persist a per-screen shown count to user_prefs.view.tutSeen on
+  // first render - a legitimate write, but not what this test is about. Seed Watch's tour as played so no
+  // banner (and so no write) happens.
+  await seedUserPrefs(user.id, { ref_code: testRefCode("CAS1219AC45"), view: { tutSeen: { watch: { played: true, dismissed: 0, shown: 0 } } } });
   await seedNotifyPrefs(user.id, { in_app: true, email_on: true, email_address: email });
 
   // A clean boot first, so the account load genuinely ran once before this device "reboots".
