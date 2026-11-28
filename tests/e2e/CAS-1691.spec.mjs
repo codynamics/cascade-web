@@ -21,6 +21,7 @@ async function toFavourites(page, { partner = true, kids = true } = {}){
   await cta.click();                                           // who -> services
   await page.evaluate(() => { prefs.sub.clear(); [...SUB_SERVICES].slice(0, 2).forEach(s => prefs.sub.add(s)); });
   await cta.click();                                           // services -> topSvc
+  await expect(page.locator("#oafScreen:not([data-busy])")).toBeVisible();   // CAS-1704: the glide drops taps while it runs
   await page.locator("#oafTopSvcOpts .chip").first().click();
   await cta.click();                                           // topSvc -> favourites
   await expect(page.locator("#oafInner .osh")).toHaveText("Your favourite genres");

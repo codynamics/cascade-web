@@ -314,12 +314,14 @@ export async function finishFlow(page){
       await page.locator("#oafFavGrid .favcell .favtoggle").first().click();
     } else if(st === "topSvc"){
       // Lee, 14 Nov: "which streaming service do you use most?" — pick the first.
+      await expect(page.locator("#oafScreen:not([data-busy])")).toBeVisible();   // CAS-1704: settled before tapping
       await page.locator("#oafTopSvcOpts .chip").first().click();
     } else if(st === "who"){
       await answerWho(page);
     }
     await cta.click();
     await page.waitForTimeout(120);
+    await page.waitForFunction(() => { const s = document.getElementById("oafScreen"); return !s || !s.hasAttribute("data-busy"); });
   }
   await expect(page.locator("#membScreen.open")).toBeVisible();
   // Lee, 14 Nov: the membership screen no longer prints a film count — return the done screen's own count.

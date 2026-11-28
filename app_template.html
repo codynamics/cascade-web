@@ -23281,6 +23281,8 @@ function oafShow(key){
 // first 200 ms; the new heading/sub-line fade in over the last 250 ms. While it runs (oafBusy) a tap is dropped,
 // not queued (CAS-1206's rule). Reduced motion: a plain 150 ms cross-fade. Back is a plain cross-fade.
 let oafBusy = false;
+// CAS-1704: test signal only — #oafScreen[data-busy="1"] while a transition drops taps; removed when input is accepted again.
+function oafSetBusy(v){ oafBusy=v; const s=$("oafScreen"); if(s){ if(v) s.setAttribute("data-busy","1"); else s.removeAttribute("data-busy"); } }
 function oafFadeSwap(ms){
   const inner=$("oafInner"); if(inner && inner.animate) inner.animate([{opacity:0},{opacity:1}], {duration:ms, easing:"ease-out"});
 }
@@ -23288,8 +23290,8 @@ function oafFlyToTopSvc(){
   const inner=$("oafInner");
   if(!inner || !inner.animate) return oafShow("topSvc");
   if(oaReducedMotion()){
-    oafBusy=true; oafShow("topSvc"); oafFadeSwap(150);
-    setTimeout(()=>{ oafBusy=false; }, 150);
+    oafSetBusy(true); oafShow("topSvc"); oafFadeSwap(150);
+    setTimeout(()=>{ oafSetBusy(false); }, 150);
     return;
   }
   const first=new Map([...inner.querySelectorAll("#oafSvcSubs .chip.svc.on")].map(c=>[c.textContent.trim(), c.getBoundingClientRect()]));
@@ -23298,7 +23300,7 @@ function oafFlyToTopSvc(){
   ghost.querySelectorAll("#oafSvcSubs .chip.svc.on").forEach(c=>{ c.style.visibility="hidden"; });
   ghost.querySelectorAll("[id]").forEach(e=>e.removeAttribute("id")); ghost.removeAttribute("id");
   ghost.setAttribute("aria-hidden","true");
-  oafBusy=true;
+  oafSetBusy(true);
   oafShow("topSvc");
   const cs=getComputedStyle(inner); if(cs.position==="static") inner.style.position="relative";
   Object.assign(ghost.style, {position:"absolute", left:"0", top:(oldTop-inner.getBoundingClientRect().top)+"px", width:oldW+"px",
@@ -23318,7 +23320,7 @@ function oafFlyToTopSvc(){
   setTimeout(()=>{
     ghost.remove(); inner.style.position="";
     inner.getAnimations({subtree:true}).forEach(a=>a.cancel());
-    oafBusy=false;
+    oafSetBusy(false);
   }, Math.max(600, 450 + Math.max(0,n-1)*40) + 40);
 }
 // The tapped topSvc chip scales to ~1.08 with a soft glow for ~250 ms.
