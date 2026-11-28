@@ -11436,6 +11436,11 @@ function wireMoodRowDrag(row){
     if(navigator.vibrate) navigator.vibrate(10);
     press=null;
   };
+  // Lee, 28 Nov 2026: a swipe of the row (pan) or a lift sets _moodSuppressClick, but neither gesture fires a
+  // click to consume it — so the flag survived and swallowed the NEXT real tap (two taps to change list on iOS).
+  // Every new press starts clean; a pan or lift inside this same gesture sets it again as before. Capture phase,
+  // so it also covers the pinned Latest and Best chip, which has no pointerdown listener of its own.
+  row.addEventListener("pointerdown", ()=>{ row._moodSuppressClick=false; }, true);
   row.querySelectorAll(".moodchip:not(.pinned)").forEach(chip=>{
     chip.addEventListener("pointerdown", e=>{
       if(e.pointerType==="mouse" && e.button!==0) return;

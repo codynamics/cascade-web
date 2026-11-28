@@ -4,7 +4,7 @@
      then run `python qa/build_checklist.py`. The push gate (tests/lint/qa-drift.mjs) fails if this
      file is stale. -->
 
-111 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
+112 cases. `how` says what runs the check; `lee-phone` and `claude` are manual steps.
 
 ## Part A
 
@@ -73,6 +73,8 @@
   - the My taste/Override segment, the Taste link and the read-only thumbs are gone from the list sheet
   - tapping a row's name toggles it Off and Include
   - All on turns every Off genre to Include and keeps Favourites; All off turns every genre Off
+- [ ] **LISTS-006** One tap changes the list after swiping the list row (CAS-1706) _(browser, auto)_
+  - after a swipe of the list row that fires no click, the next single tap on a list chip selects it
 - [ ] **MEMB-001** Membership screen shows price and free-month copy, no Prototype disclaimer _(browser, auto)_
   - #membScreen carries the price and free-month copy on both the onboarding recap and the standalone preview
 - [ ] **MEMB-002** Web membership screen has no purchase button _(browser, auto)_

@@ -59,3 +59,13 @@
   refs:
     - tests/e2e/list-levels.spec.mjs
     - tests/js/list-levels.test.mjs
+- id: LISTS-006
+  part: A
+  title: "One tap changes the list after swiping the list row (CAS-1706)"
+  how: browser
+  area:
+    - watch
+  expect:
+    - "after a swipe of the list row that fires no click, the next single tap on a list chip selects it"
+  refs:
+    - tests/e2e/list-tap-after-swipe.spec.mjs
