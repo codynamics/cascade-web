@@ -1833,9 +1833,13 @@ test("CAS-1296 AC1: the mood sheet's first section is Name, and there is no manu
   await finishFlow(page);
   await toListing(page);
 
+  // CAS-1703: CAS-1702 shows the Lists tutorial banner at the top of this sheet's body for a signed-in
+  // account; this test is about the sheet's own sections, so mark the Lists tutorial played first.
+  await page.evaluate(() => { tutSeenMap.moods = { played: true, dismissed: 0, shown: 0 }; });
   const moodId = await page.evaluate(() => watchMoodSel);
   await page.locator(`.moodchip[data-mood="${moodId}"]`).click();
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
+  await expect(page.locator("#watchSheetBody .tutban")).toHaveCount(0);
 
   // CAS-1425: the v2 (CAS-1341) mood sheet leads with the name input in its .oamhead block; Order is the
   // derived Score / Release date / A-Z choice, never a manual ordering control.
