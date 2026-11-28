@@ -25434,6 +25434,7 @@ window.membBackToEmail=()=>{
   membSetStateAVisible(true);
   const head=$("membHead");
   if(head && membHeadingSaved!==null){ head.textContent=membHeadingSaved; membHeadingSaved=null; }
+  const cta=document.querySelector(".membcta"); if(cta && !cta.classList.contains("busy")) cta.textContent=membCtaLabel();   // CAS-1699: back to "Become a member"
   // Restored to visible above — focus has to happen after, or it's a no-op on a still-display:none field.
   const emailEl=$("membEmail");
   if(emailEl){ emailEl.readOnly=false; emailEl.style.opacity=""; emailEl.focus(); }

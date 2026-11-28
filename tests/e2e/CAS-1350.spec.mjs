@@ -56,6 +56,20 @@ test("CAS-1350/CAS-1699: the first run completes end to end, welcome through Sta
   await expect(page.locator("#oafCta")).toBeEnabled();
   await page.locator("#oafCta").click();   // favourites -> people (no together, no family screens)
 
+  // Lee, 14 Nov: an optional favourite actor or director (one box); empty, the CTA reads Skip.
+  await expect(page.locator("#oafInner .osh")).toHaveText("A favourite actor or director?");
+  await expectHeadingBelowHeader(page);
+  await expect(page.locator("#oafCta")).toHaveText("Skip");
+  await page.locator("#oafCta").click();   // people -> done
+
+  await expect(page.locator("#oafInner .osh")).toHaveText("Your agent is ready.");
+  await expectHeadingBelowHeader(page);
+  await expect(page.locator("#oafInner .oafdtold .oafdtoldh")).toHaveText("Your agent is working for you");
+  await expect(page.locator("#oafDoneCount")).not.toHaveText("0", { timeout: 4000 });
+  await expect(page.locator("#oafCta")).toHaveText("Proceed");
+  // CAS-1368: the moods table follows the answers (partner+kids both on) — and the done screen shows it.
+  await expect(page.locator("#oafInner .oafdmood"))
+    .toHaveText(["Cinema releases", "Me", "Partner", "Family"]);   // no Starred (Lee, 14 Nov)
   await page.locator("#oafCta").click();
 
   // CAS-1361 part 1: after Start watching, the setup header/nav must not float over Watch underneath.
