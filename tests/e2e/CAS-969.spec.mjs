@@ -73,6 +73,13 @@ test("CAS-969 AC4: the native plugin is asked at most once per version, even acr
   await page.waitForFunction(() => Number(localStorage.getItem("__cas969_review_requests") || 0) > 0, null, { timeout: 5000 });
   expect(await page.evaluate(() => Number(localStorage.getItem("__cas969_review_requests")))).toBe(1);
 
+  // CAS-1661: since CAS-1222 the "asked this version" flag is account state (user_prefs.view.reviewAskedVer),
+  // written through the account op queue and adopted by loadUserPrefs on the next boot. The stub's count hits 1
+  // the instant markReviewPromptAsked runs — before that write has necessarily reached the server — so a reload
+  // straight after could boot against an account that doesn't have the flag yet (a second ask). Wait for the
+  // queue to drain first, so the reload really does have the account's answer to adopt.
+  await page.waitForFunction(() => window.CascadeAccountStore.queue.length === 0, null, { timeout: 15_000 });
+
   // Reload (not a fresh onboarding run) — the point is the SAME device storage surviving into a new load.
   // Re-prime after the reload too: it's a real navigation, so the real vendor scripts reset window.Capacitor
   // right back, same as the very first load. The listing itself streams back in from local state.
