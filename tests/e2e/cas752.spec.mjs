@@ -55,6 +55,13 @@ async function seedFilms(page, cascadeId){
       e.wins = { stream: true };
       e.winsSource = { stream: "manual" };
     });
+    // CAS-1669: the one-agent Watch listing (CAS-1341) is the selected list's own pool, not "every film an agent
+    // lists" — pinnedTo/wins above no longer get a synthetic film onto the screen, so it was never rendered and
+    // #card-<id> was not found. Add both films to the selected list by hand (mood.in is always admitted),
+    // the same fix CAS-1667 made in cas1248.
+    if(!watchMoods.some(m => m && m.v2)) watchMoods = oamMoodDefaultsNow();
+    const mood = watchMoods.find(m => m && m.v2 && m.id === watchMoodSel) || watchMoods.find(m => m && m.v2);
+    if(mood) mood.in = [...(mood.in || []), a, b];
   }, { cascadeId, a: FILM_A, b: FILM_B });
 }
 
