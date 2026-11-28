@@ -133,6 +133,11 @@ test("CAS-753 AC5: a cinema/upcoming film (no offers) is unaffected by the toggl
   await page.evaluate(({ cascadeId, id }) => {
     MOVIES.push({ tmdb_id: id, title: "CAS-753 — Upcoming Untouched", status: ["upcoming"], offers: [] });
     entryFor(id).pinnedTo = [cascadeId];
+    // CAS-1677: the one-agent Watch listing is the selected list's own pool, so pinnedTo alone never renders the
+    // synthetic film; add it to the selected list by hand (as CAS-1676/CAS-1667/CAS-1669).
+    if(!watchMoods.some(m => m && m.v2)) watchMoods = oamMoodDefaultsNow();
+    const mood = watchMoods.find(m => m && m.v2 && m.id === watchMoodSel) || watchMoods.find(m => m && m.v2);
+    if(mood) mood.in = [...(mood.in || []), id];
   }, { cascadeId, id: FILM_UPCOMING });
   await page.evaluate(() => { prefs.sub.clear(); prefs.store.clear(); render(); });
   await settleListing(page);
