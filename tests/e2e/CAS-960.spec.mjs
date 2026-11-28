@@ -128,14 +128,17 @@ test("switches and pressed chips announce and update their state (CAS-960 AC4)",
   await page.locator(".moodchip.on").click();
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
 
-  const sw = page.locator("#watchMineOnlySwitch");
+  // CAS-1655: the one-agent app's mood sheet (openOamMoodSheetFor) replaced the legacy sheet and its
+  // #watchMineOnlySwitch; its switches are .mftog[role=switch] buttons inside the collapsed MORE FILTERS section.
+  await page.locator("#oamMoreSec .oamsechd").click();
+  const sw = page.locator("#oamMoreSec .mftog").first();
   await expect(sw).toHaveAttribute("role", "switch");
   const swBefore = await sw.getAttribute("aria-checked");
   expect(["true", "false"]).toContain(swBefore);
   await sw.click();
   await expect(sw).toHaveAttribute("aria-checked", swBefore === "true" ? "false" : "true");
 
-  const chip = page.locator("#watchSheetBody .chip:not([disabled])").first();
+  const chip = page.locator("#oamMoreSec .chip:not([disabled])").first();
   const chipBefore = await chip.getAttribute("aria-pressed");
   expect(["true", "false"]).toContain(chipBefore);
   await chip.click();
