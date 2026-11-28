@@ -354,7 +354,9 @@ test("LST-2: Best N is a hard maximum of N films in each stage, taken by score",
 });
 
 test("LST-3: a genre list shows only its genres", () => {
-  const com = film(["Comedy"], 80), dra = film(["Drama"], 80), hor = film(["Horror"], 80);
+  // CAS-1695: a list admits at the genre's top-25% bar (CAS-1690), which tracks the catalogue (Drama is 83 today), so the
+  // fixtures score 95 to clear it whatever the catalogue holds; this check is about genre selection, not the bar.
+  const com = film(["Comedy"], 95), dra = film(["Drama"], 95), hor = film(["Horror"], 95);
   withWorld([com, dra, hor], () => {
     const c = agent({Comedy:60, Drama:60, Horror:60});
     withAgent(c, () => {
