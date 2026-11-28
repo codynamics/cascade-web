@@ -181,6 +181,8 @@ async function assertNoOverflow(page, surfaceName) {
       if (el.offsetParent === null && el !== document.body) return;   // not rendered
       const style = getComputedStyle(el);
       if (style.visibility === "hidden" || style.display === "none") return;
+      // CAS-1658: a deliberately scrollable strip (e.g. .moodrow, overflow-x:auto) is not clipping.
+      if (style.overflowX === "auto" || style.overflowX === "scroll") return;
       if (el.scrollWidth > el.clientWidth + 1 && el.textContent && el.textContent.trim()) {
         bad.push(el.className || el.tagName);
       }

@@ -4445,7 +4445,10 @@
     border-radius:10px;background:var(--panel)!important;border:1px solid var(--line)!important;
     box-shadow:none!important;color:var(--dim)!important}
   .hdr-actions .modechip .mcicon{width:16px;height:16px}
-  .hdr-actions .modechip .mclabel{font:600 10.5px/1 var(--font-body);letter-spacing:.1px}
+  /* CAS-1658: at the largest text scale (--ui-scale 1.6) the 5-chip row is ~244 CSS px wide, so the 10.5px
+     "Database" label overflowed its chip. Shrink the label only past the shipped default (--zoomcomp is 1
+     there), floored at 70% so it still ends up larger on screen than at default. */
+  .hdr-actions .modechip .mclabel{font:600 calc(10.5px * max(.7, var(--zoomcomp)))/1 var(--font-body);letter-spacing:.1px}
   .hdr-actions .modechip.ag .mcicon{color:var(--dim)}
   .hdr-actions .modechip.active{background:var(--sel-bg)!important;border-color:var(--sel-bd)!important;
     color:#fff!important}
