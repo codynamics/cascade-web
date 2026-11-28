@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-11-27T20:31:19.151197+00:00",
+  "checked_at": "2026-11-28T06:01:26.510510+00:00",
   "checks": [
     {
       "name": "catalogue_size",
@@ -161,7 +161,7 @@
       "threshold": 0,
       "detail": "no email attempted this run \u2014 unavailable.",
       "status": "unknown",
-      "checked_at": "2026-11-27T20:31:19.151197+00:00"
+      "checked_at": "2026-11-28T06:01:26.510510+00:00"
     },
     {
       "name": "push_send",
@@ -170,7 +170,7 @@
       "threshold": 0,
       "detail": "APNs configured but no push attempted this run \u2014 unavailable.",
       "status": "unknown",
-      "checked_at": "2026-11-27T20:31:19.151197+00:00"
+      "checked_at": "2026-11-28T06:01:26.510510+00:00"
     }
   ],
   "ok": true
