@@ -22791,6 +22791,15 @@ function oneAgentStarterMoods(who, ages){
   const pick = id => ({...oamMoodDefaultFields(), ...ONE_AGENT_MOOD_BUILTINS.find(b=>b.id===id), ages, watched:true});
   const list = [pick("releases"),
     {...oamMoodDefaultFields(), id:"me", name:"Me", show:"40", ages, watched:true}];
+  // CAS-1701 (new accounts, at onboarding commit): Me mirrors the favourites step exactly (Off/Include/Favourite) at
+  // Best 80; Cinema releases keeps every genre on (the agent's) with its How far back at 1 year. `styles` holds every
+  // picked genre (♥ too) so a favourites-only Me never reads as the empty "every genre" list.
+  if(who.picks){
+    const picked=Object.keys(who.picks);
+    const me=list[1];
+    me.show="80"; me.styles=picked; me.favs=picked.filter(g=>who.picks[g]==="fav");
+    list[0].years=1;
+  }
   // Lee, 14 Nov: a mood for the streaming service they use most (named after it, default agent settings), and
   // one for each favourite actor/director (a keyword mood on their name). Ids are fixed so the Watch tutorial
   // can point at them.
@@ -22817,8 +22826,10 @@ function oneAgentBuildDraft(){
   const styles={};
   ONE_AGENT_SETUP_STYLES.forEach(s=>{
     const pick = oafState.favs[s];
-    if(!pick) return;   // unmarked: no entry at all — matchesCriteriaOneAgent's own "no style" gate
+    // CAS-1701: an unmarked genre is still ON for the agent (✓ bar 80, no alerts) — Cinema releases' ticks ARE the
+    // agent's, and onboarding Off has no effect on that list. Me's own Off comes from who.picks, not from here.
     const al={};
+    if(!pick){ ONE_AGENT_WINDOWS.forEach(w=>{ al[w.key]=false; }); styles[s]={bar:80, al}; return; }
     ONE_AGENT_WINDOWS.forEach(w=>{ al[w.key] = windows.some(x=>x.key===w.key) && pick==="fav"; });
     styles[s] = pick==="fav" ? {bar:60, al, fav:true} : {bar:80, al};
   });
@@ -22837,6 +22848,7 @@ function oneAgentBuildDraft(){
   Object.values(styles).forEach(v=>{ delete v.fromWho; });
   const ages = oafState.age==="under18" ? ["PG","M","MA 15+"] : ["M","MA 15+","R 18+"];
   const who = {
+    picks: Object.fromEntries(ONE_AGENT_SETUP_STYLES.filter(g=>oafState.favs[g]).map(g=>[g, oafState.favs[g]])),
     partner: oafState.partner==="yes",
     kids: oafHasChildrenStep() && oafState.children==="yes",
     dateStyles: oafState.partner==="yes" ? Object.keys(oafState.together) : [],

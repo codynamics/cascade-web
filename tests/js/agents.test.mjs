@@ -483,3 +483,13 @@ test("SHM-1: the monitor's admission shim agrees with the app for a v2 agent on 
     deq(inShim, inApp);
   });
 });
+
+test("CAS-1701: onboarding picks drive Me (mirrored, Best 80) and Cinema releases (1 yr back)", () => {
+  const list = E.oneAgentStarterMoods({ picks:{ Action:"fav", Drama:"incl" } }, ["M"]);
+  const me = list.find(m => m.id === "me");
+  assert.deepEqual(me.styles, ["Action","Drama"]);
+  assert.deepEqual(me.favs, ["Action"]);
+  assert.equal(me.show, "80");
+  assert.equal(list[0].years, 1);
+  assert.equal(E.oneAgentStarterMoods({}, ["M"])[0].years, 0, "repair path without picks is untouched");
+});

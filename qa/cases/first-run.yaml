@@ -12,6 +12,7 @@
     - tests/e2e/CAS-1350.spec.mjs
     - tests/e2e/CAS-1691.spec.mjs
     - tests/e2e/CAS-1692.spec.mjs
+    - tests/e2e/CAS-1700.spec.mjs
     - "#oafScreen"
     - oafOpen()
 - id: FIRSTRUN-002
