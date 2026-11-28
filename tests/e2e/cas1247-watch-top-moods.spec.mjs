@@ -130,17 +130,19 @@ test("a device that had saved the bar collapsed still boots open", async ({ page
 
 test("AC12: watchNavKey() differs between two moods that differ only in top", async ({ page }) => {
   await toWatchScreen(page);
-  const differ = await page.evaluate(() => {
-    const a = window.CascadePersistence.watchNavKey();
-    const mood = window.watchMoodsList ? window.watchMoodsList()[0] : null;
-    // Flip the selected mood's own `top` via the real save path so the live state (and the key) reflect it.
-    window.openMoodSheetFor(window.onMoodChipTap ? document.querySelector(".moodchip.on").dataset.mood : null);
-    document.getElementById("moodTop").click();
-    document.getElementById("moodSaveBtn").click();
-    const b = window.CascadePersistence.watchNavKey();
-    return a !== b;
-  });
-  expect(differ).toBe(true);
+  // CAS-1665: rewritten for the one-agent lists (CAS-1341/CAS-1491) — the v1 sheet's #moodTop/#moodSaveBtn and
+  // openMoodSheetFor are gone. The v2 equivalent of "Show top" is the list's SHOW cap (HOW MANY section): tap the
+  // selected chip to open its sheet, change Show, save, and the nav key must change.
+  const before = await page.evaluate(() => window.CascadePersistence.watchNavKey());
+  await page.locator(".moodchip.on").click();
+  await page.locator('#watchSheetBody .oamsec[data-sec="how"] .oamsechd').click();
+  const seg = page.locator('#watchSheetBody .mfseg[aria-label="Show"]');
+  const cur = await seg.locator('[aria-pressed="true"]').first().textContent();
+  await seg.locator("button", { hasText: /^Best 20$/ }).click();
+  expect(cur.trim()).not.toBe("Best 20");   // the list must change, else the key can't
+  await page.locator("#watchSheetBody .oamhead .donebtn").click();
+  const after = await page.evaluate(() => window.CascadePersistence.watchNavKey());
+  expect(after).not.toBe(before);
 });
 
 test("AC13: no stale selector for a removed control remains", async ({ page }) => {
