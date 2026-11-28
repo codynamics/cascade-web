@@ -23238,7 +23238,7 @@ function oafPaint(){
   else if(oafStep==="services") oafWireServices();
   else if(oafStep==="favourites") oafWireFavourites();
   else if(oafStep==="topSvc") $("oafTopSvcOpts").querySelectorAll(".chip[data-val]").forEach(c=>{
-      c.onclick=()=>{ oafState.topSvc=c.dataset.val; oafPaint(); };
+      c.onclick=()=>{ if(oafBusy) return; oafState.topSvc=c.dataset.val; oafPaint(); oafPopChosen(); };
     });
   else if(oafStep==="people") oafWirePeople();
   else if(oafStep==="done"){ oafFitTagRows(); oafAnimateDone(); }
@@ -23258,15 +23258,68 @@ function oafShow(key){
   $("oafScreen").scrollTop=0;
   oafLog("onbstep_shown", key);
 }
+// CAS-1700: services -> topSvc is a shared-element transition: the ticked streaming chips glide (FLIP, transform
+// only) from their place on `services` to their place on `topSvc`; a ghost of the old screen fades out over the
+// first 200 ms; the new heading/sub-line fade in over the last 250 ms. While it runs (oafBusy) a tap is dropped,
+// not queued (CAS-1206's rule). Reduced motion: a plain 150 ms cross-fade. Back is a plain cross-fade.
+let oafBusy = false;
+function oafFadeSwap(ms){
+  const inner=$("oafInner"); if(inner && inner.animate) inner.animate([{opacity:0},{opacity:1}], {duration:ms, easing:"ease-out"});
+}
+function oafFlyToTopSvc(){
+  const inner=$("oafInner");
+  if(!inner || !inner.animate) return oafShow("topSvc");
+  if(oaReducedMotion()){
+    oafBusy=true; oafShow("topSvc"); oafFadeSwap(150);
+    setTimeout(()=>{ oafBusy=false; }, 150);
+    return;
+  }
+  const first=new Map([...inner.querySelectorAll("#oafSvcSubs .chip.svc.on")].map(c=>[c.textContent.trim(), c.getBoundingClientRect()]));
+  const oldTop=inner.getBoundingClientRect().top, oldW=inner.getBoundingClientRect().width;
+  const ghost=inner.cloneNode(true);
+  ghost.querySelectorAll("#oafSvcSubs .chip.svc.on").forEach(c=>{ c.style.visibility="hidden"; });
+  ghost.querySelectorAll("[id]").forEach(e=>e.removeAttribute("id")); ghost.removeAttribute("id");
+  ghost.setAttribute("aria-hidden","true");
+  oafBusy=true;
+  oafShow("topSvc");
+  const cs=getComputedStyle(inner); if(cs.position==="static") inner.style.position="relative";
+  Object.assign(ghost.style, {position:"absolute", left:"0", top:(oldTop-inner.getBoundingClientRect().top)+"px", width:oldW+"px",
+    boxSizing:"border-box", pointerEvents:"none", margin:"0"});
+  inner.appendChild(ghost);
+  ghost.animate([{opacity:1},{opacity:0}], {duration:200, easing:"ease-out", fill:"forwards"});
+  inner.querySelectorAll(".osh,.ossub,.svcsech").forEach(e=>e.animate([{opacity:0},{opacity:1}],
+    {duration:250, delay:350, easing:"ease-out", fill:"backwards"}));
+  let n=0;
+  inner.querySelectorAll("#oafTopSvcOpts .chip").forEach(c=>{
+    const f=first.get(c.textContent.trim()); if(!f) return;
+    const l=c.getBoundingClientRect();
+    c.animate([{transform:`translate(${f.left-l.left}px,${f.top-l.top}px)`},{transform:"translate(0,0)"}],
+      {duration:450, delay:n*40, easing:"cubic-bezier(.2,.8,.2,1)", fill:"both"});
+    n++;
+  });
+  setTimeout(()=>{
+    ghost.remove(); inner.style.position="";
+    inner.getAnimations({subtree:true}).forEach(a=>a.cancel());
+    oafBusy=false;
+  }, Math.max(600, 450 + Math.max(0,n-1)*40) + 40);
+}
+// The tapped topSvc chip scales to ~1.08 with a soft glow for ~250 ms.
+function oafPopChosen(){
+  const el=document.querySelector("#oafTopSvcOpts .chip.on");
+  if(!el || !el.animate || oaReducedMotion()) return;
+  el.animate([{transform:"scale(1)", boxShadow:"0 0 0 rgba(124,92,255,0)"},
+    {transform:"scale(1.08)", boxShadow:"0 0 18px rgba(124,92,255,.55)", offset:.5},
+    {transform:"scale(1)", boxShadow:"0 0 0 rgba(124,92,255,0)"}], {duration:250, easing:"ease-out"});
+}
 window.oafGoContinue=()=>{
-  if(oafBlocked()) return;
+  if(oafBusy || oafBlocked()) return;
   oafForward=true;
   try{ oafGoContinueInner(); } finally { oafForward=false; }
 };
 function oafGoContinueInner(){
   if(oafStep==="welcome") return oafShow("who");
   if(oafStep==="who") return oafShow(oafHasServicesStep() ? "services" : "favourites");
-  if(oafStep==="services") return oafShow(oafHasTopSvcStep() ? "topSvc" : "favourites");
+  if(oafStep==="services") return oafHasTopSvcStep() ? oafFlyToTopSvc() : oafShow("favourites");
   if(oafStep==="topSvc") return oafShow("favourites");
   if(oafStep==="favourites") return oafShow("people");
   if(oafStep==="people") return oafShow("done");
@@ -23280,6 +23333,8 @@ function oafHide(){
 }
 const oafIsOpen = () => !!$("oafScreen") && $("oafScreen").classList.contains("open");
 window.oafGoBack=()=>{
+  if(oafBusy) return;
+  if(oafStep==="topSvc"){ oafShow("services"); oafFadeSwap(oaReducedMotion() ? 150 : 200); return; }
   if(oafStep==="welcome"){
     // Off the front of a new account's first run: out to the splash, the draft abandoned (CAS-1099 rule).
     if(oafMode==="migrate") return;
