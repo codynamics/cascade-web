@@ -20725,7 +20725,7 @@ function renderAgentsScreen(){
     const stale=(newest===null || newest>AGENT_STALE_DAYS);
     const whoLine=agentWhoLineText(c);
     return `
-    <div class="agrow agrank-${Math.min(rank,6)}" data-id="${escA(c.id)}">
+    <div role="listitem" class="agrow agrank-${Math.min(rank,6)}" data-id="${escA(c.id)}">
       <span class="agranker">
         <span class="agrank" aria-hidden="true">${rank}</span>
         <span class="aggrip" data-role="grip" role="button" tabindex="0"
@@ -20971,7 +20971,7 @@ function oaRowHTML(c, style, verdictCount, changed){
         <button type="button" class="oachev" onclick="oaToggleStyle('${escA(style)}')" aria-expanded="${open}" aria-label="${open?"Close":"Open"} ${escA(name)}"></button>
       </div>
     </div>`;
-  return `<div class="oarow${changed?" oa-changed":""}${open?" oa-open":""}" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
+  return `<div role="listitem" class="oarow${changed?" oa-changed":""}${open?" oa-open":""}" data-style="${escA(style)}">${head}${open?oaOpenBodyHTML(c, style):""}</div>`;
 }
 // CAS-1480: the Agent recommendations card (from CAS-1479's tasteRecs). Open state survives re-renders.
 let tasteRecsOpen=false;
