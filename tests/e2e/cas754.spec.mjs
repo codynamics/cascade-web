@@ -44,7 +44,8 @@ test("CAS-754 AC2: tapping every stop lights only it, and its listing leads with
     await expect(stop).toHaveClass(/\bon\b/);
     await expect(page.locator(".stgroups .stagestop.on")).toHaveCount(1);
     const keys = await groupKeys(page);
+    // CAS-1309: the Upcoming stage splits into "Next week" (upcoming_soon) then "Upcoming"; the pair leads.
     const i = keys.indexOf("upcoming");
-    if(i >= 0) expect(i, `stop ${key}: sections ${keys.join(",")}`).toBe(0);
+    if(i >= 0) expect(i, `stop ${key}: sections ${keys.join(",")}`).toBe(keys[0] === "upcoming_soon" ? 1 : 0);
   }
 });
