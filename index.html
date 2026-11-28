@@ -2252,6 +2252,20 @@
   .mbtx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
   .mbt{font-family:var(--font-display);font-weight:700;font-size:15.5px;color:var(--ink)}
   .membsub{margin:-2px 0 16px;color:var(--dim);font-size:15px}
+  /* CAS-1699: sign-up screen - the user's own five-poster fan, the count, and the free-month line. */
+  #membScreen .membh.one{text-align:left;margin-bottom:4px}
+  #membScreen .oafdposters{display:flex;justify-content:center;align-items:center;margin:8px 0 10px;height:100px}
+  #membScreen .oafdposter{width:62px;height:93px;border-radius:8px;background:#1b2130 center/cover;flex:none;margin-left:-14px;
+    box-shadow:0 6px 18px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.12);transform:rotate(var(--r)) translateY(var(--y))}
+  #membScreen .oafdposter:first-child{margin-left:0}
+  #membScreen .oafdposter:nth-child(1){--r:-10deg;--y:8px} #membScreen .oafdposter:nth-child(2){--r:-5deg;--y:2px}
+  #membScreen .oafdposter:nth-child(3){--r:0deg;--y:0px;z-index:1} #membScreen .oafdposter:nth-child(4){--r:5deg;--y:2px}
+  #membScreen .oafdposter:nth-child(5){--r:10deg;--y:8px}
+  #membScreen .oafdmore{margin-left:10px;font-size:12px;font-weight:700;color:var(--dim)}
+  #membScreen .membwait{margin:0;text-align:center;font-family:var(--font-display);font-weight:700;font-size:17px;color:#fff}
+  #membScreen .membfree{margin:2px 0 18px;text-align:center;color:var(--dim);font-size:15px}
+  #membScreen .membpromo #membPromoLink,#membScreen .pnote .linkbtn{font-weight:700;color:#cddcff;text-decoration:none}
+  #membScreen .membpromo #membPromoLink:hover,#membScreen .pnote .linkbtn:hover,#membScreen .pnote .linkbtn:focus{text-decoration:none}
   #membScreen .mbrow .oafwart{flex:none;width:52px;height:44px;border-radius:12px;display:grid;place-items:center;
     background:rgba(255,255,255,.05);border:1px solid var(--line);position:relative}
   #membScreen .mbrow .oafwflow{display:flex}
@@ -3139,14 +3153,25 @@
   #oafScreen .oafdbot svg circle{animation:oafwBlink 3s ease-in-out 1s infinite}
   #oafScreen .oafdtitle{margin:16px 0 2px;text-align:center}
   #oafScreen .oafdsub{margin:0;color:var(--dim);font-size:14px}
-  /* CAS-1691: Who's watching? — three icon tiles (lit = gradient + glow, dim = dark, ~35%) over three question cards. */
-  #oafScreen .whoicons{display:flex;justify-content:center;gap:18px;margin:18px 0 20px}
-  #oafScreen .whoitem{display:flex;flex-direction:column;align-items:center;gap:6px}
-  #oafScreen .whoico{width:68px;height:68px;border-radius:18px;display:flex;align-items:center;justify-content:center;
-    background:#161c2e;border:1px solid #232b44;opacity:.35;transition:opacity .3s ease,box-shadow .3s ease,transform .3s ease,background .3s ease}
-  #oafScreen .whoico svg{width:34px;height:34px}
-  #oafScreen .whoico.lit{background:var(--grad);border-color:transparent;opacity:1;box-shadow:0 0 22px rgba(124,92,255,.55);transform:scale(1.04)}
-  #oafScreen .wholabel{font-size:13px;font-weight:700;color:var(--ink)}
+  /* CAS-1699: Who watches movies with you? - three tiles are the controls (lit = gradient border + icon tile + glow). */
+  #oafScreen .whotiles{display:flex;gap:10px;margin:20px 0 14px;align-items:stretch}
+  #oafScreen .whotile{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;
+    padding:14px 8px 12px;border-radius:16px;border:1px solid #232b44;background:#12182a;color:var(--dim);font:inherit;cursor:pointer;
+    transition:border-color .3s ease,box-shadow .3s ease,background .3s ease}
+  #oafScreen .whotile.static{cursor:default}
+  #oafScreen .whotile .whoico{width:66px;height:66px;border-radius:18px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;
+    background:#161c2e;border:1px solid #232b44;transition:box-shadow .3s ease,background .3s ease}
+  #oafScreen .whotile .whoico svg{width:34px;height:34px}
+  #oafScreen .whotile .wholabel{font-size:15px;font-weight:700;color:var(--dim)}
+  #oafScreen .whotile .whoexp{font-size:12px;line-height:1.3;color:var(--dim)}
+  #oafScreen .whotile .whostat{font-size:12px;font-weight:700;margin-top:auto;padding-top:4px;color:var(--dim)}
+  #oafScreen .whotile.lit{border-color:rgba(56,189,248,.75);background:linear-gradient(#12182a,#12182a) padding-box,var(--grad) border-box;
+    box-shadow:0 0 18px rgba(124,92,255,.25)}
+  #oafScreen .whotile.lit .whoico{background:var(--grad);border-color:transparent;box-shadow:0 0 22px rgba(124,92,255,.55)}
+  #oafScreen .whotile.lit .wholabel{color:#fff}
+  #oafScreen .whotile.lit .whostat{color:var(--cyan)}
+  #oafScreen .whotile.static.lit .whostat{color:var(--dim)}
+  #oafScreen .whotile[aria-disabled="true"]{opacity:.4;cursor:not-allowed}
   #oafScreen .whorow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;margin-bottom:10px;border-radius:14px;background:#12182a;border:1px solid #232b44}
   #oafScreen .whotxt{display:flex;flex-direction:column;gap:2px;min-width:0}
   #oafScreen .whotxt b{font-size:15px;color:var(--ink)}
@@ -3154,7 +3179,7 @@
   #oafScreen .whopills{display:flex;gap:8px;flex:0 0 auto}
   #oafScreen .whopill{min-width:58px;padding:9px 14px;border-radius:999px;border:1px solid #2c3552;background:#161c2e;color:var(--ink);font-size:14px;font-weight:700;cursor:pointer}
   #oafScreen .whopill.on{background:var(--grad);border-color:transparent;color:#fff}
-  @media (prefers-reduced-motion:reduce){ #oafScreen .whoico{transition:none} }
+  @media (prefers-reduced-motion:reduce){ #oafScreen .whotile,#oafScreen .whotile .whoico{transition:none} }
   #oafScreen .oafdcount{display:flex;flex-direction:column;align-items:center;margin:18px 0 10px;
     animation:oafwIn .6s ease .3s both}
   #oafScreen .oafdcount b{font-family:Poppins,system-ui,sans-serif;font-size:44px;line-height:1;font-weight:700;
@@ -22725,14 +22750,11 @@ function oafActiveWindows(){
 // The counted sequence the progress rail reads its position from — grows as the partner/age answers reveal
 // more of the branch actually ahead, the same approximate-until-answered shape "services" already had.
 function oafCountedKeys(){
-  // CAS-1691: welcome, who, services, topSvc, favourites, together, family, people, done.
+  // CAS-1699: welcome, who, services, topSvc, favourites, people, done (the together/family screens are gone).
   const keys=["welcome","who"];
   if(oafHasServicesStep()) keys.push("services");
   if(oafHasTopSvcStep()) keys.push("topSvc");
-  keys.push("favourites");
-  if(oafState.partner==="yes") keys.push("together");
-  if(oafHasChildrenStep() && oafState.children==="yes") keys.push("family");
-  keys.push("people","done");
+  keys.push("favourites","people","done");
   return keys;
 }
 function oafProgressPct(key){
@@ -22790,6 +22812,7 @@ function oneAgentStarterMoods(who, ages){
 // live wizard state but with no side effect of its own (CAS-1347's "expose the draft and the commit
 // separately").
 function oneAgentBuildDraft(){
+  oafSeedWhoLists();
   const windows = oafActiveWindows();
   const styles={};
   ONE_AGENT_SETUP_STYLES.forEach(s=>{
@@ -22949,7 +22972,7 @@ function oafFavCellHTML(style, picks){
 function oafFavouritesHTML(){
   const n = ONE_AGENT_SETUP_STYLES.filter(s=>oafState.favs[s]==="fav").length;
   return `<h2 class="osh">Your favourite genres</h2>
-    <p class="ossub">If you don't like it, switch it off. If you love it, make it a favourite.</p>
+    <p class="ossub">Switch on the genres you like. Make the ones you love a favourite.</p>
     ${oafFavLegendHTML()}
     <div class="favgrid" id="oafFavGrid">${oafFavGridCellsHTML(oafState.favs)}</div>
     <p class="ossub" style="margin-top:10px">${n} favourite${n===1?"":"s"}${n>3?" · fewer gives sharper lists":""}</p>`;
@@ -23006,10 +23029,22 @@ function oafWirePeople(){
     sync();
   });
 }
-// CAS-1691: one "Who's watching?" step replaces the old age, partner and children steps. It writes exactly the
-// fields they did (oafState.age / partner / children), so together, family, ratings and the lists are unchanged.
+// CAS-1699: "Who watches movies with you?" - the tiles are the controls. Writes oafState.age / partner / children.
+// The Partner and Family lists are seeded from the same defaults the removed together/family screens preselected,
+// so a person who never sees those screens gets exactly what Continue-without-changes used to give.
 const OAF_WHO_ICON_1 = `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.6-3.8 3.4-5.8 7-5.8s6.4 2 7 5.8"/></svg>`;
 const OAF_WHO_ICON_2 = `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="3"/><circle cx="16.5" cy="9.5" r="2.6"/><path d="M2.5 19.5c.5-3.2 2.8-5 6-5s5.5 1.8 6 5"/><path d="M15.5 14.6c3 0 5.3 1.5 6 4.6"/></svg>`;
+function oafSeedWhoLists(){
+  if(!oafState) return;
+  if(oafState.partner==="yes" && !oafState.togetherInit){
+    oafState.together=Object.fromEntries(ONE_AGENT_TOGETHER_DEFAULT.map(g=>[g,"incl"]));
+    oafState.togetherInit=true;
+  }
+  if(oafState.children==="yes" && !oafState.familyInit){
+    oafState.family=Object.fromEntries(ONE_AGENT_FAMILY_DEFAULT.map(g=>[g,"incl"]));
+    oafState.familyInit=true;
+  }
+}
 function oafWhoPillsHTML(field, left, right){
   const cur = oafState[field];
   return `<span class="whopills" role="group" aria-label="${escA(left[1])} or ${escA(right[1])}">${[left,right].map(([val,label])=>
@@ -23018,65 +23053,62 @@ function oafWhoPillsHTML(field, left, right){
 function oafWhoRowHTML(field, q, sub, left, right){
   return `<div class="whorow" id="oafWho_${field}"><span class="whotxt"><b>${esc(q)}</b><small>${esc(sub)}</small></span>${oafWhoPillsHTML(field,left,right)}</div>`;
 }
+function oafWhoTileState(key){
+  if(key==="you") return {lit:true, disabled:false, status:"Always on"};
+  if(key==="partner"){ const on=oafState.partner==="yes"; return {lit:on, disabled:false, status:on?"✓ Added":"Tap to add"}; }
+  const on=oafState.children==="yes" && oafState.age!=="under18";
+  return {lit:on, disabled:oafState.age==="under18", status:on?"✓ Added":"Tap to add"};
+}
+function oafWhoTileHTML(key, label, explainer, svg){
+  const t=oafWhoTileState(key);
+  const inner=`<span class="whoico">${svg}</span><span class="wholabel">${esc(label)}</span><span class="whoexp">${esc(explainer)}</span><span class="whostat">${t.status}</span>`;
+  if(key==="you") return `<div class="whotile static lit" data-who="you">${inner}</div>`;
+  return `<button type="button" class="whotile${t.lit?" lit":""}" data-who="${key}" aria-pressed="${t.lit}"${t.disabled?' aria-disabled="true"':""}>${inner}</button>`;
+}
 function oafWhoHTML(){
-  const ico = (key, label, lit, svg) => `<span class="whoitem"><span class="whoico${lit?" lit":""}" data-who="${key}">${svg}</span><span class="wholabel">${label}</span></span>`;
-  return `<h2 class="osh">Who's watching?</h2>
-    <p class="ossub">Tell us who's on the couch. We'll make a list for each of you.</p>
-    <div class="whoicons">${ico("you","You",true,OAF_WHO_ICON_1)}${ico("partner","Partner",oafState.partner==="yes",OAF_WHO_ICON_1)}${ico("family","Family",oafState.children==="yes" && oafHasChildrenStep(),OAF_WHO_ICON_2)}</div>
-    ${oafWhoRowHTML("age","How old are you?","Sets the age ratings you see",["under18","Under 18"],["18plus","18+"])}
-    ${oafWhoRowHTML("partner","Watch with a partner?","Adds a Partner list",["no","No"],["yes","Yes"])}
-    ${oafHasChildrenStep() ? oafWhoRowHTML("children","Watch with young kids?","Adds a Family list",["no","No"],["yes","Yes"]) : ""}`;
+  return `<h2 class="osh">Who watches movies with you?</h2>
+    <p class="ossub">Tap anyone you regularly watch with. Each gets their own list of films you'll all enjoy.</p>
+    <div class="whotiles">${oafWhoTileHTML("you","Just me","Your own list",OAF_WHO_ICON_1)}${oafWhoTileHTML("partner","My partner","Films for the two of you",OAF_WHO_ICON_1)}${oafWhoTileHTML("children","Young kids","Family-friendly films",OAF_WHO_ICON_2)}</div>
+    ${oafWhoRowHTML("age","How old are you?","Sets the age ratings you see",["under18","Under 18"],["18plus","18+"])}`;
 }
 function oafWireWho(){
   const root=$("oafInner"); if(!root) return;
   root.querySelectorAll(".whopill[data-field]").forEach(b=>{
     b.onclick=()=>{
-      const field=b.dataset.field, val=b.dataset.val;
-      const prevAge=oafState.age;
-      oafState[field]=val;
-      // Under 18 hides the kids row and answers it "no"; coming back to 18+ shows it unanswered.
-      if(field==="age" && val==="under18") oafState.children="no";
-      else if(field==="age" && val==="18plus" && prevAge!=="18plus") oafState.children=null;
-      if(field==="partner" && val==="yes" && !oafState.togetherInit){
-        // Pre-tick Date night with ONE_AGENT_TOGETHER_DEFAULT the first time Yes is picked — never again, so
-        // a later edit to the grid survives tapping Yes/No/Yes.
-        oafState.together=Object.fromEntries(ONE_AGENT_TOGETHER_DEFAULT.map(g=>[g,"incl"]));
-        oafState.togetherInit=true;
-      }
-      if(field==="children" && val==="yes" && !oafState.familyInit){
-        oafState.family=Object.fromEntries(ONE_AGENT_FAMILY_DEFAULT.map(g=>[g,"incl"]));
-        oafState.familyInit=true;
-      }
+      oafState.age=b.dataset.val;
+      if(oafState.age==="under18") oafState.children="no";   // the Young kids tile is disabled for under-18s
+      oafPaintWhoInPlace();
+    };
+  });
+  root.querySelectorAll(".whotile[data-who]").forEach(t=>{
+    if(t.dataset.who==="you") return;
+    t.onclick=()=>{
+      if(t.getAttribute("aria-disabled")==="true") return;
+      if(t.dataset.who==="partner") oafState.partner = oafState.partner==="yes" ? "no" : "yes";
+      else oafState.children = oafState.children==="yes" ? "no" : "yes";
+      oafSeedWhoLists();
       oafPaintWhoInPlace();
     };
   });
 }
-// Repaints only the rows/pills/CTA (not the icon tiles) so a lit tile animates instead of being rebuilt.
+// Updates the tiles/pills/CTA in place (no rebuild) so a lit tile animates.
 function oafPaintWhoInPlace(){
-  const lit = {partner:oafState.partner==="yes", family:oafHasChildrenStep() && oafState.children==="yes"};
   const root=$("oafInner"); if(!root) return;
-  root.querySelectorAll(".whoico[data-who]").forEach(el=>{ const k=el.dataset.who; el.classList.toggle("lit", k==="you" ? true : !!lit[k]); });
-  // Rebuild the rows (row 3 appears/disappears with the age answer).
-  const rows=root.querySelectorAll(".whorow"); rows.forEach(r=>r.remove());
-  root.insertAdjacentHTML("beforeend",
-    oafWhoRowHTML("age","How old are you?","Sets the age ratings you see",["under18","Under 18"],["18plus","18+"]) +
-    oafWhoRowHTML("partner","Watch with a partner?","Adds a Partner list",["no","No"],["yes","Yes"]) +
-    (oafHasChildrenStep() ? oafWhoRowHTML("children","Watch with young kids?","Adds a Family list",["no","No"],["yes","Yes"]) : ""));
-  oafWireWho();
+  root.querySelectorAll(".whotile[data-who]").forEach(el=>{
+    const t=oafWhoTileState(el.dataset.who);
+    el.classList.toggle("lit", t.lit);
+    if(el.dataset.who!=="you"){
+      el.setAttribute("aria-pressed", String(t.lit));
+      if(t.disabled) el.setAttribute("aria-disabled","true"); else el.removeAttribute("aria-disabled");
+    }
+    const st=el.querySelector(".whostat"); if(st) st.textContent=t.status;
+  });
+  root.querySelectorAll(".whopill[data-field]").forEach(b=>{
+    const on=oafState[b.dataset.field]===b.dataset.val;
+    b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on));
+  });
   const cta=$("oafCta"); if(cta){ const b=oafBlocked(); cta.disabled=b; cta.classList.toggle("blocked", b); }
   $("oafFill").style.width = oafProgressPct(oafStep)+"%";
-}
-function oafTogetherHTML(){
-  return `<h2 class="osh">What do you watch together?</h2>
-    <p class="ossub">Switch on the genres for your <b>Partner</b> list, and ♥ the ones you watch together most.</p>
-    ${oafFavLegendHTML()}
-    <div class="favgrid" id="oafTogetherGrid">${oafFavGridCellsHTML(oafState.together)}</div>`;
-}
-function oafFamilyHTML(){
-  return `<h2 class="osh">What do you watch as a family?</h2>
-    <p class="ossub">We've switched on the usual ones. Change them as you like, and ♥ the family favourites.</p>
-    ${oafFavLegendHTML()}
-    <div class="favgrid" id="oafFamilyGrid">${oafFavGridCellsHTML(oafState.family)}</div>`;
 }
 // "Alerts for your favourites" — one row per active window, naming every ♥ genre (the only genres that ever
 // get an alert — see oneAgentBuildDraft).
@@ -23124,7 +23156,8 @@ function oafDoneHTML(){
   // Lee, 14 Nov: three blocks — genres (♥ first, then the rest; two lines max), the stages on a line of their
   // own, then services in short names (two lines max). A block that won't fit ends on a "+N more" chip
   // (oafFitTagRows trims it after layout). Partner/Family are moods, not answers to play back here.
-  const others = ONE_AGENT_SETUP_STYLES.filter(st=>draft.styles[st] && oafState.favs[st]!=="fav").map(oneAgentShortName);
+  // CAS-1699: only the person's own picks - a genre the agent turned on just for Partner/Family stays on but isn't listed.
+  const others = ONE_AGENT_SETUP_STYLES.filter(st=>oafState.favs[st]==="incl").map(oneAgentShortName);
   const svcs = [...(prefs.sub||[])].map(oafSvcTagName);
   const tagRow = (cls, tags) => `<div class="oafdrow ${cls}" data-fit="2">${tags.join("")}<span class="oafdtag more" hidden></span></div>`;
   const told =
@@ -23178,7 +23211,7 @@ function oafAnimateDone(){
   requestAnimationFrame(step);
 }
 function oafBlocked(){
-  if(oafStep==="who") return !oafState.age || !oafState.partner || (oafHasChildrenStep() && !oafState.children);
+  if(oafStep==="who") return !oafState.age;
   if(oafStep==="favourites") return oafFavCount()===0;
   if(oafStep==="topSvc") return !oafState.topSvc;
   return false;
@@ -23187,8 +23220,7 @@ function oafBlocked(){
 // position, so a chip toggle's own repaint (a chip toggle) doesn't jump the screen back to the top.
 function oafPaint(){
   const fns = {welcome:oafWelcomeHTML, who:oafWhoHTML, services:oafServicesHTML, favourites:oafFavouritesHTML,
-    topSvc:oafTopSvcHTML, people:oafPeopleHTML, together:oafTogetherHTML,
-    family:oafFamilyHTML, done:oafDoneHTML};
+    topSvc:oafTopSvcHTML, people:oafPeopleHTML, done:oafDoneHTML};
   const inner=$("oafInner"); if(!inner) return;
   inner.innerHTML = fns[oafStep]();
   // CAS-1344: a migration cannot be skipped. Lee, 13 Nov: done is a finished state — no way back from it.
@@ -23209,12 +23241,10 @@ function oafPaint(){
       c.onclick=()=>{ oafState.topSvc=c.dataset.val; oafPaint(); };
     });
   else if(oafStep==="people") oafWirePeople();
-  else if(oafStep==="together") oafWireFavGrid("oafTogetherGrid", oafState.together);
-  else if(oafStep==="family") oafWireFavGrid("oafFamilyGrid", oafState.family);
   else if(oafStep==="done"){ oafFitTagRows(); oafAnimateDone(); }
 }
 // CAS-1513: first-run step events. data.step = "oaf_" + the step key; a migration (oafMode "migrate") logs none.
-const OAF_ORDER = ["welcome","who","services","topSvc","favourites","together","family","people","done"];
+const OAF_ORDER = ["welcome","who","services","topSvc","favourites","people","done"];
 let oafForward = false;   // true only while oafGoContinue is moving the person on (vs Back / first paint)
 function oafLog(type, key){ if(oafMode!=="migrate") logEvent(type, {step:"oaf_"+key}); }
 function oafShow(key){
@@ -23238,13 +23268,9 @@ function oafGoContinueInner(){
   if(oafStep==="who") return oafShow(oafHasServicesStep() ? "services" : "favourites");
   if(oafStep==="services") return oafShow(oafHasTopSvcStep() ? "topSvc" : "favourites");
   if(oafStep==="topSvc") return oafShow("favourites");
-  if(oafStep==="favourites") return oafShow(oafNextAfterFavourites());
-  if(oafStep==="together") return oafShow(oafWantsFamily() ? "family" : "people");
-  if(oafStep==="family") return oafShow("people");
+  if(oafStep==="favourites") return oafShow("people");
   if(oafStep==="people") return oafShow("done");
 }
-const oafWantsFamily = () => oafHasChildrenStep() && oafState.children==="yes";
-function oafNextAfterFavourites(){ return oafState.partner==="yes" ? "together" : oafWantsFamily() ? "family" : "people"; }
 // Closes the overlay chrome without touching oafState/draft (shared by Start watching, Back-to-splash and the
 // hand-off to membership).
 function oafHide(){
@@ -23264,9 +23290,7 @@ window.oafGoBack=()=>{
   if(oafStep==="services") return oafShow("who");
   if(oafStep==="topSvc") return oafShow("services");
   if(oafStep==="favourites") return oafShow(oafHasTopSvcStep() ? "topSvc" : oafHasServicesStep() ? "services" : "who");
-  if(oafStep==="together") return oafShow("favourites");
-  if(oafStep==="family") return oafShow(oafState.partner==="yes" ? "together" : "favourites");
-  if(oafStep==="people") return oafShow(oafWantsFamily() ? "family" : oafState.partner==="yes" ? "together" : "favourites");
+  if(oafStep==="people") return oafShow("favourites");
   if(oafStep==="done") return oafShow("people");
 };
 // Entry point — flowStart() opens it for a brand-new account ({mode:"new"}); afterSignIn() opens it for a
@@ -23280,8 +23304,8 @@ window.oafOpen=(opts)=>{
   oafMode = opts.mode==="migrate" ? "migrate" : "new";
   oafPendingDraft=null;
   oafState = {
-    // Lee, 13 Nov (pm): every genre starts on ✓ (the middle setting).
-    where: new Set(["cinema","rent","stream"]), favs: Object.fromEntries(ONE_AGENT_SETUP_STYLES.map(g=>[g,"incl"])), age: null, partner: null, children: null,
+    // CAS-1699: every genre starts Off; partner and kids start unlit.
+    where: new Set(["cinema","rent","stream"]), favs: {}, age: null, partner: "no", children: "no",
     together: {}, togetherInit: false, family: {}, familyInit: false,
     name: "", topSvc: null, person: "",
   };
@@ -25130,11 +25154,15 @@ function openOnbMembership(){
   const needsEmail = membNeedsEmail();
   const agents = onbFlow.workingAgents || [];
   const posters = onbMembershipFilms(agents).slice(0, MEMB_POSTERS).map(rvPosterHTML).join("");
+  // CAS-1699: the same five-poster fan the done screen showed (the user's own films) and the same count.
+  const own = oafPendingDraft ? oafDraftMatches(oafPendingDraft).filter(m=>m.poster).slice(0,5) : [];
+  const fan = own.length
+    ? `<div class="oafdposters" aria-hidden="true">${own.map(m=>`<div class="oafdposter" style="background-image:url(https://image.tmdb.org/t/p/w185${m.poster})"></div>`).join("")}<span class="oafdmore">+ more</span></div>
+       <p class="membwait" id="membWait">${Number(oafDoneFound).toLocaleString()} films waiting for you</p>` : "";
   $("membBody").innerHTML = `
     <span class="cascpill" id="membPill">CASCADE</span>
-    <div class="membtop">Membership</div>
-    <h2 class="membh" id="membHead">Become a Cascade member</h2>
-    <p class="membsub" id="membSub">Join to start watching. Your first month is free.</p>
+    <h2 class="membh${needsEmail?" one":""}" id="membHead">${needsEmail?"Become a member":"Become a Cascade member"}</h2>
+    ${needsEmail ? `${fan}<p class="membfree" id="membFree">Your first month is free.</p>` : `<p class="membsub" id="membSub">Join to start watching. Your first month is free.</p>`}
     <div class="membenefits">
       ${OB_MEMB_BENEFITS.map(b=>`<div class="mbrow">${b.art}
         <span class="mbtx"><span class="mbt">${b.html}</span></span></div>`).join("")}
@@ -25162,8 +25190,8 @@ function openOnbMembership(){
         <button type="button" class="linkbtn" id="membResend" onclick="membResendCode()"
                 style="vertical-align:baseline">Resend code</button></p>
     </div>
-    <p class="pnote">By continuing you agree to our
-      <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button> and the
+    <p class="pnote">By becoming a member you agree to our
+      <button type="button" class="linkbtn" onclick="openPrivacy('membership')">Privacy policy</button> and
       <a class="linkbtn" href="${MEMB_TERMS_URL}" target="_blank" rel="noopener">Terms of Use</a>.</p>` : ""}
     <p class="fielderr" id="membPurchaseMsg" hidden></p>
     <button class="membcta" type="button" onclick="membStart()">${esc(membCtaLabel())}</button>
@@ -25289,7 +25317,7 @@ function membSetStateAVisible(visible){
   const d = visible ? "" : "none";
   // Lee, 14 Nov: the privacy consent line shows once, with the email it applies to, not again on the code step.
   // Lee, 16 Nov: the First month free box is the email step's only; the code step just asks for the code.
-  [$("membPill"), $("membOffer"), body.querySelector(".membhaul"), body.querySelector(".membenefits"),
+  [$("membPill"), $("membOffer"), $("membFree"), $("membWait"), body.querySelector(".oafdposters"), body.querySelector(".membhaul"), body.querySelector(".membenefits"),
    body.querySelector(".memfine"), $("membEmailField"), $("membPromo"), $("membPosterGrid"),
    // The privacy line specifically — the first .pnote is #membCodeMsg, which holds Change email (CAS-1445).
    body.querySelector('.pnote button[onclick^="openPrivacy"]')?.closest(".pnote")]
@@ -25315,6 +25343,7 @@ function membShowCodeState(email){
   const head=$("membHead");
   if(head && membHeadingSaved===null){ membHeadingSaved=head.textContent; head.textContent="Check your email"; }
   membSetStateAVisible(false);
+  const cta=document.querySelector(".membcta"); if(cta && !cta.classList.contains("busy")) cta.textContent=membCtaLabel();
   const scr=$("membScreen"); if(scr) scr.scrollTop=0;
 }
 // B9: back to State A — email editable and focused, code step gone, countdown stopped, both errors clear.
@@ -25590,7 +25619,7 @@ function membOfferHTML(){
 function membHasFreeTrial(p){ return !!(p && p.introductoryPrice && Number(p.introductoryPrice.price)===0); }
 function membCtaLabel(){
   // Lee, 23 Nov: on the email step this screen is plainly a sign-up — say so on the button.
-  if(membNeedsEmail()) return "Become a member";
+  if(membNeedsEmail()) return membInCodeState ? "Continue" : "Become a member";   // CAS-1699: the code step's button just continues
   if(!membIsNativeApp()) return "Continue";
   return (membProduct && !membHasFreeTrial(membProduct)) ? "Subscribe" : "Start free trial";
 }

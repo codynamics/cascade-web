@@ -265,12 +265,13 @@ export async function walkToServices(page, kind){
   await expect(page.locator("#oafSvcStores")).toBeVisible();             // services
 }
 
-/** CAS-1691: answer every visible row of the "Who's watching?" step (18+, no partner, no kids by default). */
+/** CAS-1699: answer the "Who watches movies with you?" step - the age pill, then tap the partner / kids tiles if wanted
+ * (both start unlit; the Young kids tile is disabled for Under 18). */
 export async function answerWho(page, { age = "18plus", partner = "no", children = "no" } = {}){
-  await expect(page.locator("#oafInner .osh")).toHaveText("Who's watching?");
+  await expect(page.locator("#oafInner .osh")).toHaveText("Who watches movies with you?");
   await page.locator(`.whopill[data-field="age"][data-val="${age}"]`).click();
-  await page.locator(`.whopill[data-field="partner"][data-val="${partner}"]`).click();
-  if(age === "18plus") await page.locator(`.whopill[data-field="children"][data-val="${children}"]`).click();
+  if(partner === "yes") await page.locator('.whotile[data-who="partner"]').click();
+  if(children === "yes" && age === "18plus") await page.locator('.whotile[data-who="children"]').click();
 }
 
 /** Every card on the shortlist, as {name, countText, count}. */
@@ -303,7 +304,7 @@ export const ctaCount = page => ctaLocator(page).textContent().then(numberIn);
  * a roster-wide figure read off onbFlow.workingAgents, whichever generator committed it. */
 export async function finishFlow(page){
   // CAS-1344: from the services step (or wherever the caller left the one-agent flow) to membership:
-  // CAS-1691: services -> favourites (one genre on) -> people -> done -> Start watching (who is answered by walkToServices).
+  // CAS-1699: services -> favourites (one genre on) -> people -> done -> Start watching (who is answered by walkToServices).
   const cta = page.locator("#oafCta");
   const step = () => page.evaluate(() => oafStep);
   for(let i = 0; i < 20; i++){

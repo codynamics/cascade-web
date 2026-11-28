@@ -154,10 +154,8 @@ test("real user on the deployed site", async ({ page }) => {
     const cta = page.locator("#oafCta");
     await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");
     await cta.click();
-    await expect(page.locator("#oafInner .osh")).toHaveText("Who's watching?");
+    await expect(page.locator("#oafInner .osh")).toHaveText("Who watches movies with you?");
     await page.locator('.whopill[data-field="age"][data-val="18plus"]').click();
-    await page.locator('.whopill[data-field="partner"][data-val="no"]').click();
-    await page.locator('.whopill[data-field="children"][data-val="no"]').click();
     await cta.click();
     await expect(page.locator("#oafSvcStores")).toBeVisible();
     for(let i = 0; i < 20; i++){

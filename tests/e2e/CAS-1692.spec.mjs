@@ -92,10 +92,10 @@ test("CAS-1692 AC1/AC2: the onboarding done screen shows no 'Nova' and has no na
   const cta = page.locator("#oafCta");
   await cta.click();                                           // welcome -> who
   await page.locator('.whopill[data-field="age"][data-val="under18"]').click();
-  await page.locator('.whopill[data-field="partner"][data-val="no"]').click();
   await cta.click();                                           // who -> services
   await page.evaluate(n => { prefs.sub.clear(); prefs.sub.add([...SUB_SERVICES][0]); oafState.name = n; }, NAME);
   await cta.click();                                           // services -> favourites
+  await page.locator('.favcell[data-style="Action"] .favtoggle').click();
   await cta.click();                                           // favourites -> people
   await cta.click();                                           // people -> done
   await expect(page.locator("#oafInner .osh")).toHaveText("Your agent is ready.");

@@ -58,7 +58,7 @@ test("the app loads and onboarding renders", async ({ page }) => {
   // fixed 120ms wait below.
   await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");   // CAS-1344: one-agent welcome
   await page.locator("#oafCta").click();
-  await expect(page.locator("#oafInner .osh")).toContainText("Who's watching?");
+  await expect(page.locator("#oafInner .osh")).toContainText("Who watches movies with you?");
 });
 
 // CAS-911: onboarding generates its roster from the v2 sequence's own four-agent generator
@@ -847,7 +847,7 @@ test("CAS-740 AC4: a signed-in user whose account already holds agents is never 
   await page.locator("#splashCta").click();
   await expect(page.locator("#oafInner .osh")).toContainText("Let's get you set up.");   // CAS-1344: one-agent welcome
   await page.locator("#oafCta").click();
-  await expect(page.locator("#oafInner .osh")).toContainText("Who's watching?");   // proves the wizard actually opened
+  await expect(page.locator("#oafInner .osh")).toContainText("Who watches movies with you?");   // proves the wizard actually opened
 
   // Now let the session restore resolve to an account that already holds an agent.
   await page.evaluate(() => window.__cas740ResolveSession());

@@ -72,7 +72,7 @@ test.describe("CAS-960 axe scan — zero serious/critical on the five named surf
     await freshApp(page);
     await page.locator("#splashCta").click();
     await page.locator("#oafCta").click();
-    await expect(page.locator("#oafInner .osh")).toHaveText("Who's watching?");
+    await expect(page.locator("#oafInner .osh")).toHaveText("Who watches movies with you?");
     const { serious } = await scanSurface(page, "onboarding — #oafScreen who", "#oafScreen");
     expect(serious.map(v => v.id)).toEqual([]);
     const unnamed = await page.evaluate(() => [...document.querySelectorAll("#oafScreen button, #oafScreen .obopt")]

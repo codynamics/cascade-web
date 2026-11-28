@@ -19,8 +19,8 @@ async function expectHeadingBelowHeader(page){
   expect(oshBox.y).toBeGreaterThanOrEqual(hdrBox.y + hdrBox.height);
 }
 
-// CAS-1691: the order is welcome, who, services, topSvc, favourites, together, family, people, done.
-test("CAS-1350/CAS-1691: the first run completes end to end, welcome through Start watching — partner and kids both yes", async ({ page }) => {
+// CAS-1699: the order is welcome, who, services, topSvc, favourites, people, done (no together/family screens).
+test("CAS-1350/CAS-1699: the first run completes end to end, welcome through Start watching — partner and kids both on", async ({ page }) => {
   await freshApp(page);
   await page.evaluate(() => window.oafOpen());
 
@@ -29,12 +29,12 @@ test("CAS-1350/CAS-1691: the first run completes end to end, welcome through Sta
   await expectHeadingBelowHeader(page);
   await page.locator("#oafCta").click();   // welcome -> who
 
-  await expect(page.locator("#oafInner .osh")).toHaveText("Who's watching?");
+  await expect(page.locator("#oafInner .osh")).toHaveText("Who watches movies with you?");
   await expectHeadingBelowHeader(page);
   await expect(page.locator("#oafCta")).toBeDisabled();
   await page.locator('.whopill[data-field="age"][data-val="18plus"]').click();
-  await page.locator('.whopill[data-field="partner"][data-val="yes"]').click();
-  await page.locator('.whopill[data-field="children"][data-val="yes"]').click();
+  await page.locator('.whotile[data-who="partner"]').click();
+  await page.locator('.whotile[data-who="children"]').click();
   await expect(page.locator("#oafCta")).toBeEnabled();
   await page.locator("#oafCta").click();   // who -> services
 
@@ -44,49 +44,18 @@ test("CAS-1350/CAS-1691: the first run completes end to end, welcome through Sta
   await expect(page.locator("#oafSvcSubs")).toBeVisible();
   await page.locator("#oafCta").click();   // services -> favourites (under 2 streaming services: no topSvc)
 
-  // Lee, 13 Nov (pm): every genre starts on ✓, so Continue is ready at once; switching every genre Off
-  // disables it again (CAS-1368's "at least one genre" rule still holds).
+  // CAS-1699: every genre starts Off, so Continue is disabled until at least one is Include or Favourite.
   await expect(page.locator("#oafInner .osh")).toHaveText("Your favourite genres");
   await expectHeadingBelowHeader(page);
-  await expect(page.locator('.favcell[data-style="Comedy"]')).toHaveClass(/ on incl/);
-  await expect(page.locator("#oafCta")).toBeEnabled();
-  await page.evaluate(() => document.querySelectorAll("#oafFavGrid .favbtn.off").forEach(b => b.click()));
+  await expect(page.locator('.favcell[data-style="Comedy"]')).not.toHaveClass(/ on/);
   await expect(page.locator("#oafCta")).toBeDisabled();
   await page.locator('.favcell[data-style="Action"] .favbtn.heart').click();
   await page.locator('.favcell[data-style="Drama"] .favbtn.check').click();
   await expect(page.locator('.favcell[data-style="Action"]')).toHaveClass(/fav/);
   await expect(page.locator('.favcell[data-style="Drama"]')).toHaveClass(/incl/);
   await expect(page.locator("#oafCta")).toBeEnabled();
-  await page.locator("#oafCta").click();   // favourites -> together (partner yes)
+  await page.locator("#oafCta").click();   // favourites -> people (no together, no family screens)
 
-  await expect(page.locator("#oafInner .osh")).toHaveText("What do you watch together?");
-  await expectHeadingBelowHeader(page);
-  // Lee, 11 Nov: Date night pre-ticks a fixed five (ONE_AGENT_TOGETHER_DEFAULT), not the person's own picks.
-  for(const s of ["Comedy","Documentary","Romance","Mystery","Drama"])
-    await expect(page.locator(`.favcell[data-style="${s}"]`)).toHaveClass(/ on incl/);   // Lee, 13 Nov: middle setting
-  await expect(page.locator('.favcell[data-style="Action"]')).not.toHaveClass(/on/);
-  await page.locator("#oafCta").click();   // together -> family (kids yes)
-
-  await expect(page.locator("#oafInner .osh")).toHaveText("What do you watch as a family?");
-  await expectHeadingBelowHeader(page);
-  await expect(page.locator('.favcell[data-style="Family"]')).toHaveClass(/on/);
-  await expect(page.locator('.favcell[data-style="Animation"]')).toHaveClass(/on/);
-  await page.locator("#oafCta").click();   // family -> people
-
-  // Lee, 14 Nov: an optional favourite actor or director (one box); empty, the CTA reads Skip.
-  await expect(page.locator("#oafInner .osh")).toHaveText("A favourite actor or director?");
-  await expectHeadingBelowHeader(page);
-  await expect(page.locator("#oafCta")).toHaveText("Skip");
-  await page.locator("#oafCta").click();   // people -> done
-
-  await expect(page.locator("#oafInner .osh")).toHaveText("Your agent is ready.");
-  await expectHeadingBelowHeader(page);
-  await expect(page.locator("#oafInner .oafdtold .oafdtoldh")).toHaveText("Your agent is working for you");
-  await expect(page.locator("#oafDoneCount")).not.toHaveText("0", { timeout: 4000 });
-  await expect(page.locator("#oafCta")).toHaveText("Proceed");
-  // CAS-1368: the moods table follows the answers (partner+kids both yes) — and the done screen shows it (Lee, 13 Nov).
-  await expect(page.locator("#oafInner .oafdmood"))
-    .toHaveText(["Cinema releases", "Me", "Partner", "Family"]);   // no Starred (Lee, 14 Nov)
   await page.locator("#oafCta").click();
 
   // CAS-1361 part 1: after Start watching, the setup header/nav must not float over Watch underneath.
@@ -95,14 +64,14 @@ test("CAS-1350/CAS-1691: the first run completes end to end, welcome through Sta
   await expect(page.locator("#oafNav")).toBeHidden();
 });
 
-test("CAS-1368 AC1: under 18 skips family, and 'No' to partner skips together", async ({ page }) => {
+test("CAS-1699: under 18 with no partner goes favourites -> people", async ({ page }) => {
   await freshApp(page);
   await page.evaluate(() => window.oafOpen());
   await page.locator("#oafCta").click();   // welcome -> who
   await page.locator('.whopill[data-field="age"][data-val="under18"]').click();
-  await page.locator('.whopill[data-field="partner"][data-val="no"]').click();
   await page.locator("#oafCta").click();   // who -> services
   await page.locator("#oafCta").click();   // services -> favourites
+  await page.locator('.favcell[data-style="Action"] .favtoggle').click();
   await page.locator("#oafCta").click();   // favourites -> people (no together, no family)
 
   await expect(page.locator("#oafInner .osh")).toHaveText("A favourite actor or director?");
@@ -113,12 +82,11 @@ test("CAS-1350 AC3: '‹ Back' from the services step shows the who step visibly
   await page.evaluate(() => window.oafOpen());
   await page.locator("#oafCta").click();   // welcome -> who
   await page.locator('.whopill[data-field="age"][data-val="under18"]').click();
-  await page.locator('.whopill[data-field="partner"][data-val="no"]').click();
   await page.locator("#oafCta").click();   // who -> services
 
   await expect(page.locator("#oafInner .osh")).toHaveText("Which services do you have?");
   await page.locator("#oafBack").click();   // services' own back
 
   await expect(page.locator("#oafScreen")).toHaveClass(/open/);
-  await expect(page.locator("#oafInner .osh")).toHaveText("Who's watching?");
+  await expect(page.locator("#oafInner .osh")).toHaveText("Who watches movies with you?");
 });
