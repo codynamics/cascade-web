@@ -3139,7 +3139,8 @@
     90%,100%{left:34px;background:var(--green);box-shadow:0 0 8px var(--green)}}
   @media (prefers-reduced-motion:reduce){
     #oafScreen .oafwbeat,#oafScreen .oafwclose{animation:none;opacity:1;transform:none}
-    #oafScreen .oafwfilm,#oafScreen .oafwico.alerts,#oafScreen .oafwico.agent svg circle{animation:none}
+    #oafScreen .oafwfilm,#oafScreen .oafwico.alerts,#oafScreen .oafwico.agent svg circle,
+    #membScreen .oafwfilm,#membScreen .oafwico.agent svg circle{animation:none}
   }
   /* Done screen (Lee, 13 Nov pm): the agent comes alive, counts what it has found, plays back the answers. */
   #oafScreen .oafdhero{display:flex;flex-direction:column;align-items:center;text-align:center;margin:6px 0 4px}
@@ -3220,6 +3221,7 @@
   @media (prefers-reduced-motion:reduce){
     #oafScreen .oafdbot,#oafScreen .oafdbot .ring,#oafScreen .oafdcount,#oafScreen .oafdposter,#oafScreen .oafdmore,
     #oafScreen .oafdtold,#oafScreen .oafdmood{animation:none;opacity:1}
+    #oafScreen .oafdbot svg circle{animation:none}
   }
   #oafScreen .obintrotext{font-size:15.5px}
   #oafScreen .ossub{font-size:14.5px}
