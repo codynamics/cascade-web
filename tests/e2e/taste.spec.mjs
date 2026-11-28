@@ -73,25 +73,33 @@ test("CAS-1551 taste: a genre's alert can be turned off and on, and each state s
   const chip = () => rowOf().locator(".oachip", { hasText: "Cinema" });
   const openRow = async () => { await rowOf().locator(".oarowleft").click(); await expect(chip()).toBeVisible(); };
 
+  // CAS-1680: a guest device keeps no agents of its own (loadCascades() is a placeholder returning [], the agent
+  // lives on the account store since CAS-1109/CAS-1222), so a guest reload boots with no agent and the old
+  // "survives reload" step waited on cascades.length > 0 forever. "Each state saves" is asserted at the save
+  // chokepoint instead: every toggle must call saveCascades() with the new alert state already in place.
+  await page.evaluate(s => {
+    window.__tasteSaves = [];
+    const orig = saveCascades;
+    saveCascades = function(){ window.__tasteSaves.push(!!oneAgentCriteria().styles[s].al.cinema); return orig.apply(this, arguments); };
+  }, style);
+  const saves = () => page.evaluate(() => window.__tasteSaves.slice());
+
   await openRow();
   if(!(await alertOn())) await chip().click();          // start from ON so "off then on" is what is tested
   expect(await alertOn()).toBe(true);
+  await page.evaluate(() => { window.__tasteSaves.length = 0; });
 
   await chip().click();                                  // off
   await expect.poll(alertOn).toBe(false);
   await expect(chip()).toHaveAttribute("aria-pressed", "false");
-  await reloadApp(page);
-  expect(await alertOn()).toBe(false);
+  expect(await saves()).toEqual([false]);
 
-  await openTaste(page);
-  await openRow();
   await chip().click();                                  // on again
   await expect.poll(alertOn).toBe(true);
   await expect(chip()).toHaveAttribute("aria-pressed", "true");
   const d = await dots();
   expect(d.drawn).toBe(d.expected);
-  await reloadApp(page);
-  expect(await alertOn()).toBe(true);
+  expect(await saves()).toEqual([false, true]);
 });
 
 /** Two (or more, until the engine proposes something) disliked verdicts on one main|sub-genre combo of real
