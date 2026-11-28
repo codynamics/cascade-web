@@ -34,6 +34,12 @@ async function seedStreamFilms(page, cascadeId){
       e.wins = { stream: true };
       e.winsSource = { stream: "manual" };
     });
+    // CAS-1676: the one-agent Watch listing (CAS-1341) is the selected list's own pool, not "every film an agent
+    // lists" — pinnedTo/wins above no longer get a synthetic film onto the screen, so the AC4 dead end never
+    // rendered. Add both films to the selected list by hand (mood.in is always admitted), as CAS-1667/CAS-1669.
+    if(!watchMoods.some(m => m && m.v2)) watchMoods = oamMoodDefaultsNow();
+    const mood = watchMoods.find(m => m && m.v2 && m.id === watchMoodSel) || watchMoods.find(m => m && m.v2);
+    if(mood) mood.in = [...(mood.in || []), onId, offId];
   }, { cascadeId, onId: FILM_ON, offId: FILM_OFF });
 }
 
