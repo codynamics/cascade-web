@@ -360,6 +360,10 @@ export async function toListing(page, opts = {}){
   }
   await expect(page.locator("#membScreen.open")).toBeHidden({ timeout: 30_000 });
   await settleListing(page);
+  if(!skipTutorial){
+    // CAS-1702: the tour no longer opens by itself after sign-up; callers that want to see it start it as a banner would.
+    await page.evaluate(() => startTutorialV2());
+  }
   if(skipTutorial){
     const tour = page.locator("#tutScrim.open");
     // maybeStartTutorial() (already called synchronously above, inside membStartWork) schedules the

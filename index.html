@@ -4878,6 +4878,11 @@
   .tutbans{font-size:12px;color:#aab3c5;margin-top:1px}
   .tutbango{flex:none;background:#7C5CFF;color:#fff;border:0;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:800}
   .tutbanx{flex:none;background:none;border:0;color:#8b95a5;font-size:18px;padding:2px 4px}
+  /* CAS-1702: a soft glow, 3 pulses over ~8.4s, then still. Alerts' head is sticky; with the banner in it, let it scroll. */
+  @keyframes tutbanpulse{0%,100%{box-shadow:0 0 0 0 rgba(124,92,255,0)}50%{box-shadow:0 0 22px rgba(124,92,255,.45),0 0 0 1px #22d3ee}}
+  .tutban,.tutbanic{animation:tutbanpulse 2.8s ease-in-out 3}
+  @media (prefers-reduced-motion:reduce){.tutban,.tutbanic{animation:none}}
+  .mvhead:has(.tutban){position:static}
   /* CAS-1566: Watch reminder / Taste card (verbatim from the ticket) */
   .rnudge{display:flex;align-items:center;gap:10px;margin:10px 12px;padding:12px;border-radius:14px;background:rgba(124,92,255,.14);border:1px solid rgba(124,92,255,.55)}
   .rnudge .ic{flex:none;width:34px;height:34px;border-radius:50%;background:#7C5CFF;display:flex;align-items:center;justify-content:center;font-size:17px}
@@ -5105,6 +5110,7 @@
        mean something, and the order is visible in the list itself. -->
   <div>
     <div id="listChrome"></div>
+    <div id="tutbanSlot"></div>
     <div id="rnudgeSlot"></div>
     <div id="groups"></div>
   </div>
@@ -23858,7 +23864,7 @@ window.openAgentsScreen=()=>{
   $("agentsBtn").classList.add("active"); $("agentsBtn").setAttribute("aria-pressed","true");
   syncWatchChip();
   logEvent("agents_screen_opened",{count:cascades.length});
-  tutBannerAfterFirst("agent", $("agentsBody"));   // CAS-1534
+  tutBannerAfter("agent", $("agentsBody"), ".ossub");   // CAS-1534
 };
 window.closeAgentsScreen=()=>{
   oaScreenOrder=null;    // Lee, 2026-11-22: rows re-sort on the next visit, never mid-visit
@@ -23887,7 +23893,7 @@ window.openMovingScreen=()=>{
   syncHeaderHeight();   // CAS-1475: renderMovingScreen ran before .open, so --stickyh still held the Watch value
   syncWatchChip();
   logEvent("moving_screen_opened",{});
-  tutBannerAfterFirst("alerts", $("movingBody"));   // CAS-1534
+  tutBannerBefore("alerts", $("movingBody"), ".mvwindows");   // CAS-1534
 };
 window.closeMovingScreen=()=>{
   movingIsOpen=false;
@@ -24261,7 +24267,7 @@ window.openFindScreen=()=>{
   $("findBtn").classList.add("active"); $("findBtn").setAttribute("aria-pressed","true");
   syncWatchChip();
   logEvent("find_screen_opened",{});
-  tutBannerAfterFirst("find", $("findBody"));   // CAS-1534
+  tutBannerAfter("find", $("findBody"), "h2.osh");   // CAS-1534
 };
 window.closeFindScreen=()=>{
   $("findScreen").classList.remove("open"); lockBodyScroll(false);
@@ -24290,6 +24296,7 @@ window.showAgentsHome=()=>{
 // Where & when, Tags, About — and Your Movies itself, in the unlikely event it's ever reopened) is open.
 // Called from every .uscreen's own open/close pair.
 function syncWatchChip(){
+  tutWatchBannerSync();   // CAS-1702: Watch's banner draws when the listing is what's showing
   const showing=!document.querySelector(".uscreen.open");
   // CAS-752: this runs on every .uscreen's own open/close pair, so `showing` flips true exactly when a
   // covering screen closes and the listing is what's visible again — "navigating away and back" in the
@@ -26054,11 +26061,16 @@ function markTourV2Seen(){ tourV2SeenFlag=true; pushViewField("tourV2Seen", true
 // or returns to the foreground after 30 minutes away.
 let tutSeenMap={};
 let tutVisitShown=false, tutHiddenAt=0;
-const TUT_BANNER_MAX_DISMISS=2, TUT_VISIT_GAP_MS=30*60*1000;
+// CAS-1702: banners are per key, from day one, on a member's first TUT_BANNER_MAX_SHOWN visits to that screen (a
+// visit = app open / foreground after 30 min away), each at most once per visit; no app-wide one-per-visit
+// limit; X hides it for the visit only and counts as one showing. tutSeen = {key:{played, dismissed, shown}}.
+const TUT_BANNER_MAX_SHOWN=3, TUT_VISIT_GAP_MS=30*60*1000;
+let tutVisitState={};   // key -> "shown" | "dismissed", for this visit only
 const TUT_BANNERS={
-  agent:  {key:"agent",    title:"New to Taste?"},
-  alerts: {key:"alerts",   title:"New to Alerts?"},
-  find:   {key:"database", title:"New to Database?"},
+  watch:  {key:"watch",    title:"New to Cascade? Take the tour",   sub:"1 minute · see how Watch works"},
+  agent:  {key:"agent",    title:"New to Taste? Take the tour",     sub:"1 minute · see how your agent learns"},
+  alerts: {key:"alerts",   title:"New to Alerts? Take the tour",    sub:"1 minute · see what your agent tells you"},
+  find:   {key:"database", title:"New to Database? Take the tour",  sub:"1 minute · search every film, anywhere"},
   moods:  {key:"moods",    title:"New to Lists?"},
   friends:{key:"invite",   title:"Inviting friends?"},
   invites:{key:"invite",   title:"Inviting friends?"},
@@ -26071,22 +26083,21 @@ function tutAccountAgeDays(createdAt, now){
   return Math.round((Date.parse(tutSydneyDay(now)+"T00:00:00Z")-Date.parse(tutSydneyDay(c)+"T00:00:00Z"))/86400000);
 }
 // The decision, pure: should a banner for tutorial `key` show now?
-//   o: {key, now, createdAt, signedIn, seen, steps, shownThisVisit, blocked}
+//   o: {key, now, createdAt, signedIn, seen, steps, visit, blocked}   (visit: this visit's state for the key)
 // Signed-out visitors never see one (no account, so no creation day, and `invite` is signed-in only).
 function tutBannerDecide(o){
   if(!o || !o.key || !o.signedIn) return false;
-  if(o.blocked || o.shownThisVisit) return false;
-  if(o.key==="alerts" && !(o.steps>1)) return false;   // Alerts is a 1-step placeholder until it has more
+  if(o.blocked || o.visit==="dismissed") return false;
   if(!(o.steps>0)) return false;
-  if(tutAccountAgeDays(o.createdAt, o.now)<1) return false;
   const s=(o.seen||{})[o.key];
   if(s && s.played) return false;
-  if(s && (s.dismissed||0)>=TUT_BANNER_MAX_DISMISS) return false;
+  if(o.visit==="shown") return true;   // already counted this visit: a re-render redraws it
+  if(s && (s.shown||0)>=TUT_BANNER_MAX_SHOWN) return false;
   return true;
 }
 function tutMarkPlayed(key){
   if(!key) return;
-  const s=tutSeenMap[key]||(tutSeenMap[key]={played:false, dismissed:0});
+  const s=tutSeenMap[key]||(tutSeenMap[key]={played:false, dismissed:0, shown:0});
   if(s.played) return;
   s.played=true;
   pushViewField("tutSeen", tutSeenMap);
@@ -26096,8 +26107,8 @@ function tutAdoptSeen(v){
   if(!v || typeof v!=="object") return;
   for(const k in v){
     const r=v[k]; if(!r || typeof r!=="object") continue;
-    const l=tutSeenMap[k]||{played:false, dismissed:0};
-    tutSeenMap[k]={played:!!(l.played||r.played), dismissed:Math.max(l.dismissed||0, +r.dismissed||0)};
+    const l=tutSeenMap[k]||{played:false, dismissed:0, shown:0};
+    tutSeenMap[k]={played:!!(l.played||r.played), dismissed:Math.max(l.dismissed||0, +r.dismissed||0), shown:Math.max(l.shown||0, +r.shown||0)};
   }
 }
 function tutBannerBlocked(screen){
@@ -26111,13 +26122,13 @@ function tutBannerCheck(screen){
   const a=window.CascadeAuth;
   const signedIn=!!(a && a.enabled && a.status==="signed-in" && a.user);
   return tutBannerDecide({key:cfg.key, now:Date.now(), createdAt:signedIn?a.user.created_at:null, signedIn,
-    seen:tutSeenMap, steps:(TOURS[cfg.key]||{steps:[]}).steps.length, shownThisVisit:tutVisitShown,
+    seen:tutSeenMap, steps:(TOURS[cfg.key]||{steps:[]}).steps.length, visit:tutVisitState[cfg.key],
     blocked:tutBannerBlocked(screen)});
 }
 function tutBannerHTML(cfg){
   return `<div class="tutban" role="note">
   <span class="tutbanic" aria-hidden="true">▶</span>
-  <div class="tutbantx"><div class="tutbant">${esc(cfg.title)}</div><div class="tutbans">Quick tour</div></div>
+  <div class="tutbantx"><div class="tutbant">${esc(cfg.title)}</div><div class="tutbans">${esc(cfg.sub||"Quick tour")}</div></div>
   <button type="button" class="tutbango" data-tut="${cfg.key}">View tutorial</button>
   <button type="button" class="tutbanx" aria-label="Dismiss">✕</button>
 </div>`;
@@ -26133,11 +26144,41 @@ function tutBannerMount(screen, host, place){
   el.dataset.scr=screen;
   place(el);
   tutVisitShown=true;
-  logEvent("tutorial_banner_shown",{key:cfg.key, screen});
+  if(tutVisitState[cfg.key]!=="shown"){
+    tutVisitState[cfg.key]="shown";
+    const sn=tutSeenMap[cfg.key]||(tutSeenMap[cfg.key]={played:false, dismissed:0, shown:0});
+    sn.shown=(sn.shown||0)+1;
+    pushViewField("tutSeen", tutSeenMap);
+    logEvent("tutorial_banner_shown",{key:cfg.key, screen});
+  }
 }
 function tutBannerAfterFirst(screen, host){
   if(!host) return;
   tutBannerMount(screen, host, el=>{ const f=host.firstElementChild; f ? f.after(el) : host.prepend(el); });
+}
+// CAS-1702: per-screen placements (Taste: under "Built from..."; Alerts: above Period; Database: under the heading).
+function tutBannerAfter(screen, host, sel){
+  if(!host) return;
+  tutBannerMount(screen, host, el=>{ const a=host.querySelector(sel); a ? a.after(el) : host.prepend(el); });
+}
+function tutBannerBefore(screen, host, sel){
+  if(!host) return;
+  tutBannerMount(screen, host, el=>{ const a=host.querySelector(sel); a ? a.before(el) : host.prepend(el); });
+}
+// Watch: the slot sits under the list chips + status boxes (#listChrome), above the first section header.
+function tutWatchBannerSync(){
+  const slot=$("tutbanSlot"); if(!slot) return;
+  const open=!!document.querySelector("#movingScreen.open,#agentsScreen.open,#findScreen.open");
+  if(open){ return; }
+  if(!accountFanoutSettled() || tutBannerBlocked("watch")){ slot.innerHTML=""; return; }
+  tutBannerMount("watch", slot, el=>slot.prepend(el));
+}
+// Back to the foreground after a new visit began: draw whatever screen is showing.
+function tutResyncVisible(){
+  if($("agentsScreen").classList.contains("open")) tutBannerAfter("agent", $("agentsBody"), ".ossub");
+  else if($("movingScreen").classList.contains("open")) tutBannerBefore("alerts", $("movingBody"), ".mvwindows");
+  else if($("findScreen").classList.contains("open")) tutBannerAfter("find", $("findBody"), "h2.osh");
+  else tutWatchBannerSync();
 }
 function tutBannerMountCard(copies){
   copies.forEach(c=>{
@@ -26154,8 +26195,9 @@ document.addEventListener("click", e=>{
     t.remove();
     playTutorial(cfg.key);
   } else if(e.target.closest(".tutbanx")){
-    const s=tutSeenMap[cfg.key]||(tutSeenMap[cfg.key]={played:false, dismissed:0});
+    const s=tutSeenMap[cfg.key]||(tutSeenMap[cfg.key]={played:false, dismissed:0, shown:0});
     s.dismissed=(s.dismissed||0)+1;
+    tutVisitState[cfg.key]="dismissed";
     pushViewField("tutSeen", tutSeenMap);
     logEvent("tutorial_banner_dismiss",{key:cfg.key, screen});
     t.remove();
@@ -26245,7 +26287,7 @@ document.addEventListener("click", e=>{
 });
 document.addEventListener("visibilitychange", ()=>{
   if(document.visibilityState==="hidden"){ tutHiddenAt=Date.now(); return; }
-  if(tutHiddenAt && Date.now()-tutHiddenAt>=TUT_VISIT_GAP_MS){ tutVisitShown=false; rnudgeVisit=null; rnudgeVisitGone=false; }
+  if(tutHiddenAt && Date.now()-tutHiddenAt>=TUT_VISIT_GAP_MS){ tutVisitShown=false; tutVisitState={}; rnudgeVisit=null; rnudgeVisitGone=false; tutHiddenAt=0; tutResyncVisible(); return; }
   tutHiddenAt=0;
 });
 // Card text for this script is set via innerHTML (the ticket's own "¶ = <br><br>" rule, spec verbatim) —
@@ -26564,6 +26606,7 @@ function tutResolveStep(step){
 // right after onboarding, per CAS-962, must win over the tour starting underneath it).
 // CAS-1119: a #/film/ route counts as "the film page" even in the instant before openFilmPage() has run.
 function maybeStartTutorial(){
+  return;   // CAS-1702: no automatic tour after sign-up; tours start from a banner or the Tutorials screen
   if(!onboardingSeen() || !cascades.length) return;
   if(filmRouteId()!=null || document.querySelector(".uscreen.open,.modal.open,.wsheetscrim.open,.filmpage.open")) return;
   if(oneAgentCriteria()){
@@ -27456,6 +27499,7 @@ function render(){
   renderCallCount++;
   renderGen++;   // CAS-129: supersede any card-fill still streaming from a previous render
   const myGen=renderGen;   // CAS-421: only THIS render may lift the blur it didn't set
+  tutWatchBannerSync();   // CAS-1702
   if(accountFanoutSettled()) rnudgeSync();   // CAS-1566
   if(!accountFanoutSettled()){
     $("groups").innerHTML = accountLoadingHTML();
