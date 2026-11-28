@@ -13,7 +13,9 @@ const SEEDED_CASCADE = { id: "1551aaaa-0000-4000-8000-000000000001", user_id: "c
   name: "Existing agent", criteria: {}, created_at: "2020-01-01T00:00:00.000Z" };
 
 function fakeSupabaseScript(approved, signedOut = false){
-  return `
+  // Wrapped in an IIFE: this is a classic script sharing the page's global lexical scope, so a top-level
+  // const here (SESSION, SEEDED_CASCADE) collides with the app's own top-level declarations and the app never boots.
+  return `;(function(){
     window.__rpcCalls = [];
     window.__signOutCalls = 0;
     const SEEDED_CASCADE = ${JSON.stringify(SEEDED_CASCADE)};
@@ -45,7 +47,7 @@ function fakeSupabaseScript(approved, signedOut = false){
         },
       };
     } };
-  `;
+  })();`;
 }
 
 async function bootSignedIn(page, approved, signedOut = false){
