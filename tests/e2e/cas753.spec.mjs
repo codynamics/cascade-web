@@ -86,7 +86,10 @@ test("CAS-753 AC1/AC2: default on hides a film only on an unpicked service; the 
   expect(after).toBeGreaterThan(before);
 });
 
-test("CAS-753 AC3: the toggle persists across a reload; a brand new list still starts on", async ({ page }) => {
+// CAS-1675: CAS-1247 (C4) retired the toggle's own persistence — mineOnly now rides inside whichever mood is
+// applied/saved (app_template.html ~11741), so a bare setWatchMineOnly(false) is session-only and a reload
+// lands back on the default, on. The app is right; this asserts that, not the retired persistence.
+test("CAS-753 AC3: the toggle no longer persists on its own across a reload; a brand new list still starts on", async ({ page }) => {
   await toWatchScreen(page, "stream");
   // CAS-1150 requeue: pin to "stream" explicitly rather than reading watchMineOnly[watchTab] — watchTab
   // itself is never persisted (pickLandingWatchTab re-derives it from the catalogue on every boot,
@@ -98,7 +101,7 @@ test("CAS-753 AC3: the toggle persists across a reload; a brand new list still s
 
   await page.reload();
   await page.waitForFunction(() => typeof flowStart === "function" && Array.isArray(MOVIES));
-  expect(await page.evaluate(() => watchMineOnly.stream)).toBe(false);
+  expect(await page.evaluate(() => watchMineOnly.stream)).toBe(true);
 
   // A record this device has never seen before (nothing stored yet) takes the default — on.
   await page.evaluate(() => localStorage.removeItem("cascade_watch_mineonly"));
