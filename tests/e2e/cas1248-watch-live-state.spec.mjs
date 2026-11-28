@@ -141,8 +141,9 @@ test("AC3: renaming the selected mood updates its chip and the collapsed-bar sum
   const selectedId = await page.locator(".moodchip.on").getAttribute("data-mood");
   await page.locator(".moodchip.on").click();   // tapping the already-selected chip opens its sheet (C5)
   await expect(page.locator("#watchSheet")).toHaveClass(/open/);
-  await page.locator("#moodName").fill("Best ten");
-  await page.locator("#moodSaveBtn").click();
+  await // CAS-1668: one-agent sheet (CAS-1341/1491) — name input is #oamMoodName, Save is .oamhead .donebtn.
+  await page.locator("#oamMoodName").fill("Best ten");
+  await page.locator("#watchSheetBody .oamhead .donebtn").click();
 
   expect(await page.evaluate(id => watchMoodsList().find(m => m.id === id).name, selectedId),
     "sanity: the mood must actually have been renamed").toBe("Best ten");
