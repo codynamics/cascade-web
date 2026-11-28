@@ -183,6 +183,10 @@ async function assertNoOverflow(page, surfaceName) {
       if (style.visibility === "hidden" || style.display === "none") return;
       // CAS-1658: a deliberately scrollable strip (e.g. .moodrow, overflow-x:auto) is not clipping.
       if (style.overflowX === "auto" || style.overflowX === "scroll") return;
+      // CAS-1659: deliberate single-line truncation (text-overflow:ellipsis — .titletext, .metaline, .clab, or
+      // a .cap whose .saveline ellipsizes) shows the cut with an ellipsis; that is designed, not clipping.
+      if (style.textOverflow === "ellipsis" ||
+          [...el.querySelectorAll("*")].some(d => getComputedStyle(d).textOverflow === "ellipsis")) return;
       if (el.scrollWidth > el.clientWidth + 1 && el.textContent && el.textContent.trim()) {
         bad.push(el.className || el.tagName);
       }
