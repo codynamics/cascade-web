@@ -8,7 +8,7 @@ import { test, expect } from "@playwright/test";
 import { bootAlreadySignedIn } from "./helpers.mjs";
 
 const SEEDED_CASCADE = { id: "932aaaa1-0000-4000-8000-000000000001", user_id: "cas932-user",
-  name: "Existing agent", criteria: {}, created_at: "2020-01-01T00:00:00.000Z" };
+  name: "Existing agent", criteria: { v: 2, styles: {}, combo: {} }, created_at: "2020-01-01T00:00:00.000Z" };
 
 function fakeSupabaseScript(){
   return `
