@@ -45,19 +45,11 @@ test("AC1/AC2/AC3: stage groups, moods, and the removed controls", async ({ page
     expect(await page.locator(sel).count(), sel).toBe(0);
   }
 
-  // AC3: the two default moods, Top scores selected, filt.sort "cascade"; tapping Releases flips both.
+  // AC3 (CAS-1662: rewritten for the one-agent lists, CAS-1491/CAS-1693 — the old Top scores/Releases pair is
+  // gone): the built-in list is "releases", named Cinema releases, pinned first and selected on open.
   const chipNames = await page.locator(".moodchip").allTextContents();
-  expect(chipNames[0]).toContain("Top scores");
-  expect(chipNames[1]).toContain("Releases");
-  await expect(page.locator('.moodchip[data-mood="top"]')).toHaveClass(/\bon\b/);
-  await expect(page.locator('.moodchip[data-mood="releases"]')).not.toHaveClass(/\bon\b/);
-  expect(await page.evaluate(() => filt.sort)).toBe("cascade");
-
-  await page.locator('.moodchip[data-mood="releases"]').click();
-  await settleListing(page);
-  await expect(page.locator('.moodchip[data-mood="releases"]')).toHaveClass(/\bon\b/);
-  await expect(page.locator('.moodchip[data-mood="top"]')).not.toHaveClass(/\bon\b/);
-  expect(await page.evaluate(() => filt.sort)).toBe("cinema");
+  expect(chipNames[0]).toContain("Cinema releases");
+  await expect(page.locator('.moodchip[data-mood="releases"]')).toHaveClass(/on/);
 });
 
 test("AC5: no account write on boot; selecting a mood pushes exactly one mood field", async ({ page }) => {
